@@ -1,0 +1,42 @@
+{
+  "name": "corbium",
+  "productName": "GDLauncher",
+  "private": true,
+  "version": "2.0.0",
+  "description": "GDLauncher Carbon.",
+  "author": "killpowa <davide@gdlauncher.com>",
+  "license": "ARR",
+  "main": "dist/main/index.cjs",
+  "scripts": {
+    "dev": "node scripts/watch.mjs",
+    "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config electron-builder.config.js",
+    "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json",
+    "napi-build-mac-x86_64": "cd packages/napi && npm run build-mac-x86_64",
+    "napi-build-mac-aarch64": "cd packages/napi && npm run build-mac-aarch64"
+  },
+  "engines": {
+    "node": ">=18.6.0"
+  },
+  "dependencies": {
+    "electron-store": "^8.0.2"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.10.1",
+    "autoprefixer": "^10.4.7",
+    "cross-env": "^7.0.3",
+    "electron": "^19.0.8",
+    "electron-builder": "^23.1.0",
+    "postcss": "^8.4.14",
+    "solid-app-router": "^0.4.1",
+    "solid-js": "^1.4.7",
+    "tailwindcss": "^3.1.6",
+    "typescript": "^4.7.4",
+    "vite": "^3.0.0",
+    "vite-plugin-resolve": "^2.1.2",
+    "vite-plugin-solid": "^2.3.0"
+  },
+  "env": {
+    "//": "Used in build scripts",
+    "PORT": 3344
+  }
+}
