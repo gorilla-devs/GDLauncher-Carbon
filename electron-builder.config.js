@@ -51,19 +51,30 @@ module.exports = {
     const { spawnSync } = require("child_process");
     const { promises: fs } = require("fs");
 
-    if (context.arch === 1) {
-      // x64
-      // exec npm run napi-build
-      spawnSync("npm", ["run", "napi-build-mac-x86_64"], {
-        stdio: "inherit",
-        shell: true,
-      });
-    } else if (context.arch === 3) {
-      // arm64
-      spawnSync("npm", ["run", "napi-build-mac-aarch64"], {
-        stdio: "inherit",
-        shell: true,
-      });
+    if (context.electronPlatformName === "darwin") {
+      if (context.arch === 1) {
+        // x64
+        // exec npm run napi-build
+        spawnSync("npm", ["run", "napi-build-mac-x86_64"], {
+          stdio: "inherit",
+          shell: true,
+        });
+      } else if (context.arch === 3) {
+        // arm64
+        spawnSync("npm", ["run", "napi-build-mac-aarch64"], {
+          stdio: "inherit",
+          shell: true,
+        });
+      }
+    } else if (context.electronPlatformName === "win32") {
+      if (context.arch === 1) {
+        // x64
+        // exec npm run napi-build
+        spawnSync("npm", ["run", "napi-build-mac-x86_64"], {
+          stdio: "inherit",
+          shell: true,
+        });
+      }
     }
 
     await fs.copyFile("packages/napi/napi.node", "dist/preload/napi.node");
