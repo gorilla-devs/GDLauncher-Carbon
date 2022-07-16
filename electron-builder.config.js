@@ -47,7 +47,7 @@ module.exports = {
     target: ["AppImage"],
     artifactName: "${productName}-${version}-Installer.${ext}",
   },
-  beforePack: async (context) => {
+  beforePack: (context) => {
     const { spawnSync } = require("child_process");
     const { promises: fs } = require("fs");
 
@@ -55,13 +55,13 @@ module.exports = {
       if (context.arch === 1) {
         // x64
         // exec npm run napi-build
-        spawnSync("npm", ["run", "napi-build-mac-x86_64"], {
+        spawnSync("npm", ["run", "napi-build", "darwin-x64"], {
           stdio: "inherit",
           shell: true,
         });
       } else if (context.arch === 3) {
         // arm64
-        spawnSync("npm", ["run", "napi-build-mac-aarch64"], {
+        spawnSync("npm", ["run", "napi-build", "darwin-arm64"], {
           stdio: "inherit",
           shell: true,
         });
@@ -70,7 +70,7 @@ module.exports = {
       if (context.arch === 1) {
         // x64
         // exec npm run napi-build
-        spawnSync("npm", ["run", "napi-build-win-x86_64"], {
+        spawnSync("npm", ["run", "napi-build", "win32-x64"], {
           stdio: "inherit",
           shell: true,
         });
