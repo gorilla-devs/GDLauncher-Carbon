@@ -70,7 +70,7 @@ module.exports = {
       if (context.arch === 1) {
         // x64
         // exec npm run napi-build
-        spawnSync("npm", ["run", "napi-build-mac-x86_64"], {
+        spawnSync("npm", ["run", "napi-build-win-x86_64"], {
           stdio: "inherit",
           shell: true,
         });

@@ -12,7 +12,8 @@
     "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config electron-builder.config.js",
     "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json",
     "napi-build-mac-x86_64": "cd packages/napi && npm run build-mac-x86_64",
-    "napi-build-mac-aarch64": "cd packages/napi && npm run build-mac-aarch64"
+    "napi-build-mac-aarch64": "cd packages/napi && npm run build-mac-aarch64",
+    "napi-build-win-x86_64": "cd packages/napi && npm run build-win-x86_64"
   },
   "engines": {
     "node": ">=18.6.0"

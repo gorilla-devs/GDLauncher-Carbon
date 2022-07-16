@@ -5,7 +5,8 @@
   "types": "./index.d.ts",
   "scripts": {
     "build-mac-x86_64": "node ../../node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ../../node_modules/@napi-rs/cli/scripts/index.js build --js false --release --target x86_64-apple-darwin",
-    "build-mac-aarch64": "node ../../node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ../../node_modules/@napi-rs/cli/scripts/index.js build --js false --release --target aarch64-apple-darwin"
+    "build-mac-aarch64": "node ../../node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ../../node_modules/@napi-rs/cli/scripts/index.js build --js false --release --target aarch64-apple-darwin",
+    "build-win-x86_64": "node ../../node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ../../node_modules/@napi-rs/cli/scripts/index.js build --js false --release --target x86_64-pc-windows-msvc"
   },
   "napi": {
     "name": "napi"
