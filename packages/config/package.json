@@ -1,0 +1,13 @@
+{
+  "name": "@gd/config",
+  "version": "0.0.0",
+  "main": "index.js",
+  "files": [
+    "eslint-preset.js",
+    "base.tsconfig.json"
+  ],
+  "devDependencies": {
+    "vite-plugin-resolve": "^2.1.2",
+    "vite-plugin-solid": "^2.3.0"
+  }
+}

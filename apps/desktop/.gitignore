@@ -86,7 +86,3 @@ release
 .DS_Store
 dist-ssr
 *.local
-
-target
-*.node
-.turbo

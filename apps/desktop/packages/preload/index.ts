@@ -5,9 +5,9 @@ import { domReady } from "./utils";
 import { useLoading } from "./loading";
 
 const nAPIPath =
-  import.meta.env.MODE === "development" ? "./packages/napi" : __dirname;
+  import.meta.env.MODE === "development" ? "../../core" : __dirname;
 
-const addon = require(path.resolve(nAPIPath, "napi.node"));
+const addon = require(path.resolve(nAPIPath, "core.node"));
 
 const { appendLoading, removeLoading } = useLoading();
 
@@ -22,8 +22,6 @@ contextBridge.exposeInMainWorld("fs", fs);
 contextBridge.exposeInMainWorld("removeLoading", removeLoading);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
 contextBridge.exposeInMainWorld("computeFibonacci", computeFibonacci);
-
-console.log("INITTAL", addon);
 
 function computeFibonacci() {
   const res = addon.fibonacci(45);

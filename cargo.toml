@@ -1,6 +1,6 @@
 [workspace]
 members = [
-	"packages/napi",
+	"core",
 ]
 
 [profile.release]

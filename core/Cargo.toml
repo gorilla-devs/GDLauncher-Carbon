@@ -1,5 +1,5 @@
 [package]
-name = "napi"
+name = "core"
 version = "0.1.0"
 edition = "2021"
 
@@ -19,4 +19,4 @@ tokio = "1.19.2"
 murmurhash32 = {git = "https://github.com/gorilla-devs/murmurhash32.git"}
 
 [build-dependencies]
-napi-build = "1"
+napi-build = "2.0.1"

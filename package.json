@@ -6,36 +6,18 @@
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
-  "main": "dist/main/index.cjs",
   "scripts": {
-    "dev": "npm run napi-build && node scripts/watch.mjs",
-    "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config electron-builder.config.js",
-    "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json",
-    "napi-build": "cd packages/napi && npm run build"
-  },
-  "engines": {
-    "node": ">=18.6.0"
-  },
-  "dependencies": {
-    "electron-store": "^8.0.2"
+    "dev": "npm run core-dev && turbo run dev --filter @gd/desktop",
+    "build": "turbo run build --filter @gd/desktop",
+    "core-dev": "cd core && npm run dev"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^2.10.1",
-    "autoprefixer": "^10.4.7",
-    "cross-env": "^7.0.3",
-    "electron": "^19.0.8",
-    "electron-builder": "^23.1.0",
-    "postcss": "^8.4.14",
-    "solid-app-router": "^0.4.1",
-    "solid-js": "^1.4.7",
-    "tailwindcss": "^3.1.6",
-    "typescript": "^4.7.4",
-    "vite": "^3.0.0",
-    "vite-plugin-resolve": "^2.1.2",
-    "vite-plugin-solid": "^2.3.0"
+    "turbo": "^1.3.1"
   },
-  "env": {
-    "//": "Used in build scripts",
-    "PORT": 3344
+  "engines": {
+    "pnpm": ">=6.0.0",
+    "npm": "pnpm",
+    "yarn": "pnpm",
+    "node": ">=18.6.0"
   }
 }

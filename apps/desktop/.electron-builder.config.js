@@ -47,36 +47,37 @@ module.exports = {
     target: ["AppImage"],
     artifactName: "${productName}-${version}-Installer.${ext}",
   },
-  beforePack: (context) => {
+  beforePack: async (context) => {
     const { spawnSync } = require("child_process");
     const { promises: fs } = require("fs");
 
     if (context.electronPlatformName === "darwin") {
       if (context.arch === 1) {
         // x64
-        // exec npm run napi-build
-        spawnSync("npm", ["run", "napi-build", "darwin-x64"], {
+        spawnSync("npm", ["run", "core-build", "darwin-x64"], {
           stdio: "inherit",
           shell: true,
+          cwd: "../../",
         });
       } else if (context.arch === 3) {
         // arm64
-        spawnSync("npm", ["run", "napi-build", "darwin-arm64"], {
+        spawnSync("npm", ["run", "core-build", "darwin-arm64"], {
           stdio: "inherit",
           shell: true,
+          cwd: "../../",
         });
       }
     } else if (context.electronPlatformName === "win32") {
       if (context.arch === 1) {
         // x64
-        // exec npm run napi-build
-        spawnSync("npm", ["run", "napi-build", "win32-x64"], {
+        spawnSync("npm", ["run", "core-build", "win32-x64"], {
           stdio: "inherit",
           shell: true,
+          cwd: "../../",
         });
       }
     }
 
-    await fs.copyFile("packages/napi/napi.node", "dist/preload/napi.node");
+    await fs.copyFile("../../core/core.node", "dist/preload/core.node");
   },
 };
