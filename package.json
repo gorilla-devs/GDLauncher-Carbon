@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "npm run core-dev && turbo run dev --filter @gd/desktop",
     "build": "turbo run build --filter @gd/desktop",
-    "core-dev": "cd core && npm run dev"
+    "core-dev": "cd core && npm run dev",
+    "core-build": "cd core && npm run build"
   },
   "devDependencies": {
     "turbo": "^1.3.1"
