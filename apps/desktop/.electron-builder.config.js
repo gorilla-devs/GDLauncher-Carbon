@@ -3,8 +3,8 @@
  * @see https://www.electron.build/configuration/configuration
  */
 module.exports = {
-  productName: "GDLauncher",
-  appId: "org.gorilladevs.GDLauncher",
+  productName: "GDLauncher Carbon",
+  appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: "Copyright © 2022 ${author}",
   asar: true,
   directories: {

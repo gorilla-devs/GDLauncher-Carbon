@@ -6,8 +6,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
-    "_build_": "node ./node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ./node_modules/@napi-rs/cli/scripts/index.js build --js false --release",
-    "_dev_": "node ./node_modules/cross-env/src/bin/cross-env-shell.js RUSTFLAGS=-Csymbol-mangling-version=v0 node ./node_modules/@napi-rs/cli/scripts/index.js build --js false"
+    "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 node ../node_modules/@napi-rs/cli/scripts/index.js build --js false --release",
+    "_dev_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 node ../node_modules/@napi-rs/cli/scripts/index.js build --js false"
   },
   "napi": {
     "name": "core"

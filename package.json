@@ -8,17 +8,16 @@
   "license": "ARR",
   "scripts": {
     "dev": "npm run core-dev && turbo run dev --filter @gd/desktop",
-    "build": "turbo run build --filter @gd/desktop",
+    "build": "turbo run build --filter @gd/desktop --no-cache",
     "core-dev": "cd core && npm run dev",
     "core-build": "cd core && npm run build"
   },
   "devDependencies": {
     "turbo": "^1.3.1"
   },
-  "engines": {
-    "pnpm": ">=6.0.0",
-    "npm": "pnpm",
-    "yarn": "pnpm",
-    "node": ">=18.6.0"
-  }
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "core"
+  ]
 }

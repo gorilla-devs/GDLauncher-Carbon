@@ -1,9 +1,9 @@
 # vite-solid-electron
 
-![GitHub stars](https://img.shields.io/github/stars/ch99q/vite-solid-electron?color=fa6470&style=flat)
+![GitHub stars](https://img.shields.io/github/stars/gorilla-devs/GDLauncher?color=fa6470&style=flat)
 ![GitHub issues](https://img.shields.io/github/issues/ch99q/vite-solid-electron?color=d8b22d&style=flat)
 ![GitHub license](https://img.shields.io/github/license/ch99q/vite-solid-electron?style=flat)
-[![Required Node.JS >= v14.17.0](https://img.shields.io/static/v1?label=node&message=%3E=14.17.0&logo=node.js&color=3f893e&style=flat)](https://nodejs.org/about/releases)
+[![Required Node.JS >= v18.6.0](https://img.shields.io/static/v1?label=node&message=%3E=18.6.0&logo=node.js&color=3f893e&style=flat)](https://nodejs.org/about/releases)
 
 ## Overview
 
@@ -15,6 +15,12 @@
 
 ## Installation
 
+Ensure you have yarn v1.22.19
+
+`npm i -g yarn@1.22.19`
+
+And after run
+
 ```bash
 # clone the project
 git clone https://github.com/ch99q/vite-solid-electron.git
@@ -23,13 +29,13 @@ git clone https://github.com/ch99q/vite-solid-electron.git
 cd vite-solid-electron
 
 # install dependencies
-npm install
+yarn
 
 # start the application
-npm run dev
+yarn dev
 
 # make a production build
-npm run build
+yarn build
 ```
 
 ## Directory structure
