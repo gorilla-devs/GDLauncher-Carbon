@@ -7,12 +7,15 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.62.0-node
+    resource_class: medium
   mac:
     macos:
       xcode: "14.0.0"
+    resource_class: medium
   macm1:
     macos:
       xcode: "14.0.0"
+    resource_class: medium
 
 jobs:
   build:
@@ -77,10 +80,10 @@ jobs:
                 pwd
                 ls
                 cd ~/ && pwd
-          resource_class: medium
   buildWin:
     executor:
       name: win/server-2022
+      resource_class: medium
     steps:
       - checkout
       - run:
