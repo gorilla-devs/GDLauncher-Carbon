@@ -83,7 +83,7 @@ jobs:
   buildWin:
     executor:
       name: win/server-2022
-      resource_class: medium
+    resource_class: medium
     steps:
       - checkout
       - run:
