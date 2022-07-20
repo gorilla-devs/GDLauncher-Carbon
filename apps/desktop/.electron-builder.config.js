@@ -23,7 +23,6 @@ module.exports = {
     target: [
       {
         target: "nsis",
-        arch: ["x64"],
       },
     ],
     artifactName: "${productName}-${version}-Setup.${ext}",
@@ -37,7 +36,6 @@ module.exports = {
   mac: {
     target: {
       target: "dmg",
-      arch: ["x64", "arm64"],
     },
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
@@ -71,6 +69,15 @@ module.exports = {
       if (context.arch === 1) {
         // x64
         spawnSync("npm", ["run", "core-build", "win32-x64"], {
+          stdio: "inherit",
+          shell: true,
+          cwd: "../../",
+        });
+      }
+    } else if (context.electronPlatformName === "linux") {
+      if (context.arch === 1) {
+        // x64
+        spawnSync("npm", ["run", "core-build", "linux32-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",

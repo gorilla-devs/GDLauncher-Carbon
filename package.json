@@ -8,7 +8,12 @@
   "license": "ARR",
   "scripts": {
     "dev": "npm run core-dev && turbo run dev --filter @gd/desktop",
-    "build": "turbo run build --filter @gd/desktop --no-cache",
+    "dev-web": "turbo run dev --filter @gd/web",
+    "build-linux-x64": "turbo run build --filter @gd/desktop --no-cache -- --x64 --linux",
+    "build-win-x64": "turbo run build --filter @gd/desktop --no-cache -- --x64 --win",
+    "build-mac-x64": "turbo run build --filter @gd/desktop --no-cache -- --x64 --mac",
+    "build-mac-arm64": "turbo run build --filter @gd/desktop --no-cache -- --arm64 --mac",
+    "build-web": "turbo run build --filter @gd/web --no-cache",
     "core-dev": "cd core && npm run dev",
     "core-build": "cd core && npm run build"
   },

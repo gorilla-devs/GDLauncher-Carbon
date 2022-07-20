@@ -1,19 +1,16 @@
 {
   "name": "@gd/desktop",
-  "productName": "Electron",
+  "productName": "GDLauncher",
   "private": true,
-  "version": "1.0.0",
-  "description": "Vite SolidJS Electron boilerplate.",
-  "author": "ch99q <64793a1a@gmail.com>",
-  "license": "MIT",
+  "version": "2.0.0",
+  "description": "GDLauncher Carbon.",
+  "author": "killpowa <davide@gdlauncher.com>",
+  "license": "ARR",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config .electron-builder.config.js",
     "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json"
-  },
-  "engines": {
-    "node": ">=18.6.0"
   },
   "dependencies": {
     "electron-store": "^8.0.2"

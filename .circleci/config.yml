@@ -1,32 +1,111 @@
 version: 2.1
+
+orbs:
+  win: circleci/windows@4.1.1
+
+executors:
+  linux:
+    docker:
+      - image: cimg/rust:1.62.0-node
+  mac:
+    macos:
+      xcode: "14.0.0"
+  macm1:
+    macos:
+      xcode: "14.0.0"
+
 jobs:
   build:
-    working_directory: ~/corbium
-    docker:
-      - image: cimg/node:18.6.0
+    parameters:
+      os:
+        type: string
+    executor: <<parameters.os>>
+    steps:
+      - checkout
+      # MACOS
+      - when:
+          condition:
+            and:
+              - equal: ["mac", <<parameters.os>>]
+          steps:
+            - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
+                rustup toolchain install nightly
+                rustup target add x86_64-apple-darwin --toolchain nightly
+                rustup default nightly
+                node -v
+                cargo --version
+                yarn
+                yarn build-mac-x64
+                pwd
+                ls
+                cd ~/ && pwd
+      # MACOS M1
+      - when:
+          condition:
+            and:
+              - equal: ["macm1", <<parameters.os>>]
+          steps:
+            - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
+                rustup toolchain install nightly
+                rustup target add aarch64-apple-darwin --toolchain nightly
+                rustup default nightly
+                node -v
+                cargo --version
+                yarn
+                yarn build-mac-arm64
+                pwd
+                ls
+                cd ~/ && pwd
+      # LINUX
+      - when:
+          condition:
+            and:
+              - equal: ["linux", <<parameters.os>>]
+          steps:
+            - run: |
+                rustup toolchain install nightly
+                rustup target add x86_64-unknown-linux-gnu --toolchain nightly
+                rustup default nightly
+                node -v
+                cargo --version
+                yarn
+                yarn build-linux-x64
+                pwd
+                ls
+                cd ~/ && pwd
+  buildWin:
+    executor:
+      name: win/server-2022
     steps:
       - checkout
       - run:
-          name: Update NPM
-          command: "sudo npm install -g yarn"
-      # - restore_cache:
-      #     key: dependency-cache-{{ checksum "package.json" }}
-      - run:
-          name: Install Dependencies
-          command: yarn
-      - run:
-          name: Install dpkg and fakeroot
+          name: "Install Rust"
           command: |
-            sudo apt-get update -y
-            sudo apt-get install -y dpkg fakeroot
+            $ProgressPreference = 'Continue'    
+            Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
+            & C:\rustup-init.exe -y --default-toolchain "nightly-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
+            $env:path += ";$env:userprofile\.cargo\bin"
+            rustc -Vv
+            cargo --version
+            rustc --version | Out-File -FilePath "rust-version"
+            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
+                cargo generate-lockfile
+            }
+      - run: |
+            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            npm i -g yarn
+            yarn
+            yarn build-win-x64
 
-      # - save_cache:
-      #     key: dependency-cache-{{ checksum "package.json" }}
-      #     paths:
-      #       - ./node_modules
-      - run:
-          name: Generate Builds
-          command: yarn build
-
-      - store_artifacts:
-          path: ~/corbium/release
+workflows:
+  all-builds:
+    jobs:
+      - build:
+          matrix:
+            parameters:
+              os: ["linux", "mac", "macm1"]
+      - buildWin
