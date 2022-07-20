@@ -77,6 +77,7 @@ jobs:
                 pwd
                 ls
                 cd ~/ && pwd
+          resource_class: medium
   buildWin:
     executor:
       name: win/server-2022
