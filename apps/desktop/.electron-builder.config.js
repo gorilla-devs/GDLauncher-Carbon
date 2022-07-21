@@ -49,6 +49,8 @@ module.exports = {
     const { spawnSync } = require("child_process");
     const { promises: fs } = require("fs");
 
+    console.log("COMMIT HASH", process.env.CIRCLE_SHA1);
+
     if (context.electronPlatformName === "darwin") {
       if (context.arch === 1) {
         // x64
