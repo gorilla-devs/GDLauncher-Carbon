@@ -7,3 +7,5 @@ members = [
 opt-level = 3
 strip = "symbols"
 lto = true
+codegen-units = 1
+panic = "abort"

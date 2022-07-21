@@ -7,7 +7,7 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true node ../node_modules/@napi-rs/cli/scripts/index.js build --js false --release",
-    "_dev_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true node ../node_modules/@napi-rs/cli/scripts/index.js build --js false"
+    "_dev_": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true node ../node_modules/@napi-rs/cli/scripts/index.js build --js false"
   },
   "napi": {
     "name": "core"

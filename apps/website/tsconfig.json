@@ -1,0 +1,21 @@
+{
+  "include": ["**/*.ts", "**/*.tsx", "**/*.astro"],
+  "exclude": ["node_modules"],
+  "types": ["vite/client"],
+  "compilerOptions": {
+    "jsx": "preserve",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsxImportSource": "solid-js",
+    "resolveJsonModule": true,
+    "types": ["unplugin-icons/types/solid"],
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@ui": ["ui/index.ts"],
+      "@ui/*": ["ui/src/*"]
+    }
+  }
+}

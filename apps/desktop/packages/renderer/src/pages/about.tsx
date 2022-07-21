@@ -1,8 +1,9 @@
-import { Component, createEffect, Suspense } from 'solid-js';
-import { useRouteData } from 'solid-app-router';
+import { Component, createEffect, Suspense } from "solid-js";
+import { useNavigate, useRouteData } from "solid-app-router";
 
 export default function About() {
   const name = useRouteData<() => string>();
+  const navigate = useNavigate();
 
   createEffect(() => {
     console.log(name());
@@ -20,6 +21,7 @@ export default function About() {
           <span>&nbsp;{name()}</span>
         </Suspense>
       </p>
+      <button onClick={() => navigate("?m=myModal")}>Open modal</button>
     </section>
   );
 }
