@@ -100,13 +100,16 @@ jobs:
                 cargo generate-lockfile
             }
       - run: |
-            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-            npm i -g yarn
-            yarn
-            yarn build-win-x64
+          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+          npm i -g yarn
+          yarn
+          yarn build-win-x64
 
 workflows:
   all-builds:
+    when:
+      and:
+        - equal: [_build_, << GIT_COMMIT_MESSAGE >>]
     jobs:
       - build:
           matrix:
