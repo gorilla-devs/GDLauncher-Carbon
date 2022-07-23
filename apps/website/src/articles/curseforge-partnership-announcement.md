@@ -34,10 +34,11 @@ We are dedicating all of our resources towards the development of a brand new ve
 # FAQ
 
 ## How will this partnership impact the current launcher? What about the rewrite, Carbon?
+
 The current launcher will not be too impacted from this partnership aside from the fact that with our latest release (v1.2.0) coming today will have full access to curseforge's APIs.
 
 All the resources coming from our partnership will go towards the development of GDLauncher Carbon. We don't have an ETA yet and we will publish updates in the next few weeks on our [Discord](https://discord.gdlauncher.com).
-After GDLauncher Carbon will be ready to go in production, the current release of  GDLauncher will be archieved. We will probably change the license to MIT so anyone will be free to do (mostly) whatever they want with it!
+After GDLauncher Carbon will be ready to go in production, the current release of GDLauncher will be archieved. We will probably change the license to MIT so anyone will be free to do (mostly) whatever they want with it!
 
 ## Will GDLauncher be part of the Overwolf network?
 
@@ -65,7 +66,7 @@ Even though we will still use Electron, there are some major differences in the 
 
 Right now the entire app is written in (unoptimized) React, including all the system operations, networking, logic, etc. This is an issue since NodeJS is single threaded and running both the UI and business logic on it is not ideal. React is also not very performant when it comes to rendering.
 
-In the rewrite, all the native operations will be done in [Rust](https://rust-lang.org) on a separate thread, taking advantage of Rust's blazingly fast speed. The UI will be written in [SolidJS](https://solidjs.com) which is a super lightweight library with close to vanills-JS performance.
+In the rewrite, all the native operations will be done in [Rust](https://rust-lang.org) on a separate thread, taking advantage of Rust's blazingly fast speed. The UI will be written in [SolidJS](https://solidjs.com) which is a super lightweight library with close to vanills-js performance.
 
 ## What about translations? Will it support \_\_ language?
 
@@ -110,7 +111,7 @@ Below you can find insights of the added/removed lines of code of all contributo
 
 ### More about this
 
-If you want to dig deeper into why we chose this direction, please read [this]() article. We also copied parts of that article because we believe it explains it very well.
+If you want to dig deeper into why we chose this direction, please read [this](https://greensock.com/why-license/) article. We also copied parts of that article because we believe it explains it very well.
 
 ### Why not open core?
 
