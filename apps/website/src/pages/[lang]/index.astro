@@ -1,0 +1,14 @@
+---
+import languages from "@/i18n/languages";
+import MainWrapper from "@/layouts/MainWrapper.astro";
+
+export const getStaticPaths = () => Object.keys(languages).map(lang => ({ params: { lang } }));
+
+const { lang } = Astro.params;
+
+---
+
+<!-- <meta http-equiv="refresh" content={`0;url=/${lang}/getting-started/`} /> -->
+<MainWrapper>
+    <h1>HOME {lang}</h1>
+</MainWrapper>

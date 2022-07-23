@@ -1,5 +1,8 @@
 ---
 import Navbar from "@/components/Navbar/index.astro";
+const url = new URL(Astro.request.url);
+const currentPage = url.pathname;
+
 ---
 
 <html>
@@ -11,7 +14,7 @@ import Navbar from "@/components/Navbar/index.astro";
     />
   </head>
   <body class="font-main w-full">
-    <Navbar />
+    <Navbar {currentPage}/>
     <main>
       <slot></slot>
     </main>
