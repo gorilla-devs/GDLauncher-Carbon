@@ -107,9 +107,6 @@ jobs:
 
 workflows:
   all-builds:
-    when:
-      and:
-        - equal: [_build_, << GIT_COMMIT_MESSAGE >>]
     jobs:
       - build:
           matrix:
