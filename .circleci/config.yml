@@ -110,6 +110,8 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
+          cd node_modules
+          ls
           pnpm build-win-x64
 
 workflows:
