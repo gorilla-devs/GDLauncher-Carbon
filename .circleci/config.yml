@@ -39,6 +39,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
+                npm i -g pnpm
                 pnpm i
                 pnpm build-mac-x64
                 pwd
@@ -58,6 +59,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
+                npm i -g pnpm
                 pnpm i
                 pnpm build-mac-arm64
                 pwd
@@ -75,6 +77,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
+                npm i -g pnpm
                 pnpm i
                 pnpm build-linux-x64
                 pwd
@@ -101,6 +104,7 @@ jobs:
             }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+          npm i -g pnpm
           pnpm i
           pnpm build-win-x64
 
