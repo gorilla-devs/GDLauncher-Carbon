@@ -5,65 +5,55 @@ import Interactivity from "@/components/Navbar/Interactivity";
 import LanguageSelect from "@/components/Navbar/LanguageSelect";
 import linksList from "@/components/Navbar/linksList";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-// import { format } from "@/utils/i18n";
-import { getLanguageFromURL } from "@/utils/helpers";
+import { getLanguageFromURL, localizePath } from "@/utils/helpers";
 import { useTranslations } from "@/i18n/utils";
+import { format } from "@/utils/i18n";
 
-const { currentPage } = Astro.props;
+export interface Props {
+  currentPage: string;
+}
+
+
+const { currentPage } = Astro.props as Props;;
 const lang = currentPage && getLanguageFromURL(currentPage);
 const t = useTranslations(Astro);
 
 ---
 
 <Interactivity client:load />
+<!-- // {format(t(props.title[0], props.title[1]), "capitalize")} -->
 
 <div
-  class="navbar absolute bottom-0 md:top-0 md:bottom-auto left-0 right-0 z-10 p-6 flex flex-col justify-between items-center"
->
+  class="navbar absolute bottom-0 md:top-0 md:bottom-auto left-0 right-0 z-10 p-6 flex flex-col justify-between items-center">
   <div class="flex justify-between w-full max-w-7xl">
     <div class="flex justify-between items-center gap-x-10 w-full md:w-auto">
-      <img
-        src={composeCDNAssetLink("gdlauncher_logo.svg")}
-        alt="logo"
-        class="cursor-pointer h-8 w-8"
-      />
+      <img src={composeCDNAssetLink("gdlauncher_logo.svg")} alt="logo" class="cursor-pointer h-8 w-8" />
       <div class="burger md:hidden">
         <Burger />
       </div>
-      <div
-        class="hidden md:flex font-medium justify-between items-center gap-x-5 text-white"
-      >
-        <!-- {linksList.map((props) => (
-          <a
-            class={`button ${
-              globalThis?.location?.pathname === props.linkTo ? "selected" : ""
-            }`}
-            // href={localizePath(props.linkTo, props.isExternalLink)}
-            // {format(t(props.title[0], props.title[1]), "capitalize")}
-          >
-          {props.title[0]}
-          </a>
-        ))} -->
+      <div class="hidden md:flex font-medium justify-between items-center gap-x-5 text-white">
+        {linksList.map((props) => (
+        <a class={`button ${ globalThis?.location?.pathname===props.linkTo ? "selected" : "" }`}
+          href={localizePath(props.linkTo, lang, props.isExternalLink)}>
+          {format(t(props.title[0]), "capitalize")}
+        </a>
+        ))}
       </div>
     </div>
     <div class="hidden lg:block">
-      {lang && <LanguageSelect lang={lang} client:idle />}
+      {lang &&
+      <LanguageSelect lang={lang} client:idle />}
       <Button>{t("navbar.download")}</Button>
-      <!-- <Button>{t("navbar.download", "download")}</Button> -->
     </div>
   </div>
   <div class={`responsiveButtons buttons`}>
-    <!-- {linksList.map((props) => (
-      <a
-        class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400	 ${
-          globalThis?.location?.pathname === props.linkTo ? "selected" : ""
-        }`}
-        // href={localizePath(props.linkTo, props.isExternalLink)}
-        // {format(t(props.title[0], props.title[1]), "capitalize")}
-      >
-      {props.title[0]}
-      </a>
-    ))} -->
+    {linksList.map((props) => (
+    <a class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400 ${
+      globalThis?.location?.pathname===props.linkTo ? "selected" : "" }`} href={localizePath(props.linkTo, lang,
+      props.isExternalLink)}>
+      {format(t(props.title[0]), "capitalize")}
+    </a>
+    ))}
     <div class={`block`}>
       <Button>{t("navbar.download")}</Button>
     </div>

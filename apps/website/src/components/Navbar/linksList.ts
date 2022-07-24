@@ -1,35 +1,34 @@
+import { UIDictionaryKeys } from "@/i18n/utils";
+
 interface NavigationLink {
-  title: [string, string];
+  title: [UIDictionaryKeys];
   linkTo: string;
   isExternalLink?: boolean;
 }
-
-// Title is a [string, string] array because it needs to be translated reactively
-
 export default [
   {
-    title: ["home", "home"],
+    title: ["navbar.home"],
     linkTo: "/",
   },
   {
-    title: ["features", "features"],
+    title: ["navbar.features"],
     linkTo: "/features",
   },
   {
-    title: ["team", "team"],
+    title: ["navbar.team"],
     linkTo: "/team",
   },
   {
-    title: ["contact", "contact"],
+    title: ["navbar.contact"],
     linkTo: "/contact",
   },
   {
-    title: ["github", "github"],
+    title: ["navbar.github"],
     linkTo: "https://github.com/gorilla-devs/GDLauncher",
     isExternalLink: true,
   },
   {
-    title: ["discord", "discord"],
+    title: ["navbar.discord"],
     linkTo: "https://discord.gdlauncher.com",
     isExternalLink: true,
   },
