@@ -7,11 +7,13 @@ const currentPage = url.pathname;
 ---
 
 <html>
+
 <head>
   <HeadCommon />
 </head>
-<body class="font-main w-full">
-  <Navbar {currentPage} />
+
+<body class="font-main w-full bg-gray-800">
+  <Navbar currentPage={currentPage} />
   <main>
     <slot></slot>
   </main>

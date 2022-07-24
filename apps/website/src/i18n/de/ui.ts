@@ -1,4 +1,5 @@
 export default {
+  "navbar.home": "Home",
   "navbar.download": "Download",
   "navbar.homepage": "HomePage",
   "navbar.features": "Features",

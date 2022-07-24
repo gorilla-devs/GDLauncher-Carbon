@@ -3,9 +3,9 @@ import {Component} from 'solid-js'
 
 const LanguageSelect: Component<{lang: string}> = ({lang}) => {
   return (
-    <div class="language-select-wrapper">
+    <div class="border-2 border-white rounded">
       <select
-        class="header-button language-select"
+        class="bg-gray-800 text-white"
         value={lang}
         aria-label="Select language"
         onChange={(e) => {
