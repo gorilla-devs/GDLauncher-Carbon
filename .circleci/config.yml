@@ -39,7 +39,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                npm i -g pnpm
+                curl -fsSL https://get.pnpm.io/install.sh | sh -
                 pnpm i
                 pnpm build-mac-x64
                 pwd
@@ -59,7 +59,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                npm i -g pnpm
+                curl -fsSL https://get.pnpm.io/install.sh | sh -
                 pnpm i
                 pnpm build-mac-arm64
                 pwd
@@ -77,7 +77,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                npm i -g pnpm
+                curl -fsSL https://get.pnpm.io/install.sh | sh -
                 pnpm i
                 pnpm build-linux-x64
                 pwd
@@ -96,6 +96,10 @@ jobs:
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --default-toolchain "nightly-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
+            Invoke-WebRequest https://get.pnpm.io/install.ps1 -useb | Invoke-Expression
+            $env:PNPM_HOME = [System.Environment]::GetEnvironmentVariable("PNPM_HOME", "User")
+            $env:Path = [System.Environment]::ExpandEnvironmentVariables([System.Environment]::GetEnvironmentVariable("Path", "User"))
+
             rustc -Vv
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
@@ -104,7 +108,8 @@ jobs:
             }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          npm i -g pnpm
+          $env:PNPM_HOME = [System.Environment]::GetEnvironmentVariable("PNPM_HOME", "User")
+          $env:Path = [System.Environment]::ExpandEnvironmentVariables([System.Environment]::GetEnvironmentVariable("Path", "User"))
           pnpm i
           pnpm build-win-x64
 
