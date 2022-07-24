@@ -43,9 +43,6 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
                 pnpm build-mac-x64
-                pwd
-                ls
-                cd ~/ && pwd
       # MACOS M1
       - when:
           condition:
@@ -64,9 +61,6 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
                 pnpm build-mac-arm64
-                pwd
-                ls
-                cd ~/ && pwd
       # LINUX
       - when:
           condition:
@@ -83,9 +77,6 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
                 pnpm build-linux-x64
-                pwd
-                ls
-                cd ~/ && pwd
   buildWin:
     executor:
       name: win/server-2022
