@@ -14,8 +14,8 @@
     "build-mac-x64": "turbo run build --filter @gd/desktop --no-cache -- --x64 --mac",
     "build-mac-arm64": "turbo run build --filter @gd/desktop --no-cache -- --arm64 --mac",
     "build-web": "turbo run build --filter @gd/web --no-cache",
-    "core-dev": "cd core && pnpm dev",
-    "core-build": "cd core && pnpm build"
+    "core-dev": "turbo run dev --filter @gd/core --no-cache",
+    "core-build": "turbo run build --filter @gd/core --no-cache"
   },
   "devDependencies": {
     "turbo": "^1.3.1"
