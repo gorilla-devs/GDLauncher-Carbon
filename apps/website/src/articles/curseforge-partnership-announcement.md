@@ -35,7 +35,7 @@ We are dedicating all of our resources towards the development of a brand new ve
 
 ## How will this partnership impact the current launcher? What about the rewrite, Carbon?
 
-The current launcher will not be too impacted from this partnership aside from the fact that with our latest release (v1.2.0) coming today will have full access to curseforge's APIs.
+The current launcher will not be too impacted from this partnership aside from the fact that our latest release (v1.2.0) coming today will have full access to curseforge's APIs.
 
 All the resources coming from our partnership will go towards the development of GDLauncher Carbon. We don't have an ETA yet and we will publish updates in the next few weeks on our [Discord](https://discord.gdlauncher.com).
 After GDLauncher Carbon will be ready to go in production, the current release of GDLauncher will be archieved. We will probably change the license to MIT so anyone will be free to do (mostly) whatever they want with it!

@@ -14,17 +14,15 @@
     "fix-eslint": "eslint --fix \"src/**/*.{ts,js,tsx,jsx,astro}\"",
     "lint": "npm run format && npm run check-astro && npm run check-tsc && npm run check-eslint",
     "lint-fix": "npm run format && npm run check-astro && npm run check-tsc && npm run fix-eslint",
-    "prepare": "husky install",
     "serve": "npm run build -- --config astro.config.node.mjs && node server/index.mjs"
   },
   "devDependencies": {
-    "@astrojs/solid-js": "^0.2.1",
-    "@astrojs/tailwind": "^0.2.3",
-    "@iconify/json": "^2.1.76",
-    "@svgr/core": "^6.2.1",
-    "astro": "^1.0.0-beta.65",
+    "@astrojs/solid-js": "^0.4.1",
+    "@astrojs/tailwind": "^0.2.4",
+    "@iconify/json": "^2.1.80",
+    "@svgr/core": "^6.3.0",
+    "astro": "^1.0.0-beta.73",
     "esbuild": "^0.14.49",
-    "husky": "^8.0.1",
     "i18next": "^21.8.13",
     "iso-639-1": "^2.1.15",
     "lint-staged": "^13.0.3",
@@ -33,11 +31,8 @@
     "solid-js": "^1.4.7",
     "svgo": "^2.8.0",
     "unplugin-icons": "^0.14.7",
-    "vite-plugin-solid": "^2.2.6"
+    "vite-plugin-solid": "^2.3.0"
   },
-  "pre-commit": [
-    "format"
-  ],
   "lint-staged": {
     "*.{mjs,jsx,js,ts,tsx}": "npm run lint-fix",
     "*.svg": "svgo"
