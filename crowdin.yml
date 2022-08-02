@@ -1,13 +1,10 @@
 project_id: "530216"
-api_token_env: CROWDIN_PERSONAL_TOKEN
-base_path: ./packages/i18n
+api_token_env: "CROWDIN_PERSONAL_TOKEN"
 base_url: "https://api.crowdin.com"
 preserve_hierarchy: true
-pull_request_title: "Custom PR title"
-commit_message: "Fix: New translations %original_file_name% from Crowdin"
 files:
-  - source: "en/*.json"
+  - source: "/packages/i18n/en/*.json"
     ignore:
       - LICENSE
-    translation: "output/%two_letters_code%/%original_file_name%"
+    translation: "/packages/i18n/output/%two_letters_code%/%original_file_name%"
     type: json
