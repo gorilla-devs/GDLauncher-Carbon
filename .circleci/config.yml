@@ -39,7 +39,6 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                sudo npm i -g yarn
                 yarn
                 chmod -R a+x node_modules
                 yarn build-mac-x64
@@ -57,7 +56,6 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                sudo npm i -g yarn
                 yarn i
                 chmod -R a+x node_modules
                 yarn build-mac-arm64
@@ -73,7 +71,6 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                sudo npm i -g yarn
                 yarn i
                 chmod -R a+x node_modules
                 yarn build-linux-x64
@@ -99,7 +96,6 @@ jobs:
             }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          npm i -g yarn
           yarn i
           yarn build-win-x64
 
