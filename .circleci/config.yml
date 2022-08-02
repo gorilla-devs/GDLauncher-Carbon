@@ -114,7 +114,7 @@ workflows:
           matrix:
             parameters:
               os: ["linux", "mac", "macm1"]
-      - buildWin
+      - buildWin:
           filters:
             branches:
               only:
