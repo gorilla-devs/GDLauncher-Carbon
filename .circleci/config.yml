@@ -56,7 +56,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                yarn i
+                yarn
                 chmod -R a+x node_modules
                 yarn build-mac-arm64
       # LINUX
@@ -71,7 +71,7 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                yarn i
+                yarn
                 chmod -R a+x node_modules
                 yarn build-linux-x64
   buildWin:
@@ -96,7 +96,7 @@ jobs:
             }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          yarn i
+          yarn
           yarn build-win-x64
 
 workflows:
