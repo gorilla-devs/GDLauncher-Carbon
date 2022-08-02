@@ -6,7 +6,7 @@ preserve_hierarchy: true
 pull_request_title: "Custom PR title"
 commit_message: "Fix: New translations %original_file_name% from Crowdin"
 files:
-  - source: /en/*.json
+  - source: /packages/i18n/en/*.json
     ignore:
       - LICENSE
     translation: "%two_letters_code%/%original_file_name%"
