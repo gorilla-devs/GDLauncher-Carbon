@@ -1,6 +1,4 @@
-import Button from "~ui/Button";
+export { Button } from "./Button";
 import "@fontsource/ubuntu";
-// eslint-disable-next-line no-restricted-imports
-import "./index.css";
 
-export { Button };
+import "./index.scss";

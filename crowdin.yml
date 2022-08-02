@@ -1,11 +1,11 @@
-project_id: '530216'
-api_token_env: CROWDIN_PERSONAL_TOKEN
-base_path: ./packages/i18n
-base_url: 'https://api.crowdin.com'
+project_id: "530216"
+api_token_env: "CROWDIN_PERSONAL_TOKEN"
+base_url: "https://api.crowdin.com"
+commit_message: "[skip ci] new translations %original_file_name% from Crowdin"
 preserve_hierarchy: true
 files:
-  - source: /en/*.json
+  - source: "/packages/i18n/en/*.json"
     ignore:
       - LICENSE
-    translation: '%two_letters_code%/%original_file_name%'
+    translation: "/packages/i18n/output/%two_letters_code%/%original_file_name%"
     type: json

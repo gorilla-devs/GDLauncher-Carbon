@@ -1,7 +1,6 @@
 import { app, BrowserWindow, protocol, shell } from "electron";
 import { release } from "os";
 import { join, normalize } from "path";
-import "./samples/electron-store";
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();

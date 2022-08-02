@@ -6,8 +6,18 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@gd/desktop#build": {
+      "dependsOn": ["@gd/core#build", "@gd/ui#build"],
+      "outputs": ["dist/**"]
+    },
+    "@gd/desktop#dev": {
+      "dependsOn": ["@gd/core#dev"],
+      "outputs": ["dist/**"]
+    },
+    "@gd/website#dev": {
+      "outputs": ["dist/**"]
+    },
     "dev": {
-      "dependsOn": ["^dev"],
       "outputs": ["dist/**"]
     }
   }

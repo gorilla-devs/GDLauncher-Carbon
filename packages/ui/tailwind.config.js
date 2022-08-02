@@ -1,11 +1,8 @@
-module.exports = require('./style/tailwind')();
-
+/** @type {import('tailwindcss').Config} */
 module.exports = {
-    theme: {
-        extend: {
-            zIndex: {
-                '55': '55',
-            }
-        }
-    }
-}
+  content: ["./src/**/*.{js,ts,jsx,tsx}"],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};

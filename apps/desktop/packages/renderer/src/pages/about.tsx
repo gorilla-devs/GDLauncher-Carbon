@@ -6,7 +6,7 @@ export default function About() {
   const navigate = useNavigate();
 
   createEffect(() => {
-    console.log(name());
+    console.log(name);
   });
 
   return (
@@ -18,7 +18,7 @@ export default function About() {
       <p>
         <span>We love</span>
         <Suspense fallback={<span>...</span>}>
-          <span>&nbsp;{name()}</span>
+          <span>&nbsp;{name}</span>
         </Suspense>
       </p>
       <button onClick={() => navigate("?m=myModal")}>Open modal</button>
