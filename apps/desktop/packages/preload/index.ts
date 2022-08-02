@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import { contextBridge, ipcRenderer } from "electron";
 import { domReady } from "./utils";
@@ -18,7 +17,6 @@ const { appendLoading, removeLoading } = useLoading();
 })();
 
 // --------- Expose some API to the Renderer process. ---------
-contextBridge.exposeInMainWorld("fs", fs);
 contextBridge.exposeInMainWorld("removeLoading", removeLoading);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
 contextBridge.exposeInMainWorld("computeFibonacci", computeFibonacci);

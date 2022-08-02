@@ -1,13 +1,13 @@
 /* @refresh reload */
-import "tailwindcss/tailwind.css";
-
 import "./samples/electron-store";
-
 import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "solid-app-router";
 import App from "./app";
 import Modals from "./Modals";
+import "tailwindcss/tailwind.css";
+import "@gd/ui/style.css";
+
 
 render(() => {
   onMount(() => {
