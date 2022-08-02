@@ -39,9 +39,10 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                yarn
+                sudo npm i -g pnpm
+                pnpm i
                 chmod -R a+x node_modules
-                yarn build-mac-x64
+                pnpm build-mac-x64
       # MACOS M1
       - when:
           condition:
@@ -56,9 +57,10 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                yarn
+                sudo npm i -g pnpm
+                pnpm i
                 chmod -R a+x node_modules
-                yarn build-mac-arm64
+                pnpm build-mac-arm64
       # LINUX
       - when:
           condition:
@@ -71,9 +73,10 @@ jobs:
                 rustup default nightly
                 node -v
                 cargo --version
-                yarn
+                sudo npm i -g pnpm
+                pnpm i
                 chmod -R a+x node_modules
-                yarn build-linux-x64
+                pnpm build-linux-x64
   buildWin:
     executor:
       name: win/server-2022
@@ -96,8 +99,9 @@ jobs:
             }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          yarn
-          yarn build-win-x64
+          npm i -g pnpm
+          pnpm i
+          pnpm build-win-x64
 
 workflows:
   all-builds:

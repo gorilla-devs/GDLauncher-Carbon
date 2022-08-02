@@ -12,7 +12,7 @@
     "./style.css": "./dist/style.css"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build --",
     "dev": "vite build --watch"
   },
   "devDependencies": {

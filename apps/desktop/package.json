@@ -12,9 +12,6 @@
     "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config .electron-builder.config.js",
     "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json"
   },
-  "dependencies": {
-    "electron-store": "^8.1.0"
-  },
   "devDependencies": {
     "@gd/ui": "*",
     "autoprefixer": "^10.4.8",

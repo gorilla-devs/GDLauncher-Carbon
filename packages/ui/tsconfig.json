@@ -1,5 +1,5 @@
 {
-  "extends": "@gd/config/base.tsconfig.json",
+  // "extends": "@gd/config/base.tsconfig.json",
   "include": ["src"],
   "compilerOptions": {
     "outDir": "./dist"
