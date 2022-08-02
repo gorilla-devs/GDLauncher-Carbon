@@ -1,4 +1,5 @@
 import { createSignal } from "solid-js";
+import { Button } from "@gd/ui";
 
 export default function Home() {
   const [count, setCount] = createSignal(0);
@@ -15,6 +16,8 @@ export default function Home() {
         >
           -
         </button>
+
+        <Button>Hi</Button>
 
         <output class="p-10px">Count: {count}</output>
 

@@ -13,7 +13,7 @@
     "name": "core"
   },
   "devDependencies": {
-    "@napi-rs/cli": "^2.10.1",
+    "@napi-rs/cli": "^2.10.3",
     "cross-env": "^7.0.3"
   }
 }
