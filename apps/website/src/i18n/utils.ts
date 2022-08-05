@@ -28,7 +28,7 @@ const translations = mapDefaultExports<UIDict>(
 export function useTranslations(
     Astro: Readonly<AstroGlobal>
   ): (key: UIDictionaryKeys) => string | undefined {
-    const lang = getLanguageFromURL(Astro.canonicalURL.pathname) || "en";
+    const lang = getLanguageFromURL(Astro.url.pathname) || "en";
     return function getTranslation(key: UIDictionaryKeys) {
       const str =
         translations[lang]?.[key] || translations[fallbackLang][key];

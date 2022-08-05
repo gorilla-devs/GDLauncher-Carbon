@@ -1,12 +1,40 @@
 ---
+import Button from "@/components/Button";
+import Icon from "@/components/Icon";
 import languages from "@/i18n/languages";
-import MainWrapper from "@/layouts/MainWrapper.astro";
+import { useTranslations } from "@/i18n/utils";
+import CaretDown from "~icons/mdi/caret-down";
+import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
 
 export const getStaticPaths = () => Object.keys(languages).map(lang => ({ params: { lang } }));
 
-const { lang } = Astro.params;
+const t = useTranslations(Astro);
 ---
 
-<MainWrapper>
-    <h1 class="h-[calc(100vh-theme(space.28))]">HOME {lang}</h1>
-</MainWrapper>
+<SimpleWrapper>
+
+    <div class="h-[calc(100vh)*7] relative">
+        <div class="relative flex flex-col justify-center items-center pt-1 box-border">
+            <div class="absolute top-0 bottom-0 left-0 right-0">
+                <div class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-800"></div>
+                <img class="z-10 h-full" src="https://cdn.gdlauncher.com/assets/mc_panda.webp"
+                    alt="mc_panda" />
+            </div>
+            <div class="w-full z-20 flex flex-col-reverse justify-between items-center gap-20 max-w-3xl mt-10 sm:mt-32">
+                <div class="py-0 px-4">
+                    <h3 class="text-5xl mb-2 text-bo">{t("home.title")}</h3>
+                    <p class="text-xl mb-12"> 
+                        {t(
+                        "launcher.mockup.description",
+                        )}
+                    </p>
+                    <Button>{t("navbar.download")}</Button>
+                </div>
+                <img class="launcherMockup" src="https://cdn.gdlauncher.com/assets/launcher_mockup.webp"
+                    alt="launcher_mockup" />
+            </div>
+            <Icon icon={CaretDown} class="caret text-5xl" />
+        </div>
+
+    </div>
+</SimpleWrapper>
