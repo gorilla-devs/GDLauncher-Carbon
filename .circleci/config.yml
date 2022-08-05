@@ -1,7 +1,8 @@
 version: 2.1
 
 orbs:
-  win: circleci/windows@4.1.1
+  win: circleci/windows@5.0
+  node: circleci/node@5.0.2
 
 executors:
   linux:
@@ -16,6 +17,8 @@ executors:
     macos:
       xcode: "14.0.0"
     resource_class: medium
+  windows: win/default
+  node: node/default
 
 jobs:
   build:
@@ -78,13 +81,30 @@ jobs:
                 chmod -R a+x node_modules
                 pnpm build-linux-x64
   buildWin:
+    working_directory: ./
     executor:
-      name: win/server-2022
+      name: win/default
       size: medium
     steps:
       - checkout
       - run:
+          name: Install NVM
+          shell: powershell.exe
+          command: choco install nvm -y
+      - run:
+          name: Install Node 16.16.0
+          shell: powershell.exe
+          command: |
+              nvm list
+              nvm install 16.16.0
+              nvm use 16.16.0
+      - run:
+          name: Verify Node Version
+          shell: powershell.exe
+          command: node --version
+      - run:
           name: "Install Rust"
+          shell: powershell.exe
           command: |
             $ProgressPreference = 'Continue'    
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
@@ -92,6 +112,7 @@ jobs:
             $env:path += ";$env:userprofile\.cargo\bin"
 
             rustc -Vv
+            node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
             if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
@@ -102,7 +123,8 @@ jobs:
           npm i -g pnpm
           pnpm i
           pnpm build-win-x64
-
+      - store_artifacts:
+          path: ./apps/desktop/release
 workflows:
   all-builds:
     jobs:
@@ -114,8 +136,9 @@ workflows:
           matrix:
             parameters:
               os: ["linux", "mac", "macm1"]
-      - buildWin
+      - buildWin:
           filters:
             branches:
               only:
                 - master
+                
