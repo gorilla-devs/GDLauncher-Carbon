@@ -1,10 +1,3 @@
-module.exports = {
-  content: [
-    "./packages/renderer/index.html",
-    "./packages/renderer/src/**/*.{js,ts,jsx,tsx}",
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
+const config = require("@gd/config/tailwind.config");
+
+module.exports = config;

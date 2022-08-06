@@ -16,6 +16,7 @@
     "serve": "npm run build -- --config astro.config.node.mjs && node server/index.mjs"
   },
   "devDependencies": {
+    "@gd/config": "workspace:*",
     "@astrojs/solid-js": "^0.4.1",
     "@astrojs/tailwind": "^0.2.5",
     "@iconify/json": "^2.1.86",

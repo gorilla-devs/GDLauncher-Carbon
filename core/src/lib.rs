@@ -1,16 +1,13 @@
 use murmurhash32::murmurhash2;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::io::Read;
+use std::{io::Read, thread, time};
 
-// Here for sentimental reasons.
-#[allow(dead_code)]
 #[napi]
-fn fibonacci(n: u32) -> u32 {
-    match n {
-        1 | 2 => 1,
-        _ => fibonacci(n - 1) + fibonacci(n - 2),
-    }
+pub async fn fibonacci(num: i32, num1: u32) -> u32 {
+    let ten_millis = time::Duration::from_secs(3);
+    thread::sleep(ten_millis);
+    (num as u32) + num1
 }
 
 #[allow(dead_code)]

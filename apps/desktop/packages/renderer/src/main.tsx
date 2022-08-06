@@ -1,12 +1,15 @@
 /* @refresh reload */
 import { onMount } from "solid-js";
 import { render } from "solid-js/web";
-import { Router, hashIntegration } from "solid-app-router";
+// import LogRocket from "logrocket";
+import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
 import Modals from "./Modals";
 import "tailwindcss/tailwind.css";
 import "@gd/ui/style.css";
 
+
+// LogRocket.init("hadq3z/mytest");
 
 render(() => {
   onMount(() => {

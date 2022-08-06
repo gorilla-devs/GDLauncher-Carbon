@@ -3,6 +3,7 @@
 import solid from "@astrojs/solid-js";
 import tailwindIntegration from "@astrojs/tailwind";
 import { defineConfig } from "astro/config";
+import { resolve } from "path";
 import Icons from "unplugin-icons/vite";
 
 // https://astro.build/config
@@ -13,6 +14,7 @@ export default defineConfig({
         compiler: "solid",
       }),
     ],
+    // envDir: resolve(__dirname, "../../"),
   },
   integrations: [solid(), tailwindIntegration()],
 });

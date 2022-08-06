@@ -18,7 +18,8 @@
       "outputs": ["dist/**"]
     },
     "dev": {
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     }
   }
 }

@@ -1,6 +1,3 @@
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
+const config = require("@gd/config/postcss.config");
+
+module.exports = config;

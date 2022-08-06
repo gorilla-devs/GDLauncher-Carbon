@@ -1,5 +1,6 @@
-import { Component } from "solid-js";
-import { Link, useRoutes, useLocation } from "solid-app-router";
+import { Component, createEffect, createSignal, onMount } from "solid-js";
+import { Link, useRoutes, useLocation } from "@solidjs/router";
+import { Transition } from "solid-transition-group";
 
 import { routes } from "./routes";
 
@@ -17,7 +18,7 @@ const App: Component = () => {
             </Link>
           </li>
           <li class="py-2 px-4">
-            <Link href="/about?m=mymodal" class="no-underline hover:underline">
+            <Link href="/about" class="no-underline hover:underline">
               About
             </Link>
           </li>
@@ -39,8 +40,43 @@ const App: Component = () => {
         </ul>
       </nav>
 
-      <main>
-        <Route />
+      <main class="relative">
+        <Transition
+          onEnter={(el, done) => {
+            const a = el.animate(
+              [
+                {
+                  opacity: 0,
+                },
+                {
+                  opacity: 1,
+                },
+              ],
+              {
+                duration: 120,
+              }
+            );
+            a.finished.then(done);
+          }}
+          onExit={(el, done) => {
+            const a = el.animate(
+              [
+                {
+                  opacity: 1,
+                },
+                {
+                  opacity: 0,
+                },
+              ],
+              {
+                duration: 120,
+              }
+            );
+            a.finished.then(done);
+          }}
+        >
+          <Route />
+        </Transition>
       </main>
     </>
   );
