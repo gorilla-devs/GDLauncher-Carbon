@@ -16,6 +16,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.135.0",
     "@gd/config": "workspace:*",
+    "@gd/core": "workspace:*",
     "@gd/ui": "workspace:*",
     "@solidjs/router": "^0.4.2",
     "autoprefixer": "^10.4.8",
