@@ -4,23 +4,9 @@ import { Transition } from "solid-transition-group";
 
 import { routes } from "./routes";
 
-interface LocationChange {
-  prev: string | undefined;
-  next: string | undefined;
-}
-
 const App: Component = () => {
-  const [locationChange, setLocationChange] = createSignal<LocationChange>({
-    prev: undefined,
-    next: undefined,
-  });
   const location = useLocation();
   const Route = useRoutes(routes);
-
-  createEffect((prev: string | undefined) => {
-    setLocationChange({ prev, next: location.pathname });
-    return location.pathname;
-  });
 
   return (
     <>
@@ -57,85 +43,35 @@ const App: Component = () => {
       <main class="relative">
         <Transition
           onEnter={(el, done) => {
-            const { prev, next } = locationChange();
-            const prevIndex = routes.findIndex((v) => v.path === prev);
-            const nextIndex = routes.findIndex((v) => v.path === next);
-            const isForward = nextIndex > prevIndex;
-
-            let transformation;
-            if (
-              prev === undefined ||
-              next === undefined ||
-              prevIndex === -1 ||
-              nextIndex === -1
-            ) {
-              transformation = [{ opacity: 0 }, { opacity: 1 }];
-            } else if (isForward) {
-              transformation = [
+            const a = el.animate(
+              [
                 {
-                  transform: "translateX(100%)",
+                  opacity: 0,
                 },
                 {
-                  transform: "translateX(0%)",
+                  opacity: 1,
                 },
-              ];
-            } else {
-              transformation = [
-                {
-                  transform: "translateX(-100%)",
-                },
-                {
-                  transform: "translateX(0%)",
-                },
-              ];
-            }
-
-            console.log("ENTER", prevIndex, prev, nextIndex, next);
-
-            const a = el.animate(transformation, {
-              duration: 250,
-            });
+              ],
+              {
+                duration: 120,
+              }
+            );
             a.finished.then(done);
           }}
           onExit={(el, done) => {
-            const { prev, next } = locationChange();
-            const prevIndex = routes.findIndex((v) => v.path === prev);
-            const nextIndex = routes.findIndex((v) => v.path === next);
-            const isForward = nextIndex < prevIndex;
-
-            let transformation;
-            if (
-              prev === undefined ||
-              next === undefined ||
-              prevIndex === -1 ||
-              nextIndex === -1
-            ) {
-              transformation = [{ opacity: 1 }, { opacity: 0 }];
-            } else if (isForward) {
-              transformation = [
+            const a = el.animate(
+              [
                 {
-                  transform: "translateX(0%)",
+                  opacity: 1,
                 },
                 {
-                  transform: "translateX(-100%)",
+                  opacity: 0,
                 },
-              ];
-            } else {
-              transformation = [
-                {
-                  transform: "translateX(0%)",
-                },
-                {
-                  transform: "translateX(100%)",
-                },
-              ];
-            }
-
-            console.log("EXIT", prevIndex, prev, nextIndex, next);
-
-            const a = el.animate(transformation, {
-              duration: 250,
-            });
+              ],
+              {
+                duration: 120,
+              }
+            );
             a.finished.then(done);
           }}
         >
