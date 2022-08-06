@@ -10,7 +10,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   return (
-    <section class="bg-gray-100 text-gray-700 p-8">
+    <section class="absolute w-full h-full bg-gray-100 text-gray-700 p-8">
       <h1 class="text-2xl font-bold">Home</h1>
       <p class="mt-4">This is the home page.</p>
 
