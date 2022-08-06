@@ -7,7 +7,7 @@ type Props = {
 
 function Button(props: Props) {
   const c = children(() => props.children);
-  return <div class={`font-main ${style.buttonContainer}`}>{c()}</div>;
+  return <div class={`font-main text-white font-bold ${style.buttonContainer}`}>{c()}</div>;
 }
 
 export default Button;

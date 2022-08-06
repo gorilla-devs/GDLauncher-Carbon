@@ -12,11 +12,10 @@ const currentPage = url.pathname;
     <HeadCommon />
 </head>
 
-<body class="font-main w-full bg-gray-800">
+<body class="font-main w-full bg-gray-800 font-[ubuntu]">
     <Navbar currentPage={currentPage} />
     <main class="text-white">
         <slot></slot>
     </main>
 </body>
-
 </html>
