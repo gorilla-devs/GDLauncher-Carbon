@@ -6,7 +6,7 @@ module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: "Copyright © 2022 ${author}",
-  asar: true,
+  asar: false,
   directories: {
     output: "release/${version}",
     buildResources: "build",
@@ -36,7 +36,7 @@ module.exports = {
   },
   mac: {
     target: {
-      target: "dmg",
+      target: "dir",
     },
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",

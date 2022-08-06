@@ -11,10 +11,10 @@ napi = { version = "2", features = [
   "tokio_fs",
   "napi8",
   "tokio_rt",
-  "async",
+  "async"
 ]}
 futures = "0.3.21"
-napi-derive = "2"
+napi-derive = { version = "2", features = ["type-def"] }
 tokio = "1.19.2"
 murmurhash32 = {git = "https://github.com/gorilla-devs/murmurhash32.git"}
 

@@ -1,5 +1,12 @@
-import { build } from 'vite'
+import { build } from "vite";
 
-await build({ configFile: 'packages/main/vite.config.ts' })
-await build({ configFile: 'packages/preload/vite.config.ts' })
-await build({ configFile: 'packages/renderer/vite.config.ts' })
+await build({ configFile: "packages/main/vite.config.ts", mode: "production" });
+await build({
+  configFile: "packages/preload/vite.config.ts",
+  mode: "production",
+});
+await build({
+  configFile: "packages/renderer/vite.config.ts",
+  mode: "production",
+  optimizeDeps: true,
+});

@@ -1,31 +1,19 @@
-import path from "path";
 import { contextBridge, ipcRenderer } from "electron";
 import { domReady } from "./utils";
 import { useLoading } from "./loading";
-
-const nAPIPath =
-  import.meta.env.MODE === "development" ? "../../core" : __dirname;
-
-const addon = require(path.resolve(nAPIPath, "core.node"));
+import napi from "./napi";
 
 const { appendLoading, removeLoading } = useLoading();
 
 (async () => {
   await domReady();
-
   appendLoading();
 })();
 
 // --------- Expose some API to the Renderer process. ---------
 contextBridge.exposeInMainWorld("removeLoading", removeLoading);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
-contextBridge.exposeInMainWorld("computeFibonacci", computeFibonacci);
-
-function computeFibonacci() {
-  const res = addon.fibonacci(45);
-  console.log(res);
-  return res;
-}
+contextBridge.exposeInMainWorld(import.meta.env.VITE_NAPI_ID, napi);
 
 // `exposeInMainWorld` can't detect attributes and methods of `prototype`, manually patching it.
 function withPrototype(obj: Record<string, any>) {

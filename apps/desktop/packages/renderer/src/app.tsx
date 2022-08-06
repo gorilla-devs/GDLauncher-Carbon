@@ -1,11 +1,15 @@
-import { Component } from "solid-js";
-import { Link, useRoutes, useLocation } from "solid-app-router";
+import { Component, createEffect, onMount } from "solid-js";
+import { Link, useRoutes, useLocation } from "@solidjs/router";
 
 import { routes } from "./routes";
 
 const App: Component = () => {
   const location = useLocation();
   const Route = useRoutes(routes);
+
+  // createEffect(() => {
+  //   console.log(location.pathname, location.search);
+  // });
 
   return (
     <>

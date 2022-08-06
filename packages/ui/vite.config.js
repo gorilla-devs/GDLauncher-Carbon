@@ -5,13 +5,6 @@ import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 
 export default defineConfig({
-  // resolve: {
-  //   alias: {
-  //     // eslint-disable-next-line @typescript-eslint/naming-convention
-  //     "~ui": path.resolve(__dirname, "./src"),
-  //   },
-  // },
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
   plugins: [
     solidPlugin(),
     dts({

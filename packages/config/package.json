@@ -3,11 +3,9 @@
   "version": "0.0.0",
   "main": "index.js",
   "files": [
-    "eslint-preset.js",
+    "postcss.config.js",
+    "tailwind.config.js",
     "base.tsconfig.json"
   ],
-  "devDependencies": {
-    "vite-plugin-resolve": "^2.1.2",
-    "vite-plugin-solid": "^2.3.0"
-  }
+  "devDependencies": {}
 }

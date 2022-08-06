@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "solid-app-router";
+import { useLocation, useNavigate } from "@solidjs/router";
 import {
   Component,
   createEffect,

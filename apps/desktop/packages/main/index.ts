@@ -1,6 +1,6 @@
-import { app, BrowserWindow, protocol, shell } from "electron";
+import { app, BrowserWindow, session, shell } from "electron";
 import { release } from "os";
-import { join, normalize } from "path";
+import { join } from "path";
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
@@ -29,7 +29,9 @@ async function createWindow() {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
     const url = `http://${process.env["VITE_DEV_SERVER_HOST"]}:${process.env["VITE_DEV_SERVER_PORT"]}`;
 
-    win.loadURL(url);
+    win.loadURL(url, {
+      userAgent: "GDLauncher Carbon",
+    });
   }
   win.webContents.openDevTools();
 
@@ -46,6 +48,32 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    {
+      urls: ["http://*/*", "https://*/*"],
+    },
+    (details, callback) => {
+      details.requestHeaders["Origin"] = "https://app.gdlauncher.com";
+      callback({ requestHeaders: details.requestHeaders });
+    }
+  );
+
+  session.defaultSession.webRequest.onHeadersReceived(
+    {
+      urls: ["http://*/*", "https://*/*"],
+    },
+    (details, callback) => {
+      // eslint-disable-next-line
+      delete details.responseHeaders!["Access-Control-Allow-Origin"];
+      // eslint-disable-next-line
+      delete details.responseHeaders!["access-control-allow-origin"];
+      details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"];
+      callback({
+        cancel: false,
+        responseHeaders: details.responseHeaders,
+      });
+    }
+  );
   createWindow();
 });
 

@@ -1,9 +1,11 @@
+import { resolve } from "path";
 import { builtinModules } from "module";
 import { defineConfig } from "vite";
 import pkg from "../../package.json";
 
 export default defineConfig({
   root: __dirname,
+  envDir: resolve(__dirname, "../../../../"),
   build: {
     outDir: "../../dist/preload",
     lib: {
@@ -17,7 +19,7 @@ export default defineConfig({
       external: [
         "electron",
         ...builtinModules,
-        ...Object.keys(pkg.dependencies || {}),
+        // ...Object.keys(pkg.dependencies || {}),
       ],
     },
   },
