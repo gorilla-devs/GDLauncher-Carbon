@@ -11,7 +11,8 @@ importers:
   apps/desktop:
     specifiers:
       '@aws-sdk/client-s3': ^3.135.0
-      '@gd/ui': '*'
+      '@gd/config': workspace:*
+      '@gd/ui': workspace:*
       '@solidjs/router': ^0.4.2
       autoprefixer: ^10.4.8
       cssnano: ^5.1.12
@@ -27,6 +28,7 @@ importers:
       vite-plugin-solid: ^2.3.0
     devDependencies:
       '@aws-sdk/client-s3': 3.142.0
+      '@gd/config': link:../../packages/config
       '@gd/ui': link:../../packages/ui
       '@solidjs/router': 0.4.2_solid-js@1.4.8
       autoprefixer: 10.4.8_postcss@8.4.14
@@ -46,6 +48,7 @@ importers:
     specifiers:
       '@astrojs/solid-js': ^0.4.1
       '@astrojs/tailwind': ^0.2.5
+      '@gd/config': workspace:*
       '@iconify/json': ^2.1.86
       '@svgr/core': ^6.3.1
       astro: ^1.0.0-rc.3
@@ -67,6 +70,7 @@ importers:
     devDependencies:
       '@astrojs/solid-js': 0.4.1_motrryvgq5ajmlbt6atggvzy5u
       '@astrojs/tailwind': 0.2.5
+      '@gd/config': link:../../packages/config
       '@iconify/json': 2.1.86
       '@svgr/core': 6.3.1
       astro: 1.0.0-rc.3_sass@1.54.0
@@ -85,9 +89,11 @@ importers:
 
   core:
     specifiers:
+      '@gd/config': workspace:*
       '@napi-rs/cli': ^2.10.3
       cross-env: ^7.0.3
     devDependencies:
+      '@gd/config': link:../packages/config
       '@napi-rs/cli': 2.10.3
       cross-env: 7.0.3
 
@@ -97,6 +103,7 @@ importers:
   packages/ui:
     specifiers:
       '@fontsource/ubuntu': ^4.5.10
+      '@gd/config': workspace:*
       autoprefixer: ^10.4.8
       cssnano: ^5.1.12
       postcss: ^8.4.14
@@ -109,6 +116,7 @@ importers:
       '@fontsource/ubuntu': 4.5.10
       tailwindcss: 3.1.7
     devDependencies:
+      '@gd/config': link:../config
       autoprefixer: 10.4.8_postcss@8.4.14
       cssnano: 5.1.12_postcss@8.4.14
       postcss: 8.4.14
@@ -7727,7 +7735,7 @@ packages:
       merge-anything: 5.0.2
       solid-js: 1.4.8
       solid-refresh: 0.4.1_solid-js@1.4.8
-      vite: 3.0.4
+      vite: 3.0.4_sass@1.54.0
     transitivePeerDependencies:
       - supports-color
     dev: true
