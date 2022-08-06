@@ -1,5 +1,5 @@
 {
-  "extends": "@gd/config/base.tsconfig.json",
+  "extends": "@gd/config/tsconfig.json",
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],
   "exclude": ["dist/**/*", "node_modules"]
 }
