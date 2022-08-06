@@ -30,4 +30,9 @@ export default defineConfig({
     target: "esnext",
     polyfillDynamicImport: false,
   },
+  resolve: {
+    alias: {
+      "@": path.join(__dirname, "src"),
+    },
+  },
 });

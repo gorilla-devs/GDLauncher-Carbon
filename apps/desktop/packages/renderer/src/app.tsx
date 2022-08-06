@@ -58,6 +58,9 @@ const App: Component = () => {
             );
             a.finished.then(done);
           }}
+          onAfterEnter={(el) => {
+            el.classList.add("opacity-100");
+          }}
           onExit={(el, done) => {
             const a = el.animate(
               [

@@ -1,5 +1,4 @@
 import { children, createSignal, createEffect } from "solid-js";
-import styles from "./styles.module.scss";
 
 type Props = {
   children: HTMLElement | string;
