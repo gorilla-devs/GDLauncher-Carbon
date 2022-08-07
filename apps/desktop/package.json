@@ -23,6 +23,7 @@
     "cssnano": "^5.1.12",
     "electron": "19.0.10",
     "electron-builder": "^23.3.3",
+    "event-lite": "^0.1.2",
     "logrocket": "3.0.1",
     "postcss": "^8.4.14",
     "solid-js": "^1.4.8",

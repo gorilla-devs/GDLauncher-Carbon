@@ -46,7 +46,7 @@ export default function Home() {
           Compute value
         </button>
         <div />
-        {value}
+        {value()}
         <div />
       </section>
     </Page>
