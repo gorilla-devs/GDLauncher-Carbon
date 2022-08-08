@@ -7,7 +7,7 @@ import App from "./app";
 import Modals from "./Modals";
 import "tailwindcss/tailwind.css";
 import "@gd/ui/style.css";
-
+import "./utils/napi";
 
 // LogRocket.init("hadq3z/mytest");
 
