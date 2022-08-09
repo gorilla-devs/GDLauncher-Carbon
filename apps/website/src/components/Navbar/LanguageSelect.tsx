@@ -9,7 +9,7 @@ const LanguageSelect: Component<{lang: string}> = ({lang}) => {
         value={lang}
         aria-label="Select language"
         onChange={(e) => {
-          const newLang = e.target.value;
+          const newLang = e.currentTarget.value;
           const [_leadingSlash, _oldLang, ...rest] =
             window.location.pathname.split("/");
           const slug = rest.join("/");
