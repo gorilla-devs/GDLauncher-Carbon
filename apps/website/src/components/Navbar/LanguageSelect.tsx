@@ -13,7 +13,7 @@ const LanguageSelect: Component<{lang: string}> = ({lang}) => {
           const [_leadingSlash, _oldLang, ...rest] =
             window.location.pathname.split("/");
           const slug = rest.join("/");
-          window.location.pathname = `/${newLang}/${slug}`;
+          window.location.pathname = `/${newLang}${`${slug ? `/${slug}` : ""}`}`;
         }}
       >
         {Object.entries(languages).map(([code, name]) => (
