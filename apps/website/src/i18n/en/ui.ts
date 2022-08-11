@@ -19,4 +19,9 @@ export default {
   "features.curseforgeIntegration": "Curseforge Integrations",
   "features.modsManager": "Build-In Mods Manager",
   "features.javaAutoInstall": "Auto Java Installation",
+  "features.easyToUse": "Easy To Use User Interface",
+  "features.darkLightMode": "Dark & Light Mode",
+  "features.automaticUpdater": "Automatic Updater",
+  "features.importModpacks": "Import/Export Modpacks",
+  "features.ftb": "Feed The Beast Integrations",
 };
