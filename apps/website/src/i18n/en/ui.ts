@@ -14,4 +14,9 @@ export default {
   "home.createYourOwn_text3": "Modify any pre-existing modpack to add custom mods, resource packs, or maps.",
   "launcher.mockup.description":
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+  "home.features": "Features",
+  "home.features_subitle": "See what makes GDLauncher so special.",
+  "features.curseforgeIntegration": "Curseforge Integrations",
+  "features.modsManager": "Build-In Mods Manager",
+  "features.javaAutoInstall": "Auto Java Installation",
 };
