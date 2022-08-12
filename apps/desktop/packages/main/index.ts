@@ -1,6 +1,9 @@
 import { app, BrowserWindow, session, shell } from "electron";
 import { release } from "os";
 import { join } from "path";
+import { autoUpdater } from "electron-updater";
+
+console.log(autoUpdater);
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
@@ -20,7 +23,7 @@ async function createWindow() {
     title: "Main window",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
-      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
+      sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
 

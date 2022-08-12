@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
-    "build": "npm run typecheck && node scripts/build.mjs && electron-builder --config .electron-builder.config.js",
+    "build": "npm run typecheck && node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
     "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json"
   },
   "devDependencies": {
@@ -23,6 +23,7 @@
     "cssnano": "^5.1.12",
     "electron": "20.0.2",
     "electron-builder": "^23.3.3",
+    "electron-updater": "^5.2.1",
     "event-lite": "^0.1.2",
     "logrocket": "3.0.1",
     "postcss": "^8.4.16",
