@@ -16,7 +16,7 @@
   },
   "devDependencies": {
     "@gd/config": "workspace:*",
-    "@napi-rs/cli": "^2.10.3",
+    "@napi-rs/cli": "^2.11.3",
     "cross-env": "^7.0.3"
   }
 }

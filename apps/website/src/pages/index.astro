@@ -7,3 +7,6 @@ const { lang } = Astro.params;
 ---
 
 <meta http-equiv="refresh" content={`0;url=/${lang || 'en'}`} />
+
+<Button client:only="solid">Ciao</Button>
+
