@@ -4,14 +4,21 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "core.node"]
+    },
+    "@gd/desktop#build": {
+      "cache": false
     },
     "@gd/desktop#dev": {
       "dependsOn": ["^@gd/core#dev", "^@gd/ui#build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "dev": {
       "outputs": ["dist/**"]
     }
-  }
+  },
+  "globalDependencies": [
+    ".env"
+  ]
 }

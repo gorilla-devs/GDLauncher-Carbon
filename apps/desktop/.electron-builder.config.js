@@ -6,7 +6,7 @@ module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: "Copyright © 2022 ${author}",
-  asar: false,
+  asar: true,
   directories: {
     output: "release/${version}",
     buildResources: "build",
