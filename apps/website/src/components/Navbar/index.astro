@@ -49,7 +49,7 @@ const t = useTranslations(Astro);
   </div>
 </div>
 <div
-  class="mobile-menu hidden absolute top-0 bottom-0 left-0 right-0 flex-col justify-center items-center bg-gray-900 padding-4 z-30">
+  class="mobile-menu hidden fixed top-0 bottom-0 left-0 right-0 flex-col justify-center items-center bg-gray-900 padding-4 z-30">
   <div class="flex flex-col justify-center items-center gap-4">
     {linksList.map((props) => (
     <a class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400 ${
