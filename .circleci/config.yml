@@ -9,6 +9,10 @@ executors:
     docker:
       - image: cimg/rust:1.62.0-node
     resource_class: medium
+  website:
+    docker:
+      - image: cimg/rust:1.62.0-node
+    resource_class: medium
   mac:
     macos:
       xcode: "14.0.0"
@@ -80,6 +84,18 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
                 pnpm build-linux-x64
+      # LINUX WEBSITE
+      - when:
+          condition:
+            and:
+              - equal: ["website", <<parameters.os>>]
+          steps:
+            - run: |
+                node -v
+                sudo npm i -g pnpm
+                pnpm i
+                chmod -R a+x node_modules
+                pnpm build-web
   buildWin:
     working_directory: ./
     executor:
@@ -135,7 +151,7 @@ workflows:
                 - master
           matrix:
             parameters:
-              os: ["linux", "mac", "macm1"]
+              os: ["linux", "mac", "macm1", "website"]
       - buildWin:
           filters:
             branches:
