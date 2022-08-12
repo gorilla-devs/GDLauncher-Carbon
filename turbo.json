@@ -6,20 +6,12 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@gd/desktop#build": {
-      "dependsOn": ["@gd/core#build", "@gd/ui#build"],
-      "outputs": ["dist/**"]
-    },
     "@gd/desktop#dev": {
-      "dependsOn": ["@gd/core#dev"],
-      "outputs": ["dist/**"]
-    },
-    "@gd/website#dev": {
+      "dependsOn": ["^@gd/core#dev", "^@gd/ui#build"],
       "outputs": ["dist/**"]
     },
     "dev": {
-      "outputs": ["dist/**"],
-      "cache": false
+      "outputs": ["dist/**"]
     }
   }
 }

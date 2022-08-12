@@ -29,6 +29,7 @@ export default defineConfig({
     },
     target: "esnext",
     polyfillDynamicImport: false,
+    emptyOutDir: false,
   },
   resolve: {
     alias: {

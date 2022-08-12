@@ -20,6 +20,7 @@ async function createWindow() {
     title: "Main window",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
+      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
 

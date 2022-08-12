@@ -15,6 +15,9 @@ export default defineConfig({
       }),
     ],
     // envDir: resolve(__dirname, "../../"),
+    ssr: {
+      noExternal: "style.css", // from @gd/ui
+    },
   },
   integrations: [solid(), tailwindIntegration()],
 });
