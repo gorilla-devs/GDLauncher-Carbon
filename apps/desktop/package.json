@@ -11,7 +11,7 @@
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
     "build": "npm run typecheck && node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
-    "typecheck": "tsc --noEmit --project packages/renderer/tsconfig.json"
+    "typecheck": "tsc --noEmit --project packages/mainWindow/tsconfig.json && tsc --noEmit --project packages/mcLogWindow/tsconfig.json"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.145.0",
