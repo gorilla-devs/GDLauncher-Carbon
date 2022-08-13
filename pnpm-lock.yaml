@@ -20,6 +20,7 @@ importers:
       electron: 20.0.2
       electron-builder: ^23.3.3
       electron-updater: ^5.2.1
+      esm: 3.2.25
       event-lite: ^0.1.2
       logrocket: 3.0.1
       postcss: ^8.4.16
@@ -29,6 +30,8 @@ importers:
       typescript: ^4.7.4
       vite: ^3.0.6
       vite-plugin-solid: ^2.3.0
+    dependencies:
+      esm: 3.2.25
     devDependencies:
       '@aws-sdk/client-s3': 3.145.0
       '@gd/config': link:../../packages/config
@@ -3884,6 +3887,11 @@ packages:
     resolution: {integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw==}
     engines: {node: '>=12'}
     dev: true
+
+  /esm/3.2.25:
+    resolution: {integrity: sha512-U1suiZ2oDVWv4zPO56S0NcR5QriEahGtdN2OR6FiOG4WJvcjBVFB0qI4+eKoWFH483PKGuLuu6V8Z4T5g63UVA==}
+    engines: {node: '>=6'}
+    dev: false
 
   /esprima/4.0.1:
     resolution: {integrity: sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==}
