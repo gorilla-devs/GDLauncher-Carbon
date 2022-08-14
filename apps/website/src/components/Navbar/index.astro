@@ -16,7 +16,7 @@ export interface Props {
 
 const { currentPage } = Astro.props as Props;;
 const lang = currentPage && getLanguageFromURL(currentPage);
-const t = useTranslations(Astro);
+const t = useTranslations(Astro.url.pathname);
 
 ---
 

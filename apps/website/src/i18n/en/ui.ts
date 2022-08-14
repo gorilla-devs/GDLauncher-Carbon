@@ -24,4 +24,8 @@ export default {
   "features.automaticUpdater": "Automatic Updater",
   "features.importModpacks": "Import/Export Modpacks",
   "features.ftb": "Feed The Beast Integrations",
+  "modloader.none_title": "All platforms covered.",
+  "modloader.none_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "modloader.vanilla_title": "All platforms covered.",
+  "modloader.vanilla_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
 };
