@@ -9,9 +9,9 @@ function DefaultSection() {
         <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
           <div class="py-0 px-4 max-w-2xl">
             <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
-              {t("modloader.vanilla_title")}
+              {t("modloader.none_title")}
             </h3>
-            <p class="text-xl mb-12 font-light">{t("modloader.vanilla_text")}</p>
+            <p class="text-xl mb-12 font-light">{t("modloader.none_text")}</p>
           </div>
           <div>
             <img

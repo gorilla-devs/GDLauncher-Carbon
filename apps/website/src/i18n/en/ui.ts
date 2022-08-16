@@ -1,4 +1,6 @@
 export default {
+  "generic.donate_kofi_title": "Donate on Ko-fi",
+  "generic.donate_kofi_text": "Consider supporting the development of the GDLauncher. Even a dollar helps!",
   "navbar.home": "Home",
   "navbar.download": "Download",
   "navbar.homepage": "HomePage",
@@ -15,6 +17,8 @@ export default {
   "launcher.mockup.description":
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
   "home.features": "Features",
+  "home.donate_title": "Donate to GDLauncher",
+  "home.donate_text": "Consider supporting the development of the GDLauncher. Even a dollar helps!",
   "home.features_subitle": "See what makes GDLauncher so special.",
   "features.curseforgeIntegration": "Curseforge Integrations",
   "features.modsManager": "Build-In Mods Manager",
@@ -26,6 +30,10 @@ export default {
   "features.ftb": "Feed The Beast Integrations",
   "modloader.none_title": "All platforms covered.",
   "modloader.none_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-  "modloader.vanilla_title": "All platforms covered.",
+  "modloader.vanilla_title": "Vanilla",
   "modloader.vanilla_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "modloader.forge_title": "Forge",
+  "modloader.forge_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "modloader.fabric_title": "Fabric",
+  "modloader.fabric_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
 };

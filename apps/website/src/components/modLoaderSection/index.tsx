@@ -11,10 +11,6 @@ enum sectionType {
   none = "none",
 }
 
-type Props = {
-  t: any;
-};
-
 function Section(props: { type: sectionType }) {
   const t = useTranslations(window.location.pathname);
 
@@ -35,7 +31,7 @@ function Section(props: { type: sectionType }) {
             </div>
             <div>
               <img
-                class="w-full"
+                class="w-full min-w-[50%]"
                 src={composeCDNAssetLink("launcher_mockup.webp")}
                 alt="launcher_mockup"
               />
@@ -44,10 +40,46 @@ function Section(props: { type: sectionType }) {
         </div>
       </Match>
       <Match when={reactiveProps.type === sectionType.forge}>
-        <div>Forge</div>
+        <div class="pt-32">
+          <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
+            <div class="py-0 px-4 max-w-2xl">
+              <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
+                {t("modloader.forge_title")}
+              </h3>
+              <p class="text-xl mb-12 font-light">
+                {t("modloader.forge_text")}
+              </p>
+            </div>
+            <div>
+              <img
+                class="w-full"
+                src={composeCDNAssetLink("launcher_mockup.webp")}
+                alt="launcher_mockup"
+              />
+            </div>
+          </div>
+        </div>
       </Match>
       <Match when={reactiveProps.type === sectionType.fabric}>
-        <div>Fabric</div>
+        <div class="pt-32">
+          <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
+            <div class="py-0 px-4 max-w-2xl">
+              <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
+                {t("modloader.vanilla_title")}
+              </h3>
+              <p class="text-xl mb-12 font-light">
+                {t("modloader.vanilla_text")}
+              </p>
+            </div>
+            <div>
+              <img
+                class="w-full"
+                src={composeCDNAssetLink("launcher_mockup.webp")}
+                alt="launcher_mockup"
+              />
+            </div>
+          </div>
+        </div>
       </Match>
     </Switch>
   );
