@@ -163,19 +163,19 @@ const t = useTranslations(Astro.url.pathname);
             </div>
         </div>
         <ModLoaderSection client:only="solid" />
-        <div class={`relative flex flex-col justify-center items-center pt-1 box-border h-screen
-            bg-[url("https://cdn.gdlauncher.com/assets/mc_forest.webp")] bg-no-repeat pb-32`}>
+        <div class={`relative flex flex-col justify-center items-center box-border
+            bg-[url("https://cdn.gdlauncher.com/assets/mc_forest.webp")] bg-no-repeat py-32`}>
             <div
                 class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
                 <div class="absolute top-0 bottom-0 left-0 right-0">
-                    <div class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-800"></div>
+                    <div class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-900"></div>
                 </div>
-                <div class="py-0 px-4 max-w-2xl z-20">
-                    <h3 class="text-5xl lg:text-8xl mb-2 font-bold">{t("generic.donate_kofi_title")}</h3>
-                    <p class="text-xl mb-12 font-light">
+                <div class="py-0 px-4 max-w-5xl z-20">
+                    <h3 class="text-4xl lg:text-6xl mb-12 font-bold">{t("generic.donate")}</h3>
+                    <p class="text-xl mb-12 font-light max-w-lg">
                         {t("generic.donate_kofi_text")}
                     </p>
-                    <Button class="bg-[#FF5E5B] h-[4rem]">{t("navbar.download")}</Button>
+                    <Button class="bg-[#FF5E5B] h-[4rem]">{t("generic.donate_kofi_title")}</Button>
                 </div>
             </div>
         </div>

@@ -1,4 +1,5 @@
 export default {
+  "generic.donate": "Donate to GDLauncher",
   "generic.donate_kofi_title": "Donate on Ko-fi",
   "generic.donate_kofi_text": "Consider supporting the development of the GDLauncher. Even a dollar helps!",
   "navbar.home": "Home",

@@ -1,8 +1,6 @@
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import { t } from "i18next";
 import { mergeProps, createSignal, Switch, Match } from "solid-js";
-import DefaultSection from "./Sections/defaultSection";
 
 enum sectionType {
   vanilla = "vanilla",
@@ -11,77 +9,70 @@ enum sectionType {
   none = "none",
 }
 
+const images = {
+  vanilla: 'vanilla_integration.webp', 
+  forge: 'forge_integration.webp', 
+  fabric: 'fabric_integration.webp', 
+  none: 'all_platforms_covered.webp', 
+}
+
 function Section(props: { type: sectionType }) {
   const t = useTranslations(window.location.pathname);
 
   const reactiveProps = mergeProps(props);
 
   return (
-    <Switch fallback={<DefaultSection />}>
-      <Match when={reactiveProps.type === sectionType.vanilla}>
-        <div class="pt-32">
-          <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
-            <div class="py-0 px-4 max-w-2xl">
+    <div class="pt-32 flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
+      <div class="relatove w-4/5 lg:w-full z-20 max-w-7xl flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
+        <div class="absolute py-0 px-4 max-w-2xl z-30">
+          <Switch
+            fallback={
+              <>
+                <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
+                  {t("modloader.none_title")}
+                </h3>
+                <p class="text-xl mb-12 font-light">
+                  {t("modloader.none_text")}
+                </p>
+              </>
+            }
+          >
+            <Match when={reactiveProps.type === sectionType.vanilla}>
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                 {t("modloader.vanilla_title")}
               </h3>
               <p class="text-xl mb-12 font-light">
                 {t("modloader.vanilla_text")}
               </p>
-            </div>
-            <div>
-              <img
-                class="w-full min-w-[50%]"
-                src={composeCDNAssetLink("launcher_mockup.webp")}
-                alt="launcher_mockup"
-              />
-            </div>
-          </div>
-        </div>
-      </Match>
-      <Match when={reactiveProps.type === sectionType.forge}>
-        <div class="pt-32">
-          <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
-            <div class="py-0 px-4 max-w-2xl">
+            </Match>
+            <Match when={reactiveProps.type === sectionType.forge}>
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                 {t("modloader.forge_title")}
               </h3>
               <p class="text-xl mb-12 font-light">
                 {t("modloader.forge_text")}
               </p>
-            </div>
-            <div>
-              <img
-                class="w-full"
-                src={composeCDNAssetLink("launcher_mockup.webp")}
-                alt="launcher_mockup"
-              />
-            </div>
-          </div>
-        </div>
-      </Match>
-      <Match when={reactiveProps.type === sectionType.fabric}>
-        <div class="pt-32">
-          <div class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl">
-            <div class="py-0 px-4 max-w-2xl">
+            </Match>
+            <Match when={reactiveProps.type === sectionType.fabric}>
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
-                {t("modloader.vanilla_title")}
+                {t("modloader.fabric_title")}
               </h3>
               <p class="text-xl mb-12 font-light">
-                {t("modloader.vanilla_text")}
+                {t("modloader.fabric_text")}
               </p>
-            </div>
-            <div>
-              <img
-                class="w-full"
-                src={composeCDNAssetLink("launcher_mockup.webp")}
-                alt="launcher_mockup"
-              />
-            </div>
-          </div>
+            </Match>
+          </Switch>
         </div>
-      </Match>
-    </Switch>
+        <div>
+          <img
+            class="w-full opacity-10 lg:opacity-100"
+            loading="lazy"
+            src={composeCDNAssetLink(images[reactiveProps.type])}
+            alt="launcher_mockup"
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
