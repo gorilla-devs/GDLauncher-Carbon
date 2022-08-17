@@ -1,5 +1,13 @@
 {
   "extends": "@gd/config/tsconfig.json",
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["dist/**/*", "node_modules"]
+  "exclude": ["dist/**/*", "node_modules"],
+  "compilerOptions": {
+    "types": ["unplugin-icons/types/solid"],
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
 }
