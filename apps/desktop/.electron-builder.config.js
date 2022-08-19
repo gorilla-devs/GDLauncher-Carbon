@@ -87,7 +87,7 @@ module.exports = {
     } else if (context.electronPlatformName === "linux") {
       if (context.arch === 1) {
         // x64
-        spawnSync("pnpm", ["core-build", "-- linux32-x64"], {
+        spawnSync("pnpm", ["core-build", "-- linux-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
