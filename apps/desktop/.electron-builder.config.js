@@ -11,7 +11,16 @@ module.exports = {
     output: "release/${version}",
     buildResources: "build",
   },
-  files: ["dist"],
+  files: [
+    "dist",
+    "package.json",
+  ],
+  extraResources: [
+    {
+      from: "../../core/core.node",
+      to: "core.node",
+    },
+  ],
   npmRebuild: false,
   protocols: [
     {
@@ -85,7 +94,5 @@ module.exports = {
         });
       }
     }
-
-    await fs.copyFile("../../core/core.node", "dist/preload/core.node");
   },
 };

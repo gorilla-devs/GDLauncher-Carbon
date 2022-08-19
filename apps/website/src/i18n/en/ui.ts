@@ -2,6 +2,7 @@ export default {
   "generic.donate": "Donate to GDLauncher",
   "generic.donate_kofi_title": "Donate on Ko-fi",
   "generic.donate_kofi_text": "Consider supporting the development of the GDLauncher. Even a dollar helps!",
+  "generic.learn_more": "Learn More",
   "navbar.home": "Home",
   "navbar.download": "Download",
   "navbar.homepage": "HomePage",
@@ -37,4 +38,6 @@ export default {
   "modloader.forge_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
   "modloader.fabric_title": "Fabric",
   "modloader.fabric_text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "team.title": "Meet the Team",
+  "team.text": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
 };

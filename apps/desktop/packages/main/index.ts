@@ -28,10 +28,10 @@ async function createWindow() {
   });
 
   if (app.isPackaged) {
-    win.loadFile(join(__dirname, "../renderer/index.html"));
+    win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
-    const url = `http://${process.env["VITE_DEV_SERVER_HOST"]}:${process.env["VITE_DEV_SERVER_PORT"]}`;
+    const url = `http://${process.env["VITE_DEV_SERVER_HOST"]}:${process.env["VITE_DEV_MAIN_WINDOW_PORT"]}`;
 
     win.loadURL(url, {
       userAgent: "GDLauncher Carbon",

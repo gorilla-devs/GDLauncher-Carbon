@@ -6,7 +6,12 @@ await build({
   mode: "production",
 });
 await build({
-  configFile: "packages/renderer/vite.config.ts",
+  configFile: "packages/mainWindow/vite.config.ts",
+  mode: "production",
+  optimizeDeps: true,
+});
+await build({
+  configFile: "packages/mcLogWindow/vite.config.ts",
   mode: "production",
   optimizeDeps: true,
 });

@@ -11,6 +11,9 @@
     "jsxImportSource": "solid-js",
     "types": ["vite/client"],
     "noEmit": true,
+    "paths": {
+      "@/*": ["packages/mainWindow/src/*"]
+    }
   },
   "include": ["src"]
 }
