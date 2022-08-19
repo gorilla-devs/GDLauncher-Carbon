@@ -1,0 +1,53 @@
+---
+import { useTranslations } from "@/i18n/utils";
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+
+const t = useTranslations(Astro.url.pathname);
+---
+
+<footer
+    class="h-auto md:h-96 bg-slate-900 w-screen"
+>
+    <div class="h-full w-full max-w-7xl my-0 mx-auto">
+        <div
+            class="h-full flex flex-col gap-10 md:gap-0 pl-10 md:pl-0 md:flex-row justify-evenly items-start text-white"
+        >
+            <div class="flex flex-col">
+                <img
+                    class="mb-10"
+                    src={composeCDNAssetLink("gdlauncher_wide_logo.webp")}
+                    alt="gdlauncher_wide_logo"
+                />
+                <p class="text-xl max-w-sm">
+                    {t("footer.text")}
+                </p>
+            </div>
+            <div class="flex flex-col justify-between items-start gap-4">
+                <h3 class="font-bold">{t("footer.home")}</h3>
+                <a class="text-xl text-slate-400">{t("footer.about")}</a>
+                <a class="text-xl text-slate-400">{t("footer.features")}</a>
+                <a class="text-xl text-slate-400">{t("footer.team")}</a>
+                <a class="text-xl text-slate-400">{t("footer.timeline")}</a>
+                <a class="text-xl text-slate-400">{t("footer.contact")}</a>
+            </div>
+            <div class="flex flex-col justify-between items-start gap-4">
+                <h3 class="font-bold">{t("footer.download")}</h3>
+                <a class="text-xl text-slate-400">{t("footer.windows")}</a>
+                <a class="text-xl text-slate-400">{t("footer.macos")}</a>
+                <a class="text-xl text-slate-400">{t("footer.linux")}</a>
+            </div>
+            <div class="flex flex-col justify-between items-start gap-4">
+                <h3 class="font-bold">{t("footer.legal")}</h3>
+                <a class="text-xl text-slate-400"
+                    >{t("footer.termsNCondition")}
+                </a>
+                <a class="text-xl text-slate-400">{t("footer.policy")}</a>
+            </div>
+        </div>
+    </div>
+    <div
+        class="h-20 bg-blue-400 text-white flex justify-center items-center text-2xl"
+    >
+        {t("footer.copyright_text")}
+    </div>
+</footer>
