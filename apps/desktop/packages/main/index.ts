@@ -94,7 +94,8 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 
-app.on("second-instance", () => {
+app.on("second-instance", (e, argv) => {
+  dialog.showErrorBox('Welcome Back', `You arrived from: ${argv}`)
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
