@@ -1,9 +1,7 @@
-import { app, BrowserWindow, session, shell } from "electron";
+import { app, BrowserWindow, dialog, session, shell } from "electron";
 import { release } from "os";
-import { join } from "path";
+import { join, resolve } from "path";
 import { autoUpdater } from "electron-updater";
-
-console.log(autoUpdater);
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
@@ -14,6 +12,16 @@ if (process.platform === "win32") app.setAppUserModelId(app.getName());
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
+}
+
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient("gdlauncher", process.execPath, [
+      resolve(process.argv[1]),
+    ]);
+  }
+} else {
+  app.setAsDefaultProtocolClient("gdlauncher");
 }
 
 let win: BrowserWindow | null = null;
@@ -83,16 +91,21 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   win = null;
-  if (process.platform !== "darwin") app.quit();
+  app.quit();
 });
 
-app.on("second-instance", () => {
+app.on("second-instance", (e, argv) => {
+  dialog.showErrorBox('Welcome Back', `You arrived from: ${argv}`)
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
     win.focus();
   }
 });
+
+app.on('open-url', (event, url) => {
+  dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`)
+})
 
 app.on("activate", () => {
   const allWindows = BrowserWindow.getAllWindows();
