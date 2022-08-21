@@ -9,17 +9,21 @@ enum sectionType {
   none = "none",
 }
 
-const images = {
-  vanilla: 'vanilla_integration.webp', 
-  forge: 'forge_integration.webp', 
-  fabric: 'fabric_integration.webp', 
-  none: 'all_platforms_covered.webp', 
+interface Props {
+  t: any;
 }
 
-function Section(props: { type: sectionType }) {
-  const t = useTranslations(window.location.pathname);
+const images = {
+  vanilla: "vanilla_integration.webp",
+  forge: "forge_integration.webp",
+  fabric: "fabric_integration.webp",
+  none: "all_platforms_covered.webp",
+};
 
+function Section(props: { type: sectionType } & Props) {
   const reactiveProps = mergeProps(props);
+
+  const t = reactiveProps.t;
 
   return (
     <div class="pt-32 flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
@@ -76,7 +80,7 @@ function Section(props: { type: sectionType }) {
   );
 }
 
-function ModLoaderSection() {
+function ModLoaderSection(props: Props) {
   const [type, setType] = createSignal<sectionType>(sectionType.none);
   return (
     <div class="h-auto flex justify-center items-start py-32">
@@ -123,7 +127,7 @@ function ModLoaderSection() {
           </div>
         </div>
 
-        <Section type={type()} />
+        <Section type={type()} t={props.t} />
       </div>
     </div>
   );

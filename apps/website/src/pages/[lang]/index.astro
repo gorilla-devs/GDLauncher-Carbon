@@ -162,7 +162,7 @@ const t = useTranslations(Astro.url.pathname);
                 <div class="absolute w-[30rem] h-[30rem] bg-yellow-200 rounded-full opacity-20" />
             </div>
         </div>
-        <ModLoaderSection client:only="solid" />
+        <ModLoaderSection client:visible t={t}/>
         <div class={`relative flex flex-col justify-center items-center box-border
             bg-[url("https://cdn.gdlauncher.com/assets/mc_forest.webp")] bg-no-repeat py-32`}>
             <div
