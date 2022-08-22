@@ -1,45 +1,59 @@
-<link
-    href="https://fonts.googleapis.com/css?family=Open+Sans:400,300,300italic,400italic,600,600italic,700,700italic"
-    rel="stylesheet"
-    type="text/css"
-/>
-<div>
+<div class="py-32 flex flex-col justify-center items-center">
+    <h1 class="text-6xl md:text-8xl font-bol mb-10 text-center">
+        Years in the Making
+    </h1>
+    <p class="mb-20">The progression of the GDLauncher and its predicesors</p>
     <ul class="timeline">
-        <!-- Item 1 -->
         <li>
             <div class="direction-r">
                 <div class="flag-wrapper">
                     <span class="flag">2014</span>
                 </div>
-                <div class="desc">
-                    My current employment. Way better than the position before!
-                </div>
+                <div class="desc">Initial Launch</div>
             </div>
         </li>
-
-        <!-- Item 2 -->
         <li>
             <div class="direction-l">
                 <div class="flag-wrapper">
                     <span class="flag">2015</span>
                 </div>
-                <div class="desc">
-                    My first employer. All the stuff I've learned and projects
-                    I've been working on.
-                </div>
+                <div class="desc">Interface Update</div>
             </div>
         </li>
-
-        <!-- Item 3 -->
         <li>
             <div class="direction-r">
                 <div class="flag-wrapper">
                     <span class="flag">2016</span>
                 </div>
-                <div class="desc">
-                    A description of all the lectures and courses I have taken
-                    and my final degree?
+                <div class="desc">Beta Launcher Release</div>
+            </div>
+        </li>
+        <li>
+            <div class="direction-l">
+                <div class="flag-wrapper">
+                    <span class="flag">2018</span>
                 </div>
+                <div class="desc">The GD Rebrand</div>
+            </div>
+        </li>
+        <li>
+            <div class="direction-r">
+                <div class="flag-wrapper">
+                    <span class="flag">2019</span>
+                </div>
+                <div class="desc">
+                    The GDLauncher takes on a new and modern design features
+                    Curseforge integrations, massive UI changes, and
+                    one-of-a-kind features.
+                </div>
+            </div>
+        </li>
+        <li>
+            <div class="direction-l">
+                <div class="flag-wrapper">
+                    <span class="flag">2022</span>
+                </div>
+                <div class="desc">New Launcher</div>
             </div>
         </li>
     </ul>
@@ -60,19 +74,55 @@
         position: absolute;
         left: 50%;
         top: 0;
-        content: ' ';
+        content: " ";
         display: block;
         width: 6px;
         height: 100%;
         margin-left: -3px;
-        background: rgb(80,80,80);
-        background: -moz-linear-gradient(top, rgba(80,80,80,0) 0%, rgb(80,80,80) 8%, rgb(80,80,80) 92%, rgba(80,80,80,0) 100%);
-        background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(30,87,153,1)), color-stop(100%,rgba(125,185,232,1)));
-        background: -webkit-linear-gradient(top, rgba(80,80,80,0) 0%, rgb(80,80,80) 8%, rgb(80,80,80) 92%, rgba(80,80,80,0) 100%);
-        background: -o-linear-gradient(top, rgba(80,80,80,0) 0%, rgb(80,80,80) 8%, rgb(80,80,80) 92%, rgba(80,80,80,0) 100%);
-        background: -ms-linear-gradient(top, rgba(80,80,80,0) 0%, rgb(80,80,80) 8%, rgb(80,80,80) 92%, rgba(80,80,80,0) 100%);
-        background: linear-gradient(to bottom, rgba(80,80,80,0) 0%, rgb(80,80,80) 8%, rgb(80,80,80) 92%, rgba(80,80,80,0) 100%);
-        
+        background: rgb(80, 80, 80);
+        background: -moz-linear-gradient(
+            top,
+            rgba(80, 80, 80, 0) 0%,
+            rgb(80, 80, 80) 8%,
+            rgb(80, 80, 80) 92%,
+            rgba(80, 80, 80, 0) 100%
+        );
+        background: -webkit-gradient(
+            linear,
+            left top,
+            left bottom,
+            color-stop(0%, rgba(30, 87, 153, 1)),
+            color-stop(100%, rgba(125, 185, 232, 1))
+        );
+        background: -webkit-linear-gradient(
+            top,
+            rgba(80, 80, 80, 0) 0%,
+            rgb(80, 80, 80) 8%,
+            rgb(80, 80, 80) 92%,
+            rgba(80, 80, 80, 0) 100%
+        );
+        background: -o-linear-gradient(
+            top,
+            rgba(80, 80, 80, 0) 0%,
+            rgb(80, 80, 80) 8%,
+            rgb(80, 80, 80) 92%,
+            rgba(80, 80, 80, 0) 100%
+        );
+        background: -ms-linear-gradient(
+            top,
+            rgba(80, 80, 80, 0) 0%,
+            rgb(80, 80, 80) 8%,
+            rgb(80, 80, 80) 92%,
+            rgba(80, 80, 80, 0) 100%
+        );
+        background: linear-gradient(
+            to bottom,
+            rgba(80, 80, 80, 0) 0%,
+            rgb(80, 80, 80) 8%,
+            rgb(80, 80, 80) 92%,
+            rgba(80, 80, 80, 0) 100%
+        );
+
         z-index: 5;
     }
 
@@ -149,6 +199,14 @@
         border: 4px solid white;
         z-index: 10;
         box-sizing: content-box;
+    }
+
+    .direction-l .flag:hover::before,
+    .direction-r .flag:hover::before,
+    .direction-l .flag:hover::after,
+    .direction-r .flag:hover::after {
+        background: #ECC94B;
+        border-color: #ECC94B;
     }
 
     .direction-r .flag:before {
@@ -250,7 +308,7 @@
             -webkit-box-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
             -moz-box-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
             box-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
-
+            color: black;
             z-index: 15;
         }
 
