@@ -1,4 +1,4 @@
-import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
+import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { mergeProps, createSignal, Switch, Match, Component } from "solid-js";
 
@@ -87,7 +87,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   return (
     <div class="h-auto flex justify-center items-start py-32">
       <div class="flex flex-col items-center">
-        <div class="flex flex-row gap-5 uppercase font-medium text-xl">
+        <div class="flex flex-row lg:gap-5 uppercase font-medium text-xl">
           <div
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.vanilla ? "font-bold" : ""
