@@ -81,46 +81,32 @@
         margin-left: -3px;
         background: rgb(80, 80, 80);
         background: -moz-linear-gradient(
-            top,
-            rgba(80, 80, 80, 0) 0%,
-            rgb(80, 80, 80) 8%,
-            rgb(80, 80, 80) 92%,
-            rgba(80, 80, 80, 0) 100%
-        );
-        background: -webkit-gradient(
-            linear,
-            left top,
-            left bottom,
-            color-stop(0%, rgba(30, 87, 153, 1)),
-            color-stop(100%, rgba(125, 185, 232, 1))
-        );
-        background: -webkit-linear-gradient(
-            top,
-            rgba(80, 80, 80, 0) 0%,
-            rgb(80, 80, 80) 8%,
-            rgb(80, 80, 80) 92%,
-            rgba(80, 80, 80, 0) 100%
+            to bottom,
+            rgba(43, 108, 176, 0) 0%,
+            rgb(43, 108, 176) 8%,
+            rgb(43, 108, 176) 92%,
+            rgba(43, 108, 176, 0) 100%
         );
         background: -o-linear-gradient(
-            top,
-            rgba(80, 80, 80, 0) 0%,
-            rgb(80, 80, 80) 8%,
-            rgb(80, 80, 80) 92%,
-            rgba(80, 80, 80, 0) 100%
+            to bottom,
+            rgba(43, 108, 176, 0) 0%,
+            rgb(43, 108, 176) 8%,
+            rgb(43, 108, 176) 92%,
+            rgba(43, 108, 176, 0) 100%
         );
         background: -ms-linear-gradient(
-            top,
-            rgba(80, 80, 80, 0) 0%,
-            rgb(80, 80, 80) 8%,
-            rgb(80, 80, 80) 92%,
-            rgba(80, 80, 80, 0) 100%
+            to bottom,
+            rgba(43, 108, 176, 0) 0%,
+            rgb(43, 108, 176) 8%,
+            rgb(43, 108, 176) 92%,
+            rgba(43, 108, 176, 0) 100%
         );
         background: linear-gradient(
             to bottom,
-            rgba(80, 80, 80, 0) 0%,
-            rgb(80, 80, 80) 8%,
-            rgb(80, 80, 80) 92%,
-            rgba(80, 80, 80, 0) 100%
+            rgba(43, 108, 176, 0) 0%,
+            rgb(43, 108, 176) 8%,
+            rgb(43, 108, 176) 92%,
+            rgba(43, 108, 176, 0) 100%
         );
 
         z-index: 5;
@@ -200,13 +186,18 @@
         z-index: 10;
         box-sizing: content-box;
     }
-
     .direction-l .flag:hover::before,
     .direction-r .flag:hover::before,
     .direction-l .flag:hover::after,
     .direction-r .flag:hover::after {
-        background: #ECC94B;
-        border-color: #ECC94B;
+        background: #ecc94b;
+        border-color: #ecc94b;
+        color: #ecc94b;
+    }
+
+    .direction-l:hover,
+    .direction-r:hover {
+        color: #ecc94b;
     }
 
     .direction-r .flag:before {

@@ -1,6 +1,6 @@
 ---
 import Button from "@/components/Button";
-import ModLoaderSection from "@/components/modLoaderSection";
+import ModLoaderSection from "@/components/ModLoaderSection";
 import Icon from "@/components/Icon";
 import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
@@ -162,7 +162,7 @@ const t = useTranslations(Astro.url.pathname);
                 <div class="absolute w-[30rem] h-[30rem] bg-yellow-200 rounded-full opacity-20" />
             </div>
         </div>
-        <ModLoaderSection client:visible t={t}/>
+        <ModLoaderSection client:visible pathname={Astro.url.pathname}/>
         <div class={`relative flex flex-col justify-center items-center box-border
             bg-[url("https://cdn.gdlauncher.com/assets/mc_forest.webp")] bg-no-repeat py-32`}>
             <div

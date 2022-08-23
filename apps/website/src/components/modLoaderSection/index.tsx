@@ -1,6 +1,6 @@
-import { useTranslations } from "@/i18n/utils";
+import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import { mergeProps, createSignal, Switch, Match } from "solid-js";
+import { mergeProps, createSignal, Switch, Match, Component } from "solid-js";
 
 enum sectionType {
   vanilla = "vanilla",
@@ -80,8 +80,10 @@ function Section(props: { type: sectionType } & Props) {
   );
 }
 
-function ModLoaderSection(props: Props) {
+const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   const [type, setType] = createSignal<sectionType>(sectionType.none);
+  const t = useTranslations(pathname);
+
   return (
     <div class="h-auto flex justify-center items-start py-32">
       <div class="flex flex-col items-center">
@@ -127,10 +129,10 @@ function ModLoaderSection(props: Props) {
           </div>
         </div>
 
-        <Section type={type()} t={props.t} />
+        <Section type={type()} t={t || (() => {})} />
       </div>
     </div>
   );
-}
+};
 
 export default ModLoaderSection;
