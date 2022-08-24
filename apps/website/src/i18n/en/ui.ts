@@ -77,4 +77,7 @@ export default {
   "footer.linux": "Linux",
   "footer.termsNCondition": "Terms & Conditions",
   "footer.policy": "Privacy Policy",
+  "download.title": "Download",
+  "download.text":
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
 };
