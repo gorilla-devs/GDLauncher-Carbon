@@ -35,7 +35,7 @@ function Section(props: { type: sectionType } & Props) {
                 <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                   {t("modloader.none_title")}
                 </h3>
-                <p class="text-xl mb-12 font-light">
+                <p class="text-xl max-w-lg mb-12 font-light">
                   {t("modloader.none_text")}
                 </p>
               </>
@@ -45,7 +45,7 @@ function Section(props: { type: sectionType } & Props) {
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                 {t("modloader.vanilla_title")}
               </h3>
-              <p class="text-xl mb-12 font-light">
+              <p class="text-xl max-w-lg mb-12 font-light">
                 {t("modloader.vanilla_text")}
               </p>
             </Match>
@@ -53,7 +53,7 @@ function Section(props: { type: sectionType } & Props) {
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                 {t("modloader.forge_title")}
               </h3>
-              <p class="text-xl mb-12 font-light">
+              <p class="text-xl max-w-lg mb-12 font-light">
                 {t("modloader.forge_text")}
               </p>
             </Match>
@@ -61,7 +61,7 @@ function Section(props: { type: sectionType } & Props) {
               <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
                 {t("modloader.fabric_title")}
               </h3>
-              <p class="text-xl mb-12 font-light">
+              <p class="text-xl max-w-lg mb-12 font-light">
                 {t("modloader.fabric_text")}
               </p>
             </Match>
