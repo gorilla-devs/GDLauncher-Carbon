@@ -1,0 +1,9 @@
+---
+import languages from "@/i18n/languages";
+import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
+export const getStaticPaths = () => Object.keys(languages).map(lang => ({ params: { lang } }));
+---
+
+<SimpleWrapper>
+    <div>Download</div>
+</SimpleWrapper>
