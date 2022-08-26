@@ -5,11 +5,12 @@ import Icon from "@/components/Icon";
 import DonateKofiSection from "@/components/DonateKofiSection/index.astro";
 import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
-import CaretDown from "~icons/mdi/caret-down";
 import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 
-export const getStaticPaths = () => Object.keys(languages).map((lang) => ({ params: { lang } }));
+export function getStaticPaths() {
+    return Object.keys(languages).map((lang) => ({ params: { lang } }));
+}
 
 // @ts-ignore
 const t = useTranslations(Astro.url.pathname);
@@ -49,7 +50,7 @@ const t = useTranslations(Astro.url.pathname);
                     />
                 </div>
             </div>
-            <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" />
+            <!-- <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" /> -->
         </div>
         <div
             class="relative h-auto lg:h-screen flex flex-row justify-start items-center py-20 lg:pt-40 lg:pr-20 bg-slate-900"
@@ -286,5 +287,11 @@ const t = useTranslations(Astro.url.pathname);
         li:last-child {
             list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_yellow.svg");
         }
+    }
+    .createYourOwn li:first-child {
+        list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_teal.svg");
+    }
+    .createYourOwn li:last-child {
+        list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_yellow.svg");
     }
 </style>

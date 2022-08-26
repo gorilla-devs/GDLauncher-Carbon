@@ -1,5 +1,4 @@
 import { children } from "solid-js";
-import style from "@/components/Button/style.module.scss";
 
 type Props = {
   children: HTMLElement | string;

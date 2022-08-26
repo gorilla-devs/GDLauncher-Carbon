@@ -1,4 +1,4 @@
 export { Button } from "./Button";
-import "@fontsource/ubuntu";
+export { Select } from "./Select";
 
-import "./index.scss";
+import "virtual:uno.css";

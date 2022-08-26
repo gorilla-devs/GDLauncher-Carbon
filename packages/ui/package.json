@@ -1,13 +1,11 @@
 {
   "name": "@gd/ui",
   "version": "0.0.0",
-  "main": "./dist/ui.umd.js",
   "module": "./dist/ui.es.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/ui.es.js",
-      "require": "./dist/ui.umd.js"
+      "import": "./dist/ui.es.js"
     },
     "./style.css": "./dist/style.css"
   },
@@ -17,16 +15,10 @@
   },
   "devDependencies": {
     "@gd/config": "workspace:*",
-    "autoprefixer": "^10.4.8",
-    "cssnano": "^5.1.12",
-    "postcss": "^8.4.16",
-    "typescript": "^4.7.4",
-    "vite": "^3.0.6",
+    "solid-js": "1.5.1",
+    "typescript": "^4.8.2",
+    "unocss": "^0.45.13",
+    "vite": "^3.0.9",
     "vite-plugin-dts": "^1.4.1"
-  },
-  "peerDependencies": {
-    "@fontsource/ubuntu": "^4.5.10",
-    "solid-js": "^1.4.8",
-    "tailwindcss": "^3.1.7"
   }
 }

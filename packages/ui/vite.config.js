@@ -2,11 +2,13 @@
 import path from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
+import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
 
 export default defineConfig({
   plugins: [
     solidPlugin(),
+    Unocss({}),
     dts({
       insertTypesEntry: true,
     }),
@@ -15,15 +17,14 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
       name: "@gd/ui",
-      formats: ["es", "umd"],
+      formats: ["es"],
       fileName: (format) => `ui.${format}.js`,
     },
     rollupOptions: {
-      external: ["solid-js", "@fontsource/ubuntu"],
+      external: ["solid-js"],
       output: {
         globals: {
           "solid-js": "SolidJS",
-          "@fontsource/ubuntu": "Ubuntu",
         },
       },
     },

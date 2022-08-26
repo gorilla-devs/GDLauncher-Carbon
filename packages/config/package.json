@@ -3,8 +3,6 @@
   "version": "0.0.0",
   "main": "index.js",
   "files": [
-    "postcss.config.js",
-    "tailwind.config.js",
     "tsconfig.json"
   ],
   "devDependencies": {}
