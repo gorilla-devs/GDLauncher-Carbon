@@ -1,6 +1,7 @@
 import { resolve, join } from "path";
 import { defineConfig, Plugin } from "vite";
 import solidPlugin from "vite-plugin-solid";
+import Unocss from "unocss/vite";
 import pkg from "../../package.json";
 
 /**
@@ -9,9 +10,7 @@ import pkg from "../../package.json";
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [
-    solidPlugin(),
-  ],
+  plugins: [solidPlugin(), Unocss()],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   build: {
