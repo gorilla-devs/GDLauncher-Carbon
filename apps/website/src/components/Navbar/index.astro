@@ -13,55 +13,76 @@ export interface Props {
   currentPage: string;
 }
 
-
 const { currentPage } = Astro.props as Props;
 const lang = currentPage && getLanguageFromURL(currentPage);
 const t = useTranslations(Astro.url.pathname);
-
 ---
 
 <Interactivity client:load />
 
 <div
-  class="navbar max-h-28 fixed bottom-0 lg:absolute lg:top-0 lg:bottom-auto left-0 right-0 z-40 p-6 flex flex-col justify-between items-center bg-gray-900 lg:bg-transparent">
+  class="navbar max-h-28 fixed bottom-0 lg:absolute lg:top-0 lg:bottom-auto left-0 right-0 z-40 p-6 flex flex-col justify-between items-center bg-gray-900 lg:bg-transparent"
+>
   <div class="flex justify-between w-full max-w-7xl">
     <div class="flex justify-between items-center gap-x-10 w-full lg:w-auto">
-      <img src={composeCDNAssetLink("gdlauncher_logo.svg")} alt="logo" class="cursor-pointer h-8 w-8" />
+      <img
+        src={composeCDNAssetLink("gdlauncher_logo.svg")}
+        alt="logo"
+        class="cursor-pointer h-8 w-8"
+      />
       <div class="burger lg:hidden">
         <Burger />
       </div>
-      <div class="hidden lg:flex font-medium justify-between items-center gap-x-5 text-white">
-        {linksList.map((props) => (
-        <a class={`button ${ globalThis?.location?.pathname===props.linkTo ? "selected" : "" }`}
-          href={localizePath(props.linkTo, lang, props.isExternalLink)}>
-          {format(t(props.title[0]), "capitalize")}
-        </a>
-        ))}
+      <div
+        class="hidden lg:flex font-medium justify-between items-center gap-x-5 text-white"
+      >
+        {
+          linksList.map((props) => (
+            <a
+              class={`button ${
+                globalThis?.location?.pathname === props.linkTo
+                  ? "selected"
+                  : ""
+              }`}
+              href={localizePath(props.linkTo, lang, props.isExternalLink)}
+            >
+              {format(t(props.title[0]), "capitalize")}
+            </a>
+          ))
+        }
         <a class="button">
-          {lang &&
-          <LanguageSelect lang={lang} client:idle />}
+          {lang && <LanguageSelect lang={lang} client:idle />}
         </a>
       </div>
     </div>
     <div class="hidden lg:flex">
-      <Button>{t("navbar.download")}</Button>
+      <a href="/download">
+        <Button>{t("navbar.download")}</Button>
+      </a>
     </div>
   </div>
 </div>
 <div
-  class="mobile-menu hidden fixed top-0 bottom-0 left-0 right-0 flex-col justify-center items-center bg-gray-900 padding-4 z-30">
+  class="mobile-menu hidden fixed top-0 bottom-0 left-0 right-0 flex-col justify-center items-center bg-gray-900 padding-4 z-30"
+>
   <div class="flex flex-col justify-center items-center gap-4">
-    {linksList.map((props) => (
-    <a class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400 ${
-      globalThis?.location?.pathname===props.linkTo ? "selected" : "" }`} href={localizePath(props.linkTo, lang,
-      props.isExternalLink)}>
-      {format(t(props.title[0]), "capitalize")}
-    </a>
-    ))}
-    {lang &&
-    <LanguageSelect lang={lang} client:idle />}
+    {
+      linksList.map((props) => (
+        <a
+          class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400 ${
+            globalThis?.location?.pathname === props.linkTo ? "selected" : ""
+          }`}
+          href={localizePath(props.linkTo, lang, props.isExternalLink)}
+        >
+          {format(t(props.title[0]), "capitalize")}
+        </a>
+      ))
+    }
+    {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">
-      <Button>{t("navbar.download")}</Button>
+      <a href="/download">
+        <Button>{t("navbar.download")}</Button>
+      </a>
     </div>
   </div>
 </div>

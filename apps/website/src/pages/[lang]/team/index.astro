@@ -4,7 +4,7 @@ import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
 import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
 import Timeline from "@/components/Timeline/index.astro";
-import Partner from "@/components/Partner/index.astro";
+import PartnerSection from "@/components/PartnerSection/index.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import CaretDown from "~icons/mdi/caret-down";
 import Icon from "@/components/Icon";
@@ -99,7 +99,7 @@ const t = useTranslations(Astro.url.pathname);
                 </div>
             </div>
         </div>
-        <Partner />
+        <PartnerSection />
         <div
             class='relative flex flex-col justify-center items-center pt-1 box-border
             bg-[url("https://cdn.gdlauncher.com/assets/mc_forest_3.webp")] bg-no-repeat'
