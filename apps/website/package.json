@@ -20,6 +20,7 @@
     "@astrojs/tailwind": "^1.0.0",
     "@gd/config": "workspace:*",
     "@gd/ui": "workspace:*",
+    "@unocss/preset-wind": "^0.45.13",
     "astro": "^1.0.9",
     "i18next": "^21.9.1",
     "i18next-http-backend": "^1.4.1",

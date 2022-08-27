@@ -2,6 +2,7 @@
 /* eslint-disable import/no-unresolved */
 import solid from "@astrojs/solid-js";
 import Unocss from "unocss/astro";
+import presetWind from "@unocss/preset-wind";
 import { defineConfig } from "astro/config";
 
 // https://astro.build/config
@@ -12,5 +13,5 @@ export default defineConfig({
       noExternal: "style.css", // from @gd/ui
     },
   },
-  integrations: [solid(), Unocss()],
+  integrations: [solid(), Unocss({ presets: [presetWind()] })],
 });
