@@ -6,8 +6,8 @@ import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
 import Timeline from "@/components/Timeline/index.astro";
 import PartnerSection from "@/components/PartnerSection/index.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import CaretDown from "~icons/mdi/caret-down";
-import Icon from "@/components/Icon";
+// import CaretDown from "~icons/mdi/caret-down";
+// import Icon from "@/components/Icon";
 
 export const getStaticPaths = () => Object.keys(languages).map((lang) => ({ params: { lang } }));
 
@@ -46,7 +46,7 @@ const t = useTranslations(Astro.url.pathname);
                     />
                 </div>
             </div>
-            <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" />
+            <!-- <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" /> -->
         </div>
         <Timeline/>
         <div class="flex flex-col justify-center items-center">
