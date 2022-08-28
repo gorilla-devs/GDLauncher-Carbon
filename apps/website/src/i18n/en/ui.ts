@@ -79,5 +79,8 @@ export default {
   "footer.policy": "Privacy Policy",
   "download.title": "Download",
   "download.text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+  "download.windows": "Download for windows",
+  "download.macos": "Download for Mac",
+  "download.linux": "Download for Linux",
 };

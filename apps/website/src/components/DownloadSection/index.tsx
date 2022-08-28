@@ -1,7 +1,6 @@
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { Component } from "solid-js";
-import Button from "../Button";
 import Dropdown from "../Dropdown";
 
 const DownloadSection: Component<{ pathname: string }> = ({ pathname }) => {
@@ -19,7 +18,7 @@ const DownloadSection: Component<{ pathname: string }> = ({ pathname }) => {
             {t("download.title")}
           </h3>
           <p class="text-xl mb-12 font-light">{t("download.text")}</p>
-          <Dropdown />
+          <Dropdown pathname={pathname}/>
         </div>
         <div>
           <img

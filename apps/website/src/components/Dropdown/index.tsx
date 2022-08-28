@@ -1,9 +1,15 @@
-import { createSignal, For, mergeProps } from "solid-js";
+import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
+import { createSignal, For } from "solid-js";
 import Caret from "../CaretIcon";
 
 type Props = {
   children?: HTMLElement | string;
   class?: string;
+  pathname: string;
+};
+
+type ILabels = {
+  [os in OS]: UIDictionaryKeys;
 };
 
 enum OS {
@@ -21,10 +27,16 @@ const urls = {
     "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage",
 };
 
+const labels: ILabels = {
+  [OS.windows]: "download.windows",
+  [OS.macos]: "download.macos",
+  [OS.linux]: "download.linux",
+};
+
 const Dropdown = (props: Props) => {
   const [currentValue, setCurrentValue] = createSignal<OS>(OS.windows);
   const [open, setOpen] = createSignal(false);
-  const merged = mergeProps(props);
+  const t = useTranslations(props.pathname);
 
   // createEffect(() => {
   //   const platform = navigator?.platform;
@@ -39,7 +51,7 @@ const Dropdown = (props: Props) => {
         onclick={() => setOpen(!open())}
         class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer ${props.class}`}
       >
-        <a href={urls[currentValue()]}>Download for {currentValue()}</a>
+        <a href={urls[currentValue()]}> {t(labels[currentValue()])}</a>
         <Caret
           class={`ease-linear duration-100 ${
             open() ? "rotate-0" : "-rotate-90"
@@ -59,7 +71,7 @@ const Dropdown = (props: Props) => {
                     }}
                     class="py-4 px-10 w-full cursor-pointer hover:bg-slate-700 ease-linear duration-100"
                   >
-                    Download for {os}
+                    {t(labels[os])}
                   </li>
                 </a>
               )}
