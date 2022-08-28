@@ -26,7 +26,7 @@ const translations = mapDefaultExports<UIDict>(
 );
 
 export function useTranslations(
-  pathname: Readonly<string>
+  pathname: Readonly<string> | string
 ): (key: UIDictionaryKeys) => string {
   const lang = getLanguageFromURL(pathname) || "en";
   return function getTranslation(key: UIDictionaryKeys) {

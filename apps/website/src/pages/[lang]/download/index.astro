@@ -3,15 +3,15 @@ import DownloadSection from "@/components/DownloadSection";
 import DonateKofiSection from "@/components/DonateKofiSection/index.astro";
 import PartnerSection from "@/components/PartnerSection/index.astro";
 import languages from "@/i18n/languages";
-import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
+import MainWrapper from "@/layouts/MainWrapper.astro";
 
 export const getStaticPaths = () => Object.keys(languages).map((lang) => ({ params: { lang } }));
 ---
 
-<SimpleWrapper>
+<MainWrapper>
     <div>
-        <DownloadSection client:idle pathname={Astro.url.pathname} />
+        <DownloadSection client:idle pathname={Astro.url.pathname || ""} />
         <DonateKofiSection />
         <PartnerSection />
     </div>
-</SimpleWrapper>
+</MainWrapper>

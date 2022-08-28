@@ -5,7 +5,7 @@ import Icon from "@/components/Icon";
 import DonateKofiSection from "@/components/DonateKofiSection/index.astro";
 import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
-import SimpleWrapper from "@/layouts/SimpleWrapper.astro";
+import MainWrapper from "@/layouts/MainWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 
 export function getStaticPaths() {
@@ -16,10 +16,10 @@ export function getStaticPaths() {
 const t = useTranslations(Astro.url.pathname);
 ---
 
-<SimpleWrapper>
+<MainWrapper>
     <div class="h-auto relative">
         <div
-            class={`relative flex flex-col justify-center items-center pt-1 box-border h-screen
+            class={`relative flex flex-col justify-center items-center pt-1 box-border h-[calc(100vh-1.5rem)] lg:h-screen
             bg-[url("https://cdn.gdlauncher.com/assets/mc_panda.webp")] bg-no-repeat`}
         >
             <div class="absolute top-0 bottom-0 left-0 right-0">
@@ -272,7 +272,7 @@ const t = useTranslations(Astro.url.pathname);
         <ModLoaderSection client:visible pathname={Astro.url.pathname} />
         <DonateKofiSection />
     </div>
-</SimpleWrapper>
+</MainWrapper>
 
 <style>
     .createYourOwn li {

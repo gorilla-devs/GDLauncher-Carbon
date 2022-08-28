@@ -21,11 +21,12 @@ const t = useTranslations(Astro.url.pathname);
 <Interactivity client:load />
 
 <div
-  class="navbar max-h-28 fixed bottom-0 lg:absolute lg:top-0 lg:bottom-auto left-0 right-0 z-40 p-6 flex flex-col justify-between items-center bg-gray-900 lg:bg-transparent"
+  class="navbar max-h-22 fixed bottom-0 lg:absolute lg:top-0 lg:bottom-auto left-0 right-0 z-40 p-6 flex flex-col justify-between items-center bg-gray-900 lg:bg-transparent"
 >
   <div class="flex justify-between w-full max-w-7xl">
     <div class="flex justify-between items-center gap-x-10 w-full lg:w-auto">
       <img
+        class="w-10 lg:w-full"
         src={composeCDNAssetLink("gdlauncher_logo.svg")}
         alt="logo"
         class="cursor-pointer"

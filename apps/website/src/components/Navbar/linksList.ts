@@ -10,10 +10,10 @@ export default [
     title: ["navbar.home"],
     linkTo: "/",
   },
-  {
-    title: ["navbar.features"],
-    linkTo: "/features",
-  },
+  // {
+  //   title: ["navbar.features"],
+  //   linkTo: "/features",
+  // },
   {
     title: ["navbar.team"],
     linkTo: "/team",
