@@ -2,6 +2,7 @@
 import HeadCommon from "@/components/HeadCommon.astro";
 import Navbar from "@/components/Navbar/index.astro";
 import Footer from "@/components/Footer/index.astro";
+import 'unocss-hmr-fix'
 const url = new URL(Astro.request.url);
 const currentPage = url.pathname;
 
