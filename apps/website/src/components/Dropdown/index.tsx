@@ -6,6 +6,7 @@ type Props = {
   children?: HTMLElement | string;
   class?: string;
   pathname: string;
+  onclick: () => void;
 };
 
 type ILabels = {
@@ -51,7 +52,9 @@ const Dropdown = (props: Props) => {
         onclick={() => setOpen(!open())}
         class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer ${props.class}`}
       >
-        <a href={urls[currentValue()]}> {t(labels[currentValue()])}</a>
+        <a href={urls[currentValue()]} onclick={() => props.onclick()}>
+          {t(labels[currentValue()])}
+        </a>
         <Caret
           class={`ease-linear duration-100 ${
             open() ? "rotate-0" : "-rotate-90"
@@ -68,6 +71,7 @@ const Dropdown = (props: Props) => {
                     onclick={() => {
                       setCurrentValue(os);
                       setOpen(!open());
+                      props.onclick();
                     }}
                     class="py-4 px-10 w-full cursor-pointer hover:bg-slate-700 ease-linear duration-100"
                   >
