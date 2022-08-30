@@ -1,0 +1,21 @@
+---
+import languages from "@/i18n/languages";
+import { useTranslations } from "@/i18n/utils";
+import Input from '@/components/Input'
+import MainWrapper from "@/layouts/MainWrapper.astro";
+
+export function getStaticPaths() {
+    return Object.keys(languages).map((lang) => ({ params: { lang } }));
+}
+
+// @ts-ignore
+const t = useTranslations(Astro.url.pathname);
+---
+
+<MainWrapper>
+    <div class="h-[calc(100vh-1.5rem)] lg:h-screen relative flex flex-col justify-center items-center gap-10">
+        <Input label={t("whitelist.email")}/>
+        <Input label={t("whitelist.mc_email")}/>
+        <Input label={t("whitelist.kofi_email")}/>
+    </div>
+</MainWrapper>

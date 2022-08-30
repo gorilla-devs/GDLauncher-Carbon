@@ -25,12 +25,14 @@ const t = useTranslations(Astro.url.pathname);
 >
   <div class="flex justify-between w-full max-w-7xl">
     <div class="flex justify-between items-center gap-x-10 w-full lg:w-auto">
-      <img
-        class="w-10 lg:w-full"
-        src={composeCDNAssetLink("gdlauncher_logo.svg")}
-        alt="logo"
-        class="cursor-pointer"
-      />
+      <a href="/">
+          <img
+            class="w-10 lg:w-full"
+            src={composeCDNAssetLink("gdlauncher_logo.svg")}
+            alt="logo"
+            class="cursor-pointer"
+          />
+      </a>
       <div class="burger lg:hidden">
         <Burger />
       </div>

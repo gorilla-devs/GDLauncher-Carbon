@@ -86,4 +86,8 @@ export default {
   "download.macos": "Download for Mac",
   "download.linux": "Download for Linux",
   "download.retry": "retry.",
+  "whitelist.subscribe": "Subscribe to the whitelist",
+  "whitelist.mc_email": "Minecraft Email",
+  "whitelist.email": "Email",
+  "whitelist.kofi_email": "Kofi Email",
 };

@@ -38,9 +38,14 @@ const t = useTranslations(Astro.url.pathname);
                     <p class="text-xl mb-12 font-light">
                         {t("launcher.mockup.description")}
                     </p>
-                    <a href="/download">
-                        <Button>{t("navbar.download")}</Button>
-                    </a>
+                    <div class="flex flex-col lg:flex-row gap-10">
+                        <a href="/download">
+                            <Button>{t("navbar.download")}</Button>
+                        </a>
+                        <a href="/waitlist">
+                            <Button class="max-w-[300px] bg-orange-500">{t("whitelist.subscribe")}</Button>
+                        </a>
+                    </div>
                 </div>
                 <div>
                     <img
