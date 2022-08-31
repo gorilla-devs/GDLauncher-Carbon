@@ -9,7 +9,8 @@ export default {
   "generic.reportIssues": "Report issues",
   "generic.reportAnIssue": "Report an issue",
   "generic.reportIssues_text":
-    "Find an issue or have a suggestion? Make a formal report below. We take all cases very seriously.",
+  "Find an issue or have a suggestion? Make a formal report below. We take all cases very seriously.",
+  "generic.404": "404",
   "navbar.home": "Home",
   "navbar.download": "Download",
   "navbar.homepage": "HomePage",

@@ -26,12 +26,12 @@ const t = useTranslations(Astro.url.pathname);
   <div class="flex justify-between w-full max-w-7xl">
     <div class="flex justify-between items-center gap-x-10 w-full lg:w-auto">
       <a href="/">
-          <img
-            class="w-10 lg:w-full"
-            src={composeCDNAssetLink("gdlauncher_logo.svg")}
-            alt="logo"
-            class="cursor-pointer"
-          />
+        <img
+          class="w-10 lg:w-full"
+          src={composeCDNAssetLink("gdlauncher_logo.svg")}
+          alt="logo"
+          class="cursor-pointer"
+        />
       </a>
       <div class="burger lg:hidden">
         <Burger />
@@ -59,7 +59,7 @@ const t = useTranslations(Astro.url.pathname);
       </div>
     </div>
     <div class="hidden lg:flex">
-      <a href="/download">
+      <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
       </a>
     </div>
@@ -83,7 +83,7 @@ const t = useTranslations(Astro.url.pathname);
     }
     {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">
-      <a href="/download">
+      <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
       </a>
     </div>

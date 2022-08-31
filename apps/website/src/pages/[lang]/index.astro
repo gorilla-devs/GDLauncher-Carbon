@@ -7,10 +7,13 @@ import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import { localizePath } from "@/utils/helpers";
 
 export function getStaticPaths() {
     return Object.keys(languages).map((lang) => ({ params: { lang } }));
 }
+
+const { lang } = Astro.params;
 
 // @ts-ignore
 const t = useTranslations(Astro.url.pathname);
@@ -38,12 +41,24 @@ const t = useTranslations(Astro.url.pathname);
                     <p class="text-xl mb-12 font-light">
                         {t("launcher.mockup.description")}
                     </p>
-                    <div class="flex flex-col lg:flex-row gap-10">
-                        <a href="/download">
+                    <div class="flex flex-col lg:flex-row gap-5 lg:gap-10">
+                        <a
+                            href={localizePath(
+                                "/download",
+                                lang?.toString() || "en"
+                            )}
+                        >
                             <Button>{t("navbar.download")}</Button>
                         </a>
-                        <a href="/waitlist">
-                            <Button class="max-w-[300px] bg-orange-500">{t("waitlist.subscribe")}</Button>
+                        <a
+                            href={localizePath(
+                                "/waitlist",
+                                lang?.toString() || "en"
+                            )}
+                        >
+                            <Button class="max-w-[300px] bg-yellow-500"
+                                >{t("waitlist.subscribe")}
+                            </Button>
                         </a>
                     </div>
                 </div>

@@ -1,7 +1,6 @@
 import Button from "@/components/Button";
 import Input from "@/components/Input";
 import { useTranslations } from "@/i18n/utils";
-import html from "solid-js/html";
 
 const WaitList = ({ pathname }: { pathname: string }) => {
   const t = useTranslations(pathname);
