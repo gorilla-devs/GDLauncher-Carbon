@@ -9,8 +9,7 @@ import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 // import CaretDown from "~icons/mdi/caret-down";
 // import Icon from "@/components/Icon";
 
-export const getStaticPaths = () =>
-    Object.keys(languages).map((lang) => ({ params: { lang } }));
+export const getStaticPaths = () => Object.keys(languages).map((lang) => ({ params: { lang } }));
 
 const t = useTranslations(Astro.url.pathname);
 ---
