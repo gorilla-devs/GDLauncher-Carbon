@@ -6,7 +6,7 @@ import html from "solid-js/html";
 const WaitList = ({ pathname }: { pathname: string }) => {
   const t = useTranslations(pathname);
   return (
-    <div class="h-[calc(100vh-1.5rem)] lg:h-screen relative flex flex-col justify-center items-center">
+    <div class="h-[calc(100vh-5.5rem)] lg:h-screen relative flex flex-col justify-center items-center">
       <div class="flex flex-col justify-center items-center gap-10 max-w-5xl text-center">
         <h1 class="flex flex-col lg:block text-2xl lg:text-7xl font-bold ">
           {t("waitlist.title")}
