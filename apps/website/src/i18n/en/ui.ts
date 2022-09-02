@@ -90,6 +90,7 @@ export default {
   "waitlist.title": "Subscribe to get early access to the",
   "waitlist.title2": "NEW",
   "waitlist.title3": "GDLauncher",
+  "waitlist.text": "Enter your Email, Minecraft email and Ko-fi email (if it's different from the first email entered).",
   "waitlist.getAccess": "GET EARLY ACCESS",
   "waitlist.subscribe": "Subscribe to the waitlist",
   "waitlist.mc_email": "Minecraft Email",
