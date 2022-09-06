@@ -37,6 +37,7 @@ jobs:
               - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
+                brew install go@1.19
                 node -v
                 go version
                 sudo npm i -g pnpm
@@ -50,6 +51,7 @@ jobs:
               - equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
+                brew install go@1.19
                 node -v
                 go version
                 sudo npm i -g pnpm
