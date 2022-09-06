@@ -19,6 +19,6 @@
     "build-web": "turbo run build --filter @gd/web"
   },
   "devDependencies": {
-    "turbo": "^1.4.3"
+    "turbo": "^1.4.4"
   }
 }

@@ -11,11 +11,9 @@ function watchMain(mainWindow, mcLogWindow) {
    */
   let electronProcess = null;
   const addressMainWindow = mainWindow.httpServer.address();
-  const addressMcLogWindow = mcLogWindow.httpServer.address();
   const env = Object.assign(process.env, {
     VITE_DEV_SERVER_HOST: "localhost",
     VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
-    VITE_DEV_MC_LOG_WINDOW_PORT: addressMcLogWindow.port,
   });
 
   return build({
@@ -39,7 +37,7 @@ function watchMain(mainWindow, mcLogWindow) {
 /**
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */
-function watchPreload(mainWindow, mcLogWindow) {
+function watchPreload(mainWindow) {
   return build({
     configFile: "packages/preload/vite.config.ts",
     mode: "development",
@@ -48,7 +46,6 @@ function watchPreload(mainWindow, mcLogWindow) {
         name: "electron-preload-watcher",
         writeBundle() {
           mainWindow.ws.send({ type: "full-reload" });
-          mcLogWindow.ws.send({ type: "full-reload" });
         },
       },
     ],
@@ -58,15 +55,10 @@ function watchPreload(mainWindow, mcLogWindow) {
   });
 }
 
-// bootstrap
 const mainWindow = await createServer({
   configFile: "packages/mainWindow/vite.config.ts",
 });
-const mcLogWindow = await createServer({
-  configFile: "packages/mcLogWindow/vite.config.ts",
-});
 
 await mainWindow.listen();
-await mcLogWindow.listen();
-await watchPreload(mainWindow, mcLogWindow);
-await watchMain(mainWindow, mcLogWindow);
+await watchPreload(mainWindow);
+await watchMain(mainWindow);

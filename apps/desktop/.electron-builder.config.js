@@ -17,8 +17,12 @@ module.exports = {
   ],
   extraResources: [
     {
-      from: "../../core/core.node",
-      to: "core.node",
+      from: "../../core/core",
+      to: "core",
+    },
+    {
+      from: "../../core/core.exe",
+      to: "core.exe",
     },
   ],
   npmRebuild: false,
