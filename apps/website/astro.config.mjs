@@ -3,6 +3,7 @@
 import solid from "@astrojs/solid-js";
 import Unocss from "unocss/astro";
 import presetWind from "@unocss/preset-wind";
+import presetAttributify from "@unocss/preset-attributify";
 import { defineConfig } from "astro/config";
 import uno from "astro-uno";
 import { presetUno } from "unocss";
@@ -17,7 +18,7 @@ export default defineConfig({
   },
   integrations: [
     solid(),
-    Unocss({ presets: [presetWind()] }),
+    Unocss({ presets: [presetWind(), presetAttributify()] }),
     uno({
       presets: [presetUno()],
     }),

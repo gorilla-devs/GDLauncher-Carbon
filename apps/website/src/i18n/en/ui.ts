@@ -96,4 +96,5 @@ export default {
   "waitlist.mc_email": "Minecraft Email",
   "waitlist.email": "Email",
   "waitlist.kofi_email": "Kofi Email",
+  "waitlist.error_422": "You already subscribed, verify your email!"
 };

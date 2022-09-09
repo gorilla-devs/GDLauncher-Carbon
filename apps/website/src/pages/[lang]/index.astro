@@ -1,13 +1,12 @@
 ---
 import Button from "@/components/Button";
 import ModLoaderSection from "@/components/ModLoaderSection";
-import Icon from "@/components/Icon";
 import DonateKofiSection from "@/components/DonateKofiSection/index.astro";
-import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
+import languages from "@/i18n/languages";
 
 export function getStaticPaths() {
     return Object.keys(languages).map((lang) => ({ params: { lang } }));

@@ -21,6 +21,7 @@
     "@gd/config": "workspace:*",
     "@gd/ui": "workspace:*",
     "@unocss/preset-wind": "^0.45.13",
+    "@unocss/preset-attributify": "^0.45.18",
     "astro": "^1.0.9",
     "astro-uno": "^0.2.0",
     "i18next": "^21.9.1",
