@@ -80,4 +80,5 @@ export default {
   "download.title": "Download",
   "download.text":
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+  "blog.title": "The GDLauncher Blog",
 };

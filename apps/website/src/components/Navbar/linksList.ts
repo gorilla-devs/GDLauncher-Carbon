@@ -19,6 +19,10 @@ export default [
     linkTo: "/team",
   },
   {
+    title: ["navbar.blog"],
+    linkTo: "/blog",
+  },
+  {
     title: ["navbar.github"],
     linkTo: "https://github.com/gorilla-devs/GDLauncher",
     isExternalLink: true,

@@ -9,7 +9,7 @@ export default {
   "generic.reportIssues": "Report issues",
   "generic.reportAnIssue": "Report an issue",
   "generic.reportIssues_text":
-  "Find an issue or have a suggestion? Make a formal report below. We take all cases very seriously.",
+    "Find an issue or have a suggestion? Make a formal report below. We take all cases very seriously.",
   "generic.404": "404",
   "navbar.home": "Home",
   "navbar.download": "Download",
@@ -19,6 +19,7 @@ export default {
   "navbar.contact": "Contact",
   "navbar.github": "Github",
   "navbar.discord": "Discord",
+  "navbar.blog": "Blog",
   "home.title": "GDLauncher",
   "home.createYourOwn": "Create your own!",
   "home.createYourOwn_text1":
@@ -80,7 +81,8 @@ export default {
   "footer.policy": "Privacy Policy",
   "download.title": "Download",
   "download.downloading": "GDLauncher is downloading…",
-  "download.downloading_text": "The GDLauncher is currently downloading, if you’re having issues with the download, click here to",
+  "download.downloading_text":
+    "The GDLauncher is currently downloading, if you’re having issues with the download, click here to",
   "download.text":
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
   "download.windows": "Download for windows",
@@ -90,11 +92,13 @@ export default {
   "waitlist.title": "Subscribe to get early access to the",
   "waitlist.title2": "NEW",
   "waitlist.title3": "GDLauncher",
-  "waitlist.text": "Enter your Email, Minecraft email and Ko-fi email (if it's different from the first email entered).",
+  "waitlist.text":
+    "Enter your Email, Minecraft email and Ko-fi email (if it's different from the first email entered).",
   "waitlist.getAccess": "GET EARLY ACCESS",
   "waitlist.subscribe": "Subscribe to the waitlist",
   "waitlist.mc_email": "Minecraft Email",
   "waitlist.email": "Email",
   "waitlist.kofi_email": "Kofi Email",
-  "waitlist.error_422": "You already subscribed, verify your email!"
+  "waitlist.error_422": "You already subscribed, verify your email!",
+  "blog.title": "The GDLauncher Blog",
 };

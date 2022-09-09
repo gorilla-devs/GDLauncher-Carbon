@@ -14,7 +14,9 @@ const currentPage = url.pathname;
 
   <body class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden">
     <Navbar currentPage={currentPage} />
-    <main class="text-white">
+    <main
+      class="relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:[calc(100vh-6.5rem)] mt-[6.5rem] bg-no-repeat text-white"
+    >
       <slot />
     </main>
     <Footer />

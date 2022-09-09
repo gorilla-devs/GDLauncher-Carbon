@@ -1,5 +1,5 @@
 export const APP_URLS = {
-  cdn: "https://gdlauncher-dev.b-cdn.net",
+  cdn: "https://gdlauncher.b-cdn.net",
   waitlist: "https://fastapi-production-4094.up.railway.app",
 };
 
