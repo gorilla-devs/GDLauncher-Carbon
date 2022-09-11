@@ -1,8 +1,9 @@
 ---
 import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
-import CenteredWrapper from "@/layouts/CenteredWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import ArticleCard from "@/components/ArticleCard/index.astro";
+import MainWrapper from "@/layouts/MainWrapper.astro";
 
 export const getStaticPaths = async () => {
   const mdPosts = await Astro.glob("../../../articles/*.md");
@@ -14,7 +15,8 @@ export const getStaticPaths = async () => {
     url: url,
     title: frontmatter.title,
     description: frontmatter.description,
-    publishDate: frontmatter.publishDate,
+    date: frontmatter.date,
+    author: frontmatter.author,
     image: frontmatter.image,
   }));
 
@@ -28,9 +30,9 @@ const { posts } = Astro.props;
 const t = useTranslations(Astro.url.pathname);
 ---
 
-<CenteredWrapper>
+<MainWrapper>
   <div
-    class="relative flex flex-col justify-between items-center pt-10 lg:pt-20 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen bg-no-repeat"
+    class="relative flex flex-col justify-between items-center pt-10 lg:pt-20 pb-10 box-border bg-no-repeat"
   >
     <div class="flex flex-col justify-center items-center">
       <img
@@ -41,6 +43,8 @@ const t = useTranslations(Astro.url.pathname);
       />
       <h1 class="text-xl lg:text-4xl font-bold">{t("blog.title")}</h1>
     </div>
-    {posts.map((post: any) => <div>{post.title}</div>)}
+    <div class="flex flex-col gap-20 pt-20 px-4">
+      {posts.map((post: any) => <ArticleCard post={post} />)}
+    </div>
   </div>
-</CenteredWrapper>
+</MainWrapper>

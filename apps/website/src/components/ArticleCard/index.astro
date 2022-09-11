@@ -1,0 +1,19 @@
+---
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+
+const { post } = Astro.props;
+---
+
+<!-- src={composeCDNAssetLink(post.image || "")}  -->
+<article class="max-w-xl rounded-xl bg-slate-900 hover:-translate-y-4 ease-in-out duration-200">
+  <div>
+    <img class="rounded-t-xl" src={composeCDNAssetLink("mc_forest_2.webp")} />
+  </div>
+  <div class="flex flex-col justify-between py-10 px-14 min-h-[18rem]">
+    <div>
+      <h2 class="text-2xl font-bold">{post.title}</h2>
+      <p>{post.description}</p>
+    </div>
+    <p class="text-sm text-slate-500">{post.author} - {post.date}</p>
+  </div>
+</article>
