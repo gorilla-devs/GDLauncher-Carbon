@@ -3,23 +3,20 @@ import languages from "@/i18n/languages";
 import { useTranslations } from "@/i18n/utils";
 import CenteredWrapper from "@/layouts/CenteredWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import { t } from "i18next";
 
 export const getStaticPaths = async () => {
-  const posts = await Astro.glob("./*.md").then(
-    (posts) => {
-      return posts.map(({ frontmatter, url }) => ({
-        url: url,
-        title: frontmatter.title,
-        description: frontmatter.description,
-        publishDate: frontmatter.publishDate,
-        image: frontmatter.image,
-      }));
-    }
+  const posts = await Astro.glob("../../../articles/*.md").then((posts) => {
+    return posts.map(({ frontmatter, url }) => ({
+      url: url,
+      title: frontmatter.title,
+      description: frontmatter.description,
+      publishDate: frontmatter.publishDate,
+      image: frontmatter.image,
+    }));
     // .sort((a, b) => {
     // 	new Date(b.publishDate) - new Date(a.publishDate)
     // })
-  );
+  });
 
   return Object.keys(languages).map((lang) => ({
     params: { lang },
@@ -28,7 +25,6 @@ export const getStaticPaths = async () => {
 };
 
 const { posts } = Astro.props;
-
 const t = useTranslations(Astro.url.pathname);
 ---
 

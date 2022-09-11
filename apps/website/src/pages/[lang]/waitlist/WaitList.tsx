@@ -1,10 +1,9 @@
 import Button from "@/components/Button";
 import Input from "@/components/Input";
-import { ADD_USER_ENDPOINT, APP_URLS } from "@/constants";
+import { ADD_USER_ENDPOINT } from "@/constants";
 import { useTranslations } from "@/i18n/utils";
-import { createEffect, createResource, createSignal } from "solid-js";
-import { createStore } from "solid-js/store";
-import { useForm } from "./useForm";
+import { createSignal } from "solid-js";
+import { useForm } from "../../../components/useForm";
 interface IForm {
   email: string;
   emailMc: string;
@@ -12,7 +11,7 @@ interface IForm {
 }
 
 const WaitList = ({ pathname }: { pathname: string }) => {
-  const { form, updateFormField, clearField } = useForm();
+  const { form, updateFormField } = useForm();
   const [error, setError] = createSignal("");
   const t = useTranslations(pathname);
 
