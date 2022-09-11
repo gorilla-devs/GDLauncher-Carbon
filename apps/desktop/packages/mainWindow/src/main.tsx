@@ -7,9 +7,12 @@ import App from "./app";
 import Modals from "./Modals";
 import "@gd/ui/style.css";
 import "virtual:uno.css";
-import "./utils/napi";
+import initAnalytics from "./utils/analytics";
 
 // LogRocket.init("hadq3z/mytest");
+queueMicrotask(() => {
+  initAnalytics();
+});
 
 render(() => {
   onMount(() => {

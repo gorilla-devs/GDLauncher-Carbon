@@ -4,9 +4,10 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "core.node"]
+      "outputs": ["dist/**", "core", "core.exe"]
     },
     "@gd/desktop#build": {
+      "dependsOn": ["^@gd/ui#build"],
       "cache": false
     },
     "@gd/desktop#dev": {
@@ -16,9 +17,10 @@
     },
     "dev": {
       "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^test"]
     }
   },
-  "globalDependencies": [
-    ".env"
-  ]
+  "globalDependencies": [".env"]
 }

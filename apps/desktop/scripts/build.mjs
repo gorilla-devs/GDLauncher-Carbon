@@ -10,8 +10,3 @@ await build({
   mode: "production",
   optimizeDeps: true,
 });
-await build({
-  configFile: "packages/mcLogWindow/vite.config.ts",
-  mode: "production",
-  optimizeDeps: true,
-});

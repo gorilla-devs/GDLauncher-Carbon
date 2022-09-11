@@ -1,5 +1,8 @@
 {
   "extends": "@gd/config/tsconfig.json",
   "include": ["packages/**/*.ts", "packages/**/*.tsx"],
-  "exclude": ["dist/**/*", "node_modules"]
+  "exclude": ["dist/**/*", "node_modules"],
+  "compilerOptions": {
+    "resolveJsonModule": true
+  }
 }
