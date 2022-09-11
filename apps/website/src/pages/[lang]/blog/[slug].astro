@@ -1,6 +1,9 @@
 ---
 export const getStaticPaths = async () => {
-  const posts = await Astro.glob("../../../articles/*.md");
+  const mdPosts = await Astro.glob("../../../articles/*.md");
+  const mdxPosts = await Astro.glob("../../../articles/*.mdx");
+
+  const posts = [...mdPosts, ...mdxPosts];
 
   return posts.map((post) => ({
     params: {

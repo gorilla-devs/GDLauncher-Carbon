@@ -2,7 +2,7 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import { ADD_USER_ENDPOINT } from "@/constants";
 import { useTranslations } from "@/i18n/utils";
-import { createSignal } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useForm } from "../../../components/useForm";
 interface IForm {
   email: string;
@@ -40,7 +40,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
 
   return (
     <div class="h-[calc(100vh-5.5rem)] lg:h-screen relative flex flex-col justify-center items-center">
-      <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center">
+      <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
           {t("waitlist.title")}
           <span class="inline-block px-4 text-yellow-500 -rotate-10 hover:rotate-0 transition-transform underline">
@@ -78,7 +78,9 @@ const WaitList = ({ pathname }: { pathname: string }) => {
             <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
               {t("waitlist.getAccess")}
             </Button>
-            <div class="p-10 text-red-400">{error()}</div>
+            <Show when={error()}>
+              <div class="p-10 text-red-400">{error()}</div>
+            </Show>
           </div>
         </form>
       </div>

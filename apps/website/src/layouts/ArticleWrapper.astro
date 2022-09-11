@@ -1,19 +1,24 @@
 ---
-// 1. The frontmatter prop gives access to frontmatter and other data
+import HeadCommon from "@/components/HeadCommon.astro";
+import Navbar from "@/components/Navbar/index.astro";
+import Footer from "@/components/Footer/index.astro";
+import "unocss-hmr-fix";
+const url = new URL(Astro.request.url);
+const currentPage = url.pathname;
 const { frontmatter } = Astro.props;
-import 'unocss-hmr-fix'
+import "unocss-hmr-fix";
 ---
 
 <html>
-  <head>
-    <!-- Add other Head elements here, like styles and meta tags. -->
-    <title>{frontmatter.title}</title>
-  </head>
-  <body>
-    <!-- Add other UI components here, like common headers and footers. -->
-    <h1>{frontmatter.title} by {frontmatter.author}</h1>
-    <!-- 2. Rendered HTML will be passed into the default slot. -->
-    <slot />
+  <body class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden">
+    <Navbar currentPage={currentPage} />
+    <main
+      class="relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:[calc(100vh-6.5rem)] mt-[6.5rem] bg-no-repeat text-white"
+    >
+      <h1>{frontmatter.title} by {frontmatter.author}</h1>
+      <slot />
+    </main>
     <p>Written on: {frontmatter.date}</p>
+    <Footer />
   </body>
 </html>
