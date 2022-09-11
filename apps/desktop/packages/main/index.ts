@@ -29,6 +29,8 @@ let win: BrowserWindow | null = null;
 async function createWindow() {
   win = new BrowserWindow({
     title: "Main window",
+    minHeight: 750,
+    minWidth: 1350,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288

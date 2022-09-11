@@ -36,13 +36,16 @@ jobs:
             and:
               - equal: ["mac", <<parameters.os>>]
           steps:
+            - run: brew install go@1.19
             - run: |
-                brew install go@1.19
                 node -v
                 go version
+            - run: |
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: |
+                pnpm test
                 pnpm build-mac-x64
       # MACOS M1
       - when:
@@ -50,13 +53,16 @@ jobs:
             and:
               - equal: ["macm1", <<parameters.os>>]
           steps:
+            - run: brew install go@1.19
             - run: |
-                brew install go@1.19
                 node -v
                 go version
+            - run: |
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: |
+                pnpm test
                 pnpm build-mac-arm64
       # LINUX
       - when:
@@ -70,6 +76,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+                pnpm test
                 pnpm build-linux-x64
       # LINUX WEBSITE
       - when:
@@ -82,6 +89,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+                pnpm test
                 pnpm build-web
   buildWin:
     working_directory: ./
@@ -111,9 +119,10 @@ jobs:
           go version
           npm i -g pnpm
           pnpm i
+          pnpm test
           pnpm build-win-x64
-      - store_artifacts:
-          path: ./apps/desktop/release
+      # - store_artifacts:
+      #     path: ./apps/desktop/release
 workflows:
   all-builds:
     jobs:

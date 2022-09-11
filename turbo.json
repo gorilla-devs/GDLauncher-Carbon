@@ -17,9 +17,10 @@
     },
     "dev": {
       "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["^test"]
     }
   },
-  "globalDependencies": [
-    ".env"
-  ]
+  "globalDependencies": [".env"]
 }

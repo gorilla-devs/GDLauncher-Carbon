@@ -1,11 +1,23 @@
+---
+// TODO: PLEASE REMOVE THE LAYOUT!!
+layout: "@/layouts/ArticleWrapper.astro"
+title: GDLauncher x Overwolf x Curseforge
+description: GDLauncher x Overwolf x Curseforge
+author: Davide Ceschia
+date: 09 Aug 2022
+---
+
 # A new start
+
 Hello everyone! As some of you might know, we have been working on a rewrite of GDLauncher for a while, and we're here today to finally give you some updates!
 
 # What is GDLauncher
+
 For those who don't know, GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience. Its main goal is to make it easy and enjoyable to manage different Minecraft versions and install forge/fabric, bringing the playing and modding experience to the next level.
 
 # GorillaDevs Inc. is now a company!
-GorillaDevs, the entity behind GDLauncher, is now officially a company. As such, we will be able to get access to a lot of things that were just out of touch before. We can also now hire people to help us develop GDLauncher, which we have wanted to do for a while now.
+
+GorillaDevs, the entity behind GDLauncher, is now officially a company. As such, we will be able to get access to a lot of things that were just out of reach before. We can also now hire people to help us develop GDLauncher, which we have wanted to do for a while.
 
 By the way, let me present to you our new incredible team!
 
@@ -15,7 +27,9 @@ By the way, let me present to you our new incredible team!
 - Heather (General Partner at Tech Law Partners LLP) - Open Source Licensing & Strategy Specialist
 - Lucio - Senior Software Engineer
 - Simone - Senior Software Engineer
+
 ## Partners
+
 - SpaceBerry - UI/UX Design Studio
 - Overwolf - Sponsor of the funding program
 - Curseforge - Strategic partner
@@ -30,9 +44,12 @@ Since the project's primary goal was to get better at programming and have fun, 
 
 Below, you can see GDLauncher's design evolution over the years.
 
-<img src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/launcher_evolution.webp" alt="GDLauncher's Evolution">
+<img
+  src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/launcher_evolution.webp"
+  alt="GDLauncher's Evolution"
+/>
 
-# GDLauncher x CurseForge
+# GDLauncher x CurseForge x Overwolf
 
 GDLauncher is currently just a simple launcher, but it can be much more!
 
@@ -45,7 +62,10 @@ Playing modded Minecraft became very stressful and cumbersome, especially for Li
 
 We also got invited into Overwolf's funding program, allowing us to take the next big step and create a fantastic product!
 
-<img src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/GDl_Dev_meme.webp" alt="GDLauncher's Slow Development">
+<img
+  src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/GDl_Dev_meme.webp"
+  alt="GDLauncher's Slow Development"
+/>
 
 One of the more frequent complaints was the lack of consistency in our releases and bug fixes. GDLauncher has always been loved for our attention to detail and the fantastic user experience it provides, but the truth is that we can still do so much better. We believe that our product is average at best, somewhat buggy, heavy, and still lacking in essential features that a custom launcher should have. This is where our partnership comes in.
 
@@ -59,10 +79,10 @@ We are dedicating all of our resources towards developing a brand new version of
 
 ## How will this partnership impact the current launcher? What about the rewrite, Carbon?
 
-This partnership will not impact the current launcher too much.
+This partnership will not impact the current launcher too much. Over time its support will be discontinued in favor of GDLauncher Carbon.
 
 All the resources from our partnership will go towards developing GDLauncher Carbon. We don't have an ETA yet, and we will publish updates in the next few weeks on our [Discord](https://discord.gdlauncher.com).
-After GDLauncher Carbon is ready to go to production, the current release of GDLauncher will be archived. We will probably change the license to MIT, so anyone will be free to do (mostly) whatever they want with it!
+After GDLauncher Carbon is ready to go to production, the current release of GDLauncher will be completely archived. We will change the license to MIT, so anyone will be free to do (mostly) whatever they want with it, including forking it and continuing its development.
 
 ## Will GDLauncher Carbon be part of the Overwolf network?
 
@@ -72,7 +92,22 @@ Yes and no. GDLauncher will remain a standalone installable/portable executable 
 
 No, there will always be a free version of GDLauncher.
 However, to support us, the developers of GDLauncher, and mod(pack) developers on CurseForge, there will be non-intrusive advertisements integrated within the launcher.
-We might add monthly subscriptions to access non-essential features and hide ads.
+
+## Will advertisements in GDLauncher Carbon be intrusive?
+
+It depends on your definition of intrusive. I will definitely be more intrusive than not having ads, but in general they won't bother you too much. We won't have full screen popups, hidden ads, ads that are difficult to identify from content and that kind of stuff. We will make sure to define where the content is and where the ads are and differentiate them appropriately so you don't end pp clicking them on accident. Our main goal with GDLauncher Carbon is to completely rethink the user experience and bring so much more to the table than a simple launcher.
+We will try to keep ads as unintrusive as possible.
+We want to make it easy and enjoyable to play modded Minecraft, and we believe that advertisements are necessary to
+
+- Support the developers of GDLauncher
+- Support mod and modpack developers on CurseForge
+- Pay for the infrastructure needed to run the launcher
+- Keep GDLauncher up to date, bug-free and performant
+  If you really hate ads (understandable) you will have the option to pay a monthly subscription to access premium non-essential features and disable ads.
+
+## Will GDLauncher Carbon support other games other than Minecraft?
+
+No, our goal is to make GDLauncher the best Minecraft launcher out there. We will not be adding support for other games.
 
 ## Will Overwolf own GDLauncher Carbon?
 
@@ -93,9 +128,10 @@ Right now, the entire app is written in (unoptimized) React, including all the s
 In the rewrite, all the native operations will be done in [Golang](https://go.dev) on a separate process, taking advantage of go's blazingly fast speed. The UI will be written in [SolidJS](https://solidjs.com), a super lightweight library with close to vanilla-js performance.
 
 ## Why Golang instead of Rust?
-Well... It wasn't easy to choose between the two. Rust is a great language, but it's still not mature enough, in our opinion. Golang is a bit more mature and has a much larger community, so it's easier to find help, documentation, and libraries. We also believe that Golang is a better fit for our use case as it better represents our coding style.
+
+It wasn't easy to choose between the two. Rust is a great language, but it's still not mature enough, in our opinion. Golang is a bit more mature and has a much larger community, so it's easier to find help, documentation, and libraries. We also believe that Golang is a better fit for our use case as it better represents our coding style.
 Rust is a low-level language, and most of our team comprises web developers. Golang is a more natural fit for us, and we believe it will allow us to develop GDLauncher Carbon faster and better.
-Moreover, it fits our ideology of "Easiness of programming" much better, instead of trying to overengineer every piece of code by using a low-level language full of clever tricks that are often unnecessary.
+Moreover, it fits our ideology of "Easiness of programming" much better, instead of trying to overengineer every piece of code by using a low-level language full of clever tricks that are often unnecessary, we prefer to focus on shipping high quality features and be able to quickly iterate over them.
 
 ## What about translations? Will it support \_\_ language?
 
@@ -136,7 +172,10 @@ Maintaining open-source software has always been challenging. Most people (like 
 Moreover, even though open source software can technically be community driven, in most cases it's not, and GDLauncher is a clear example. The vast majority of it has been developed by just 2 of us over the years, taking thousands of hours of work.
 Below you can find insights into all contributors' added/removed lines of code.
 
-<img src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/gdl_contributions.webp" alt="GDLauncher's contributions">
+<img
+  src="https://cdn.gdlauncher.com/assets/articles/curseforge-partnership-announcement/gdl_contributions.webp"
+  alt="GDLauncher's contributions"
+/>
 
 ### More about this
 
@@ -170,15 +209,19 @@ You can look at the current version as a proof of concept of what we can achieve
 
 GDLauncher Carbon will be a complete rewrite of the app from the ground up, using the best practices and technologies available today. It will be faster, lighter, more secure, and easier to maintain.
 
+## A note for supporters/donators
+
+If you are a donator of GDLauncher, you will be able to get early access to the new launcher! Just subscribe to our [mailing / waiting list](https://gdlauncher.com) indicating your ko-fi email and your minecraft email from our website and we will notify you as soon as you'll be able to access it!
+
 ## How can I contribute?
 
 There are a lot of ways in which you can contribute to making GDLauncher an excellent product!
-First of all, if you didn't do it already (SHAME ON YOU!!), you could come over to our [Discord](https://discord.gdlauncher.com) and make suggestions on what you would like to see implemented!
+First of all, if you didn't do it already, you could come over to our [Discord](https://discord.gdlauncher.com) and make suggestions on what you would like to see implemented!
 Moreover, if you feel like you have the skills, you could come work with us.
 Yes, you heard that right! If you want to join the team, you can either:
 
 - Contribute as an open source contributor in your spare time
-- Apply to our hiring selection at [here](https://gdlauncher.com/careers) to work with us full time! We are hiring designers, and Golang and JavaScript engineers
+- Apply to our hiring selection at [here](https://gdlauncher.com/careers) to work with us full time! We are hiring designers as well as Golang and JavaScript engineers
 
 ## I have more questions!
 
