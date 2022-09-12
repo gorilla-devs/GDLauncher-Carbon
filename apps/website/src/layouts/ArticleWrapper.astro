@@ -13,12 +13,12 @@ import "unocss-hmr-fix";
   <body class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden">
     <Navbar currentPage={currentPage} />
     <main
-      class="relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:[calc(100vh-6.5rem)] mt-[6.5rem] bg-no-repeat text-white"
+      class="relative flex flex-col justify-center items-center pt-1 pb-10 px-20 mx-auto box-border h-auto min-h-screen max-w-7xl mt-[6.5rem] bg-no-repeat text-center text-white"
     >
       <h1>{frontmatter.title} by {frontmatter.author}</h1>
       <slot />
+      <p class="pt-20">Written on: {frontmatter.date}</p>
     </main>
-    <p>Written on: {frontmatter.date}</p>
     <Footer />
   </body>
 </html>

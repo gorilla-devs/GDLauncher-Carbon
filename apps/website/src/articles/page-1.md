@@ -3,7 +3,6 @@ layout: "@/layouts/ArticleWrapper.astro"
 title: "Hello, World"
 author: "Matthew Phillips"
 date: "09 Aug 2022"
-slug: hello-world
 ---
 
 # Hi there!

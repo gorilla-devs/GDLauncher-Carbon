@@ -11,13 +11,15 @@ export const getStaticPaths = async () => {
 
   let posts: any[] = [...mdPosts, ...mdxPosts];
 
-  posts = posts.map(({ frontmatter, url }) => ({
+  posts = posts.map(({ frontmatter, url, file }) => ({
     url: url,
     title: frontmatter.title,
     description: frontmatter.description,
     date: frontmatter.date,
     author: frontmatter.author,
     image: frontmatter.image,
+    slug: file.substring(file.lastIndexOf("/") + 1).split(".")[0],
+
   }));
 
   return Object.keys(languages).map((lang) => ({

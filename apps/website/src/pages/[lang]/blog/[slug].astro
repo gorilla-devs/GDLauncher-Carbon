@@ -7,7 +7,7 @@ export const getStaticPaths = async () => {
 
   return posts.map((post) => ({
     params: {
-      slug: post.frontmatter.slug,
+      slug: post.file.substring(post.file.lastIndexOf("/") + 1).split(".")[0],
       lang: "en",
     },
     props: {
