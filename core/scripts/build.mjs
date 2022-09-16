@@ -5,18 +5,14 @@ import targetMapping from "./targetMapping.mjs";
 const argPlatform = (process.argv[2] || "").split("-")[0];
 const argArch = (process.argv[2] || "").split("-")[1];
 
-const target =
-  targetMapping[`${argPlatform || os.platform()}-${argArch || os.arch()}`];
-
 spawnSync(
   "npm",
   [
     "run",
-    "cross-env-shell",
-    `GOOS=${target.GOOS} GOARCH=${target.GOARCH}`,
-    `go build`,
-    "-ldflags",
-    `"-s -w"`,
+    "_build_",
+    "--",
+    "--target",
+    targetMapping[`${argPlatform || os.platform()}-${argArch || os.arch()}`],
   ],
   {
     stdio: "inherit",

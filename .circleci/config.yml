@@ -2,15 +2,16 @@ version: 2.1
 
 orbs:
   win: circleci/windows@5.0
+  node: circleci/node@5.0.2
 
 executors:
   linux:
     docker:
-      - image: cimg/go:1.19.0-node
+      - image: cimg/rust:1.62.0-node
     resource_class: medium
   website:
     docker:
-      - image: cimg/go:1.19.0-node
+      - image: cimg/rust:1.62.0-node
     resource_class: medium
   mac:
     macos:
@@ -21,6 +22,7 @@ executors:
       xcode: "14.0.0"
     resource_class: medium
   windows: win/default
+  node: node/default
 
 jobs:
   build:
@@ -38,9 +40,13 @@ jobs:
           steps:
             - run: brew install go@1.19
             - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
+                rustup toolchain install nightly
+                rustup target add x86_64-apple-darwin --toolchain nightly
+                rustup default nightly
                 node -v
-                go version
-            - run: |
+                cargo --version
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
@@ -55,9 +61,13 @@ jobs:
           steps:
             - run: brew install go@1.19
             - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
+                rustup toolchain install nightly
+                rustup target add aarch64-apple-darwin --toolchain nightly
+                rustup default nightly
                 node -v
-                go version
-            - run: |
+                cargo --version
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
@@ -71,8 +81,11 @@ jobs:
               - equal: ["linux", <<parameters.os>>]
           steps:
             - run: |
+                rustup toolchain install nightly
+                rustup target add x86_64-unknown-linux-gnu --toolchain nightly
+                rustup default nightly
                 node -v
-                go version
+                cargo --version
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
@@ -103,20 +116,34 @@ jobs:
           shell: powershell.exe
           command: choco install nvm -y
       - run:
-          name: Install Node 16.17.0
+          name: Install Node 16.16.0
           shell: powershell.exe
           command: |
               nvm list
-              nvm install 16.17.0
-              nvm use 16.17.0
+              nvm install 16.16.0
+              nvm use 16.16.0
       - run:
           name: Verify Node Version
           shell: powershell.exe
           command: node --version
+      - run:
+          name: "Install Rust"
+          shell: powershell.exe
+          command: |
+            $ProgressPreference = 'Continue'    
+            Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
+            & C:\rustup-init.exe -y --default-toolchain "nightly-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
+            $env:path += ";$env:userprofile\.cargo\bin"
+
+            rustc -Vv
+            node -v
+            cargo --version
+            rustc --version | Out-File -FilePath "rust-version"
+            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
+                cargo generate-lockfile
+            }
       - run: |
-          $env:path += ";$env:appdata\npm"
-          node -v
-          go version
+          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
           pnpm test
