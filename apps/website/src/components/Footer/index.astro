@@ -5,49 +5,128 @@ import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 const t = useTranslations(Astro.url.pathname);
 ---
 
-<footer
-    class="h-auto md:h-96 bg-slate-900 mb-20 lg:mb-0"
->
-    <div class="h-full w-full max-w-7xl my-0 mx-auto">
-        <div
-            class="h-full flex flex-col gap-10 md:gap-0 px-10 md:px-0 md:flex-row justify-between items-start text-white pt-10 pb-10"
-        >
-            <div class="flex flex-col">
-                <img
-                    class="mb-10"
-                    src={composeCDNAssetLink("gdlauncher_wide_logo.webp")}
-                    alt="gdlauncher_wide_logo"
-                />
-                <p class="text-xl max-w-sm">
-                    {t("footer.text")}
-                </p>
-            </div>
-            <div class="flex flex-col justify-between items-start gap-4">
-                <h3 class="font-bold">{t("footer.home")}</h3>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.about")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.features")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.team")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.timeline")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.contact")}</a>
-            </div>
-            <div class="flex flex-col justify-between items-start gap-4">
-                <h3 class="font-bold">{t("footer.download")}</h3>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.windows")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.macos")}</a>
-                <a class="text-xl text-slate-400 cursor-pointer">{t("footer.linux")}</a>
-            </div>
-            <div class="flex flex-col justify-between items-start gap-4">
-                <h3 class="font-bold">{t("footer.legal")}</h3>
-                <a class="text-xl text-slate-400 cursor-pointer"
-                    >{t("footer.termsNCondition")}
-                </a>
-                <a class="text-xl text-slate-400">{t("footer.policy")}</a>
-            </div>
-        </div>
+<footer>
+  <div class="innerContainer">
+    <div>
+      <div>
+        <img
+          src={composeCDNAssetLink("gdlauncher_wide_logo.webp")}
+          alt="gdlauncher_wide_logo"
+        />
+        <p>
+          {t("footer.text")}
+        </p>
+      </div>
+      <div>
+        <h3>{t("footer.home")}</h3>
+        <a>{t("footer.about")}</a>
+        <a>{t("footer.features")}</a>
+        <a>{t("footer.team")}</a>
+        <a>{t("footer.timeline")}</a>
+        <a>{t("footer.contact")}</a>
+      </div>
+      <div>
+        <h3>{t("footer.download")}</h3>
+        <a>{t("footer.windows")}</a>
+        <a>{t("footer.macos")}</a>
+        <a>{t("footer.linux")}</a>
+      </div>
+      <div>
+        <h3>{t("footer.legal")}</h3>
+        <a>{t("footer.termsNCondition")}</a>
+        <a>{t("footer.policy")}</a>
+      </div>
     </div>
-    <div
-        class="h-20 bg-blue-500 text-slate-200 flex justify-center items-center text-2xl text-center"
-    >
-        {t("footer.copyright_text")}
-    </div>
+  </div>
+  <div class="footerBottom">
+    {t("footer.copyright_text")}
+  </div>
 </footer>
+
+<style lang="scss">
+  footer {
+    height: auto;
+    margin-bottom: 5rem;
+    background-color: #0f172a;
+    .innerContainer {
+      height: 100%;
+      width: 100%;
+      max-width: 80rem;
+      margin: 0 auto;
+
+      & > div {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+        padding-top: 2.5rem;
+        padding-bottom: 2.5rem;
+        justify-content: space-between;
+        align-items: flex-start;
+        color: white;
+
+        div:first-child {
+          display: flex;
+          flex-direction: column;
+          img {
+            margin-bottom: 0;
+          }
+          p {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+            max-width: 24rem;
+            margin: 0;
+          }
+        }
+
+        div {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+          h3 {
+            font-weight: bold;
+          }
+          a {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+            cursor: pointer;
+            color: #94a3b8;
+          }
+        }
+      }
+    }
+    .footerBottom {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      height: 5rem;
+      font-size: 1.5rem;
+      line-height: 2rem;
+      background-color: #3b82f6;
+      color: #e2e8f0;
+    }
+  }
+
+  @media (min-width: 768px) {
+    footer {
+      height: 24rem;
+      .innerContainer {
+        & > div {
+          gap: 0;
+          padding-top: 0;
+          padding-bottom: 0;
+          flex-direction: row;
+        }
+      }
+    }
+  }
+
+  @media (min-width: 1024px) {
+    footer {
+      margin-bottom: 0px;
+    }
+  }
+</style>
