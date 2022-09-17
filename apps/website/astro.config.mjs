@@ -2,12 +2,8 @@
 
 /* eslint-disable import/no-unresolved */
 import solid from "@astrojs/solid-js";
-import Unocss from "unocss/astro";
-import presetWind from "@unocss/preset-wind";
-import presetAttributify from "@unocss/preset-attributify";
 import { defineConfig } from "astro/config";
-import uno from "astro-uno";
-import { presetUno } from "unocss";
+import tailwind from "@astrojs/tailwind";
 
 import mdx from "@astrojs/mdx";
 
@@ -15,12 +11,13 @@ import mdx from "@astrojs/mdx";
 export default defineConfig({
   vite: {
     // envDir: resolve(__dirname, "../../"),
-    ssr: {// noExternal: "style.css", // from @gd/ui
-    }
+    ssr: {
+      // noExternal: "style.css", // from @gd/ui
+    },
   },
-  integrations: [solid(), Unocss({
-    presets: [presetWind(), presetAttributify()]
-  }), uno({
-    presets: [presetUno()]
-  }), mdx()]
+  integrations: [
+    solid(),
+    tailwind({ config: { applyBaseStyles: false } }),
+    mdx(),
+  ],
 });

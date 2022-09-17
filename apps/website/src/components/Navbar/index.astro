@@ -20,25 +20,20 @@ const t = useTranslations(Astro.url.pathname);
 
 <Interactivity client:load />
 
-<div
-  class="navbar max-h-32 fixed bottom-0 lg:absolute lg:top-0 lg:bottom-auto left-0 right-0 z-40 p-6 flex flex-col justify-between items-center bg-gray-900 lg:bg-transparent"
->
-  <div class="flex justify-between w-full max-w-7xl">
-    <div class="flex justify-between items-center gap-x-10 w-full lg:w-auto">
+<div class="navbar">
+  <div class="innerContainer">
+    <div class="leftInnerContainer">
       <a href="/">
         <img
-          class="w-10 lg:w-full"
           src={composeCDNAssetLink("gdlauncher_logo.svg")}
           alt="logo"
           class="cursor-pointer"
         />
       </a>
-      <div class="burger lg:hidden">
+      <div class="burger">
         <Burger />
       </div>
-      <div
-        class="hidden lg:flex font-medium justify-between items-center gap-x-5 text-white"
-      >
+      <div class="linksContainer hidden">
         {
           linksList.map((props) => (
             <a
@@ -58,23 +53,21 @@ const t = useTranslations(Astro.url.pathname);
         </a>
       </div>
     </div>
-    <div class="hidden lg:flex">
+    <div class="rightInnerContainer">
       <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
       </a>
     </div>
   </div>
 </div>
-<div
-  class="mobile-menu hidden fixed top-0 bottom-0 left-0 right-0 flex-col justify-center items-center bg-gray-900 padding-4 z-30"
->
-  <div class="flex flex-col justify-center items-center gap-4">
+<div class="mobile-menu">
+  <div>
     {
       linksList.map((props) => (
         <a
-          class={`p-0 cursor-pointer transition ease-in-out relative m-1 text-slate-400 ${
+          class={
             globalThis?.location?.pathname === props.linkTo ? "selected" : ""
-          }`}
+          }
           href={localizePath(props.linkTo, lang, props.isExternalLink)}
         >
           {format(t(props.title[0]), "capitalize")}
@@ -89,3 +82,111 @@ const t = useTranslations(Astro.url.pathname);
     </div>
   </div>
 </div>
+
+<style lang="scss">
+  .navbar {
+    max-height: 8rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #111827;
+  }
+
+  .innerContainer {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 80rem;
+  }
+
+  .leftInnerContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    column-gap: 2.5rem;
+    width: 100%;
+    img {
+      width: 2.5rem;
+    }
+    .linksContainer {
+      display: none;
+      font-weight: 500;
+      column-gap: 1.25rem;
+      color: white;
+      a {
+        text-decoration: none;
+        color: white;
+      }
+    }
+  }
+
+  .rightInnerContainer {
+    display: none;
+  }
+
+  .mobile-menu {
+    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: #111827;
+    padding: 1rem;
+    z-index: 30;
+
+    & > div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+
+      a {
+        position: relative;
+        padding: 0;
+        cursor: pointer;
+        transition: all ease-in-out;
+        margin: 0.25rem;
+        color: #94a3b8;
+      }
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .navbar {
+      position: absolute;
+      top: 0;
+      bottom: auto;
+      background-color: transparent;
+    }
+
+    .burger {
+      display: none;
+    }
+    .leftInnerContainer {
+      width: auto;
+      img {
+        width: 100%;
+      }
+      .linksContainer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+    .rightInnerContainer {
+      display: flex;
+    }
+  }
+</style>
