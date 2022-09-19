@@ -9,7 +9,7 @@ import { localizePath } from "@/utils/helpers";
 import languages from "@/i18n/languages";
 
 export function getStaticPaths() {
-    return Object.keys(languages).map((lang) => ({ params: { lang } }));
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
 }
 
 const { lang } = Astro.params;
@@ -19,288 +19,267 @@ const t = useTranslations(Astro.url.pathname);
 ---
 
 <MainWrapper>
-    <div class="h-auto relative">
-        <div
-            class={`relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen
+  <div class="h-auto relative">
+    <div
+      class={`relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen
             bg-[url("https://cdn.gdlauncher.com/assets/mc_panda.webp")] bg-no-repeat`}
-        >
-            <div class="absolute top-0 bottom-0 left-0 right-0">
-                <div
-                    class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-800"
-                >
-                </div>
-            </div>
-            <div
-                class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-10 lg:gap-20 max-w-7xl"
-            >
-                <div class="py-0 px-4 max-w-2xl">
-                    <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
-                        {t("home.title")}
-                    </h3>
-                    <p class="text-xl mb-12 font-light">
-                        {t("launcher.mockup.description")}
-                    </p>
-                    <div class="flex flex-col lg:flex-row gap-5 lg:gap-10">
-                        <a
-                            href={localizePath(
-                                "/download",
-                                lang?.toString() || "en"
-                            )}
-                        >
-                            <Button>{t("navbar.download")}</Button>
-                        </a>
-                        <a
-                            href={localizePath(
-                                "/waitlist",
-                                lang?.toString() || "en"
-                            )}
-                        >
-                            <Button class="max-w-[300px] bg-yellow-500"
-                                >{t("waitlist.subscribe")}
-                            </Button>
-                        </a>
-                    </div>
-                </div>
-                <div>
-                    <img
-                        class="w-full"
-                        src={composeCDNAssetLink("launcher_mockup.webp")}
-                        alt="launcher_mockup"
-                    />
-                </div>
-            </div>
-            <!-- <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" /> -->
-        </div>
+    >
+      <div class="absolute top-0 bottom-0 left-0 right-0">
         <div
-            class="relative h-auto lg:h-screen flex flex-row justify-start items-center py-20 lg:pt-40 lg:pr-20 bg-slate-900"
+          class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-800"
         >
-            <div
-                class="w-full z-20 flex flex-col-reverse lg:flex-row-reverse justify-between items-start lg:items-center gap-40"
-            >
-                <div class="py-0 px-10">
-                    <h3 class="text-5xl lg:text-7xl mb-10 font-bold">
-                        {t("home.createYourOwn")}
-                    </h3>
-                    <ul class="createYourOwn px-8 lg:pl-4 lg:pr-0">
-                        <li class="mb-10 text-xl pl-5">
-                            {t("home.createYourOwn_text1")}
-                        </li>
-                        <li class="mb-10 text-xl pl-5">
-                            {t("home.createYourOwn_text2")}
-                        </li>
-                        <li class="mb-10 text-xl pl-5">
-                            {t("home.createYourOwn_text3")}
-                        </li>
-                    </ul>
-                    <div>
-                        <a href="/download">
-                            <Button>{t("navbar.download")}</Button>
-                        </a>
-                    </div>
-                </div>
-                <div class="w-[80%] lg:h-full lg:w-auto">
-                    <img
-                        class="h-full"
-                        src={composeCDNAssetLink("create_your_own.svg")}
-                        alt="create_your_own"
-                    />
-                </div>
-            </div>
         </div>
-        <div
-            class="h-auto flex flex-col justify-start items-center px-10 lg:px-0 py-32 lg:py-10 bg-slate-900"
-        >
-            <div class="w-full lg:w-4/5 flex flex-col justify-start">
-                <div class="mb-20">
-                    <h3 class="text-5xl lg:text-9xl mb-10 font-bold">
-                        {t("home.features")}
-                    </h3>
-                    <p class="text-base lg:text-3xl text-gray-200">
-                        {t("home.features_subitle")}
-                    </p>
-                </div>
-                <div class="flex flex-col flex-wrap gap-20 justify-center">
-                    <div
-                        class="flex flex-col justify-center lg:flex-row flex-wrap gap-20"
-                    >
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink(
-                                    "curseforge_integration.svg"
-                                )}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.curseforgeIntegration")}
-                            </p>
-                        </div>
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink("built_in_mods.svg")}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.modsManager")}
-                            </p>
-                        </div>
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink(
-                                    "auto_java_installation.svg"
-                                )}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.javaAutoInstall")}
-                            </p>
-                        </div>
-                    </div>
-                    <div
-                        class="flex flex-col lg:flex-row flex-wrap gap-20 justify-center"
-                    >
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink(
-                                    "easy_to_use_interface.svg"
-                                )}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.easyToUse")}
-                            </p>
-                        </div>
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink("dark_light_mode.svg")}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.darkLightMode")}
-                            </p>
-                        </div>
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink(
-                                    "automatic_updater.svg"
-                                )}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.automaticUpdater")}
-                            </p>
-                        </div>
-                    </div>
-                    <div
-                        class="flex flex-col lg:flex-row gap-20 justify-center"
-                    >
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink(
-                                    "import_export_modpack.svg"
-                                )}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.importModpacks")}
-                            </p>
-                        </div>
-                        <div
-                            class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
-                        >
-                            <img
-                                class="mb-5 max-w-xs"
-                                src={composeCDNAssetLink("ftb_integration.svg")}
-                                alt="curseforge_integration"
-                            />
-                            <p class="font-bold text-center text-2xl">
-                                {t("features.ftb")}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+      </div>
+      <div
+        class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-10 lg:gap-20 max-w-7xl"
+      >
+        <div class="py-0 px-4 max-w-2xl">
+          <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
+            {t("home.title")}
+          </h3>
+          <p class="text-xl mb-12 font-light">
+            {t("launcher.mockup.description")}
+          </p>
+          <div class="flex flex-col lg:flex-row gap-5 lg:gap-10">
+            <a href={localizePath("/download", lang?.toString() || "en")}>
+              <Button>{t("navbar.download")}</Button>
+            </a>
+            <a href={localizePath("/waitlist", lang?.toString() || "en")}>
+              <Button
+                style={{ "max-width": "300px", "background-color": "#eab308" }}
+                >{t("waitlist.subscribe")}
+              </Button>
+            </a>
+          </div>
         </div>
-        <div
-            class={`relative h-auto bg-[url("https://cdn.gdlauncher.com/assets/github_issues.png")] bg-no-repeat flex
-            flex-col justify-end items-center p-20 overflow-hidden bg-slate-900`}
-        >
-            <div class="absolute top-0 bottom-0 left-0 right-0 z-10">
-                <div
-                    class="absolute top-0 bottom-0 left-0 right-0 opacity-95 bg-slate-900"
-                >
-                </div>
-            </div>
-            <div
-                class="w-full lg:w-4/5 flex flex-col justify-start items-end gap-20 z-20 text-right text-5xl"
-            >
-                <h1
-                    class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
-                >
-                    A lancher focused on the user experience
-                </h1>
-                <h1
-                    class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
-                >
-                    A launcher that strengthens the Minecraft community
-                </h1>
-                <h1
-                    class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
-                >
-                    A launcher that prioritixes consumer input
-                </h1>
-            </div>
-
-            <div
-                class="absolute bottom-32 right-20 flex justify-center items-center z-10"
-            >
-                <div
-                    class="absolute w-[10rem] h-[10rem] bg-yellow-200 rounded-full opacity-20"
-                >
-                </div>
-                <div
-                    class="absolute w-[20rem] h-[20rem] bg-yellow-200 rounded-full opacity-20"
-                >
-                </div>
-                <div
-                    class="absolute w-[30rem] h-[30rem] bg-yellow-200 rounded-full opacity-20"
-                >
-                </div>
-            </div>
+        <div>
+          <img
+            class="w-full"
+            src={composeCDNAssetLink("launcher_mockup.webp")}
+            alt="launcher_mockup"
+          />
         </div>
-        <ModLoaderSection client:visible pathname={Astro.url.pathname} />
-        <DonateKofiSection />
+      </div>
+      <!-- <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" /> -->
     </div>
+    <div
+      class="relative h-auto lg:h-screen flex flex-row justify-start items-center py-20 lg:pt-40 lg:pr-20 bg-slate-900"
+    >
+      <div
+        class="w-full z-20 flex flex-col-reverse lg:flex-row-reverse justify-between items-start lg:items-center gap-40"
+      >
+        <div class="py-0 px-10">
+          <h3 class="text-5xl lg:text-7xl mb-10 font-bold">
+            {t("home.createYourOwn")}
+          </h3>
+          <ul class="createYourOwn px-8 lg:pl-4 lg:pr-0">
+            <li class="mb-10 text-xl pl-5">
+              {t("home.createYourOwn_text1")}
+            </li>
+            <li class="mb-10 text-xl pl-5">
+              {t("home.createYourOwn_text2")}
+            </li>
+            <li class="mb-10 text-xl pl-5">
+              {t("home.createYourOwn_text3")}
+            </li>
+          </ul>
+          <div>
+            <a href="/download">
+              <Button>{t("navbar.download")}</Button>
+            </a>
+          </div>
+        </div>
+        <div class="w-[80%] lg:h-full lg:w-auto">
+          <img
+            class="h-full"
+            src={composeCDNAssetLink("create_your_own.svg")}
+            alt="create_your_own"
+          />
+        </div>
+      </div>
+    </div>
+    <div
+      class="h-auto flex flex-col justify-start items-center px-10 lg:px-0 py-32 lg:py-10 bg-slate-900"
+    >
+      <div class="w-full lg:w-4/5 flex flex-col justify-start">
+        <div class="mb-20">
+          <h3 class="text-5xl lg:text-9xl mb-10 font-bold">
+            {t("home.features")}
+          </h3>
+          <p class="text-base lg:text-3xl text-gray-200">
+            {t("home.features_subitle")}
+          </p>
+        </div>
+        <div class="flex flex-col flex-wrap gap-20 justify-center">
+          <div
+            class="flex flex-col justify-center lg:flex-row flex-wrap gap-20"
+          >
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("curseforge_integration.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.curseforgeIntegration")}
+              </p>
+            </div>
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("built_in_mods.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.modsManager")}
+              </p>
+            </div>
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("auto_java_installation.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.javaAutoInstall")}
+              </p>
+            </div>
+          </div>
+          <div
+            class="flex flex-col lg:flex-row flex-wrap gap-20 justify-center"
+          >
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("easy_to_use_interface.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.easyToUse")}
+              </p>
+            </div>
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("dark_light_mode.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.darkLightMode")}
+              </p>
+            </div>
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("automatic_updater.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.automaticUpdater")}
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-col lg:flex-row gap-20 justify-center">
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("import_export_modpack.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.importModpacks")}
+              </p>
+            </div>
+            <div
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+            >
+              <img
+                class="mb-5 max-w-xs"
+                src={composeCDNAssetLink("ftb_integration.svg")}
+                alt="curseforge_integration"
+              />
+              <p class="font-bold text-center text-2xl">
+                {t("features.ftb")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class={`relative h-auto bg-[url("https://cdn.gdlauncher.com/assets/github_issues.png")] bg-no-repeat flex
+            flex-col justify-end items-center p-20 overflow-hidden bg-slate-900`}
+    >
+      <div class="absolute top-0 bottom-0 left-0 right-0 z-10">
+        <div
+          class="absolute top-0 bottom-0 left-0 right-0 opacity-95 bg-slate-900"
+        >
+        </div>
+      </div>
+      <div
+        class="w-full lg:w-4/5 flex flex-col justify-start items-end gap-20 z-20 text-right text-5xl"
+      >
+        <h1
+          class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
+        >
+          A lancher focused on the user experience
+        </h1>
+        <h1
+          class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
+        >
+          A launcher that strengthens the Minecraft community
+        </h1>
+        <h1
+          class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
+        >
+          A launcher that prioritixes consumer input
+        </h1>
+      </div>
+
+      <div
+        class="absolute bottom-32 right-20 flex justify-center items-center z-10"
+      >
+        <div
+          class="absolute w-[10rem] h-[10rem] bg-yellow-200 rounded-full opacity-20"
+        >
+        </div>
+        <div
+          class="absolute w-[20rem] h-[20rem] bg-yellow-200 rounded-full opacity-20"
+        >
+        </div>
+        <div
+          class="absolute w-[30rem] h-[30rem] bg-yellow-200 rounded-full opacity-20"
+        >
+        </div>
+      </div>
+    </div>
+    <ModLoaderSection client:visible pathname={Astro.url.pathname} />
+    <DonateKofiSection />
+  </div>
 </MainWrapper>
 
 <style>
-    .createYourOwn li {
-        list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_orange.svg");
-    }
-    .createYourOwn li:first-child {
-        list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_teal.svg");
-    }
-    .createYourOwn li:last-child {
-        list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_yellow.svg");
-    }
+  .createYourOwn li {
+    list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_orange.svg");
+  }
+  .createYourOwn li:first-child {
+    list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_teal.svg");
+  }
+  .createYourOwn li:last-child {
+    list-style-image: url("https://cdn.gdlauncher.com/assets/hexagon_yellow.svg");
+  }
 </style>
