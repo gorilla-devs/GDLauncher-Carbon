@@ -12,7 +12,14 @@ const DownloadSection: Component<{ pathname: string }> = ({ pathname }) => {
     <>
       <Show
         when={!isDownloading()}
-        fallback={<DownloadedSection pathname={pathname} setIsDownloading={() => setIsDownloading(true)} />}
+        fallback={
+          <DownloadedSection
+            pathname={pathname}
+            setIsDownloading={() => {
+              setIsDownloading(!isDownloading());
+            }}
+          />
+        }
       >
         <div
           class={`relative flex flex-col justify-center items-center pt-1 box-border h-screen bg-[url("https://cdn.gdlauncher.com/assets/mc_forest_2.webp")] bg-no-repeat`}

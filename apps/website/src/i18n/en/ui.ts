@@ -100,5 +100,6 @@ export default {
   "waitlist.email": "Email",
   "waitlist.kofi_email": "Kofi Email",
   "waitlist.error_422": "You already subscribed, verify your email!",
+  "waitlist.success": "You successfully subscribed to the waitlist",
   "blog.title": "The GDLauncher Blog",
 };

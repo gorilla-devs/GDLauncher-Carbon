@@ -13,27 +13,36 @@ interface IForm {
 const WaitList = ({ pathname }: { pathname: string }) => {
   const { form, updateFormField } = useForm();
   const [error, setError] = createSignal("");
+  const [success, setSuccess] = createSignal("");
   const t = useTranslations(pathname);
 
-  const addUser = async (body: any) =>
-    await fetch(ADD_USER_ENDPOINT, {
+  const addUser = async (body: any) => {
+    return await fetch(ADD_USER_ENDPOINT, {
       method: "POST",
-      body,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
     });
+  };
 
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
-    const formData = new FormData();
+    const obj: any = {};
 
+    console.log("TEST", form.email && form.emailMc && form.emailKofi);
     if (form.email && form.emailMc && form.emailKofi) {
-      formData.append("user_email", form.email);
-      formData.append("mc_email", form.emailMc);
-      formData.append("kofi_email", form.emailKofi);
+      obj["user_email"] = form.email;
+      obj["mc_email"] = form.emailMc;
+      obj["kofi_email"] = form.emailKofi;
 
-      const res = await addUser(formData);
-      console.log("res", res);
-      if (res.status === 422) {
+      const res = await addUser(obj);
+      console.log("res", res.status);
+      if (res.status !== 200) {
         setError(t("waitlist.error_422"));
+      } else {
+        setSuccess("waitlist.success");
       }
     }
   };
@@ -80,6 +89,9 @@ const WaitList = ({ pathname }: { pathname: string }) => {
             </Button>
             <Show when={error()}>
               <div class="p-10 text-red-400">{error()}</div>
+            </Show>
+            <Show when={success()}>
+              <div class="p-10 text-green-400">{success()}</div>
             </Show>
           </div>
         </form>

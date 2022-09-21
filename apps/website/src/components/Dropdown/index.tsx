@@ -46,17 +46,19 @@ const Dropdown = (props: Props) => {
   return (
     <div class="relative max-w-[300px] bg-slate-600 rounded-2xl">
       {open() && (
-        <div class="absolute top-0 left-0 right-0 bottom-0 bg-slate-600 -z-1 rounded-t-2xl" />
+        <div class="absolute top-0 left-0 right-0 bottom-0 bg-slate-600 -z-10 rounded-t-2xl" />
       )}
       <div
         onclick={() => setOpen(!open())}
-        class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer ${props.class}`}
+        class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer z-10 ${
+          props.class || ""
+        }`}
       >
         <a href={urls[currentValue()]} onclick={() => props.onclick()}>
           {t(labels[currentValue()])}
         </a>
         <Caret
-          class={`ease-linear duration-100 ${
+          class={`ease-linear duration-100 w-4 h-4 ${
             open() ? "rotate-0" : "-rotate-90"
           }`}
         />
