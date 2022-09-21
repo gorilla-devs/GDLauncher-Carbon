@@ -1,4 +1,5 @@
 import Page from "@/components/Page";
+import napi from "@/utils/napi";
 import { useNavigate } from "@solidjs/router";
 import { createSignal } from "solid-js";
 import { Button } from "@gd/ui";
@@ -38,8 +39,8 @@ export default function Home() {
         <div />
         <button
           onClick={async () => {
-            // const res = await napi.fibonacci(1, 2);
-            setValue(0);
+            const res = await napi.fibonacci(1, 2);
+            setValue(res);
           }}
         >
           Compute value

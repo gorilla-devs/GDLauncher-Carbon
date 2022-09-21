@@ -2,16 +2,21 @@
   "name": "@gd/core",
   "version": "0.0.1",
   "main": "./index.js",
+  "files": [
+    "core.node"
+  ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
-    "test": "go test",
-    "ts-node": "ts-node",
-    "cross-env-shell": "cross-env-shell"
+    "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts --release",
+    "_dev_": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts"
+  },
+  "napi": {
+    "name": "core"
   },
   "devDependencies": {
     "@gd/config": "workspace:*",
-    "cross-env": "^7.0.3",
-    "ts-node": "^10.9.1"
+    "@napi-rs/cli": "^2.11.4",
+    "cross-env": "^7.0.3"
   }
 }

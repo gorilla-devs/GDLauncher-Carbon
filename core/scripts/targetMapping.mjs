@@ -1,18 +1,6 @@
 export default {
-  "darwin-arm64": {
-    GOOS: "darwin",
-    GOARCH: "arm64",
-  },
-  "darwin-x64": {
-    GOOS: "darwin",
-    GOARCH: "amd64",
-  },
-  "win32-x64": {
-    GOOS: "windows",
-    GOARCH: "amd64",
-  },
-  "linux-x64": {
-    GOOS: "linux",
-    GOARCH: "amd64",
-  },
+  "darwin-arm64": "aarch64-apple-darwin",
+  "darwin-x64": "x86_64-apple-darwin",
+  "win32-x64": "x86_64-pc-windows-msvc",
+  "linux32-x64": "x86_64-unknown-linux-gnu",
 };
