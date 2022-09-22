@@ -7,6 +7,7 @@ import MainWrapper from "@/layouts/MainWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
 import languages from "@/i18n/languages";
+import CaretIcon from "@/components/CaretIcon";
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
@@ -60,8 +61,8 @@ const t = useTranslations(Astro.url.pathname);
           />
         </div>
       </div>
-      <!-- <Icon icon={CaretDown} class="relative z-20 my-12 text-5xl" /> -->
     </div>
+    <CaretIcon class="relative bottom-14 lg:bottom-20 my-0 mx-auto w-5 h-5 z-50" />
     <div
       class="relative h-auto lg:h-screen flex flex-row justify-start items-center py-20 lg:pt-40 lg:pr-20 bg-slate-900"
     >

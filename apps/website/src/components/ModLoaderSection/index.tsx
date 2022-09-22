@@ -67,9 +67,9 @@ function Section(props: { type: sectionType } & Props) {
             </Match>
           </Switch>
         </div>
-        <div>
+        <div class="lg:m-h-[540px]">
           <img
-            class="w-full opacity-10 lg:opacity-100"
+            class="w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
             loading="lazy"
             src={composeCDNAssetLink(images[reactiveProps.type])}
             alt="launcher_mockup"
