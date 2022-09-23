@@ -52,7 +52,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
       <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
           {t("waitlist.title")}
-          <span class="inline-block px-4 text-yellow-500 -rotate-10 hover:rotate-0 transition-transform underline">
+          <span class="inline-block px-4 text-yellow-500 -rotate-12 hover:rotate-0 transition-transform underline">
             {t("waitlist.title2")}
           </span>
           {t("waitlist.title3")}

@@ -6,7 +6,7 @@ const t = useTranslations(Astro.url.pathname);
 ---
 
 <footer>
-  <div class="innerContainer">
+  <div class="footerInnerContainer">
     <div>
       <div>
         <img
@@ -46,9 +46,9 @@ const t = useTranslations(Astro.url.pathname);
 <style lang="scss">
   footer {
     height: auto;
-    margin-bottom: 5rem;
+    margin-bottom: 6em;
     background-color: #0f172a;
-    .innerContainer {
+    .footerInnerContainer {
       height: 100%;
       width: 100%;
       max-width: 80rem;
@@ -115,7 +115,7 @@ const t = useTranslations(Astro.url.pathname);
     footer {
       height: 24rem;
       padding-top: 2rem;
-      .innerContainer {
+      .footerInnerContainer {
         padding: 0;
         & > div {
           gap: 0;
