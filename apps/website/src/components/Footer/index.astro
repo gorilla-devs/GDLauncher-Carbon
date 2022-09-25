@@ -126,10 +126,20 @@ const t = useTranslations(Astro.url.pathname);
       }
     }
   }
+  @media (width: 768px) {
+    footer {
+      margin-bottom: 11em;
+    }
+  }
 
   @media (min-width: 1024px) {
     footer {
       margin-bottom: 0px;
+      .footerInnerContainer {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
     }
   }
 </style>

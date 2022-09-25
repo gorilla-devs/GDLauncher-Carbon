@@ -65,7 +65,7 @@ export default {
   "team.member_gianmarco": "Gianmarco | Co-Founder",
   "footer.text":
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.",
-  "footer.copyright_text": "© 2022 by GDDevs | All rights reserved",
+  "footer.copyright_text": "© 2022 by GDdevs | All rights reserved",
   "footer.home": "HOME",
   "footer.download": "DOWNLOAD",
   "footer.legal": "LEGAL",
