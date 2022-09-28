@@ -30,20 +30,25 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
     const obj: any = {};
+    setError("");
+    setSuccess("");
 
-    console.log("TEST", form.email && form.emailMc && form.emailKofi);
     if (form.email && form.emailMc && form.emailKofi) {
       obj["user_email"] = form.email;
       obj["mc_email"] = form.emailMc;
       obj["kofi_email"] = form.emailKofi;
 
       const res = await addUser(obj);
-      console.log("res", res.status);
-      if (res.status !== 200) {
-        setError(t("waitlist.error_422"));
-      } else {
-        setSuccess("waitlist.success");
+      console.log("res", res.status, res);
+      if (res.status === 401) {
+        setError(t("waitlist.error_401"));
+      } else if (res.status === 400) {
+        setError(t("waitlist.error_400"));
+      } else if (res.status === 200) {
+        setSuccess(t("waitlist.success"));
       }
+    } else {
+      setError(t("waitlist.error_missing_info"));
     }
   };
 
@@ -87,12 +92,14 @@ const WaitList = ({ pathname }: { pathname: string }) => {
             <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
               {t("waitlist.getAccess")}
             </Button>
-            <Show when={error()}>
-              <div class="p-10 text-red-400">{error()}</div>
-            </Show>
-            <Show when={success()}>
-              <div class="p-10 text-green-400">{success()}</div>
-            </Show>
+            <div class="h-[100px]">
+              <Show when={error()}>
+                <div class="p-10 text-red-400">{error()}</div>
+              </Show>
+              <Show when={success()}>
+                <div class="p-10 text-green-400">{success()}</div>
+              </Show>
+            </div>
           </div>
         </form>
       </div>

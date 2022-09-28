@@ -4,21 +4,18 @@ import { useTranslations } from "@/i18n/utils";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 
 export const getStaticPaths = () => {
-    return Object.keys(languages).map((lang) => ({ params: { lang } }));
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
 };
-
-// const { lang } = Astro.params;
 
 const t = useTranslations(Astro.url.pathname);
 ---
 
-<!-- <meta http-equiv="refresh" content={`0;url=/${lang || "en"}`} /> -->
 <MainWrapper>
-    <div
-        class="relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen"
-    >
-        <h1 class="text-5xl lg:text-7xl font-bol">
-            {t("generic.404")}
-        </h1>
-    </div>
+  <div
+    class="relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen"
+  >
+    <h1 class="text-5xl lg:text-7xl font-bol">
+      {t("generic.404")}
+    </h1>
+  </div>
 </MainWrapper>

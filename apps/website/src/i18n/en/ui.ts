@@ -99,7 +99,9 @@ export default {
   "waitlist.mc_email": "Minecraft Email",
   "waitlist.email": "Email",
   "waitlist.kofi_email": "Kofi Email",
-  "waitlist.error_422": "You already subscribed, verify your email!",
+  "waitlist.error_401": "Pending verification, verify your email!",
+  "waitlist.error_400": "You already subscribed, one of your email was already used!",
+  "waitlist.error_missing_info": "Please enter all the info, some of the them are missing.",
   "waitlist.success": "You successfully subscribed to the waitlist",
   "blog.title": "The GDLauncher Blog",
 };

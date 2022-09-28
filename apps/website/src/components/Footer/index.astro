@@ -1,8 +1,10 @@
 ---
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import { localizePath } from "@/utils/helpers";
 
 const t = useTranslations(Astro.url.pathname);
+const { lang } = Astro.params;
 ---
 
 <footer>
@@ -19,23 +21,34 @@ const t = useTranslations(Astro.url.pathname);
       </div>
       <div>
         <h3>{t("footer.home")}</h3>
-        <a>{t("footer.about")}</a>
-        <a>{t("footer.features")}</a>
-        <a>{t("footer.team")}</a>
-        <a>{t("footer.timeline")}</a>
+        <a href={localizePath("/features", lang?.toString() || "en")}
+          >{t("footer.features")}
+        </a>
+        <a href={localizePath("/team", lang?.toString() || "en")}
+          >{t("footer.team")}
+        </a>
         <a>{t("footer.contact")}</a>
       </div>
       <div>
         <h3>{t("footer.download")}</h3>
-        <a>{t("footer.windows")}</a>
-        <a>{t("footer.macos")}</a>
-        <a>{t("footer.linux")}</a>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe"
+          >{t("footer.windows")}
+        </a>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-mac-setup.dmg"
+          >{t("footer.macos")}
+        </a>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage"
+          >{t("footer.linux")}
+        </a>
       </div>
-      <div>
+      <!-- <div class="legalContainer">
         <h3>{t("footer.legal")}</h3>
         <a>{t("footer.termsNCondition")}</a>
         <a>{t("footer.policy")}</a>
-      </div>
+      </div> -->
     </div>
   </div>
   <div class="footerBottom">

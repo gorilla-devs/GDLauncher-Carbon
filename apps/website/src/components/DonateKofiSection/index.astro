@@ -1,4 +1,5 @@
 ---
+import { APP_URLS } from "@/constants";
 import { useTranslations } from "@/i18n/utils";
 import Button from "../Button";
 const t = useTranslations(Astro.url.pathname);
@@ -24,9 +25,11 @@ const t = useTranslations(Astro.url.pathname);
       <p class="text-xl mb-12 font-light max-w-lg">
         {t("generic.donate_kofi_text")}
       </p>
-      <Button style={{ "background-color": "#FF5E5B", height: "4rem" }}
-        >{t("generic.donate_kofi_title")}
-      </Button>
+      <a href={APP_URLS.kofi} target="_blank">
+        <Button style={{ "background-color": "#FF5E5B", height: "4rem" }}
+          >{t("generic.donate_kofi_title")}
+        </Button>
+      </a>
     </div>
   </div>
 </div>

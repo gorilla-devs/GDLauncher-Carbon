@@ -1,3 +1,4 @@
+import { APP_URLS } from "@/constants";
 import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
 import { createSignal, For } from "solid-js";
 import Caret from "../CaretIcon";
@@ -20,12 +21,9 @@ enum OS {
 }
 
 const urls = {
-  [OS.windows]:
-    "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
-  [OS.macos]:
-    "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-mac-setup.dmg",
-  [OS.linux]:
-    "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage",
+  [OS.windows]: APP_URLS.download.win,
+  [OS.macos]: APP_URLS.download.macOs,
+  [OS.linux]: APP_URLS.download.linux,
 };
 
 const labels: ILabels = {
@@ -40,6 +38,7 @@ const Dropdown = (props: Props) => {
   const t = useTranslations(props.pathname);
 
   // createEffect(() => {
+  // TODO: get default language
   //   const platform = navigator?.platform;
   // });
 

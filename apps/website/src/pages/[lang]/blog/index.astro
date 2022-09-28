@@ -6,10 +6,16 @@ import ArticleCard from "@/components/ArticleCard/index.astro";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 
 export const getStaticPaths = async () => {
-  const mdPosts = await Astro.glob("../../../articles/*.md");
-  const mdxPosts = await Astro.glob("../../../articles/*.mdx");
+  let mdPosts: any = [];
+  let mdxPosts: any = [];
+  try {
+    mdPosts = await Astro.glob("../../../articles/*.md");
+  } catch {}
+  try {
+    mdxPosts = await Astro.glob("../../../articles/*.mdx");
+  } catch {}
 
-  let posts: any[] = [...mdPosts, ...mdxPosts];
+  let posts: any[] = [...(mdPosts || []), ...(mdxPosts || [])];
 
   posts = posts.map(({ frontmatter, url, file }) => ({
     url: url,
@@ -19,7 +25,6 @@ export const getStaticPaths = async () => {
     author: frontmatter.author,
     image: frontmatter.image,
     slug: file.substring(file.lastIndexOf("/") + 1).split(".")[0],
-
   }));
 
   return Object.keys(languages).map((lang) => ({

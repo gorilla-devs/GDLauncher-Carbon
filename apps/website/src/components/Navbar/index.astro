@@ -43,6 +43,7 @@ const t = useTranslations(Astro.url.pathname);
                   : ""
               }`}
               href={localizePath(props.linkTo, lang, props.isExternalLink)}
+              target={props.isExternalLink ? "_blank" : "_self"}
             >
               {format(t(props.title[0]), "capitalize")}
             </a>
