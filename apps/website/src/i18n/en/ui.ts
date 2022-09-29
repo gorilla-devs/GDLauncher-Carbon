@@ -29,7 +29,7 @@ export default {
   "home.createYourOwn_text3":
     "Modify any pre-existing modpack to add custom mods, resource packs, or maps.",
   "launcher.mockup.description":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+    "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
   "home.features": "Features",
   "home.donate_title": "Donate to GDLauncher",
   "home.donate_text":
@@ -45,26 +45,26 @@ export default {
   "features.ftb": "Feed The Beast Integrations",
   "modloader.none_title": "All platforms covered.",
   "modloader.none_text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+    "With GDLauncher you can have access to the best resources from the best platforms.",
   "modloader.vanilla_title": "Vanilla",
   "modloader.vanilla_text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+    "If you like a vanilla experience, GDLauncher still works for you, you can easly download the latest or old versions of the game, or change the version later if you change your mind.",
   "modloader.forge_title": "Forge",
   "modloader.forge_text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+    "From GDLauncher you will be able to download Forge mods and modpacks.",
   "modloader.fabric_title": "Fabric",
-  "modloader.fabric_text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+  "modloader.fabric_text": "GDlauncher support also Fabric.",
   "team.title": "Meet the Team",
   "team.text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In imperdiet ligula ut nibh volutpat, non aliquet orci molestie. Ut at pharetra elit.",
+    "Here below you can meet our dream team working on making gdlauncher great!",
   "team.team_title": "The Team",
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
   "team.member_davide": "Davide | Founder",
   "team.member_gianmarco": "Gianmarco | Co-Founder",
+  "team.member_valentin": "Valentin | Co-Founder",
   "footer.text":
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim.",
+    "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
   "footer.copyright_text": "© 2022 by GDdevs | All rights reserved",
   "footer.home": "HOME",
   "footer.download": "DOWNLOAD",
@@ -100,8 +100,10 @@ export default {
   "waitlist.email": "Email",
   "waitlist.kofi_email": "Kofi Email",
   "waitlist.error_401": "Pending verification, verify your email!",
-  "waitlist.error_400": "You already subscribed, one of your email was already used!",
-  "waitlist.error_missing_info": "Please enter all the info, some of the them are missing.",
+  "waitlist.error_400":
+    "You already subscribed, one of your email was already used!",
+  "waitlist.error_missing_info":
+    "Please enter all the info, some of the them are missing.",
   "waitlist.success": "You successfully subscribed to the waitlist",
   "blog.title": "The GDLauncher Blog",
 };

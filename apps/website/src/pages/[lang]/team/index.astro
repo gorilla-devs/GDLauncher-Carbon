@@ -98,6 +98,26 @@ const t = useTranslations(Astro.url.pathname);
                 />
               </div>
             </div>
+
+            <div
+              class="w-full flex flex-col-reverse lg:flex-row-reverse justify-between items-center max-w-7xl"
+            >
+              <div class="py-0 px-4 max-w-4xl">
+                <h3 class="mb-2 text-2xl font-bold">
+                  {t("team.member_valentin")}
+                </h3>
+                <p class="text-xl font-light max-w-lg">
+                  {t("team.text")}
+                </p>
+              </div>
+              <div>
+                <img
+                  class="w-full"
+                  src={composeCDNAssetLink("BH_valentin.webp")}
+                  alt="launcher_mockup"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
