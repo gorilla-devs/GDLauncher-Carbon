@@ -6,7 +6,11 @@ body {
   margin: 0;
 }
 
-main {
+article {
+  margin: 0 auto;
+}
+
+.articleMainWrapper {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -22,32 +26,48 @@ main {
   min-height: 100vh;
   max-width: 50rem;
   background-color: #0f172a;
+
+  .author {
+    color: #f8fafc;
+    margin-bottom: 0;
+  }
+
+  .mainTitle {
+    margin-bottom: 0.5rem;
+  }
+
+  .mainSubtitle {
+    margin-top: 0;
+    color: #94a3b8;
+  }
+
+  p,
+  ul,
+  li {
+    color: #cbd5e1;
+  }
+
+  a {
+    color: #3b82f6;
+  }
+
+  img {
+    margin: 1rem 0;
+  }
 }
 
-.author {
-  color: #f8fafc;
-  margin-bottom: 0;
-}
+@media (min-width: 768px) {
+  .articleMainWrapper {
+    p,
+    ul,
+    li {
+      font-size: 1.5rem; /* 24px */
+      line-height: 2rem; /* 32px */
+    }
 
-.mainTitle {
-  margin-bottom: 0.5rem;
-}
-
-.mainSubtitle {
-  margin-top: 0;
-  color: #94a3b8;
-}
-
-p,
-ul,
-li {
-  color: #cbd5e1;
-}
-
-a {
-  color: #3b82f6;
-}
-
-img {
-  margin: 1rem 0;
+    h1 {
+      font-size: 1.875rem; /* 30px */
+      line-height: 2.25rem; /* 36px */
+    }
+  }
 }

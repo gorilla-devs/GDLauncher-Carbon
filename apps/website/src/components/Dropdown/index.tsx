@@ -1,6 +1,6 @@
 import { APP_URLS } from "@/constants";
 import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
-import { createSignal, For } from "solid-js";
+import { createEffect, createSignal, For } from "solid-js";
 import Caret from "../CaretIcon";
 
 type Props = {
@@ -18,29 +18,40 @@ enum OS {
   windows = "windows",
   macos = "macos",
   linux = "linux",
+  none = "none",
 }
 
 const urls = {
   [OS.windows]: APP_URLS.download.win,
   [OS.macos]: APP_URLS.download.macOs,
   [OS.linux]: APP_URLS.download.linux,
+  [OS.none]: "",
 };
 
 const labels: ILabels = {
   [OS.windows]: "download.windows",
   [OS.macos]: "download.macos",
   [OS.linux]: "download.linux",
+  [OS.none]: "download.none",
+};
+
+const platforms: any = {
+  ["Win32"]: OS.windows,
+  ["Win64"]: OS.windows,
+  ["darwin"]: OS.macos,
+  ["MacIntel"]: OS.macos,
+  ["Linux x86_64"]: OS.linux,
 };
 
 const Dropdown = (props: Props) => {
-  const [currentValue, setCurrentValue] = createSignal<OS>(OS.windows);
+  const [currentPlatform, setCurrentPlatform] = createSignal<OS>(OS.none);
   const [open, setOpen] = createSignal(false);
   const t = useTranslations(props.pathname);
 
-  // createEffect(() => {
-  // TODO: get default language
-  //   const platform = navigator?.platform;
-  // });
+  createEffect(() => {
+    const platform: any = navigator?.platform;
+    setCurrentPlatform(platforms[platform]);
+  });
 
   return (
     <div class="relative max-w-[300px] bg-slate-600 rounded-2xl">
@@ -53,8 +64,8 @@ const Dropdown = (props: Props) => {
           props.class || ""
         }`}
       >
-        <a href={urls[currentValue()]} onclick={() => props.onclick()}>
-          {t(labels[currentValue()])}
+        <a href={urls[currentPlatform()]} onclick={() => props.onclick()}>
+          {t(labels[currentPlatform()])}
         </a>
         <Caret
           class={`ease-linear duration-100 w-4 h-4 ${
@@ -65,12 +76,14 @@ const Dropdown = (props: Props) => {
       {open() && (
         <div class="absolute flex flex-col justify-between items-center bg-slate-600 rounded-b-xl max-w-[300px] w-full overflow-hidden">
           <ul class="w-full">
-            <For each={Object.values(OS).filter((os) => os !== currentValue())}>
+            <For
+              each={Object.values(OS).filter((os) => os !== currentPlatform() && os !== OS.none)}
+            >
               {(os) => (
                 <a href={urls[os]}>
                   <li
                     onclick={() => {
-                      setCurrentValue(os);
+                      setCurrentPlatform(os);
                       setOpen(!open());
                       props.onclick();
                     }}
