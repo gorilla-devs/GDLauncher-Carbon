@@ -1,6 +1,14 @@
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import { mergeProps, createSignal, Switch, Match, Component } from "solid-js";
+import {
+  mergeProps,
+  createSignal,
+  Switch,
+  Match,
+  Component,
+  useTransition,
+} from "solid-js";
+import "./style.scss";
 
 enum sectionType {
   vanilla = "vanilla",
@@ -82,6 +90,9 @@ function Section(props: { type: sectionType } & Props) {
 
 const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   const [type, setType] = createSignal<sectionType>(sectionType.none);
+  const [pending, start] = useTransition();
+
+  const updateSection = (type: sectionType) => () => start(() => setType(type));
   const t = useTranslations(pathname);
 
   return (
@@ -92,7 +103,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.vanilla ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={() => setType(sectionType.vanilla)}
+            onClick={updateSection(sectionType.vanilla)}
           >
             <h2 class="pb-3">Vanilla</h2>
             <div
@@ -105,7 +116,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.forge ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={() => setType(sectionType.forge)}
+            onClick={updateSection(sectionType.forge)}
           >
             <h2 class="pb-3">Forge</h2>
             <div
@@ -118,7 +129,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.fabric ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={() => setType(sectionType.fabric)}
+            onClick={updateSection(sectionType.fabric)}
           >
             <h2 class="pb-3">Fabric</h2>
             <div
@@ -128,8 +139,9 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             />
           </div>
         </div>
-
-        <Section type={type()} t={t || (() => {})} />
+        <div classList={{ pending: pending() }}>
+          <Section type={type()} t={t || (() => {})} />
+        </div>
       </div>
     </div>
   );
