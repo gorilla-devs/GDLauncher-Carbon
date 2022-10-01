@@ -27,6 +27,27 @@ article {
   max-width: 60rem;
   background-color: #0f172a;
 
+  .backBtnContainer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    .backBtn {
+      background-color: #475569;
+      border-radius: 10rem;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 2rem;
+      gap: 1rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      svg {
+        fill: #cbd5e1;
+      }
+    }
+  }
+
   .author {
     color: #f8fafc;
     margin-bottom: 0;
