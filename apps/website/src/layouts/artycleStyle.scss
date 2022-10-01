@@ -1,0 +1,53 @@
+body {
+  background-color: #1f2937;
+  font-family: ubuntu;
+  width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+}
+
+main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem;
+  border-radius: 1rem;
+  margin: 0 auto;
+  margin-top: 10rem;
+  margin-bottom: 5rem;
+  color: #f8fafc;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 100vh;
+  max-width: 50rem;
+  background-color: #0f172a;
+}
+
+.author {
+  color: #f8fafc;
+  margin-bottom: 0;
+}
+
+.mainTitle {
+  margin-bottom: 0.5rem;
+}
+
+.mainSubtitle {
+  margin-top: 0;
+  color: #94a3b8;
+}
+
+p,
+ul,
+li {
+  color: #cbd5e1;
+}
+
+a {
+  color: #3b82f6;
+}
+
+img {
+  margin: 1rem 0;
+}

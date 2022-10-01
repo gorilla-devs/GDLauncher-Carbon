@@ -5,50 +5,22 @@ import Footer from "@/components/Footer/index.astro";
 const url = new URL(Astro.request.url);
 const currentPage = url.pathname;
 const { frontmatter } = Astro.props;
+import "./artycleStyle.scss";
 ---
 
 <html>
   <head>
     <HeadCommon />
-    <style>
-      body {
-        background-color: #1f2937;
-        font-family: ubuntu;
-        width: 100%;
-        overflow-x: hidden;
-        margin: 0;
-      }
-
-      main {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding-top: 4rem;
-        padding-bottom: 4rem;
-        /* padding-left: 10rem;
-        padding-right: 10rem; */
-        margin: 0 auto;
-        color: white;
-        box-sizing: border-box;
-        height: auto;
-        min-height: 100vh;
-        max-width: 50rem;
-        margin-top: 6.5rem;
-      }
-
-      main a {
-        color: rgb(14 165 233);
-      }
-    </style>
   </head>
 
   <body>
     <Navbar currentPage={currentPage} />
     <main>
-      <h1>{frontmatter.title} by {frontmatter.author}</h1>
+      <h1 class="mainTitle">{frontmatter.title}</h1>
+      <h5 class="mainSubtitle">
+        Written on {frontmatter.date} by {frontmatter.author}
+      </h5>
       <slot />
-      <p class="pt-20">Written on: {frontmatter.date}</p>
     </main>
     <Footer />
   </body>
