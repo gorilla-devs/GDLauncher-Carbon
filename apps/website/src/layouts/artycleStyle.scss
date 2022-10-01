@@ -15,7 +15,7 @@ article {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 2rem;
+  padding: 0 4rem 4rem 4rem;
   border-radius: 1rem;
   margin: 0 auto;
   margin-top: 10rem;
@@ -24,7 +24,7 @@ article {
   box-sizing: border-box;
   height: auto;
   min-height: 100vh;
-  max-width: 50rem;
+  max-width: 60rem;
   background-color: #0f172a;
 
   .author {

@@ -65,7 +65,7 @@ export default {
   "team.member_valentin": "Valentin | Co-Founder",
   "footer.text":
     "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
-  "footer.copyright_text": "© 2022 by GDdevs | All rights reserved",
+  "footer.copyright_text": "© 2022 by GorillaDevs Inc. | All rights reserved",
   "footer.home": "HOME",
   "footer.download": "DOWNLOAD",
   "footer.legal": "LEGAL",
@@ -87,6 +87,7 @@ export default {
   "download.windows": "Download for windows",
   "download.macos": "Download for Mac",
   "download.linux": "Download for Linux",
+  "download.none": "Select your operative system",
   "download.retry": "retry.",
   "waitlist.title": "Subscribe to get early access to the",
   "waitlist.title2": "NEW",

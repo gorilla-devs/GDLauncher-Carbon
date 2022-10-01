@@ -2,6 +2,7 @@
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
+import Button from "../Button";
 
 const t = useTranslations(Astro.url.pathname);
 const { lang } = Astro.params;
@@ -18,6 +19,16 @@ const { lang } = Astro.params;
         <p>
           {t("footer.text")}
         </p>
+        <a href={localizePath("/waitlist", lang?.toString() || "en")}>
+          <Button
+            style={{
+              "max-width": "300px",
+              "background-color": "#16a34a",
+              "font-size": "1rem;",
+            }}
+            >{t("waitlist.subscribe")}
+          </Button>
+        </a>
       </div>
       <div>
         <h3>{t("footer.home")}</h3>

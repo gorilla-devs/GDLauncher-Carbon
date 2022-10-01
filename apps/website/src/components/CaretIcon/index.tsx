@@ -1,4 +1,4 @@
-const CaretIcon = (props: {class: string}) => {
+const CaretIcon = (props: {class?: string}) => {
   return (
     <div class={`w-20px ${props.class}`}>
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512">
