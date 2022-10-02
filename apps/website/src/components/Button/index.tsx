@@ -18,7 +18,7 @@ function Button(props: Props) {
         "align-items": "center",
         "font-family": "ubuntu",
         color: "white",
-        padding: "1rem 2.5rem",
+        padding: "1rem 2rem",
         "max-width": "250px",
         "border-radius": "1rem",
         "background-color": "#2b6cb0",
