@@ -6,7 +6,7 @@ import MainWrapper from "@/layouts/MainWrapper.astro";
 import Timeline from "@/components/Timeline/index.astro";
 import PartnerSection from "@/components/PartnerSection/index.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import CaretIcon from "@/components/CaretIcon";
+import CaretIcon from "@/components/Icons/CaretIcon";
 
 export const getStaticPaths = () => {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));

@@ -1,7 +1,7 @@
 import { APP_URLS } from "@/constants";
 import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
 import { createEffect, createSignal, For } from "solid-js";
-import Caret from "../CaretIcon";
+import Caret from "../Icons/CaretIcon";
 
 type Props = {
   children?: HTMLElement | string;

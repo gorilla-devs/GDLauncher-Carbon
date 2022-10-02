@@ -7,7 +7,7 @@ import MainWrapper from "@/layouts/MainWrapper.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
 import languages from "@/i18n/languages";
-import CaretIcon from "@/components/CaretIcon";
+import CaretIcon from "@/components/Icons/CaretIcon";
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
