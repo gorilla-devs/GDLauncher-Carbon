@@ -1,13 +1,6 @@
 import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import {
-  mergeProps,
-  createSignal,
-  Switch,
-  Match,
-  Component,
-  useTransition,
-} from "solid-js";
+import { mergeProps, createSignal, Switch, Match, Component } from "solid-js";
 import "./style.scss";
 
 enum sectionType {
@@ -90,10 +83,14 @@ function Section(props: { type: sectionType } & Props) {
 
 const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   const [type, setType] = createSignal<sectionType>(sectionType.none);
-  const [pending, start] = useTransition();
 
-  const updateSection = (type: sectionType) => () => start(() => setType(type));
   const t = useTranslations(pathname);
+
+  const handeClick = (sectionTypeProp: sectionType) => {
+    if (type() === sectionTypeProp) {
+      setType(sectionType.none);
+    } else setType(sectionTypeProp);
+  };
 
   return (
     <div class="h-auto flex justify-center items-start py-32">
@@ -103,7 +100,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.vanilla ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={updateSection(sectionType.vanilla)}
+            onClick={() => handeClick(sectionType.vanilla)}
           >
             <h2 class="pb-3">Vanilla</h2>
             <div
@@ -116,7 +113,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.forge ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={updateSection(sectionType.forge)}
+            onClick={() => handeClick(sectionType.forge)}
           >
             <h2 class="pb-3">Forge</h2>
             <div
@@ -129,7 +126,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             class={`relative w-32 flex flex-col items-center cursor-pointer ${
               type() === sectionType.fabric ? "font-bold" : ""
             } ease-in-out duration-100`}
-            onClick={updateSection(sectionType.fabric)}
+            onClick={() => handeClick(sectionType.fabric)}
           >
             <h2 class="pb-3">Fabric</h2>
             <div
@@ -139,7 +136,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             />
           </div>
         </div>
-        <div classList={{ pending: pending() }}>
+        <div>
           <Section type={type()} t={t || (() => {})} />
         </div>
       </div>
