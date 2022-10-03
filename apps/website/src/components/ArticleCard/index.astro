@@ -1,0 +1,31 @@
+---
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import { localizePath } from "@/utils/helpers";
+
+const { post } = Astro.props;
+const { lang } = Astro.params;
+---
+
+<a href={localizePath(`/blog/${post.slug}`, lang?.toString() || "en")}>
+  <article
+    class="max-w-2xl rounded-xl bg-slate-900 hover:-translate-y-4 ease-in-out duration-200"
+  >
+    <div class="min-h-[18rem] bg-green-400 rounded-t-xl">
+      {
+        post.image && (
+          <img
+            class="rounded-t-xl"
+            src={composeCDNAssetLink(post.image || "")}
+          />
+        )
+      }
+    </div>
+    <div class="flex flex-col justify-between py-10 px-14 min-h-[18rem]">
+      <div>
+        <h2 class="text-2xl font-bold">{post.title}</h2>
+        <p>{post.description}</p>
+      </div>
+      <p class="text-sm text-slate-500">{post.author} - {post.date}</p>
+    </div>
+  </article>
+</a>

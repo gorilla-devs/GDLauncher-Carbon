@@ -1,0 +1,61 @@
+---
+import HeadCommon from "@/components/HeadCommon.astro";
+import Navbar from "@/components/Navbar/index.astro";
+import Footer from "@/components/Footer/index.astro";
+const url = new URL(Astro.request.url);
+const currentPage = url.pathname;
+const { frontmatter } = Astro.props;
+import "./artycleStyle.scss";
+import ArrowBackIcon from "@/components/Icons/ArrowBackIcon";
+import DiscordIcon from "@/components/Icons/DiscordIcon";
+import GithubIcon from "@/components/Icons/GithubIcon";
+import InstagramIcon from "@/components/Icons/InstagramIcon";
+import TwitterIcon from "@/components/Icons/TwitterIcon";
+import { localizePath } from "@/utils/helpers";
+import { useTranslations } from "@/i18n/utils";
+import { APP_URLS } from "@/constants";
+
+const { lang } = Astro.params;
+const t = useTranslations(Astro.url.pathname);
+---
+
+<html>
+  <head>
+    <HeadCommon />
+  </head>
+
+  <body>
+    <Navbar currentPage={currentPage} />
+    <main class="articleMainWrapper">
+      <div class="backBtnContainer">
+        <a href={localizePath("/blog", lang?.toString() || "en")}>
+          <div class="backBtn">
+            <ArrowBackIcon /><span>{t("generic.backBtn")}</span>
+          </div>
+        </a>
+      </div>
+      <h1 class="mainTitle">{frontmatter.title}</h1>
+      <h5 class="mainSubtitle">
+        Written on {frontmatter.date} by {frontmatter.author}
+      </h5>
+      <slot />
+    </main>
+    <div class="socialsContainer">
+      <div class="socialsInnerContainer">
+        <a href={APP_URLS.socials.discord} target="_blank">
+          <DiscordIcon />
+        </a>
+        <a href={APP_URLS.socials.github}>
+          <GithubIcon />
+        </a>
+        <a href={APP_URLS.socials.twitter}>
+          <TwitterIcon />
+        </a>
+        <a href={APP_URLS.socials.instagram}>
+          <InstagramIcon />
+        </a>
+      </div>
+    </div>
+    <Footer />
+  </body>
+</html>

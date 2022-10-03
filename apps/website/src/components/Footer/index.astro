@@ -1,0 +1,174 @@
+---
+import { useTranslations } from "@/i18n/utils";
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import { localizePath } from "@/utils/helpers";
+import Button from "../Button";
+
+const t = useTranslations(Astro.url.pathname);
+const { lang } = Astro.params;
+---
+
+<footer>
+  <div class="footerInnerContainer">
+    <div>
+      <div>
+        <img
+          src={composeCDNAssetLink("gdlauncher_wide_logo.webp")}
+          alt="gdlauncher_wide_logo"
+        />
+        <p>
+          {t("footer.text")}
+        </p>
+        <a href={localizePath("/waitlist", lang?.toString() || "en")}>
+          <Button
+            style={{
+              "max-width": "300px",
+              "background-color": "#16a34a",
+              "font-size": "1rem;",
+            }}
+            >{t("waitlist.subscribe")}
+          </Button>
+        </a>
+      </div>
+      <div>
+        <h3>{t("footer.home")}</h3>
+        <a href={localizePath("/features", lang?.toString() || "en")}
+          >{t("footer.features")}
+        </a>
+        <a href={localizePath("/team", lang?.toString() || "en")}
+          >{t("footer.team")}
+        </a>
+        <a>{t("footer.contact")}</a>
+      </div>
+      <div>
+        <h3>{t("footer.download")}</h3>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe"
+          >{t("footer.windows")}
+        </a>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-mac-setup.dmg"
+          >{t("footer.macos")}
+        </a>
+        <a
+          href="https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage"
+          >{t("footer.linux")}
+        </a>
+      </div>
+      <!-- <div class="legalContainer">
+        <h3>{t("footer.legal")}</h3>
+        <a>{t("footer.termsNCondition")}</a>
+        <a>{t("footer.policy")}</a>
+      </div> -->
+    </div>
+  </div>
+  <div class="footerBottom">
+    {t("footer.copyright_text")}
+  </div>
+</footer>
+
+<style lang="scss">
+  footer {
+    height: auto;
+    margin-bottom: 6em;
+    background-color: #0f172a;
+    .footerInnerContainer {
+      height: 100%;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 2rem;
+      max-width: 100vw;
+      box-sizing: border-box;
+
+      & > div {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 2.5rem;
+        padding-top: 2.5rem;
+        padding-bottom: 2.5rem;
+        justify-content: space-between;
+        align-items: flex-start;
+        color: white;
+
+        div:first-child {
+          display: flex;
+          flex-direction: column;
+          img {
+            margin-bottom: 0;
+          }
+          p {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+            max-width: 24rem;
+            margin: 0;
+          }
+        }
+
+        div {
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+          h3 {
+            font-weight: bold;
+          }
+          a {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+            cursor: pointer;
+            color: #94a3b8;
+            text-decoration: none;
+          }
+        }
+      }
+    }
+    .footerBottom {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      height: 3rem;
+      font-size: 1rem;
+      line-height: 2rem;
+      background-color: #3b82f6;
+      color: #e2e8f0;
+    }
+  }
+
+  @media (min-width: 768px) {
+    footer {
+      height: 24rem;
+      padding-top: 2rem;
+      .footerInnerContainer {
+        padding: 0;
+        & > div {
+          gap: 0;
+          padding-top: 0;
+          padding-bottom: 0;
+          flex-direction: row;
+        }
+      }
+    }
+  }
+  @media (width: 768px) {
+    footer {
+      margin-bottom: 11em;
+      .footerInnerContainer {
+        padding: 0 2rem;
+      }
+    }
+  }
+
+  @media (min-width: 1024px) {
+    footer {
+      margin-bottom: 0px;
+      .footerInnerContainer {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+    }
+  }
+</style>

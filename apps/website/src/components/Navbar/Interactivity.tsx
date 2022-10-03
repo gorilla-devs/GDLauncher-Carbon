@@ -1,20 +1,20 @@
 function Interactivity() {
   if (globalThis.document) {
     const burger = globalThis.document.querySelector(".burger");
-    burger.addEventListener("click", () => {
-      const classListMenu =
-        globalThis.document.querySelector(".mobile-menu").classList;
-      classListMenu.toggle("hidden");
-      classListMenu.toggle("flex");
 
-      const classListNavbar =
-        globalThis.document.querySelector(".navbar").classList;
-      classListNavbar.toggle("absolute");
-      classListNavbar.toggle("fixed");
+    (burger || ({} as Element)).addEventListener("click", () => {
+      const mobileMenu = globalThis.document.querySelector(".mobile-menu");
 
-      globalThis.document
-        .querySelector(".btn-brg")
-        .classList.toggle("opened-burger");
+      const mobileMenuDisplayStyle = (mobileMenu || ({} as any)).style.display;
+
+      if (mobileMenuDisplayStyle) {
+        (mobileMenu || ({} as any)).style.display =
+          mobileMenuDisplayStyle === "none" ? "flex" : "none";
+      } else (mobileMenu || ({} as any)).style.display = "flex";
+
+      const btnBrg = globalThis.document.querySelector(".btn-brg");
+
+      ((btnBrg || {}) as Element).classList.toggle("opened-burger");
     });
   }
 

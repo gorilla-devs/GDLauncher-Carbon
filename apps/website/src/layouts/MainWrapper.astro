@@ -1,22 +1,22 @@
 ---
 import HeadCommon from "@/components/HeadCommon.astro";
 import Navbar from "@/components/Navbar/index.astro";
+import Footer from "@/components/Footer/index.astro";
 const url = new URL(Astro.request.url);
 const currentPage = url.pathname;
-
+import "./style.css";
 ---
 
 <html>
+  <head>
+    <HeadCommon />
+  </head>
 
-<head>
-  <HeadCommon />
-</head>
-
-<body class="font-main w-full bg-gray-800">
-  <Navbar currentPage={currentPage} />
-  <main class="md:pt-28 text-white">
-    <slot></slot>
-  </main>
-</body>
-
+  <body class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden">
+    <Navbar currentPage={currentPage} />
+    <main class="text-white">
+      <slot />
+    </main>
+    <Footer />
+  </body>
 </html>

@@ -10,17 +10,17 @@ export default [
     title: ["navbar.home"],
     linkTo: "/",
   },
-  {
-    title: ["navbar.features"],
-    linkTo: "/features",
-  },
+  // {
+  //   title: ["navbar.features"],
+  //   linkTo: "/features",
+  // },
   {
     title: ["navbar.team"],
     linkTo: "/team",
   },
   {
-    title: ["navbar.contact"],
-    linkTo: "/contact",
+    title: ["navbar.blog"],
+    linkTo: "/blog",
   },
   {
     title: ["navbar.github"],

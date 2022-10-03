@@ -3,7 +3,7 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["dist/**/*", "node_modules"],
   "compilerOptions": {
-    "types": ["unplugin-icons/types/solid"],
+    "types": [],
     "isolatedModules": true,
     "baseUrl": ".",
     "paths": {

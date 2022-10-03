@@ -1,0 +1,139 @@
+body {
+  background-color: #1f2937;
+  font-family: ubuntu;
+  width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+}
+
+article {
+  margin: 0 auto;
+}
+
+.socialsContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 4rem;
+  border-radius: 1rem;
+  margin: 0 auto;
+  margin-bottom: 5rem;
+  color: #f8fafc;
+  box-sizing: border-box;
+  height: auto;
+  max-width: 60rem;
+  background-color: #0f172a;
+
+  .socialsInnerContainer {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 1rem;
+    }
+    a:hover {
+      svg {
+        fill: #f8fafc !important;
+      }
+      background-color: #1e293b;
+      transition: background-color 0.1s ease-in-out;
+    }
+  }
+}
+
+.articleMainWrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4rem 4rem 4rem;
+  border-radius: 1rem;
+  margin: 0 auto;
+  margin-top: 10rem;
+  margin-bottom: 5rem;
+  color: #f8fafc;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 100vh;
+  max-width: 60rem;
+  background-color: #0f172a;
+
+  .backBtnContainer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    .backBtn {
+      border-radius: 1rem;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 2rem;
+      gap: 1rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      svg {
+        fill: #cbd5e1;
+      }
+    }
+    .backBtn:hover {
+      background-color: #1e293b;
+      transition: background-color 0.1s ease-in-out;
+    }
+  }
+
+  .author {
+    color: #f8fafc;
+    margin-bottom: 0;
+  }
+
+  .mainTitle {
+    margin-bottom: 0.5rem;
+  }
+
+  .mainSubtitle {
+    margin-top: 0;
+    color: #94a3b8;
+  }
+
+  p,
+  ul,
+  li {
+    color: #cbd5e1;
+  }
+
+  a {
+    color: #60a5fa;
+  }
+
+  img {
+    margin: 1rem 0;
+  }
+}
+
+@media (min-width: 768px) {
+  .articleMainWrapper {
+    p,
+    ul,
+    li {
+      font-size: 1.5rem; /* 24px */
+      line-height: 2rem; /* 32px */
+    }
+
+    h1 {
+      font-size: 1.875rem; /* 30px */
+      line-height: 2.25rem; /* 36px */
+    }
+  }
+
+  .socialsContainer {
+    margin-left: 2rem;
+    margin-right: 2rem;
+  }
+}

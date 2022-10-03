@@ -1,11 +1,23 @@
 import languages from "../../i18n/languages";
-import {Component} from 'solid-js'
+import { Component } from "solid-js";
 
-const LanguageSelect: Component<{lang: string}> = ({lang}) => {
+const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
   return (
-    <div class="border-2 border-white rounded">
+    <div
+      style={{
+        border: "2px solid white",
+        "border-radius": "0.25rem",
+        "font-family": "ubuntu",
+        "line-height": "1.5",
+        "font-weight": "bold",
+      }}
+    >
       <select
-        class="bg-gray-800 text-white"
+        style={{
+          "background-color": "#1f2937",
+          color: "white",
+          "font-size": "100%",
+        }}
         value={lang}
         aria-label="Select language"
         onChange={(e) => {
@@ -13,7 +25,9 @@ const LanguageSelect: Component<{lang: string}> = ({lang}) => {
           const [_leadingSlash, _oldLang, ...rest] =
             window.location.pathname.split("/");
           const slug = rest.join("/");
-          window.location.pathname = `/${newLang}${`${slug ? `/${slug}` : ""}`}`;
+          window.location.pathname = `/${newLang}${`${
+            slug ? `/${slug}` : ""
+          }`}`;
         }}
       >
         {Object.entries(languages).map(([code, name]) => (
@@ -24,6 +38,6 @@ const LanguageSelect: Component<{lang: string}> = ({lang}) => {
       </select>
     </div>
   );
-}
+};
 
 export default LanguageSelect;
