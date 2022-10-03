@@ -1,7 +1,7 @@
-import { children } from "solid-js";
+import { children, JSX } from "solid-js";
 
 type Props = {
-  children: HTMLElement | string;
+  children: HTMLElement | string | JSX.Element;
   class?: string;
   style?: any;
   onClick?: () => void;

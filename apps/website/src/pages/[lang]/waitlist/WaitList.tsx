@@ -1,5 +1,6 @@
 import Button from "@/components/Button";
 import Input from "@/components/Input";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { ADD_USER_ENDPOINT } from "@/constants";
 import { useTranslations } from "@/i18n/utils";
 import { createSignal, Show } from "solid-js";
@@ -13,6 +14,7 @@ interface IForm {
 const WaitList = ({ pathname }: { pathname: string }) => {
   const { form, updateFormField } = useForm();
   const [error, setError] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal("");
   const t = useTranslations(pathname);
 
@@ -32,6 +34,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     const obj: any = {};
     setError("");
     setSuccess("");
+    setLoading(true);
 
     if (form.email && form.emailMc && form.emailKofi) {
       obj["user_email"] = form.email;
@@ -50,6 +53,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     } else {
       setError(t("waitlist.error_missing_info"));
     }
+    setLoading(false);
   };
 
   return (
@@ -90,7 +94,12 @@ const WaitList = ({ pathname }: { pathname: string }) => {
               />
             </div>
             <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
-              {t("waitlist.getAccess")}
+              <>
+                <Show when={loading()}>
+                  <LoadingSpinner />
+                </Show>
+                {t("waitlist.getAccess")}
+              </>
             </Button>
             <div class="h-[100px]">
               <Show when={error()}>
