@@ -75,9 +75,10 @@ const { lang } = Astro.params;
     .footerInnerContainer {
       height: 100%;
       width: 100%;
-      max-width: 80rem;
       margin: 0 auto;
       padding: 0 2rem;
+      max-width: 100vw;
+      box-sizing: border-box;
 
       & > div {
         height: 100%;
@@ -154,7 +155,7 @@ const { lang } = Astro.params;
   @media (width: 768px) {
     footer {
       margin-bottom: 11em;
-      .footerInnerContainer{
+      .footerInnerContainer {
         padding: 0 2rem;
       }
     }
