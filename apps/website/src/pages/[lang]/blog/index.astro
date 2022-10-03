@@ -4,6 +4,7 @@ import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import ArticleCard from "@/components/ArticleCard/index.astro";
 import MainWrapper from "@/layouts/MainWrapper.astro";
+import { localizePath } from "@/utils/helpers";
 
 export const getStaticPaths = async () => {
   let mdPosts: any = [];
@@ -34,6 +35,7 @@ export const getStaticPaths = async () => {
 };
 
 const { posts } = Astro.props;
+const { lang } = Astro.params;
 const t = useTranslations(Astro.url.pathname);
 ---
 
@@ -42,12 +44,14 @@ const t = useTranslations(Astro.url.pathname);
     class="relative flex flex-col justify-between items-center pt-32 lg:pt-50 pb-10 box-border bg-no-repeat"
   >
     <div class="flex flex-col justify-center items-center">
-      <img
-        class="w-32 pb-5"
-        src={composeCDNAssetLink("gdlauncher_logo.svg")}
-        alt="logo"
-        class="cursor-pointer"
-      />
+      <a href={localizePath("/", lang?.toString() || "en")}>
+        <img
+          class="w-32 pb-5"
+          src={composeCDNAssetLink("gdlauncher_logo.svg")}
+          alt="logo"
+          class="cursor-pointer"
+        />
+      </a>
       <h1 class="text-xl lg:text-4xl font-bold">{t("blog.title")}</h1>
     </div>
     <div class="flex flex-col gap-20 pt-20 px-4">
