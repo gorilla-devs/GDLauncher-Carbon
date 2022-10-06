@@ -49,6 +49,14 @@ const t = useTranslations(Astro.url.pathname);
             </a>
           ))
         }
+        <a
+          class={`waitlistLink ${
+            globalThis?.location?.pathname === "/waitlist" ? "selected" : ""
+          }`}
+          href={localizePath("/waitlist", lang)}
+        >
+          {t("navbar.waitlist")}
+        </a>
         <a class="button">
           {lang && <LanguageSelect lang={lang} client:idle />}
         </a>
@@ -75,6 +83,14 @@ const t = useTranslations(Astro.url.pathname);
         </a>
       ))
     }
+    <a
+      class={`waitlistLink ${
+        globalThis?.location?.pathname === "/waitlist" ? "selected" : ""
+      }`}
+      href={localizePath("/waitlist", lang)}
+    >
+      {t("navbar.waitlist")}
+    </a>
     {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">
       <a href={localizePath("/download", lang)}>
@@ -100,6 +116,12 @@ const t = useTranslations(Astro.url.pathname);
     background-color: #111827;
     box-sizing: border-box;
     max-width: 100vw;
+  }
+
+  .waitlistLink {
+    color: #16a34a !important;
+    text-decoration: underline !important;
+    text-decoration-thickness: 2px !important;
   }
 
   .innerContainer {

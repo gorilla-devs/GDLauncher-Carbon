@@ -21,6 +21,7 @@ export default {
   "navbar.github": "Github",
   "navbar.discord": "Discord",
   "navbar.blog": "Blog",
+  "navbar.waitlist": "Waitlist",
   "home.title": "GDLauncher",
   "home.createYourOwn": "Create your own!",
   "home.createYourOwn_text1":
