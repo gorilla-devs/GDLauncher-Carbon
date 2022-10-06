@@ -22,7 +22,7 @@ const t = useTranslations(Astro.url.pathname);
 <MainWrapper>
   <div class="h-auto relative">
     <div
-      class={`relative flex flex-col justify-center items-center pt-1 pb-10 box-border h-[calc(100vh-5.5rem)] lg:h-screen
+      class={`relative flex flex-col justify-center items-center pt-20 lg:pt-1 pb-10 box-border h-auto lg:h-screen
             bg-[url("https://cdn.gdlauncher.com/assets/mc_panda.webp")] bg-no-repeat`}
     >
       <div class="absolute top-0 bottom-0 left-0 right-0">
@@ -62,9 +62,9 @@ const t = useTranslations(Astro.url.pathname);
         </div>
       </div>
     </div>
-    <CaretIcon
-      class="relative bottom-10 sm:bottom-14 lg:bottom-20 my-0 mx-auto w-5 h-5 z-30"
-    />
+    <div class="py-10">
+      <CaretIcon class="relative my-0 mx-auto w-5 h-5 z-30" />
+    </div>
     <div
       class="relative h-auto lg:h-screen flex flex-row justify-start items-center py-20 lg:pt-40 lg:pr-20 bg-slate-900"
     >
