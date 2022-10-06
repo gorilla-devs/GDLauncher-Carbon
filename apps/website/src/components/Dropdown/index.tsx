@@ -50,7 +50,9 @@ const Dropdown = (props: Props) => {
 
   createEffect(() => {
     const platform: any = navigator?.platform;
-    setCurrentPlatform(platforms[platform]);
+    if (platforms[platform]) {
+      setCurrentPlatform(platforms[platform]);
+    }
   });
 
   return (
@@ -77,7 +79,9 @@ const Dropdown = (props: Props) => {
         <div class="absolute flex flex-col justify-between items-center bg-slate-600 rounded-b-xl max-w-[300px] w-full overflow-hidden">
           <ul class="w-full">
             <For
-              each={Object.values(OS).filter((os) => os !== currentPlatform() && os !== OS.none)}
+              each={Object.values(OS).filter(
+                (os) => os !== currentPlatform() && os !== OS.none
+              )}
             >
               {(os) => (
                 <a href={urls[os]}>
