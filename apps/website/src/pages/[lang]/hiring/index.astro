@@ -1,0 +1,157 @@
+---
+import JobDescription from "@/components/JobDescription/index.astro";
+import SEO from "@/components/SEO/index.astro";
+import HiringWrapper from "@/layouts/HiringWrapper.astro";
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import languages from "@/i18n/languages";
+
+export const getStaticPaths = () => {
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
+};
+---
+
+<SEO
+  title="GDLauncher - Open Position - Rust Engineer"
+  description="GDLauncher is looking for new rust engineers. Apply now!"
+/>
+
+<HiringWrapper>
+  <div class="columns-1">
+    <div class="flex flex-col justify-between">
+      <!-- <div class="inline-block mb-8 lg:mb-0">
+        <a href="/" class="text-slate-400 text-5xl lg:text-base">
+          <ArrowLeft />
+        </a>
+      </div> -->
+      <div>
+        <img
+          src={composeCDNAssetLink("gdlauncher_wide_logo_blue.svg")}
+          alt="logo"
+          class="mt-5 inline h-32 lg:h-16 my-8"
+        />
+      </div>
+      <JobDescription
+        title={"GDLauncher Challenge: Rust Engineer"}
+        range={[70, 90]}
+        type={"Full Time"}
+      />
+      <div class="text-slate-400 text-5xl lg:text-base">
+        <div>
+          Welcome to the GDLauncher's challenge! This is a small coding task to
+          test your thinking and coding abilities. The time required to complete
+          this task should be around 2-3 hours.
+        </div>
+      </div>
+      <div class="my-4">
+        <h4
+          class="text-6xl lg:text-xl font-bold text-slate-200 mb-5 mt-5 lg:mb-2 lg:mt-0"
+        >
+          Submission
+        </h4>
+        <div class="text-slate-400 text-5xl lg:text-base">
+          Please complete this challenge and send your solution to <span
+            class="text-yellow-500 font-bold"
+          >
+            hiring@gdlauncher.com
+          </span> along with your updated CV. Please use <span
+            class="text-yellow-500 font-bold"
+          >
+            [Application] GDLauncher Challenge: Rust Engineer
+          </span> as subject.
+        </div>
+      </div>
+      <div class="my-4">
+        <h4
+          class="text-6xl lg:text-xl font-bold text-slate-200 mb-5 mt-5 lg:mb-2 lg:mt-0"
+        >
+          Imaginary
+        </h4>
+        <div class="text-slate-400 text-5xl lg:text-base">
+          Welcome to Number Associative Mining and Trading Inc, or NAMT for
+          short! Your duties are to make sure our turtles, working in difficult
+          environments, are making correct associations, and stopping their
+          operations when the tunnel is about to crumble. For that, our
+          mathematicians finally found with absolute certainty the pattern the
+          numbers mined follow before going too far.
+        </div>
+      </div>
+      <div class="my-4">
+        <h4
+          class="text-6xl lg:text-xl font-bold text-slate-200 mb-5 mt-5 lg:mb-2 lg:mt-0"
+        >
+          The Problem
+        </h4>
+        <div class="text-slate-400 text-5xl lg:text-base">
+          Here&apos;s how the mathematicians have written the solution, they did
+          write it in understandable words for once:
+        </div>
+        <div
+          class="border-8 lg:border-4 border-transparent border-l-white p-8 lg:p-4 mt-5 text-slate-300 rounded-md text-5xl lg:text-base"
+        >
+          <q>
+            The first 100 numbers of the mine are always secure, but after that,
+            the next number is only safe if it is the sum of 2 numbers in the
+            previous 100.
+          </q>
+        </div>
+        <div class="text-slate-400 my-5 text-5xl lg:text-base">
+          Here&apos;s an example in a smaller scale mine, where only the last 5
+          numbers matters:
+        </div>
+        <div class="p-4 bg-neutral-900 text-slate-100 text-3xl lg:text-base">
+          <div>35</div>
+          <div>20</div>
+          <div>15</div>
+          <div>25</div>
+          <div>47</div>
+          <div>40</div>
+          <div>62</div>
+          <div>55</div>
+          <div>65</div>
+          <div>95</div>
+          <div>102</div>
+          <div>117</div>
+          <div>150</div>
+          <div>182</div>
+          <div>127</div>
+          <div>219</div>
+          <div>299</div>
+          <div>277</div>
+          <div>309</div>
+          <div>576</div>
+        </div>
+        <div class="text-slate-400 my-5 text-5xl lg:text-base">
+          In that case, the number <span class="text-yellow-500 font-bold"
+            >127
+          </span> will make the mine crumble, as there is no 2-number combination
+          in the last 5 numbers that sum to 127.<div>
+            Attached to this message is your input for the challenge, good luck!
+          </div>
+        </div>
+
+        <div class="my-4 flex items-start flex-col lg:flex-row lg:items-center">
+          <div>
+            <a
+              class="text-blue-500 my-5 text-4xl lg:text-base"
+              href="/challenge_input.txt"
+              download
+              >Download Challenge Input Sample
+            </a>
+          </div>
+          <div class="text-slate-400 text-4xl lg:text-xs ml-2">(~200 KB)</div>
+        </div>
+        <div class="mb-4 mt-8">
+          <h4
+            class="text-6xl lg:text-xl font-bold text-slate-200 mb-5 mt-5 lg:mb-2 lg:mt-0"
+          >
+            Requirements
+          </h4>
+          <div class="text-slate-400 text-5xl lg:text-base">
+            Find ways to make it as fast as possible, while also keeping it as
+            efficient as possible.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</HiringWrapper>
