@@ -52,7 +52,7 @@ module.exports = {
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: ["dir"],
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-Installer.${ext}",
   },
   beforePack: async (context) => {
