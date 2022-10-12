@@ -47,7 +47,7 @@ async function createWindow() {
       userAgent: "GDLauncher Carbon",
     });
   }
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 
   // Test active push message to Renderer-process
   win.webContents.on("did-finish-load", () => {

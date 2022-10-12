@@ -32,7 +32,7 @@ module.exports = {
   win: {
     target: [
       {
-        target: "nsis",
+        target: "dir",
       },
     ],
     artifactName: "${productName}-${version}-Setup.${ext}",
@@ -52,7 +52,7 @@ module.exports = {
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: ["AppImage"],
+    target: ["dir"],
     artifactName: "${productName}-${version}-Installer.${ext}",
   },
   beforePack: async (context) => {
