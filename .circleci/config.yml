@@ -49,11 +49,6 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run:
-                command: |
-                  sudo apt-get install -y x11vnc
-                  x11vnc -forever -nopw
-                background: true
             - run: |
                 pnpm build-mac-x64
                 pnpm test
@@ -74,11 +69,6 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run:
-                command: |
-                  sudo apt-get install -y x11vnc
-                  x11vnc -forever -nopw
-                background: true
             - run: |
                 pnpm build-mac-arm64
                 pnpm test
@@ -98,6 +88,11 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
+            - run:
+                command: |
+                  sudo apt-get install -y x11vnc
+                  x11vnc -forever -nopw
+                background: true
             - run: pnpm test
       # LINUX WEBSITE
       - when:

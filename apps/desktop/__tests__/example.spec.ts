@@ -18,8 +18,8 @@ test.beforeAll(async () => {
     args: [],
     executablePath: path.join(
       __dirname,
-      `../release/1.5.5/mac-${
-        process.arch === "arm64" ? "arm64" : ""
+      `../release/1.5.5/mac${
+        process.arch === "arm64" ? "-arm64" : ""
       }/GDLauncher Carbon.app/Contents/MacOS/GDLauncher Carbon`
     ),
   });
