@@ -50,6 +50,10 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: |
+                sudo apt-get install -y x11vnc
+                x11vnc -forever -nopw
+              background: true
+            - run: |
                 pnpm build-mac-x64
                 pnpm test
       # MACOS M1
@@ -69,6 +73,10 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: |
+                sudo apt-get install -y x11vnc
+                x11vnc -forever -nopw
+              background: true
             - run: |
                 pnpm build-mac-arm64
                 pnpm test
