@@ -46,7 +46,7 @@ let page: Page;
 
 test("renders the first page", async () => {
   page = await electronApp.firstWindow();
-  await page.waitForSelector("#root");
+  // await page.waitForSelector("#root");
   const title = await page.title();
   expect(title).toBe("GDLauncher Carbon");
 });
