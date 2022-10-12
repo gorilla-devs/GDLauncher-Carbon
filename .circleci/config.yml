@@ -7,7 +7,7 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.62.0-browser
+      - image: cimg/rust:1.62.0-browsers
     resource_class: medium
   website:
     docker:
