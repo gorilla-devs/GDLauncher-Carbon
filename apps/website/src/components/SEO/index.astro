@@ -1,0 +1,27 @@
+---
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+
+export interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props as Props;
+---
+
+<title>{title}</title>
+<meta name="description" content={title} />
+<meta name="og:title" property="og:title" content={title} />
+<meta property="og:type" content="website" />
+<meta property="og:description" content={description} />
+<meta
+  property="og:image"
+  content={composeCDNAssetLink("gdlauncher_logo_og.png")}
+/>
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta
+  property="twitter:image"
+  content={composeCDNAssetLink("gdlauncher_logo__og_twitter.png")}
+/>

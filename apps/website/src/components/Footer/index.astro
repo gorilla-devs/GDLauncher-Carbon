@@ -38,7 +38,10 @@ const { lang } = Astro.params;
         <a href={localizePath("/team", lang?.toString() || "en")}
           >{t("footer.team")}
         </a>
-        <a>{t("footer.contact")}</a>
+        <a href={localizePath("/hiring", lang?.toString() || "en")}
+          >{t("footer.hiring")}</a
+        >
+        <!-- <a>{t("footer.contact")}</a> -->
       </div>
       <div>
         <h3>{t("footer.download")}</h3>

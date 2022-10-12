@@ -1,0 +1,37 @@
+---
+import Clock from "@/components/Icons/Clock";
+import Dollar from "@/components/Icons/Dollar";
+import Globe from "@/components/Icons/Globe";
+
+export interface Props {
+  title: string;
+  range: [number, number];
+  type: "Full Time" | "Part Time";
+}
+
+const { title, range, type } = Astro.props as Props;
+---
+
+<div class="my-5">
+  <h1 class="text-5xl font-bold text-slate-100 lg:text-2xl">
+    {title}
+  </h1>
+  <h3
+    class="text-xl lg:text-lg font-bold text-slate-400 flex items-center my-12 lg:my-2"
+  >
+    <span class="flex items-center"
+      ><span class="inline-flex items-center "
+        ><Dollar class="w-8 lg:w-[20px] inline mr-2" /> ${range[0]}k - ${
+          range[1]
+        }k
+      </span>
+      <span class="ml-4 inline-flex items-center">
+        <Clock class="w-8 lg:w-[20px] inline mr-2" />
+        {type}
+      </span>
+      <span class="ml-4 inline-flex items-center"
+        ><Globe class="w-8 lg:w-[20px] inline mr-2" /> Remote
+      </span>
+    </span>
+  </h3>
+</div>

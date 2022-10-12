@@ -74,6 +74,7 @@ export default {
   "footer.about": "About",
   "footer.features": "Features",
   "footer.team": "Team",
+  "footer.hiring": "Hiring",
   "footer.timeline": "Timeline",
   "footer.contact": "Contact",
   "footer.windows": "Windows",
