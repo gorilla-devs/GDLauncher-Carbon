@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js",
-    "types": ["vite/client", "vitest/globals"],
+    "types": ["vite/client"],
     "noEmit": true,
     "paths": {
       "@/*": ["packages/mainWindow/src/*"]
