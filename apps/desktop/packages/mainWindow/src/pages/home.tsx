@@ -36,7 +36,7 @@ export default function Home() {
           </button>
         </div>
         <button onClick={() => navigate("?m=myModal")}>Open modal</button>
-        <div />
+        <div class="helloworld" />
         <button
           onClick={async () => {
             const res = await napi.fibonacci(1, 2);
