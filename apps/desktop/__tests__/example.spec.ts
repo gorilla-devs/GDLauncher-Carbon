@@ -18,7 +18,9 @@ test.beforeAll(async () => {
     args: [],
     executablePath: path.join(
       __dirname,
-      "../release/1.5.5/mac-arm64/GDLauncher Carbon.app/Contents/MacOS/GDLauncher Carbon"
+      `../release/1.5.5/mac-${
+        process.arch === "arm64" ? "arm64" : ""
+      }/GDLauncher Carbon.app/Contents/MacOS/GDLauncher Carbon`
     ),
   });
   electronApp.on("window", async (page) => {
