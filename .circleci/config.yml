@@ -87,8 +87,8 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-                pnpm test
-                pnpm build-linux-x64
+            - run: pnpm test
+            - run: pnpm build-linux-x64
       # LINUX WEBSITE
       - when:
           condition:
@@ -100,8 +100,8 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-                pnpm test
-                pnpm build-web
+            - run: pnpm test
+            - run: pnpm build-web
   buildWin:
     working_directory: ./
     executor:
@@ -144,8 +144,8 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
-          pnpm test
-          pnpm build-win-x64
+      - run: pnpm test
+      - run: pnpm build-win-x64
       # - store_artifacts:
       #     path: ./apps/desktop/release
 workflows:
