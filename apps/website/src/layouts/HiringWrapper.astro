@@ -12,9 +12,11 @@ import "./style.css";
     <HeadCommon />
   </head>
 
-  <body class="font-main w-full bg-gray-800 font-[ubuntu]">
-    <main class="container mx-auto p-8">
-      <slot></slot>
+  <body class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden">
+    <Navbar currentPage={currentPage} />
+    <main class="container max-w-[80rem] mx-auto p-8">
+      <slot />
     </main>
+    <Footer />
   </body>
 </html>
