@@ -39,38 +39,49 @@ const getBinaryPath = async () => {
   return basePath;
 };
 
-test.beforeAll(async () => {
-  // set the CI environment variable to true
-  process.env.CI = "e2e";
-  electronApp = await electron.launch({
-    args: [],
-    executablePath: await getBinaryPath(),
-  });
-});
+test.describe("Init Tests", () => {
+  test.skip(() => {
+    if (process.arch === "arm64") {
+      return true;
+    }
+    return false;
+  }, "MacOS ARM64 is not supported on CircleCI");
 
-test.afterAll(async () => {
-  await electronApp.close();
-});
-
-let page: Page;
-
-test("renders the first page", async () => {
-  page = await electronApp.firstWindow();
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  const screenshot = await page.screenshot({ path: "release/screenshot.png" });
-
-  // capture errors
-  page.on("pageerror", (error) => {
-    console.error(error);
-  });
-  // capture console messages
-  page.on("console", (msg) => {
-    console.log(msg.text());
+  test.beforeAll(async () => {
+    // set the CI environment variable to true
+    process.env.CI = "e2e";
+    electronApp = await electron.launch({
+      args: [],
+      executablePath: await getBinaryPath(),
+    });
   });
 
-  const innerText = await (await page.$(".helloworld"))?.innerHTML();
-  expect(innerText).toBe("prova");
-  const title = await page.title();
-  expect(title).toBe("GDLauncher Carbon");
+  test.afterAll(async () => {
+    await electronApp.close();
+  });
+
+  let page: Page;
+
+  test("renders the first page", async () => {
+    page = await electronApp.firstWindow();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const screenshot = await page.screenshot({
+      path: "release/screenshot.png",
+    });
+
+    // capture errors
+    page.on("pageerror", (error) => {
+      console.error(error);
+    });
+    // capture console messages
+    page.on("console", (msg) => {
+      console.log(msg.text());
+    });
+
+    const innerText = await (await page.$(".helloworld"))?.innerHTML();
+    expect(innerText).toBe("prova");
+    const title = await page.title();
+    expect(title).toBe("GDLauncher Carbon");
+  });
 });

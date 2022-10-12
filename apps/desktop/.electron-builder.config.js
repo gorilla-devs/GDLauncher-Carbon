@@ -27,8 +27,8 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip"],
-    artifactName: "${productName}-${version}-Setup.${ext}",
+    target: ["dir"],
+    artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
     oneClick: false,
@@ -37,16 +37,14 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: {
-      target: "dir",
-    },
+      target: ["dir"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: ["dir", "zip"],
-    artifactName: "${productName}-${version}-Installer.${ext}",
+    target: ["dir"],
+    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
     const { spawnSync } = require("child_process");
