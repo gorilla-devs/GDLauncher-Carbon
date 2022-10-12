@@ -88,7 +88,11 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
-            - run: xvfb-run pnpm test
+            - run:
+                  name: Running X virtual framebuffer
+                  command: Xvfb :99 -screen 0 1280x1024x24
+                  background: true
+            - run: pnpm test
       # LINUX WEBSITE
       - when:
           condition:
