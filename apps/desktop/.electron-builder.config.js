@@ -27,9 +27,7 @@ module.exports = {
     },
   ],
   win: {
-    target: {
-      target: ["dir", "zip"],
-    },
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-Setup.${ext}",
   },
   nsis: {
