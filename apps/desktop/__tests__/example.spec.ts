@@ -46,7 +46,9 @@ let page: Page;
 
 test("renders the first page", async () => {
   page = await electronApp.firstWindow();
-  await page.waitForSelector(".helloworld");
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const innerText = await (await page.$(".helloworld"))?.innerHTML();
+  expect(innerText).toBe("prova");
   const title = await page.title();
   expect(title).toBe("GDLauncher Carbon");
 });
