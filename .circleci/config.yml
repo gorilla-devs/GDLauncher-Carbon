@@ -50,8 +50,8 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: |
-                pnpm test
                 pnpm build-mac-x64
+                pnpm test
       # MACOS M1
       - when:
           condition:
@@ -70,8 +70,8 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: |
-                pnpm test
                 pnpm build-mac-arm64
+                pnpm test
       # LINUX
       - when:
           condition:
@@ -87,8 +87,8 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm test
             - run: pnpm build-linux-x64
+            - run: pnpm test
       # LINUX WEBSITE
       - when:
           condition:
@@ -100,7 +100,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm test
+            # - run: pnpm test
             - run: pnpm build-web
   buildWin:
     working_directory: ./
@@ -144,8 +144,8 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
-      - run: pnpm test
       - run: pnpm build-win-x64
+      - run: pnpm test
       # - store_artifacts:
       #     path: ./apps/desktop/release
 workflows:
