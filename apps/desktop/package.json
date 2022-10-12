@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
+    "test": "playwright test",
     "build": "npm run typecheck && node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
     "typecheck": "tsc --noEmit --project packages/mainWindow/tsconfig.json"
   },
@@ -18,12 +19,15 @@
     "@gd/config": "workspace:*",
     "@gd/core": "workspace:*",
     "@gd/ui": "workspace:*",
+    "@playwright/test": "^1.27.0",
     "@solidjs/router": "^0.4.3",
     "electron": "20.1.1",
     "electron-builder": "^23.3.3",
+    "electron-playwright-helpers": "^1.2.0",
     "electron-updater": "^5.2.1",
     "event-lite": "^0.1.2",
     "logrocket": "3.0.1",
+    "playwright": "^1.27.0",
     "solid-js": "^1.5.4",
     "solid-transition-group": "^0.0.11",
     "typescript": "^4.8.2",
