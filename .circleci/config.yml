@@ -7,7 +7,7 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.62.0-node
+      - image: cimg/rust:1.62.0-browser
     resource_class: medium
   website:
     docker:
@@ -88,7 +88,6 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
-            - run: sudo apt install -y xvfb
             - run: xvfb-run pnpm test
       # LINUX WEBSITE
       - when:
