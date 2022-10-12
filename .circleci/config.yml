@@ -88,11 +88,10 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
-            - run:
-                  name: Running X virtual framebuffer
-                  command: Xvfb :99 -screen 0 1280x1024x24
-                  background: true
             - run: pnpm test
+            - store_artifacts:
+                path: ./apps/desktop/release
+
       # LINUX WEBSITE
       - when:
           condition:
