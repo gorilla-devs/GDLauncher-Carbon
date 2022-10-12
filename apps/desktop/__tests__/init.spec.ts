@@ -35,6 +35,8 @@ const getBinaryPath = async () => {
       "GDLauncher Carbon"
     );
   }
+
+  return basePath;
 };
 
 test.beforeAll(async () => {
@@ -42,12 +44,7 @@ test.beforeAll(async () => {
   process.env.CI = "e2e";
   electronApp = await electron.launch({
     args: [],
-    executablePath: path.join(
-      __dirname,
-      `../release/1.5.5/mac${
-        process.arch === "arm64" ? "-arm64" : ""
-      }/GDLauncher Carbon.app/Contents/MacOS/GDLauncher Carbon`
-    ),
+    executablePath: await getBinaryPath(),
   });
 });
 
