@@ -149,8 +149,8 @@ jobs:
           pnpm i
       - run: pnpm build-win-x64
       - run: pnpm test
-      # - store_artifacts:
-      #     path: ./apps/desktop/release
+      - store_artifacts:
+          path: ./apps/desktop/release
 workflows:
   all-builds:
     jobs:

@@ -32,7 +32,7 @@ module.exports = {
   win: {
     target: [
       {
-        target: "dir",
+        target: ["dir", "zip"],
       },
     ],
     artifactName: "${productName}-${version}-Setup.${ext}",
