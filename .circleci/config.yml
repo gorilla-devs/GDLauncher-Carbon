@@ -52,6 +52,8 @@ jobs:
             - run: |
                 pnpm build-mac-x64
                 pnpm test
+            - store_artifacts:
+                path: ./apps/desktop
       # MACOS M1
       - when:
           condition:

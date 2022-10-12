@@ -47,6 +47,7 @@ let page: Page;
 test("renders the first page", async () => {
   page = await electronApp.firstWindow();
   await new Promise((resolve) => setTimeout(resolve, 1000));
+  await page.screenshot({ path: 'screenshot.png' });
   const innerText = await (await page.$(".helloworld"))?.innerHTML();
   expect(innerText).toBe("prova");
   const title = await page.title();
