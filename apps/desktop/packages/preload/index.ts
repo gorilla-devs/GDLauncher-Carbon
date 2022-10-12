@@ -13,7 +13,7 @@ const { appendLoading, removeLoading } = useLoading();
 // --------- Expose some API to the Renderer process. ---------
 contextBridge.exposeInMainWorld("removeLoading", removeLoading);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
-contextBridge.exposeInMainWorld(import.meta.env.VITE_NAPI_ID, napi);
+contextBridge.exposeInMainWorld("__GDL__", napi);
 
 // `exposeInMainWorld` can't detect attributes and methods of `prototype`, manually patching it.
 function withPrototype(obj: Record<string, any>) {

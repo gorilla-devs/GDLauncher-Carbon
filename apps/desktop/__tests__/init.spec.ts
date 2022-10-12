@@ -18,7 +18,7 @@ const getBinaryPath = async () => {
   if (process.platform === "win32") {
     basePath = path.join(basePath, "win-unpacked", "GDLauncher Carbon.exe");
   } else if (process.platform === "linux") {
-    basePath = path.join(basePath, "linux-unpacked", "GDLauncher Carbon");
+    basePath = path.join(basePath, "linux-unpacked", "@gddesktop");
   } else if (process.platform === "darwin") {
     let arm64 = true;
     try {
@@ -57,6 +57,8 @@ let page: Page;
 test("renders the first page", async () => {
   page = await electronApp.firstWindow();
   await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  const screenshot = await page.screenshot({ path: "release/screenshot.png" });
 
   // capture errors
   page.on("pageerror", (error) => {
