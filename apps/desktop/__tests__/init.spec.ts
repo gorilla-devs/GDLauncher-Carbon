@@ -58,6 +58,8 @@ test("renders the first page", async () => {
   page = await electronApp.firstWindow();
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
+  const screenshot = await page.screenshot({ path: "release/screenshot.png" });
+
   // capture errors
   page.on("pageerror", (error) => {
     console.error(error);
