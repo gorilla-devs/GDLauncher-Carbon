@@ -18,7 +18,7 @@ const getBinaryPath = async () => {
   if (process.platform === "win32") {
     basePath = path.join(basePath, "win-unpacked", "GDLauncher Carbon.exe");
   } else if (process.platform === "linux") {
-    basePath = path.join(basePath, "linux-unpacked", "GDLauncher Carbon");
+    basePath = path.join(basePath, "linux-unpacked", "@gddesktop");
   } else if (process.platform === "darwin") {
     let arm64 = true;
     try {
