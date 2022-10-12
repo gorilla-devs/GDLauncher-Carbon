@@ -2,7 +2,7 @@ import core from "@gd/core";
 
 let resolvedAddon: typeof core | undefined;
 
-let addon = (window as any)[import.meta.env.VITE_NAPI_ID] as Promise<
+let addon = (window as any)["__GDL__"] as Promise<
   () => typeof core | undefined
 >;
 
