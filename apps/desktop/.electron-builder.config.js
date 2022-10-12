@@ -11,10 +11,7 @@ module.exports = {
     output: "release/${version}",
     buildResources: "build",
   },
-  files: [
-    "dist",
-    "package.json",
-  ],
+  files: ["dist", "package.json"],
   extraResources: [
     {
       from: "../../core/core.node",
@@ -30,11 +27,9 @@ module.exports = {
     },
   ],
   win: {
-    target: [
-      {
-        target: ["dir", "zip"],
-      },
-    ],
+    target: {
+      target: ["dir", "zip"],
+    },
     artifactName: "${productName}-${version}-Setup.${ext}",
   },
   nsis: {
