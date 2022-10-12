@@ -88,6 +88,7 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
+            - run: sudo apt install -y xvfb
             - run: xvfb-run pnpm test
       # LINUX WEBSITE
       - when:
