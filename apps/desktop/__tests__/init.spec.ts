@@ -40,12 +40,7 @@ const getBinaryPath = async () => {
 };
 
 test.describe("Init Tests", () => {
-  test.skip(() => {
-    if (process.arch === "arm64") {
-      return true;
-    }
-    return false;
-  }, "MacOS ARM64 is not supported on CircleCI");
+  test.skip(() => process.arch === "arm64", "MacOS ARM64 is not supported on CircleCI");
 
   test.beforeAll(async () => {
     // set the CI environment variable to true
