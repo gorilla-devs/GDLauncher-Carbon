@@ -5,7 +5,7 @@ import { Counter } from ".";
 describe("Timer component", () => {
   it("should assert some dummy assertion", () => {
     render(<Counter />);
-    const timerElm = screen.getByText("Clickk");
+    const timerElm = screen.getByText("Click");
     expect(timerElm).toBeInTheDocument();
   });
 });
