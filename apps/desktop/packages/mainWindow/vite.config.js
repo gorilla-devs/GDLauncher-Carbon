@@ -1,5 +1,8 @@
+/// <reference types="vitest" />
+/// <reference types="vite/client" />
+
 import { resolve, join } from "path";
-import { defineConfig, Plugin } from "vite";
+import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import pkg from "../../package.json";
@@ -23,8 +26,23 @@ export default defineConfig({
     alias: {
       "@": join(__dirname, "src"),
     },
+    conditions: ["development", "browser"],
   },
   server: {
     port: pkg.env.PORT,
   },
+  test: {
+    environment: "jsdom",
+    transformMode: {
+      web: [/.[jt]sx?/],
+    },
+    globals: true,
+    deps: {
+      registerNodeLoader: true,
+      inline: [/solid-testing-library/],
+    },
+    // threads: false,
+    // isolate: false,
+  },
 });
+
