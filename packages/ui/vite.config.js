@@ -2,17 +2,30 @@
 import path from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
 
 export default defineConfig({
   plugins: [
     solidPlugin(),
-    Unocss({}),
     dts({
       insertTypesEntry: true,
     }),
   ],
+  test: {
+    globals: true,
+    environment: "jsdom",
+    transformMode: {
+      web: [/\.[t|s]sx?$/],
+    },
+    setupFiles: "./setupVitest.js",
+    // solid needs to be inline to work around
+    // a resolution issue in vitest
+    // And solid-testing-library needs to be here so that the 'hydrate'
+    // method will be provided
+    deps: {
+      inline: [/solid-js/],
+    },
+  },
   build: {
     lib: {
       entry: path.resolve(__dirname, "src/index.ts"),
@@ -21,10 +34,11 @@ export default defineConfig({
       fileName: (format) => `ui.${format}.js`,
     },
     rollupOptions: {
-      external: ["solid-js"],
+      external: ["solid-js", "solid-styled-components"],
       output: {
         globals: {
           "solid-js": "SolidJS",
+          "solid-styled-components": "SolidStyledComponents",
         },
       },
     },
@@ -36,5 +50,6 @@ export default defineConfig({
     alias: {
       "@": path.join(__dirname, "src"),
     },
+    conditions: ["development", "browser"],
   },
 });
