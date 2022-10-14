@@ -5,8 +5,8 @@ import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
 import Modals from "./Modals";
-import "@gd/ui/style.css";
 import "virtual:uno.css";
+import 'virtual:unocss-devtools';
 import "./utils/napi";
 import initAnalytics from "./utils/analytics";
 
