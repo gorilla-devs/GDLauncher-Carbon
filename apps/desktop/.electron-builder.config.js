@@ -27,7 +27,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir"],
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -37,13 +37,13 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-      target: ["dir"],
+      target: ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: ["dir"],
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {

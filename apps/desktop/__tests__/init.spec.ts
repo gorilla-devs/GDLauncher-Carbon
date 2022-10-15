@@ -51,9 +51,9 @@ test.describe("Init Tests", () => {
     });
 
     page = await electronApp.firstWindow();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    const innerText = await (await page.$(".appLoadingState"))?.innerHTML();
+    const innerText = await (await page.$(".appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
   });
 
@@ -79,6 +79,5 @@ test.describe("Init Tests", () => {
     expect(innerText).toBe("prova");
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
-    console.log("TEST");
   });
 });

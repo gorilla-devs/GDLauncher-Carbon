@@ -11,11 +11,11 @@ export function useLoading() {
   oDiv.style.justifyContent = "center";
   oDiv.style.alignItems = "center";
   oDiv.style.fontSize = "1.5rem";
-  oDiv.className = "appLoadingState";
-
+  
   return {
     appendLoading() {
       oDiv.innerHTML = `<div>Loading...</div>`;
+      oDiv.className = "appLoadingState";
       oDiv.style.color = "#fff";
       oDiv.style.fontWeight = "600";
       document.body.appendChild(oDiv);
@@ -25,6 +25,7 @@ export function useLoading() {
     },
     fatalError(error: Error) {
       oDiv.innerHTML = `<div>${error}</div>`;
+      oDiv.className = "appFatalCrashState";
       oDiv.style.color = "#fff";
       oDiv.style.fontWeight = "600";
     },
