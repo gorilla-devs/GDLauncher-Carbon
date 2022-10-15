@@ -1,4 +1,7 @@
 import core from "@gd/core";
+import { createSignal } from "solid-js";
+
+let [moduleLoaded, setModuleLoaded] = createSignal<boolean | Error>(false);
 
 let resolvedAddon: typeof core | undefined;
 
@@ -12,14 +15,20 @@ const napi: typeof core = new Proxy({} as any, {
     if (resolvedAddon) {
       return resolvedAddon?.[prop];
     } else {
-      console.error(`NAPI not initialized yet. Calling ${prop} too early.`);
+      console.error(`NAPI not initialized. Called ${prop}`);
     }
   },
 });
 
-console.time("Loading NAPI Module");
-// TODO: Handle failure
-resolvedAddon = (await addon)();
-console.timeEnd("Loading NAPI Module");
+try {
+  console.time("Loading NAPI Module");
+  resolvedAddon = (await addon)();
+  console.timeEnd("Loading NAPI Module");
+  setModuleLoaded(true);
+} catch {
+  console.error("Failed to load NAPI module");
+  setModuleLoaded(new Error("Failed to load NAPI module"));
+}
 
 export default napi;
+export const isModuleLoaded = moduleLoaded;

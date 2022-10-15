@@ -1,4 +1,4 @@
-import pgk from "../../../../package.json";
+import { version } from "../../../../package.json";
 
 function initAnalytics(this: any) {
   const httpsDesktopUrl = "https://" + import.meta.env.VITE_DESKTOP_APP_URL;
@@ -41,7 +41,7 @@ function initAnalytics(this: any) {
     } else {
       i.u = httpsDesktopUrl + sliced;
     }
-    t("pageview", { props: { version: pgk.version } });
+    t("pageview", { props: { version: version } });
   }
   window.addEventListener("hashchange", p);
   p();

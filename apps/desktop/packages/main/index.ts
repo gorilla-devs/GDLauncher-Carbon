@@ -28,7 +28,7 @@ let win: BrowserWindow | null = null;
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: "Main window",
+    title: "GDLauncher Carbon",
     minHeight: 750,
     minWidth: 1350,
     webPreferences: {

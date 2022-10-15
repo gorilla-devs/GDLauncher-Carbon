@@ -22,19 +22,19 @@
     "@storybook/addon-essentials": "^6.5.12",
     "@storybook/addon-interactions": "^6.5.12",
     "@storybook/addon-links": "^6.5.12",
-    "@storybook/builder-vite": "^0.2.3",
+    "@storybook/builder-vite": "^0.2.4",
     "@storybook/html": "^6.5.12",
     "@storybook/testing-library": "^0.0.13",
     "@testing-library/jest-dom": "^5.16.5",
     "babel-loader": "^8.2.5",
     "concurrently": "^7.4.0",
     "jsdom": "^20.0.1",
-    "solid-js": "1.5.4",
+    "solid-js": "1.5.7",
     "solid-testing-library": "^0.3.0",
-    "typescript": "^4.8.2",
-    "unocss": "^0.45.14",
-    "vite": "^3.0.9",
-    "vite-plugin-dts": "^1.4.1",
-    "vitest": "^0.24.1"
+    "typescript": "^4.8.4",
+    "unocss": "^0.45.29",
+    "vite": "^3.1.8",
+    "vite-plugin-dts": "^1.6.6",
+    "vitest": "^0.24.3"
   }
 }

@@ -1,9 +1,11 @@
 import { builtinModules } from "module";
 import { defineConfig } from "vite";
+import { ViteMinifyPlugin } from "vite-plugin-minify";
 import pkg from "../../package.json";
 
 export default defineConfig({
   root: __dirname,
+  plugins: [ViteMinifyPlugin({})],
   build: {
     outDir: "../../dist/main",
     lib: {

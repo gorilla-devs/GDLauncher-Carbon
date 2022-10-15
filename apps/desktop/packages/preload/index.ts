@@ -3,7 +3,7 @@ import { domReady } from "./utils";
 import { useLoading } from "./loading";
 import napi from "./napi";
 
-const { appendLoading, removeLoading } = useLoading();
+const { appendLoading, removeLoading, fatalError } = useLoading();
 
 (async () => {
   await domReady();
@@ -12,8 +12,10 @@ const { appendLoading, removeLoading } = useLoading();
 
 // --------- Expose some API to the Renderer process. ---------
 contextBridge.exposeInMainWorld("removeLoading", removeLoading);
+contextBridge.exposeInMainWorld("fatalError", fatalError);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
 contextBridge.exposeInMainWorld("__GDL__", napi);
+
 
 // `exposeInMainWorld` can't detect attributes and methods of `prototype`, manually patching it.
 function withPrototype(obj: Record<string, any>) {

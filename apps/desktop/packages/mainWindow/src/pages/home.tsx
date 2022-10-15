@@ -18,6 +18,7 @@ export default function Home() {
 
         <div class="flex items-center space-x-2">
           <button
+            w:dark="bg-light-50"
             class="border rounded-lg px-2 border-gray-900"
             onClick={() => setCount(count() - 1)}
           >
