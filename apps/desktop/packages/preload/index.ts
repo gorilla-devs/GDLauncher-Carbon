@@ -3,7 +3,7 @@ import { domReady } from "./utils";
 import { useLoading } from "./loading";
 import napi from "./napi";
 
-const { appendLoading, removeLoading, fatalError } = useLoading();
+const { appendLoading, clearState, fatalError } = useLoading();
 
 (async () => {
   await domReady();
@@ -11,7 +11,7 @@ const { appendLoading, removeLoading, fatalError } = useLoading();
 })();
 
 // --------- Expose some API to the Renderer process. ---------
-contextBridge.exposeInMainWorld("removeLoading", removeLoading);
+contextBridge.exposeInMainWorld("clearState", clearState);
 contextBridge.exposeInMainWorld("fatalError", fatalError);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
 contextBridge.exposeInMainWorld("__GDL__", napi);

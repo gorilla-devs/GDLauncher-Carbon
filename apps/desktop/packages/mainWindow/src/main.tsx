@@ -16,8 +16,9 @@ queueMicrotask(() => {
 
 render(() => {
   createEffect(() => {
+    console.log("isModuleLoaded", isModuleLoaded());
     if (isModuleLoaded() === true) {
-      window.removeLoading();
+      window.clearState();
     } else if (isModuleLoaded() instanceof Error) {
       window.fatalError(isModuleLoaded() as Error);
     }

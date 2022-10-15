@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    removeLoading: () => void;
+    clearState: () => void;
     fatalError: (err: Error) => void;
     ipcRenderer: import("electron").IpcRenderer;
     plausible: any;

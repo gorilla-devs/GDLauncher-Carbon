@@ -40,7 +40,7 @@ const getBinaryPath = async () => {
 };
 
 test.describe("Init Tests", () => {
-  test.skip(() => process.arch === "arm64", "MacOS ARM64 is not supported on CircleCI");
+  // test.skip(() => process.arch === "arm64", "MacOS ARM64 is not supported on CircleCI");
 
   test.beforeAll(async () => {
     // set the CI environment variable to true
@@ -49,6 +49,12 @@ test.describe("Init Tests", () => {
       args: [],
       executablePath: await getBinaryPath(),
     });
+
+    page = await electronApp.firstWindow();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    const innerText = await (await page.$(".appLoadingState"))?.innerHTML();
+    expect(innerText).toBe(undefined);
   });
 
   test.afterAll(async () => {
@@ -59,11 +65,6 @@ test.describe("Init Tests", () => {
 
   test("renders the first page", async () => {
     page = await electronApp.firstWindow();
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const screenshot = await page.screenshot({
-      path: "release/screenshot.png",
-    });
 
     // capture errors
     page.on("pageerror", (error) => {
@@ -78,5 +79,6 @@ test.describe("Init Tests", () => {
     expect(innerText).toBe("prova");
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
+    console.log("TEST");
   });
 });
