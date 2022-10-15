@@ -151,7 +151,9 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
-      - run: pnpm build-win-x64
+      - run: |
+          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+          pnpm build-win-x64
       - run: pnpm test
       - store_artifacts:
           path: ./apps/desktop/release
