@@ -52,6 +52,7 @@ jobs:
             - run: |
                 pnpm build-mac-x64
                 pnpm test
+            - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
       # MACOS M1
@@ -74,6 +75,7 @@ jobs:
             - run: |
                 pnpm build-mac-arm64
                 pnpm test
+            - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
       # LINUX
@@ -93,6 +95,7 @@ jobs:
                 chmod -R a+x node_modules
             - run: pnpm build-linux-x64
             - run: pnpm test
+            - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
 
@@ -155,6 +158,7 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm build-win-x64
       - run: pnpm test
+      - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
 workflows:

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import fs from "fs/promises";
+import fs from "fs";
 import {
   clickMenuItemById,
   ipcMainCallFirstListener,
@@ -7,28 +7,33 @@ import {
   ipcMainInvokeHandler,
   ipcRendererInvoke,
 } from "electron-playwright-helpers";
+import { version } from "../package.json";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
 
 let electronApp: ElectronApplication;
 
+const isArm64 = () => {
+  let arm64 = true;
+  try {
+    fs.accessSync(path.join(__dirname, `../release/${version}/mac-arm64`));
+  } catch {
+    arm64 = false;
+  }
+  return arm64;
+};
+
 const getBinaryPath = async () => {
-  let basePath = path.join(__dirname, "../release/1.5.5/");
+  let basePath = path.join(__dirname, `../release/${version}/`);
 
   if (process.platform === "win32") {
     basePath = path.join(basePath, "win-unpacked", "GDLauncher Carbon.exe");
   } else if (process.platform === "linux") {
     basePath = path.join(basePath, "linux-unpacked", "@gddesktop");
   } else if (process.platform === "darwin") {
-    let arm64 = true;
-    try {
-      await fs.access(path.join(basePath, "mac-arm64"));
-    } catch {
-      arm64 = false;
-    }
     basePath = path.join(
       basePath,
-      arm64 ? "mac-arm64" : "mac",
+      isArm64() ? "mac-arm64" : "mac",
       "GDLauncher Carbon.app",
       "Contents",
       "MacOS",
@@ -40,7 +45,7 @@ const getBinaryPath = async () => {
 };
 
 test.describe("Init Tests", () => {
-  test.skip(() => process.arch !== "x64", "Only x64 is supported");
+  test.skip(() => isArm64(), "Only x64 is supported");
 
   test.beforeAll(async () => {
     // set the CI environment variable to true
