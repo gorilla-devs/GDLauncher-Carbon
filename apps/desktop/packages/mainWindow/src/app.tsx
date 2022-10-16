@@ -1,4 +1,4 @@
-import { Component, createEffect, createSignal, onMount } from "solid-js";
+import { Component } from "solid-js";
 import { Link, useRoutes, useLocation } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 
@@ -34,7 +34,7 @@ const App: Component = () => {
               class="w-75px p-1 bg-white text-sm rounded-lg"
               type="text"
               readOnly
-              value={location.pathname}
+              value={location.pathname + location.search}
             />
           </li>
         </ul>

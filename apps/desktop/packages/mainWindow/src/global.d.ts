@@ -3,7 +3,7 @@ declare global {
     clearState: () => void;
     fatalError: (err: Error) => void;
     ipcRenderer: import("electron").IpcRenderer;
-    plausible: any;
+    report: any;
   }
 }
 

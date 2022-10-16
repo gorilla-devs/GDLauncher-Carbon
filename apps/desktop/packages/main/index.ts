@@ -30,7 +30,9 @@ async function createWindow() {
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
     minHeight: 750,
-    minWidth: 1350,
+    height: 750,
+    minWidth: 1360,
+    width: 1360,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288

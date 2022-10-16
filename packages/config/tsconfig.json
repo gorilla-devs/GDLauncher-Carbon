@@ -23,5 +23,7 @@
     "jsxImportSource": "solid-js",
     "outDir": "dist"
   },
-  "types": ["vite/client"]
+  "types": ["vite/client"],
+  "include": ["**/*"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"]
 }

@@ -1,13 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="margin: 0; padding: 0;">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="script-src 'self' 'unsafe-inline';"
-    />
     <style>
       @font-face {
         font-family: "Ubuntu";
@@ -44,17 +40,12 @@
     </style>
     <title>GDLauncher Carbon</title>
   </head>
-  <body>
-    <div id="overlay" style="position: absolute; z-index: 100"></div>
+  <body style="margin: 0; padding: 0;">
+    <div
+      id="overlay"
+      style="position: absolute; z-index: 100; top: 0;"
+    ></div>
     <div id="root"></div>
-    <!-- define the `plausible` function to manually trigger events -->
-    <script>
-      window.plausible =
-        window.plausible ||
-        function () {
-          (window.plausible.q = window.plausible.q || []).push(arguments);
-        };
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

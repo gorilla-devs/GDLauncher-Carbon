@@ -5,3 +5,4 @@
 
 export function fibonacci(num: number, num1: number): Promise<number>
 export function computePathMurmur(path: string): Promise<number>
+export function auth(): void

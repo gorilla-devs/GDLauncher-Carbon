@@ -40,11 +40,11 @@ export default function Home() {
         <div class="helloworld">prova</div>
         <button
           onClick={async () => {
-            const res = await napi.fibonacci(1, 2);
-            setValue(res);
+            const res = await napi.auth();
+            // setValue(res);
           }}
         >
-          Compute value
+          Auth
         </button>
         <div />
         {value()}

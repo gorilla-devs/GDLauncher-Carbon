@@ -36,11 +36,10 @@ export default defineConfig({
       fileName: (format) => `ui.${format}.js`,
     },
     rollupOptions: {
-      external: ["solid-js", "solid-styled-components"],
+      external: ["solid-js"],
       output: {
         globals: {
-          "solid-js": "SolidJS",
-          "solid-styled-components": "SolidStyledComponents",
+          "solid-js": "SolidJS"
         },
       },
     },

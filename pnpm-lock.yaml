@@ -25,6 +25,7 @@ importers:
       event-lite: ^0.1.2
       logrocket: 3.0.1
       playwright: ^1.27.1
+      posthog-js: ^1.32.2
       solid-js: ^1.5.7
       solid-transition-group: ^0.0.11
       typescript: ^4.8.4
@@ -48,6 +49,7 @@ importers:
       event-lite: 0.1.2
       logrocket: 3.0.1
       playwright: 1.27.1
+      posthog-js: 1.32.4
       solid-js: 1.5.7
       solid-transition-group: 0.0.11_solid-js@1.5.7
       typescript: 4.8.4
@@ -3336,6 +3338,11 @@ packages:
       argparse: 1.0.10
       colors: 1.2.5
       string-argv: 0.3.1
+    dev: true
+
+  /@sentry/types/7.15.0:
+    resolution: {integrity: sha512-MN9haDRh9ZOsTotoDTHu2BT3sT8Vs1F0alhizUpDyjN2YgBCqR6JV+AbAE1XNHwS2+5zbppch1PwJUVeE58URQ==}
+    engines: {node: '>=8'}
     dev: true
 
   /@sinclair/typebox/0.24.46:
@@ -9510,6 +9517,10 @@ packages:
     resolution: {integrity: sha512-uJQyMrX5IJZkhoEUBQ3EjxkeiZkppBd5jS/fMTJmfZxLSiaQjv2zD0kTvuvkSH89uFvgSlB6ueGpjD3HWN7Bxw==}
     dev: true
 
+  /fflate/0.4.8:
+    resolution: {integrity: sha512-FJqqoDBR00Mdj9ppamLa/Y7vxm+PRmNWA67N846RvsoYVMKB4q3y/de5PA7gUmRMYK/8CMz2GDZQmCRN1wBcWA==}
+    dev: true
+
   /figgy-pudding/3.5.2:
     resolution: {integrity: sha512-0btnI/H8f2pavGMN8w40mlSKOfTK2SVJmBfBeVIj3kNw0swwgzyRq0d5TJVOwodFmtvpPeWPN/MCcfuWF0Ezbw==}
     dev: true
@@ -13907,6 +13918,14 @@ packages:
       source-map-js: 1.0.2
     dev: true
 
+  /posthog-js/1.32.4:
+    resolution: {integrity: sha512-92ZAF62HsA5wEPJoD3T6A4GSqPg4mxD0571Gq7xLPos8bAIkB4BGFnuP3TcjobJG8elLAPNXOuW8u9dz3DoPEA==}
+    dependencies:
+      '@sentry/types': 7.15.0
+      fflate: 0.4.8
+      rrweb-snapshot: 1.1.14
+    dev: true
+
   /preferred-pm/3.0.3:
     resolution: {integrity: sha512-+wZgbxNES/KlJs9q40F/1sfOd/j7f1O9JaHcW5Dsn3aUUOZg3L2bjpVUcKV2jvtElYfoTuQiNeMfQJ4kwUAhCQ==}
     engines: {node: '>=10'}
@@ -14848,6 +14867,10 @@ packages:
     hasBin: true
     optionalDependencies:
       fsevents: 2.3.2
+    dev: true
+
+  /rrweb-snapshot/1.1.14:
+    resolution: {integrity: sha512-eP5pirNjP5+GewQfcOQY4uBiDnpqxNRc65yKPW0eSoU1XamDfc4M8oqpXGMyUyvLyxFDB0q0+DChuxxiU2FXBQ==}
     dev: true
 
   /rsvp/4.8.5:

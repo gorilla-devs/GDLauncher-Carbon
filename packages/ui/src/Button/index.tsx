@@ -3,7 +3,6 @@ import { children, createSignal, createEffect } from "solid-js";
 type Props = {
   children: HTMLElement | string;
 };
-
 function Button(props: Props) {
   const [q, setC] = createSignal(false);
 
