@@ -58,8 +58,12 @@ test.describe("Init Tests", () => {
     page = await electronApp.firstWindow();
     await new Promise((resolve) => setTimeout(resolve, 500));
 
+    await page.screenshot({ path: "initial-screenshot.png" });
+
     const innerText = await (await page.$(".appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
+
+
   });
 
   test.afterAll(async () => {
@@ -80,6 +84,7 @@ test.describe("Init Tests", () => {
       console.log(msg.text());
     });
 
+    await page.screenshot({ path: "post-screenshot.png" });
     const innerText = await (await page.$(".helloworld"))?.innerHTML();
     expect(innerText).toBe("prova");
     const title = await page.title();
