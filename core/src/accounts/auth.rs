@@ -25,7 +25,7 @@ use {
 use {
     anyhow::bail,
     byteorder::{ReadBytesExt, WriteBytesExt, LE},
-    reqwest::{blocking::Client, StatusCode},
+    reqwest::{Client, StatusCode},
     serde::{Deserialize, Serialize},
     serde_json::json,
 };
@@ -66,14 +66,16 @@ struct McAuth {
 }
 
 impl McAuth {
-    fn mc_profile(&self, client: &Client) -> anyhow::Result<McProfile> {
+    async fn mc_profile(&self, client: &Client) -> anyhow::Result<McProfile> {
         let pr_resp = client
             .get("https://api.minecraftservices.com/minecraft/profile")
             .header("Authorization", format!("Bearer {}", self.access_token))
-            .send()?;
+            .send()
+            .await?
+            .json()
+            .await?;
 
-        let mc_profile = serde_json::from_reader(pr_resp)?;
-        Ok(mc_profile)
+        Ok(pr_resp)
     }
 }
 
@@ -95,7 +97,7 @@ struct XstsAuth {
 }
 
 impl XstsAuth {
-    fn auth_mc(&self, client: &Client) -> anyhow::Result<McAuth> {
+    async fn auth_mc(&self, client: &Client) -> anyhow::Result<McAuth> {
         let json = json!({
             "identityToken": format!("XBL3.0 x={};{}", self.display_claims.xui[0].uhs, self.token)
         });
@@ -104,12 +106,14 @@ impl XstsAuth {
             .post("https://api.minecraftservices.com/authentication/login_with_xbox")
             .header("Accept", "application/json")
             .json(&json)
-            .send()?
-            .error_for_status()?;
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
-        let mc_auth: McAuth = serde_json::from_reader(mc_resp)?;
         //mc_auth.expires_after = mc_auth.expires_in + chrono::Utc::now().timestamp();
-        Ok(mc_auth)
+        Ok(mc_resp)
     }
 }
 
@@ -120,7 +124,7 @@ struct XblAuth {
 }
 
 impl XblAuth {
-    fn auth_xsts(&self, client: &Client) -> anyhow::Result<XstsAuth> {
+    async fn auth_xsts(&self, client: &Client) -> anyhow::Result<XstsAuth> {
         let json = json!({
             "Properties": {
                 "SandboxId":  "RETAIL",
@@ -134,12 +138,13 @@ impl XblAuth {
             .post("https://xsts.auth.xboxlive.com/xsts/authorize")
             .header("Content-Type", "application/json")
             .json(&json)
-            .send()?
-            .error_for_status()?;
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
 
-        let xsts_auth: XstsAuth = serde_json::from_reader(xsts_resp)?;
-
-        Ok(xsts_auth)
+        Ok(xsts_resp)
     }
 }
 
@@ -161,9 +166,9 @@ struct MsAuth {
 
 impl MsAuth {
     /// Checks if the access token is still valid and refreshes it if it isn't.
-    pub fn refresh(&mut self, cid: &str, client: &Client) -> anyhow::Result<bool> {
+    pub async fn refresh(&mut self, cid: &str, client: &Client) -> anyhow::Result<bool> {
         if self.expires_after <= chrono::Utc::now().timestamp() {
-            let resp = client
+            let resp: MsAuthRefresh = client
                 .post("https://login.live.com/oauth20_token.srf")
                 .form(&[
                     ("client_id", cid),
@@ -174,18 +179,21 @@ impl MsAuth {
                         "https://login.microsoftonline.com/common/oauth2/nativeclient",
                     ),
                 ])
-                .send()?
-                .error_for_status()?;
-            let refresh: MsAuthRefresh = serde_json::from_reader(resp)?;
-            self.access_token = refresh.access_token;
-            self.refresh_token = refresh.refresh_token;
-            self.expires_after = refresh.expires_in + chrono::Utc::now().timestamp();
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+
+            self.access_token = resp.access_token;
+            self.refresh_token = resp.refresh_token;
+            self.expires_after = resp.expires_in + chrono::Utc::now().timestamp();
             return Ok(true);
         }
         Ok(false)
     }
 
-    pub fn auth_xbl(&self, client: &Client) -> anyhow::Result<XblAuth> {
+    pub async fn auth_xbl(&self, client: &Client) -> anyhow::Result<XblAuth> {
         let json = json!({
             "Properties": {
                 "AuthMethod": "RPS",
@@ -200,10 +208,13 @@ impl MsAuth {
             .post("https://user.auth.xboxlive.com/user/authenticate")
             .header("Accept", "application/json")
             .json(&json)
-            .send()?
-            .error_for_status()?;
-        let xbl_auth: XblAuth = serde_json::from_reader(xbl_resp)?;
-        Ok(xbl_auth)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+
+        Ok(xbl_resp)
     }
 
     pub fn write_to(&self, w: &mut impl Write) -> anyhow::Result<()> {
@@ -262,7 +273,7 @@ impl DeviceCode {
     /// Entry point of the auth flow.
     /// It's up to you how you show the user the user code and the link
     /// Only show the user code and the link when cached is false because they'll be empty if not.
-    pub fn new(cid: &str, cache_file: Option<&str>, client: &Client) -> anyhow::Result<Self> {
+    pub async fn new(cid: &str, cache_file: Option<&str>, client: &Client) -> anyhow::Result<Self> {
         let (path, name) = match cache_file {
             Some(file) => (Path::new(file), file),
             None => (Path::new(CACHE_FILE_NAME), CACHE_FILE_NAME),
@@ -278,9 +289,13 @@ impl DeviceCode {
                     ("scope", "XboxLive.signin offline_access"),
                 ])
                 .header("content-length", "0")
-                .send()?
-                .error_for_status()?;
-            device_code_inner = Some(serde_json::from_reader(device_resp)?);
+                .send()
+                .await?
+                .error_for_status()?
+                .json()
+                .await?;
+
+            device_code_inner = Some(device_resp);
         } else {
             device_code_inner = None;
         }
@@ -292,7 +307,7 @@ impl DeviceCode {
         Ok(device_code)
     }
 
-    fn auth_ms(&self, client: &Client) -> anyhow::Result<Option<MsAuth>> {
+    async fn auth_ms(&self, client: &Client) -> anyhow::Result<Option<MsAuth>> {
         match &self.inner {
             Some(inner) => loop {
                 std::thread::sleep(std::time::Duration::from_secs(inner.interval + 1));
@@ -305,10 +320,12 @@ impl DeviceCode {
                         ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
                         ("device_code", &inner.device_code),
                     ])
-                    .send()?;
+                    .send()
+                    .await?;
+
                 match code_resp.status() {
                     StatusCode::BAD_REQUEST => {
-                        let ms_auth: MsAuthError = serde_json::from_reader(code_resp)?;
+                        let ms_auth: MsAuthError = code_resp.json().await?;
                         match &ms_auth.error as &str {
                             "authorization_pending" => continue,
                             _ => {
@@ -317,7 +334,7 @@ impl DeviceCode {
                         }
                     }
                     StatusCode::OK => {
-                        let mut ms_auth: MsAuth = serde_json::from_reader(code_resp)?;
+                        let mut ms_auth: MsAuth = code_resp.json().await?;
                         ms_auth.expires_after = ms_auth.expires_in + chrono::Utc::now().timestamp();
                         return Ok(Some(ms_auth));
                     }
@@ -335,25 +352,31 @@ impl DeviceCode {
 
     /// Call this method after creating the device code and having shown the user the code (but only if DeviceCode.cached is false)
     /// It might block for a while if the access token hasn't been cached yet.
-    pub fn authenticate(&self, client: &Client) -> anyhow::Result<Auth> {
+    pub async fn authenticate(&self, client: &Client) -> anyhow::Result<Auth> {
         let path: &Path = Path::new(&self.cache);
         let msa = match self.inner {
             Some(_) => {
-                let msa = self.auth_ms(client)?.unwrap();
+                let msa = self.auth_ms(client).await?.unwrap();
                 msa.write_to(&mut fs::File::create(path)?)?;
                 msa
             }
             None => {
                 let mut msa: MsAuth = MsAuth::read_from(&mut fs::File::open(path)?)?;
-                if msa.refresh(&self.cid, client)? {
+                if msa.refresh(&self.cid, client).await? {
                     msa.write_to(&mut fs::File::create(path)?)?;
                 }
                 msa
             }
         };
-        let mca = msa.auth_xbl(client)?.auth_xsts(client)?.auth_mc(client)?;
+        let mca = msa
+            .auth_xbl(client)
+            .await?
+            .auth_xsts(client)
+            .await?
+            .auth_mc(client)
+            .await?;
 
-        let profile = mca.mc_profile(client)?;
+        let profile = mca.mc_profile(client).await?;
 
         let auth = Auth {
             name: profile.name,
