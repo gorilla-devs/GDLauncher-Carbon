@@ -1,4 +1,6 @@
 ---
+import languages from "@/i18n/languages";
+
 export const getStaticPaths = async () => {
   let mdPosts: any = [];
   let mdxPosts: any = [];
@@ -11,15 +13,25 @@ export const getStaticPaths = async () => {
 
   let posts: any[] = [...(mdPosts || []), ...(mdxPosts || [])];
 
-  return posts.map((post) => ({
-    params: {
-      slug: post.file.substring(post.file.lastIndexOf("/") + 1).split(".")[0],
-      lang: "en",
-    },
-    props: {
-      post,
-    },
-  }));
+  return Object.keys(languages).map((lang) => {
+    let obj = {};
+
+    posts.forEach((post) => {
+      obj = {
+        params: {
+          slug: post.file
+            .substring(post.file.lastIndexOf("/") + 1)
+            .split(".")[0],
+          lang: lang,
+        },
+        props: {
+          post,
+        },
+      };
+    });
+
+    return obj;
+  });
 };
 
 const { Content } = Astro.props.post;
