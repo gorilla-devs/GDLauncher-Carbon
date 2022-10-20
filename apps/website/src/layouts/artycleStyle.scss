@@ -67,6 +67,10 @@ article {
     display: flex;
     justify-content: flex-start;
     align-items: center;
+    .backBtnLink {
+      text-decoration: none;
+    }
+
     .backBtn {
       border-radius: 1rem;
       padding: 1rem;
