@@ -28,9 +28,11 @@ let win: BrowserWindow | null = null;
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: "Main window",
+    title: "GDLauncher Carbon",
     minHeight: 750,
-    minWidth: 1350,
+    height: 750,
+    minWidth: 1360,
+    width: 1360,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
@@ -47,7 +49,7 @@ async function createWindow() {
       userAgent: "GDLauncher Carbon",
     });
   }
-  // win.webContents.openDevTools();
+  win.webContents.openDevTools();
 
   // Test active push message to Renderer-process
   win.webContents.on("did-finish-load", () => {
@@ -97,7 +99,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("second-instance", (e, argv) => {
-  dialog.showErrorBox('Welcome Back', `You arrived from: ${argv}`)
+  dialog.showErrorBox("Welcome Back", `You arrived from: ${argv}`);
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
@@ -105,9 +107,9 @@ app.on("second-instance", (e, argv) => {
   }
 });
 
-app.on('open-url', (event, url) => {
-  dialog.showErrorBox('Welcome Back', `You arrived from: ${url}`)
-})
+app.on("open-url", (event, url) => {
+  dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`);
+});
 
 app.on("activate", () => {
   const allWindows = BrowserWindow.getAllWindows();

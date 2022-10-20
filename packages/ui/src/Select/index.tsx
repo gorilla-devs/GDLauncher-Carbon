@@ -14,7 +14,7 @@ function Select(props: Props) {
   });
 
   const c = children(() => props.children);
-  return <div class={`font-main bg-slate-500`}>{c()}</div>;
+  return <div class={`font-main bg-slate-500 py-5`}>{c()}</div>;
 }
 
 export { Select };

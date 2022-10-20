@@ -18,6 +18,7 @@ export default function Home() {
 
         <div class="flex items-center space-x-2">
           <button
+            w:dark="bg-light-50"
             class="border rounded-lg px-2 border-gray-900"
             onClick={() => setCount(count() - 1)}
           >
@@ -39,11 +40,11 @@ export default function Home() {
         <div class="helloworld">prova</div>
         <button
           onClick={async () => {
-            const res = await napi.fibonacci(1, 2);
-            setValue(res);
+            const res = await napi.auth();
+            // setValue(res);
           }}
         >
-          Compute value
+          Auth
         </button>
         <div />
         {value()}

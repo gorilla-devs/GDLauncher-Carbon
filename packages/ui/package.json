@@ -6,30 +6,35 @@
   "exports": {
     ".": {
       "import": "./dist/ui.es.js"
-    },
-    "./style.css": "./dist/style.css"
+    }
   },
   "scripts": {
     "build": "vite build --",
     "dev": "vite build --watch",
-    "storybook": "start-storybook -p 6006",
+    "test": "vitest run",
+    "storybook": "concurrently \"npm run dev\" \"start-storybook -p 6006\"",
     "build-storybook": "build-storybook"
   },
   "devDependencies": {
-    "@gd/config": "workspace:*",
     "@babel/core": "^7.19.3",
+    "@gd/config": "workspace:*",
     "@storybook/addon-actions": "^6.5.12",
     "@storybook/addon-essentials": "^6.5.12",
     "@storybook/addon-interactions": "^6.5.12",
     "@storybook/addon-links": "^6.5.12",
-    "@storybook/builder-vite": "^0.2.3",
+    "@storybook/builder-vite": "^0.2.4",
     "@storybook/html": "^6.5.12",
     "@storybook/testing-library": "^0.0.13",
+    "@testing-library/jest-dom": "^5.16.5",
     "babel-loader": "^8.2.5",
-    "solid-js": "1.5.4",
-    "typescript": "^4.8.2",
-    "unocss": "^0.45.14",
-    "vite": "^3.0.9",
-    "vite-plugin-dts": "^1.4.1"
+    "concurrently": "^7.4.0",
+    "jsdom": "^20.0.1",
+    "solid-js": "1.5.7",
+    "solid-testing-library": "^0.3.0",
+    "typescript": "^4.8.4",
+    "unocss": "^0.45.29",
+    "vite": "^3.1.8",
+    "vite-plugin-dts": "^1.6.6",
+    "vitest": "^0.24.3"
   }
 }

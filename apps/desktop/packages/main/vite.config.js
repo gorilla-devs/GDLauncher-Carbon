@@ -1,13 +1,13 @@
-import { resolve } from "path";
 import { builtinModules } from "module";
 import { defineConfig } from "vite";
+import { ViteMinifyPlugin } from "vite-plugin-minify";
 import pkg from "../../package.json";
 
 export default defineConfig({
   root: __dirname,
-  envDir: resolve(__dirname, "../../../../"),
+  plugins: [ViteMinifyPlugin({})],
   build: {
-    outDir: "../../dist/preload",
+    outDir: "../../dist/main",
     lib: {
       entry: "index.ts",
       formats: ["cjs"],
@@ -19,9 +19,8 @@ export default defineConfig({
       external: [
         "electron",
         ...builtinModules,
-        ...builtinModules.map((e) => `node:${e}`),
         // ...Object.keys(pkg.dependencies || {}),
       ],
     },
-  }
+  },
 });

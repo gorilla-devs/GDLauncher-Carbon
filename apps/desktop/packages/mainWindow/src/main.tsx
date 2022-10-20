@@ -1,31 +1,33 @@
 /* @refresh reload */
-import { onMount } from "solid-js";
+import { createEffect, onMount } from "solid-js";
 import { render } from "solid-js/web";
-// import LogRocket from "logrocket";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
 import Modals from "./Modals";
-import "@gd/ui/style.css";
 import "virtual:uno.css";
+import "virtual:unocss-devtools";
 import "./utils/napi";
 import initAnalytics from "./utils/analytics";
+import { isModuleLoaded } from "./utils/napi";
 
-// LogRocket.init("hadq3z/mytest");
 queueMicrotask(() => {
   initAnalytics();
 });
 
 render(() => {
-  onMount(() => {
-    window.removeLoading();
+  createEffect(() => {
+    console.log("isModuleLoaded", isModuleLoaded());
+    if (isModuleLoaded() === true) {
+      window.clearState();
+    } else if (isModuleLoaded() instanceof Error) {
+      window.fatalError(isModuleLoaded() as Error);
+    }
   });
 
   return (
-    <>
-      <Router source={hashIntegration()}>
-        <App />
-      </Router>
-    </>
+    <Router source={hashIntegration()}>
+      <App />
+    </Router>
   );
 }, document.getElementById("root") as HTMLElement);
 

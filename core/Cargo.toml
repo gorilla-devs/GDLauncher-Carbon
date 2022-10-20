@@ -7,16 +7,21 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = { version = "2", features = [
-  "tokio_fs",
-  "napi8",
-  "tokio_rt",
-  "async"
-]}
+config = "0.13"
+lazy_static = "1.4.0"
+napi = { version = "2", features = ["tokio_fs", "napi8", "tokio_rt", "async"] }
 futures = "0.3.21"
+anyhow = "1.0.51"
+byteorder = "1.4.3"
+reqwest = { version = "0.11.6", features = ["blocking", "json"] }
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.70"
+base64 = "0.13.0"
+chrono = "0.4.19"
 napi-derive = { version = "2", features = ["type-def"] }
 tokio = "1.19.2"
-murmurhash32 = {git = "https://github.com/gorilla-devs/murmurhash32.git"}
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32.git" }
+thiserror = "1.0.37"
 
 [build-dependencies]
 napi-build = "2.0.1"

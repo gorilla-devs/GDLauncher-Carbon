@@ -1,10 +1,10 @@
-/// <reference types="vitest" />
-/// <reference types="vite/client" />
-
 import { resolve, join } from "path";
-import { defineConfig } from "vite";
+import { defineConfig, Plugin } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
+import { ViteMinifyPlugin } from "vite-plugin-minify";
+import presetAttributify from "@unocss/preset-attributify";
+import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
 
 /**
@@ -13,7 +13,20 @@ import pkg from "../../package.json";
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [solidPlugin(), Unocss()],
+  plugins: [
+    solidPlugin(),
+    Unocss({
+      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+      presets: [
+        presetAttributify({
+          prefix: "w:",
+          prefixedOnly: true,
+        }),
+        presetWind(),
+      ],
+    }),
+    ViteMinifyPlugin({})
+  ],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   build: {
@@ -26,23 +39,8 @@ export default defineConfig({
     alias: {
       "@": join(__dirname, "src"),
     },
-    conditions: ["development", "browser"],
   },
   server: {
     port: pkg.env.PORT,
   },
-  test: {
-    environment: "jsdom",
-    transformMode: {
-      web: [/.[jt]sx?/],
-    },
-    globals: true,
-    deps: {
-      registerNodeLoader: true,
-      inline: [/solid-testing-library/],
-    },
-    // threads: false,
-    // isolate: false,
-  },
 });
-
