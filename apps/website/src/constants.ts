@@ -4,7 +4,7 @@ export const APP_URLS = {
     discord: "https://discord.com/invite/3WjYJTBcSz",
     github: "https://github.com/gorilla-devs/GDLauncher",
     instagram: "https://www.instagram.com/gdlauncher",
-    twitter: "https://twitter.com/gdlauncher"
+    twitter: "https://twitter.com/gdlauncher",
   },
   maillist: "https://fastapi-production-354a.up.railway.app",
   kofi: "https://ko-fi.com/gdlauncher",
@@ -14,6 +14,7 @@ export const APP_URLS = {
       "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-mac-setup.dmg",
     linux:
       "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage",
+    releases: "https://github.com/gorilla-devs/GDLauncher/releases",
   },
 };
 

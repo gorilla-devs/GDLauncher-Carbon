@@ -25,7 +25,7 @@ const urls = {
   [OS.windows]: APP_URLS.download.win,
   [OS.macos]: APP_URLS.download.macOs,
   [OS.linux]: APP_URLS.download.linux,
-  [OS.none]: "",
+  [OS.none]: APP_URLS.download.releases,
 };
 
 const labels: ILabels = {
@@ -56,13 +56,13 @@ const Dropdown = (props: Props) => {
   });
 
   return (
-    <div class="relative max-w-[300px] bg-slate-600 rounded-2xl">
+    <div class="relative max-w-[300px] bg-slate-600 rounded-2xl w-[300px] h-[80px]">
       {open() && (
         <div class="absolute top-0 left-0 right-0 bottom-0 bg-slate-600 -z-10 rounded-t-2xl" />
       )}
       <div
         onclick={() => setOpen(!open())}
-        class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer z-10 ${
+        class={`flex justify-between items-center font-main text-white font-bold py-4 px-10 rounded-2xl bg-[#2b6cb0] cursor-pointer z-10 w-[300px] h-[80px] ${
           props.class || ""
         }`}
       >
