@@ -51,11 +51,11 @@ const t = useTranslations(Astro.url.pathname);
         }
         <a
           class={`waitlistLink ${
-            globalThis?.location?.pathname === "/waitlist" ? "selected" : ""
+            globalThis?.location?.pathname === "/maillist" ? "selected" : ""
           }`}
-          href={localizePath("/waitlist", lang)}
+          href={localizePath("/maillist", lang)}
         >
-          {t("navbar.waitlist")}
+          {t("navbar.maillist")}
         </a>
         <a class="button">
           {lang && <LanguageSelect lang={lang} client:idle />}
@@ -85,11 +85,11 @@ const t = useTranslations(Astro.url.pathname);
     }
     <a
       class={`waitlistLink ${
-        globalThis?.location?.pathname === "/waitlist" ? "selected" : ""
+        globalThis?.location?.pathname === "/maillist" ? "selected" : ""
       }`}
-      href={localizePath("/waitlist", lang)}
+      href={localizePath("/maillist", lang)}
     >
-      {t("navbar.waitlist")}
+      {t("navbar.maillist")}
     </a>
     {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">

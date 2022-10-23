@@ -5,11 +5,6 @@ import { ADD_USER_ENDPOINT } from "@/constants";
 import { useTranslations } from "@/i18n/utils";
 import { createSignal, Show } from "solid-js";
 import { useForm } from "../../../components/useForm";
-interface IForm {
-  email: string;
-  emailMc: string;
-  emailKofi: string;
-}
 
 const WaitList = ({ pathname }: { pathname: string }) => {
   const { form, updateFormField } = useForm();
@@ -39,19 +34,18 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     if (form.email && form.emailMc && form.emailKofi) {
       obj["user_email"] = form.email;
       obj["mc_email"] = form.emailMc;
-      obj["kofi_email"] = form.emailKofi;
 
       const res = await addUser(obj);
       console.log("res", res.status, res);
       if (res.status === 401) {
-        setError(t("waitlist.error_401"));
+        setError(t("maillist.error_401"));
       } else if (res.status === 400) {
-        setError(t("waitlist.error_400"));
+        setError(t("maillist.error_400"));
       } else if (res.status === 200) {
-        setSuccess(t("waitlist.success"));
+        setSuccess(t("maillist.success"));
       }
     } else {
-      setError(t("waitlist.error_missing_info"));
+      setError(t("maillist.error_missing_info"));
     }
     setLoading(false);
   };
@@ -60,37 +54,29 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     <div class="pt-10 lg:h-screen relative flex flex-col justify-center items-center">
       <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
-          {t("waitlist.title")}
+          {t("maillist.title")}
           <span class="inline-block px-4 text-yellow-500 -rotate-12 hover:rotate-0 transition-transform underline">
-            {t("waitlist.title2")}
+            {t("maillist.title2")}
           </span>
-          {t("waitlist.title3")}
+          {t("maillist.title3")}
         </h1>
         <p class="text-xl lg:text-3xl font-thin max-w-xs lg:max-w-4xl">
-          {t("waitlist.text")}
+          {t("maillist.text")}
         </p>
         <form onSubmit={handleSubmit} method="post">
           <div class="flex flex-col justify-center items-center gap-10">
-            <div class="w-full">
+            <div class="flex flex-col lg:flex-row gap-10">
               <Input
-                placeholder={t("waitlist.email")}
+                placeholder={t("maillist.email")}
                 type="email"
                 value={form.email}
                 onChange={updateFormField("email")}
               />
-            </div>
-            <div class="flex flex-col lg:flex-row gap-10">
               <Input
-                placeholder={t("waitlist.mc_email")}
+                placeholder={t("maillist.mc_email")}
                 type="email"
                 value={form.emailMc}
                 onChange={updateFormField("emailMc")}
-              />
-              <Input
-                placeholder={t("waitlist.kofi_email")}
-                type="email"
-                value={form.emailKofi}
-                onChange={updateFormField("emailKofi")}
               />
             </div>
             <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
@@ -98,7 +84,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 <Show when={loading()}>
                   <LoadingSpinner />
                 </Show>
-                {t("waitlist.getAccess")}
+                {t("maillist.getAccess")}
               </>
             </Button>
             <div class="h-[100px]">
