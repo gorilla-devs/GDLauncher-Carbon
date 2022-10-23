@@ -19,14 +19,14 @@ const { lang } = Astro.params;
         <p>
           {t("footer.text")}
         </p>
-        <a href={localizePath("/waitlist", lang?.toString() || "en")}>
+        <a href={localizePath("/maillist", lang?.toString() || "en")}>
           <Button
             style={{
               "max-width": "300px",
               "background-color": "#16a34a",
               "font-size": "1rem;",
             }}
-            >{t("waitlist.subscribe")}
+            >{t("maillist.subscribe")}
           </Button>
         </a>
       </div>
@@ -38,7 +38,7 @@ const { lang } = Astro.params;
         <a href={localizePath("/team", lang?.toString() || "en")}
           >{t("footer.team")}
         </a>
-        <a href={localizePath("/hiring", lang?.toString() || "en")}
+        <a href={localizePath("/careers", lang?.toString() || "en")}
           >{t("footer.hiring")}</a
         >
         <!-- <a>{t("footer.contact")}</a> -->

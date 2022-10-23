@@ -89,21 +89,21 @@ export default {
   "download.linux": "Download for Linux",
   "download.none": "Select your operative system",
   "download.retry": "retry.",
-  "waitlist.title": "Subscribe to get early access to the",
-  "waitlist.title2": "NEW",
-  "waitlist.title3": "GDLauncher",
-  "waitlist.text":
+  "maillist.title": "Subscribe to keep updated about the the",
+  "maillist.title2": "NEW",
+  "maillist.title3": "GDLauncher",
+  "maillist.text":
     "Enter your Email, Minecraft email and Ko-fi email (if it's different from the first email entered).",
-  "waitlist.getAccess": "GET EARLY ACCESS",
-  "waitlist.subscribe": "Subscribe to the waitlist",
-  "waitlist.mc_email": "Minecraft Email",
-  "waitlist.email": "Email",
-  "waitlist.kofi_email": "Kofi Email",
-  "waitlist.error_401": "Pending verification, verify your email!",
-  "waitlist.error_400":
+  "maillist.getAccess": "GET EARLY ACCESS",
+  "maillist.subscribe": "Subscribe to the maillist",
+  "maillist.mc_email": "Minecraft Email",
+  "maillist.email": "Email",
+  "maillist.kofi_email": "Kofi Email",
+  "maillist.error_401": "Pending verification, verify your email!",
+  "maillist.error_400":
     "You already subscribed, one of your email was already used!",
-  "waitlist.error_missing_info":
+  "maillist.error_missing_info":
     "Please enter all the info, some of the them are missing.",
-  "waitlist.success": "You successfully subscribed to the waitlist",
+  "maillist.success": "You successfully subscribed to the maillist",
   "blog.title": "The GDLauncher Blog",
 };

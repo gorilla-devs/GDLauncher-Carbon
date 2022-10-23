@@ -29,6 +29,7 @@
     "electron-playwright-helpers": "^1.2.0",
     "electron-updater": "^5.3.0",
     "event-lite": "^0.1.2",
+    "jsdom": "^20.0.1",
     "logrocket": "3.0.1",
     "playwright": "^1.27.1",
     "solid-js": "^1.5.7",

@@ -28,7 +28,7 @@ const t = useTranslations(Astro.url.pathname);
     <Navbar currentPage={currentPage} />
     <main class="articleMainWrapper">
       <div class="backBtnContainer">
-        <a href={localizePath("/blog", lang?.toString() || "en")}>
+        <a class="backBtnLink" href={localizePath("/blog", lang?.toString() || "en")}>
           <div class="backBtn">
             <ArrowBackIcon /><span>{t("generic.backBtn")}</span>
           </div>

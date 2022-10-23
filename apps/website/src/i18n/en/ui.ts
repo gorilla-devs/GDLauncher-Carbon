@@ -21,7 +21,7 @@ export default {
   "navbar.github": "Github",
   "navbar.discord": "Discord",
   "navbar.blog": "Blog",
-  "navbar.waitlist": "Waitlist",
+  "navbar.maillist": "Waitlist",
   "home.title": "GDLauncher",
   "home.createYourOwn": "Create your own!",
   "home.createYourOwn_text1":
@@ -74,7 +74,7 @@ export default {
   "footer.about": "About",
   "footer.features": "Features",
   "footer.team": "Team",
-  "footer.hiring": "Hiring",
+  "footer.hiring": "Careers",
   "footer.timeline": "Timeline",
   "footer.contact": "Contact",
   "footer.windows": "Windows",
@@ -92,22 +92,22 @@ export default {
   "download.linux": "Download for Linux",
   "download.none": "Select your operative system",
   "download.retry": "retry.",
-  "waitlist.title": "Subscribe to get early access to the",
-  "waitlist.title2": "NEW",
-  "waitlist.title3": "GDLauncher",
-  "waitlist.text":
-    "Enter your Email, Minecraft email and Ko-fi email (if it's different from the first email entered).",
-  "waitlist.getAccess": "GET EARLY ACCESS",
-  "waitlist.subscribe": "Subscribe to the waitlist",
-  "waitlist.mc_email": "Minecraft Email",
-  "waitlist.email": "Email",
-  "waitlist.kofi_email": "Kofi Email",
-  "waitlist.error_401": "Pending verification, verify your email!",
-  "waitlist.error_400":
+  "maillist.title": "Subscribe to keep updated about the",
+  "maillist.title2": "NEW",
+  "maillist.title3": "GDLauncher",
+  "maillist.text":
+    "Enter your Email and Minecraft email (if it's different from the first email entered).",
+  "maillist.getAccess": "SUBSCRIBE NOW!",
+  "maillist.subscribe": "Subscribe to the maillist",
+  "maillist.mc_email": "Minecraft Email",
+  "maillist.email": "Email",
+  "maillist.kofi_email": "Kofi Email",
+  "maillist.error_401": "Pending verification, verify your email!",
+  "maillist.error_400":
     "You already subscribed, one of your email was already used!",
-  "waitlist.error_missing_info":
+  "maillist.error_missing_info":
     "Please enter all the info, some of the them are missing.",
-  "waitlist.success": "You successfully subscribed to the waitlist",
+  "maillist.success": "You successfully subscribed to the maillist",
   "blog.title": "The GDLauncher Blog",
   "timeline.title": "Years in the Making",
   "timeline.subtitle": "The progression of the GDLauncher and its predecessors",
@@ -124,4 +124,6 @@ export default {
     "The GDLauncher takes on a new and modern design features Curseforge integrations, massive UI changes, and one-of-a-kind features.",
   "timeline.2022": "2022",
   "timeline.2022_title": "New Launcher",
+  "careers.title": "Working at GDLauncher",
+  "careers.text": "GDLauncher is looking for amazing people to join the team!",
 };
