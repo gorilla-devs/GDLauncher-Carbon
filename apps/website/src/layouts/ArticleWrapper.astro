@@ -2,6 +2,7 @@
 import HeadCommon from "@/components/HeadCommon.astro";
 import Navbar from "@/components/Navbar/index.astro";
 import Footer from "@/components/Footer/index.astro";
+import ArticleInteractiveMarkdown from "@/components/ArticleInteractiveMarkdown";
 const url = new URL(Astro.request.url);
 const currentPage = url.pathname;
 const { frontmatter } = Astro.props;
@@ -28,7 +29,10 @@ const t = useTranslations(Astro.url.pathname);
     <Navbar currentPage={currentPage} />
     <main class="articleMainWrapper">
       <div class="backBtnContainer">
-        <a class="backBtnLink" href={localizePath("/blog", lang?.toString() || "en")}>
+        <a
+          class="backBtnLink"
+          href={localizePath("/blog", lang?.toString() || "en")}
+        >
           <div class="backBtn">
             <ArrowBackIcon /><span>{t("generic.backBtn")}</span>
           </div>
@@ -38,7 +42,10 @@ const t = useTranslations(Astro.url.pathname);
       <h5 class="mainSubtitle">
         Written on {frontmatter.date} by {frontmatter.author}
       </h5>
-      <slot />
+      <ArticleInteractiveMarkdown client:idle />
+      <div id="articleContainer">
+        <slot />
+      </div>
     </main>
     <div class="socialsContainer">
       <div class="socialsInnerContainer">
