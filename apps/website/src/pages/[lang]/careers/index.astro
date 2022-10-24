@@ -38,14 +38,14 @@ const t = useTranslations(Astro.url.pathname);
     <div class="text-slate-100 mt-8 mb-12 text-5xl lg:text-base">
       {t("careers.text")}
     </div>
-    <a
+    <!-- <a
       href={localizePath("/fe", lang?.toString() || "en")}
       class="transition ease-in-out border-slate-300 border-2 hover:bg-gray-800 rounded mb-16 lg:mb-4 text-slate-400 px-16 py-32 lg:p-8 w-full lg:w-80 text-5xl lg:text-base flex items-center justify-between"
     >
       Front End Engineer <ArrowRight
         class="ease-linear duration-100 w-4 h-4 -rotate-180"
       />
-    </a>
+    </a> -->
     <a
       href={localizePath("/rust", lang?.toString() || "en")}
       class="transition ease-in-out border-slate-300 border-2 hover:bg-gray-800 rounded mb-16 lg:mb-4 text-slate-400 px-16 py-32 lg:p-8 w-full lg:w-80 text-5xl lg:text-base flex items-center justify-between"
@@ -54,13 +54,13 @@ const t = useTranslations(Astro.url.pathname);
         class="ease-linear duration-100 w-4 h-4 -rotate-180"
       />
     </a>
-    <a
+    <!-- <a
       href={localizePath("/design", lang?.toString() || "en")}
       class="transition ease-in-out border-slate-300 border-2 hover:bg-gray-800 rounded mb-16 lg:mb-4 text-slate-400 px-16 py-32 lg:p-8 w-full lg:w-80 text-5xl lg:text-base flex items-center justify-between"
     >
       UI / UX Designer <ArrowRight
         class="ease-linear duration-100 w-4 h-4 -rotate-180"
       />
-    </a>
+    </a> -->
   </div>
 </CenteredWrapper>
