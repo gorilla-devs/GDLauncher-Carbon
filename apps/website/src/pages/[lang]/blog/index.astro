@@ -5,6 +5,7 @@ import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import ArticleCard from "@/components/ArticleCard/index.astro";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 import { localizePath } from "@/utils/helpers";
+import SEO from "@/components/SEO/index.astro";
 
 export const getStaticPaths = async () => {
   let mdPosts: any = [];
@@ -39,6 +40,10 @@ const { lang } = Astro.params;
 const t = useTranslations(Astro.url.pathname);
 ---
 
+<SEO
+  title="GDLauncher - Blog"
+  description="Here you can keep yourself updated about GDLauncher, reading our articles!"
+/>
 <MainWrapper>
   <div
     class="relative flex flex-col justify-between items-center pt-32 lg:pt-50 pb-10 box-border bg-no-repeat"

@@ -4,11 +4,17 @@ import DonateKofiSection from "@/components/DonateKofiSection/index.astro";
 import PartnerSection from "@/components/PartnerSection/index.astro";
 import languages from "@/i18n/languages";
 import MainWrapper from "@/layouts/MainWrapper.astro";
+import SEO from "@/components/SEO/index.astro";
+
 
 export const getStaticPaths = () => {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
 };
 ---
+<SEO
+  title="GDLauncher - Downloads"
+  description="Here you can download the right version of GDLauncher for your operative sistem"
+/>
 
 <MainWrapper>
   <div>

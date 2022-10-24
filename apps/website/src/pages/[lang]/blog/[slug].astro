@@ -1,5 +1,6 @@
 ---
 import languages from "@/i18n/languages";
+import SEO from "@/components/SEO/index.astro";
 
 export const getStaticPaths = async () => {
   let mdPosts: any = [];
@@ -35,8 +36,13 @@ export const getStaticPaths = async () => {
 };
 
 const { Content } = Astro.props.post;
+const { frontmatter } = Astro.props.post;
 ---
 
+<SEO
+  title={`GDLauncher - Article - ${frontmatter.title}`}
+  description={frontmatter.description}
+/>
 <article>
   <Content />
 </article>

@@ -8,6 +8,7 @@ import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
 import languages from "@/i18n/languages";
 import CaretIcon from "@/components/Icons/CaretIcon";
+import SEO from "@/components/SEO/index.astro";
 
 export function getStaticPaths() {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
@@ -18,6 +19,11 @@ const { lang } = Astro.params;
 // @ts-ignore
 const t = useTranslations(Astro.url.pathname);
 ---
+
+<SEO
+  title="GDLauncher - Home"
+  description="GDLauncher home page"
+/>
 
 <MainWrapper>
   <div class="h-auto relative">

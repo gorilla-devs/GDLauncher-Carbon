@@ -2,12 +2,19 @@
 import languages from "@/i18n/languages";
 import MainWrapper from "@/layouts/MainWrapper.astro";
 import WaitList from "./MailList";
+import SEO from "@/components/SEO/index.astro";
+
 
 export function getStaticPaths() {
     return Object.keys(languages).map((lang) => ({ params: { lang } }));
 }
 
 ---
+
+<SEO
+  title="GDLauncher - Mailing list"
+  description="GDLauncher mailing list"
+/>
 
 <MainWrapper>
     <WaitList client:idle pathname={Astro.url.pathname}/>
