@@ -26,6 +26,8 @@ function Button(props: Props) {
         "text-decoration": "none",
         "font-weight": "bold",
         height: "60px",
+        border: 0,
+        "box-sizing": "border-box",
         ...props.style,
       }}
     >

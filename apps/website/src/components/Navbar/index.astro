@@ -50,7 +50,7 @@ const t = useTranslations(Astro.url.pathname);
           ))
         }
         <a
-          class={`waitlistLink ${
+          class={`maillistLink ${
             globalThis?.location?.pathname === "/maillist" ? "selected" : ""
           }`}
           href={localizePath("/maillist", lang)}
@@ -84,7 +84,7 @@ const t = useTranslations(Astro.url.pathname);
       ))
     }
     <a
-      class={`waitlistLink ${
+      class={`maillistLink ${
         globalThis?.location?.pathname === "/maillist" ? "selected" : ""
       }`}
       href={localizePath("/maillist", lang)}
@@ -118,7 +118,7 @@ const t = useTranslations(Astro.url.pathname);
     max-width: 100vw;
   }
 
-  .waitlistLink {
+  .maillistLink {
     color: #16a34a !important;
     text-decoration: underline !important;
     text-decoration-thickness: 2px !important;

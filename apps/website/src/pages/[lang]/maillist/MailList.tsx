@@ -33,7 +33,6 @@ const WaitList = ({ pathname }: { pathname: string }) => {
 
     if (form.email && form.emailMc && form.emailKofi) {
       obj["user_email"] = form.email;
-      obj["mc_email"] = form.emailMc;
 
       const res = await addUser(obj);
       console.log("res", res.status, res);
@@ -65,28 +64,22 @@ const WaitList = ({ pathname }: { pathname: string }) => {
         </p>
         <form onSubmit={handleSubmit} method="post">
           <div class="flex flex-col justify-center items-center gap-10">
-            <div class="flex flex-col lg:flex-row gap-10">
+            <div class="flex flex-col gap-10">
               <Input
                 placeholder={t("maillist.email")}
                 type="email"
                 value={form.email}
                 onChange={updateFormField("email")}
               />
-              <Input
-                placeholder={t("maillist.mc_email")}
-                type="email"
-                value={form.emailMc}
-                onChange={updateFormField("emailMc")}
-              />
+              <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
+                <>
+                  <Show when={loading()}>
+                    <LoadingSpinner />
+                  </Show>
+                  {t("maillist.getAccess")}
+                </>
+              </Button>
             </div>
-            <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
-              <>
-                <Show when={loading()}>
-                  <LoadingSpinner />
-                </Show>
-                {t("maillist.getAccess")}
-              </>
-            </Button>
             <div class="h-[100px]">
               <Show when={error()}>
                 <div class="p-10 text-red-400">{error()}</div>
