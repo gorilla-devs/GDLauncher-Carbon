@@ -42,10 +42,10 @@ const t = useTranslations(Astro.url.pathname);
       <h5 class="mainSubtitle">
         Written on {frontmatter.date} by {frontmatter.author}
       </h5>
-      <ArticleInteractiveMarkdown client:idle />
+      <!-- <ArticleInteractiveMarkdown client:idle />
       <div id="articleContainer">
         <slot />
-      </div>
+      </div> -->
     </article>
     <div class="socialsContainer">
       <div class="socialsInnerContainer">
