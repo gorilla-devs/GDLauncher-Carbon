@@ -123,7 +123,7 @@ article {
 
 @media (min-width: 768px) {
   .articleMainWrapper {
-    margin-top: 10rem;
+    margin-top: 0;
     p,
     ul,
     li {
@@ -143,3 +143,8 @@ article {
   }
 }
 
+@media (min-width: 1024px) {
+  .articleMainWrapper {
+    margin-top: 10rem;
+  }
+}
