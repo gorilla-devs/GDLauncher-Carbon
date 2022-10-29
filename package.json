@@ -7,7 +7,7 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "prebuild": "test \"$CI\" = true && npx pnpm install --store=node_modules/.pnpm-store || echo skipping pnpm install && npx pnpm build-web",
+    "prebuild": "npm i -g pnpm@7.14.0 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i && pnpm build-web",
     "dev-app": "turbo run dev --filter=!@gd/web",
     "test": "turbo run test",
     "build-linux-x64": "turbo run build --filter=!@gd/web --filter=!@gd/core -- --x64 --linux",
@@ -21,5 +21,6 @@
   },
   "devDependencies": {
     "turbo": "^1.5.6"
-  }
+  },
+  "packageManager": "pnpm@7.14.0"
 }
