@@ -7,7 +7,7 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "prebuild": "npx pnpm install --store=node_modules/.pnpm-store || echo skipping pnpm install && npx pnpm build-web",
+    "prebuild": "npx pnpm install --store=node_modules/.pnpm-store && pnpm build-web",
     "dev-app": "turbo run dev --filter=!@gd/web",
     "test": "turbo run test",
     "build-linux-x64": "turbo run build --filter=!@gd/web --filter=!@gd/core -- --x64 --linux",
