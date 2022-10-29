@@ -27,6 +27,8 @@ const ArticleInteractiveMarkdown = () => {
     const container = document.querySelector("#articleContainer");
     const tableList = document.getElementById("tableList");
 
+    if (container) (container as any).style.cursor = "pointer";
+
     container?.querySelectorAll("h1").forEach((item) => {
       item.style.cursor = "pointer";
       item.style.maxWidth = "fit-content";
@@ -59,11 +61,11 @@ const ArticleInteractiveMarkdown = () => {
       div.style.opacity = "0";
       div.style.width = "40px";
       div.style.height = "100%";
-      div.style.position = "absolute" 
-      div.style.left = "-2.5rem" 
-      div.style.display = "flex" 
-      div.style.justifyContent = "center" 
-      div.style.alignItems = "center" 
+      div.style.position = "absolute";
+      div.style.left = "-2.5rem";
+      div.style.display = "flex";
+      div.style.justifyContent = "center";
+      div.style.alignItems = "center";
 
       item.onmouseenter = () => {
         div.style.opacity = "1";
