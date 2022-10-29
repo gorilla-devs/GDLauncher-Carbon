@@ -2,7 +2,7 @@ import languages from "../../i18n/languages";
 import { Component } from "solid-js";
 
 const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
-
+  console.log("LANG", lang);
   return (
     <div
       style={{
@@ -36,12 +36,12 @@ const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
             <span>{name}</span>
           </option>
         ))} */}
-          <option value={"en"}>
-            <span>English</span>
-          </option>
-          <option value={"it"}>
-            <span>Italiano</span>
-          </option>
+        <option value={"en"}>
+          <span>English</span>
+        </option>
+        <option value={"it"}>
+          <span>Italiano</span>
+        </option>
       </select>
     </div>
   );
