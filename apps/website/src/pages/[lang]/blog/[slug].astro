@@ -16,7 +16,7 @@ export const getStaticPaths = async () => {
 
   return Object.keys(languages).map((lang) => {
     let obj = {};
-
+    console.log("TEST", lang);
     posts.forEach((post) => {
       obj = {
         params: {
