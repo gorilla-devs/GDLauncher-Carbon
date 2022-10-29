@@ -16,6 +16,7 @@ export interface Props {
 const { currentPage } = Astro.props as Props;
 const lang = currentPage && getLanguageFromURL(currentPage);
 const t = useTranslations(Astro.url.pathname);
+console.log("TT", lang, currentPage);
 ---
 
 <Interactivity client:load />
@@ -58,7 +59,7 @@ const t = useTranslations(Astro.url.pathname);
           {t("navbar.newsletter")}
         </a>
         <a class="button">
-          {lang && <LanguageSelect lang={lang} client:idle />}
+          {lang && <LanguageSelect lang={lang} client:load />}
         </a>
       </div>
     </div>
@@ -91,7 +92,7 @@ const t = useTranslations(Astro.url.pathname);
     >
       {t("navbar.newsletter")}
     </a>
-    {lang && <LanguageSelect lang={lang} client:idle />}
+    {lang && <LanguageSelect lang={lang} client:load />}
     <div class="block">
       <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
