@@ -59,7 +59,7 @@ console.log("TT", lang, currentPage);
           {t("navbar.newsletter")}
         </a>
         <a class="button">
-          {lang && <LanguageSelect lang={lang} client:load />}
+          {lang && <LanguageSelect lang={lang} client:idle />}
         </a>
       </div>
     </div>
@@ -92,7 +92,7 @@ console.log("TT", lang, currentPage);
     >
       {t("navbar.newsletter")}
     </a>
-    {lang && <LanguageSelect lang={lang} client:load />}
+    {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">
       <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>

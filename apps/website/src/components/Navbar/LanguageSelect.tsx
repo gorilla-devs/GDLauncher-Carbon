@@ -40,9 +40,7 @@ const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
         }}
       >
         {Object.entries(languages).map(([code, name]) => (
-          <option value={code}>
-            <span>{name}</span>
-          </option>
+          <option value={code}>LANG</option>
         ))}
       </select>
     </div>
