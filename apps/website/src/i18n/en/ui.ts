@@ -92,7 +92,7 @@ export default {
   "download.downloading_text":
     "The GDLauncher is currently downloading, if you’re having issues with the download, click here to",
   "download.text": "You can start playing GDLauncher downloading it here!",
-  "download.windows": "Download for windows",
+  "download.windows": "Download for Windows",
   "download.macos": "Download for Mac",
   "download.linux": "Download for Linux",
   "download.none": "Select your operative system",

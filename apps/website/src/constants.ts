@@ -18,5 +18,5 @@ export const APP_URLS = {
   },
 };
 
-export const SUPPORTED_LANGUAGES = ["en", "it"];
+export const SUPPORTED_LANGUAGES = ["en"];
 export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/add`;
