@@ -86,6 +86,8 @@ const ArticleInteractiveMarkdown = () => {
         subLi.onclick = () => {
           const subItemId = subItem.id;
           history.pushState({}, "", url + "#" + subItemId);
+
+          subItem.scrollIntoView({ behavior: "smooth" });
         };
 
         ul.appendChild(subLi);
@@ -101,6 +103,8 @@ const ArticleInteractiveMarkdown = () => {
         li.onclick = () => {
           const id = item.id;
           history.pushState({}, "", url + "#" + id);
+          item.scrollIntoView({ behavior: "smooth" });
+
         };
       }
 
