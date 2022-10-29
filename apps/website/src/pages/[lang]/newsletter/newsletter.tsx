@@ -61,7 +61,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
         </p>
         <form onSubmit={handleSubmit} method="post">
           <div class="flex flex-col justify-center items-center gap-10">
-            <div class="flex lg:flex-row gap-10">
+            <div class="flex flex-col lg:flex-row gap-10">
               <Input
                 placeholder={t("newsletter.email")}
                 type="email"
