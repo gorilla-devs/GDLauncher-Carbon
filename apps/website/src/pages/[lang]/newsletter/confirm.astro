@@ -2,9 +2,8 @@
 import SEO from "@/components/SEO/index.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import languages from "@/i18n/languages";
-import CenteredWrapper from "@/layouts/CenteredWrapper.astro";
 import { useTranslations } from "@/i18n/utils";
-import MainWrapper from "@/layouts/MainWrapper.astro";
+import BasicLayout from "@/layouts/BasicLayout.astro";
 
 export const getStaticPaths = () => {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
@@ -18,17 +17,19 @@ const t = useTranslations(Astro.url.pathname);
   description="You have successfully subscribed to the GDLauncher newsletter!"
 />
 
-<MainWrapper>
-  <div class="flex justify-center flex-col items-center pt-20 lg:pt-32 px-10">
+<BasicLayout>
+  <div class="flex justify-center flex-col items-center pt-20 lg:pt-26 px-10 h-screen overflow-hidden gap-5 lg:gap-auto">
     <h1
       class="flex flex-col lg:block text-4xl lg:text-7xl font-bold text-center max-w-[1000px]"
     >
       {t("newsletter.confirm.title")}
     </h1>
-    <img
-      src={composeCDNAssetLink("gorilla_email.png")}
-      alt="logo"
-      class="w-full"
-    />
+    <div class="h-full">
+      <img
+        src={composeCDNAssetLink("gorilla_email.png")}
+        alt="logo"
+        class="w-full"
+      />
+    </div>
   </div>
-</MainWrapper>
+</BasicLayout>

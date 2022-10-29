@@ -46,7 +46,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   };
 
   return (
-    <div class="pt-10 pb-10 lg:pb-0 lg:h-screen relative flex flex-col justify-center items-center">
+    <div class="pt-10 pb-10 lg:pb-0 h-screen relative flex flex-col justify-center items-center">
       <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
           {t("newsletter.title")}
