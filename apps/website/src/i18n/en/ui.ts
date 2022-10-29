@@ -66,8 +66,7 @@ export default {
   "team.member_davide_text":
     "Here below you can meet our dream team working on making gdlauncher great!",
   "team.member_gianmarco": "Gianmarco | Co-Founder",
-  "team.member_gianmarco_text":
-    "Here below you can meet our dream team working on making gdlauncher great!",
+  "team.member_gianmarco_text": "Our Front-end Engineer and Magic Designer.",
   "team.member_valentin": "Valentin | Co-Founder",
   "team.member_valentin_text":
     "Here below you can meet our dream team working on making gdlauncher great!",
