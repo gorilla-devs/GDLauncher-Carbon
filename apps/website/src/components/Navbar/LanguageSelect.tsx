@@ -2,6 +2,8 @@ import languages from "../../i18n/languages";
 import { Component } from "solid-js";
 
 const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
+  console.log("lang", lang, languages, Object.entries(languages));
+
   return (
     <div
       style={{
@@ -18,7 +20,7 @@ const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
           color: "white",
           "font-size": "100%",
         }}
-        value={lang}
+        value={lang || "en"}
         aria-label="Select language"
         onChange={(e) => {
           const newLang = e.currentTarget.value;
