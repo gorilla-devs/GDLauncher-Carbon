@@ -59,7 +59,7 @@ export default {
   "team.title": "Meet the Team",
   "team.team_title": "The Team",
   "team.text":
-    "Here below you can meet our dream team working on making gdlauncher great!",
+    "Here below you can meet our wonderful team working on making GDLauncher great!",
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
   "team.member_davide": "Davide | Founder | 25",
@@ -119,18 +119,18 @@ export default {
   "timeline.title": "Years in the Making",
   "timeline.subtitle": "The progression of the GDLauncher and its predecessors",
   "timeline.2014": "2014",
-  "timeline.2014_title": "Initial Launch",
+  "timeline.2014_title": "Davide started experimenting with writing a C# launcher",
   "timeline.2015": "2015",
-  "timeline.2015_title": "Interface Update",
+  "timeline.2015_title": "Davide rewrote the launcher (still in C#) but with some better designs",
   "timeline.2016": "2016",
-  "timeline.2016_title": "Beta Launcher Release",
+  "timeline.2016_title": "Yet another C# rewrite",
   "timeline.2018": "2018",
-  "timeline.2018_title": "The GD Rebrand",
+  "timeline.2018_title": "First Electron rewrite (Gianmarco joined development here)",
   "timeline.2019": "2019",
   "timeline.2019_title":
     "The GDLauncher takes on a new and modern design features Curseforge integrations, massive UI changes, and one-of-a-kind features.",
   "timeline.2022": "2022",
-  "timeline.2022_title": "New Launcher",
+  "timeline.2022_title": "GDLauncher Carbon Rewrite",
   "careers.title": "Working at GDLauncher",
   "careers.text": "GDLauncher is looking for amazing people to join the team!",
 };
