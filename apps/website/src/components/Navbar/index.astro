@@ -59,11 +59,11 @@ const t = useTranslations(Astro.url.pathname);
           {t("navbar.newsletter")}
         </a>
         <a class="button">
-          {
+          <!-- {
             lang && !langSelectorDisabled && (
               <LanguageSelect lang={lang} client:idle />
             )
-          }
+          } -->
         </a>
       </div>
     </div>
@@ -96,11 +96,11 @@ const t = useTranslations(Astro.url.pathname);
     >
       {t("navbar.newsletter")}
     </a>
-    {
+    <!-- {
       lang && !langSelectorDisabled && (
         <LanguageSelect lang={lang} client:idle />
       )
-    }
+    } -->
     <div class="block">
       <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
