@@ -1,0 +1,34 @@
+---
+import SEO from "@/components/SEO/index.astro";
+import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import languages from "@/i18n/languages";
+import CenteredWrapper from "@/layouts/CenteredWrapper.astro";
+import { useTranslations } from "@/i18n/utils";
+
+export const getStaticPaths = () => {
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
+};
+
+const t = useTranslations(Astro.url.pathname);
+---
+
+<SEO
+  title="GDLauncher - Successfully subscribed to the newsletter"
+  description="You have successfully subscribed to the GDLauncher newsletter!"
+/>
+
+<CenteredWrapper>
+  <div class="flex justify-center flex-col items-center">
+    <div>
+      <img
+        src={composeCDNAssetLink("gdlauncher_wide_logo_blue.svg")}
+        alt="logo"
+        class="cursor-pointer h-32 lg:h-16 my-8 inline flex lg:hidden"
+      />
+    </div>
+    <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold text-center max-w-[1000px]">
+      {t("newsletter.confirm.title")}
+    </h1>
+    <img  />
+  </div>
+</CenteredWrapper>

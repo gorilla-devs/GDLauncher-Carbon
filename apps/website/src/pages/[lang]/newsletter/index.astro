@@ -1,7 +1,7 @@
 ---
 import languages from "@/i18n/languages";
 import MainWrapper from "@/layouts/MainWrapper.astro";
-import WaitList from "./MailList";
+import Newsletter from "./newsletter";
 import SEO from "@/components/SEO/index.astro";
 
 
@@ -12,10 +12,10 @@ export function getStaticPaths() {
 ---
 
 <SEO
-  title="GDLauncher - Mailing list"
-  description="GDLauncher mailing list"
+  title="GDLauncher - Newsletter list"
+  description="GDLauncher newsletter list"
 />
 
 <MainWrapper>
-    <WaitList client:idle pathname={Astro.url.pathname}/>
+    <Newsletter client:idle pathname={Astro.url.pathname}/>
 </MainWrapper>

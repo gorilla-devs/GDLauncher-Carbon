@@ -35,16 +35,13 @@ const WaitList = ({ pathname }: { pathname: string }) => {
       obj["user_email"] = form.email;
 
       const res = await addUser(obj);
-      console.log("res", res.status, res);
-      if (res.status === 401) {
-        setError(t("maillist.error_401"));
-      } else if (res.status === 400) {
-        setError(t("maillist.error_400"));
-      } else if (res.status === 200) {
-        setSuccess(t("maillist.success"));
+      if (res.status === 400) {
+        setError(t("newsletter.error_400"));
+      } else if (res.status === 201) {
+        setSuccess(t("newsletter.success"));
       }
     } else {
-      setError(t("maillist.error_missing_info"));
+      setError(t("newsletter.error_missing_info"));
     }
     setLoading(false);
   };
@@ -53,20 +50,20 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     <div class="pt-10 lg:h-screen relative flex flex-col justify-center items-center">
       <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
-          {t("maillist.title")}
+          {t("newsletter.title")}
           <span class="inline-block px-4 text-yellow-500 -rotate-12 hover:rotate-0 transition-transform underline">
-            {t("maillist.title2")}
+            {t("newsletter.title2")}
           </span>
-          {t("maillist.title3")}
+          {t("newsletter.title3")}
         </h1>
         <p class="text-xl lg:text-3xl font-thin max-w-xs lg:max-w-4xl">
-          {t("maillist.text")}
+          {t("newsletter.text")}
         </p>
         <form onSubmit={handleSubmit} method="post">
           <div class="flex flex-col justify-center items-center gap-10">
-            <div class="flex flex-col gap-10">
+            <div class="flex lg:flex-row gap-10">
               <Input
-                placeholder={t("maillist.email")}
+                placeholder={t("newsletter.email")}
                 type="email"
                 value={form.email}
                 onChange={updateFormField("email")}
@@ -76,7 +73,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                   <Show when={loading()}>
                     <LoadingSpinner />
                   </Show>
-                  {t("maillist.getAccess")}
+                  {t("newsletter.getAccess")}
                 </>
               </Button>
             </div>

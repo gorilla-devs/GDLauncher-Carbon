@@ -50,12 +50,12 @@ const t = useTranslations(Astro.url.pathname);
           ))
         }
         <a
-          class={`maillistLink ${
-            globalThis?.location?.pathname === "/maillist" ? "selected" : ""
+          class={`newsletterLink ${
+            globalThis?.location?.pathname === "/newsletter" ? "selected" : ""
           }`}
-          href={localizePath("/maillist", lang)}
+          href={localizePath("/newsletter", lang)}
         >
-          {t("navbar.maillist")}
+          {t("navbar.newsletter")}
         </a>
         <a class="button">
           {lang && <LanguageSelect lang={lang} client:idle />}
@@ -84,12 +84,12 @@ const t = useTranslations(Astro.url.pathname);
       ))
     }
     <a
-      class={`maillistLink ${
-        globalThis?.location?.pathname === "/maillist" ? "selected" : ""
+      class={`newsletterLink ${
+        globalThis?.location?.pathname === "/newsletter" ? "selected" : ""
       }`}
-      href={localizePath("/maillist", lang)}
+      href={localizePath("/newsletter", lang)}
     >
-      {t("navbar.maillist")}
+      {t("navbar.newsletter")}
     </a>
     {lang && <LanguageSelect lang={lang} client:idle />}
     <div class="block">
@@ -118,7 +118,7 @@ const t = useTranslations(Astro.url.pathname);
     max-width: 100vw;
   }
 
-  .maillistLink {
+  .newsletterLink {
     color: #16a34a !important;
     text-decoration: underline !important;
     text-decoration-thickness: 2px !important;

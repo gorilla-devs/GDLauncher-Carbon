@@ -51,10 +51,10 @@ const t = useTranslations(Astro.url.pathname);
             <a href={localizePath("/download", lang?.toString() || "en")}>
               <Button>{t("navbar.download")}</Button>
             </a>
-            <a href={localizePath("/maillist", lang?.toString() || "en")}>
+            <a href={localizePath("/newsletter", lang?.toString() || "en")}>
               <Button
                 style={{ "max-width": "300px", "background-color": "#16a34a" }}
-                >{t("maillist.subscribe")}
+                >{t("newsletter.subscribe")}
               </Button>
             </a>
           </div>

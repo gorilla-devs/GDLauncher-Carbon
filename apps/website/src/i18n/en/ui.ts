@@ -21,7 +21,7 @@ export default {
   "navbar.github": "Github",
   "navbar.discord": "Discord",
   "navbar.blog": "Blog",
-  "navbar.maillist": "Mailinglist",
+  "navbar.newsletter": "Newsletter",
   "home.title": "GDLauncher",
   "home.createYourOwn": "Create your own!",
   "home.createYourOwn_text1":
@@ -92,22 +92,24 @@ export default {
   "download.linux": "Download for Linux",
   "download.none": "Select your operative system",
   "download.retry": "retry.",
-  "maillist.title": "Subscribe to keep updated about the",
-  "maillist.title2": "NEW",
-  "maillist.title3": "GDLauncher",
-  "maillist.text":
-    "Enter your Email and Minecraft email (if it's different from the first email entered).",
-  "maillist.getAccess": "SUBSCRIBE NOW!",
-  "maillist.subscribe": "Subscribe to the maillist",
-  "maillist.mc_email": "Minecraft Email",
-  "maillist.email": "Email",
-  "maillist.kofi_email": "Kofi Email",
-  "maillist.error_401": "Pending verification, verify your email!",
-  "maillist.error_400":
+  "newsletter.title": "Subscribe to keep updated about the",
+  "newsletter.title2": "NEW",
+  "newsletter.title3": "GDLauncher",
+  "newsletter.text":
+    "Subscribe and keep yourself updated about GDLauncher news!",
+  "newsletter.getAccess": "SUBSCRIBE NOW!",
+  "newsletter.subscribe": "Subscribe to the newsletter",
+  "newsletter.mc_email": "Minecraft Email",
+  "newsletter.email": "Email",
+  "newsletter.kofi_email": "Kofi Email",
+  "newsletter.error_401": "Pending verification, verify your email!",
+  "newsletter.error_400":
     "You already subscribed, one of your email was already used!",
-  "maillist.error_missing_info":
+  "newsletter.error_missing_info":
     "Please enter all the info, some of the them are missing.",
-  "maillist.success": "You successfully subscribed to the maillist",
+  "newsletter.success": "You successfully subscribed to the newsletter",
+  "newsletter.confirm.title":
+    "You have successfully subscribed to the newsletter🎉",
   "blog.title": "The GDLauncher Blog",
   "timeline.title": "Years in the Making",
   "timeline.subtitle": "The progression of the GDLauncher and its predecessors",
