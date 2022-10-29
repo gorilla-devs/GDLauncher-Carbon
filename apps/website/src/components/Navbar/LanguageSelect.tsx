@@ -2,7 +2,14 @@ import languages from "../../i18n/languages";
 import { Component } from "solid-js";
 
 const LanguageSelect: Component<{ lang: string }> = ({ lang }) => {
-  console.log("lang", lang, languages, Object.entries(languages));
+  console.log(
+    "lang",
+    lang,
+    languages,
+    Object.entries(languages),
+    JSON.stringify(languages),
+    JSON.stringify(Object.entries(languages))
+  );
 
   return (
     <div
