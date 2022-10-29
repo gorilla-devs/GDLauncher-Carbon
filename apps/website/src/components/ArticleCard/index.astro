@@ -1,4 +1,5 @@
 ---
+import { APP_URLS } from "@/constants";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
 
@@ -15,7 +16,7 @@ const { lang } = Astro.params;
         post.image && (
           <img
             class="rounded-t-xl"
-            src={composeCDNAssetLink(post.image || "")}
+            src={`${APP_URLS.cdn}/articles/${post.slug}/${post.image}`}
           />
         )
       }
