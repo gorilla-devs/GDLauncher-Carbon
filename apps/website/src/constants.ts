@@ -1,5 +1,5 @@
 export const APP_URLS = {
-  cdn: "https://gdlauncher.b-cdn.net/assets",
+  cdn: "https://edge.gdlauncher.com/assets",
   socials: {
     discord: "https://discord.com/invite/3WjYJTBcSz",
     github: "https://github.com/gorilla-devs/GDLauncher",
