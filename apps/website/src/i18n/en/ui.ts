@@ -62,12 +62,12 @@ export default {
     "Here below you can meet our wonderful team working on making GDLauncher great!",
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
-  "team.member_davide": "Davide | Founder | 25",
+  "team.member_davide": "Davide | Founder - 25",
   "team.member_davide_text":
     "The one and only Davide.",
-  "team.member_gianmarco": "Gianmarco | Co-Founder | 22",
+  "team.member_gianmarco": "Gianmarco | Co-Founder - 22",
   "team.member_gianmarco_text": "Our Front-end Engineer and Magic Designer.",
-  "team.member_valentin": "Valentin | Co-Founder | 20",
+  "team.member_valentin": "Valentin | Co-Founder - 20",
   "team.member_valentin_text":
     "Ex co-founder of modrinth",
   "footer.text":
