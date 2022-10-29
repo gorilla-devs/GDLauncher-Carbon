@@ -67,7 +67,10 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 value={form.email}
                 onChange={updateFormField("email")}
               />
-              <Button disabled={loading()} class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active" >
+              <Button
+                disabled={loading()}
+                class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active"
+              >
                 <>
                   <Show when={loading()}>
                     <LoadingSpinner />
@@ -76,7 +79,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 </>
               </Button>
             </div>
-            <div class="h-[100px]">
+            <div class=" lg:h-[100px]">
               <Show when={error()}>
                 <div class="p-10 text-red-400">{error()}</div>
               </Show>
