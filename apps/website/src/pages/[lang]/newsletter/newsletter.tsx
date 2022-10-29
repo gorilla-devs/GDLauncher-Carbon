@@ -31,13 +31,12 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     setSuccess("");
     setLoading(true);
 
-    if (form.email && form.emailMc && form.emailKofi) {
-      obj["user_email"] = form.email;
-
+    if (form.email) {
+      obj["email"] = form.email;
       const res = await addUser(obj);
       if (res.status === 400) {
         setError(t("newsletter.error_400"));
-      } else if (res.status === 201) {
+      } else {
         setSuccess(t("newsletter.success"));
       }
     } else {
@@ -47,7 +46,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   };
 
   return (
-    <div class="pt-10 lg:h-screen relative flex flex-col justify-center items-center">
+    <div class="pt-10 pb-10 lg:h-screen relative flex flex-col justify-center items-center">
       <div class="flex flex-col justify-center items-center gap-10 max-w-xs lg:max-w-5xl text-center lg:pt-24">
         <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold ">
           {t("newsletter.title")}
@@ -60,7 +59,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
           {t("newsletter.text")}
         </p>
         <form onSubmit={handleSubmit} method="post">
-          <div class="flex flex-col justify-center items-center gap-10">
+          <div class="flex flex-col justify-center items-center gap-4">
             <div class="flex flex-col lg:flex-row gap-10">
               <Input
                 placeholder={t("newsletter.email")}
@@ -68,7 +67,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 value={form.email}
                 onChange={updateFormField("email")}
               />
-              <Button class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active">
+              <Button disabled={loading()} class="min-w-[260px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active" >
                 <>
                   <Show when={loading()}>
                     <LoadingSpinner />

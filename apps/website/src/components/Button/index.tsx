@@ -4,6 +4,7 @@ type Props = {
   children: HTMLElement | string | JSX.Element;
   class?: string;
   style?: any;
+  disabled?: boolean;
   onClick?: () => void;
 };
 
@@ -11,6 +12,7 @@ function Button(props: Props) {
   const c = children(() => props.children);
   return (
     <button
+      disabled={props.disabled}
       class={props.class}
       style={{
         display: "flex",
