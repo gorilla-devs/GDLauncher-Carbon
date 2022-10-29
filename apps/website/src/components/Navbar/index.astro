@@ -11,9 +11,10 @@ import { format } from "@/utils/i18n";
 
 export interface Props {
   currentPage: string;
+  langSelectorDisabled?: boolean;
 }
 
-const { currentPage } = Astro.props as Props;
+const { currentPage, langSelectorDisabled } = Astro.props as Props;
 const lang = currentPage && getLanguageFromURL(currentPage);
 const t = useTranslations(Astro.url.pathname);
 ---
@@ -58,7 +59,11 @@ const t = useTranslations(Astro.url.pathname);
           {t("navbar.newsletter")}
         </a>
         <a class="button">
-          {lang && <LanguageSelect lang={lang} client:idle />}
+          {
+            lang && !langSelectorDisabled && (
+              <LanguageSelect lang={lang} client:idle />
+            )
+          }
         </a>
       </div>
     </div>
@@ -91,7 +96,11 @@ const t = useTranslations(Astro.url.pathname);
     >
       {t("navbar.newsletter")}
     </a>
-    {lang && <LanguageSelect lang={lang} client:idle />}
+    {
+      lang && !langSelectorDisabled && (
+        <LanguageSelect lang={lang} client:idle />
+      )
+    }
     <div class="block">
       <a href={localizePath("/download", lang)}>
         <Button>{t("navbar.download")}</Button>
