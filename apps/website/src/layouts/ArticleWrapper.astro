@@ -27,7 +27,7 @@ const t = useTranslations(Astro.url.pathname);
 
   <body>
     <Navbar currentPage={currentPage} />
-    <main class="articleMainWrapper">
+    <article class="articleMainWrapper">
       <div class="backBtnContainer">
         <a
           class="backBtnLink"
@@ -46,7 +46,7 @@ const t = useTranslations(Astro.url.pathname);
       <div id="articleContainer">
         <slot />
       </div>
-    </main>
+    </article>
     <div class="socialsContainer">
       <div class="socialsInnerContainer">
         <a href={APP_URLS.socials.discord} target="_blank">
