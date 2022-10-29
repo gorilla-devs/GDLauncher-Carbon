@@ -57,14 +57,20 @@ export default {
   "modloader.fabric_title": "Fabric",
   "modloader.fabric_text": "GDlauncher support also Fabric.",
   "team.title": "Meet the Team",
+  "team.team_title": "The Team",
   "team.text":
     "Here below you can meet our dream team working on making gdlauncher great!",
-  "team.team_title": "The Team",
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
   "team.member_davide": "Davide | Founder",
+  "team.member_davide_text":
+    "Here below you can meet our dream team working on making gdlauncher great!",
   "team.member_gianmarco": "Gianmarco | Co-Founder",
+  "team.member_gianmarco_text":
+    "Here below you can meet our dream team working on making gdlauncher great!",
   "team.member_valentin": "Valentin | Co-Founder",
+  "team.member_valentin_text":
+    "Here below you can meet our dream team working on making gdlauncher great!",
   "footer.text":
     "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
   "footer.copyright_text": "© 2022 by GorillaDevs Inc. | All rights reserved",
