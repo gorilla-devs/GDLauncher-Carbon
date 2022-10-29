@@ -25,9 +25,10 @@ const getH2s = (item: HTMLHeadingElement) => {
 const ArticleInteractiveMarkdown = () => {
   onMount(() => {
     const container = document.querySelector("#articleContainer");
+    const tableListTitle = document.querySelector("#tableListTitle");
     const tableList = document.getElementById("tableList");
 
-    if (container) (container as any).style.cursor = "pointer";
+    if (tableListTitle) (tableListTitle as any).style.cursor = "pointer";
 
     container?.querySelectorAll("h1").forEach((item) => {
       item.style.cursor = "pointer";
