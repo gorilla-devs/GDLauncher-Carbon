@@ -62,14 +62,14 @@ export default {
     "Here below you can meet our dream team working on making gdlauncher great!",
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
-  "team.member_davide": "Davide | Founder",
+  "team.member_davide": "Davide | Founder | 25",
   "team.member_davide_text":
-    "Here below you can meet our dream team working on making gdlauncher great!",
-  "team.member_gianmarco": "Gianmarco | Co-Founder",
+    "The one and only Davide.",
+  "team.member_gianmarco": "Gianmarco | Co-Founder | 22",
   "team.member_gianmarco_text": "Our Front-end Engineer and Magic Designer.",
-  "team.member_valentin": "Valentin | Co-Founder",
+  "team.member_valentin": "Valentin | Co-Founder | 20",
   "team.member_valentin_text":
-    "Here below you can meet our dream team working on making gdlauncher great!",
+    "Ex co-founder of modrinth",
   "footer.text":
     "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
   "footer.copyright_text": "© 2022 by GorillaDevs Inc. | All rights reserved",
