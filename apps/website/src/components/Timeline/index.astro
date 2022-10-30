@@ -1,6 +1,5 @@
 ---
 import { useTranslations } from "@/i18n/utils";
-
 const t = useTranslations(Astro.url.pathname);
 ---
 
@@ -12,52 +11,64 @@ const t = useTranslations(Astro.url.pathname);
   <ul class="timeline">
     <li>
       <div class="direction-r">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2014")}</span>
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2014")}</span>
+          </div>
+          <div class="desc">{t("timeline.2014_title")}</div>
         </div>
-        <div class="desc">{t("timeline.2014_title")}</div>
       </div>
     </li>
     <li>
       <div class="direction-l">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2015")}</span>
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2015")}</span>
+          </div>
+          <div class="desc">{t("timeline.2015_title")}</div>
         </div>
-        <div class="desc">{t("timeline.2015_title")}</div>
       </div>
     </li>
     <li>
       <div class="direction-r">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2016")}</span>
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2016")}</span>
+          </div>
+          <div class="desc">{t("timeline.2016_title")}</div>
         </div>
-        <div class="desc">{t("timeline.2016_title")}</div>
       </div>
     </li>
     <li>
       <div class="direction-l">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2018")}</span>
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2018")}</span>
+          </div>
+          <div class="desc">{t("timeline.2018_title")}</div>
         </div>
-        <div class="desc">{t("timeline.2018_title")}</div>
       </div>
     </li>
     <li>
       <div class="direction-r">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2019")}</span>
-        </div>
-        <div class="desc">
-          {t("timeline.2019_title")}
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2019")}</span>
+          </div>
+          <div class="desc">
+            {t("timeline.2019_title")}
+          </div>
         </div>
       </div>
     </li>
     <li>
       <div class="direction-l">
-        <div class="flag-wrapper">
-          <span class="flag">{t("timeline.2022")}</span>
+        <div class="directionInnerContainer">
+          <div class="flag-wrapper">
+            <span class="flag">{t("timeline.2022")}</span>
+          </div>
+          <div class="desc">{t("timeline.2022_title")}</div>
         </div>
-        <div class="desc">{t("timeline.2022_title")}</div>
       </div>
     </li>
   </ul>
@@ -190,6 +201,12 @@ const t = useTranslations(Astro.url.pathname);
   .direction-r .flag:hover::before,
   .direction-l .flag:hover::after,
   .direction-r .flag:hover::after {
+    background: #ecc94b;
+    border-color: #ecc94b;
+    color: #ecc94b;
+  }
+  .directionInnerContainer:hover .flag::before,
+  .directionInnerContainer:hover .flag::after {
     background: #ecc94b;
     border-color: #ecc94b;
     color: #ecc94b;
