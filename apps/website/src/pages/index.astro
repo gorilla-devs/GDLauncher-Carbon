@@ -1,10 +1,12 @@
 ---
 import languages from "@/i18n/languages";
+import SEO from "@/components/SEO/index.astro";
 
 export const getStaticPaths = () => Object.keys(languages).map(lang => ({ params: { lang } }));
 
 const { lang } = Astro.params;
 ---
+<SEO title="GDLauncher - Home" description="GDLauncher home page" />
 
 <meta http-equiv="refresh" content={`0;url=/${lang || 'en' }`} />
 

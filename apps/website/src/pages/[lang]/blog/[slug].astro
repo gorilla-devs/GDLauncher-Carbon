@@ -41,6 +41,7 @@ const { frontmatter } = Astro.props.post;
 <SEO
   title={`GDLauncher - Article - ${frontmatter.title}`}
   description={frontmatter.description}
+  image={frontmatter.image}
 />
 
 <Content />
