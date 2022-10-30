@@ -35,17 +35,14 @@ export const getStaticPaths = async () => {
   });
 };
 
-const { slug } = Astro.params;
-const { frontmatter, Content } = Astro.props.post;
+const { frontmatter, Content, file } = Astro.props.post;
+const ArticleSlug = file.substring(file.lastIndexOf("/") + 1).split(".")[0];
 ---
 
 <SEO
   title={`GDLauncher - Article - ${frontmatter.title}`}
   description={frontmatter.description}
-  image={composeCDNArticleThumbnailAssetLink(
-    slug?.toString() || "",
-    frontmatter.image
-  )}
+  image={composeCDNArticleThumbnailAssetLink(ArticleSlug, frontmatter.image)}
 />
 
 <Content />
