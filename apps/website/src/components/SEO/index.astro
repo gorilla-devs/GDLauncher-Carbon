@@ -17,12 +17,12 @@ const { title, description, image } = Astro.props as Props;
 <meta property="og:description" content={description} />
 <meta
   property="og:image"
-  content={composeCDNAssetLink(image || "gdlauncher_logo_og.png")}
+  content={image || composeCDNAssetLink("gdlauncher_logo_og.png")}
 />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta
   property="twitter:image"
-  content={composeCDNAssetLink(image || "gdlauncher_logo__og_twitter.png")}
+  content={image || composeCDNAssetLink("gdlauncher_logo__og_twitter.png")}
 />

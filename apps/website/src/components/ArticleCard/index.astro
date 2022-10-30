@@ -1,6 +1,5 @@
 ---
-import { APP_URLS } from "@/constants";
-import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
+import { composeCDNArticleThumbnailAssetLink } from "@/utils/composeCDNAssetLink";
 import { localizePath } from "@/utils/helpers";
 
 const { post } = Astro.props;
@@ -15,7 +14,10 @@ const { lang } = Astro.params;
       style={{
         backgroundPosition: "center",
         backgroundSize: "cover",
-        backgroundImage: `url(${APP_URLS.cdn}/articles/${post.slug}/${post.image})`,
+        backgroundImage: `url(${composeCDNArticleThumbnailAssetLink(
+          post.slug,
+          post.image
+        )})`,
       }}
       class="min-h-[18rem] bg-green-400 rounded-t-xl"
     >

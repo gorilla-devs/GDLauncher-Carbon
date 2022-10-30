@@ -1,6 +1,7 @@
 ---
 import languages from "@/i18n/languages";
 import SEO from "@/components/SEO/index.astro";
+import { composeCDNArticleThumbnailAssetLink } from "@/utils/composeCDNAssetLink";
 
 export const getStaticPaths = async () => {
   let mdPosts: any = [];
@@ -34,14 +35,17 @@ export const getStaticPaths = async () => {
   });
 };
 
-const { Content } = Astro.props.post;
-const { frontmatter } = Astro.props.post;
+const { slug } = Astro.params;
+const { frontmatter, Content } = Astro.props.post;
 ---
 
 <SEO
   title={`GDLauncher - Article - ${frontmatter.title}`}
   description={frontmatter.description}
-  image={frontmatter.image}
+  image={composeCDNArticleThumbnailAssetLink(
+    slug?.toString() || "",
+    frontmatter.image
+  )}
 />
 
 <Content />
