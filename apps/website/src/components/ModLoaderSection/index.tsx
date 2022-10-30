@@ -41,7 +41,7 @@ function Section(props: { type: sectionType } & Props) {
                 </p>
               </div>
               <img
-                class="fadeIn opacity-10 lg:opacity-100 h-full lg:h-[540px]"
+                class="fadeIn opacity-10 lg:opacity-100 h-full lg:h-full"
                 loading="lazy"
                 src={composeCDNAssetLink(images[reactiveProps.type])}
                 alt="launcher_mockup"
@@ -60,7 +60,7 @@ function Section(props: { type: sectionType } & Props) {
             </div>
 
             <img
-              class="fadeIn w-full opacity-10 lg:opacity-100 h-[300px] lg:h-[540px]"
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[300px] lg:h-full"
               loading="lazy"
               src={composeCDNAssetLink(images[reactiveProps.type])}
               alt="launcher_mockup"
@@ -77,7 +77,7 @@ function Section(props: { type: sectionType } & Props) {
             </div>
 
             <img
-              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-full"
               loading="lazy"
               src={composeCDNAssetLink(images[reactiveProps.type])}
               alt="launcher_mockup"
@@ -93,7 +93,7 @@ function Section(props: { type: sectionType } & Props) {
               </p>
             </div>
             <img
-              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-full"
               loading="lazy"
               src={composeCDNAssetLink(images[reactiveProps.type])}
               alt="launcher_mockup"
