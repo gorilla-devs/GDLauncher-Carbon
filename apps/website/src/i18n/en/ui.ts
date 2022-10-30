@@ -3,9 +3,11 @@ export default {
   "generic.donate_kofi_title": "Donate on Ko-fi",
   "generic.donate_kofi_text":
     "Consider supporting the development of the GDLauncher. Even a dollar helps!",
-  "generic.learn_more": "Learn More",
-  "generic.getAServer": "Get a Server",
-  "generic.partners": "Partners",
+    "generic.learn_more": "Learn More",
+    "generic.getAServer": "Get a Server",
+    "generic.partners": "Partners",
+    "generic.partner.text":
+      "Consider supporting the development of the GDLauncher. Using our partner's services",
   "generic.reportIssues": "Report issues",
   "generic.reportAnIssue": "Report an issue",
   "generic.reportIssues_text":

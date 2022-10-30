@@ -20,16 +20,13 @@ const { lang } = Astro.params;
 const t = useTranslations(Astro.url.pathname);
 ---
 
-<SEO
-  title="GDLauncher - Home"
-  description="GDLauncher home page"
-/>
+<SEO title="GDLauncher - Home" description="GDLauncher home page" />
 
 <MainWrapper>
   <div class="h-auto relative">
     <div
       class={`relative flex flex-col justify-center items-center pt-20 px-10 lg:pt-1 pb-10 box-border h-auto lg:h-screen
-            bg-[url("https://edge.gdlauncher.com/assets/mc_panda.webp")] bg-no-repeat`}
+            bg-[url("${composeCDNAssetLink("mc_panda.webp")}")] bg-no-repeat`}
     >
       <div class="absolute top-0 bottom-0 left-0 right-0">
         <div
@@ -49,7 +46,9 @@ const t = useTranslations(Astro.url.pathname);
           </p>
           <div class="flex flex-col lg:flex-row gap-5 lg:gap-10">
             <a href={localizePath("/download", lang?.toString() || "en")}>
-              <Button>{t("navbar.download")}</Button>
+              <Button style={{ "max-width": "initial", width: "100%" }}
+                >{t("navbar.download")}</Button
+              >
             </a>
             <a href={localizePath("/newsletter", lang?.toString() || "en")}>
               <Button
@@ -119,15 +118,15 @@ const t = useTranslations(Astro.url.pathname);
             {t("home.features_subitle")}
           </p>
         </div>
-        <div class="flex flex-col flex-wrap gap-20 justify-center">
+        <div class="flex flex-col flex-wrap gap-20 justify-center w-full">
           <div
-            class="flex flex-col justify-center lg:flex-row flex-wrap gap-20"
+            class="flex flex-col justify-center lg:flex-row flex-wrap gap-20 w-full" 
           >
             <div
-              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
+              class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 w-full lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5"
                 src={composeCDNAssetLink("curseforge_integration.svg")}
                 alt="curseforge_integration"
               />
@@ -139,7 +138,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("built_in_mods.svg")}
                 alt="curseforge_integration"
               />
@@ -151,7 +150,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("auto_java_installation.svg")}
                 alt="curseforge_integration"
               />
@@ -167,7 +166,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("easy_to_use_interface.svg")}
                 alt="curseforge_integration"
               />
@@ -179,7 +178,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("dark_light_mode.svg")}
                 alt="curseforge_integration"
               />
@@ -191,7 +190,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("automatic_updater.svg")}
                 alt="curseforge_integration"
               />
@@ -205,7 +204,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("import_export_modpack.svg")}
                 alt="curseforge_integration"
               />
@@ -217,7 +216,7 @@ const t = useTranslations(Astro.url.pathname);
               class="lg:px-5 py-20 rounded-xl bg-gray-800 opacity-80 lg:min-w-[23rem] flex flex-col justify-between items-center cursor-pointer hover:-translate-y-6 ease-in-out duration-300"
             >
               <img
-                class="mb-5 max-w-xs"
+                class="mb-5 "
                 src={composeCDNAssetLink("ftb_integration.svg")}
                 alt="curseforge_integration"
               />
@@ -245,7 +244,7 @@ const t = useTranslations(Astro.url.pathname);
         <h1
           class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
         >
-          A lancher focused on the user experience
+          A launcher focused on the user experience
         </h1>
         <h1
           class="cursor-pointer max-w-2xl font-bold hover:text-yellow-400 hover:border-r-8 hover:border-yellow-400 hover:pr-4 ease-in-out duration-300"
@@ -283,10 +282,10 @@ const t = useTranslations(Astro.url.pathname);
 
 <style>
   .createYourOwn li {
-    list-style-image: url("https://edge.gdlauncher.com/assets/hexagon_orange.svg");
+    list-style-image: url("https://edge.gdlauncher.com/assets/hexagon_teal.svg");
   }
   .createYourOwn li:first-child {
-    list-style-image: url("https://edge.gdlauncher.com/assets/hexagon_teal.svg");
+    list-style-image: url("https://edge.gdlauncher.com/assets/hexagon_orange.svg");
   }
   .createYourOwn li:last-child {
     list-style-image: url("https://edge.gdlauncher.com/assets/hexagon_yellow.svg");

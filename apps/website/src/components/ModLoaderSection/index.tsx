@@ -28,8 +28,7 @@ function Section(props: { type: sectionType } & Props) {
 
   return (
     <div class="pt-32 flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
-      <div class="relatove w-4/5 lg:w-full z-20 max-w-7xl flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
-        {/* <div class="absolute py-0 px-4 max-w-2xl z-30"> */}
+      <div class="relative w-4/5 lg:w-full z-20 max-w-7xl flex flex-col-reverse lg:flex-row justify-center lg:justify-between items-center">
         <Switch
           fallback={
             <>
@@ -41,14 +40,12 @@ function Section(props: { type: sectionType } & Props) {
                   {t("modloader.none_text")}
                 </p>
               </div>
-              <div class="lg:m-h-[540px]">
-                <img
-                  class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
-                  loading="lazy"
-                  src={composeCDNAssetLink(images[reactiveProps.type])}
-                  alt="launcher_mockup"
-                />
-              </div>
+              <img
+                class="fadeIn opacity-10 lg:opacity-100 h-full lg:h-[540px]"
+                loading="lazy"
+                src={composeCDNAssetLink(images[reactiveProps.type])}
+                alt="launcher_mockup"
+              />
             </>
           }
         >
@@ -61,14 +58,13 @@ function Section(props: { type: sectionType } & Props) {
                 {t("modloader.vanilla_text")}
               </p>
             </div>
-            <div class="lg:m-h-[540px]">
-              <img
-                class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
-                loading="lazy"
-                src={composeCDNAssetLink(images[reactiveProps.type])}
-                alt="launcher_mockup"
-              />
-            </div>
+
+            <img
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[300px] lg:h-[540px]"
+              loading="lazy"
+              src={composeCDNAssetLink(images[reactiveProps.type])}
+              alt="launcher_mockup"
+            />
           </Match>
           <Match when={reactiveProps.type === sectionType.forge}>
             <div class="absolute py-0 px-4 max-w-2xl z-30">
@@ -79,14 +75,13 @@ function Section(props: { type: sectionType } & Props) {
                 {t("modloader.forge_text")}
               </p>
             </div>
-            <div class="lg:m-h-[540px]">
-              <img
-                class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
-                loading="lazy"
-                src={composeCDNAssetLink(images[reactiveProps.type])}
-                alt="launcher_mockup"
-              />
-            </div>
+
+            <img
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
+              loading="lazy"
+              src={composeCDNAssetLink(images[reactiveProps.type])}
+              alt="launcher_mockup"
+            />
           </Match>
           <Match when={reactiveProps.type === sectionType.fabric}>
             <div class="absolute py-0 px-4 max-w-2xl z-30">
@@ -97,25 +92,14 @@ function Section(props: { type: sectionType } & Props) {
                 {t("modloader.fabric_text")}
               </p>
             </div>
-            <div class="lg:m-h-[540px]">
-              <img
-                class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
-                loading="lazy"
-                src={composeCDNAssetLink(images[reactiveProps.type])}
-                alt="launcher_mockup"
-              />
-            </div>
+            <img
+              class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
+              loading="lazy"
+              src={composeCDNAssetLink(images[reactiveProps.type])}
+              alt="launcher_mockup"
+            />
           </Match>
         </Switch>
-        {/* </div> */}
-        {/* <div class="lg:m-h-[540px]">
-          <img
-            class="fadeIn w-full opacity-10 lg:opacity-100 h-[140px] lg:h-[540px]"
-            loading="lazy"
-            src={composeCDNAssetLink(images[reactiveProps.type])}
-            alt="launcher_mockup"
-          />
-        </div> */}
       </div>
     </div>
   );
@@ -133,7 +117,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   };
 
   return (
-    <div class="h-auto flex justify-center items-start py-32">
+    <div class="h-auto flex justify-center items-start py-32 px-8">
       <div class="flex flex-col items-center">
         <div class="flex flex-row lg:gap-5 uppercase font-medium text-xl">
           <div

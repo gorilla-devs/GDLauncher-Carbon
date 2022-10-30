@@ -6,7 +6,8 @@ export const APP_URLS = {
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: "https://mailinglist-sub.edgegdl.workers.dev",
+  // newsletter: "https://mailinglist-sub.edgegdl.workers.dev",
+  newsletter: "https://sendinblue-routing-test.cavallogianmarco.workers.dev/",
   kofi: "https://ko-fi.com/gdlauncher",
   download: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",

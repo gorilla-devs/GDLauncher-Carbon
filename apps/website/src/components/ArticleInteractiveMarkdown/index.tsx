@@ -90,7 +90,6 @@ const ArticleInteractiveMarkdown = () => {
         item.scrollIntoView({ behavior: "smooth" });
       };
 
-
       li.appendChild(a);
 
       const siblings = getH2s(item);
@@ -117,6 +116,11 @@ const ArticleInteractiveMarkdown = () => {
         subLi.style.maxWidth = "fit-content";
         subItem.style.position = "relative";
         li.appendChild(ul);
+
+        subItem.onclick = () => {
+          const subItemId = subItem.id;
+          history.pushState({}, "", "#" + subItemId);
+        };
 
         const iconSvg = document.createElementNS(
           "http://www.w3.org/2000/svg",

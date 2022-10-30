@@ -4,8 +4,8 @@ import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import ArrowRight from "@/components/Icons/ArrowLeft";
 import languages from "@/i18n/languages";
 import { localizePath } from "@/utils/helpers";
-import CenteredWrapper from "@/layouts/CenteredWrapper.astro";
 import { useTranslations } from "@/i18n/utils";
+import MainWrapper from "@/layouts/MainWrapper.astro";
 
 export const getStaticPaths = () => {
   return Object.keys(languages).map((lang) => ({ params: { lang } }));
@@ -20,8 +20,8 @@ const t = useTranslations(Astro.url.pathname);
   description="GDLauncher opened positions. Apply now!"
 />
 
-<CenteredWrapper>
-  <div class="flex justify-center flex-col items-center">
+<MainWrapper>
+  <div class="flex justify-center flex-col items-center px-10 pb-10 h-screen">
     <div>
       <img
         src={composeCDNAssetLink("gdlauncher_wide_logo_blue.svg")}
@@ -32,7 +32,7 @@ const t = useTranslations(Astro.url.pathname);
     <h1 class="flex flex-col lg:block text-4xl lg:text-7xl font-bold">
       {t("careers.title")}
     </h1>
-    <div class="text-slate-100 mt-8 mb-12 text-5xl lg:text-base">
+    <div class="text-slate-100 mt-8 mb-12 text-2xl lg:text-base">
       {t("careers.text")}
     </div>
     <!-- <a
@@ -44,11 +44,11 @@ const t = useTranslations(Astro.url.pathname);
       />
     </a> -->
     <a
-      href={localizePath("/rust", lang?.toString() || "en")}
-      class="transition ease-in-out border-slate-300 border-2 hover:bg-gray-800 rounded mb-16 lg:mb-4 text-slate-400 px-16 py-32 lg:p-8 w-full lg:w-80 text-5xl lg:text-base flex items-center justify-between"
+      href={localizePath("/careers/rust", lang?.toString() || "en")}
+      class="transition ease-in-out border-slate-300 border-2 hover:bg-gray-800 rounded lg:mb-4 text-slate-400 px-16 py-16 lg:p-8 w-full lg:w-80 text-5xl lg:text-base flex items-center justify-between"
     >
       Rust Engineer <ArrowRight
-        class="ease-linear duration-100 w-4 h-4 -rotate-180"
+        class="ease-linear duration-100 w-4 h-4 -rotate-180 hidden lg:block"
       />
     </a>
     <!-- <a
@@ -60,4 +60,4 @@ const t = useTranslations(Astro.url.pathname);
       />
     </a> -->
   </div>
-</CenteredWrapper>
+</MainWrapper>

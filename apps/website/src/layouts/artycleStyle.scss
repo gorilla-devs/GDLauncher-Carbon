@@ -4,6 +4,7 @@ body {
   width: 100%;
   overflow-x: hidden;
   margin: 0;
+  margin-bottom: 91px;
 }
 
 article {
@@ -122,6 +123,10 @@ article {
 }
 
 @media (min-width: 768px) {
+  body {
+    margin-bottom: 0;
+  }
+
   .articleMainWrapper {
     margin-top: 0;
     p,

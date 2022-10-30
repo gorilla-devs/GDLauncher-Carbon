@@ -6,7 +6,6 @@ import MainWrapper from "@/layouts/MainWrapper.astro";
 import Timeline from "@/components/Timeline/index.astro";
 import PartnerSection from "@/components/PartnerSection/index.astro";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
-import CaretIcon from "@/components/Icons/CaretIcon";
 import SEO from "@/components/SEO/index.astro";
 
 export const getStaticPaths = () => {
@@ -40,7 +39,7 @@ const t = useTranslations(Astro.url.pathname);
           <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
             {t("team.title")}
           </h3>
-          <p class="text-xl mb-12 font-light">
+          <p class="text-xl mb-4 lg:mb-12 font-light">
             {t("team.text")}
           </p>
           <a href="#timeline">
@@ -147,13 +146,13 @@ const t = useTranslations(Astro.url.pathname);
         </div>
       </div>
       <div
-        class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-between items-center gap-20 max-w-7xl py-32"
+        class="w-4/5 lg:w-full z-20 flex flex-col-reverse lg:flex-row justify-center items-center gap-15 max-w-7xl py-32 lg:px-8"
       >
-        <div class="py-0 px-4 max-w-2xl">
+        <div class="py-0 max-w-2xl min-w-fit md:min-w-[1000px]">
           <h3 class="text-5xl lg:text-8xl mb-2 font-bold">
             {t("generic.reportIssues")}
           </h3>
-          <p class="text-xl mb-12 font-light">
+          <p class="text-xl mb-12 font-light md:w-1/2">
             {t("generic.reportIssues_text")}
           </p>
           <Button style={{ background: "#c2410c" }}
