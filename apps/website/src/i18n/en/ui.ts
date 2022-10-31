@@ -97,7 +97,7 @@ export default {
   "download.windows": "Download for Windows",
   "download.macos": "Download for Mac",
   "download.linux": "Download for Linux",
-  "download.none": "Select your operative system",
+  "download.none": "Download",
   "download.retry": "retry.",
   "newsletter.title": "Subscribe to keep updated about the",
   "newsletter.title2": "NEW",

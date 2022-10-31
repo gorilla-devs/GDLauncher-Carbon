@@ -6,7 +6,7 @@ export const APP_URLS = {
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: "https://sendinblue-routing-test.cavallogianmarco.workers.dev/",
+  newsletter: "https://enderium-f8fml.ondigitalocean.app/v1",
   kofi: "https://ko-fi.com/gdlauncher",
   download: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
@@ -19,4 +19,4 @@ export const APP_URLS = {
 };
 
 export const SUPPORTED_LANGUAGES = ["en"];
-export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/add`;
+export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
