@@ -11,7 +11,7 @@ const { isBlog } = Astro.props;
 const { lang } = Astro.params;
 ---
 
-<html>
+<html class="bg-slate-800">
   <head>
     <HeadCommon />
   </head>
@@ -33,7 +33,7 @@ const { lang } = Astro.params;
     }
   </div>
 
-  <Navbar currentPage={currentPage} />
+  <Navbar currentPage={currentPage} isBlog={isBlog} />
   <main class="text-white">
     <slot />
   </main>

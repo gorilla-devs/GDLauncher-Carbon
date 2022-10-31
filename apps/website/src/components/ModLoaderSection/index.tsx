@@ -117,7 +117,7 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
   };
 
   return (
-    <div class="h-auto flex justify-center items-start py-32 px-8">
+    <div class="h-screen flex justify-center items-start py-32 px-8">
       <div class="flex flex-col items-center">
         <div class="flex flex-row lg:gap-5 uppercase font-medium text-xl">
           <div

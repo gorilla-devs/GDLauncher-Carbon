@@ -12,16 +12,17 @@ import { format } from "@/utils/i18n";
 export interface Props {
   currentPage: string;
   langSelectorDisabled?: boolean;
+  isBlog?: boolean;
 }
 
-const { currentPage, langSelectorDisabled } = Astro.props as Props;
+const { currentPage, isBlog } = Astro.props as Props;
 const lang = currentPage && getLanguageFromURL(currentPage);
 const t = useTranslations(Astro.url.pathname);
 ---
 
 <Interactivity client:load />
 
-<div class="navbar">
+<div class={`navbar ${isBlog && "isBlog"}`}>
   <div class="innerContainer">
     <div class="leftInnerContainer">
       <a href="/">
@@ -209,6 +210,10 @@ const t = useTranslations(Astro.url.pathname);
       // top: 0;
       bottom: auto;
       background-color: transparent;
+    }
+
+    .navbar.isBlog {
+      top: 0;
     }
 
     .burger {
