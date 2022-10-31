@@ -15,9 +15,12 @@ import TwitterIcon from "@/components/Icons/TwitterIcon";
 import { localizePath } from "@/utils/helpers";
 import { useTranslations } from "@/i18n/utils";
 import { APP_URLS } from "@/constants";
+import { composeCDNArticleThumbnailAssetLink } from "@/utils/composeCDNAssetLink";
 
 const { lang } = Astro.params;
+const { file } = Astro.props;
 const t = useTranslations(Astro.url.pathname);
+const ArticleSlug = file.substring(file.lastIndexOf("/") + 1).split(".")[0];
 ---
 
 <html>
@@ -38,6 +41,13 @@ const t = useTranslations(Astro.url.pathname);
           </div>
         </a>
       </div>
+      <img
+        style={{ borderRadius: "1rem" }}
+        src={composeCDNArticleThumbnailAssetLink(
+          ArticleSlug,
+          frontmatter.image
+        )}
+      />
       <h1 class="mainTitle">{frontmatter.title}</h1>
       <h5 class="mainSubtitle">
         Written on {frontmatter.date} by {frontmatter.author}
