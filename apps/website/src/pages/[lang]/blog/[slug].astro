@@ -40,9 +40,9 @@ const ArticleSlug = file.substring(file.lastIndexOf("/") + 1).split(".")[0];
 ---
 
 <SEO
-  title={`GDLauncher - Article - ${frontmatter.title}`}
+  title={`GDLauncher Blog - ${frontmatter.title}`}
   description={frontmatter.description}
-  image={composeCDNArticleThumbnailAssetLink(ArticleSlug, frontmatter.image)}
+  image={composeCDNArticleThumbnailAssetLink(ArticleSlug)}
 />
 
 <Content />
