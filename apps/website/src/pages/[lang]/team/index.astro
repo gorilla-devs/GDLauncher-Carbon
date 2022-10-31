@@ -88,7 +88,7 @@ const t = useTranslations(Astro.url.pathname);
                 <img
                   class="w-full"
                   src={composeCDNAssetLink("davide_profile.svg")}
-                  alt="launcher_mockup"
+                  alt="davide_profile"
                 />
               </div>
             </div>
@@ -107,7 +107,7 @@ const t = useTranslations(Astro.url.pathname);
                 <img
                   class="w-full"
                   src={composeCDNAssetLink("gianmarco_profile.svg")}
-                  alt="launcher_mockup"
+                  alt="gianmarco_profile"
                 />
               </div>
             </div>
@@ -127,7 +127,26 @@ const t = useTranslations(Astro.url.pathname);
                 <img
                   class="w-full"
                   src={composeCDNAssetLink("BH_valentin.webp")}
-                  alt="launcher_mockup"
+                  alt="valentin_profile"
+                />
+              </div>
+            </div>
+            <div
+              class="w-full flex flex-col-reverse lg:flex-row justify-end items-center max-w-7xl text-right"
+            >
+              <div class="py-0 px-4 max-w-4xl text-left lg:text-right">
+                <h3 class="mb-2 text-2xl font-bold">
+                  {t("team.member_sasha")}
+                </h3>
+                <p class="text-xl font-light max-w-lg">
+                  {t("team.member_sasha_text")}
+                </p>
+              </div>
+              <div>
+                <img
+                  class="w-full"
+                  src={composeCDNAssetLink("sasha_profile.svg")}
+                  alt="sasha_profile"
                 />
               </div>
             </div>

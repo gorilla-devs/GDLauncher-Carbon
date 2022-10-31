@@ -3,11 +3,11 @@ export default {
   "generic.donate_kofi_title": "Donate on Ko-fi",
   "generic.donate_kofi_text":
     "Consider supporting the development of the GDLauncher. Even a dollar helps!",
-    "generic.learn_more": "Learn More",
-    "generic.getAServer": "Get a Server",
-    "generic.partners": "Partners",
-    "generic.partner.text":
-      "Consider supporting the development of the GDLauncher. Using our partner's services",
+  "generic.learn_more": "Learn More",
+  "generic.getAServer": "Get a Server",
+  "generic.partners": "Partners",
+  "generic.partner.text":
+    "Consider supporting the development of the GDLauncher. Using our partner's services",
   "generic.reportIssues": "Report issues",
   "generic.reportAnIssue": "Report an issue",
   "generic.reportIssues_text":
@@ -65,13 +65,13 @@ export default {
   "team.team_text":
     "Meet our comprehensive team of designers, coders, and gamers.",
   "team.member_davide": "Davide | Founder - 25",
-  "team.member_davide_text":
-    "The one and only Davide.",
+  "team.member_davide_text": "The one and only Davide.",
   "team.member_gianmarco": "Gianmarco | Co-Founder - 22",
   "team.member_gianmarco_text": "Our Front-end Engineer and Magic Designer.",
   "team.member_valentin": "Valentin | Co-Founder - 20",
-  "team.member_valentin_text":
-    "Ex co-founder of modrinth",
+  "team.member_valentin_text": "Ex co-founder of modrinth",
+  "team.member_sasha": "Sasha | Dog",
+  "team.member_sasha_text": "Dog",
   "footer.text":
     "GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.",
   "footer.copyright_text": "© 2022 by GorillaDevs Inc. | All rights reserved",
@@ -121,13 +121,16 @@ export default {
   "timeline.title": "Years in the Making",
   "timeline.subtitle": "The progression of the GDLauncher and its predecessors",
   "timeline.2014": "2014",
-  "timeline.2014_title": "Davide started experimenting with writing a C# launcher",
+  "timeline.2014_title":
+    "Davide started experimenting with writing a C# launcher",
   "timeline.2015": "2015",
-  "timeline.2015_title": "Davide rewrote the launcher (still in C#) but with some better designs",
+  "timeline.2015_title":
+    "Davide rewrote the launcher (still in C#) but with some better designs",
   "timeline.2016": "2016",
   "timeline.2016_title": "Yet another C# rewrite",
   "timeline.2018": "2018",
-  "timeline.2018_title": "First Electron rewrite (Gianmarco joined development here)",
+  "timeline.2018_title":
+    "First Electron rewrite (Gianmarco joined development here)",
   "timeline.2019": "2019",
   "timeline.2019_title":
     "The GDLauncher takes on a new and modern design features Curseforge integrations, massive UI changes, and one-of-a-kind features.",
