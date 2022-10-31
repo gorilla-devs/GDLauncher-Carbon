@@ -4,6 +4,6 @@ export default function composeCDNAssetLink(asset: string): string {
   return `${APP_URLS.cdn}/assets/${asset}`;
 }
 
-export function composeCDNArticleThumbnailAssetLink(slug: string, img: string): string {
-  return `${APP_URLS.cdn}/articles/${slug}/${img}`;
+export function composeCDNArticleThumbnailAssetLink(slug: string): string {
+  return `${APP_URLS.cdn}/articles/${slug}/thumbnail.jpg`;
 }

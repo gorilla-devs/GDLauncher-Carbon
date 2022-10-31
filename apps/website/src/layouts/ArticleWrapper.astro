@@ -43,10 +43,7 @@ const ArticleSlug = file.substring(file.lastIndexOf("/") + 1).split(".")[0];
       </div>
       <img
         style={{ borderRadius: "1rem" }}
-        src={composeCDNArticleThumbnailAssetLink(
-          ArticleSlug,
-          frontmatter.image
-        )}
+        src={composeCDNArticleThumbnailAssetLink(ArticleSlug)}
       />
       <h1 class="mainTitle">{frontmatter.title}</h1>
       <h5 class="mainSubtitle">

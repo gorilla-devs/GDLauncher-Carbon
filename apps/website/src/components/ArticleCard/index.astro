@@ -15,8 +15,7 @@ const { lang } = Astro.params;
         backgroundPosition: "center",
         backgroundSize: "cover",
         backgroundImage: `url(${composeCDNArticleThumbnailAssetLink(
-          post.slug,
-          post.image
+          post.slug
         )})`,
       }}
       class="min-h-[18rem] bg-green-400 rounded-t-xl"

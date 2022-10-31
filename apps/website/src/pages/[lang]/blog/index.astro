@@ -25,7 +25,6 @@ export const getStaticPaths = async () => {
     description: frontmatter.description,
     date: frontmatter.date,
     author: frontmatter.author,
-    image: frontmatter.image,
     slug: file.substring(file.lastIndexOf("/") + 1).split(".")[0],
   }));
 
