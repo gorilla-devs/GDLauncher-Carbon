@@ -15,10 +15,10 @@ interface Props {
 }
 
 const images = {
-  vanilla: "vanilla_integration.webp",
-  forge: "forge_integration.webp",
-  fabric: "fabric_integration.webp",
-  none: "all_platforms_covered.webp",
+  vanilla: "vanilla_integration.png",
+  forge: "forge_integration.png",
+  fabric: "fabric_integration.png",
+  none: "all_platforms_covered.png",
 };
 
 function Section(props: { type: sectionType } & Props) {
