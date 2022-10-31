@@ -164,8 +164,23 @@ article {
     margin-top: 10rem;
     padding: 0 4rem;
 
+    .mainTitle {
+      font-size: 1.8rem;
+    }
+
     p {
       font-size: 1rem;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+    }
+    h2 {
+      font-size: 1.4rem;
+    }
+
+    h3 {
+      font-size: 1.2rem;
     }
   }
 }
