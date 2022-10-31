@@ -6,7 +6,7 @@ const DownloadedSection: Component<{ pathname: string, setIsDownloading: () => v
   const t = useTranslations(pathname);
   return (
     <div
-      class={`relative flex flex-col justify-center items-center pt-1 px-10 box-border h-screen bg-[url("https://edge.gdlauncher.com/assets/mc_forest_2.webp")] bg-no-repeat`}
+      class={`relative flex flex-col justify-center items-center pt-1 px-10 box-border h-screen bg-[url("https://edge.gdlauncher.com/assets/mc_forest_2.jpg")] bg-no-repeat`}
     >
       <div class="absolute top-0 bottom-0 left-0 right-0">
         <div class="absolute top-0 bottom-0 left-0 right-0 z-10 opacity-95 bg-slate-800"></div>

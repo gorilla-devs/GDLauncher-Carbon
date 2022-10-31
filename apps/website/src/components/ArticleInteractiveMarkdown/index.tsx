@@ -23,7 +23,7 @@ const getH2s = (item: HTMLHeadingElement) => {
 };
 
 const ArticleInteractiveMarkdown = () => {
-  onMount(() => {
+  onMount(async () => {
     const container = document.querySelector("#articleContainer");
     const tableListTitle = document.querySelector("#tableListSummary");
     const tableList = document.getElementById("tableList");
