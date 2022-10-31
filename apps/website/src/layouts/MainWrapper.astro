@@ -5,20 +5,37 @@ import Footer from "@/components/Footer/index.astro";
 const url = new URL(Astro.request.url);
 const currentPage = url.pathname;
 import "./style.css";
+import { localizePath } from "@/utils/helpers";
+
+const { isBlog } = Astro.props;
+const { lang } = Astro.params;
 ---
 
 <html>
   <head>
     <HeadCommon />
   </head>
+  <div>
+    {
+      !isBlog && (
+        <div class="h-14 w-screen bg-blue-600 flex justify-center items-center text-white">
+          <a
+            href={localizePath(
+              "/blog/curseforge-partnership-announcement",
+              lang?.toString() || "en"
+            )}
+          >
+            GDLauncher is evolving. Learn more about this on our latest article
+            by clicking here
+          </a>
+        </div>
+      )
+    }
+  </div>
 
-  <body
-    class="font-main w-full bg-gray-800 font-[ubuntu] overflow-x-hidden mb-[91px] lg:mb-0"
-  >
-    <Navbar currentPage={currentPage} />
-    <main class="text-white">
-      <slot />
-    </main>
-    <Footer />
-  </body>
+  <Navbar currentPage={currentPage} />
+  <main class="text-white">
+    <slot />
+  </main>
+  <Footer />
 </html>

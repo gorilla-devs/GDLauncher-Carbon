@@ -52,7 +52,11 @@ const t = useTranslations(Astro.url.pathname);
             </a>
             <a href={localizePath("/newsletter", lang?.toString() || "en")}>
               <Button
-                style={{ "max-width": "300px", "background-color": "#16a34a" }}
+                style={{
+                  "max-width": "auto",
+                  width: "100%",
+                  "background-color": "#16a34a",
+                }}
                 >{t("newsletter.subscribe")}
               </Button>
             </a>
