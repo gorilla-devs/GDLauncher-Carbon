@@ -7,7 +7,7 @@ import { createSignal, Show } from "solid-js";
 import { useForm } from "../../../components/useForm";
 
 const WaitList = ({ pathname }: { pathname: string }) => {
-  const { form, updateFormField, clearField } = useForm();
+  const { form, updateFormField } = useForm();
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal("");
@@ -31,23 +31,16 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     setSuccess("");
     setLoading(true);
 
-    const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;
-
-    if (emailRegex.test(form.email || "")) {
-      if (form.email) {
-        obj["email"] = form.email;
-        const res = await addUser(obj);
-        if (res.status === 400) {
-          setError(t("newsletter.error_400"));
-        } else {
-          setSuccess(t("newsletter.success"));
-          clearField("email");
-        }
+    if (form.email) {
+      obj["email"] = form.email;
+      const res = await addUser(obj);
+      if (res.status === 400) {
+        setError(t("newsletter.error_400"));
       } else {
-        setError(t("newsletter.error_missing_info"));
+        setSuccess(t("newsletter.success"));
       }
     } else {
-      setError(t("newsletter.notEmail"));
+      setError(t("newsletter.error_missing_info"));
     }
     setLoading(false);
   };
@@ -65,7 +58,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
         <p class="text-xl lg:text-3xl font-thin max-w-xs lg:max-w-4xl">
           {t("newsletter.text")}
         </p>
-        <div onClick={handleSubmit}>
+        <form onSubmit={handleSubmit} method="post">
           <div class="flex flex-col justify-center items-center gap-4">
             <div class="flex flex-col lg:flex-row gap-10">
               <div class="grow lg:min-w-[300px]">
@@ -77,14 +70,14 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 />
               </div>
               <Button
-                disabled={loading() || !!success()}
+                disabled={loading()}
                 class="min-w-[100px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active"
               >
                 <>
                   <Show when={loading()}>
                     <LoadingSpinner />
                   </Show>
-                  {!!success() ? t("newsletter.subscribed") : t("newsletter.getAccess")}
+                  {t("newsletter.getAccess")}
                 </>
               </Button>
             </div>
@@ -97,7 +90,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
               </Show>
             </div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
