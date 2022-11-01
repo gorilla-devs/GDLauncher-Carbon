@@ -15,27 +15,29 @@ const { lang } = Astro.params;
   <head>
     <HeadCommon />
   </head>
-  <div>
-    {
-      !isBlog && (
-        <div class="h-20 lg:h-14 w-full p-4 lg:p-0 bg-blue-600 flex justify-center items-center text-white">
-          <a
-            href={localizePath(
-              "/blog/curseforge-partnership-announcement",
-              lang?.toString() || "en"
-            )}
-          >
-            GDLauncher is evolving. Learn more about this on our latest article
-            by clicking here
-          </a>
-        </div>
-      )
-    }
-  </div>
+  <body class={!isBlog ? "mb-[78px]" : ""}>
+    <div>
+      {
+        !isBlog && (
+          <div class="h-20 lg:h-14 w-full p-4 lg:p-0 bg-blue-600 flex justify-center items-center text-white">
+            <a
+              href={localizePath(
+                "/blog/curseforge-partnership-announcement",
+                lang?.toString() || "en"
+              )}
+            >
+              GDLauncher is evolving. Learn more about this on our latest
+              article by clicking here
+            </a>
+          </div>
+        )
+      }
+    </div>
 
-  <Navbar currentPage={currentPage} isBlog={isBlog} />
-  <main class="text-white">
-    <slot />
-  </main>
-  <Footer />
+    <Navbar currentPage={currentPage} isBlog={isBlog} />
+    <main class="text-white">
+      <slot />
+    </main>
+    <Footer />
+  </body>
 </html>

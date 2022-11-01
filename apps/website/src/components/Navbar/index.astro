@@ -22,7 +22,7 @@ const t = useTranslations(Astro.url.pathname);
 
 <Interactivity client:load />
 
-<div class={`navbar ${isBlog && "isBlog"}`}>
+<div class={`navbar ${isBlog ? "isBlog" : ""}`}>
   <div class="innerContainer">
     <div class="leftInnerContainer">
       <a href="/">
