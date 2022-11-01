@@ -12,37 +12,25 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   const [success, setSuccess] = createSignal("");
   const t = useTranslations(pathname);
 
-  // const addUser = async (body: any) => {
-  //   return await fetch(ADD_USER_ENDPOINT, {
-  //     method: "POST",
-  //     headers: {
-  //       Accept: "application/json",
-  //       "Content-Type": "application/json",
-  //     },
-  //     body: JSON.stringify(body),
-  //   });
-  // };
+  const addUser = async (body: any) => {
+    return await fetch(ADD_USER_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  };
 
-  // const handleSubmit = async (event: Event) => {
-  //   event.preventDefault();
-  //   const obj: any = {};
-  //   setError("");
-  //   setSuccess("");
-  //   setLoading(true);
+  const handleSubmit = async (event: Event) => {
+    event.preventDefault();
+    const obj: any = {};
+    setError("");
+    setSuccess("");
+    setLoading(true);
 
-  //   if (form.email) {
-  //     obj["email"] = form.email;
-  //     const res = await addUser(obj);
-  //     if (res.status === 400) {
-  //       setError(t("newsletter.error_400"));
-  //     } else {
-  //       setSuccess(t("newsletter.success"));
-  //     }
-  //   } else {
-  //     setError(t("newsletter.error_missing_info"));
-  //   }
-  //   setLoading(false);
-  // };
+    const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;
 
     if (emailRegex.test(email() || "")) {
       if (email()) {
