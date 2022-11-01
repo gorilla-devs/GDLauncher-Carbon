@@ -114,7 +114,8 @@ export default {
     "You already subscribed, one of your email was already used!",
   "newsletter.error_missing_info":
     "Please enter all the info, some of the them are missing.",
-  "newsletter.success": "You successfully subscribed to the newsletter",
+  "newsletter.success":
+    "Your email has been registered. Due to issues with our infrastructure you might not receive a confirmation email right away. Hold tight, we will send it as soon as possible.",
   "newsletter.confirm.title":
     "You have successfully subscribed to the newsletter🎉",
   "blog.title": "The GDLauncher Blog",
