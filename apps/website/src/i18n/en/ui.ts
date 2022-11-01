@@ -111,7 +111,8 @@ export default {
   "newsletter.kofi_email": "Kofi Email",
   "newsletter.error_401": "Pending verification, verify your email!",
   "newsletter.error_400":
-    "You already subscribed, one of your email was already used!",
+  "You already subscribed, one of your email was already used!",
+  "newsletter.notEmail":"Please enter a correct email.",
   "newsletter.error_missing_info":
     "Please enter all the info, some of the them are missing.",
   "newsletter.success":

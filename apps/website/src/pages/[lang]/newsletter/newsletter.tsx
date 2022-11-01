@@ -7,7 +7,7 @@ import { createSignal, Show } from "solid-js";
 import { useForm } from "../../../components/useForm";
 
 const WaitList = ({ pathname }: { pathname: string }) => {
-  const { form, updateFormField } = useForm();
+  const { form, updateFormField, clearField } = useForm();
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal("");
@@ -31,16 +31,23 @@ const WaitList = ({ pathname }: { pathname: string }) => {
     setSuccess("");
     setLoading(true);
 
-    if (form.email) {
-      obj["email"] = form.email;
-      const res = await addUser(obj);
-      if (res.status === 400) {
-        setError(t("newsletter.error_400"));
+    const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;
+
+    if (emailRegex.test(form.email || "")) {
+      if (form.email) {
+        obj["email"] = form.email;
+        const res = await addUser(obj);
+        if (res.status === 400) {
+          setError(t("newsletter.error_400"));
+        } else {
+          setSuccess(t("newsletter.success"));
+          clearField("email");
+        }
       } else {
-        setSuccess(t("newsletter.success"));
+        setError(t("newsletter.error_missing_info"));
       }
     } else {
-      setError(t("newsletter.error_missing_info"));
+      setError(t("newsletter.notEmail"));
     }
     setLoading(false);
   };
@@ -70,7 +77,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                 />
               </div>
               <Button
-                disabled={loading()}
+                disabled={loading() || !!success()}
                 class="min-w-[100px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active"
               >
                 <>
