@@ -105,6 +105,7 @@ export default {
   "newsletter.text":
     "Subscribe and keep yourself updated about GDLauncher news!",
   "newsletter.getAccess": "SUBSCRIBE NOW!",
+  "newsletter.subscribed": "SUBSCRIBED",
   "newsletter.subscribe": "Subscribe to the newsletter",
   "newsletter.mc_email": "Minecraft Email",
   "newsletter.email": "Email",

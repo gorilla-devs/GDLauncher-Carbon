@@ -84,7 +84,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                   <Show when={loading()}>
                     <LoadingSpinner />
                   </Show>
-                  {t("newsletter.getAccess")}
+                  {!!success() ? t("newsletter.subscribed") : t("newsletter.getAccess")}
                 </>
               </Button>
             </div>
