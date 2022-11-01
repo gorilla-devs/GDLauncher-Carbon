@@ -6,7 +6,7 @@ export const APP_URLS = {
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: "https://enderium-f8fml.ondigitalocean.app/v1",
+  newsletter: "https://api.gdlauncher.com/v1",
   kofi: "https://ko-fi.com/gdlauncher",
   download: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
