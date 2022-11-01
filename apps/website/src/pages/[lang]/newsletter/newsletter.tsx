@@ -2,7 +2,7 @@ import Button from "@/components/Button";
 import Input from "@/components/Input";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { ADD_USER_ENDPOINT } from "@/constants";
-// import { useTranslations } from "@/i18n/utils";
+import { useTranslations } from "@/i18n/utils";
 import { createSignal, Show } from "solid-js";
 
 const WaitList = ({ pathname }: { pathname: string }) => {
@@ -10,8 +10,8 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal("");
-  // const t = useTranslations(pathname);
-  const t = () => {};
+  console.log(pathname);
+  const t = useTranslations(pathname);
 
   const addUser = async (body: any) => {
     return await fetch(ADD_USER_ENDPOINT, {
