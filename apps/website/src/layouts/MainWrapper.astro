@@ -15,11 +15,11 @@ const { lang } = Astro.params;
   <head>
     <HeadCommon />
   </head>
-  <body class={!isBlog ? "mb-[78px]" : ""}>
+  <body class={!isBlog ? "mb-[78px] lg:mb-0" : ""}>
     <div>
       {
         !isBlog && (
-          <div class="h-20 lg:h-14 w-full p-4 lg:p-0 bg-blue-600 flex justify-center items-center text-white">
+          <div class="h-20 lg:h-14 w-full p-4 lg:p-0 bg-blue-600 flex justify-center items-center text-white font-bold">
             <a
               href={localizePath(
                 "/blog/curseforge-partnership-announcement",
