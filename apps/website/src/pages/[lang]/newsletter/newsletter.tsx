@@ -97,7 +97,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
               </Show>
             </div>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
