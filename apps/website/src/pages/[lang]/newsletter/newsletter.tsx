@@ -10,7 +10,6 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal("");
-  console.log(pathname);
   const t = useTranslations(pathname);
 
   const addUser = async (body: any) => {
@@ -33,7 +32,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
 
     const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;
 
-    if (emailRegex.test(email() || "")) {
+    if (emailRegex.test(email())) {
       if (email()) {
         obj["email"] = email();
         const res = await addUser(obj);
@@ -65,7 +64,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
         <p class="text-xl lg:text-3xl font-thin max-w-xs lg:max-w-4xl">
           {t("newsletter.text")}
         </p>
-        <div onInput={handleSubmit}>
+        <div>
           <div class="flex flex-col justify-center items-center gap-4">
             <div class="flex flex-col lg:flex-row gap-10">
               <div class="grow lg:min-w-[300px]">
@@ -73,10 +72,14 @@ const WaitList = ({ pathname }: { pathname: string }) => {
                   placeholder={t("newsletter.email")}
                   type="email"
                   value={email()}
-                  onChange={(e) => setEmail((e.target || ({} as any)).value)}
+                  onInput={(e) => {
+                    const value = (e.target as HTMLInputElement).value;
+                    setEmail(value);
+                  }}
                 />
               </div>
               <Button
+                onClick={handleSubmit}
                 disabled={loading() || !!success()}
                 class="min-w-[100px] border-none transition duration-150 box-shadow-button hover:box-shadow-button-hover active:box-shadow-button-active"
               >

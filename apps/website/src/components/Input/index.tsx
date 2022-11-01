@@ -5,7 +5,7 @@ type Props = {
   type?: string;
   placeholder?: string;
   label?: any;
-  onChange?: (event: Event) => void;
+  onInput?: (event: Event) => void;
   value?: string;
 };
 
@@ -17,7 +17,7 @@ function Input(props: Props) {
       </Show>
       <input
         class="rounded-2xl text-black py-4 px-6"
-        onchange={props.onChange}
+        onInput={props.onInput}
         value={props.value || ""}
         id={props.label || ""}
         type={props.type || ""}

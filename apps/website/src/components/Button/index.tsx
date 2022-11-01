@@ -5,13 +5,14 @@ type Props = {
   class?: string;
   style?: any;
   disabled?: boolean;
-  onClick?: () => void;
+  onClick?: (props: any) => any;
 };
 
 function Button(props: Props) {
   const c = children(() => props.children);
   return (
     <button
+      onClick={props.onClick}
       disabled={props.disabled}
       class={props.class}
       style={{
@@ -24,7 +25,7 @@ function Button(props: Props) {
         "max-width": "250px",
         "border-radius": "1rem",
         "background-color": props.disabled ? "#255c97" : "#2b6cb0",
-        cursor: props.disabled ? "not-allowed" :"pointer",
+        cursor: props.disabled ? "not-allowed" : "pointer",
         "text-decoration": "none",
         "font-weight": "bold",
         height: "60px",
