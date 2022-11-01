@@ -17,19 +17,19 @@
   },
   "devDependencies": {
     "@astrojs/mdx": "^0.11.4",
-    "@astrojs/solid-js": "^1.2.0",
+    "@astrojs/solid-js": "^1.2.2",
     "@astrojs/tailwind": "^2.1.0",
     "@gd/config": "workspace:*",
     "@gd/ui": "workspace:*",
     "@unocss/preset-attributify": "^0.45.29",
     "@unocss/preset-wind": "^0.45.29",
-    "astro": "^1.5.0",
+    "astro": "^1.6.2",
     "astro-uno": "^0.2.1",
     "i18next": "^21.10.0",
     "i18next-http-backend": "^1.4.4",
     "lint-staged": "^13.0.3",
     "sass": "^1.55.0",
-    "solid-js": "^1.5.7",
+    "solid-js": "^1.6.1",
     "unocss": "^0.45.29",
     "vite-plugin-solid": "^2.3.9"
   }
