@@ -65,7 +65,7 @@ const WaitList = ({ pathname }: { pathname: string }) => {
         <p class="text-xl lg:text-3xl font-thin max-w-xs lg:max-w-4xl">
           {t("newsletter.text")}
         </p>
-        <div onclick={handleSubmit}>
+        <div onInput={handleSubmit}>
           <div class="flex flex-col justify-center items-center gap-4">
             <div class="flex flex-col lg:flex-row gap-10">
               <div class="grow lg:min-w-[300px]">
