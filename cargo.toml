@@ -1,7 +1,5 @@
 [workspace]
-members = [
-	"core",
-]
+members = ["packages/core", "packages/app_helper"]
 
 [profile.release]
 opt-level = 3

@@ -3,17 +3,21 @@ use std::{
     sync::{Arc, MutexGuard},
 };
 
+use serde::{Serialize, Deserialize};
+
 use crate::component::{
     components::modloaders::{forge::ForgeModLoader, vanilla::VanillaModLoader},
     Component,
 };
 
+#[derive(Debug, Serialize, Deserialize)]
 struct JavaMemoryOverride {
     min_mem_alloc: u16,
     max_mem_alloc: u16,
     perm_gen: u16,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Instance {
     components: Vec<Component>,
     override_java_path: Option<String>,

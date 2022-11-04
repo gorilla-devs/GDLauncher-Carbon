@@ -37,7 +37,7 @@ importers:
     devDependencies:
       '@aws-sdk/client-s3': 3.194.0
       '@gd/config': link:../../packages/config
-      '@gd/core': link:../../core
+      '@gd/core': link:../../packages/core
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.27.1
       '@solidjs/router': 0.5.0_solid-js@1.6.0
@@ -96,18 +96,26 @@ importers:
       unocss: 0.45.30_rollup@3.2.3+vite@3.2.2
       vite-plugin-solid: 2.3.10_solid-js@1.6.1+vite@3.2.2
 
-  core:
+  packages/app_helper:
+    specifiers:
+      '@gd/config': workspace:*
+      cross-env: ^7.0.3
+    devDependencies:
+      '@gd/config': link:../config
+      cross-env: 7.0.3
+
+  packages/config:
+    specifiers: {}
+
+  packages/core:
     specifiers:
       '@gd/config': workspace:*
       '@napi-rs/cli': ^2.12.0
       cross-env: ^7.0.3
     devDependencies:
-      '@gd/config': link:../packages/config
+      '@gd/config': link:../config
       '@napi-rs/cli': 2.12.0
       cross-env: 7.0.3
-
-  packages/config:
-    specifiers: {}
 
   packages/ui:
     specifiers:

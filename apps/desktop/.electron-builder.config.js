@@ -14,8 +14,24 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../core/core.node",
+      from: "../../packages/core/core.node",
       to: "core.node",
+    },
+    {
+      from: "../../target/aarch64-apple-darwin/release/app_helper",
+      to: "app_helper",
+    },
+    {
+      from: "../../target/x86_64-apple-darwin/release/app_helper",
+      to: "app_helper",
+    },
+    {
+      from: "../../target/x86_64-pc-windows-msvc/release/app_helper.exe",
+      to: "app_helper.exe",
+    },
+    {
+      from: "../../target/x86_64-unknown-linux-gnu/release/app_helper",
+      to: "app_helper",
     },
   ],
   npmRebuild: false,

@@ -4,13 +4,15 @@ pub mod components;
 use std::sync::Arc;
 
 use error::ComponentError;
+use serde::{Deserialize, Serialize};
 
-use crate::instance::Instance;
+use super::instance::Instance;
 
 use self::components::modloaders::{vanilla::VanillaModLoader, forge::ForgeModLoader};
 
 pub type ComponentVersion = String;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub enum Component {
     VanillaModLoader(VanillaModLoader),
     ForgeModLoader(ForgeModLoader),

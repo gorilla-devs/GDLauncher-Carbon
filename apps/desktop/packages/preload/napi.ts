@@ -2,7 +2,7 @@ import path from "path";
 import core from "@gd/core";
 
 const isDev = import.meta.env.MODE === "development";
-const nAPIPath = isDev ? "../../core" : `${__dirname}/../../../`;
+const nAPIPath = isDev ? "../../packages/core" : `${__dirname}/../../../`;
 
 let calledOnce = false;
 let addon = new Promise<() => typeof core | undefined>((resolve, reject) => {

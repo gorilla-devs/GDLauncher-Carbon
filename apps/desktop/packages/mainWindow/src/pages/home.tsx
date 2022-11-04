@@ -40,7 +40,10 @@ export default function Home() {
         <div class="helloworld">prova</div>
         <button
           onClick={async () => {
-            const res = await napi.auth();
+            const res = await napi.auth((id) => {
+              console.log("hello", id);
+            });
+            console.log("RES:", res);
             // setValue(res);
           }}
         >
