@@ -27,7 +27,10 @@ export default defineConfig({
     }),
     mdx(),
     sitemap({
-      filter: (page) => page !== "https://gdlauncher.com/newsletter/confirm",
+      // TODO: do that automaticlly for each language
+      filter: (page) =>
+        page !== "https://gdlauncher.com/en/newsletter/confirm/" &&
+        page !== "https://gdlauncher.com/en/privacy-policy/",
       i18n: {
         defaultLocale: "en",
         locales: {
