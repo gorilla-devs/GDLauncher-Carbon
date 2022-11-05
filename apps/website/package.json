@@ -32,5 +32,8 @@
     "solid-js": "^1.6.1",
     "unocss": "^0.45.29",
     "vite-plugin-solid": "^2.3.9"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^1.0.0"
   }
 }

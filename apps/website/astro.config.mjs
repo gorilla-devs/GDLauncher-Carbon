@@ -4,8 +4,10 @@
 import solid from "@astrojs/solid-js";
 import { defineConfig } from "astro/config";
 import tailwind from "@astrojs/tailwind";
-
 import mdx from "@astrojs/mdx";
+
+// https://astro.build/config
+import sitemap from "@astrojs/sitemap";
 
 // https://astro.build/config
 export default defineConfig({
@@ -15,9 +17,15 @@ export default defineConfig({
       // noExternal: "style.css", // from @gd/ui
     },
   },
+  site: "https://gdlauncher.com",
   integrations: [
     solid(),
-    tailwind({ config: { applyBaseStyles: false } }),
+    tailwind({
+      config: {
+        applyBaseStyles: false,
+      },
+    }),
     mdx(),
+    sitemap(),
   ],
 });
