@@ -26,6 +26,14 @@ export default defineConfig({
       },
     }),
     mdx(),
-    sitemap(),
+    sitemap({
+      filter: (page) => page !== "https://gdlauncher.com/newsletter/confirm",
+      i18n: {
+        defaultLocale: "en",
+        locales: {
+          en: "en-US",
+        },
+      },
+    }),
   ],
 });
