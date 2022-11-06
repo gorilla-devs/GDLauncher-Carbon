@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@astrojs/mdx": "^0.11.4",
+    "@astrojs/sitemap": "^1.0.0",
     "@astrojs/solid-js": "^1.2.2",
     "@astrojs/tailwind": "^2.1.0",
     "@gd/config": "workspace:*",
@@ -32,8 +33,5 @@
     "solid-js": "^1.6.1",
     "unocss": "^0.45.29",
     "vite-plugin-solid": "^2.3.9"
-  },
-  "dependencies": {
-    "@astrojs/sitemap": "^1.0.0"
   }
 }
