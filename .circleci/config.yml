@@ -49,9 +49,8 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: |
-                pnpm build-mac-x64
-                pnpm test
+            - run: pnpm build-mac-x64
+            - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -72,9 +71,8 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: |
-                pnpm build-mac-arm64
-                pnpm test
+            - run: pnpm build-mac-arm64
+            - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release

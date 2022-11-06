@@ -3,13 +3,13 @@ use napi_derive::napi;
 
 use super::{Accounts};
 
-#[napi(object)]
+#[napi(object, js_name="account")]
 struct NAPIAccount {
     pub id: String,
     pub name: String,
 }
 
-#[napi(object)]
+#[napi(object, js_name="accounts")]
 struct NAPIAccounts {
     pub accounts: Vec<NAPIAccount>,
     pub selected_account: Option<NAPIAccount>,
