@@ -1,4 +1,12 @@
-import { app, BrowserWindow, dialog, Menu, session, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  session,
+  shell,
+  screen,
+} from "electron";
 import {
   setupTitlebar,
   attachTitlebarToWindow,
@@ -35,13 +43,45 @@ let win: BrowserWindow | null = null;
 const menu = Menu.buildFromTemplate([]);
 Menu.setApplicationMenu(menu);
 
+function getMinimumBounds() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.workAreaSize;
+
+  if (width <= 800 || height <= 600) {
+    // Smaller ads (160/600)
+    return {
+      minWidth: 760,
+      minHeight: 500,
+    };
+  } else if (width < 1000 || height < 800) {
+    // Smaller ads (160/600)
+    return {
+      minWidth: 800,
+      minHeight: 600,
+    };
+  } else if (width < 1600 || height < 900) {
+    // Smaller ads (160/600)
+    return {
+      minWidth: 1160,
+      minHeight: 670,
+    };
+  } else {
+    return {
+      minWidth: 1280,
+      minHeight: 740,
+    };
+  }
+}
+
 async function createWindow() {
+  const { minWidth, minHeight } = getMinimumBounds();
+
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
-    minHeight: 750,
-    height: 750,
-    minWidth: 1360,
-    width: 1360,
+    minHeight,
+    height: minHeight,
+    minWidth,
+    width: minWidth,
     titleBarStyle: "hidden",
     autoHideMenuBar: true,
     webPreferences: {
@@ -49,6 +89,19 @@ async function createWindow() {
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
+
+  screen.addListener(
+    "display-metrics-changed",
+    (_, display, changedMetrics) => {
+      const { minWidth, minHeight } = getMinimumBounds();
+      if (changedMetrics.includes("workArea")) {
+        const { width, height } = display.workAreaSize;
+        win?.setMinimumSize(minWidth, minHeight);
+        win?.setSize(minWidth, minHeight);
+      }
+    }
+  );
+
   attachTitlebarToWindow(win);
 
   if (app.isPackaged) {

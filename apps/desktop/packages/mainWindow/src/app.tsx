@@ -49,7 +49,7 @@ const App: Component = () => {
                   },
                 ],
                 {
-                  duration: 120,
+                  duration: 0,
                 }
               );
               a.finished.then(done);

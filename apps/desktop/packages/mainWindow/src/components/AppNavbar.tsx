@@ -14,7 +14,7 @@ export default function AppNavbar() {
         <img src={GDLauncherWideLogo} class="h-9" />
         <ul class="flex items-between gap-6 m-0 text-white list-none pl-23">
           <li class="py-2">
-            <Link href="/" class="no-underline hover:underline text-white">
+            <Link href="/home" class="no-underline hover:underline text-white">
               Home
             </Link>
           </li>
@@ -29,6 +29,14 @@ export default function AppNavbar() {
               class="no-underline decoratione hover:underline text-white"
             >
               Error
+            </Link>
+          </li>
+          <li class="py-2">
+            <Link
+              href="/"
+              class="no-underline decoratione hover:underline text-white"
+            >
+              Logout
             </Link>
           </li>
 
