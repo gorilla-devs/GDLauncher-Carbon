@@ -8,7 +8,7 @@ interface Props {
 // Page starts with opacity 0 and then fades in, handled in app.tsx
 const Page = (props: Props) => {
   const c = children(() => props.children);
-  return <div class="absolute w-full h-full opacity-0">{c()}</div>;
+  return <div class="absolute w-screen h-screen opacity-0">{c()}</div>;
 };
 
 export default Page;

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, session, shell } from "electron";
+import { setupTitlebar, attachTitlebarToWindow } from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
 import { autoUpdater } from "electron-updater";
@@ -24,6 +25,8 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
+setupTitlebar();
+
 let win: BrowserWindow | null = null;
 
 async function createWindow() {
@@ -33,11 +36,14 @@ async function createWindow() {
     height: 750,
     minWidth: 1360,
     width: 1360,
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
+
+  attachTitlebarToWindow(win);
 
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));

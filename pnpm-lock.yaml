@@ -18,6 +18,7 @@ importers:
       '@solidjs/router': ^0.5.0
       '@unocss/preset-attributify': ^0.45.29
       '@unocss/preset-wind': ^0.45.29
+      custom-electron-titlebar: ^4.1.2
       electron: 21.1.1
       electron-builder: ^23.6.0
       electron-playwright-helpers: ^1.2.0
@@ -43,6 +44,7 @@ importers:
       '@solidjs/router': 0.5.0_solid-js@1.6.0
       '@unocss/preset-attributify': 0.45.30
       '@unocss/preset-wind': 0.45.30
+      custom-electron-titlebar: 4.1.2_electron@21.1.1
       electron: 21.1.1
       electron-builder: 23.6.0
       electron-playwright-helpers: 1.2.0
@@ -5103,6 +5105,7 @@ packages:
 
   /@types/glob/7.2.0:
     resolution: {integrity: sha512-ZUxbzKl0IfJILTS6t7ip5fQQM/J3TJYubDm3nMbgubNNYS62eXeUpoLUC8/7fJNiFYHTrGPQn7hspDUzIHX3UA==}
+    requiresBuild: true
     dependencies:
       '@types/minimatch': 5.1.2
       '@types/node': 18.11.4
@@ -6108,10 +6111,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
+      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
-      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -6986,9 +6989,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
+      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
-      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -7958,6 +7961,14 @@ packages:
       array-find-index: 1.0.2
     dev: true
     optional: true
+
+  /custom-electron-titlebar/4.1.2_electron@21.1.1:
+    resolution: {integrity: sha512-sLNLRYhDR/UOCP0oiO6dAiyMrgTr7yb8JjxE/MK2eAJwO+UbbF1lXOG3RxwWFwPJgJfyZnk0rPC8Ke+GKe4M4A==}
+    peerDependencies:
+      electron: '>20'
+    dependencies:
+      electron: 21.1.1
+    dev: true
 
   /cyclist/1.0.1:
     resolution: {integrity: sha512-NJGVKPS81XejHcLhaLJS7plab0fK3slPh11mESeeDq2W4ZI5kUKK/LRRdVDvjJseojbPB7ZwjnyOybg3Igea/A==}
@@ -10175,6 +10186,7 @@ packages:
   /global-agent/3.0.0:
     resolution: {integrity: sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q==}
     engines: {node: '>=10.0'}
+    requiresBuild: true
     dependencies:
       boolean: 3.2.0
       es6-error: 4.1.1
@@ -15045,6 +15057,7 @@ packages:
 
   /rxjs/7.5.7:
     resolution: {integrity: sha512-z9MzKh/UcOqB3i20H6rtrlaE/CgjLOvheWK/9ILrbhROGTweAi1BaFsTT9FbwZi5Trr1qNRs+MXkhmR06awzQA==}
+    requiresBuild: true
     dependencies:
       tslib: 2.4.0
     dev: true

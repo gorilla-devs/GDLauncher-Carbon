@@ -6,6 +6,10 @@ import AboutData from "./pages/about.data";
 export const routes: RouteDefinition[] = [
   {
     path: "/",
+    component: lazy(() => import("./pages/auth")),
+  },
+  {
+    path: "/home",
     component: lazy(() => import("./pages/home")),
   },
   {
