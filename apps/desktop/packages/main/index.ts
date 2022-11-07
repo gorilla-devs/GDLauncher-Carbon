@@ -6,6 +6,7 @@ import {
   session,
   shell,
   screen,
+  ipcMain,
 } from "electron";
 import {
   setupTitlebar,
@@ -52,26 +53,47 @@ function getMinimumBounds() {
     return {
       minWidth: 760,
       minHeight: 500,
+      adSize: {
+        width: 160,
+        height: 600,
+      },
     };
   } else if (width < 1000 || height < 800) {
     // Smaller ads (160/600)
     return {
       minWidth: 800,
       minHeight: 600,
+      adSize: {
+        width: 160,
+        height: 600,
+      },
     };
   } else if (width < 1600 || height < 900) {
     // Smaller ads (160/600)
     return {
       minWidth: 1160,
       minHeight: 670,
+      adSize: {
+        width: 160,
+        height: 600,
+      },
     };
   } else {
     return {
       minWidth: 1280,
       minHeight: 740,
+      adSize: {
+        width: 400,
+        height: 600,
+      },
     };
   }
 }
+
+// Handlers
+ipcMain.handle("getMinimumBounds", async () => {
+  return getMinimumBounds();
+});
 
 async function createWindow() {
   const { minWidth, minHeight } = getMinimumBounds();

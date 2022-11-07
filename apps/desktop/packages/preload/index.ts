@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, Menu } from "electron";
+import { contextBridge, ipcRenderer, screen } from "electron";
 import { Titlebar, Color } from "custom-electron-titlebar";
 import { domReady } from "./utils";
 import { useLoading } from "./loading";
@@ -11,7 +11,7 @@ const { appendLoading, clearState, fatalError } = useLoading();
   new Titlebar({
     containerOverflow: "visible",
     backgroundColor: Color.fromHex("#15181E"),
-    icon: " "
+    icon: " ",
   });
   appendLoading();
 })();
@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld("clearState", clearState);
 contextBridge.exposeInMainWorld("fatalError", fatalError);
 contextBridge.exposeInMainWorld("ipcRenderer", withPrototype(ipcRenderer));
 contextBridge.exposeInMainWorld("__GDL__", napi);
+contextBridge.exposeInMainWorld(
+  "getMinimumBounds",
+  ipcRenderer.invoke("getMinimumBounds")
+);
 
 // `exposeInMainWorld` can't detect attributes and methods of `prototype`, manually patching it.
 function withPrototype(obj: Record<string, any>) {
