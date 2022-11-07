@@ -1,5 +1,6 @@
 import path from "path";
 import core from "@gd/core";
+import { contextBridge } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
 const nAPIPath = isDev ? "../../packages/core" : `${__dirname}/../../../`;
@@ -19,4 +20,4 @@ let addon = new Promise<() => typeof core | undefined>((resolve, reject) => {
     .catch(reject);
 });
 
-export default addon;
+contextBridge.exposeInMainWorld("__GDL__", addon);

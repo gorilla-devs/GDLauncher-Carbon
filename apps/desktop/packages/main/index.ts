@@ -90,11 +90,6 @@ function getMinimumBounds() {
   }
 }
 
-// Handlers
-ipcMain.handle("getMinimumBounds", async () => {
-  return getMinimumBounds();
-});
-
 async function createWindow() {
   const { minWidth, minHeight } = getMinimumBounds();
 
@@ -120,9 +115,17 @@ async function createWindow() {
         const { width, height } = display.workAreaSize;
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
+        win?.webContents.send("minimumBoundsChanged", {
+          ...getMinimumBounds(),
+        });
       }
     }
   );
+
+  // Handlers
+  ipcMain.handle("getMinimumBounds", async (e) => {
+    return getMinimumBounds();
+  });
 
   attachTitlebarToWindow(win);
 

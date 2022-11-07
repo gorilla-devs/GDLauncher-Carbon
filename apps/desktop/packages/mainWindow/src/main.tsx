@@ -9,6 +9,7 @@ import "virtual:unocss-devtools";
 import "./utils/napi";
 import initAnalytics from "./utils/analytics";
 import { isModuleLoaded } from "./utils/napi";
+import loadHandlers from "./utils/loadHandlers";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -22,6 +23,10 @@ render(() => {
     } else if (isModuleLoaded() instanceof Error) {
       window.fatalError(isModuleLoaded() as Error);
     }
+  });
+
+  onMount(() => {
+    loadHandlers();
   });
 
   return (
@@ -38,10 +43,3 @@ render(() => {
     </Router>
   );
 }, document.getElementById("overlay") as HTMLElement);
-
-console.log("ipcRenderer", window.ipcRenderer);
-
-// Usage of ipcRenderer.on
-window.ipcRenderer.on("main-process-message", (_event, ...args) => {
-  console.log("[Receive Main-process message]:", ...args);
-});
