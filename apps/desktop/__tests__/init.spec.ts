@@ -56,7 +56,7 @@ test.describe("Init Tests", () => {
     });
 
     page = await electronApp.firstWindow();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     await page.screenshot({ path: "initial-screenshot.png" });
 
