@@ -5,6 +5,7 @@ import { Transition } from "solid-transition-group";
 import { routes } from "./routes";
 import AppNavbar from "./components/AppNavbar";
 import Sidebar from "./components/Sidebar";
+import { AdsBanner } from "./components/AdBanner";
 
 const App: Component = () => {
   const location = useLocation();
@@ -59,7 +60,7 @@ const App: Component = () => {
           </Transition>
         </main>
         <Show when={location.pathname !== "/"}>
-          <div class="h-[600px] w-[400px] bg-red-400 mx-5 mt-5"></div>
+          <AdsBanner />
         </Show>
       </div>
     </div>

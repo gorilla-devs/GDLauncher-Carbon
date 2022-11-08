@@ -2,8 +2,8 @@ import { children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 
 interface Props {
-  children: JSX.Element;
-  class: string;
+  children: JSX.Element | Element;
+  class?: string;
 }
 
 // Page starts with opacity 0 and then fades in, handled in app.tsx
