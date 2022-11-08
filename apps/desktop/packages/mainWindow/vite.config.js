@@ -6,6 +6,7 @@ import { ViteMinifyPlugin } from "vite-plugin-minify";
 import presetAttributify from "@unocss/preset-attributify";
 import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
+// import
 
 /**
  * @see https://vitejs.dev/config/
@@ -24,8 +25,25 @@ export default defineConfig({
         }),
         presetWind(),
       ],
+      rules: [
+        [
+          /^bg-image-(.*)$/,
+          ([_, d]) => {
+            let img = d.split("-")[0];
+            return {
+              background: `url('./assets/images/${img}.png')`,
+              "background-size": "100% 100%",
+              "background-repeat": "no-repeat",
+              "box-sizing": "border-box",
+            };
+          },
+        ],
+      ],
+      theme: {
+        colors: {},
+      },
     }),
-    ViteMinifyPlugin({})
+    ViteMinifyPlugin({}),
   ],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
