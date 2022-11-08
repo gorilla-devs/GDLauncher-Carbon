@@ -11,7 +11,15 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
     }),
-    Unocss(),
+    Unocss({
+      theme: {
+        colors: {
+          accent: {
+            main: "#2B6CB0",
+          },
+        },
+      },
+    }),
   ],
   test: {
     globals: true,
@@ -39,7 +47,7 @@ export default defineConfig({
       external: ["solid-js"],
       output: {
         globals: {
-          "solid-js": "SolidJS"
+          "solid-js": "SolidJS",
         },
       },
     },
@@ -49,7 +57,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.join(__dirname, "src")
+      "@": path.join(__dirname, "src"),
     },
     conditions: ["development", "browser"],
   },

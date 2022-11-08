@@ -40,7 +40,11 @@ export default defineConfig({
         ],
       ],
       theme: {
-        colors: {},
+        colors: {
+          accent: {
+            main: "#2B6CB0",
+          },
+        },
       },
     }),
     ViteMinifyPlugin({}),
