@@ -1,5 +1,5 @@
 import { Component, Show } from "solid-js";
-import { Link, useRoutes, useLocation } from "@solidjs/router";
+import { useRoutes, useLocation } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { Pattern } from "@gd/ui";
 import { routes } from "./routes";

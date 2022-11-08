@@ -1,11 +1,6 @@
 import { minimumBounds } from "@/stores/ads";
-import { createEffect, onMount } from "solid-js";
 
 export const AdsBanner = () => {
-  createEffect(() => {
-    console.log("adSizes", minimumBounds().adSize);
-  });
-
   return (
     <div
       style={{
