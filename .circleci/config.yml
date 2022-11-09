@@ -8,7 +8,7 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.62.0-browsers
-    resource_class: medium
+    resource_class: small
   website:
     docker:
       - image: cimg/rust:1.62.0-node
@@ -157,7 +157,11 @@ jobs:
       - store_artifacts:
           path: ./apps/desktop/release
 workflows:
-  all-builds:
+  every-commit:
+    jobs:
+      - buildWebsite
+      - buildLinux
+  master-builds:
     jobs:
       - buildMac:
           filters:
@@ -167,11 +171,8 @@ workflows:
           matrix:
             parameters:
               os: ["mac", "macm1"]
-      - buildWebsite
-      - buildLinux
       - buildWin:
           filters:
             branches:
               only:
                 - master
-                
