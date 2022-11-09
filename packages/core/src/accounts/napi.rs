@@ -6,7 +6,7 @@ use super::{
     Account, Accounts, ACCOUNTS,
 };
 
-#[napi(object, js_name = "account")]
+#[napi(object, js_name = "Account")]
 struct NAPIAccount {
     pub id: String,
     pub name: String,
@@ -23,7 +23,7 @@ impl From<Account> for NAPIAccount {
     }
 }
 
-#[napi(object, js_name = "accounts")]
+#[napi(object, js_name = "Accounts")]
 struct NAPIAccounts {
     pub accounts: Vec<NAPIAccount>,
     pub selected_account: Option<NAPIAccount>,
@@ -107,7 +107,6 @@ pub fn auth(
 
             let mc_auth = auth.finalize_auth(&client).await.unwrap();
             let mc_profile = mc_auth.get_mc_profile(&client).await.unwrap();
-            let mc_profile_clone = mc_profile.clone();
 
             let account = Account {
                 ms_data: auth,
@@ -137,5 +136,11 @@ pub fn auth(
 #[napi]
 pub async fn init_accounts() -> Result<NAPIAccounts> {
     let accounts = Accounts::new().await.unwrap();
+    Ok(accounts.into())
+}
+
+#[napi]
+pub async fn get_accounts() -> Result<NAPIAccounts> {
+    let accounts = ACCOUNTS.lock().await.clone();
     Ok(accounts.into())
 }

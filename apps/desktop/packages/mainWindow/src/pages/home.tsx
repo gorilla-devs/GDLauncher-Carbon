@@ -1,8 +1,9 @@
 import Page from "@/components/Page";
-import napi from "@/utils/napi";
+import napi from "@/modules/napi";
 import { useNavigate } from "@solidjs/router";
 import { createSignal } from "solid-js";
 import { Button } from "@gd/ui";
+import accounts from "@/modules/components/accounts";
 
 export default function Home() {
   const [count, setCount] = createSignal(0);

@@ -10,33 +10,41 @@ function useLoading() {
   oDiv.style.width = "100%";
   oDiv.style.height = "100%";
   oDiv.style.zIndex = "999999";
-  oDiv.style.backgroundColor = "#282c34";
+  oDiv.style.backgroundColor = "#1D2028";
+  oDiv.style.color = "#fff";
   oDiv.style.display = "flex";
   oDiv.style.justifyContent = "center";
   oDiv.style.alignItems = "center";
-  oDiv.style.fontSize = "1.5rem";
+  oDiv.style.fontSize = "1.7rem";
+  oDiv.style.textAlign = "center";
 
   return {
     appendLoading() {
-      oDiv.innerHTML = `<div>Loading...</div>`;
+      oDiv.innerHTML = `<div></div>`;
       oDiv.className = "appLoadingState";
-      oDiv.style.color = "#fff";
       oDiv.style.fontWeight = "600";
       document.body.appendChild(oDiv);
     },
-    async clearState() {
+    updateLoading(loaded: number, total: number) {
+      oDiv.innerHTML = `<div>Loaded ${loaded}/${total} modules</div>`;
+    },
+    async clearLoading() {
       document.body.removeChild(oDiv);
     },
-    fatalError(error: Error) {
-      oDiv.innerHTML = `<div>${error}</div>`;
-      oDiv.className = "appFatalCrashState";
-      oDiv.style.color = "#fff";
+    fatalError(error: string, moduleName?: string) {
       oDiv.style.fontWeight = "600";
+      oDiv.className = "appFatalCrashState";
+      if (moduleName) {
+        const errorText = `<div style="margin-top: 1.5rem; font-size: 1.3rem; font-weight: 400;">${error}</div>`;
+        oDiv.innerHTML = `<div><div>Couldn't load module "${moduleName}"</div>${errorText}</div>`;
+      } else {
+        oDiv.innerHTML = `<div>${error}</div>`;
+      }
     },
   };
 }
 
-const { appendLoading, clearState, fatalError } = useLoading();
+const { appendLoading, clearLoading, fatalError, updateLoading } = useLoading();
 (async () => {
   await domReady();
   new Titlebar({
@@ -48,5 +56,6 @@ const { appendLoading, clearState, fatalError } = useLoading();
 })();
 
 // --------- Expose some API to the Renderer process. ---------
-contextBridge.exposeInMainWorld("clearState", clearState);
+contextBridge.exposeInMainWorld("updateLoading", updateLoading);
+contextBridge.exposeInMainWorld("clearLoading", clearLoading);
 contextBridge.exposeInMainWorld("fatalError", fatalError);
