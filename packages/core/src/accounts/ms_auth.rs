@@ -1,6 +1,4 @@
 use std::sync::Arc;
-use futures::prelude::*;
-use napi_derive::napi;
 use anyhow::{bail, Result};
 use chrono::{Duration, Local, NaiveDateTime};
 use jsonwebtoken::{DecodingKey, TokenData};
@@ -177,7 +175,6 @@ lazy_static! {
     pub static ref AZURE_DATA: Arc<Mutex<Option<AzureData>>> = Arc::new(Mutex::new(None));
 }
 
-#[napi(object)]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct McProfile {
     pub id: String,
@@ -581,7 +578,7 @@ impl DeviceCode {
     pub async fn poll_device_code_auth(&self, client: &Client) -> anyhow::Result<MsAuth> {
         match &self.inner {
             Some(inner) => loop {
-                std::thread::sleep(std::time::Duration::from_secs(inner.interval));
+                std::thread::sleep(std::time::Duration::from_secs(2));
 
                 let code_resp = client
                     .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
