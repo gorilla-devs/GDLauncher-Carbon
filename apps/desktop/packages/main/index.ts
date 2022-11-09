@@ -134,18 +134,16 @@ async function createWindow() {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
-    const url = `http://${process.env["VITE_DEV_SERVER_HOST"]}:${process.env["VITE_DEV_MAIN_WINDOW_PORT"]}`;
+    const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${import.meta.env.VITE_DEV_MAIN_WINDOW_PORT}`;
 
     win.loadURL(url, {
       userAgent: "GDLauncher Carbon",
     });
   }
-  win.webContents.openDevTools();
 
-  // Test active push message to Renderer-process
-  win.webContents.on("did-finish-load", () => {
-    win?.webContents.send("main-process-message", new Date().toLocaleString());
-  });
+  if (import.meta.env.VITE_AUTO_START_DEVTOOLS) {
+    win.webContents.openDevTools();
+  }
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {

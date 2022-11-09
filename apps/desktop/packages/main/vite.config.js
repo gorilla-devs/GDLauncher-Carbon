@@ -1,26 +1,29 @@
 import { builtinModules } from "module";
-import { defineConfig } from "vite";
+import { resolve } from "path";
+import { defineConfig, loadEnv } from "vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
-import pkg from "../../package.json";
 
-export default defineConfig({
-  root: __dirname,
-  plugins: [ViteMinifyPlugin({})],
-  build: {
-    outDir: "../../dist/main",
-    lib: {
-      entry: "index.ts",
-      formats: ["cjs"],
-      fileName: () => "[name].cjs",
+export default defineConfig(({ mode }) => {
+  return {
+    root: __dirname,
+    plugins: [ViteMinifyPlugin({})],
+    envDir: resolve(__dirname, "../../../../"),
+    build: {
+      outDir: "../../dist/main",
+      lib: {
+        entry: "index.ts",
+        formats: ["cjs"],
+        fileName: () => "[name].cjs",
+      },
+      minify: process.env./* from mode option */ NODE_ENV === "production",
+      emptyOutDir: true,
+      rollupOptions: {
+        external: [
+          "electron",
+          ...builtinModules,
+          // ...Object.keys(pkg.dependencies || {}),
+        ],
+      },
     },
-    minify: process.env./* from mode option */ NODE_ENV === "production",
-    emptyOutDir: true,
-    rollupOptions: {
-      external: [
-        "electron",
-        ...builtinModules,
-        // ...Object.keys(pkg.dependencies || {}),
-      ],
-    },
-  },
+  };
 });

@@ -1,5 +1,5 @@
 import { useNavigate } from "@solidjs/router";
-import Logo from "../../assets/images/gdlauncher_vertical_logo.svg";
+import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 export default function Home() {
   const navigate = useNavigate();
