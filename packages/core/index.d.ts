@@ -11,7 +11,12 @@ export interface accounts {
   accounts: Array<account>
   selectedAccount?: account
 }
+export interface DeviceCodeObject {
+  userCode: string
+  link: string
+  expiresAt: number
+}
+export function auth(reporter: (deviceCode: string) => void): Promise<DeviceCodeObject>
 export function initAccounts(): Promise<accounts>
 export function fibonacci(num: number, num1: number): Promise<number>
 export function computePathMurmur(path: string): Promise<number>
-export function auth(reporter: (token: string) => void): Promise<string>

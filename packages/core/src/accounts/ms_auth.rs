@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use chrono::{Duration, Local, NaiveDateTime};
-use jsonwebtoken::{TokenData, DecodingKey};
+use jsonwebtoken::{DecodingKey, TokenData};
 use lazy_static::lazy_static;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -119,8 +119,10 @@ impl AzureData {
         // exp, nbf, iat is set to validate as default
         validator.leeway = 60;
         validator.set_audience(&[&MS_KEY]);
-        let decoded: TokenData<AzureJwtClaims> =
-            self.validate_token_authenticity(token, &validator).await.unwrap();
+        let decoded: TokenData<AzureJwtClaims> = self
+            .validate_token_authenticity(token, &validator)
+            .await
+            .unwrap();
 
         Ok(decoded)
     }
@@ -517,7 +519,7 @@ pub struct DeviceCodeInner {
     pub user_code: String,
     device_code: String,
     pub verification_uri: String,
-    expires_in: i64,
+    pub expires_in: i64,
     interval: u64,
     pub message: String,
 }
@@ -530,6 +532,7 @@ struct MsAuthError {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct DeviceCode {
     pub inner: Option<DeviceCodeInner>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl DeviceCode {
@@ -547,7 +550,7 @@ impl DeviceCode {
     pub async fn new(client: &Client) -> anyhow::Result<Self> {
         let device_code: DeviceCode;
         let device_code_inner: Option<DeviceCodeInner>;
-        let device_resp = client
+        let device_resp: DeviceCodeInner = client
             .get("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
             .query(&[
                 ("client_id", MS_KEY),
@@ -563,9 +566,12 @@ impl DeviceCode {
             .json()
             .await?;
 
+        let expires_in = device_resp.expires_in;
+
         device_code_inner = Some(device_resp);
         device_code = DeviceCode {
             inner: device_code_inner,
+            expires_at: Some(chrono::Utc::now() + chrono::Duration::seconds(expires_in)),
         };
         Ok(device_code)
     }
