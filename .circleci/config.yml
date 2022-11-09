@@ -25,7 +25,7 @@ executors:
   node: node/default
 
 jobs:
-  build:
+  buildMac:
     parameters:
       os:
         type: string
@@ -76,40 +76,6 @@ jobs:
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
-      # LINUX
-      - when:
-          condition:
-            and:
-              - equal: ["linux", <<parameters.os>>]
-          steps:
-            - run: |
-                rustup toolchain install nightly
-                rustup target add x86_64-unknown-linux-gnu --toolchain nightly
-                rustup default nightly
-                node -v
-                cargo --version
-                sudo npm i -g pnpm
-                pnpm i
-                chmod -R a+x node_modules
-            - run: pnpm build-linux-x64
-            - run: pnpm test
-            - run: cd apps && cd desktop && pnpm clean
-            - store_artifacts:
-                path: ./apps/desktop/release
-
-      # LINUX WEBSITE
-      - when:
-          condition:
-            and:
-              - equal: ["website", <<parameters.os>>]
-          steps:
-            - run: |
-                node -v
-                sudo npm i -g pnpm
-                pnpm i
-                chmod -R a+x node_modules
-            # - run: pnpm test
-            - run: pnpm build-web
   buildWin:
     working_directory: ./
     executor:
@@ -161,10 +127,39 @@ jobs:
           shell: bash.exe
       - store_artifacts:
           path: ./apps/desktop/release
+  buildWebsite:
+    executor: "website"
+    steps:
+      - checkout
+      - run: |
+          node -v
+          sudo npm i -g pnpm
+          pnpm i
+          chmod -R a+x node_modules
+      # - run: pnpm test
+      - run: pnpm build-web
+  buildLinux:
+    executor: "linux"
+    steps:
+      - checkout
+      - run: |
+          rustup toolchain install nightly
+          rustup target add x86_64-unknown-linux-gnu --toolchain nightly
+          rustup default nightly
+          node -v
+          cargo --version
+          sudo npm i -g pnpm
+          pnpm i
+          chmod -R a+x node_modules
+      - run: pnpm build-linux-x64
+      - run: pnpm test
+      - run: cd apps && cd desktop && pnpm clean
+      - store_artifacts:
+          path: ./apps/desktop/release
 workflows:
   all-builds:
     jobs:
-      - build:
+      - buildMac:
           filters:
             branches:
               only:
@@ -172,10 +167,8 @@ workflows:
           matrix:
             parameters:
               os: ["mac", "macm1"]
-      - build:
-          matrix:
-            parameters:
-              os: ["linux", "website"]
+      - buildWebsite
+      - buildLinux
       - buildWin:
           filters:
             branches:
