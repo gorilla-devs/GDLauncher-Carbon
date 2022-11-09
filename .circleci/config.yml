@@ -171,7 +171,11 @@ workflows:
                 - master
           matrix:
             parameters:
-              os: ["linux", "mac", "macm1", "website"]
+              os: ["mac", "macm1"]
+      - build:
+          matrix:
+            parameters:
+              os: ["linux", "website"]
       - buildWin:
           filters:
             branches:
