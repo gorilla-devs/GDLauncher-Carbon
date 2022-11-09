@@ -86,6 +86,7 @@ pub fn auth(
 
             let mc_auth = auth.finalize_auth(&client).await.unwrap();
             let mc_profile = mc_auth.get_mc_profile(&client).await.unwrap();
+            let mc_profile_clone = mc_profile.clone();
 
             let account = Account {
                 ms_data: auth,
@@ -93,13 +94,12 @@ pub fn auth(
                 mc_profile,
             };
 
-            println!("{:?}", account.ms_data.get_id_token_claims().await.unwrap());
             let accounts = &*ACCOUNTS.lock().await;
 
             accounts.clone().add_account(account).await;
 
             // here the promise which we returned gets resolved with a computed value
-            deferred.resolve(|_| Ok("Some stuff"));
+            deferred.resolve(|_| Ok(mc_profile_clone));
 
             Ok(())
         },
