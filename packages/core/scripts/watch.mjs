@@ -40,6 +40,10 @@ let debouncedFn = debounce(() => {
   console.log("Rebuilding native core done");
 }, 1000);
 
+//! IMPORTANT !//
+// This only works on Unix systems, as in windows you cannot delete a file while it's being used (core.node).
+// The workaround for windows would be to build the native core to a different file, and then reload the app
+// targetting the new file.
 chokidar.watch("./src", { ignoreInitial: true }).on("all", (event, path) => {
   debouncedFn();
 });

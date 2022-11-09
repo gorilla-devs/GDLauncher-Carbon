@@ -77,4 +77,12 @@ const mainWindow = await createServer({
 await mainWindow.listen();
 await watchPreload(mainWindow);
 await watchMain(mainWindow);
-await watchNativeCore(mainWindow);
+
+
+//! IMPORTANT !//
+// This only works on Unix systems, as in windows you cannot delete a file while it's being used (core.node).
+// The workaround for windows would be to build the native core to a different file, and then reload the app
+// targetting the new file.
+if (process.platform !== "win32") {
+  await watchNativeCore(mainWindow);
+}
