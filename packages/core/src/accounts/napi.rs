@@ -1,12 +1,26 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{ms_auth::DeviceCode, Account, Accounts, ACCOUNTS};
+use super::{
+    ms_auth::{DeviceCode, McAuth, McProfile},
+    Account, Accounts, ACCOUNTS,
+};
 
 #[napi(object, js_name = "account")]
 struct NAPIAccount {
     pub id: String,
     pub name: String,
+    pub access_token: String,
+}
+
+impl From<Account> for NAPIAccount {
+    fn from(account: Account) -> Self {
+        Self {
+            id: account.mc_profile.id,
+            name: account.mc_profile.name,
+            access_token: account.mc_data.access_token,
+        }
+    }
 }
 
 #[napi(object, js_name = "accounts")]
@@ -23,6 +37,7 @@ impl From<Accounts> for NAPIAccounts {
             .map(|account| NAPIAccount {
                 id: account.mc_profile.id.clone(),
                 name: account.mc_profile.name.clone(),
+                access_token: account.mc_data.access_token.clone(),
             })
             .collect();
 
@@ -30,6 +45,7 @@ impl From<Accounts> for NAPIAccounts {
         let selected_account = accounts.selected_account.map(|account| NAPIAccount {
             id: account.mc_profile.id.clone(),
             name: account.mc_profile.name.clone(),
+            access_token: account.mc_data.access_token.clone(),
         });
 
         NAPIAccounts {
@@ -46,7 +62,7 @@ struct DeviceCodeObject {
     pub expires_at: i64,
 }
 
-#[napi(ts_return_type = "Promise<String>")]
+#[napi(ts_return_type = "Promise<Account>")]
 pub fn auth(
     env: Env,
     #[napi(ts_arg_type = "(deviceData: DeviceCodeObject) => void")] reporter: JsFunction,
@@ -76,7 +92,12 @@ pub fn auth(
                 DeviceCodeObject {
                     user_code: device_code.clone().inner.unwrap().user_code.clone().clone(),
                     link: device_code.clone().inner.unwrap().verification_uri.clone(),
-                    expires_at: device_code.clone().expires_at.clone().unwrap().timestamp_millis()
+                    expires_at: device_code
+                        .clone()
+                        .expires_at
+                        .clone()
+                        .unwrap()
+                        .timestamp_millis(),
                 },
                 napi::threadsafe_function::ThreadsafeFunctionCallMode::Blocking,
             );
@@ -93,13 +114,14 @@ pub fn auth(
                 mc_data: mc_auth,
                 mc_profile,
             };
+            let napi_account: NAPIAccount = account.clone().into();
 
             let accounts = &*ACCOUNTS.lock().await;
 
             accounts.clone().add_account(account).await;
 
             // here the promise which we returned gets resolved with a computed value
-            deferred.resolve(|_| Ok(mc_profile_clone));
+            deferred.resolve(|_| Ok(napi_account));
 
             Ok(())
         },
