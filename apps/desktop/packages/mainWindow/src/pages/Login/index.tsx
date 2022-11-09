@@ -1,13 +1,11 @@
-import { createSignal, Switch, Match, onMount } from "solid-js";
+import { createSignal, Switch, Match } from "solid-js";
+import { DeviceCodeObject } from "@gd/core";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 
-export const [step, setStep] = createSignal(0);
-
 export default function Login() {
-  onMount(() => {
-    setStep(0);
-  });
+  const [step, setStep] = createSignal(0);
+  const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
 
   return (
     <div class="flex justify-center items-center w-full h-full bg-image-loginBG p-0">
@@ -18,12 +16,16 @@ export default function Login() {
         class="absolute top-0 left-0 right-0 bottom-0 bg-[#1D2028] opacity-80"
       />
       <div class="w-120 h-90 rounded-2xl bg-[#1D2028] opacity-80 relative backdrop-blur-sm flex flex-col justify-end items-center text-white">
-        <Switch fallback={<Auth />}>
+        <Switch
+          fallback={
+            <Auth setStep={setStep} setDeviceCodeObject={setDeviceCodeObject} />
+          }
+        >
           <Match when={step() === 0}>
-            <Auth />
+            <Auth setStep={setStep} setDeviceCodeObject={setDeviceCodeObject} />
           </Match>
           <Match when={step() === 1}>
-            <CodeStep />
+            <CodeStep deviceCodeObject={deviceCodeObject()} />
           </Match>
         </Switch>
       </div>
