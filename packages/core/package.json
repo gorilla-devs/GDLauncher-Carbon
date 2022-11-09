@@ -8,6 +8,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
+    "watch": "node scripts/watch.mjs",
     "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts --release",
     "_dev_": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts"
   },
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@gd/config": "workspace:*",
     "@napi-rs/cli": "^2.12.0",
+    "chokidar": "^3.5.3",
     "cross-env": "^7.0.3"
   }
 }

@@ -1,11 +1,12 @@
 import { spawn } from "child_process";
 import { createServer, build } from "vite";
 import electron from "electron";
+import chokidar from "chokidar";
 
 /**
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */
-function watchMain(mainWindow, mcLogWindow) {
+function watchMain(mainWindow) {
   /**
    * @type {import('child_process').ChildProcessWithoutNullStreams | null}
    */
@@ -34,6 +35,19 @@ function watchMain(mainWindow, mcLogWindow) {
   });
 }
 
+function watchNativeCore(mainWindow) {
+  spawn("pnpm", ["watch"], {
+    cwd: "../../packages/core",
+    stdio: "inherit",
+  });
+
+  chokidar
+    .watch("../../packages/core/core.node", { ignoreInitial: true })
+    .on("all", (event, path) => {
+      console.log("Reloading app due to native core rebuild", event);
+      mainWindow.ws.send({ type: "full-reload" });
+    });
+}
 /**
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */
@@ -62,3 +76,4 @@ const mainWindow = await createServer({
 await mainWindow.listen();
 await watchPreload(mainWindow);
 await watchMain(mainWindow);
+await watchNativeCore(mainWindow);

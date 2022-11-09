@@ -1,15 +1,15 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
-use super::{Accounts};
+use super::Accounts;
 
-#[napi(object, js_name="account")]
+#[napi(object, js_name = "account")]
 struct NAPIAccount {
     pub id: String,
     pub name: String,
 }
 
-#[napi(object, js_name="accounts")]
+#[napi(object, js_name = "accounts")]
 struct NAPIAccounts {
     pub accounts: Vec<NAPIAccount>,
     pub selected_account: Option<NAPIAccount>,
@@ -27,12 +27,10 @@ impl From<Accounts> for NAPIAccounts {
             .collect();
 
         // Get index of selected account
-        let selected_account = accounts
-            .selected_account
-            .map(|account| NAPIAccount {
-                id: account.mc_profile.id.clone(),
-                name: account.mc_profile.name.clone(),
-            });
+        let selected_account = accounts.selected_account.map(|account| NAPIAccount {
+            id: account.mc_profile.id.clone(),
+            name: account.mc_profile.name.clone(),
+        });
 
         NAPIAccounts {
             accounts: accounts_new,

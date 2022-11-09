@@ -1,4 +1,5 @@
 import { contextBridge } from "electron";
+import { Titlebar, Color } from "custom-electron-titlebar";
 import { domReady } from "./utils";
 
 function useLoading() {
@@ -23,7 +24,7 @@ function useLoading() {
       oDiv.style.fontWeight = "600";
       document.body.appendChild(oDiv);
     },
-    clearState() {
+    async clearState() {
       document.body.removeChild(oDiv);
     },
     fatalError(error: Error) {
@@ -38,6 +39,11 @@ function useLoading() {
 const { appendLoading, clearState, fatalError } = useLoading();
 (async () => {
   await domReady();
+  new Titlebar({
+    containerOverflow: "visible",
+    backgroundColor: Color.fromHex("#15181E"),
+    icon: " ",
+  });
   appendLoading();
 })();
 
