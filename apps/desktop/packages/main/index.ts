@@ -15,6 +15,7 @@ import {
 import { release } from "os";
 import { join, resolve } from "path";
 import { autoUpdater } from "electron-updater";
+import "./preloadListeners";
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
