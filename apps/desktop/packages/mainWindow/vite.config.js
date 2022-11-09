@@ -28,10 +28,14 @@ export default defineConfig({
       rules: [
         [
           /^bg-image-(.*)$/,
-          ([_, d]) => {
+          ([a, d]) => {
             let img = d.split("-")[0];
+            let extension = a.split(".")[1];
+            const isSvg = extension === "svg";
             return {
-              background: `url('./assets/images/${img}.png')`,
+              background: `url('./assets/images/${
+                isSvg ? img : `${img}.png`
+              }')`,
               "background-size": "100% 100%",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",
