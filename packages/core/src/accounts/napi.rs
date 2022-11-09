@@ -46,10 +46,10 @@ struct DeviceCodeObject {
     pub expires_at: i64,
 }
 
-#[napi(ts_return_type = "Promise<DeviceCodeObject>")]
+#[napi(ts_return_type = "Promise<String>")]
 pub fn auth(
     env: Env,
-    #[napi(ts_arg_type = "(deviceCode: string) => void")] reporter: JsFunction,
+    #[napi(ts_arg_type = "(deviceData: DeviceCodeObject) => void")] reporter: JsFunction,
 ) -> napi::Result<napi::JsObject> {
     // creating a promise which we can later resolve from another thread
     let (deferred, promise) = env.create_deferred()?;
