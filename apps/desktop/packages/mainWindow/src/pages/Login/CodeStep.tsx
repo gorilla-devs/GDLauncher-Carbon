@@ -15,6 +15,7 @@ const CodeStep = () => {
           authorization
         </p>
       </div>
+
       <Button
         onClick={() => {
           navigate("/home");
