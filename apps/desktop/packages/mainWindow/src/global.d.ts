@@ -1,9 +1,10 @@
-import { BoundsSize } from "./stores/ads";
+import { BoundsSize } from "./modules/components/minimumBounds";
 
 declare global {
   interface Window {
-    clearState: () => void;
-    fatalError: (err: Error) => void;
+    clearLoading: () => void;
+    fatalError: (error: string, moduleName?: string) => void;
+    updateLoading: (loaded: number, total: number) => void;
     ipcRenderer: import("electron").IpcRenderer;
     report: any;
     getMinimumBounds: () => Promise<BoundsSize>;

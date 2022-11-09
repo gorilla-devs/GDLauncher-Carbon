@@ -6,10 +6,8 @@ import App from "./app";
 import Modals from "./Modals";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
-import "./utils/napi";
 import initAnalytics from "./utils/analytics";
-import { isModuleLoaded } from "./utils/napi";
-import loadHandlers from "./utils/loadHandlers";
+import { initModules } from "./modules";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -17,16 +15,16 @@ queueMicrotask(() => {
 
 render(() => {
   createEffect(() => {
-    console.log("isModuleLoaded", isModuleLoaded());
-    if (isModuleLoaded() === true) {
-      window.clearState();
-    } else if (isModuleLoaded() instanceof Error) {
-      window.fatalError(isModuleLoaded() as Error);
-    }
+    // console.log("isModuleLoaded", isModuleLoaded());
+    // if (isModuleLoaded() === true) {
+    //   window.clearState();
+    // } else if (isModuleLoaded() instanceof Error) {
+    //   window.fatalError(isModuleLoaded() as Error);
+    // }
   });
 
   onMount(() => {
-    loadHandlers();
+    initModules();
   });
 
   return (
