@@ -8,13 +8,6 @@ const CodeStep = () => {
   return (
     <div class="flex flex-col justify-between items-center gap-5 p-10 text-center">
       <img src={DoorImage} />
-      <button
-        onClick={() => {
-          navigate("/home");
-        }}
-      >
-        auth
-      </button>
       <div>
         <input />
         <p class="text-[#8A8B8F]">
@@ -22,7 +15,13 @@ const CodeStep = () => {
           authorization
         </p>
       </div>
-      <Button>Insert the code</Button>
+      <Button
+        onClick={() => {
+          navigate("/home");
+        }}
+      >
+        Insert the code
+      </Button>
     </div>
   );
 };
