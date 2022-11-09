@@ -1,5 +1,6 @@
 use std::sync::Arc;
-
+use futures::prelude::*;
+use napi_derive::napi;
 use anyhow::{bail, Result};
 use chrono::{Duration, Local, NaiveDateTime};
 use jsonwebtoken::{DecodingKey, TokenData};
@@ -176,6 +177,7 @@ lazy_static! {
     pub static ref AZURE_DATA: Arc<Mutex<Option<AzureData>>> = Arc::new(Mutex::new(None));
 }
 
+#[napi(object)]
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct McProfile {
     pub id: String,
