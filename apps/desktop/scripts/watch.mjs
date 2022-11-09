@@ -38,6 +38,7 @@ function watchMain(mainWindow) {
 function watchNativeCore(mainWindow) {
   spawn("pnpm", ["watch"], {
     cwd: "../../packages/core",
+    shell: true,
     stdio: "inherit",
   });
 
