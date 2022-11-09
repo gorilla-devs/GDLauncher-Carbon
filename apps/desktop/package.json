@@ -24,6 +24,7 @@
     "@solidjs/router": "^0.5.0",
     "@unocss/preset-attributify": "^0.45.29",
     "@unocss/preset-wind": "^0.45.29",
+    "chokidar": "^3.5.3",
     "custom-electron-titlebar": "^4.1.2",
     "electron": "21.1.1",
     "electron-builder": "^23.6.0",

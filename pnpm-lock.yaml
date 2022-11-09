@@ -18,6 +18,7 @@ importers:
       '@solidjs/router': ^0.5.0
       '@unocss/preset-attributify': ^0.45.29
       '@unocss/preset-wind': ^0.45.29
+      chokidar: ^3.5.3
       custom-electron-titlebar: ^4.1.2
       electron: 21.1.1
       electron-builder: ^23.6.0
@@ -44,6 +45,7 @@ importers:
       '@solidjs/router': 0.5.0_solid-js@1.6.0
       '@unocss/preset-attributify': 0.45.30
       '@unocss/preset-wind': 0.45.30
+      chokidar: 3.5.3
       custom-electron-titlebar: 4.1.2_electron@21.1.1
       electron: 21.1.1
       electron-builder: 23.6.0
@@ -115,10 +117,12 @@ importers:
     specifiers:
       '@gd/config': workspace:*
       '@napi-rs/cli': ^2.12.0
+      chokidar: ^3.5.3
       cross-env: ^7.0.3
     devDependencies:
       '@gd/config': link:../config
       '@napi-rs/cli': 2.12.0
+      chokidar: 3.5.3
       cross-env: 7.0.3
 
   packages/ui:
