@@ -12,7 +12,7 @@ executors:
   website:
     docker:
       - image: cimg/rust:1.62.0-node
-    resource_class: medium
+    resource_class: small
   mac:
     macos:
       xcode: "14.0.0"
