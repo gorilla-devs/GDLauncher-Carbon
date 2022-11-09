@@ -1,4 +1,7 @@
-export function useLoading() {
+import { contextBridge } from "electron";
+import { domReady } from "./utils";
+
+function useLoading() {
   const oDiv = document.createElement("div");
   oDiv.style.position = "fixed";
   oDiv.style.top = "0";
@@ -11,7 +14,7 @@ export function useLoading() {
   oDiv.style.justifyContent = "center";
   oDiv.style.alignItems = "center";
   oDiv.style.fontSize = "1.5rem";
-  
+
   return {
     appendLoading() {
       oDiv.innerHTML = `<div>Loading...</div>`;
@@ -31,3 +34,13 @@ export function useLoading() {
     },
   };
 }
+
+const { appendLoading, clearState, fatalError } = useLoading();
+(async () => {
+  await domReady();
+  appendLoading();
+})();
+
+// --------- Expose some API to the Renderer process. ---------
+contextBridge.exposeInMainWorld("clearState", clearState);
+contextBridge.exposeInMainWorld("fatalError", fatalError);
