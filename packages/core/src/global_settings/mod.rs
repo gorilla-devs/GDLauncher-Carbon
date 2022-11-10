@@ -1,66 +1,45 @@
-// NOTE: As this is rust, it is relatively easy to move things around,
-// and in the event that the configuration becomes too complex, we can just change settings.rs to
-// settings/mod.rs, and move the structs around.
+use std::{collections::HashMap, path::PathBuf};
 
-use config::{Config, ConfigError, File};
-use serde::Deserialize;
-use std::ops::Deref;
-use std::sync::Arc;
-// As this is an Arc, cloning it is "free", so deriving clone is not a problem,
-// and won't use a lot of memory.
-#[derive(Clone)]
-pub struct Settings {
-    inner: Arc<RawSettings>,
-}
-/// Implementing Deref for Settings allows for the raw usage of the settings
-/// as if the wrapper was never there, even if it is wrapped in an Arc for thread sharing.
-impl Deref for Settings {
-    type Target = RawSettings;
+pub type JavaMajorVersion = u8;
 
-    fn deref(&self) -> &Self::Target {
-        self.inner.deref()
-    }
+pub struct GDLSettings {
+    java: JavaSettings,
+    discord_rpc: DiscordRPC,
+    launcher: LauncherSettings,
 }
 
-impl Settings {
-    pub fn new() -> Result<Self, ConfigError> {
-        return Ok(Settings {
-            inner: Arc::new(RawSettings::new()?),
-        });
-    }
+pub struct JavaSettings {
+    components: HashMap<JavaMajorVersion, Vec<JavaComponent>>,
+    args: Vec<ArgumentComponent>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct RawSettings {
-    pub curseforge: Curseforge,
-    pub server: Server,
+pub struct ArgumentComponent {
+    pub name: String,
+    pub value: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Curseforge {
-    pub api_key: String,
-    pub endpoint: String,
+pub struct JavaComponent {
+    pub path: PathBuf,
+    pub full_version: String,
+    pub arch: String,
+    /// Indicates whether the component has manually been added by the user
+    pub is_custom: bool,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Server {
-    pub ip: String,
-    pub port: u16,
+pub struct DiscordRPC {
+    pub enabled: bool,
 }
 
-impl RawSettings {
-    pub fn new() -> Result<Self, ConfigError> {
-        let config = Config::builder()
-            // Set all the default values
-            .set_default("curseforge.endpoint", "https://api.curseforge.com/v1/")?
-            .set_default("server.ip", "127.0.0.1")?
-            .set_default("server.port", "8000")?
-            .set_default("log.console_level", "info")?
-            .set_default("log.file_level", "warn")?
-            .set_default("log.directory", "logs")?
-            .add_source(File::with_name("./settings.toml").required(true))
-            .build()?;
+pub struct LauncherSettings {
+    quit_on_game_close: bool,
+    quit_on_game_launch: Option<RecordPlaySession>,
+}
 
-        config.try_deserialize()
-    }
+pub struct RecordPlaySession {
+    /// Keeps track of the time the game was launched
+    record_playtime: bool,
+    /// Records the general computer's usage of resources during the session
+    record_resources_usage: bool,
+    /// Records how much memory, CPU and general resources the game used during the session
+    record_game_performance: bool,
 }
