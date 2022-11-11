@@ -54,6 +54,8 @@ function getMinimumBounds() {
     return {
       minWidth: 760,
       minHeight: 500,
+      width: 760,
+      height: 500,
       adSize: {
         width: 160,
         height: 600,
@@ -64,6 +66,8 @@ function getMinimumBounds() {
     return {
       minWidth: 800,
       minHeight: 600,
+      width: 800,
+      height: 600,
       adSize: {
         width: 160,
         height: 600,
@@ -74,6 +78,8 @@ function getMinimumBounds() {
     return {
       minWidth: 1160,
       minHeight: 670,
+      width: 1160,
+      height: 670,
       adSize: {
         width: 160,
         height: 600,
@@ -83,6 +89,8 @@ function getMinimumBounds() {
     return {
       minWidth: 1280,
       minHeight: 740,
+      width: 1560,
+      height: 740,
       adSize: {
         width: 400,
         height: 600,
@@ -92,14 +100,14 @@ function getMinimumBounds() {
 }
 
 async function createWindow() {
-  const { minWidth, minHeight } = getMinimumBounds();
+  const { minWidth, minHeight, width, height } = getMinimumBounds();
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
     minHeight,
-    height: minHeight,
+    height,
     minWidth,
-    width: minWidth,
+    width,
     titleBarStyle: "hidden",
     autoHideMenuBar: true,
     webPreferences: {
@@ -141,7 +149,7 @@ async function createWindow() {
     });
   }
 
-  if (import.meta.env.VITE_AUTO_START_DEVTOOLS) {
+  if (import.meta.env.DEV) {
     win.webContents.openDevTools();
   }
 

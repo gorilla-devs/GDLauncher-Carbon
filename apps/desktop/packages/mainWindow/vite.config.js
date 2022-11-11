@@ -19,7 +19,7 @@ export default defineConfig({
       include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
       presets: [
         presetAttributify({
-          prefix: "w:",
+          prefix: "uno:",
           prefixedOnly: true,
         }),
         presetWind(),
