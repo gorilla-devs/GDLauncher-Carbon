@@ -15,6 +15,7 @@
       "cache": false
     },
     "@gd/core": {
+      "outputs": ["core.node"],
       "cache": false
     },
     "@gd/app_helper": {
