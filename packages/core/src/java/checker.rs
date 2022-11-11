@@ -227,8 +227,8 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-async fn find_java_paths() -> Result<Vec<PathBuf>> {
-    let FOLDERS = [
+async fn find_java_paths() -> Vec<PathBuf> {
+    let folders = [
         "/usr/java",
         "/usr/lib/jvm",
         "/usr/lib64/jvm",
@@ -242,13 +242,17 @@ async fn find_java_paths() -> Result<Vec<PathBuf>> {
     let mut javas: Vec<PathBuf> = vec![];
     javas.push(PathBuf::from(get_default_java_path()));
 
-    for f in FOLDERS {
-        for b in scan_java_dirs(f).await {
-            javas.extend(b);
+    for file in folders {
+        let directories = scan_java_dirs(file).await;
+        for dir in directories {
+            javas.push(dir);
         }
     }
 
-    javas = load_java_paths_from_env().await.unwrap().unwrap();
+    let java_from_env = load_java_paths_from_env().await;
+    if let Ok(Some(java_from_env)) = java_from_env {
+        javas.extend(java_from_env);
+    }
 
     // Remove duplicates
     javas.sort_by(|a, b| {
@@ -259,21 +263,26 @@ async fn find_java_paths() -> Result<Vec<PathBuf>> {
     });
     javas.dedup();
 
-    return Ok(javas);
+    javas
 }
 
 #[cfg(target_os = "linux")]
-async fn scan_java_dirs(dir_path: &str) -> Result<Vec<PathBuf>> {
+async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     let mut result: Vec<PathBuf> = Vec::new();
-    let mut entries = fs::read_dir(dir_path).await?;
+    let mut entries = match fs::read_dir(dir_path).await {
+        Ok(directories) => directories,
+        Err(_) => return result,
+    };
 
-    while let Some(child) = entries.next_entry().await? {
-        let path = PathBuf::from(child.path());
-        result.push(path.join("jre/bin/java"));
-        result.push(path.join("bin/java"));
+    while let Ok(child) = entries.next_entry().await {
+        if let Some(child) = child {
+            let path = PathBuf::from(child.path());
+            result.push(path.join("jre/bin/java"));
+            result.push(path.join("bin/java"));
+        }
     }
 
-    Ok(result)
+    result
 }
 
 mod tests {
