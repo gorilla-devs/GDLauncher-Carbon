@@ -32,9 +32,8 @@ export default defineConfig({
             let extension = a.split(".")[1];
             const isSvg = extension === "svg";
             return {
-              background: `url('./${
-                process.env.NODE_ENV === "development" ? "assets/" : ""
-              }images/${isSvg ? img : `${img}.png`}')`,
+              background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
+                }images/${isSvg ? img : `${img}.png`}')`,
               "background-size": "100% 100%",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",

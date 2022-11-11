@@ -1,9 +1,10 @@
 {
   "name": "@gd/config",
   "version": "0.0.0",
-  "main": "index.js",
+  "main": "index.ts",
   "files": [
-    "tsconfig.json"
+    "tsconfig.json",
+    "index.ts"
   ],
   "devDependencies": {}
 }
