@@ -4,6 +4,17 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
+import presetIcons from "@unocss/preset-icons";
+import { readdirSync, readFileSync } from "fs";
+
+let icons = {};
+
+const iconFiles = readdirSync(path.join("./", "icons"));
+
+for (const iconFile of iconFiles) {
+  const file = readFileSync(path.join("./", "icons", iconFile));
+  icons[path.basename(iconFile, ".svg")] = file.toString();
+}
 
 export default defineConfig({
   plugins: [
@@ -19,6 +30,17 @@ export default defineConfig({
           },
         },
       },
+      presets: [
+        presetIcons({
+          collections: {
+            hero: () =>
+              import("@iconify-json/heroicons/icons.json").then(
+                (i) => i.default
+              ),
+            gdl: icons,
+          },
+        }),
+      ],
     }),
   ],
   test: {

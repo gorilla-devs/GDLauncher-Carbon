@@ -1,18 +1,10 @@
-import { children, createSignal, createEffect } from "solid-js";
+import { children } from "solid-js";
 
 type Props = {
   children: HTMLElement | string;
   onClick?: () => void;
 };
 function Button(props: Props) {
-  const [q, setC] = createSignal(false);
-
-  createEffect(() => {
-    if (q()) {
-      console.log(q());
-    }
-  });
-
   const c = children(() => props.children);
   return (
     <div

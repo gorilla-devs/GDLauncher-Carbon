@@ -14,7 +14,7 @@ export default function Login() {
         }}
         class="absolute top-0 left-0 right-0 bottom-0 bg-[#1D2028] opacity-80"
       />
-      <div class="w-120 h-90 rounded-2xl bg-[#1D2028] opacity-80 relative backdrop-blur-sm flex flex-col justify-end items-center text-white">
+      <div class="w-120 h-90 rounded-2xl bg-[#1D2028] opacity-80 relative flex flex-col justify-end items-center text-white">
         <Switch
           fallback={
             <Auth setStep={setStep} setDeviceCodeObject={setDeviceCodeObject} />

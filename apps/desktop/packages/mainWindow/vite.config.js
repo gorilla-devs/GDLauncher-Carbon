@@ -34,7 +34,7 @@ export default defineConfig({
             return {
               background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
                 }images/${isSvg ? img : `${img}.png`}')`,
-              "background-size": "100% 100%",
+              "background-size": "cover",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",
             };

@@ -18,6 +18,7 @@
   "devDependencies": {
     "@babel/core": "^7.19.3",
     "@gd/config": "workspace:*",
+    "@iconify-json/heroicons": "^1.1.6",
     "@storybook/addon-actions": "^6.5.12",
     "@storybook/addon-essentials": "^6.5.12",
     "@storybook/addon-interactions": "^6.5.12",
@@ -26,6 +27,7 @@
     "@storybook/html": "^6.5.12",
     "@storybook/testing-library": "^0.0.13",
     "@testing-library/jest-dom": "^5.16.5",
+    "@unocss/preset-icons": "^0.46.4",
     "babel-loader": "^8.2.5",
     "concurrently": "^7.4.0",
     "jsdom": "^20.0.1",

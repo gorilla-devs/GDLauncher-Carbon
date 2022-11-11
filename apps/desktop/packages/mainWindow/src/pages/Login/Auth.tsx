@@ -29,7 +29,7 @@ const Auth = (props: Props) => {
           Sign in with your Microsoft Account. By doing so, you accept all our
           policies and terms stated below.
         </p>
-        <ul class="flex gap-3 list-none p-0 mb-8 underline">
+        <ul class="flex gap-3 list-none p-0 mb-8 underline text-sm">
           <li>Privacy Policy</li>
           <li>Terms and Conditions</li>
           <li>Acceptable Use Policy</li>
