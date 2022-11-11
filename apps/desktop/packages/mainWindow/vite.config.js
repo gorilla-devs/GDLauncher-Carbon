@@ -7,12 +7,6 @@ import presetAttributify from "@unocss/preset-attributify";
 import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
 
-const unoAssetsPath = (img) => {
-  return `url('./${
-    process.env.NODE_ENV === "development" ? "assets/" : ""
-  }images/${img}.png')`;
-};
-
 /**
  * @see https://vitejs.dev/config/
  */
@@ -25,7 +19,7 @@ export default defineConfig({
       include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
       presets: [
         presetAttributify({
-          prefix: "w:",
+          prefix: "uno:",
           prefixedOnly: true,
         }),
         presetWind(),
@@ -38,7 +32,8 @@ export default defineConfig({
             let extension = a.split(".")[1];
             const isSvg = extension === "svg";
             return {
-              background: unoAssetsPath(img),
+              background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
+                }images/${isSvg ? img : `${img}.png`}')`,
               "background-size": "100% 100%",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",

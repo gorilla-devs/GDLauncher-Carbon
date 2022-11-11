@@ -1,7 +1,7 @@
-import { createStore } from "solid-js/store";
 import { initNAPI } from "./napi";
+import config from "@gd/config";
 
-const moduleNames = ["minimumBounds", "accounts"] as const;
+let moduleNames = config.moduleNames;
 
 export type ModuleStatus = Record<
   typeof moduleNames[number],
@@ -20,11 +20,18 @@ const modulesStatus = moduleNames.reduce((acc, module) => {
 }, {} as ModuleStatus);
 
 export const initModules = async () => {
-  console.time("Loading NAPI Module");
-  await initNAPI();
-  console.timeEnd("Loading NAPI Module");
-
   let loadedModules = 0;
+
+  try {
+    console.time("Loading NAPI Module");
+    await initNAPI();
+    console.timeEnd("Loading NAPI Module");
+  } catch (err) {
+    console.error(err);
+    window.fatalError(err as string, "NAPI");
+    return;
+  }
+
   try {
     await Promise.all(
       moduleNames.map(async (moduleName) => {
