@@ -20,5 +20,6 @@ export interface DeviceCodeObject {
 export function auth(reporter: (deviceData: DeviceCodeObject) => void): Promise<Account>
 export function initAccounts(): Promise<Accounts>
 export function getAccounts(): Promise<Accounts>
+export function initJava(): Promise<void>
 export function fibonacci(num: number, num1: number): Promise<number>
 export function computePathMurmur(path: string): Promise<number>

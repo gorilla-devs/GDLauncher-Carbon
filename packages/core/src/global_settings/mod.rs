@@ -1,4 +1,6 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap};
+
+use crate::java::JavaComponent;
 
 pub type JavaMajorVersion = u8;
 
@@ -16,14 +18,6 @@ pub struct JavaSettings {
 pub struct ArgumentComponent {
     pub name: String,
     pub value: String,
-}
-
-pub struct JavaComponent {
-    pub path: PathBuf,
-    pub full_version: String,
-    pub arch: String,
-    /// Indicates whether the component has manually been added by the user
-    pub is_custom: bool,
 }
 
 pub struct DiscordRPC {

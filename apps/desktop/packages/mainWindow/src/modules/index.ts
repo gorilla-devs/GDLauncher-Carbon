@@ -32,6 +32,8 @@ export const initModules = async () => {
     return;
   }
 
+  let errored = false;
+
   try {
     await Promise.all(
       moduleNames.map(async (moduleName) => {
@@ -39,11 +41,13 @@ export const initModules = async () => {
           console.time(`Loading Module - ${moduleName}`);
           const module = await import(`./components/${moduleName}.ts`);
           await module.init();
+          if (errored) return;
           loadedModules++;
           window.updateLoading(loadedModules, moduleNames.length);
           modulesStatus[moduleName].loaded = true;
           console.timeEnd(`Loading Module - ${moduleName}`);
         } catch (err) {
+          errored = true;
           modulesStatus[moduleName].error = err as Error;
           console.error(err);
           throw err;

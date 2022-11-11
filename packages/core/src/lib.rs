@@ -9,6 +9,7 @@ mod component;
 mod instance;
 mod minecraft;
 mod global_settings;
+mod java;
 
 #[napi]
 pub async fn fibonacci(num: i32, num1: u32) -> u32 {

@@ -40,6 +40,9 @@ checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
 [[package]]
 name = "app_helper"
 version = "0.0.0"
+dependencies = [
+ "anyhow",
+]
 
 [[package]]
 name = "async-recursion"
@@ -195,11 +198,11 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "once_cell",
  "rayon",
  "reqwest",
  "serde",
  "serde_json",
- "thiserror",
  "tokio",
 ]
 
