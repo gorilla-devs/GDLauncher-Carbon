@@ -204,6 +204,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "winreg",
 ]
 
 [[package]]
