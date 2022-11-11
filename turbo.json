@@ -3,7 +3,8 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "core.node"]
+      "outputs": ["dist/**", "core.node"],
+      "cache": false
     },
     "@gd/desktop#build": {
       "dependsOn": ["^@gd/ui#build"],
@@ -22,7 +23,8 @@
       "cache": false
     },
     "dev": {
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**"],
+      "cache": false
     },
     "test": {
       "dependsOn": ["^test"]
