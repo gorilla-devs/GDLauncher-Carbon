@@ -11,7 +11,7 @@ async fn load_java_paths_from_env() -> Result<Option<Vec<PathBuf>>> {
     for path in paths {
         let path = path.to_string();
         if path.contains("java") {
-            java_paths.push(PathBuf::from(path));
+            java_paths.extend(search_java_binary_in_path(path));
         }
     }
 
@@ -66,59 +66,169 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     }
 
     // Remove duplicates
-    javas = javas
-        .into_iter()
-        .filter(|java_path| java_path.to_str().is_some())
-        .collect();
     javas.sort_by(|a, b| {
-        a.to_str()
-            .unwrap()
+        a.to_string_lossy()
+            .to_string()
             .to_lowercase()
-            .cmp(&b.to_str().unwrap().to_lowercase())
+            .cmp(&b.to_string_lossy().to_string().to_lowercase())
     });
     javas.dedup();
 
     javas
 }
 
+fn search_java_binary_in_path(path: String) -> Vec<PathBuf> {
+    let mut options = vec![];
+    if cfg!(windows) {
+        options.push(format!("{}\\bin\\java.exe", path));
+        options.push(format!("{}\\java.exe", path));
+    } else {
+        options.push(format!("{}/bin/java", path));
+        options.push(format!("{}/java", path));
+    }
+
+    options
+        .into_iter()
+        .filter(|path| PathBuf::from(path).exists())
+        .map(|path| PathBuf::from(path))
+        .collect()
+}
+
 #[cfg(target_os = "windows")]
-pub fn read_registry_key(key: &str, value: &str) -> Result<String> {
+pub fn read_registry_key(
+    key: &str,
+    value: &str,
+    subkey_suffix: Option<&str>,
+) -> Result<Vec<PathBuf>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-    let key = hkcu.open_subkey(key)?;
-    let res: String = key.get_value(value)?;
-    Ok(res)
+    let key_reg = hkcu.open_subkey(key)?;
+    let mut results = vec![];
+
+    if let Some(subkey_suffix) = subkey_suffix {
+        let subkeys = key_reg.enum_keys();
+        for subkey in subkeys {
+            if let Ok(subkey) = subkey {
+                let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
+                let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
+                match subkey_reg.get_value(value) {
+                    Ok(value) => {
+                        results.extend(search_java_binary_in_path(value));
+                    }
+                    Err(_) => continue,
+                };
+            }
+        }
+    } else {
+        match key_reg.get_value(value) {
+            Ok(value) => {
+                results.extend(search_java_binary_in_path(value));
+            }
+            Err(_) => {}
+        };
+    }
+    Ok(results)
 }
 
 #[cfg(target_os = "windows")]
 pub async fn find_java_paths() -> Vec<PathBuf> {
-    use winreg::enums::*;
-    use winreg::RegKey;
     let mut javas: Vec<PathBuf> = vec![];
-    javas.push(PathBuf::from(get_default_java_path()));
-    let reg_paths = vec![
-        (r"SOFTWARE\JavaSoft\Java Runtime Environment", "JavaHome"),
-        (r"SOFTWARE\JavaSoft\Java Development Kit", "JavaHome"),
-        (r"SOFTWARE\JavaSoft\JRE", "JavaHome"),
-        (r"SOFTWARE\JavaSoft\JDK", "JavaHome"),
-    ];
 
+    // Load default java
+    javas.push(PathBuf::from(get_default_java_path()));
+
+    // Load from env
     let java_from_env = load_java_paths_from_env().await;
     if let Ok(Some(java_from_env)) = java_from_env {
         javas.extend(java_from_env);
     }
 
+    // Load from registry
+    let reg_paths = vec![
+        // Oracle
+        (
+            r"SOFTWARE\JavaSoft\Java Runtime Environment",
+            "JavaHome",
+            None,
+        ),
+        (r"SOFTWARE\JavaSoft\Java Development Kit", "JavaHome", None),
+        // Oracle for Java 9 and newer
+        (r"SOFTWARE\JavaSoft\JRE", "JavaHome", None),
+        (r"SOFTWARE\JavaSoft\JDK", "JavaHome", None),
+        (r"SOFTWARE\JavaSoft\JDK", "JavaHome", Some(r#"\\"#)),
+        // AdoptOpenJDK
+        (r"SOFTWARE\AdoptOpenJDK\JRE", "Path", Some(r#"hotspot\MSI"#)),
+        (r"SOFTWARE\AdoptOpenJDK\JDK", "Path", Some(r#"hotspot\MSI"#)),
+        // Eclipse Foundation
+        (
+            r"SOFTWARE\Eclipse Foundation\JDK",
+            "Path",
+            Some(r#"hotspot\MSI"#),
+        ),
+        // Eclipse Adoptium
+        (
+            r"SOFTWARE\Eclipse Adoptium\JRE",
+            "Path",
+            Some(r#"hotspot\MSI"#),
+        ),
+        (
+            r"SOFTWARE\Eclipse Adoptium\JDK",
+            "Path",
+            Some(r#"hotspot\MSI"#),
+        ),
+        // Microsoft
+        (r"SOFTWARE\Microsoft\JDK", "Path", Some(r#"hotspot\MSI"#)),
+        // Azul Zulu
+        (r"SOFTWARE\Azul Systems\Zulu", "InstallationPath", None),
+        // BellSoft Liberica
+        (r"SOFTWARE\BellSoft\Liberica", "InstallationPath", None),
+    ];
+
+    for (key, value, subkey_suffix) in reg_paths {
+        match read_registry_key(key, value, subkey_suffix) {
+            Ok(paths) => {
+                javas.extend(paths.into_iter().map(|path| PathBuf::from(path)));
+            }
+            Err(_) => continue,
+        }
+    }
+
+    // Load from disk options
+    let potential_parent_dirs = vec!["C:/Program Files/Java", "C:/Program Files (x86)/Java"];
+    for potential_parent_dir in potential_parent_dirs {
+        let parent_dir = PathBuf::from(potential_parent_dir);
+        if parent_dir.exists() {
+            let children = std::fs::read_dir(parent_dir);
+            if let Ok(mut children) = children {
+                while let Some(child) = children.next() {
+                    if let Ok(child) = child {
+                        let child = child.path();
+                        if child.is_dir() {
+                            javas.extend(search_java_binary_in_path(
+                                child.to_string_lossy().to_string(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Remove duplicates
-    javas = javas
-        .into_iter()
-        .filter(|java_path| java_path.to_str().is_some())
-        .collect();
     javas.sort_by(|a, b| {
-        a.to_str()
-            .unwrap()
+        a.to_string_lossy()
+            .to_string()
             .to_lowercase()
-            .cmp(&b.to_str().unwrap().to_lowercase())
+            .cmp(&b.to_string_lossy().to_string().to_lowercase())
     });
     javas.dedup();
 
     javas
+}
+
+mod tests {
+    #[tokio::test]
+    async fn test_find_java_paths() {
+        let javas = super::find_java_paths().await;
+        assert!(javas.len() > 0);
+    }
 }

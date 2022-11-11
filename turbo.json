@@ -27,7 +27,8 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^test"],
+      "cache": false
     }
   },
   "globalDependencies": [".env"]
