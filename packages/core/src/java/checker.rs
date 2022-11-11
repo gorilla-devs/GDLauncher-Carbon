@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use tokio::fs;
 
 use super::{utils::get_path_separator, JavaComponent};
 
@@ -223,6 +224,56 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     javas.dedup();
 
     javas
+}
+
+#[cfg(target_os = "linux")]
+async fn find_java_paths() -> Result<Vec<PathBuf>> {
+    let FOLDERS = [
+        "/usr/java",
+        "/usr/lib/jvm",
+        "/usr/lib64/jvm",
+        "/usr/lib32/jvm",
+        "java",
+        "/opt/jdk",
+        "/opt/jdks",
+        "/app/jdk",
+    ];
+
+    let mut javas: Vec<PathBuf> = vec![];
+    javas.push(PathBuf::from(get_default_java_path()));
+
+    for f in FOLDERS {
+        for b in scan_java_dirs(f).await {
+            javas.extend(b);
+        }
+    }
+
+    javas = load_java_paths_from_env().await.unwrap().unwrap();
+
+    // Remove duplicates
+    javas.sort_by(|a, b| {
+        a.to_string_lossy()
+            .to_string()
+            .to_lowercase()
+            .cmp(&b.to_string_lossy().to_string().to_lowercase())
+    });
+    javas.dedup();
+
+    return Ok(javas);
+}
+
+#[cfg(target_os = "linux")]
+async fn scan_java_dirs(dir_path: &str) -> Result<Vec<PathBuf>> {
+    let mut result: Vec<PathBuf> = Vec::new();
+    let mut entries = fs::read_dir(dir_path).await?;
+
+    while let Some(child) = entries.next_entry().await? {
+        let path = PathBuf::from(child.path());
+        result.push(path.join("jre/bin/java"));
+        result.push(path.join("bin/java"));
+    }
+
+    Ok(result)
 }
 
 mod tests {
