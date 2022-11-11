@@ -20,4 +20,4 @@ let addon = new Promise<() => typeof core | undefined>((resolve, reject) => {
     .catch(reject);
 });
 
-contextBridge.exposeInMainWorld("__GDL__", addon);
+contextBridge.exposeInMainWorld(import.meta.env.VITE_NAPI_ID, addon);

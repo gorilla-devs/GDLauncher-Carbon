@@ -4,7 +4,6 @@ import electron from "electron";
 import chokidar from "chokidar";
 
 let electronProcess = null;
-
 /**
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */

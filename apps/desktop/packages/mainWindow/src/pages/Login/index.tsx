@@ -1,5 +1,4 @@
 import { createSignal, Switch, Match } from "solid-js";
-import { DeviceCodeObject } from "@gd/core";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 

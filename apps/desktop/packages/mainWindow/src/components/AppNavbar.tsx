@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
-import GDLauncherWideLogo from "../../assets/images/gdlauncher_wide_logo_blue.svg";
+import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 
 export default function AppNavbar() {
   const location = useLocation();

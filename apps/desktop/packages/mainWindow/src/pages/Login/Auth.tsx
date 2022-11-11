@@ -2,7 +2,7 @@ import { login } from "@/modules/components/accounts";
 import { DeviceCodeObject } from "@gd/core";
 import { Button } from "@gd/ui";
 import { Setter } from "solid-js";
-import Logo from "../../../assets/images/gdlauncher_vertical_logo.svg";
+import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 type Props = {
   setStep: Setter<number>;

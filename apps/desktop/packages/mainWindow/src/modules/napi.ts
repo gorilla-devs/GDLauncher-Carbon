@@ -1,9 +1,8 @@
 import core from "@gd/core";
-import { createSignal } from "solid-js";
 
 let resolvedAddon: typeof core | undefined;
 
-let addon = (window as any)["__GDL__"] as Promise<
+let addon = (window as any)[import.meta.env.VITE_NAPI_ID] as Promise<
   () => typeof core | undefined
 >;
 

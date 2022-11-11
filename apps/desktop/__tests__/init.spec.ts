@@ -60,7 +60,7 @@ test.describe("Init Tests", () => {
 
     await page.screenshot({ path: "initial-screenshot.png" });
 
-    const innerText = await (await page.$(".appFatalCrashState"))?.innerHTML();
+    const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
 
 
@@ -85,7 +85,7 @@ test.describe("Init Tests", () => {
     });
 
     await page.screenshot({ path: "post-screenshot.png" });
-    const innerText = await (await page.$(".appFatalCrashState"))?.innerHTML();
+    const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");

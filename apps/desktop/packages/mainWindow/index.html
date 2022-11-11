@@ -1,9 +1,16 @@
 <!DOCTYPE html>
-<html lang="en" style="margin: 0; padding: 0;">
+<html lang="en" style="margin: 0; padding: 0">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/assets/images/gdlauncher_logo.svg" />
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; img-src 'self'; default-src 'unsafe-inline' 'self';">
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/assets/images/gdlauncher_logo.svg"
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'unsafe-inline'; img-src 'self'; default-src 'unsafe-inline' 'self';"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       @font-face {
@@ -39,18 +46,42 @@
         font-family: "Ubuntu";
       }
 
-      html, body {
-        background: #1D2028;
+      html,
+      body {
+        background: #1d2028;
+      }
+
+      #appLoadingState, #appFatalCrashState {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #1d2028;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        font-size: 1.7rem;
+        color: #fff;
+        text-align: center;
+        font-weight: 600;
+        transition: transform 0.4s ease-in-out;
       }
     </style>
     <title>GDLauncher Carbon</title>
+    <script type="module">
+      import config from "@gd/config";
+      let moduleNames = config.moduleNames;
+      window.document.getElementById(
+        "appLoadingState"
+      ).innerText = `Loaded 0 / ${moduleNames.length} modules`;
+    </script>
   </head>
-  <body style="margin: 0; padding: 0;">
-    <div
-      id="overlay"
-      style="position: absolute; z-index: 100; top: 0;"
-    ></div>
+  <body style="margin: 0; padding: 0">
+    <div id="overlay" style="position: absolute; z-index: 100; top: 0"></div>
     <div id="root"></div>
+    <div id="appLoadingState"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

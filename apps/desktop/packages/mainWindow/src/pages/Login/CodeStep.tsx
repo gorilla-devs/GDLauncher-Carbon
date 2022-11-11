@@ -1,7 +1,7 @@
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { DeviceCodeObject } from "@gd/core";
-import DoorImage from "../../../assets/images/door.png";
+import DoorImage from "/assets/images/door.png";
 
 type Props = {
   deviceCodeObject: DeviceCodeObject | null;
