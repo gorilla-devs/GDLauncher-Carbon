@@ -238,11 +238,14 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
         "/opt/jdks",
         "/app/jdk",
     ];
-
+    println!("Searching for java in {:?}", folders);
+    
     let mut javas: Vec<PathBuf> = vec![];
     javas.push(PathBuf::from(get_default_java_path()));
-
+    println!("Default java path: {:?}", javas[0]);
+    
     for file in folders {
+        println!("Searching for java in {:?}", file);
         let directories = scan_java_dirs(file).await;
         for dir in directories {
             println!("adding dir: {}", dir.to_string_lossy().to_string());
