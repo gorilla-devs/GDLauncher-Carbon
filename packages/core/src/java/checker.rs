@@ -288,7 +288,9 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
 mod tests {
     #[tokio::test]
     async fn test_find_java_paths() {
+        println!("TEST BEFORE");
         let javas = super::find_java_paths().await;
+        println!("TEST AFTER");
         assert!(javas.len() > 0);
     }
 }

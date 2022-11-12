@@ -9,7 +9,7 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "watch": "node scripts/watch.mjs",
-    "test": "cargo test",
+    "test": "cargo test -- --nocapture",
     "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts --release",
     "_dev_": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts"
   },
