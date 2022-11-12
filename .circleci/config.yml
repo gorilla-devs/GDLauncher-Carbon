@@ -111,6 +111,40 @@ jobs:
           chmod -R a+x node_modules
       # - run: pnpm test
       - run: pnpm build-web
+  testDocker:
+    executor: "linux"
+    steps:
+      - checkout
+      - restore_cache:
+          name: Restore Cargo Package Cache
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+      - restore_cache:
+          name: Restore Pnpm Package Cache
+          keys:
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}
+      - run: |
+          node -v
+          cargo --version
+      - run: |
+          sudo npm i -g pnpm
+          pnpm i
+          chmod -R a+x node_modules
+      - run: pnpm build-linux-x64-test
+      - run: pnpm test
+      - save_cache:
+          name: Save Cargo Package Cache
+          key: cargo-{{ checksum "Cargo.lock" }}
+          paths:
+            - target
+      - save_cache:
+          name: Save Pnpm Package Cache
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - node_modules
+      - run: cd apps && cd desktop && pnpm clean
+      - store_artifacts:
+          path: ./apps/desktop/release
   buildLinux:
     executor: "linux"
     steps:
@@ -143,13 +177,11 @@ jobs:
           paths:
             - node_modules
       - run: cd apps && cd desktop && pnpm clean
-      - store_artifacts:
-          path: ./apps/desktop/release
 workflows:
   every-commit:
     jobs:
       - buildWebsite
-      - buildLinux
+      - testDocker
   master-builds:
     jobs:
       - buildMac:
@@ -161,6 +193,11 @@ workflows:
             parameters:
               os: ["mac", "macm1"]
       - buildWin:
+          filters:
+            branches:
+              only:
+                - master
+      - buildLinux:
           filters:
             branches:
               only:

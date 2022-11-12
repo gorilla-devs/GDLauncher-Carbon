@@ -239,11 +239,11 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
         "/app/jdk",
     ];
     println!("Searching for java in {:?}", folders);
-    
+
     let mut javas: Vec<PathBuf> = vec![];
     javas.push(PathBuf::from(get_default_java_path()));
     println!("Default java path: {:?}", javas[0]);
-    
+
     for file in folders {
         println!("Searching for java in {:?}", file);
         let directories = scan_java_dirs(file).await;
@@ -279,10 +279,13 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     };
 
     while let Ok(child) = entries.next_entry().await {
-        if let Some(child) = child {
-            let path = PathBuf::from(child.path());
-            result.push(path.join("jre/bin/java"));
-            result.push(path.join("bin/java"));
+        match child {
+            Some(child) => {
+                let path = PathBuf::from(child.path());
+                result.push(path.join("jre/bin/java"));
+                result.push(path.join("bin/java"));
+            }
+            None => break,
         }
     }
 
