@@ -7,22 +7,21 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.62.0-browsers
+      - image: cimg/rust:1.65.0-browsers
     resource_class: small
   website:
     docker:
-      - image: cimg/rust:1.62.0-node
+      - image: cimg/rust:1.65.0-node
     resource_class: small
   mac:
     macos:
-      xcode: "14.0.0"
+      xcode: "14.1.0"
     resource_class: medium
   macm1:
     macos:
-      xcode: "14.0.0"
+      xcode: "14.1.0"
     resource_class: medium
   windows: win/default
-  node: node/default
 
 jobs:
   buildMac:
@@ -39,11 +38,6 @@ jobs:
               - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-                source "$HOME/.cargo/env"
-                rustup toolchain install nightly
-                rustup target add x86_64-apple-darwin --toolchain nightly
-                rustup default nightly
                 node -v
                 cargo --version
                 sudo npm i -g pnpm
@@ -61,11 +55,6 @@ jobs:
               - equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-                source "$HOME/.cargo/env"
-                rustup toolchain install nightly
-                rustup target add aarch64-apple-darwin --toolchain nightly
-                rustup default nightly
                 node -v
                 cargo --version
                 sudo npm i -g pnpm
@@ -88,32 +77,16 @@ jobs:
           shell: powershell.exe
           command: choco install nvm -y
       - run:
-          name: Install Node 16.16.0
+          name: Install Node 18.12.1
           shell: powershell.exe
           command: |
               nvm list
-              nvm install 16.16.0
-              nvm use 16.16.0
+              nvm install 18.12.1
+              nvm use 18.12.1
       - run:
-          name: Verify Node Version
-          shell: powershell.exe
-          command: node --version
-      - run:
-          name: "Install Rust"
-          shell: powershell.exe
           command: |
-            $ProgressPreference = 'Continue'    
-            Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
-            & C:\rustup-init.exe -y --default-toolchain "nightly-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
-            $env:path += ";$env:userprofile\.cargo\bin"
-
-            rustc -Vv
             node -v
             cargo --version
-            rustc --version | Out-File -FilePath "rust-version"
-            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
-                cargo generate-lockfile
-            }
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
@@ -143,11 +116,9 @@ jobs:
     steps:
       - checkout
       - run: |
-          rustup toolchain install nightly
-          rustup target add x86_64-unknown-linux-gnu --toolchain nightly
-          rustup default nightly
           node -v
           cargo --version
+      - run: |
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
