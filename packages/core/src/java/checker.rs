@@ -245,6 +245,7 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     for file in folders {
         let directories = scan_java_dirs(file).await;
         for dir in directories {
+            println!("adding dir: {}", dir);
             javas.push(dir);
         }
     }
