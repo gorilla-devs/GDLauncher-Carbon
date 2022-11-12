@@ -227,7 +227,7 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-async fn find_java_paths() -> Vec<PathBuf> {
+pub async fn find_java_paths() -> Vec<PathBuf> {
     let folders = [
         "/usr/java",
         "/usr/lib/jvm",
