@@ -1,3 +1,4 @@
+import minimumBounds from "@/modules/components/minimumBounds";
 import { Link, useLocation } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
@@ -5,12 +6,19 @@ import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 export default function AppNavbar() {
   const [count, setCount] = createSignal(0);
   const [value, setValue] = createSignal<number>();
+  const bannerSize = () => minimumBounds.adSize.width;
+  const isBannerSmall = () => bannerSize() === 160;
 
   const location = useLocation();
 
   return (
     <Show when={location.pathname !== "/"}>
-      <nav class="bg-[#1D2028] text-white h-15 flex items-center px-5">
+      <nav
+        class="bg-[#1D2028] text-white h-15 flex items-center px-5 box-border"
+        style={{
+          width: isBannerSmall() ? `calc(100vw - 200px)` : "100%",
+        }}
+      >
         <img src={GDLauncherWideLogo} class="h-9" />
         <ul class="flex items-between gap-6 m-0 text-white list-none pl-23">
           <li class="py-2">

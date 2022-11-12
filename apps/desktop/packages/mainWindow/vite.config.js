@@ -27,15 +27,30 @@ export default defineConfig({
       rules: [
         [
           /^bg-image-(.*)$/,
+          ([_, d]) => {
+            let img = d.split("-")[0];
+            return {
+              background: `url('./${
+                process.env.NODE_ENV === "development" ? "assets/" : ""
+              }images/${img}.png')`,
+              "background-size": "cover",
+              "background-repeat": "no-repeat",
+              "box-sizing": "border-box",
+            };
+          },
+        ],
+        [
+          /^bg-pattern-(.*)$/,
           ([a, d]) => {
             let img = d.split("-")[0];
             let extension = a.split(".")[1];
             const isSvg = extension === "svg";
             return {
-              background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
-                }images/${isSvg ? img : `${img}.png`}')`,
-              "background-size": "100% 100%",
-              "background-repeat": "no-repeat",
+              background: `url('./${
+                process.env.NODE_ENV === "development" ? "assets/" : ""
+              }images/${isSvg ? img : `${img}.png`}')`,
+              "background-size": "100%",
+              "background-repeat": "repeat",
               "box-sizing": "border-box",
             };
           },
