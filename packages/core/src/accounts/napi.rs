@@ -26,13 +26,14 @@ impl From<Account> for NAPIAccount {
 #[napi(object, js_name = "Accounts")]
 struct NAPIAccounts {
     pub accounts: Vec<NAPIAccount>,
-    pub selected_account: Option<NAPIAccount>,
+    pub selected_account_id: Option<String>,
 }
 
 impl From<Accounts> for NAPIAccounts {
     fn from(accounts: Accounts) -> Self {
         let accounts_new: Vec<NAPIAccount> = accounts
             .inner
+            .clone()
             .into_iter()
             .map(|account| NAPIAccount {
                 id: account.mc_profile.id.clone(),
@@ -42,15 +43,14 @@ impl From<Accounts> for NAPIAccounts {
             .collect();
 
         // Get index of selected account
-        let selected_account = accounts.selected_account.map(|account| NAPIAccount {
-            id: account.mc_profile.id.clone(),
-            name: account.mc_profile.name.clone(),
-            access_token: account.mc_data.access_token.clone(),
-        });
+
+        let selected_account_id = accounts
+            .selected_account
+            .map(|account| account.mc_profile.id.clone());
 
         NAPIAccounts {
             accounts: accounts_new,
-            selected_account,
+            selected_account_id,
         }
     }
 }

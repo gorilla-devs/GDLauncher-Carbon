@@ -30,9 +30,9 @@ const Auth = (props: Props) => {
           policies and terms stated below.
         </p>
         <ul class="flex gap-3 list-none p-0 mb-8 underline text-sm">
-          <li>Privacy Policy</li>
-          <li>Terms and Conditions</li>
-          <li>Acceptable Use Policy</li>
+          <li class="cursor-pointer">Privacy Policy</li>
+          <li class="cursor-pointer">Terms and Conditions</li>
+          <li class="cursor-pointer">Acceptable Use Policy</li>
         </ul>
       </div>
     </div>

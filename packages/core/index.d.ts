@@ -10,7 +10,7 @@ export interface Account {
 }
 export interface Accounts {
   accounts: Array<Account>
-  selectedAccount?: Account
+  selectedAccountId?: string
 }
 export interface DeviceCodeObject {
   userCode: string

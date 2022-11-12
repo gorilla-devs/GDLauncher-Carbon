@@ -3,7 +3,7 @@ import { useNavigate } from "@solidjs/router";
 import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
 import { createEffect } from "solid-js";
-import { selectedAccount } from "@/modules/components/accounts";
+import { accounts } from "@/modules/components/accounts";
 
 type Props = {
   deviceCodeObject: DeviceCodeObject | null;
@@ -16,8 +16,8 @@ const CodeStep = (props: Props) => {
   const deviceCodeLink = () => props.deviceCodeObject?.link;
 
   createEffect(() => {
-    if (selectedAccount()) {
-      console.log("selectedAccount", selectedAccount());
+    if (accounts.selectedAccountId) {
+      console.log("selectedAccount", accounts.selectedAccountId);
       navigate("/home");
     }
   });
