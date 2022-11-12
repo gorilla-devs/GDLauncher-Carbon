@@ -59,6 +59,7 @@ function getMinimumBounds() {
       adSize: {
         width: 160,
         height: 600,
+        padding: 20
       },
     };
   } else if (width < 1000 || height < 800) {
@@ -71,6 +72,7 @@ function getMinimumBounds() {
       adSize: {
         width: 160,
         height: 600,
+        padding: 20
       },
     };
   } else if (width < 1600 || height < 900) {
@@ -83,6 +85,7 @@ function getMinimumBounds() {
       adSize: {
         width: 160,
         height: 600,
+        padding: 20
       },
     };
   } else {
@@ -94,6 +97,7 @@ function getMinimumBounds() {
       adSize: {
         width: 400,
         height: 600,
+        padding: 20
       },
     };
   }

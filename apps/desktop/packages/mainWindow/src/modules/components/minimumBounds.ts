@@ -6,6 +6,7 @@ export interface BoundsSize {
   adSize: {
     width: number;
     height: number;
+    padding: number;
   };
 }
 
@@ -15,6 +16,7 @@ export const [minimumBounds, setMinimumBounds] = createStore<BoundsSize>({
   adSize: {
     width: 0,
     height: 0,
+    padding: 20
   },
 });
 
