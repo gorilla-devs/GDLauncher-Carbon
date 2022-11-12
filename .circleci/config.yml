@@ -118,7 +118,7 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "cargo.lock" }}
+            - cargo-{{ checksum "Cargo.lock" }}
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
@@ -134,7 +134,7 @@ jobs:
       - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "cargo.lock" }}
+          key: cargo-{{ checksum "Cargo.lock" }}
           paths:
             - target
       - save_cache:
