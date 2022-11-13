@@ -6,6 +6,8 @@ import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
 import presetIcons from "@unocss/preset-icons";
 import { readdirSync, readFileSync } from "fs";
+import presetWind from "@unocss/preset-wind";
+import { presetAttributify } from "unocss";
 
 let icons = {};
 
@@ -23,14 +25,13 @@ export default defineConfig({
       insertTypesEntry: true,
     }),
     Unocss({
-      theme: {
-        colors: {
-          accent: {
-            main: "#2B6CB0",
-          },
-        },
-      },
+      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
       presets: [
+        presetAttributify({
+          prefix: "uno:",
+          prefixedOnly: true,
+        }),
+        presetWind(),
         presetIcons({
           collections: {
             hero: () =>
@@ -41,6 +42,13 @@ export default defineConfig({
           },
         }),
       ],
+      theme: {
+        colors: {
+          accent: {
+            main: "#2B6CB0",
+          },
+        },
+      },
     }),
   ],
   test: {
