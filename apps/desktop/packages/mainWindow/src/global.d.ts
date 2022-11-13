@@ -12,6 +12,7 @@ declare global {
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
     openExternalLink: (link: string) => void;
+    copyToClipboard: (text: string) => void;
   }
 }
 

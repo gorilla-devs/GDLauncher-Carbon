@@ -27,7 +27,10 @@ const CodeStep = (props: Props) => {
       <img src={DoorImage} />
       <div>
         <div class="flex justify-center">
-          <CodeInput value={userCode() || ""} />
+          <CodeInput
+            value={userCode() || ""}
+            onClick={() => window.copyToClipboard(userCode() || "")}
+          />
           <div class="i-gdl:copy w-4 h-4" />
         </div>
         <p class="text-[#8A8B8F]">

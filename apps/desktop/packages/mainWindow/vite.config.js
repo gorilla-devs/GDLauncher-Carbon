@@ -32,8 +32,9 @@ export default defineConfig({
             let extension = a.split(".")[1];
             const isSvg = extension === "svg";
             return {
-              background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
-                }images/${isSvg ? img : `${img}.png`}')`,
+              background: `url('./${
+                process.env.NODE_ENV === "development" ? "assets/" : ""
+              }images/${isSvg ? img : `${img}.png`}')`,
               "background-size": "cover",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",
@@ -41,13 +42,6 @@ export default defineConfig({
           },
         ],
       ],
-      theme: {
-        colors: {
-          accent: {
-            main: "#2B6CB0",
-          },
-        },
-      },
     }),
     ViteMinifyPlugin({}),
   ],
