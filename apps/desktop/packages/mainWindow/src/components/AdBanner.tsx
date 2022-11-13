@@ -11,7 +11,7 @@ export const AdsBanner = () => {
         // TODO: 60 is the hardcoded navbar height, we should put that in a varÍ
         "margin-top": isBannerSmall()
           ? `-${60 - minimumBounds.adSize.padding}px`
-          : "0",
+          : "",
       }}
       class="bg-red-400 mx-5 mt-5"
     />
