@@ -35,6 +35,7 @@ export default defineConfig({
       formats: ["es"],
       fileName: (format) => `ui.${format}.js`,
     },
+    sourcemap: true,
     rollupOptions: {
       external: ["solid-js"],
       output: {

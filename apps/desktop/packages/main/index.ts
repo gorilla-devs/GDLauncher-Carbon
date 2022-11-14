@@ -142,12 +142,21 @@ async function createWindow() {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
-    const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${import.meta.env.VITE_DEV_MAIN_WINDOW_PORT}`;
+    const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${
+      import.meta.env.VITE_DEV_MAIN_WINDOW_PORT
+    }`;
 
     win.loadURL(url, {
       userAgent: "GDLauncher Carbon",
     });
   }
+
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.alt && input.shift && input.key.toLowerCase() === "i") {
+      event.preventDefault();
+      win?.webContents.openDevTools();
+    }
+  });
 
   if (import.meta.env.DEV) {
     win.webContents.openDevTools();

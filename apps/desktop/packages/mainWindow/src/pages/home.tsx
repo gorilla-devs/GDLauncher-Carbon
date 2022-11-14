@@ -16,6 +16,8 @@ export default function Home() {
       <button onClick={() => navigate("?m=myModal")}>Open modal</button>
       <button
         onClick={async () => {
+          console.log(import.meta.url);
+          page();
           const res = await napi.auth((id) => {
             console.log("hello", id);
           });
