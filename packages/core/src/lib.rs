@@ -8,7 +8,7 @@ mod accounts;
 mod component;
 mod instance;
 mod minecraft;
-mod global_storage;
+mod global_store;
 mod java;
 
 #[napi]
