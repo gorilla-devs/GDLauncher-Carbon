@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
-    "test": "playwright test",
+    "test": "vitest run vitest && playwright test",
     "build": "node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "typecheck": "tsc --noEmit --project packages/mainWindow/tsconfig.json"
