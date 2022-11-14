@@ -12,6 +12,10 @@ declare global {
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
     openExternalLink: (link: string) => void;
+    nodePath: {
+      join: typeof import("path").join;
+      resolve: typeof import("path").resolve;
+    };
   }
 }
 

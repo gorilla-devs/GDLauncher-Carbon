@@ -152,7 +152,7 @@ async function createWindow() {
   }
 
   win.webContents.on("before-input-event", (event, input) => {
-    if (input.alt && input.shift && input.key.toLowerCase() === "i") {
+    if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault();
       win?.webContents.openDevTools();
     }
