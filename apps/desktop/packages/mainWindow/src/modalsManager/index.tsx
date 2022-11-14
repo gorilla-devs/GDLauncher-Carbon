@@ -10,7 +10,9 @@ import {
   Switch,
 } from "solid-js";
 import { createStore } from "solid-js/store";
+import AcceptableUsePolicy from "./modals/AcceptableUsePolicy";
 import Privacypolicy from "./modals/Privacypolicy";
+import TermsAndConditions from "./modals/TermsAndConditions";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
@@ -29,6 +31,8 @@ const Modals: Component = () => {
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
   const [modals] = createStore<Hash>({
     privacyPolicy: Privacypolicy,
+    termsAndConditions: TermsAndConditions,
+    acceptableUsePolicy: AcceptableUsePolicy,
   });
 
   const queryParams = createMemo(() => location.search);
@@ -41,7 +45,6 @@ const Modals: Component = () => {
   };
 
   createEffect(() => {
-    console.log("queryParams", mParam(), getModal(mParam() || ""));
     const visibility = isModal();
     // When the URL changes, update the visibility of the modal after a timeout
     if (visibility) {
@@ -59,7 +62,7 @@ const Modals: Component = () => {
 
   return (
     <div
-      class="absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen h-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center"
+      class="absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen h-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
       classList={{
         "opacity-100": !!opacity(),
         "scale-100": !!opacity(),

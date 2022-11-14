@@ -1,5 +1,7 @@
+import ModalLayout from "../ModalLayout";
+
 const Privacypolicy = () => {
-  return <div class="h-130 w-190 bg-black-black rounded-lg">Privacypolicy</div>;
+  return <ModalLayout>Privacypolicy</ModalLayout>;
 };
 
 export default Privacypolicy;

@@ -1,6 +1,7 @@
 import { login } from "@/modules/components/accounts";
 import { DeviceCodeObject } from "@gd/core";
 import { Button } from "@gd/ui";
+import { useNavigate } from "@solidjs/router";
 import { Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
@@ -10,6 +11,8 @@ type Props = {
 };
 
 const Auth = (props: Props) => {
+  const navigate = useNavigate();
+
   const handleClick = async () => {
     await login(({ userCode, link, expiresAt }) => {
       props.setDeviceCodeObject({ userCode, link, expiresAt });
@@ -30,9 +33,24 @@ const Auth = (props: Props) => {
           policies and terms stated below.
         </p>
         <ul class="flex gap-3 list-none p-0 mb-8 underline text-sm">
-          <li class="cursor-pointer">Privacy Policy</li>
-          <li class="cursor-pointer">Terms and Conditions</li>
-          <li class="cursor-pointer">Acceptable Use Policy</li>
+          <li
+            class="cursor-pointer"
+            onClick={() => navigate("?m=privacyPolicy")}
+          >
+            Privacy Policy
+          </li>
+          <li
+            class="cursor-pointer"
+            onClick={() => navigate("?m=termsAndConditions")}
+          >
+            Terms and Conditions
+          </li>
+          <li
+            class="cursor-pointer"
+            onClick={() => navigate("?m=acceptableUsePolicy")}
+          >
+            Acceptable Use Policy
+          </li>
         </ul>
       </div>
     </div>

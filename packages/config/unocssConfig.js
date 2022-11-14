@@ -47,8 +47,8 @@ const config = {
         black: {
           black: "#1D2028",
           blackOpacity80: "rgba(29, 32, 40, 0.8)",
-          semiblack: "#272B35"
         },
+        semiblack: "#272B35"
       },
     },
     rules: [
