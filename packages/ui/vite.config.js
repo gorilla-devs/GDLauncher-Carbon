@@ -8,6 +8,7 @@ import presetIcons from "@unocss/preset-icons";
 import { readdirSync, readFileSync } from "fs";
 import presetWind from "@unocss/preset-wind";
 import { presetAttributify } from "unocss";
+import config from "../config/unocssConfig";
 
 let icons = {};
 
@@ -24,32 +25,7 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
     }),
-    Unocss({
-      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-      presets: [
-        presetAttributify({
-          prefix: "uno:",
-          prefixedOnly: true,
-        }),
-        presetWind(),
-        presetIcons({
-          collections: {
-            hero: () =>
-              import("@iconify-json/heroicons/icons.json").then(
-                (i) => i.default
-              ),
-            gdl: icons,
-          },
-        }),
-      ],
-      theme: {
-        colors: {
-          accent: {
-            main: "#2B6CB0",
-          },
-        },
-      },
-    }),
+    config.unoCss,
   ],
   test: {
     globals: true,

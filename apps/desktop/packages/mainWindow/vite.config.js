@@ -6,6 +6,7 @@ import { ViteMinifyPlugin } from "vite-plugin-minify";
 import presetAttributify from "@unocss/preset-attributify";
 import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
+import config from "../../../../packages/config/unocssConfig";
 
 /**
  * @see https://vitejs.dev/config/
@@ -13,38 +14,7 @@ import pkg from "../../package.json";
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [
-    solidPlugin(),
-    Unocss({
-      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-      presets: [
-        presetAttributify({
-          prefix: "uno:",
-          prefixedOnly: true,
-        }),
-        presetWind(),
-      ],
-      rules: [
-        [
-          /^bg-image-(.*)$/,
-          ([a, d]) => {
-            let img = d.split("-")[0];
-            let extension = a.split(".")[1];
-            const isSvg = extension === "svg";
-            return {
-              background: `url('./${
-                process.env.NODE_ENV === "development" ? "assets/" : ""
-              }images/${isSvg ? img : `${img}.png`}')`,
-              "background-size": "cover",
-              "background-repeat": "no-repeat",
-              "box-sizing": "border-box",
-            };
-          },
-        ],
-      ],
-    }),
-    ViteMinifyPlugin({}),
-  ],
+  plugins: [solidPlugin(), config.unoCss, ViteMinifyPlugin({})],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   build: {
