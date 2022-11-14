@@ -13,7 +13,7 @@ export default function Home() {
 
   return (
     <Page class="bg-black-black">
-      <button onClick={() => navigate("?m=myModal")}>Open modal</button>
+      <button onClick={() => navigate("?m=privacyPolicy")}>Open modal</button>
       <button
         onClick={async () => {
           const res = await napi.auth((id) => {

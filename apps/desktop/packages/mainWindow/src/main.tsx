@@ -3,7 +3,7 @@ import { createEffect, onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
-import Modals from "./Modals";
+import Modals from "./modalsManager";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import initAnalytics from "./utils/analytics";

@@ -4,15 +4,22 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  JSX,
   Match,
   Show,
   Switch,
 } from "solid-js";
+import { createStore } from "solid-js/store";
+import Privacypolicy from "./modals/Privacypolicy";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
  * @returns A component that renders a modal.
  */
+
+interface Hash {
+  [name: string]: JSX.Element;
+}
 
 const Modals: Component = () => {
   const location = useLocation();
@@ -20,13 +27,21 @@ const Modals: Component = () => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
+  const [modals] = createStore<Hash>({
+    privacyPolicy: Privacypolicy,
+  });
 
   const queryParams = createMemo(() => location.search);
-  const isModal = createMemo(
-    () => new URLSearchParams(location.search).get("m") !== null
-  );
+  const mParam = createMemo(() => new URLSearchParams(queryParams()).get("m"));
+  const isModal = createMemo(() => mParam() !== null);
+
+  const getModal = (type: string) => {
+    const Component = () => modals[type];
+    return <Component />;
+  };
 
   createEffect(() => {
+    console.log("queryParams", mParam(), getModal(mParam() || ""));
     const visibility = isModal();
     // When the URL changes, update the visibility of the modal after a timeout
     if (visibility) {
@@ -55,11 +70,12 @@ const Modals: Component = () => {
     >
       <Show when={isVisible()}>
         <div
-          class="h-40 w-40 bg-slate-100 rounded-lg"
           onClick={(e) => {
             e.stopPropagation();
           }}
-        ></div>
+        >
+          {getModal(mParam() || "")}
+        </div>
       </Show>
     </div>
   );
