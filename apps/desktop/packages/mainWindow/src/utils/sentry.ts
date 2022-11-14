@@ -14,24 +14,27 @@ if (!import.meta.env.DEV) {
       return sections.slice(0, sections.length - 1).join("/");
     };
 
-    console.log("IMPORT META URL", import.meta.url);
     let basePath =
       "file://" +
       removeLastSection(import.meta.url.split("app.asar")[0]).replace(
         "file://",
         ""
       );
-    console.log("BASE PATH", basePath);
     Sentry.init({
       dsn: import.meta.env.VITE_SENTRY_DSN,
+      initialScope: {
+        tags: {
+          baseUrl: import.meta.url,
+        },
+      },
       integrations: [
         new BrowserTracing(),
         new RewriteFramesIntegration({
           iteratee: (frame) => {
             if (frame.filename) {
-              console.log("FRAME", frame.filename);
-              frame.filename = frame.filename.replace(basePath, "app:/");
-              console.log("FRAME AFTER", frame.filename);
+              frame.filename = frame.filename
+                .replace(basePath, "app:/")
+                .toLowerCase();
             }
             return frame;
           },
