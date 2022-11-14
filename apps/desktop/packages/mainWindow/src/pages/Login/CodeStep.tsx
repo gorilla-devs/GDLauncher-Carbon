@@ -31,7 +31,6 @@ const CodeStep = (props: Props) => {
             value={userCode() || ""}
             onClick={() => window.copyToClipboard(userCode() || "")}
           />
-          <div class="i-gdl:copy w-4 h-4" />
         </div>
         <p class="text-[#8A8B8F]">
           Enter the specified code on the browser page to complete the
@@ -39,6 +38,7 @@ const CodeStep = (props: Props) => {
         </p>
       </div>
       <Button
+        class="normal-case"
         onClick={() => {
           window.openExternalLink(deviceCodeLink() || "");
         }}

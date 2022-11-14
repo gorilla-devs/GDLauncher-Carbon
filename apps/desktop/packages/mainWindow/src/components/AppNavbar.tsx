@@ -7,7 +7,7 @@ export default function AppNavbar() {
 
   return (
     <Show when={location.pathname !== "/"}>
-      <nav class="bg-[#1D2028] text-white h-15 flex items-center px-5">
+      <nav class="bg-black-black text-white h-15 flex items-center px-5">
         <img src={GDLauncherWideLogo} class="h-9" />
         <ul class="flex items-between gap-6 m-0 text-white list-none pl-23">
           <li class="py-2">

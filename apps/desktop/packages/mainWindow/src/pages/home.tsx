@@ -12,7 +12,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   return (
-    <Page class="bg-[#1D2028]">
+    <Page class="bg-black-black">
       <button onClick={() => navigate("?m=myModal")}>Open modal</button>
       <button
         onClick={async () => {

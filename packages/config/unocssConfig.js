@@ -44,6 +44,10 @@ const config = {
         accent: {
           main: "#2B6CB0",
         },
+        black: {
+          black: "#1D2028",
+          blackOpacity80: "rgba(29, 32, 40, 0.8)",
+        },
       },
     },
     rules: [

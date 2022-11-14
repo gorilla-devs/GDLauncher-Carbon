@@ -12,9 +12,14 @@ export default function Login() {
         style={{
           "mix-blend-mode": "hard-light",
         }}
-        class="absolute top-0 left-0 right-0 bottom-0 bg-[#1D2028] opacity-80"
+        class="absolute top-0 left-0 right-0 bottom-0 bg-black-black opacity-80"
       />
-      <div class="w-120 h-90 rounded-2xl bg-[#1D2028] opacity-80 relative flex flex-col justify-end items-center text-white">
+      <div
+        class="w-120 h-90 rounded-2xl relative flex flex-col justify-end items-center text-white"
+        style={{
+          background: "rgba(29, 32, 40, 0.8)",
+        }}
+      >
         <Switch
           fallback={
             <Auth setStep={setStep} setDeviceCodeObject={setDeviceCodeObject} />

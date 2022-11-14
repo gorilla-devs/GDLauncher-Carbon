@@ -9,7 +9,7 @@ const Sidebar = () => {
         width: opened() ? "15rem" : "5rem",
         transition: "width .1s ease-in-out",
       }}
-      class="h-full bg-[#1D2028] relative"
+      class="h-full bg-black-black relative"
     >
       <div
         class="bg-[#272B35] absolute top-10 right-0 w-4 h-10 rounded-l-md"
