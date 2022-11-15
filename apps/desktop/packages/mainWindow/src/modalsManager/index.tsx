@@ -49,7 +49,6 @@ const Modals: Component = () => {
   const getModal = (type: string) => {
     const Component = () => modals[type]?.component;
     const title = () => modals[type]?.title;
-    console.log("modals[type]", modals[type]);
 
     return (
       <ModalLayout onClose={() => navigate(location.pathname)} title={title()}>

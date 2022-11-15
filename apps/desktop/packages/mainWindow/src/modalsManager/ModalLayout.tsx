@@ -19,7 +19,7 @@ const ModalLayout = (props: Props) => {
           onClick={() => props.onClose()}
         />
       </div>
-      {c()}
+      <div class="p-5">{c()}</div>
     </div>
   );
 };
