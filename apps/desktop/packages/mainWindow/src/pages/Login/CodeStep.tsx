@@ -4,6 +4,7 @@ import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
 import { createEffect } from "solid-js";
 import { accounts } from "@/modules/components/accounts";
+import { addNotification } from "@/notificationManager";
 
 type Props = {
   deviceCodeObject: DeviceCodeObject | null;
@@ -29,7 +30,10 @@ const CodeStep = (props: Props) => {
         <div class="flex justify-center">
           <CodeInput
             value={userCode() || ""}
-            onClick={() => window.copyToClipboard(userCode() || "")}
+            onClick={() => {
+              window.copyToClipboard(userCode() || "");
+              addNotification("The link has been copied");
+            }}
           />
         </div>
         <p class="text-[#8A8B8F]">

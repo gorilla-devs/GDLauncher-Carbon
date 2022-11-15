@@ -5,15 +5,11 @@ import {
   createMemo,
   createSignal,
   JSX,
-  Match,
+  lazy,
   Show,
-  Switch,
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import ModalLayout from "./ModalLayout";
-import AcceptableUsePolicy from "./modals/AcceptableUsePolicy";
-import Privacypolicy from "./modals/Privacypolicy";
-import TermsAndConditions from "./modals/TermsAndConditions";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
@@ -31,13 +27,16 @@ const Modals: Component = () => {
   const [isVisible, setIsVisible] = createSignal(false);
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
   const [modals] = createStore<Hash>({
-    privacyPolicy: { component: Privacypolicy, title: "Privacy Policy" },
+    privacyPolicy: {
+      component: lazy(() => import("./modals/Privacypolicy")),
+      title: "Privacy Policy",
+    },
     termsAndConditions: {
-      component: TermsAndConditions,
+      component: lazy(() => import("./modals/TermsAndConditions")),
       title: "Terms and Conditions",
     },
     acceptableUsePolicy: {
-      component: AcceptableUsePolicy,
+      component: lazy(() => import("./modals/AcceptableUsePolicy")),
       title: "Acceptable Use Policy",
     },
   });

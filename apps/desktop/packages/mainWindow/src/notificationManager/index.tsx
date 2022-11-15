@@ -10,7 +10,10 @@ type Notification = {
 const [notifications, setNotifications] = createStore<Notification[]>([]);
 const clearNotification = () =>
   setTimeout(
-    () => setNotifications((notification) => notification.slice(0, -1)),
+    () =>
+      setNotifications((notification) =>
+        notification.slice(1, notification.length)
+      ),
     2000
   );
 
@@ -54,7 +57,7 @@ const Notifications = () => {
       <For each={notifications}>
         {(notification, i) => (
           <div
-            class="w-50 h-10 px-4 text-black fixed left-1/2 rounded-md flex items-center"
+            class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex items-center"
             style={{
               bottom: notification.position === "bottom" ? "20px" : "auto",
               top: notification.position === "top" ? "50px" : "auto",
@@ -72,6 +75,7 @@ const Notifications = () => {
             //   "bg-status-green": notification.type === "success",
             // }}
           >
+            {i()}
             {notification.name}
           </div>
         )}
