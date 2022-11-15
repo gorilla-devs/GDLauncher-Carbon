@@ -1,7 +1,7 @@
 import ModalLayout from "../ModalLayout";
 
 const Privacypolicy = () => {
-  return <ModalLayout>Privacypolicy</ModalLayout>;
+  return <div>Privacypolicy</div>;
 };
 
 export default Privacypolicy;

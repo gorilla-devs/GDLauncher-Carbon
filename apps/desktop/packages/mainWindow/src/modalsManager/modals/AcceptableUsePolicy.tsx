@@ -1,7 +1,7 @@
 import ModalLayout from "../ModalLayout";
 
 const AcceptableUsePolicy = () => {
-  return <ModalLayout>AcceptableUsePolicy</ModalLayout>;
+  return <div>AcceptableUsePolicy</div>;
 };
 
 export default AcceptableUsePolicy;

@@ -1,7 +1,7 @@
 import ModalLayout from "../ModalLayout";
 
 const TermsAndConditions = () => {
-  return <ModalLayout>TermsAndConditions</ModalLayout>;
+  return <div>TermsAndConditions</div>;
 };
 
 export default TermsAndConditions;

@@ -10,6 +10,7 @@ import {
   Switch,
 } from "solid-js";
 import { createStore } from "solid-js/store";
+import ModalLayout from "./ModalLayout";
 import AcceptableUsePolicy from "./modals/AcceptableUsePolicy";
 import Privacypolicy from "./modals/Privacypolicy";
 import TermsAndConditions from "./modals/TermsAndConditions";
@@ -20,7 +21,7 @@ import TermsAndConditions from "./modals/TermsAndConditions";
  */
 
 interface Hash {
-  [name: string]: JSX.Element;
+  [name: string]: { component: JSX.Element; title: string };
 }
 
 const Modals: Component = () => {
@@ -30,9 +31,15 @@ const Modals: Component = () => {
   const [isVisible, setIsVisible] = createSignal(false);
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
   const [modals] = createStore<Hash>({
-    privacyPolicy: Privacypolicy,
-    termsAndConditions: TermsAndConditions,
-    acceptableUsePolicy: AcceptableUsePolicy,
+    privacyPolicy: { component: Privacypolicy, title: "Privacy Policy" },
+    termsAndConditions: {
+      component: TermsAndConditions,
+      title: "Terms and Conditions",
+    },
+    acceptableUsePolicy: {
+      component: AcceptableUsePolicy,
+      title: "Acceptable Use Policy",
+    },
   });
 
   const queryParams = createMemo(() => location.search);
@@ -40,8 +47,15 @@ const Modals: Component = () => {
   const isModal = createMemo(() => mParam() !== null);
 
   const getModal = (type: string) => {
-    const Component = () => modals[type];
-    return <Component />;
+    const Component = () => modals[type]?.component;
+    const title = () => modals[type]?.title;
+    console.log("modals[type]", modals[type]);
+
+    return (
+      <ModalLayout onClose={() => navigate(location.pathname)} title={title()}>
+        <Component />
+      </ModalLayout>
+    );
   };
 
   createEffect(() => {
