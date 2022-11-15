@@ -48,7 +48,12 @@ const config = {
           black: "#1D2028",
           blackOpacity80: "rgba(29, 32, 40, 0.8)",
         },
-        semiblack: "#272B35"
+        semiblack: "#272B35",
+        status: {
+          red:"#E54B4B",
+          yellow:"#F7BC3D",
+          green:"#29A335"
+        }
       },
     },
     rules: [
