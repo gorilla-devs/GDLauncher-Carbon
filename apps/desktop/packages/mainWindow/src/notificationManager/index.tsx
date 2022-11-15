@@ -54,14 +54,14 @@ const Notifications = () => {
       <For each={notifications}>
         {(notification, i) => (
           <div
-            class="w-50 h-10 bg-status-green text-black fixed left-1/2 rounded-md"
+            class="w-50 h-10 px-4 text-black fixed left-1/2 rounded-md flex items-center"
             style={{
               bottom: notification.position === "bottom" ? "20px" : "auto",
               top: notification.position === "top" ? "50px" : "auto",
               transform: `translate(-50%, ${
                 notification.position === "bottom"
-                  ? `-${i() * 43}`
-                  : `${i() * 43}`
+                  ? `-${i() * 45}`
+                  : `${i() * 45}`
               }px)`,
               transition: "transform 1s",
               "background-color": getColorByType(notification.type || ""),
