@@ -33,7 +33,7 @@ export default defineConfig({
             const isSvg = extension === "svg";
             return {
               background: `url('./${process.env.NODE_ENV === "development" ? "assets/" : ""
-                }images/${isSvg ? img : `${img}.png`}')`,
+                }images/${isSvg ? img : `${img}.jpg`}')`,
               "background-size": "100% 100%",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",
@@ -54,6 +54,14 @@ export default defineConfig({
     emptyOutDir: true,
     outDir: "../../dist/mainWindow",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Prevent vendor.js being created
+        minifyInternalExports: true,
+        compact: true,
+        chunkFileNames: "assets/[hash].js",
+      },
+    }
   },
   resolve: {
     alias: {

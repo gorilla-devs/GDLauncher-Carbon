@@ -1,10 +1,12 @@
-use std::str::FromStr;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
     ConnectOptions, SqlitePool,
 };
+use std::str::FromStr;
+
+use super::GLOBAL_STORE;
 
 #[napi]
 pub async fn init_global_storage() -> Result<()> {
@@ -18,6 +20,8 @@ pub async fn init_global_storage() -> Result<()> {
         .connect()
         .await
         .map_err(|err| Error::new(Status::GenericFailure, err.to_string()))?;
+
+    GLOBAL_STORE.lock().await.replace(pool);
 
     Ok(())
 }
