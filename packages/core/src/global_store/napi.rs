@@ -6,7 +6,7 @@ use sqlx::{
 };
 use std::str::FromStr;
 
-use super::GLOBAL_STORE;
+use super::{CONN_REF};
 
 #[napi]
 pub async fn init_global_storage() -> Result<()> {
@@ -21,7 +21,7 @@ pub async fn init_global_storage() -> Result<()> {
         .await
         .map_err(|err| Error::new(Status::GenericFailure, err.to_string()))?;
 
-    GLOBAL_STORE.lock().await.replace(pool);
+    CONN_REF.lock().await.replace(pool);
 
     Ok(())
 }

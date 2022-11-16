@@ -29,11 +29,11 @@ pub struct Accounts {
 }
 
 impl Accounts {
-    pub async fn new() -> Result<Self> {
-        let azure_data = AzureData::new().await?;
-        *AZURE_DATA.lock().await = Some(azure_data);
-
-        Ok((&*ACCOUNTS).lock().await.clone())
+    pub fn new() -> Self {
+        Accounts {
+            inner: HashSet::new(),
+            selected_account: None,
+        }
     }
     pub async fn add_account(&mut self, account: Account) {
         let account_ref = Arc::new(account);
@@ -75,11 +75,4 @@ impl Accounts {
     pub fn get_accounts(&self) -> &HashSet<Arc<Account>> {
         &self.inner
     }
-}
-
-lazy_static! {
-    pub static ref ACCOUNTS: Arc<Mutex<Accounts>> = Arc::new(Mutex::new(Accounts {
-        inner: HashSet::new(),
-        selected_account: None,
-    }));
 }

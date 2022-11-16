@@ -1,9 +1,11 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
+use crate::global_store::GLOBAL_STORE;
+
 use super::{
-    ms_auth::{DeviceCode, McAuth, McProfile},
-    Account, Accounts, ACCOUNTS,
+    ms_auth::{AzureData, DeviceCode, AZURE_DATA},
+    Account, Accounts,
 };
 
 #[napi(object, js_name = "Account")]
@@ -115,9 +117,10 @@ pub fn auth(
             };
             let napi_account: NAPIAccount = account.clone().into();
 
-            let accounts = &*ACCOUNTS.lock().await;
+            let accounts = GLOBAL_STORE.lock().await;
 
-            accounts.clone().add_account(account).await;
+            (&*accounts).accounts.clone().add_account(account).await;
+            drop(accounts);
 
             // here the promise which we returned gets resolved with a computed value
             deferred.resolve(|_| Ok(napi_account));
@@ -135,12 +138,11 @@ pub fn auth(
 
 #[napi]
 pub async fn init_accounts() -> Result<NAPIAccounts> {
-    let accounts = Accounts::new().await.unwrap();
-    Ok(accounts.into())
-}
+    let azure_data = AzureData::new()
+        .await
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
+    *AZURE_DATA.lock().await = Some(azure_data);
 
-#[napi]
-pub async fn get_accounts() -> Result<NAPIAccounts> {
-    let accounts = ACCOUNTS.lock().await.clone();
+    let accounts = Accounts::new();
     Ok(accounts.into())
 }

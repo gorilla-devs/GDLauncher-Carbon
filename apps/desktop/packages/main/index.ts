@@ -73,7 +73,7 @@ function getMinimumBounds() {
         height: 600,
       },
     };
-  } else if (width < 1600 || height < 900) {
+  } else if (width < 1500 || height < 870) {
     // Smaller ads (160/600)
     return {
       minWidth: 1160,
@@ -93,7 +93,7 @@ function getMinimumBounds() {
       height: 740,
       adSize: {
         width: 400,
-        height: 600,
+        height: 300,
       },
     };
   }
