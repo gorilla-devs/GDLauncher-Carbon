@@ -2,7 +2,7 @@ import { Button, CodeInput } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
-import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { accounts } from "@/modules/components/accounts";
 import { addNotification } from "@/notificationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
@@ -17,15 +17,21 @@ const CodeStep = (props: Props) => {
   const userCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
-  const expiresAtMs = () => expiresAt() - Date.now();
+  const expiresAtMs = () => 0;
+  // const expiresAtMs = () => expiresAt() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
   const [countDown, setCountDown] = createSignal(
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
+  const [expired, setExpired] = createSignal(false);
 
   const updateExpireTime = () => {
+    console.log("TEST", minutes(), seconds());
+    if (minutes() === 0 && seconds() === 0) {
+      setExpired(true);
+    }
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
 
@@ -59,24 +65,35 @@ const CodeStep = (props: Props) => {
               addNotification("The link has been copied");
             }}
           />
-          <p class="mb-0 mt-4 text-[#8A8B8F]">
+        </div>
+        <Show when={!expired()}>
+          <p class="mb-0 mt-2 text-[#8A8B8F]">
             <span class="text-white">{countDown()}</span> before the code
             expires
           </p>
-        </div>
-        <p class="text-[#8A8B8F]">
-          Enter the specified code on the browser page to complete the
-          authorization
-        </p>
+          <p class="text-[#8A8B8F]">
+            Enter the specified code on the browser page to complete the
+            authorization
+          </p>
+        </Show>
       </div>
-      <Button
-        class="normal-case"
-        onClick={() => {
-          window.openExternalLink(deviceCodeLink() || "");
-        }}
-      >
-        Insert the code
-      </Button>
+      <Show when={!expired()}>
+        <Button
+          class="normal-case"
+          onClick={() => {
+            window.openExternalLink(deviceCodeLink() || "");
+          }}
+        >
+          Insert the code
+        </Button>
+      </Show>
+      <Show when={expired()}>
+        <p class="text-[#E54B4B] m-0">The code has been expired</p>
+        <div class="flex">
+          <span class="i-ri-refresh-line" />
+          <h3 class="m-0">Refresh</h3>
+        </div>
+      </Show>
     </div>
   );
 };
