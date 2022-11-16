@@ -75,7 +75,6 @@ const Notifications = () => {
             //   "bg-status-green": notification.type === "success",
             // }}
           >
-            {i()}
             {notification.name}
           </div>
         )}
