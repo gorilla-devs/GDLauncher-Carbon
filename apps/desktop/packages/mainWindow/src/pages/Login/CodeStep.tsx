@@ -17,8 +17,7 @@ const CodeStep = (props: Props) => {
   const userCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
-  const expiresAtMs = () => 0;
-  // const expiresAtMs = () => expiresAt() - Date.now();
+  const expiresAtMs = () => expiresAt() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
@@ -28,7 +27,6 @@ const CodeStep = (props: Props) => {
   const [expired, setExpired] = createSignal(false);
 
   const updateExpireTime = () => {
-    console.log("TEST", minutes(), seconds());
     if (minutes() === 0 && seconds() === 0) {
       setExpired(true);
     }
@@ -65,6 +63,9 @@ const CodeStep = (props: Props) => {
               addNotification("The link has been copied");
             }}
           />
+          <Show when={expired()}>
+            <p class="text-[#E54B4B] mb-0 mt-2">The code has been expired</p>
+          </Show>
         </div>
         <Show when={!expired()}>
           <p class="mb-0 mt-2 text-[#8A8B8F]">
@@ -88,8 +89,10 @@ const CodeStep = (props: Props) => {
         </Button>
       </Show>
       <Show when={expired()}>
-        <p class="text-[#E54B4B] m-0">The code has been expired</p>
-        <div class="flex">
+        <div
+          class="flex justify-between items-center gap-2 cursor-pointer"
+          onClick={() => {}}
+        >
           <span class="i-ri-refresh-line" />
           <h3 class="m-0">Refresh</h3>
         </div>

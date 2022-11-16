@@ -35,6 +35,8 @@ const config = {
         collections: {
           hero: () =>
             import("@iconify-json/heroicons/icons.json").then((i) => i.default),
+          // ri: () =>
+          //   import("@iconify-json/ri/icons.json").then((i) => i.default),
           gdl: gdlIcons(),
         },
       }),
@@ -50,10 +52,10 @@ const config = {
         },
         semiblack: "#272B35",
         status: {
-          red:"#E54B4B",
-          yellow:"#F7BC3D",
-          green:"#29A335"
-        }
+          red: "#E54B4B",
+          yellow: "#F7BC3D",
+          green: "#29A335",
+        },
       },
     },
     rules: [

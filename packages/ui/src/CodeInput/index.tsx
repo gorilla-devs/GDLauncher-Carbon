@@ -6,10 +6,10 @@ type Props = {
 
 export const CodeInput = (props: Props) => {
   return (
-    <div class="h-13 w-45 bg-black-black opacity-100 rounded-md flex justify-center items-center text-white font-bold  font-ubuntu gap-4">
+    <div class="h-13 w-47 bg-black-black opacity-100 rounded-md flex justify-center items-center text-white font-bold  font-ubuntu gap-2">
       <span class="text-2xl">{props.value}</span>
       <span
-        class="i-gdl:copy cursor-pointer"
+        class="i-ri:file-copy-fill cursor-pointer text-[#8A8B8F]"
         onClick={() => {
           if (props?.onClick) {
             props?.onClick();
