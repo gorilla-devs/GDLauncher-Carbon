@@ -37,7 +37,7 @@ const CodeStep = (props: Props) => {
   const updateExpireTime = () => {
     if (minutes() === 0 && seconds() === 0) {
       setExpired(true);
-    }
+    } else setExpired(false);
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
 

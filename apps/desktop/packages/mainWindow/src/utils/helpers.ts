@@ -1,3 +1,3 @@
 export const parseTwoDigitNumber = (number: number) => {
-  return number.toString().length === 1 ? `${number}0` : number;
+  return number.toString().length === 1 ? `0${number}` : number;
 };
