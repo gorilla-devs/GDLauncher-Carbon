@@ -3,16 +3,24 @@ import { useNavigate } from "@solidjs/router";
 import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { accounts } from "@/modules/components/accounts";
+import { accounts, login } from "@/modules/components/accounts";
 import { addNotification } from "@/notificationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
+import { Setter } from "solid-js";
 
 type Props = {
   deviceCodeObject: DeviceCodeObject | null;
+  setDeviceCodeObject: Setter<DeviceCodeObject>;
 };
 
 const CodeStep = (props: Props) => {
   const navigate = useNavigate();
+
+  const handleRefersh = async () => {
+    await login(({ userCode, link, expiresAt }) => {
+      props.setDeviceCodeObject({ userCode, link, expiresAt });
+    });
+  };
 
   const userCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
@@ -92,7 +100,7 @@ const CodeStep = (props: Props) => {
       <Show when={expired()}>
         <div
           class="flex justify-between items-center gap-2 cursor-pointer"
-          onClick={() => {}}
+          onClick={() => handleRefersh()}
         >
           <span class="i-ri-refresh-line" />
           <h3 class="m-0">Refresh</h3>
