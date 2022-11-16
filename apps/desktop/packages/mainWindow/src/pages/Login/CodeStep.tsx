@@ -57,6 +57,7 @@ const CodeStep = (props: Props) => {
       <div>
         <div class="flex flex-col justify-center items-center">
           <CodeInput
+            disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
               window.copyToClipboard(userCode() || "");

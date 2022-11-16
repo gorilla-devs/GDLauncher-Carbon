@@ -18,6 +18,7 @@ export default function Login() {
         class="w-120 h-100 rounded-2xl relative flex flex-col justify-end items-center text-white"
         style={{
           background: "rgba(29, 32, 40, 0.8)",
+          "justify-content": step() === 0 ? "flex-end" : "center",
         }}
       >
         <Switch
