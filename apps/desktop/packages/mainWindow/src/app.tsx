@@ -1,4 +1,4 @@
-import { Component, Show } from "solid-js";
+import { Component, createSignal, Show } from "solid-js";
 import { useRoutes, useLocation } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { Pattern } from "@gd/ui";
@@ -11,13 +11,17 @@ import Notifications from "./notificationManager";
 const App: Component = () => {
   const location = useLocation();
   const Route = useRoutes(routes);
+  const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 
   return (
     <div class="relative w-screen h-screen">
-      <AppNavbar />
+      <AppNavbar sidebarCollapsed={sidebarCollapsed()} />
       <div class="flex h-screen w-screen z-10">
         <Show when={location.pathname !== "/"}>
-          <Sidebar />
+          <Sidebar
+            collapsed={sidebarCollapsed()}
+            setSidebarCollapsed={setSidebarCollapsed}
+          />
         </Show>
         <main class="relative flex-1">
           <Transition

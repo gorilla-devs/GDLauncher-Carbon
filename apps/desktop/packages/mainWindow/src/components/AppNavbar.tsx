@@ -1,39 +1,37 @@
 import { Link, useLocation } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
+import { Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
+import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
 
-export default function AppNavbar() {
+type Props = {
+  sidebarCollapsed: boolean;
+};
+
+const AppNavbar = (props: Props) => {
   const location = useLocation();
 
   return (
     <Show when={location.pathname !== "/"}>
       <nav class="bg-black-black text-white h-15 flex items-center px-5">
-        <img src={GDLauncherWideLogo} class="h-9" />
-        <ul class="flex items-between gap-6 m-0 text-white list-none pl-23">
+        <img
+          src={props.sidebarCollapsed ? GDLauncherLogo : GDLauncherWideLogo}
+          class="h-9"
+        />
+        <ul
+          class="flex items-between gap-6 m-0 text-white list-none"
+          classList={{
+            "pl-12": props.sidebarCollapsed,
+            "pl-23": !props.sidebarCollapsed,
+          }}
+        >
           <li class="py-2">
             <Link href="/home" class="no-underline hover:underline text-white">
-              Home
+              Library
             </Link>
           </li>
           <li class="py-2">
             <Link href="/about" class="no-underline hover:underline text-white">
-              About
-            </Link>
-          </li>
-          <li class="py-2">
-            <Link
-              href="/error"
-              class="no-underline decoratione hover:underline text-white"
-            >
-              Error
-            </Link>
-          </li>
-          <li class="py-2">
-            <Link
-              href="/"
-              class="no-underline decoratione hover:underline text-white"
-            >
-              Logout
+              Modpacks
             </Link>
           </li>
 
@@ -50,4 +48,6 @@ export default function AppNavbar() {
       </nav>
     </Show>
   );
-}
+};
+
+export default AppNavbar;
