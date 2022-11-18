@@ -57,7 +57,7 @@ const Notifications = () => {
       <For each={notifications}>
         {(notification, i) => (
           <div
-            class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex items-center"
+            class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center"
             style={{
               bottom: notification.position === "bottom" ? "20px" : "auto",
               top: notification.position === "top" ? "50px" : "auto",

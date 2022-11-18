@@ -48,13 +48,10 @@ const CodeStep = (props: Props) => {
     }
   };
 
-  const interval = setInterval(() => {
-    updateExpireTime();
-  }, 1000);
+  let interval: NodeJS.Timer;
 
   createEffect(() => {
     if (accounts.selectedAccountId) {
-      console.log("selectedAccount", accounts.selectedAccountId);
       navigate("/home");
     }
   });
@@ -63,6 +60,10 @@ const CodeStep = (props: Props) => {
     if (expired()) {
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    } else {
+      interval = setInterval(() => {
+        updateExpireTime();
+      }, 1000);
     }
   });
 
