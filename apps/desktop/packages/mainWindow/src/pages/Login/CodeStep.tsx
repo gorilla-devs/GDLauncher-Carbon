@@ -23,6 +23,7 @@ const CodeStep = (props: Props) => {
   };
 
   const userCode = () => props.deviceCodeObject?.userCode;
+  const oldUserCode = props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
   const expiresAtMs = () => expiresAt() - Date.now();
@@ -35,16 +36,17 @@ const CodeStep = (props: Props) => {
   const [expired, setExpired] = createSignal(false);
 
   const updateExpireTime = () => {
-    if (minutes() === 0 && seconds() === 0) {
+    if (minutes() <= 0 && seconds() <= 0) {
       setExpired(true);
-    } else setExpired(false);
-    setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    } else {
+      setExpired(false);
+      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    }
   };
 
-  const interval = () =>
-    setInterval(() => {
-      updateExpireTime();
-    }, 1000);
+  const interval = setInterval(() => {
+    updateExpireTime();
+  }, 1000);
 
   createEffect(() => {
     if (accounts.selectedAccountId) {
@@ -53,11 +55,20 @@ const CodeStep = (props: Props) => {
     }
   });
 
-  onMount(() => {
-    interval();
+  createEffect(() => {
+    if (expired()) {
+      clearInterval(interval);
+      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    }
   });
 
-  onCleanup(() => clearInterval(interval()));
+  createEffect(() => {
+    if (userCode() !== oldUserCode) {
+      setExpired(false);
+    }
+  });
+
+  onCleanup(() => clearInterval(interval));
 
   return (
     <div class="flex flex-col justify-between items-center gap-5 p-10 text-center">
