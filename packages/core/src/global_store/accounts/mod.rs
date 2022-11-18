@@ -4,6 +4,7 @@ use anyhow::{bail, Ok, Result};
 use chrono::{Duration, Local};
 use jsonwebtoken::TokenData;
 use lazy_static::lazy_static;
+use serde::{Serialize, Deserialize};
 use tokio::sync::Mutex;
 
 use self::ms_auth::{
@@ -14,7 +15,7 @@ use self::ms_auth::{
 pub mod ms_auth;
 pub mod napi;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub ms_data: MsAuth,
     pub mc_data: McAuth,
@@ -22,7 +23,7 @@ pub struct Account {
 }
 
 /// Basic data structure for accounts
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Accounts {
     inner: HashSet<Arc<Account>>,
     selected_account: Option<Arc<Account>>,
@@ -35,6 +36,7 @@ impl Accounts {
             selected_account: None,
         }
     }
+
     pub async fn add_account(&mut self, account: Account) {
         let account_ref = Arc::new(account);
 

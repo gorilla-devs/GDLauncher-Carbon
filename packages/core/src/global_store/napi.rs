@@ -1,27 +1,13 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use sqlx::{
-    sqlite::{SqliteConnectOptions, SqliteJournalMode},
-    ConnectOptions, SqlitePool,
-};
-use std::str::FromStr;
 
-use super::{CONN_REF};
+use super::store_save_loop;
 
 #[napi]
 pub async fn init_global_storage() -> Result<()> {
-    // Ensure the data folder exists first 🤡
-    std::fs::create_dir_all("./data")?;
-    let pool = SqliteConnectOptions::from_str("sqlite://data/_store.db")
-        .map_err(|err| Error::new(Status::GenericFailure, err.to_string()))?
-        .journal_mode(SqliteJournalMode::Wal)
-        .create_if_missing(true)
-        .read_only(false)
-        .connect()
+    super::init_global_storage()
         .await
-        .map_err(|err| Error::new(Status::GenericFailure, err.to_string()))?;
-
-    CONN_REF.lock().await.replace(pool);
-
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, format!("{:?}", e)))?;
+    store_save_loop();
     Ok(())
 }

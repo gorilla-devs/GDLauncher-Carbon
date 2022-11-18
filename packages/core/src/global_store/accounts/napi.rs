@@ -117,10 +117,14 @@ pub fn auth(
             };
             let napi_account: NAPIAccount = account.clone().into();
 
-            let accounts = GLOBAL_STORE.lock().await;
+            let store = GLOBAL_STORE.lock().await;
 
-            (&*accounts).accounts.clone().add_account(account).await;
-            drop(accounts);
+            let store = store.as_ref().ok_or("Empty store").map_err(
+                |err| napi::Error::new(napi::Status::GenericFailure, err.to_string()),
+            )?;
+
+            store.accounts.clone().add_account(account).await;
+            drop(store);
 
             // here the promise which we returned gets resolved with a computed value
             deferred.resolve(|_| Ok(napi_account));
@@ -137,12 +141,11 @@ pub fn auth(
 }
 
 #[napi]
-pub async fn init_accounts() -> Result<NAPIAccounts> {
+pub async fn init_azure_data() -> Result<()> {
     let azure_data = AzureData::new()
         .await
         .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
     *AZURE_DATA.lock().await = Some(azure_data);
 
-    let accounts = Accounts::new();
-    Ok(accounts.into())
+    Ok(())
 }

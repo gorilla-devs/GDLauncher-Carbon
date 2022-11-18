@@ -1,3 +1,3 @@
 export default {
-  moduleNames: ["minimumBounds", "globalStorage", "accounts", "java"] as const,
+  moduleNames: ["minimumBounds", "globalStorage", "azureData", "java"] as const,
 };

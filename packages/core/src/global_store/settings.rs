@@ -1,15 +1,14 @@
-use std::collections::HashMap;
-
-use lazy_static::lazy_static;
-
+use serde::{Serialize, Deserialize};
+use std::{collections::HashMap, sync::Arc};
 use crate::java::JavaComponent;
 
 pub type JavaMajorVersion = u8;
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct GDLSettings {
-    java: JavaSettings,
-    discord_rpc: DiscordRPC,
-    launcher: LauncherSettings,
+    pub java: JavaSettings,
+    pub discord_rpc: DiscordRPC,
+    pub launcher: LauncherSettings,
 }
 
 impl GDLSettings {
@@ -22,6 +21,7 @@ impl GDLSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JavaSettings {
     components: HashMap<JavaMajorVersion, Vec<JavaComponent>>,
     args: Vec<ArgumentComponent>,
@@ -34,8 +34,18 @@ impl JavaSettings {
             args: Vec::new(),
         }
     }
+
+    pub fn get_components(&self) -> &HashMap<JavaMajorVersion, Vec<JavaComponent>> {
+        &self.components
+    }
+
+    pub fn get_args(&self) -> &Vec<ArgumentComponent> {
+        &self.args
+    }
+
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct ArgumentComponent {
     pub name: String,
     pub value: String,
@@ -47,6 +57,7 @@ impl ArgumentComponent {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct DiscordRPC {
     pub enabled: bool,
 }
@@ -57,9 +68,10 @@ impl DiscordRPC {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct LauncherSettings {
-    quit_on_game_close: bool,
-    quit_on_game_launch: Option<RecordPlaySession>,
+    pub quit_on_game_close: bool,
+    pub quit_on_game_launch: Option<RecordPlaySession>,
 }
 
 impl LauncherSettings {
@@ -71,13 +83,14 @@ impl LauncherSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct RecordPlaySession {
     /// Keeps track of the time the game was launched
-    record_playtime: bool,
+    pub record_playtime: bool,
     /// Records the general computer's usage of resources during the session
-    record_resources_usage: bool,
+    pub record_resources_usage: bool,
     /// Records how much memory, CPU and general resources the game used during the session
-    record_game_performance: bool,
+    pub record_game_performance: bool,
 }
 
 impl RecordPlaySession {
