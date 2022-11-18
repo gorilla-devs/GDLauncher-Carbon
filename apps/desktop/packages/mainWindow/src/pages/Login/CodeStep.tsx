@@ -35,12 +35,16 @@ const CodeStep = (props: Props) => {
   );
   const [expired, setExpired] = createSignal(false);
 
+  const resetCountDown = () => {
+    setExpired(false);
+    setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+  };
+
   const updateExpireTime = () => {
     if (minutes() <= 0 && seconds() <= 0) {
       setExpired(true);
     } else {
-      setExpired(false);
-      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+      resetCountDown();
     }
   };
 
@@ -64,7 +68,7 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (userCode() !== oldUserCode) {
-      setExpired(false);
+      resetCountDown();
     }
   });
 
