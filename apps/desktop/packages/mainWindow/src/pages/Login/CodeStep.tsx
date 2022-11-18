@@ -118,7 +118,7 @@ const CodeStep = (props: Props) => {
           class="flex justify-between items-center gap-2 cursor-pointer"
           onClick={() => handleRefersh()}
         >
-          <span class="i-ri-refresh-line" />
+          <span class="i-ri:refresh-line" />
           <h3 class="m-0">Refresh</h3>
         </div>
       </Show>

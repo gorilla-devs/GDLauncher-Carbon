@@ -33,12 +33,11 @@ const config = {
       presetWind(),
       presetIcons({
         collections: {
-          hero: () =>
-            import("@iconify-json/heroicons/icons.json").then((i) => i.default),
-          // ri: () =>
-          //   import("@iconify-json/ri/icons.json").then((i) => i.default),
           gdl: gdlIcons(),
         },
+        hero: () =>
+          import("@iconify-json/heroicons/icons.json").then((i) => i.default),
+        ri: () => import("@iconify-json/ri/icons.json").then((i) => i.default),
       }),
     ],
     theme: {
