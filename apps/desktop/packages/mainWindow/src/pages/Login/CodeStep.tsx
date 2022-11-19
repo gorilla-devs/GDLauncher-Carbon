@@ -52,7 +52,8 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (accounts.selectedAccountId) {
-      navigate("/home");
+      // TODO: save in a store the default / last page
+      navigate("/library");
     }
   });
 
