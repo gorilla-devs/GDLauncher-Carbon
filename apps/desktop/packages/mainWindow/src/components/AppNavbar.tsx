@@ -1,7 +1,8 @@
 import { Link, useLocation } from "@solidjs/router";
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
+import { routes } from "@/utils/constants";
 
 type Props = {
   sidebarCollapsed: boolean;
@@ -24,16 +25,22 @@ const AppNavbar = (props: Props) => {
             "pl-23": !props.sidebarCollapsed,
           }}
         >
-          <li class="py-2">
-            <Link href="/home" class="no-underline hover:underline text-white">
-              Library
-            </Link>
-          </li>
-          <li class="py-2">
-            <Link href="/about" class="no-underline hover:underline text-white">
-              Modpacks
-            </Link>
-          </li>
+          <For each={routes}>
+            {(route) => (
+              <li class="py-2 no-underline">
+                <Link
+                  href={route.href}
+                  class="no-underline"
+                  classList={{
+                    "text-white": location.pathname === route.href,
+                    "text-slate-400": location.pathname !== route.href,
+                  }}
+                >
+                  {route.label}
+                </Link>
+              </li>
+            )}
+          </For>
 
           {/* <li class="text-sm flex items-center space-x-1 ml-auto">
             <span>URL:</span>
