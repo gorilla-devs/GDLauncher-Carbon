@@ -1,9 +1,16 @@
+import { routes } from "@/utils/constants";
 import { useLocation } from "@solidjs/router";
-import { createSignal, Setter, Show } from "solid-js";
+import { Setter, Show } from "solid-js";
 
 type Props = {
   setSidebarCollapsed: Setter<boolean>;
   collapsed: boolean;
+};
+
+const getContent = (location: string) => {
+  const route = routes.find((route) => route.href === location);
+  const SidebarContent = route?.sidebarContent;
+  if (SidebarContent) return <SidebarContent />;
 };
 
 const Sidebar = (props: Props) => {
@@ -15,10 +22,11 @@ const Sidebar = (props: Props) => {
         width: !props.collapsed ? "15rem" : "5rem",
         transition: "width .1s ease-in-out",
       }}
-      class="h-full bg-black-black relative"
+      class="h-full bg-black-black relative text-white p-5 box-border"
     >
+      {getContent(location.pathname)}
       <div
-        class="bg-[#272B35] absolute top-10 right-0 w-4 h-10 rounded-l-md flex justify-center items-center"
+        class="bg-black-semiblack absolute top-10 right-0 w-4 h-10 rounded-l-md flex justify-center items-center"
         onClick={() => {
           props.setSidebarCollapsed(!props.collapsed);
         }}
