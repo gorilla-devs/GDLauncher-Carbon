@@ -49,6 +49,7 @@ const config = {
           black: "#1D2028",
           blackOpacity80: "rgba(29, 32, 40, 0.8)",
           semiblack: "#272B35",
+          "lightGray": "#8A8B8F"
         },
         status: {
           red: "#E54B4B",

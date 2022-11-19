@@ -24,11 +24,11 @@ const Auth = (props: Props) => {
     <div>
       <div class="absolute left-0 right-0 m-auto -top-15 flex flex-col justify-center items-center">
         <img class="w-40" src={Logo} />
-        <p class="text-[#8A8B8F]">v1.1.26</p>
+        <p class="text-black-lightGray">v1.1.26</p>
       </div>
       <div class="text-center flex flex-col justify-center items-center">
         <Button onClick={() => handleClick()}>Sign in with microsoft</Button>
-        <p class="max-w-90 text-sm text-[#8A8B8F]">
+        <p class="max-w-90 text-sm text-black-lightGray">
           Sign in with your Microsoft Account. By doing so, you accept all our
           policies and terms stated below.
         </p>

@@ -17,7 +17,7 @@ export const CodeInput = (props: Props) => {
         {props.value}
       </span>
       <span
-        class="i-ri:file-copy-fill cursor-pointer text-[#8A8B8F]"
+        class="i-ri:file-copy-fill cursor-pointer text-black-lightGray"
         style={{
           color: props.disabled ? "#404759" : "#8A8B8F",
         }}
