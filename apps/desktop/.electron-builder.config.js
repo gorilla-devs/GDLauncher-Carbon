@@ -18,6 +18,10 @@ module.exports = {
       to: "core.node",
     },
     {
+      from: "./JavaCheck.class",
+      to: "JavaCheck.class",
+    },
+    {
       from: "../../target/aarch64-apple-darwin/release/app_helper",
       to: "app_helper",
     },

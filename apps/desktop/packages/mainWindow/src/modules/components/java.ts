@@ -1,7 +1,9 @@
 import napi from "../napi";
 
 export const init = async () => {
-  await napi.initJava();
+  let availableJavas = await napi.initJava();
+  console.log(availableJavas);
+  return availableJavas;
 };
 
 export default {};

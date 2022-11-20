@@ -1,39 +1,62 @@
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
-use tokio::fs;
+use anyhow::{bail, Context, Result};
+use tokio::process::Command;
 
-use super::{utils::get_path_separator, JavaComponent};
+use crate::java::utils::parse_java_version;
 
-async fn load_java_paths_from_env() -> Result<Option<Vec<PathBuf>>> {
+use super::{
+    utils::{locate_java_check_class, path_separator},
+    JavaComponent,
+};
+
+pub async fn get_available_javas() -> Result<Vec<JavaComponent>> {
+    let mut all_javas = find_java_paths().await;
+    all_javas.push(PathBuf::from("java"));
+    let mut available_javas = vec![];
+
+    for java in all_javas {
+        match gather_java_bin_info(&java).await {
+            Ok(java_bin_info) => available_javas.push(java_bin_info),
+            Err(e) => {
+                eprintln!("Failed to gather Java info for {}: {}", java.display(), e);
+            }
+        };
+    }
+
+    Ok(available_javas)
+}
+
+async fn load_java_paths_from_env() -> Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH").context("Could not find PATH env")?;
-    let paths = env_path.split(get_path_separator()).collect::<Vec<&str>>();
+    let paths = env_path.split(path_separator).collect::<Vec<&str>>();
     let mut java_paths = Vec::new();
     for path in paths {
         let path = path.to_string();
         if path.contains("java") {
-            java_paths.extend(search_java_binary_in_path(path));
+            java_paths.extend(search_java_binary_in_path(PathBuf::from(path)));
         }
     }
 
-    Ok(Some(java_paths))
-}
-
-fn get_default_java_path() -> String {
-    "java".to_owned()
+    Ok(java_paths)
 }
 
 #[cfg(target_os = "macos")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
-    javas.push(PathBuf::from(get_default_java_path()));
-    javas.push(PathBuf::from("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java/bin/java"));
-    javas.push(PathBuf::from(
-        "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java",
+    javas.extend(search_java_binary_in_path(
+        PathBuf::from("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java")
     ));
-    javas.push(PathBuf::from(
-        "/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands/java",
-    ));
+    javas.extend(search_java_binary_in_path(PathBuf::from(
+        "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home",
+    )));
+    javas.extend(search_java_binary_in_path(PathBuf::from(
+        "/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands",
+    )));
+    javas.extend(search_java_binary_in_path(PathBuf::from(
+        "/opt/homebrew/opt/openjdk/bin",
+    )));
+    javas.extend(search_java_binary_in_path(PathBuf::from("/usr/bin")));
 
     // Library JVM
     let library_jvm_dir = PathBuf::from("/Library/Java/JavaVirtualMachines");
@@ -42,8 +65,13 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
         for library_jvm_java in library_jvm_javas {
             if let Ok(library_jvm_java) = library_jvm_java {
                 let library_jvm_java = library_jvm_java.path();
-                javas.push(library_jvm_java.join("Contents/Home/bin/java"));
-                javas.push(library_jvm_java.join("/Contents/Home/jre/bin/java"));
+                javas.extend(
+                    vec![
+                        search_java_binary_in_path(library_jvm_java.join("Contents/Home")),
+                        search_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
+                    ]
+                    .concat(),
+                );
             }
         }
     }
@@ -55,14 +83,22 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
         for system_library_jvm_java in system_library_jvm_javas {
             if let Ok(system_library_jvm_java) = system_library_jvm_java {
                 let system_library_jvm_java = system_library_jvm_java.path();
-                javas.push(system_library_jvm_java.join("/Contents/Home/bin/java"));
-                javas.push(system_library_jvm_java.join("/Contents/Commands/java"));
+
+                javas.extend(
+                    vec![
+                        search_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
+                        search_java_binary_in_path(
+                            system_library_jvm_java.join("Contents/Commands"),
+                        ),
+                    ]
+                    .concat(),
+                );
             }
         }
     }
 
     let java_from_env = load_java_paths_from_env().await;
-    if let Ok(Some(java_from_env)) = java_from_env {
+    if let Ok(java_from_env) = java_from_env {
         javas.extend(java_from_env);
     }
 
@@ -74,33 +110,24 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
             .cmp(&b.to_string_lossy().to_string().to_lowercase())
     });
     javas.dedup();
-
-    javas
+    javas.into_iter().filter(|java| java.exists()).collect()
 }
 
-fn search_java_binary_in_path(path: String) -> Vec<PathBuf> {
+fn search_java_binary_in_path(path: PathBuf) -> Vec<PathBuf> {
     let mut options = vec![];
     if cfg!(windows) {
-        options.push(format!("{}\\bin\\java.exe", path));
-        options.push(format!("{}\\java.exe", path));
+        options.push(path.join("bin").join("java.exe"));
+        options.push(path.join("java.exe"));
     } else {
-        options.push(format!("{}/bin/java", path));
-        options.push(format!("{}/java", path));
+        options.push(path.join("bin").join("java"));
+        options.push(path.join("java"));
     }
 
     options
-        .into_iter()
-        .filter(|path| PathBuf::from(path).exists())
-        .map(|path| PathBuf::from(path))
-        .collect()
 }
 
 #[cfg(target_os = "windows")]
-pub fn read_registry_key(
-    key: &str,
-    value: &str,
-    subkey_suffix: Option<&str>,
-) -> Result<Vec<PathBuf>> {
+fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Result<Vec<PathBuf>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
     let key_reg = hkcu.open_subkey(key)?;
     let mut results = vec![];
@@ -131,15 +158,12 @@ pub fn read_registry_key(
 }
 
 #[cfg(target_os = "windows")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
-
-    // Load default java
-    javas.push(PathBuf::from(get_default_java_path()));
 
     // Load from env
     let java_from_env = load_java_paths_from_env().await;
-    if let Ok(Some(java_from_env)) = java_from_env {
+    if let Ok(java_from_env) = java_from_env {
         javas.extend(java_from_env);
     }
 
@@ -223,24 +247,22 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     });
     javas.dedup();
 
-    javas
+    javas.into_iter().filter(|java| java.exists()).collect()
 }
 
 #[cfg(target_os = "linux")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+async fn find_java_paths() -> Vec<PathBuf> {
     let folders = [
         "/usr/java",
         "/usr/lib/jvm",
         "/usr/lib64/jvm",
         "/usr/lib32/jvm",
-        "java",
         "/opt/jdk",
         "/opt/jdks",
         "/app/jdk",
     ];
 
     let mut javas: Vec<PathBuf> = vec![];
-    javas.push(PathBuf::from(get_default_java_path()));
 
     for file in folders {
         let directories = scan_java_dirs(file).await;
@@ -250,7 +272,7 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     }
 
     let java_from_env = load_java_paths_from_env().await;
-    if let Ok(Some(java_from_env)) = java_from_env {
+    if let Ok(java_from_env) = java_from_env {
         javas.extend(java_from_env);
     }
 
@@ -263,7 +285,7 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     });
     javas.dedup();
 
-    javas
+    javas.into_iter().filter(|java| java.exists()).collect()
 }
 
 #[cfg(target_os = "linux")]
@@ -288,10 +310,28 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     result
 }
 
-mod tests {
-    #[tokio::test]
-    async fn test_find_java_paths() {
-        let javas = super::find_java_paths().await;
-        assert!(javas.len() > 0);
+async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent> {
+    let java_checker_path = locate_java_check_class()?;
+    println!("java_checker_path: {:?}", java_checker_path);
+    if java_bin_path.to_string_lossy().to_string() != "java" && !java_bin_path.exists() {
+        bail!("Java binary does not exist");
     }
+
+    // Run java
+    let output = Command::new(java_bin_path)
+        .current_dir(&java_checker_path.parent().unwrap())
+        .arg("JavaCheck")
+        .output()
+        .await?;
+
+    // print
+    let output = String::from_utf8(output.stdout)?;
+    let java_version = parse_java_version(&output)?;
+
+    Ok(JavaComponent {
+        path: java_bin_path.to_string_lossy().to_string(),
+        version: java_version,
+        arch: "aarm64".to_string(), // TODO: parse
+        is_custom: false,
+    })
 }

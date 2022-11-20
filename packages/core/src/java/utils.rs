@@ -1,23 +1,28 @@
 use anyhow::{bail, Result};
+use napi::bindgen_prelude::*;
 use regex::Regex;
+use std::path::PathBuf;
 
 use super::JavaVersion;
 
 #[cfg(target_os = "windows")]
-pub fn get_path_separator() -> char {
-    ';'
-}
+pub static path_separator: &'static str = ";";
 
 #[cfg(not(target_os = "windows"))]
-pub fn get_path_separator() -> char {
-    ':'
+pub static path_separator: &'static str = ":";
+
+pub fn locate_java_check_class() -> Result<PathBuf> {
+    match std::env::current_dir() {
+        Ok(dir_path) => Ok(PathBuf::from(dir_path).join("JavaCheck.class")),
+        Err(e) => bail!("Failed to get current directory: {}", e),
+    }
 }
 
 pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
     for line in cmd_output.lines() {
         // I spent way too much time on this regex
         let regex = Regex::new(
-            r#"build (?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?)(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
+            r#"^java.version=(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?)(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
         )?;
 
         if let Some(captures) = regex.captures(line) {
@@ -76,6 +81,8 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
 mod tests {
     use crate::java::JavaVersion;
 
+    use super::locate_java_check_class;
+
     #[test]
     fn test_parse_java_version() {
         #[derive(Debug)]
@@ -86,9 +93,7 @@ mod tests {
 
         let expected = [
             TestCase {
-                output: r#"openjdk 19.0.1 2022-10-18
-                        OpenJDK Runtime Environment Homebrew (build 19.0.1)
-                        OpenJDK 64-Bit Server VM Homebrew (build 19.0.1, mixed mode, sharing)"#,
+                output: "java.version=19.0.1",
                 expected: Some(JavaVersion {
                     major: 19,
                     minor: Some(0),
@@ -99,16 +104,11 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"Error: Could not create the Java Virtual Machine.
-                        Error: A fatal exception has occurred. Program will exit.
-                        "#,
+                output: "os.arch=amd64",
                 expected: None,
             },
             TestCase {
-                output: r#"openjdk version "1.8.0_352"
-                        OpenJDK Runtime Environment (Temurin)(build 1.8.0_352-b08)
-                        OpenJDK 64-Bit Server VM (Temurin)(build 25.352-b08, mixed mode)
-                        "#,
+                output: "java.version=1.8.0_352-b08",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(8),
@@ -119,10 +119,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "19.0.1" 2022-10-18
-                        OpenJDK Runtime Environment Temurin-19.0.1+10 (build 19.0.1+10)
-                        OpenJDK 64-Bit Server VM Temurin-19.0.1+10 (build 19.0.1+10, mixed mode)
-                        "#,
+                output: "java.version=19.0.1+10",
                 expected: Some(JavaVersion {
                     major: 19,
                     minor: Some(0),
@@ -133,10 +130,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"java version "1.4.0_03"
-                        Java(TM) 2 Runtime Environment, Standard Edition (build 1.4.0_03-b04)
-                        Java HotSpot(TM) Client VM (build 1.4.0_03-b04, mixed mode)
-                        "#,
+                output: "java.version=1.4.0_03-b04",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(4),
@@ -147,10 +141,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "17.0.6-beta" 2023-01-17
-                        OpenJDK Runtime Environment Temurin-17.0.6+2-202211152348 (build 17.0.6-beta+2-202211152348)
-                        OpenJDK 64-Bit Server VM Temurin-17.0.6+2-202211152348 (build 17.0.6-beta+2-202211152348, mixed mode)
-                        "#,
+                output: "java.version=17.0.6-beta+2-202211152348",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),
@@ -161,10 +152,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "1.8.0_362-beta"
-                        OpenJDK Runtime Environment (Temurin)(build 1.8.0_362-beta-202211161809-b03+152)
-                        OpenJDK 64-Bit Server VM (Temurin)(build 25.362-b03, mixed mode)
-                        "#,
+                output: "java.version=1.8.0_362-beta-202211161809-b03+152",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(8),
@@ -175,10 +163,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "18.0.2.1" 2022-08-18
-                        OpenJDK Runtime Environment Temurin-18.0.2.1+1 (build 18.0.2.1+1)
-                        OpenJDK 64-Bit Server VM Temurin-18.0.2.1+1 (build 18.0.2.1+1, mixed mode)
-                        "#,
+                output: "java.version=18.0.2.1+1",
                 expected: Some(JavaVersion {
                     major: 18,
                     minor: Some(0),
@@ -189,13 +174,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "17.0.5" 2022-10-18
-                        IBM Semeru Runtime Open Edition 17.0.5.0 (build 17.0.5+8)
-                        Eclipse OpenJ9 VM 17.0.5.0 (build openj9-0.35.0, JRE 17 Mac OS X amd64-64-Bit Compressed References 20221018_304 (JIT enabled, AOT enabled)
-                        OpenJ9   - e04a7f6c1
-                        OMR      - 85a21674f
-                        JCL      - 32d2c409a33 based on jdk-17.0.5+8)
-                        "#,
+                output: "java.version=17.0.5+8",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),
@@ -206,10 +185,7 @@ mod tests {
                 }),
             },
             TestCase {
-                output: r#"openjdk version "17.0.5" 2022-10-18 LTS
-                        OpenJDK Runtime Environment Microsoft-6841604 (build 17.0.5+8-LTS)
-                        OpenJDK 64-Bit Server VM Microsoft-6841604 (build 17.0.5+8-LTS, mixed mode, sharing)
-                        "#,
+                output: "java.version=17.0.5+8-LTS",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),

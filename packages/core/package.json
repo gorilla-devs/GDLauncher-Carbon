@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "main": "./index.js",
   "files": [
-    "core.node"
+    "core.node",
+    "JavaCheck.class"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
