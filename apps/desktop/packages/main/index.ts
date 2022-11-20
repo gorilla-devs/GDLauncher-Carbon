@@ -109,6 +109,7 @@ async function createWindow() {
     minWidth,
     width,
     titleBarStyle: "hidden",
+    frame: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
