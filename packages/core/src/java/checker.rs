@@ -291,7 +291,7 @@ async fn find_java_paths() -> Vec<PathBuf> {
 #[cfg(target_os = "linux")]
 async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     let mut result: Vec<PathBuf> = Vec::new();
-    let mut entries = match fs::read_dir(dir_path).await {
+    let mut entries = match tokio::fs::read_dir(dir_path).await {
         Ok(directories) => directories,
         Err(_) => return result,
     };
