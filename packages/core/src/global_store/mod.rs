@@ -104,18 +104,20 @@ impl GlobalStore {
 
 mod tests {
     #[tokio::test]
-    async fn test_init_global_storage() {
+    async fn test_init_inner_global_storage() {
         let store_path = super::STORE_PATH.lock().await;
+        let store_path_clone = store_path.clone();
+        drop(store_path);
         // Cleanup if the db is already there
-        if store_path.exists() {
-            std::fs::remove_file(store_path.to_string_lossy().to_string()).unwrap();
+        if store_path_clone.exists() {
+            std::fs::remove_file(store_path_clone.to_string_lossy().to_string()).unwrap();
         }
 
         let store_lock = super::GLOBAL_STORE.lock().await;
         assert!(store_lock.is_none() == true);
         drop(store_lock);
 
-        let init = super::init_global_storage().await;
+        let init = super::init_inner_global_storage().await;
         assert!(init.is_ok() == true);
 
         // Try to modify value, write to disk and see if next load it's loaded correctly
@@ -125,18 +127,18 @@ mod tests {
         store_lock.as_mut().unwrap().settings.discord_rpc.enabled = false;
 
         let serialized_data = bincode::serialize(&store_lock.as_ref().unwrap()).unwrap();
-        std::fs::write(store_path.to_string_lossy().to_string(), serialized_data).unwrap();
+        std::fs::write(store_path_clone.to_string_lossy().to_string(), serialized_data).unwrap();
 
         drop(store_lock);
 
-        assert!(std::fs::File::open(store_path.to_string_lossy().to_string()).is_ok() == true);
+        assert!(std::fs::File::open(store_path_clone.to_string_lossy().to_string()).is_ok() == true);
 
         let mut store_lock = super::GLOBAL_STORE.lock().await;
         *store_lock = None;
         drop(store_lock);
 
         // Test to initialize the database when it's already there
-        let init = super::init_global_storage().await;
+        let init = super::init_inner_global_storage().await;
         assert!(init.is_ok() == true);
 
         let store_lock = super::GLOBAL_STORE.lock().await;
@@ -146,6 +148,6 @@ mod tests {
         drop(store_lock);
 
         // Final cleanup
-        std::fs::remove_file(store_path.to_string_lossy().to_string()).unwrap();
+        std::fs::remove_file(store_path_clone.to_string_lossy().to_string()).unwrap();
     }
 }
