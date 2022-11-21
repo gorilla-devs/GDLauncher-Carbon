@@ -1,7 +1,7 @@
 import { lazy } from "solid-js";
-import type { RouteDefinition } from "@solidjs/router";
 import AboutData from "./pages/about.data";
 import Modpacks from "./components/Sidebar/contents/modpacks";
+import Settings from "./components/Sidebar/contents/Settings";
 
 /* Defining the routes for the application. */
 export const routes = [
@@ -31,6 +31,11 @@ export const routes = [
     path: "/modpacks/:id",
     component: lazy(() => import("./pages/modpacks/modpack")),
     sidebar: Modpacks,
+  },
+  {
+    path: "/settings",
+    component: lazy(() => import("./pages/settings")),
+    sidebar: Settings,
   },
   {
     path: "**",

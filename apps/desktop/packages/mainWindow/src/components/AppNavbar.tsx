@@ -1,4 +1,4 @@
-import { Link, useLocation } from "@solidjs/router";
+import { Link, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
@@ -10,6 +10,7 @@ type Props = {
 
 const AppNavbar = (props: Props) => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   return (
     <Show when={location.pathname !== "/"}>
@@ -46,9 +47,15 @@ const AppNavbar = (props: Props) => {
         </div>
         <div class="flex gap-5">
           <div class="flex gap-5">
-            <div class="i-ri:settings-3-fill text-black-lightGray text-2xl" />
-            <div class="i-ri:terminal-box-fill text-black-lightGray text-2xl" />
-            <div class="i-ri:notification-2-fill text-black-lightGray text-2xl" />
+            <div class="i-ri:terminal-box-fill text-black-lightGray text-2xl cursor-pointer" />
+            <div
+              class="i-ri:settings-3-fill text-black-lightGray text-2xl cursor-pointer"
+              classList={{
+                "bg-accent-main": location.pathname === "/settings"
+              }}
+              onClick={() => navigate("/settings")}
+            />
+            <div class="i-ri:notification-2-fill text-black-lightGray text-2xl cursor-pointer" />
           </div>
           <div class="w-40 h-10 bg-black-semiblack"></div>
         </div>
