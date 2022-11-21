@@ -12,7 +12,7 @@ const Home = () => {
           navigate("/library/AXDLO");
         }}
       >
-        Auth
+        Instance AXDLO
       </button>
     </Page>
   );

@@ -1,6 +1,7 @@
-import { routes } from "@/utils/constants";
+import { routes } from "@/routes";
 import { useLocation } from "@solidjs/router";
 import { Setter, Show } from "solid-js";
+import Library from "./contents/Library";
 
 type Props = {
   setSidebarCollapsed: Setter<boolean>;
@@ -8,8 +9,8 @@ type Props = {
 };
 
 const getContent = (location: string) => {
-  const route = routes.find((route) => route.href === location);
-  const SidebarContent = route?.sidebarContent;
+  const route = routes.find((route) => route.path === location);
+  const SidebarContent = route?.sidebar || Library;
   if (SidebarContent) return <SidebarContent />;
 };
 

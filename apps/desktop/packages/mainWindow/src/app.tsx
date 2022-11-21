@@ -1,5 +1,5 @@
 import { Component, createSignal, Show } from "solid-js";
-import { useRoutes, useLocation } from "@solidjs/router";
+import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { Pattern } from "@gd/ui";
 import { routes } from "./routes";
@@ -11,10 +11,29 @@ import Notifications from "./notificationManager";
 const App: Component = () => {
   const location = useLocation();
   const Route = useRoutes(routes);
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 
   return (
     <div class="relative w-screen h-screen">
+      <Show when={process.env.NODE_ENV === "development"}>
+        <div class="absolute top-0 right-0 h-10 p-2 gap-4 z-50 bg-light-600 flex justify-center items-center cursor-pointer">
+          <div
+            onClick={() => {
+              navigate("/library");
+            }}
+          >
+            LOGIN
+          </div>
+          <div
+            onClick={() => {
+              navigate("/");
+            }}
+          >
+            LOGOUT
+          </div>
+        </div>
+      </Show>
       <AppNavbar sidebarCollapsed={sidebarCollapsed()} />
       <div class="flex h-screen w-screen z-10">
         <Show when={location.pathname !== "/"}>
