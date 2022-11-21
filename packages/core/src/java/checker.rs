@@ -140,7 +140,8 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
                 let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
                 match subkey_reg.get_value(value) {
                     Ok(value) => {
-                        results.extend(search_java_binary_in_path(value));
+                        let s_value: String = value;
+                        results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
                     }
                     Err(_) => continue,
                 };
@@ -149,7 +150,8 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
     } else {
         match key_reg.get_value(value) {
             Ok(value) => {
-                results.extend(search_java_binary_in_path(value));
+                let s_value: String = value;
+                results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
             }
             Err(_) => {}
         };
@@ -228,9 +230,7 @@ async fn find_java_paths() -> Vec<PathBuf> {
                     if let Ok(child) = child {
                         let child = child.path();
                         if child.is_dir() {
-                            javas.extend(search_java_binary_in_path(
-                                child.to_string_lossy().to_string(),
-                            ));
+                            javas.extend(search_java_binary_in_path(child));
                         }
                     }
                 }
