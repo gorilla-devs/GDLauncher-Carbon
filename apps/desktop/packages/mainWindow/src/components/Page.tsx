@@ -10,7 +10,7 @@ interface Props {
 const Page = (props: Props) => {
   const c = children(() => props.children);
   return (
-    <div class="w-full h-full opacity-0 box-border p-5 bg-black-semiblack">
+    <div class="w-full h-full overflow-auto opacity-0 box-border p-5 text-white bg-black-semiblack">
       <div class={`rounded-2xl h-full w-full box-border ${props.class ?? ""}`}>
         {c()}
       </div>

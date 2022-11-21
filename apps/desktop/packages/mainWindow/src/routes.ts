@@ -13,6 +13,10 @@ export const routes: RouteDefinition[] = [
     component: lazy(() => import("./pages/library")),
   },
   {
+    path: "/library/:id",
+    component: lazy(() => import("./pages/library/instace")),
+  },
+  {
     path: "/modpacks",
     component: lazy(() => import("./pages/modpacks")),
     data: AboutData,
