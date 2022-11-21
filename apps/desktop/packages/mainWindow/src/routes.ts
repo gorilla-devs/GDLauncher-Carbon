@@ -28,6 +28,11 @@ export const routes = [
     sidebar: Modpacks,
   },
   {
+    path: "/modpacks/:id",
+    component: lazy(() => import("./pages/modpacks/modpack")),
+    sidebar: Modpacks,
+  },
+  {
     path: "**",
     component: lazy(() => import("./errors/404")),
   },

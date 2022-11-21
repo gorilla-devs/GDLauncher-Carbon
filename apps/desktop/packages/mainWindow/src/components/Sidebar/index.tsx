@@ -1,6 +1,6 @@
 import { routes } from "@/routes";
-import { useLocation } from "@solidjs/router";
-import { Setter, Show } from "solid-js";
+import { useLocation, useParams } from "@solidjs/router";
+import { createEffect, Setter, Show } from "solid-js";
 import Library from "./contents/Library";
 
 type Props = {
@@ -9,7 +9,13 @@ type Props = {
 };
 
 const getContent = (location: string) => {
-  const route = routes.find((route) => route.path === location);
+  // const reg = location.match(/^\/modpacks\/([a-zA-Z]+)/) || [];
+  const regModpack = location.match(/^\/modpacks\//) || [];
+  const isModpacks = regModpack[0];
+
+  const route = routes.find(
+    (route) => route.path === location || route.path.includes(isModpacks)
+  );
   const SidebarContent = route?.sidebar || Library;
   if (SidebarContent) return <SidebarContent />;
 };

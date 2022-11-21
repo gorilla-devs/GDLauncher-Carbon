@@ -8,7 +8,11 @@ export default function About() {
 
   return (
     <Page class="bg-black-black">
-      
+      <div>
+        <button onClick={() => navigate("/modpacks/DDLTR")}>
+          Modpack DDLTR
+        </button>
+      </div>
     </Page>
   );
 }

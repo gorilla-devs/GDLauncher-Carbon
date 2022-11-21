@@ -8,7 +8,7 @@ const Home = () => {
     <Page class="bg-black-black">
       <button onClick={() => navigate("?m=privacyPolicy")}>Open modal</button>
       <button
-        onClick={async () => {
+        onClick={() => {
           navigate("/library/AXDLO");
         }}
       >
