@@ -13,45 +13,45 @@ const AppNavbar = (props: Props) => {
 
   return (
     <Show when={location.pathname !== "/"}>
-      <nav class="bg-black-black text-white h-15 flex items-center px-5">
-        <img
-          src={props.sidebarCollapsed ? GDLauncherLogo : GDLauncherWideLogo}
-          class="h-9"
-        />
-        <ul
-          class="flex items-between gap-6 m-0 text-white list-none"
-          classList={{
-            "pl-12": props.sidebarCollapsed,
-            "pl-23": !props.sidebarCollapsed,
-          }}
-        >
-          <For each={routes.filter((route) => route.visibileInNavbar)}>
-            {(route) => (
-              <li class="py-2 no-underline">
-                <Link
-                  href={route.path}
-                  class="no-underline"
-                  classList={{
-                    "text-white": location.pathname === route.path,
-                    "text-slate-400": location.pathname !== route.path,
-                  }}
-                >
-                  {route.label}
-                </Link>
-              </li>
-            )}
-          </For>
-
-          {/* <li class="text-sm flex items-center space-x-1 ml-auto">
-            <span>URL:</span>
-            <input
-              class="w-75px p-1 bg-white text-sm rounded-lg"
-              type="text"
-              readOnly
-              value={location.pathname + location.search}
-            />
-          </li> */}
-        </ul>
+      <nav class="bg-black-black text-white h-15 flex items-center justify-between px-5">
+        <div class="flex">
+          <img
+            src={props.sidebarCollapsed ? GDLauncherLogo : GDLauncherWideLogo}
+            class="h-9"
+          />
+          <ul
+            class="flex items-between gap-6 m-0 text-white list-none"
+            classList={{
+              "pl-10": props.sidebarCollapsed,
+              "pl-20": !props.sidebarCollapsed,
+            }}
+          >
+            <For each={routes.filter((route) => route.visibileInNavbar)}>
+              {(route) => (
+                <li class="py-2 no-underline">
+                  <Link
+                    href={route.path}
+                    class="no-underline"
+                    classList={{
+                      "text-white": location.pathname === route.path,
+                      "text-slate-400": location.pathname !== route.path,
+                    }}
+                  >
+                    {route.label}
+                  </Link>
+                </li>
+              )}
+            </For>
+          </ul>
+        </div>
+        <div class="flex gap-5">
+          <div class="flex gap-5">
+            <div class="i-ri:settings-3-fill text-black-lightGray text-2xl" />
+            <div class="i-ri:terminal-box-fill text-black-lightGray text-2xl" />
+            <div class="i-ri:notification-2-fill text-black-lightGray text-2xl" />
+          </div>
+          <div class="w-40 h-10 bg-black-semiblack"></div>
+        </div>
       </nav>
     </Show>
   );
