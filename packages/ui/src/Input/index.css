@@ -1,3 +1,4 @@
-::placeholder {
-  color: #404759;
+input:focus-visible {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
 }

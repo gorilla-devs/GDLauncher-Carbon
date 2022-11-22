@@ -18,4 +18,5 @@ Main.args = {
   placeholder: "Type here",
   error: "",
   disabled: false,
+  icon: <div class="i-ri:refresh-line" />,
 };
