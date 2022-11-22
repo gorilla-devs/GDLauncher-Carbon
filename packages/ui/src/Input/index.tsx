@@ -1,5 +1,4 @@
 import { mergeProps, Show } from "solid-js";
-import "./index.css";
 
 type Props = {
   value?: string | number;
@@ -25,17 +24,21 @@ function Input(props: Props) {
       >
         <span class="text-black-gray">{props.icon}</span>
         <input
-          class={`bg-black-black border-1 border-transparent h-full box-border py-2 rounded-md focus-visible:outline-none focus-visible:border-0 placeholder:text-black-gray ${
+          class={`bg-black-black border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-black-gray ${
             props.class || ""
           }`}
+          style={{
+            outline: "none",
+          }}
           classList={{
             "border-status-red": !!mergedProps.error,
             "border-transparent": !mergedProps.error,
             "text-black-semiblack": props.disabled,
-            "bg-black-semiblack": props.icon,
+            "bg-black-semiblack focus-visible:outline-none focus-visible:border-0":
+              props.icon,
             "text-white": !props.disabled,
-            "px-4": !props.icon,
-            "hover:border-black-gray": !props.icon,
+            "px-4 focus-visible:outline-black-gray withIcon": !props.icon,
+            "hover:border-black-gray active:border-black-gray": !props.icon,
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
