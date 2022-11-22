@@ -5,6 +5,7 @@ enum Type {
   secondary = "secondary",
   outline = "outline",
   danger = "danger",
+  glow = "glow",
 }
 type Props = {
   children: HTMLElement | string;
@@ -18,26 +19,32 @@ type Props = {
 function Button(props: Props) {
   const c = children(() => props.children);
 
+  const isDisabled = () => props.disabled;
+  const isOutline = () => props.type === "outline";
+
   return (
     <div
       class={`transition duration-200 ease-in-out font-main max-w-max py-4 px-8 rounded-full cursor-pointer uppercase font-bold flex gap-2 ${
         props.class || ""
       }`}
       classList={{
-        "bg-black-black text-black-gray": props.disabled,
-        "border-1 bg-black-black": props.type === "outline",
+        "bg-black-black text-black-gray": isDisabled() && props.type !== "glow",
+        "border-1 bg-black-black": isOutline(),
         "border-white hover:border-accent-hover hover:text-accent-hover":
-          props.type === "outline" && !props.disabled,
+          isOutline() && !isDisabled(),
         "border-1 hover:border-white border-black-semiblack":
-          props.type === "secondary" && !props.disabled,
+          props.type === "secondary" && !isDisabled(),
         "bg-accent-main hover:bg-accent-hover":
-          props.type === "primary" && !props.disabled,
+          props.type === "primary" && !isDisabled(),
         "border-1 border-black-semiblack":
-          (props.type === "secondary" && props.disabled) ||
-          props.type === "outline",
-        "text-black-semiblack": props.disabled && props.type === "outline",
-        "text-white": !props.disabled,
+          (props.type === "secondary" && isDisabled()) || isOutline(),
+        "text-black-semiblack": isDisabled() && isOutline(),
+        "text-white": !isDisabled(),
         "flex-row-reverse": props.iconRight,
+        "shadow-md shadow-accent-main bg-accent-main hover:shadow-lg hover:bg-accent-hover":
+          props.type === "glow" && !isDisabled(),
+        "bg-black-gray text-black-lightGray":
+          props.type === "glow" && isDisabled(),
       }}
       onClick={props.onClick}
     >
