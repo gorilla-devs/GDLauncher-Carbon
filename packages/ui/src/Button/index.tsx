@@ -21,6 +21,9 @@ function Button(props: Props) {
 
   const isDisabled = () => props.disabled;
   const isOutline = () => props.type === "outline";
+  const isPrimary = () => props.type === "primary" || !props.type;
+  const isSecondary = () => props.type === "secondary";
+  const isGlow = () => props.type === "glow";
 
   return (
     <div
@@ -28,23 +31,21 @@ function Button(props: Props) {
         props.class || ""
       }`}
       classList={{
-        "bg-black-black text-black-gray": isDisabled() && props.type !== "glow",
+        "bg-black-black text-black-gray": isDisabled() && !isGlow(),
         "border-1 bg-black-black": isOutline(),
         "border-white hover:border-accent-hover hover:text-accent-hover":
           isOutline() && !isDisabled(),
         "border-1 hover:border-white border-black-semiblack":
-          props.type === "secondary" && !isDisabled(),
-        "bg-accent-main hover:bg-accent-hover":
-          props.type === "primary" && !isDisabled(),
+          isSecondary() && !isDisabled(),
+        "bg-accent-main hover:bg-accent-hover": isPrimary() && !isDisabled(),
         "border-1 border-black-semiblack":
-          (props.type === "secondary" && isDisabled()) || isOutline(),
+          (isSecondary() && isDisabled()) || isOutline(),
         "text-black-semiblack": isDisabled() && isOutline(),
         "text-white": !isDisabled(),
         "flex-row-reverse": props.iconRight,
         "shadow-md shadow-accent-main bg-accent-main hover:shadow-lg hover:bg-accent-hover":
-          props.type === "glow" && !isDisabled(),
-        "bg-black-gray text-black-lightGray":
-          props.type === "glow" && isDisabled(),
+          isGlow() && !isDisabled(),
+        "bg-black-gray text-black-lightGray": isGlow() && isDisabled(),
       }}
       onClick={props.onClick}
     >
