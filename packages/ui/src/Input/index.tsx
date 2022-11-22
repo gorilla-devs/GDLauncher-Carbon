@@ -6,6 +6,7 @@ type Props = {
   placeholder?: string;
   error?: string;
   disabled?: boolean;
+  class?: string;
   onInput: (e: InputEvent) => void;
 };
 
@@ -15,12 +16,14 @@ function Input(props: Props) {
   return (
     <div>
       <input
-        class="bg-black-black border-1 border-transparent hover:border-black-gray h-10 box-border py-2 px-4 rounded-md"
+        class={`bg-black-black border-1 border-transparent hover:border-black-gray h-10 box-border py-2 px-4 rounded-md ${
+          props.class || ""
+        }`}
         classList={{
           "border-status-red": !!mergedProps.error,
           "border-transparent": !mergedProps.error,
           "text-black-semiblack": props.disabled,
-          "text-white": !props.disabled
+          "text-white": !props.disabled,
         }}
         placeholder={props.placeholder}
         value={props.value}
