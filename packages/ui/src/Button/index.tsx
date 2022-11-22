@@ -1,4 +1,4 @@
-import { children } from "solid-js";
+import { children, Show } from "solid-js";
 
 enum Type {
   primary = "primary",
@@ -11,6 +11,8 @@ type Props = {
   class?: string;
   type?: string;
   disabled?: boolean;
+  icon?: JSX.Element | Element | any;
+  iconRight?: boolean;
   onClick?: () => void;
 };
 function Button(props: Props) {
@@ -18,7 +20,7 @@ function Button(props: Props) {
 
   return (
     <div
-      class={`transition duration-200 ease-in-out font-main max-w-max py-4 px-8 rounded-full cursor-pointer uppercase font-bold ${
+      class={`transition duration-200 ease-in-out font-main max-w-max py-4 px-8 rounded-full cursor-pointer uppercase font-bold flex gap-2 ${
         props.class || ""
       }`}
       classList={{
@@ -35,9 +37,11 @@ function Button(props: Props) {
           props.type === "outline",
         "text-black-semiblack": props.disabled && props.type === "outline",
         "text-white": !props.disabled,
+        "flex-row-reverse": props.iconRight,
       }}
       onClick={props.onClick}
     >
+      <Show when={props.icon}>{props.icon}</Show>
       {c()}
     </div>
   );

@@ -36,3 +36,13 @@ Outline.args = {
   type: "outline",
   children: "Click Here",
 };
+
+export const Icon = Template.bind({});
+
+Icon.args = {
+  disabled: false,
+  type: "primary",
+  children: "Click Here",
+  icon: <div class="i-ri:refresh-line" />,
+  iconRight: false,
+};
