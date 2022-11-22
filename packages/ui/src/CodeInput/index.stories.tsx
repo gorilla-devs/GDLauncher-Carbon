@@ -25,6 +25,6 @@ export default {
    */
   title: "CodeInput",
   argTypes: {
-    initialValue: { va: "string" },
+    initialValue: { value: "string" },
   },
 } as Meta<ComponentProps<typeof CodeInput>>;
