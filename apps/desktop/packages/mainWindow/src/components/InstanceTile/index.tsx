@@ -6,8 +6,8 @@ type Props = {
 
 const InstanceTile = (props: Props) => {
   return (
-    <div>
-      <div class="h-38 w-38 bg-green-600 rounded-2xl"></div>
+    <div class="flex flex-col justify-center items-center">
+      <div class="h-38 w-38 bg-green-600 rounded-2xl" />
       <h3 class="m-2">{props.title}</h3>
       <div class="flex justify-between text-black-lightGray">
         <p class="m-0">{props.modloader}</p>
