@@ -1,6 +1,8 @@
 import { Carousel } from "@/components/Carousel";
 import Page from "@/components/Page";
+import RecentPlayed from "@/components/Carousel/RecentPlayed";
 import "./index.css";
+import PopularModpacks from "@/components/Carousel/PopularModpacks";
 
 const Home = () => {
   return (
@@ -9,13 +11,13 @@ const Home = () => {
         {/* TODO: News component */}
         <div class="h-39 bg-green-400 rounded-lg"></div>
         <div class="mt-4">
-          <Carousel title="Recent Played" />
+          <RecentPlayed />
         </div>
         <div class="mt-4">
-          <Carousel title="Your Instances" />
+          <PopularModpacks />
         </div>
         <div class="mt-4">
-          <Carousel title="Popular Modpacks" />
+          <PopularModpacks />
         </div>
       </div>
     </Page>

@@ -2,11 +2,15 @@ type Props = {
   title: string;
   modloader: string;
   version: string;
+  onClick?: () => void;
 };
 
 const InstanceTile = (props: Props) => {
   return (
-    <div class="flex flex-col justify-center items-start">
+    <div
+      class="flex flex-col justify-center items-start cursor-pointer"
+      onClick={props.onClick}
+    >
       <div class="h-38 w-38 bg-green-600 rounded-2xl" />
       <h4 class="my-2">{props.title}</h4>
       <div class="flex justify-between text-black-lightGray">

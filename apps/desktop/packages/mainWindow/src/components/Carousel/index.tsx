@@ -3,64 +3,13 @@ import InstanceTile from "../InstanceTile";
 import "./index.css";
 
 type Props = {
-  // children: HTMLElement | string;
+  children?: HTMLElement | Element | string | any;
   class?: string;
   title: string;
 };
 
-const MockCarousel = [
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "ABDFEAD",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "DDAEDF",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HDHEJA",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HUSER",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "PDODK",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AKFBI",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AHUUIO",
-  },
-  {
-    title: "Minecraft forge",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HFHDJ",
-  },
-];
-
 const Carousel = (props: Props) => {
-  const [currentSlide, setCurrentSlide] = createSignal(MockCarousel[0]);
+  // const [currentSlide, setCurrentSlide] = createSignal(MockCarousel[0]);
 
   const handleScroll = (direction: string) => {
     // TODO: scroll on click
@@ -88,17 +37,7 @@ const Carousel = (props: Props) => {
         </div>
       </div>
       <div class="w-full flex gap-4 overflow-x-scroll instancesScroll">
-        <For each={MockCarousel}>
-          {(instance) => (
-            <div id={instance.id}>
-              <InstanceTile
-                title={instance.title}
-                modloader={instance.modloader}
-                version={instance.mcVersion}
-              />
-            </div>
-          )}
-        </For>
+        {props.children}
       </div>
     </div>
   );
