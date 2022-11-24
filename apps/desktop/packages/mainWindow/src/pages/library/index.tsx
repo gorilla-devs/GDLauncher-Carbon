@@ -1,19 +1,23 @@
+import { Carousel } from "@/components/Carousel";
 import Page from "@/components/Page";
-import { useNavigate } from "@solidjs/router";
+import "./index.css";
 
 const Home = () => {
-  const navigate = useNavigate();
-
   return (
-    <Page class="bg-black-black">
-      <button onClick={() => navigate("?m=privacyPolicy")}>Open modal</button>
-      <button
-        onClick={() => {
-          navigate("/library/AXDLO");
-        }}
-      >
-        Instance AXDLO
-      </button>
+    <Page class="bg-black-black p-6 max-w-200 noScroll">
+      <div>
+        {/* TODO: News component */}
+        <div class="h-39 bg-green-400 rounded-lg"></div>
+        <div class="mt-4">
+          <Carousel title="Recent Played" />
+        </div>
+        <div class="mt-4">
+          <Carousel title="Your Instances" />
+        </div>
+        <div class="mt-4">
+          <Carousel title="Popular Modpacks" />
+        </div>
+      </div>
     </Page>
   );
 };

@@ -1,12 +1,5 @@
 import { children, Show } from "solid-js";
 
-enum Type {
-  primary = "primary",
-  secondary = "secondary",
-  outline = "outline",
-  danger = "danger",
-  glow = "glow",
-}
 type Props = {
   children: HTMLElement | string;
   class?: string;
@@ -16,6 +9,7 @@ type Props = {
   iconRight?: boolean;
   onClick?: () => void;
 };
+
 function Button(props: Props) {
   const c = children(() => props.children);
 
