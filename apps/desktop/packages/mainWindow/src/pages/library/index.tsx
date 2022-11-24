@@ -4,7 +4,7 @@ import "./index.css";
 
 const Home = () => {
   return (
-    <Page class="bg-black-black p-6 max-w-200 noScroll">
+    <Page class="bg-black-black p-6 max-w-200 noScroll overflow-auto">
       <div>
         {/* TODO: News component */}
         <div class="h-39 bg-green-400 rounded-lg"></div>
