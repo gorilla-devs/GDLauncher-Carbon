@@ -42,7 +42,7 @@ const App: Component = () => {
             setSidebarCollapsed={setSidebarCollapsed}
           />
         </Show>
-        <main class="relative flex-1">
+        <main class="relative flex-1 overflow-hidden">
           <Transition
             onEnter={(el, done) => {
               const a = el.animate(

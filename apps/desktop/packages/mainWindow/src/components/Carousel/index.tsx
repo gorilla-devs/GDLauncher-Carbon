@@ -87,20 +87,18 @@ const Carousel = (props: Props) => {
           </div>
         </div>
       </div>
-      <div class="w-full">
-        <div class="w-full flex gap-4 overflow-x-scroll instancesScroll">
-          <For each={MockCarousel}>
-            {(instance) => (
-              <div class="h-55 min-w-40" id={instance.id}>
-                <InstanceTile
-                  title={instance.title}
-                  modloader={instance.modloader}
-                  version={instance.mcVersion}
-                />
-              </div>
-            )}
-          </For>
-        </div>
+      <div class="w-full flex gap-4 overflow-x-scroll instancesScroll">
+        <For each={MockCarousel}>
+          {(instance) => (
+            <div id={instance.id}>
+              <InstanceTile
+                title={instance.title}
+                modloader={instance.modloader}
+                version={instance.mcVersion}
+              />
+            </div>
+          )}
+        </For>
       </div>
     </div>
   );
