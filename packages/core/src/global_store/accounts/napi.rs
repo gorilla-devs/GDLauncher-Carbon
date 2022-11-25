@@ -64,7 +64,6 @@ struct DeviceCodeObject {
     pub expires_at: i64,
 }
 
-
 #[napi(ts_return_type = "Promise<Account>")]
 pub fn auth(
     env: Env,
@@ -106,7 +105,10 @@ pub fn auth(
             );
 
             println!("device_code: {:?}", device_code);
-            let auth = await device_code.poll_device_code_auth(&client);
+            let auth = device_code
+                .poll_device_code_auth(&client)
+                .await
+                .map_err(|err| napi::Error::new(napi::Status::GenericFailure, err.to_string()))?;
 
             let mc_auth = auth.finalize_auth(&client).await.unwrap();
             let mc_profile = mc_auth.get_mc_profile(&client).await.unwrap();
