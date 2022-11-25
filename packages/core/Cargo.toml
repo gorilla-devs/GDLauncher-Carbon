@@ -29,6 +29,7 @@ tokio = { version = "1", features = ["full"] }
 bincode = "1"
 regex = "1"
 directories = "4"
+rspc = "0.1.2"
 
 
 [target.'cfg(windows)'.dependencies]

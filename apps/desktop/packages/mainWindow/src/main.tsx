@@ -4,8 +4,6 @@ import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
 import Modals from "./Modals";
-import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
 

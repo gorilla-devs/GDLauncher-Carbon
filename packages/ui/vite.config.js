@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import path from "path";
+import path, { resolve } from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
@@ -7,11 +7,11 @@ import dts from "vite-plugin-dts";
 
 export default defineConfig({
   plugins: [
-    solidPlugin(),
     dts({
-      insertTypesEntry: true,
+      insertTypesEntry: false,
+      tsConfigFilePath: resolve(__dirname, 'tsconfig.json'),
     }),
-    Unocss(),
+    solidPlugin(),
   ],
   test: {
     globals: true,

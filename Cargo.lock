@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "Inflector"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
+
+[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -49,6 +55,27 @@ name = "async-recursion"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cda8f4bcc10624c4e85bc66b3f452cca98cfa5ca002dc83a16aad2367641bea"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "async-stream"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dad5c83079eae9969be7fadefe640a1c566901f05ff91ab221de4b6f68d9507e"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10f203db73a71dfa2fb6dd22763990fa26f3d2625a6da2da900d23b87d26be27"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -190,6 +217,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core"
 version = "0.1.0"
 dependencies = [
@@ -213,6 +249,7 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest",
+ "rspc",
  "serde",
  "serde_json",
  "tokio",
@@ -893,7 +930,7 @@ version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39f3d8b02ef355898ea98f69082d9a183c8701c836942c2daf3e92364e88a0fa"
 dependencies = [
- "convert_case",
+ "convert_case 0.5.0",
  "napi-derive-backend",
  "proc-macro2",
  "quote",
@@ -906,7 +943,7 @@ version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c35640513eb442fcbd1653a1c112fb6b2cc12b54d82f9c141f5859c721cab36"
 dependencies = [
- "convert_case",
+ "convert_case 0.5.0",
  "once_cell",
  "proc-macro2",
  "quote",
@@ -1312,6 +1349,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "rspc"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "712fc4e2fc79297d308fa4575f19f6967bf7610e3292446dfb392738aeab5239"
+dependencies = [
+ "async-stream",
+ "futures",
+ "serde",
+ "serde_json",
+ "specta",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "rust-ini"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1469,6 +1521,31 @@ checksum = "02e2d2db9033d13a1567121ddd7a095ee144db4e1ca1b1bda3419bc0da294ebd"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "specta"
+version = "0.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5886f252f583ae32d4ae21c228c7a4ab3da40a7ebed646886b942f4085047394"
+dependencies = [
+ "convert_case 0.6.0",
+ "serde_json",
+ "specta-macros",
+ "termcolor",
+]
+
+[[package]]
+name = "specta-macros"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5ad5db5dea9fa5816615d722b682781214fed875fe56c1bcd0a67ee9c477d84"
+dependencies = [
+ "Inflector",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "termcolor",
 ]
 
 [[package]]
@@ -1694,6 +1771,12 @@ checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fdbf052a0783de01e944a6ce7a8cb939e295b1e7be835a1112c3b9a7f047a5a"
 
 [[package]]
 name = "unicode-width"
