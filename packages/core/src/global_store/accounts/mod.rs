@@ -4,6 +4,7 @@ use anyhow::{bail, Ok, Result};
 use chrono::{Duration, Local};
 use jsonwebtoken::TokenData;
 use lazy_static::lazy_static;
+use serde::{Serialize, Deserialize};
 use tokio::sync::Mutex;
 
 use self::ms_auth::{
@@ -14,7 +15,7 @@ use self::ms_auth::{
 pub mod ms_auth;
 pub mod napi;
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub ms_data: MsAuth,
     pub mc_data: McAuth,
@@ -22,19 +23,20 @@ pub struct Account {
 }
 
 /// Basic data structure for accounts
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Accounts {
-    inner: HashSet<Arc<Account>>,
+    pub inner: HashSet<Arc<Account>>,
     selected_account: Option<Arc<Account>>,
 }
 
 impl Accounts {
-    pub async fn new() -> Result<Self> {
-        let azure_data = AzureData::new().await?;
-        *AZURE_DATA.lock().await = Some(azure_data);
-
-        Ok((&*ACCOUNTS).lock().await.clone())
+    pub fn new() -> Self {
+        Accounts {
+            inner: HashSet::new(),
+            selected_account: None,
+        }
     }
+
     pub async fn add_account(&mut self, account: Account) {
         let account_ref = Arc::new(account);
 
@@ -75,11 +77,4 @@ impl Accounts {
     pub fn get_accounts(&self) -> &HashSet<Arc<Account>> {
         &self.inner
     }
-}
-
-lazy_static! {
-    pub static ref ACCOUNTS: Arc<Mutex<Accounts>> = Arc::new(Mutex::new(Accounts {
-        inner: HashSet::new(),
-        selected_account: None,
-    }));
 }

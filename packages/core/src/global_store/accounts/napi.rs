@@ -1,9 +1,11 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 
+use crate::global_store::GLOBAL_STORE;
+
 use super::{
-    ms_auth::{DeviceCode, McAuth, McProfile},
-    Account, Accounts, ACCOUNTS,
+    ms_auth::{AzureData, DeviceCode, AZURE_DATA},
+    Account, Accounts,
 };
 
 #[napi(object, js_name = "Account")]
@@ -62,6 +64,7 @@ struct DeviceCodeObject {
     pub expires_at: i64,
 }
 
+
 #[napi(ts_return_type = "Promise<Account>")]
 pub fn auth(
     env: Env,
@@ -103,7 +106,7 @@ pub fn auth(
             );
 
             println!("device_code: {:?}", device_code);
-            let auth = device_code.poll_device_code_auth(&client).await.unwrap();
+            let auth = await device_code.poll_device_code_auth(&client);
 
             let mc_auth = auth.finalize_auth(&client).await.unwrap();
             let mc_profile = mc_auth.get_mc_profile(&client).await.unwrap();
@@ -115,10 +118,14 @@ pub fn auth(
             };
             let napi_account: NAPIAccount = account.clone().into();
 
-            let accounts = &*ACCOUNTS.lock().await;
+            let mut store = GLOBAL_STORE.lock().await;
 
-            accounts.clone().add_account(account).await;
+            let store = store
+                .as_mut()
+                .ok_or("Empty store")
+                .map_err(|err| napi::Error::new(napi::Status::GenericFailure, err.to_string()))?;
 
+            store.accounts.add_account(account).await;
             // here the promise which we returned gets resolved with a computed value
             deferred.resolve(|_| Ok(napi_account));
 
@@ -127,20 +134,18 @@ pub fn auth(
         // this resolver converts the output of our async block to a js value which gets passed to the .then() callback is JS
         |&mut env, _| env.get_undefined(),
     )
-    .unwrap();
+    .map_err(|err| napi::Error::new(napi::Status::GenericFailure, err.to_string()))?;
 
     // here we instantly return a promise object which later can be resolved
     Ok(promise)
 }
 
 #[napi]
-pub async fn init_accounts() -> Result<NAPIAccounts> {
-    let accounts = Accounts::new().await.unwrap();
-    Ok(accounts.into())
-}
+pub async fn init_azure_data() -> Result<()> {
+    let azure_data = AzureData::new()
+        .await
+        .map_err(|e| napi::Error::new(napi::Status::GenericFailure, e.to_string()))?;
+    *AZURE_DATA.lock().await = Some(azure_data);
 
-#[napi]
-pub async fn get_accounts() -> Result<NAPIAccounts> {
-    let accounts = ACCOUNTS.lock().await.clone();
-    Ok(accounts.into())
+    Ok(())
 }

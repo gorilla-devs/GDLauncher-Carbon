@@ -93,3 +93,5 @@ target
 *.node
 .turbo
 packages/ui/src/style.dist.css
+apps/desktop/data
+packages/core/data

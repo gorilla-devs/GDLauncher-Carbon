@@ -1,12 +1,12 @@
-use accounts::{ms_auth::DeviceCode, ACCOUNTS};
 use murmurhash32::murmurhash2;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::{io::Read, thread, time};
 
-mod accounts;
 mod component;
+mod global_store;
 mod instance;
+mod java;
 mod minecraft;
 
 #[napi]
