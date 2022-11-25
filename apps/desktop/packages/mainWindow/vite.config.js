@@ -1,10 +1,7 @@
 import { resolve, join } from "path";
 import { defineConfig, Plugin } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import Unocss from "unocss/vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
-import presetAttributify from "@unocss/preset-attributify";
-import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
 
 /**
