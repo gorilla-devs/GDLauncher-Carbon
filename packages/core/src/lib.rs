@@ -4,10 +4,10 @@ use napi_derive::napi;
 use std::{io::Read, thread, time};
 
 mod component;
-mod instance;
-mod minecraft;
 mod global_store;
+mod instance;
 mod java;
+mod minecraft;
 
 #[napi]
 pub async fn fibonacci(num: i32, num1: u32) -> u32 {

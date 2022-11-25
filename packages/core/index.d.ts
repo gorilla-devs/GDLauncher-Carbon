@@ -38,3 +38,4 @@ export interface JavaVersion {
 export function initJava(): Promise<Array<JavaComponent>>
 export function fibonacci(num: number, num1: number): Promise<number>
 export function computePathMurmur(path: string): Promise<number>
+export function generateBigData(): Promise<Array<string>>

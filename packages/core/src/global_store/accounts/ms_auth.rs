@@ -578,7 +578,7 @@ impl DeviceCode {
     pub async fn poll_device_code_auth(&self, client: &Client) -> anyhow::Result<MsAuth> {
         match &self.inner {
             Some(inner) => loop {
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                tokio::time::sleep(std::time::Duration::from_secs(2));
 
                 let code_resp = client
                     .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")

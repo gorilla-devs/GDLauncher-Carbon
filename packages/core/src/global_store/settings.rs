@@ -34,15 +34,6 @@ impl JavaSettings {
             args: Vec::new(),
         }
     }
-
-    pub fn get_components(&self) -> &HashMap<JavaMajorVersion, Vec<JavaComponent>> {
-        &self.components
-    }
-
-    pub fn get_args(&self) -> &Vec<ArgumentComponent> {
-        &self.args
-    }
-
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

@@ -25,7 +25,7 @@ pub struct Account {
 /// Basic data structure for accounts
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Accounts {
-    inner: HashSet<Arc<Account>>,
+    pub inner: HashSet<Arc<Account>>,
     selected_account: Option<Arc<Account>>,
 }
 
