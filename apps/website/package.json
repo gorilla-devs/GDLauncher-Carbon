@@ -22,8 +22,6 @@
     "@astrojs/tailwind": "^2.1.2",
     "@gd/config": "workspace:*",
     "@gd/ui": "workspace:*",
-    "@unocss/preset-attributify": "^0.46.4",
-    "@unocss/preset-wind": "^0.46.4",
     "astro": "^1.6.7",
     "astro-uno": "^0.2.1",
     "i18next": "^22.0.4",
@@ -31,7 +29,6 @@
     "lint-staged": "^13.0.3",
     "sass": "^1.56.1",
     "solid-js": "^1.6.2",
-    "unocss": "^0.46.4",
     "vite-plugin-solid": "^2.4.0"
   }
 }

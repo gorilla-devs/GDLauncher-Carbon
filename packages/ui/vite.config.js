@@ -2,7 +2,6 @@
 import path from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
 
 export default defineConfig({
@@ -11,7 +10,6 @@ export default defineConfig({
     dts({
       insertTypesEntry: true,
     }),
-    Unocss(),
   ],
   test: {
     globals: true,

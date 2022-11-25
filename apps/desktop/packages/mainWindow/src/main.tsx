@@ -1,13 +1,13 @@
 /* @refresh reload */
-import { createEffect, onMount } from "solid-js";
+import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
+import { ThemeProvider } from "solid-styled-components";
 import App from "./app";
 import Modals from "./Modals";
-import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
+import { theme } from "@gd/ui";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -19,16 +19,20 @@ render(() => {
   });
 
   return (
-    <Router source={hashIntegration()}>
-      <App />
-    </Router>
+    <ThemeProvider theme={theme}>
+      <Router source={hashIntegration()}>
+        <App />
+      </Router>
+    </ThemeProvider>
   );
 }, document.getElementById("root") as HTMLElement);
 
 render(() => {
   return (
-    <Router source={hashIntegration()}>
-      <Modals />
-    </Router>
+    <ThemeProvider theme={theme}>
+      <Router source={hashIntegration()}>
+        <Modals />
+      </Router>
+    </ThemeProvider>
   );
 }, document.getElementById("overlay") as HTMLElement);
