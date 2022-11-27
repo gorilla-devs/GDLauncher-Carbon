@@ -3,29 +3,7 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use tokio::process::Command;
 
-use crate::utils::{parse_java_version, JAVA_CHECK_APP_NAME, parse_java_arch};
-
-use super::{
-    utils::{locate_java_check_class, PATH_SEPARATOR},
-    JavaComponent,
-};
-
-pub async fn get_available_javas() -> Result<Vec<JavaComponent>> {
-    let mut all_javas = find_java_paths().await;
-    all_javas.push(PathBuf::from("java"));
-    let mut available_javas = vec![];
-
-    for java in all_javas {
-        match gather_java_bin_info(&java).await {
-            Ok(java_bin_info) => available_javas.push(java_bin_info),
-            Err(e) => {
-                eprintln!("Failed to gather Java info for {}: {}", java.display(), e);
-            }
-        };
-    }
-
-    Ok(available_javas)
-}
+use crate::{utils::{PATH_SEPARATOR, locate_java_check_class, JAVA_CHECK_APP_NAME, parse_java_version, parse_java_arch}, JavaComponent};
 
 async fn load_java_paths_from_env() -> Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH")?;
@@ -42,7 +20,7 @@ async fn load_java_paths_from_env() -> Result<Vec<PathBuf>> {
 }
 
 #[cfg(target_os = "macos")]
-async fn find_java_paths() -> Vec<PathBuf> {
+pub async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
     javas.extend(search_java_binary_in_path(
         PathBuf::from("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java")
@@ -160,7 +138,7 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
 }
 
 #[cfg(target_os = "windows")]
-async fn find_java_paths() -> Vec<PathBuf> {
+pub async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
 
     // Load from env
@@ -251,7 +229,7 @@ async fn find_java_paths() -> Vec<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-async fn find_java_paths() -> Vec<PathBuf> {
+pub async fn find_java_paths() -> Vec<PathBuf> {
     let folders = [
         "/usr/java",
         "/usr/lib/jvm",
@@ -310,7 +288,7 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     result
 }
 
-async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent> {
+pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent> {
     let java_checker_path = locate_java_check_class().await?;
     if java_bin_path.to_string_lossy().to_string() != "java" && !java_bin_path.exists() {
         bail!("Java binary does not exist");
