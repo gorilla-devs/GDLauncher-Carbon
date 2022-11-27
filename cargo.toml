@@ -2,9 +2,9 @@
 members = [
   "packages/core",
   "packages/app_helper",
-  "packages/crates/msauth",
-  "packages/crates/java",
-  "packages/crates/minecraft"
+  "crates/msauth",
+  "crates/java",
+  "crates/minecraft"
 ]
 
 [profile.release]

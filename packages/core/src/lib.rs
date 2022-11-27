@@ -23,7 +23,7 @@ async fn start_router() {
     let router =
         rspc::Router::<Ctx>::new()
             .config(Config::new().export_ts_bindings(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bindings.ts"),
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings.ts"),
             ))
             .query("version", |t| t(|_, _: ()| env!("CARGO_PKG_VERSION")))
             .query("echo", |t| t(|_, v: String| v))
@@ -102,7 +102,7 @@ mod test {
         runtime
             .unwrap() /* This should never fail */
             .block_on(async {
-                start_router();
+                super::start_router().await;
             })
     }
 }

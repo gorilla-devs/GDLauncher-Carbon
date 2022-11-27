@@ -1,0 +1,7 @@
+{
+  "name": "@gd/core-minecraft",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "cargo test -- --nocapture"
+  }
+}

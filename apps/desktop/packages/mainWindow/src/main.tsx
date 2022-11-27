@@ -10,7 +10,7 @@ import { initModules } from "./modules";
 import { theme } from "@gd/ui";
 
 queueMicrotask(() => {
-  initAnalytics();
+        initAnalytics();
 });
 
 render(() => {

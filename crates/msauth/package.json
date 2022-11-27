@@ -1,0 +1,7 @@
+{
+  "name": "@gd/core-msauth",
+  "version": "0.0.1",
+  "scripts": {
+    "test": "cargo test -- --nocapture"
+  }
+}
