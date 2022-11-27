@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use tokio::process::Command;
 
-use crate::java::utils::parse_java_version;
+use crate::utils::{parse_java_version, JAVA_CHECK_APP_NAME, parse_java_arch};
 
 use super::{
-    utils::{locate_java_check_class, path_separator},
+    utils::{locate_java_check_class, PATH_SEPARATOR},
     JavaComponent,
 };
 
@@ -28,8 +28,8 @@ pub async fn get_available_javas() -> Result<Vec<JavaComponent>> {
 }
 
 async fn load_java_paths_from_env() -> Result<Vec<PathBuf>> {
-    let env_path = std::env::var("PATH").context("Could not find PATH env")?;
-    let paths = env_path.split(path_separator).collect::<Vec<&str>>();
+    let env_path = std::env::var("PATH")?;
+    let paths = env_path.split(PATH_SEPARATOR).collect::<Vec<&str>>();
     let mut java_paths = Vec::new();
     for path in paths {
         let path = path.to_string();
@@ -311,27 +311,31 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
 }
 
 async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent> {
-    let java_checker_path = locate_java_check_class()?;
-    println!("java_checker_path: {:?}", java_checker_path);
+    let java_checker_path = locate_java_check_class().await?;
     if java_bin_path.to_string_lossy().to_string() != "java" && !java_bin_path.exists() {
         bail!("Java binary does not exist");
     }
 
     // Run java
     let output = Command::new(java_bin_path)
-        .current_dir(&java_checker_path.parent().unwrap())
-        .arg("JavaCheck")
+        .current_dir(&java_checker_path.parent().expect("This should never fail"))
+        .arg(
+            JAVA_CHECK_APP_NAME
+                .strip_suffix(".class")
+                .expect("This should never fail"),
+        )
         .output()
         .await?;
 
     // print
     let output = String::from_utf8(output.stdout)?;
     let java_version = parse_java_version(&output)?;
+    let java_arch = parse_java_arch(&output)?;
 
     Ok(JavaComponent {
         path: java_bin_path.to_string_lossy().to_string(),
         version: java_version,
-        arch: "aarm64".to_string(), // TODO: parse
+        arch: java_arch,
         is_custom: false,
     })
 }

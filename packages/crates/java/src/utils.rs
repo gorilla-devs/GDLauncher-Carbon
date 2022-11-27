@@ -1,21 +1,30 @@
-use anyhow::{bail, Result};
-use napi::bindgen_prelude::*;
+use anyhow::{bail, ensure, Result};
 use regex::Regex;
 use std::path::PathBuf;
+use tokio::io::AsyncWriteExt;
+
+use crate::JavaArch;
 
 use super::JavaVersion;
 
 #[cfg(target_os = "windows")]
-pub static path_separator: &'static str = ";";
+pub static PATH_SEPARATOR: &'static str = ";";
 
 #[cfg(not(target_os = "windows"))]
-pub static path_separator: &'static str = ":";
+pub static PATH_SEPARATOR: &'static str = ":";
 
-pub fn locate_java_check_class() -> Result<PathBuf> {
-    match std::env::current_dir() {
-        Ok(dir_path) => Ok(PathBuf::from(dir_path).join("JavaCheck.class")),
-        Err(e) => bail!("Failed to get current directory: {}", e),
+const JAVA_CHECK_APP: &'static [u8; 1013] = include_bytes!("JavaCheck.class");
+pub const JAVA_CHECK_APP_NAME: &'static str = "JavaCheck.class";
+
+pub async fn locate_java_check_class() -> Result<PathBuf> {
+    let temp_dir = std::env::temp_dir();
+    let java_check_path = temp_dir.join(JAVA_CHECK_APP_NAME);
+    if !java_check_path.exists() {
+        let mut file = tokio::fs::File::create(&java_check_path).await?;
+        file.write_all(JAVA_CHECK_APP).await?;
     }
+
+    Ok(java_check_path)
 }
 
 pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
@@ -78,14 +87,31 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
     bail!("Could not parse java version")
 }
 
-mod tests {
-    use crate::java::JavaVersion;
+pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch> {
+    for line in cmd_output.lines() {
+        // I spent way too much time on this regex
+        let regex = Regex::new(r#"^java.arch=(?P<arch>[[:alnum:]]*)"#)?;
 
-    use super::locate_java_check_class;
+        if let Some(captures) = regex.captures(line) {
+            match captures.name("arch") {
+                Some(arch) => {
+                    return Ok(arch.as_str().into());
+                }
+                None => {
+                    bail!("No arch found in output");
+                }
+            }
+        }
+    }
+    bail!("Could not parse java arch")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::JavaVersion;
 
     #[test]
     fn test_parse_java_version() {
-        #[derive(Debug)]
         struct TestCase {
             output: &'static str,
             expected: Option<JavaVersion>,
@@ -201,5 +227,64 @@ mod tests {
             let actual = super::parse_java_version(test_case.output).ok();
             assert_eq!(actual, test_case.expected);
         }
+    }
+
+    #[test]
+    fn test_parse_java_arch() {
+        struct TestCase {
+            output: &'static str,
+            expected: Option<super::JavaArch>,
+        }
+
+        let expected = [
+            TestCase {
+                output: "java.arch=amd64",
+                expected: Some(super::JavaArch::Amd64),
+            },
+            TestCase {
+                output: "java.arch=x86",
+                expected: Some(super::JavaArch::X86),
+            },
+            TestCase {
+                output: "java.arch=aarch64",
+                expected: Some(super::JavaArch::Aarch64),
+            },
+            TestCase {
+                output: "java.version=19.0.1",
+                expected: None,
+            },
+        ];
+
+        for test_case in expected.iter() {
+            let actual = super::parse_java_arch(test_case.output).ok();
+            assert_eq!(actual, test_case.expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_locate_java_check_class_and_execute() {
+        let temp_dir = std::env::temp_dir();
+        let java_check_path_env = temp_dir.join(super::JAVA_CHECK_APP_NAME);
+        let _ = std::fs::remove_file(&java_check_path_env);
+
+        let java_check_path = super::locate_java_check_class().await.unwrap();
+        assert!(
+            java_check_path == java_check_path_env,
+            "Java check path is unexpected"
+        );
+        assert!(java_check_path.exists(), "Java check path does not exist");
+
+        let proc = tokio::process::Command::new("java")
+            .current_dir(temp_dir)
+            .arg(super::JAVA_CHECK_APP_NAME.strip_suffix(".class").unwrap())
+            .output()
+            .await
+            .unwrap();
+
+        assert!(
+            proc.status.code() == Some(0),
+            "Java check exit code is not 0"
+        );
+        let _ = std::fs::remove_file(&java_check_path_env);
     }
 }

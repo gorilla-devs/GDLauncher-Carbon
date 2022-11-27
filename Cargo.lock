@@ -875,10 +875,12 @@ checksum = "4217ad341ebadf8d8e724e264f13e593e0648f5b3e94b3896a5df283be015ecc"
 name = "java"
 version = "0.1.0"
 dependencies = [
- "once_cell",
+ "anyhow",
+ "regex",
+ "reqwest",
  "serde",
  "serde_json",
- "thiserror",
+ "tokio",
  "winreg",
 ]
 
