@@ -2,12 +2,8 @@
 import path from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
-import presetIcons from "@unocss/preset-icons";
 import { readdirSync, readFileSync } from "fs";
-import presetWind from "@unocss/preset-wind";
-import { presetAttributify } from "unocss";
 import config from "../config/unocssConfig";
 
 let icons = {};
