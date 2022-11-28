@@ -11,6 +11,7 @@ export default defineConfig({
       insertTypesEntry: false,
       tsConfigFilePath: resolve(__dirname, 'tsconfig.json'),
     }),
+    Unocss(),
     solidPlugin(),
   ],
   test: {

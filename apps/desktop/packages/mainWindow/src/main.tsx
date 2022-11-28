@@ -6,10 +6,12 @@ import App from "./app";
 import Modals from "./Modals";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
+import "virtual:uno.css";
+import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
 
 queueMicrotask(() => {
-        initAnalytics();
+  initAnalytics();
 });
 
 render(() => {
