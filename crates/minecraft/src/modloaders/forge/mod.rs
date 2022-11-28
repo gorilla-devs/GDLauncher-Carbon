@@ -2,25 +2,26 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
+use tokio::sync::mpsc;
 
 use crate::{
-    component::{self, Component, ComponentVersion, ComponentInterface}, instance::Instance,
+    component::{Component, ComponentVersion}, instance::Instance,
 };
 
 use super::ModLoaderVersion;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ForgeModLoader {
+pub struct ForgeModloader {
     mod_loader_version: ModLoaderVersion,
 }
 
-impl ComponentInterface for ForgeModLoader {
+impl Component for ForgeModloader {
     fn new(mod_loader_version: ModLoaderVersion, instance: Arc<Instance>) -> Self {
-        ForgeModLoader {
+        ForgeModloader {
             mod_loader_version,
         }
     }
-    fn install(&self) -> Result<()> {
+    fn install(&self, progress_rcv: mpsc::Sender<()>) -> Result<()> {
         Ok(())
     }
     fn remove(&self) -> Result<()> {

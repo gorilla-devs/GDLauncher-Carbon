@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0.147", features = ["derive", "rc"] }
 anyhow = "1.0.51"
+tokio = { version = "1.22.0", features = ["full"] }

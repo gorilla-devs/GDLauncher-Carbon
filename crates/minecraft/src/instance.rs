@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::component::Component;
+use crate::modloaders::{Modloader, forge::ForgeModloader, vanilla::VanillaModLoader};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JavaMemoryOverride {
@@ -10,18 +10,26 @@ struct JavaMemoryOverride {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct Modloaders {
+    forge: Option<ForgeModloader>,
+    vanilla: Option<VanillaModLoader>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Instance {
-    components: Vec<Component>,
-    override_java_path: Option<String>,
-    override_java_args: Option<Vec<String>>,
-    override_java_memory: Option<JavaMemoryOverride>,
+    modloaders: Modloaders,
+    custom_lwjgl: Option<String>,
 }
 
 impl Instance {
-    fn add_component(&mut self, c: Component) {
-        self.components.push(c);
+    fn add_modloader(&mut self, c: impl Modloader) {
+        self.modloaders.push(c);
     }
-    fn add_components(&mut self, c: Vec<Component>) {
-        self.components.extend(c);
-    }
+}
+
+fn something() {
+    let mut instance = Instance {
+        modloaders: Vec::new(),
+        custom_lwjgl: None,
+    };
 }
