@@ -6,6 +6,7 @@ import App from "./app";
 import Modals from "./Modals";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
+import "@gd/ui/style.css";
 
 queueMicrotask(() => {
         initAnalytics();

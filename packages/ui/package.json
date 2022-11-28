@@ -6,7 +6,8 @@
   "exports": {
     ".": {
       "import": "./dist/ui.es.js"
-    }
+    },
+    "./style.css": "./dist/style.css"
   },
   "scripts": {
     "build": "vite build --",
