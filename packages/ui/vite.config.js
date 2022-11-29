@@ -7,14 +7,14 @@ import { readdirSync, readFileSync } from "fs";
 import Unocss from "unocss/vite";
 import config from "../config/unocssConfig";
 
-let icons = {};
+// let icons = {};
 
-const iconFiles = readdirSync(path.join("./", "icons"));
+// const iconFiles = readdirSync(path.join("./", "icons"));
 
-for (const iconFile of iconFiles) {
-  const file = readFileSync(path.join("./", "icons", iconFile));
-  icons[path.basename(iconFile, ".svg")] = file.toString();
-}
+// for (const iconFile of iconFiles) {
+//   const file = readFileSync(path.join("./", "icons", iconFile));
+//   icons[path.basename(iconFile, ".svg")] = file.toString();
+// }
 
 export default defineConfig({
   plugins: [
