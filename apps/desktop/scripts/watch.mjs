@@ -8,77 +8,77 @@ let electronProcess = null;
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */
 function watchMain(mainWindow) {
-	/**
-	 * @type {import('child_process').ChildProcessWithoutNullStreams | null}
-	 */
-	const addressMainWindow = mainWindow.httpServer.address();
-	const env = Object.assign(process.env, {
-		VITE_DEV_SERVER_HOST: "localhost",
-		VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
-	});
+  /**
+   * @type {import('child_process').ChildProcessWithoutNullStreams | null}
+   */
+  const addressMainWindow = mainWindow.httpServer.address();
+  const env = Object.assign(process.env, {
+    VITE_DEV_SERVER_HOST: "localhost",
+    VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
+  });
 
-	return build({
-		configFile: "packages/main/vite.config.js",
-		mode: "development",
-		plugins: [
-			{
-				name: "electron-main-watcher",
-				writeBundle() {
-					electronProcess && electronProcess.kill();
-					electronProcess = spawn(electron, ["."], { stdio: "inherit", env });
-				},
-			},
-		],
-		build: {
-			watch: true,
-		},
-	});
+  return build({
+    configFile: "packages/main/vite.config.js",
+    mode: "development",
+    plugins: [
+      {
+        name: "electron-main-watcher",
+        writeBundle() {
+          electronProcess && electronProcess.kill();
+          electronProcess = spawn(electron, ["."], { stdio: "inherit", env });
+        },
+      },
+    ],
+    build: {
+      watch: true,
+    },
+  });
 }
 
 function watchNativeCore(mainWindow) {
-	spawn("pnpm", ["watch"], {
-		cwd: "../../packages/core",
-		shell: true,
-		stdio: "inherit",
-	});
+  spawn("pnpm", ["watch"], {
+    cwd: "../../packages/core",
+    shell: true,
+    stdio: "inherit",
+  });
 
-	const addressMainWindow = mainWindow.httpServer.address();
-	const env = Object.assign(process.env, {
-		VITE_DEV_SERVER_HOST: "localhost",
-		VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
-	});
+  const addressMainWindow = mainWindow.httpServer.address();
+  const env = Object.assign(process.env, {
+    VITE_DEV_SERVER_HOST: "localhost",
+    VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
+  });
 
-	chokidar
-		.watch("../../packages/core/core.node", { ignoreInitial: true })
-		.on("all", (event, path) => {
-			console.log("Reloading app due to native core rebuild", event);
-			electronProcess?.kill();
-			electronProcess = spawn(electron, ["."], { stdio: "inherit", env });
-		});
+  chokidar
+    .watch("../../packages/core/core.node", { ignoreInitial: true })
+    .on("all", (event, path) => {
+      console.log("Reloading app due to native core rebuild", event);
+      electronProcess?.kill();
+      electronProcess = spawn(electron, ["."], { stdio: "inherit", env });
+    });
 }
 /**
  * @type {(server: import('vite').ViteDevServer) => Promise<import('rollup').RollupWatcher>}
  */
 function watchPreload(mainWindow) {
-	return build({
-		configFile: "packages/preload/vite.config.js",
-		mode: "development",
-		plugins: [
-			{
-				name: "electron-preload-watcher",
-				writeBundle() {
-					mainWindow.ws.send({ type: "full-reload" });
-				},
-			},
-		],
-		build: {
-			watch: true,
-		},
-	});
+  return build({
+    configFile: "packages/preload/vite.config.js",
+    mode: "development",
+    plugins: [
+      {
+        name: "electron-preload-watcher",
+        writeBundle() {
+          mainWindow.ws.send({ type: "full-reload" });
+        },
+      },
+    ],
+    build: {
+      watch: true,
+    },
+  });
 }
 
 const mainWindow = await createServer({
-	configFile: "packages/mainWindow/vite.config.js",
+  configFile: "packages/mainWindow/vite.config.js",
 });
 
 await mainWindow.listen();
@@ -90,5 +90,5 @@ await watchMain(mainWindow);
 // The workaround for windows would be to build the native core to a different file, and then reload the app
 // targetting the new file.
 if (process.platform !== "win32") {
-	await watchNativeCore(mainWindow);
+  await watchNativeCore(mainWindow);
 }
