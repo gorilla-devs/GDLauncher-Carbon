@@ -1,4 +1,5 @@
 import { children, createSignal, createEffect } from "solid-js";
+import styles from "./Button.module.scss";
 
 type Props = {
   children: HTMLElement | string;
@@ -13,7 +14,7 @@ function Button(props: Props) {
   });
 
   const c = children(() => props.children);
-  return <div class={`font-main bg-slate-400 text-green-400 py-5`}>{c()}</div>;
+  return <div class={styles.paolo}>{c()}</div>;
 }
 
 export { Button };
