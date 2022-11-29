@@ -57,7 +57,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-      target: ["dir", "zip"],
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",

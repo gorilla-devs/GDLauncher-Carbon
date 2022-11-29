@@ -1,4 +1,4 @@
-import { version } from "../../../../package.json";
+// import { version } from "../../../../package.json";
 
 // function initAnalytics(this: any) {
 //   const httpsDesktopUrl = "https://" + import.meta.env.VITE_DESKTOP_APP_URL;

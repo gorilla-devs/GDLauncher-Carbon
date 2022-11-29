@@ -15,7 +15,7 @@ const Sidebar = () => {
         class="bg-[#272B35] absolute top-10 right-0 w-4 h-10 rounded-l-md"
         onClick={() => setOpened(!opened())}
       >
-        <span class="i-custom:circle"></span>
+        <span class="i-custom:circle" />
       </div>
     </div>
   );
