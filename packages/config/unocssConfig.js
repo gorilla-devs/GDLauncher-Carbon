@@ -1,5 +1,4 @@
 import path from "path";
-import Unocss from "unocss/vite";
 import presetIcons from "@unocss/preset-icons";
 import { readdirSync, readFileSync } from "fs";
 import presetWind from "@unocss/preset-wind";
@@ -23,7 +22,7 @@ const gdlIcons = () => {
 };
 
 const config = {
-  unoCss: Unocss({
+  unoCss: {
     include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
     presets: [
       presetAttributify({
@@ -68,9 +67,7 @@ const config = {
           let extension = a.split(".")[1];
           const isSvg = extension === "svg";
           return {
-            background: `url('./${
-              process.env.NODE_ENV === "development" ? "assets/" : ""
-            }images/${isSvg ? img : `${img}.png`}')`,
+            background: `url('./assets/images/${isSvg ? img : `${img}.png`}')`,
             "background-size": "cover",
             "background-repeat": "no-repeat",
             "box-sizing": "border-box",
@@ -78,7 +75,7 @@ const config = {
         },
       ],
     ],
-  }),
+  },
 };
 
 export default config;

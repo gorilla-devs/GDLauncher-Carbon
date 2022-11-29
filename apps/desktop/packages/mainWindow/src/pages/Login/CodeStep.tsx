@@ -1,25 +1,29 @@
 import { Button, CodeInput } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
-import { DeviceCodeObject } from "@gd/core";
+// import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
-import { accounts, login } from "@/modules/components/accounts";
+// import { accounts, login } from "@/modules/components/accounts";
 import { addNotification } from "@/notificationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 
 type Props = {
-  deviceCodeObject: DeviceCodeObject | null;
-  setDeviceCodeObject: Setter<DeviceCodeObject>;
+  deviceCodeObject: any | null;
+  setDeviceCodeObject: Setter<any>;
 };
 
 const CodeStep = (props: Props) => {
   const navigate = useNavigate();
 
   const handleRefersh = async () => {
-    await login(({ userCode, link, expiresAt }) => {
-      props.setDeviceCodeObject({ userCode, link, expiresAt });
+    // await login(({ userCode, link, expiresAt }) => {
+    props.setDeviceCodeObject({
+      userCode: "AXDLE",
+      link: "",
+      expiresAt: 548559,
     });
+    // });
   };
 
   const userCode = () => props.deviceCodeObject?.userCode;
@@ -51,10 +55,10 @@ const CodeStep = (props: Props) => {
   let interval: NodeJS.Timer;
 
   createEffect(() => {
-    if (accounts.selectedAccountId) {
+    // if (accounts.selectedAccountId) {
       // TODO: save in a store the default / last page
       navigate("/library");
-    }
+    // }
   });
 
   createEffect(() => {

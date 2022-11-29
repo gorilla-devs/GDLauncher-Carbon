@@ -1,5 +1,5 @@
-import { login } from "@/modules/components/accounts";
-import { DeviceCodeObject } from "@gd/core";
+// import { login } from "@/modules/components/accounts";
+// import { DeviceCodeObject } from "@gd/core";
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { Setter } from "solid-js";
@@ -7,17 +7,21 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 type Props = {
   setStep: Setter<number>;
-  setDeviceCodeObject: Setter<DeviceCodeObject>;
+  setDeviceCodeObject: Setter<any>;
 };
 
 const Auth = (props: Props) => {
   const navigate = useNavigate();
 
   const handleClick = async () => {
-    await login(({ userCode, link, expiresAt }) => {
-      props.setDeviceCodeObject({ userCode, link, expiresAt });
-      props.setStep(1);
+    // await login(({ userCode, link, expiresAt }) => {
+    props.setDeviceCodeObject({
+      userCode: "AXDLE",
+      link: "",
+      expiresAt: 548559,
     });
+    props.setStep(1);
+    // });
   };
 
   return (

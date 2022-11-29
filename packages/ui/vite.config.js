@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 import { readdirSync, readFileSync } from "fs";
+import Unocss from "unocss/vite";
 import config from "../config/unocssConfig";
 
 let icons = {};
@@ -19,11 +20,10 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: false,
-      tsConfigFilePath: resolve(__dirname, 'tsconfig.json'),
+      tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
-    Unocss(),
     solidPlugin(),
-    config.unoCss,
+    Unocss(config.unoCss),
   ],
   test: {
     globals: true,
