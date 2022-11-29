@@ -1,10 +1,19 @@
-import { lazy } from "solid-js";
+import { JSX, lazy } from "solid-js";
+import { RouteDefinition } from "@solidjs/router";
 import AboutData from "./pages/about.data";
 import Modpacks from "./components/Sidebar/contents/Modpacks";
 import Settings from "./components/Sidebar/contents/Settings";
 
+type CustomRouteDefinition = RouteDefinition & {
+  component?: () => JSX.Element;
+  sidebar?: () => JSX.Element;
+  visibileInNavbar?: boolean;
+  label?: string;
+  children?: CustomRouteDefinition | CustomRouteDefinition[];
+};
+
 /* Defining the routes for the application. */
-export const routes = [
+export const routes: CustomRouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("./pages/login")),
@@ -13,24 +22,34 @@ export const routes = [
     label: "Library",
     visibileInNavbar: true,
     path: "/library",
-    component: lazy(() => import("./pages/library")),
-  },
-  {
-    path: "/library/:id",
-    component: lazy(() => import("./pages/library/instace")),
+    children: [
+      {
+        path: "/",
+        component: lazy(() => import("./pages/library")),
+      },
+      {
+        path: "/:id",
+        component: lazy(() => import("./pages/library/instace")),
+      },
+    ],
   },
   {
     label: "Modpacks",
     visibileInNavbar: true,
     path: "/modpacks",
-    component: lazy(() => import("./pages/modpacks")),
     data: AboutData,
     sidebar: Modpacks,
-  },
-  {
-    path: "/modpacks/:id",
-    component: lazy(() => import("./pages/modpacks/modpack")),
-    sidebar: Modpacks,
+    children: [
+      {
+        path: "/",
+        component: lazy(() => import("./pages/modpacks")),
+      },
+      {
+        path: "/:id",
+        component: lazy(() => import("./pages/modpacks/modpack")),
+        sidebar: Modpacks,
+      },
+    ],
   },
   {
     path: "/settings",
