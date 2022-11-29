@@ -34,6 +34,9 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "core.node"],
       "cache": false
+    },
+    "lint": {
+      "cache": false
     }
   },
   "globalDependencies": [".env"]

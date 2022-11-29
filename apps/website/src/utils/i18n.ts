@@ -2,7 +2,6 @@ import i18next from "i18next";
 import HttpApi from "i18next-http-backend";
 import { SUPPORTED_LANGUAGES } from "@/constants";
 
-
 export const init = async (namespaces: string[] = []) => {
   if (globalThis.document) {
     // Get the language that has been set by SSR in the html attribute
