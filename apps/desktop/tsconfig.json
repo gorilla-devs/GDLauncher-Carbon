@@ -1,8 +1,21 @@
 {
   "extends": "@gd/config/tsconfig.json",
-  "include": ["packages/**/*.ts", "packages/**/*.tsx", "packages/mainWindow/vite.config.js"],
-  "exclude": ["dist/**/*", "node_modules"],
   "compilerOptions": {
-    "resolveJsonModule": true
-  }
+    "strict": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["vite/client", "vitest/globals"],
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./packages/mainWindow/src/*"]
+    }
+  },
+  "include": ["./packages/**/*.tsx", "packages/**/*.ts"],
+  "exclude": ["./dist/**/*", "node_modules/**/*"]
 }
