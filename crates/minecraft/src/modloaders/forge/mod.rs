@@ -4,18 +4,17 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 
-use crate::{
-    component::{Component, ComponentVersion}, instance::Instance,
-};
 
-use super::ModLoaderVersion;
+use crate::instance::Instance;
+
+use super::{ModLoaderVersion, Modloader, ModloaderVersion};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ForgeModloader {
     mod_loader_version: ModLoaderVersion,
 }
 
-impl Component for ForgeModloader {
+impl Modloader for ForgeModloader {
     fn new(mod_loader_version: ModLoaderVersion, instance: Arc<Instance>) -> Self {
         ForgeModloader {
             mod_loader_version,
@@ -30,7 +29,7 @@ impl Component for ForgeModloader {
     fn verify(&self) -> Result<()> {
         Ok(())
     }
-    fn get_version(&self) -> ComponentVersion {
+    fn get_version(&self) -> ModloaderVersion {
         self.mod_loader_version.clone()
     }
 }

@@ -22,14 +22,4 @@ pub struct Instance {
 }
 
 impl Instance {
-    fn add_modloader(&mut self, c: impl Modloader) {
-        self.modloaders.push(c);
-    }
-}
-
-fn something() {
-    let mut instance = Instance {
-        modloaders: Vec::new(),
-        custom_lwjgl: None,
-    };
 }
