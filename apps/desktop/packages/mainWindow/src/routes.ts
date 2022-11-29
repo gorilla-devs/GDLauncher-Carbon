@@ -1,6 +1,6 @@
 import { lazy } from "solid-js";
 import AboutData from "./pages/about.data";
-import Modpacks from "./components/Sidebar/contents/modpacks";
+import Modpacks from "./components/Sidebar/contents/Modpacks";
 import Settings from "./components/Sidebar/contents/Settings";
 
 /* Defining the routes for the application. */
