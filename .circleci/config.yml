@@ -43,6 +43,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: pnpm lint
             - run: pnpm build-mac-x64
             - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
@@ -60,6 +61,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: pnpm lint
             - run: pnpm build-mac-arm64
             - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
@@ -80,9 +82,9 @@ jobs:
           name: Install Node 18.12.1
           shell: powershell.exe
           command: |
-              nvm list
-              nvm install 18.12.1
-              nvm use 18.12.1
+            nvm list
+            nvm install 18.12.1
+            nvm use 18.12.1
       - run:
           command: |
             node -v
@@ -91,6 +93,9 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
+      - run: |
+          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+          pnpm lint
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm build-win-x64
@@ -109,6 +114,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
+      - run: pnpm lint
       # - run: pnpm test
       - run: pnpm build-web
   testDocker:
@@ -130,6 +136,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
+      - run: pnpm lint
       - run: pnpm build-linux-x64-test
       - run: pnpm test
       - save_cache:
@@ -163,6 +170,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
+      - run: pnpm lint
       - run: pnpm build-linux-x64
       - run: pnpm test
       - save_cache:
