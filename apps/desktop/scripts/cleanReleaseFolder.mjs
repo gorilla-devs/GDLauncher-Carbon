@@ -7,7 +7,7 @@ const files = fs.readdirSync(path.join("release", packageJson.version));
 for (const file of files) {
     if (!(file.endsWith(".zip") || file.endsWith(".png"))) {
         fs.rmSync(path.join("release", packageJson.version, file), {
-            recursive: truse,
+            recursive: true,
             force: true,
         });
     }

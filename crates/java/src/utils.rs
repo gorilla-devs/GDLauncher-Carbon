@@ -107,7 +107,7 @@ pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch> {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use crate::JavaVersion;
 
     #[test]

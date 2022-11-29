@@ -2,7 +2,7 @@
   "name": "@gd/desktop",
   "productName": "GDLauncher",
   "private": true,
-  "version": "1.5.5",
+  "version": "0.0.1",
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",

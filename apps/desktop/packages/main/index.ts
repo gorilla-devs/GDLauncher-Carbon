@@ -122,7 +122,6 @@ async function createWindow() {
     (_, display, changedMetrics) => {
       const { minWidth, minHeight } = getMinimumBounds();
       if (changedMetrics.includes("workArea")) {
-        const { width, height } = display.workAreaSize;
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
         win?.webContents.send("minimumBoundsChanged", {
