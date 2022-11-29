@@ -1,9 +1,15 @@
 [workspace]
-members = ["packages/core", "packages/app_helper"]
+members = [
+  "packages/core",
+  "packages/app_helper",
+  "crates/msauth",
+  "crates/java",
+  "crates/minecraft"
+]
 
 [profile.release]
-opt-level = 3
-strip = "symbols"
-lto = true
 codegen-units = 1
+lto = true
+opt-level = 3
 panic = "abort"
+strip = "symbols"

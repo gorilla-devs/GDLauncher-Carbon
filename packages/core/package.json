@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "main": "./index.js",
   "files": [
-    "core.node"
+    "core.node",
+    "JavaCheck.class"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "watch": "node scripts/watch.mjs",
+    "test": "cargo test -- --nocapture",
     "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts --release",
     "_dev_": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts"
   },
@@ -17,7 +19,7 @@
   },
   "devDependencies": {
     "@gd/config": "workspace:*",
-    "@napi-rs/cli": "^2.12.0",
+    "@napi-rs/cli": "^2.13.0",
     "chokidar": "^3.5.3",
     "cross-env": "^7.0.3"
   }

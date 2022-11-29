@@ -73,7 +73,7 @@ function getMinimumBounds() {
         height: 600,
       },
     };
-  } else if (width < 1600 || height < 900) {
+  } else if (width < 1500 || height < 870) {
     // Smaller ads (160/600)
     return {
       minWidth: 1160,
@@ -93,7 +93,7 @@ function getMinimumBounds() {
       height: 740,
       adSize: {
         width: 400,
-        height: 600,
+        height: 300,
       },
     };
   }
@@ -109,6 +109,7 @@ async function createWindow() {
     minWidth,
     width,
     titleBarStyle: "hidden",
+    frame: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -121,7 +122,6 @@ async function createWindow() {
     (_, display, changedMetrics) => {
       const { minWidth, minHeight } = getMinimumBounds();
       if (changedMetrics.includes("workArea")) {
-        const { width, height } = display.workAreaSize;
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
         win?.webContents.send("minimumBoundsChanged", {

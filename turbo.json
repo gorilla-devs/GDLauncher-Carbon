@@ -27,7 +27,13 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^test"],
+      "cache": false
+    },
+    "build-test": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "core.node"],
+      "cache": false
     }
   },
   "globalDependencies": [".env"]

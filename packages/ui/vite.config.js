@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import path from "path";
+import path, { resolve } from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
@@ -17,10 +17,12 @@ for (const iconFile of iconFiles) {
 
 export default defineConfig({
   plugins: [
-    solidPlugin(),
     dts({
-      insertTypesEntry: true,
+      insertTypesEntry: false,
+      tsConfigFilePath: resolve(__dirname, 'tsconfig.json'),
     }),
+    Unocss(),
+    solidPlugin(),
     config.unoCss,
   ],
   test: {

@@ -4,10 +4,11 @@ import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
 import Modals from "./modalsManager";
-import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
+import "virtual:uno.css";
+import "virtual:unocss-devtools";
+import "@gd/ui/style.css";
 
 queueMicrotask(() => {
   initAnalytics();

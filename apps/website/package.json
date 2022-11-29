@@ -16,22 +16,22 @@
     "serve": "npm run build -- --config astro.config.node.mjs && node server/index.mjs"
   },
   "devDependencies": {
-    "@astrojs/mdx": "^0.11.4",
+    "@astrojs/mdx": "^0.12.0",
     "@astrojs/sitemap": "^1.0.0",
-    "@astrojs/solid-js": "^1.2.2",
-    "@astrojs/tailwind": "^2.1.0",
+    "@astrojs/solid-js": "^1.2.3",
+    "@astrojs/tailwind": "^2.1.3",
     "@gd/config": "workspace:*",
     "@gd/ui": "workspace:*",
-    "@unocss/preset-attributify": "^0.45.29",
-    "@unocss/preset-wind": "^0.45.29",
-    "astro": "^1.6.2",
+    "@unocss/preset-attributify": "^0.46.5",
+    "@unocss/preset-wind": "^0.46.5",
+    "astro": "^1.6.11",
     "astro-uno": "^0.2.1",
-    "i18next": "^21.10.0",
-    "i18next-http-backend": "^1.4.4",
-    "lint-staged": "^13.0.3",
-    "sass": "^1.55.0",
-    "solid-js": "^1.6.1",
-    "unocss": "^0.45.29",
-    "vite-plugin-solid": "^2.3.9"
+    "i18next": "^22.0.6",
+    "i18next-http-backend": "^2.0.2",
+    "lint-staged": "^13.0.4",
+    "sass": "^1.56.1",
+    "solid-js": "^1.6.2",
+    "unocss": "^0.46.5",
+    "vite-plugin-solid": "^2.4.0"
   }
 }

@@ -42,7 +42,6 @@ function watchNativeCore(mainWindow) {
     stdio: "inherit",
   });
 
-
   const addressMainWindow = mainWindow.httpServer.address();
   const env = Object.assign(process.env, {
     VITE_DEV_SERVER_HOST: "localhost",
@@ -53,7 +52,7 @@ function watchNativeCore(mainWindow) {
     .watch("../../packages/core/core.node", { ignoreInitial: true })
     .on("all", (event, path) => {
       console.log("Reloading app due to native core rebuild", event);
-      electronProcess && electronProcess.kill();
+      electronProcess?.kill();
       electronProcess = spawn(electron, ["."], { stdio: "inherit", env });
     });
 }

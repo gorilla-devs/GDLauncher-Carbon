@@ -1,4 +1,5 @@
 import { children, Show } from "solid-js";
+import styles from "./Button.module.scss";
 
 type Props = {
   children: HTMLElement | string;
