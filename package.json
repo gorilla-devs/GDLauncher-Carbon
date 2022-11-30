@@ -17,10 +17,10 @@
     "build-mac-arm64": "turbo run build --filter=!@gd/web --filter=!@gd/core --filter=!@gd/app_helper -- --arm64 --mac",
     "core-dev": "turbo run dev --filter @gd/core",
     "core-build": "turbo run build --filter @gd/core --filter @gd/app_helper",
-    "dev-web": "turbo run dev --filter=@gd/web",
-    "build-web": "turbo run build --filter @gd/web",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
-    "check-bundle": "turbo run check-bundle"
+    "check-bundle": "turbo run check-bundle --filter !@gd/web",
+    "dev-web": "turbo run dev --filter=@gd/web",
+    "build-web": "turbo run build --filter @gd/web"
   },
   "devDependencies": {
     "turbo": "^1.6.3"
