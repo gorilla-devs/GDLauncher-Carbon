@@ -117,7 +117,7 @@ export default {
   "newsletter.error_missing_info":
     "Please enter all the info, some of the them are missing.",
   "newsletter.success":
-    "Your email has been registered. Due to issues with our infrastructure you might not receive a confirmation email right away. Hold tight, we will send it as soon as possible.",
+    "We have sent you a confirmation email, please confirm it. 🚀",
   "newsletter.confirm.title":
     "You have successfully subscribed to the newsletter🎉",
   "blog.title": "The GDLauncher Blog",
