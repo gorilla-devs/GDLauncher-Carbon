@@ -125,14 +125,14 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      - restore_cache:
-          name: Restore Cargo Package Cache
-          keys:
-            - cargo-{{ checksum "Cargo.lock" }}
-      - restore_cache:
-          name: Restore Pnpm Package Cache
-          keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}
+      # - restore_cache:
+      #     name: Restore Cargo Package Cache
+      #     keys:
+      #       - cargo-{{ checksum "Cargo.lock" }}
+      # - restore_cache:
+      #     name: Restore Pnpm Package Cache
+      #     keys:
+      #       - pnpm-{{ checksum "pnpm-lock.yaml" }}
       - run: |
           node -v
           cargo --version
@@ -144,17 +144,17 @@ jobs:
       - run: pnpm lint
       - run: pnpm check-bundle
       - run: pnpm test
-      - save_cache:
-          name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}
-          paths:
-            - target
-            - packages/core/target
-      - save_cache:
-          name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
-          paths:
-            - node_modules
+      # - save_cache:
+      #     name: Save Cargo Package Cache
+      #     key: cargo-{{ checksum "Cargo.lock" }}
+      #     paths:
+      #       - target
+      #       - packages/core/target
+      # - save_cache:
+      #     name: Save Pnpm Package Cache
+      #     key: pnpm-{{ checksum "pnpm-lock.yaml" }}
+      #     paths:
+      #       - node_modules
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
