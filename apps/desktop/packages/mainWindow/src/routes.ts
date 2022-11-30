@@ -29,7 +29,7 @@ export const routes: CustomRouteDefinition[] = [
       },
       {
         path: "/:id",
-        component: lazy(() => import("./pages/library/instace")),
+        component: lazy(() => import("./pages/library/instance")),
       },
     ],
   },
