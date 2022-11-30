@@ -4,7 +4,10 @@
  */
 
 const isDockerBuild = process.env.IS_DOCKER_TEST === "true";
-console.log("Only generating dir executable for test docker build");
+console.log(
+  "Only generating dir executable for test docker build",
+  isDockerBuild
+);
 
 module.exports = {
   productName: "GDLauncher Carbon",
