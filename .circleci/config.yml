@@ -138,9 +138,7 @@ jobs:
           pnpm i
           chmod -R a+x node_modules
       - run:
-          command: pnpm build-linux-x64
-          environment:
-            IS_DOCKER_TEST: true
+          command: IS_DOCKER_TEST=true pnpm build-linux-x64
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm check-bundle

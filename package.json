@@ -17,13 +17,13 @@
     "core-dev": "turbo run dev --filter @gd/core",
     "core-build": "turbo run build --filter @gd/core --filter @gd/app_helper",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
-    "check-bundle": "turbo run check-bundle --filter !@gd/web",
+    "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "dev-web": "turbo run dev --filter=@gd/web",
     "build-web": "turbo run build --filter @gd/web",
-    "lint-web": "turbo run lint --filter @gd/web",
-    "check-bundle-web": "turbo run check-bundle --filter @gd/web"
+    "lint-web": "turbo run lint --filter @gd/web"
   },
   "devDependencies": {
+    "bundlewatch": "^0.3.3",
     "turbo": "^1.6.3"
   },
   "packageManager": "pnpm@7.15.0"

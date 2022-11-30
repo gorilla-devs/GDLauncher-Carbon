@@ -4,8 +4,10 @@ importers:
 
   .:
     specifiers:
+      bundlewatch: ^0.3.3
       turbo: ^1.6.3
     devDependencies:
+      bundlewatch: 0.3.3
       turbo: 1.6.3
 
   apps/desktop:
