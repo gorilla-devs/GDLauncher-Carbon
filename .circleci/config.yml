@@ -114,9 +114,9 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm lint
       # - run: pnpm test
       - run: pnpm build-web
+      - run: pnpm lint
   testDocker:
     executor: "linux"
     steps:

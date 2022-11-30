@@ -60,7 +60,7 @@ export default defineConfig({
         // Prevent vendor.js being created
         minifyInternalExports: true,
         compact: true,
-        chunkFileNames: "assets/[hash].js",
+        // chunkFileNames: "assets/[hash].js",
       },
     },
   },

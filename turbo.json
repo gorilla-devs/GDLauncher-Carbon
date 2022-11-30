@@ -37,6 +37,9 @@
     },
     "lint": {
       "cache": false
+    },
+    "check-bundle": {
+      "cache": false
     }
   },
   "globalDependencies": [".env"]

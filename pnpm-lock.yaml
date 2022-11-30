@@ -17,6 +17,7 @@ importers:
       '@playwright/test': ^1.28.1
       '@solidjs/router': ^0.5.1
       '@typescript-eslint/parser': ^5.45.0
+      bundlewatch: ^0.3.3
       chokidar: ^3.5.3
       custom-electron-titlebar: ^4.1.3
       electron: 21.3.1
@@ -46,6 +47,7 @@ importers:
       '@playwright/test': 1.28.1
       '@solidjs/router': 0.5.1_solid-js@1.6.2
       '@typescript-eslint/parser': 5.45.0_hsf322ms6xhhd4b5ne6lb74y4a
+      bundlewatch: 0.3.3
       chokidar: 3.5.3
       custom-electron-titlebar: 4.1.3_electron@21.3.1
       electron: 21.3.1
@@ -130,11 +132,13 @@ importers:
     specifiers:
       '@gd/config': workspace:*
       '@napi-rs/cli': ^2.13.0
+      bundlewatch: ^0.3.3
       chokidar: ^3.5.3
       cross-env: ^7.0.3
     devDependencies:
       '@gd/config': link:../config
       '@napi-rs/cli': 2.13.0
+      bundlewatch: 0.3.3
       chokidar: 3.5.3
       cross-env: 7.0.3
 
@@ -152,6 +156,7 @@ importers:
       '@testing-library/jest-dom': ^5.16.5
       '@typescript-eslint/parser': ^5.45.0
       babel-loader: ^9.1.0
+      bundlewatch: ^0.3.3
       concurrently: ^7.6.0
       eslint: ^8.28.0
       eslint-config-prettier: ^8.5.0
@@ -177,6 +182,7 @@ importers:
       '@testing-library/jest-dom': 5.16.5
       '@typescript-eslint/parser': 5.45.0_hsf322ms6xhhd4b5ne6lb74y4a
       babel-loader: 9.1.0_hkczypimj4evef4hfazf6yfxte
+      bundlewatch: 0.3.3
       concurrently: 7.6.0
       eslint: 8.28.0
       eslint-config-prettier: 8.5.0_eslint@8.28.0
@@ -6634,6 +6640,14 @@ packages:
     engines: {node: '>= 0.4'}
     dev: true
 
+  /axios/0.24.0:
+    resolution: {integrity: sha512-Q6cWsys88HoPgAaFAVUb0WpPk0O8iTeisR9IMqy9G8AbO4NlpVknrnQS03zzF9PGAWgO3cgletO3VjV/P7VztA==}
+    dependencies:
+      follow-redirects: 1.15.2
+    transitivePeerDependencies:
+      - debug
+    dev: true
+
   /babel-loader/8.2.5_hkczypimj4evef4hfazf6yfxte:
     resolution: {integrity: sha512-OSiFfH89LrEMiWd4pLNqGz4CwJDtbs2ZVc+iGu2HrkRfPxId9F2anQj38IxWpmRfsUY0aBZYi1EFcd3mhtRMLQ==}
     engines: {node: '>= 8.9'}
@@ -7151,6 +7165,25 @@ packages:
     resolution: {integrity: sha512-HpGFw18DgFWlncDfjTa2rcQ4W88O1mC8e8yZ2AvQY5KDaktSTwo+KRf6nHK6FRI5FyRyb/5T6+TSxfP7QyGsmQ==}
     dev: true
 
+  /bundlewatch/0.3.3:
+    resolution: {integrity: sha512-qzSVWrZyyWXa546JpAPRPTFmnXms9YNVnfzB05DRJKmN6wRRa7SkxE4OgKQmbAY74Z6CM2mKAc6vwvd2R+1lUQ==}
+    engines: {node: '>=10'}
+    hasBin: true
+    dependencies:
+      axios: 0.24.0
+      bytes: 3.1.2
+      chalk: 4.1.2
+      ci-env: 1.17.0
+      commander: 5.1.0
+      glob: 7.2.3
+      gzip-size: 6.0.0
+      jsonpack: 1.1.5
+      lodash.merge: 4.6.2
+      read-pkg-up: 7.0.1
+    transitivePeerDependencies:
+      - debug
+    dev: true
+
   /busboy/1.6.0:
     resolution: {integrity: sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==}
     engines: {node: '>=10.16.0'}
@@ -7471,6 +7504,10 @@ packages:
 
   /chromium-pickle-js/0.2.0:
     resolution: {integrity: sha512-1R5Fho+jBq0DDydt+/vHWj5KJNJCKdARKOCwZUen84I5BreWoLqRLANH1U87eJy1tiASPtMnGqJJq0ZsLoRPOw==}
+    dev: true
+
+  /ci-env/1.17.0:
+    resolution: {integrity: sha512-NtTjhgSEqv4Aj90TUYHQLxHdnCPXnjdtuGG1X8lTfp/JqeXTdw0FTWl/vUAPuvbWZTF8QVpv6ASe/XacE+7R2A==}
     dev: true
 
   /ci-info/2.0.0:
@@ -10034,6 +10071,16 @@ packages:
       tslib: 1.14.1
     dev: true
 
+  /follow-redirects/1.15.2:
+    resolution: {integrity: sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA==}
+    engines: {node: '>=4.0'}
+    peerDependencies:
+      debug: '*'
+    peerDependenciesMeta:
+      debug:
+        optional: true
+    dev: true
+
   /for-each/0.3.3:
     resolution: {integrity: sha512-jqYfLp7mo9vIyQf8ykW2v7A+2N4QjeCeI5+Dz9XraiO1ign81wjiH7Fb9vSOWvQfNtmSa4H2RoQTrrXivdUZmw==}
     dependencies:
@@ -12026,6 +12073,10 @@ packages:
       universalify: 2.0.0
     optionalDependencies:
       graceful-fs: 4.2.10
+    dev: true
+
+  /jsonpack/1.1.5:
+    resolution: {integrity: sha512-d2vwomK605ks7Q+uCpbwGyoIF5j+UZuJjlYcugISBt3CxM+eBo/W6y63yVPIyIvbYON+pvJYsYZjCYbzqJj/xQ==}
     dev: true
 
   /jsx-ast-utils/3.3.3:
