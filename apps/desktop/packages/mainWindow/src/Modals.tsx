@@ -1,27 +1,19 @@
 import { useLocation, useNavigate } from "@solidjs/router";
-import {
-  Component,
-  createEffect,
-  createMemo,
-  createSignal,
-  Match,
-  Show,
-  Switch,
-} from "solid-js";
+import { createEffect, createMemo, createSignal, Show } from "solid-js";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
  * @returns A component that renders a modal.
  */
 
-const Modals: Component = () => {
+const Modals = () => {
   const location = useLocation();
 
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
 
-  const queryParams = createMemo(() => location.search);
+  // const queryParams = createMemo(() => location.search);
   const isModal = createMemo(
     () => new URLSearchParams(location.search).get("m") !== null
   );
@@ -59,7 +51,7 @@ const Modals: Component = () => {
           onClick={(e) => {
             e.stopPropagation();
           }}
-        ></div>
+        />
       </Show>
     </div>
   );

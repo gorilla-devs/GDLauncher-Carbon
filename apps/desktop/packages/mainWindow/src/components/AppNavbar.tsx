@@ -1,11 +1,8 @@
 import { Link, useLocation } from "@solidjs/router";
-import { createSignal, Show } from "solid-js";
+import { Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 
 export default function AppNavbar() {
-  const [count, setCount] = createSignal(0);
-  const [value, setValue] = createSignal<number>();
-
   const location = useLocation();
 
   return (

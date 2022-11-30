@@ -97,7 +97,6 @@ async fn start_router() {
         .unwrap();
 }
 
-
 #[cfg(test)]
 mod test {
     #[tokio::test]

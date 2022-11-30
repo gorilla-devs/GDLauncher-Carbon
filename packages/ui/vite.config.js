@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import path, { resolve } from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
@@ -9,7 +8,7 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: false,
-      tsConfigFilePath: resolve(__dirname, 'tsconfig.json'),
+      tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
     Unocss(),
     solidPlugin(),
@@ -40,17 +39,16 @@ export default defineConfig({
       external: ["solid-js"],
       output: {
         globals: {
-          "solid-js": "SolidJS"
+          "solid-js": "SolidJS",
         },
       },
     },
     target: "esnext",
-    polyfillDynamicImport: false,
     emptyOutDir: false,
   },
   resolve: {
     alias: {
-      "@": path.join(__dirname, "src")
+      "@": path.join(__dirname, "src"),
     },
     conditions: ["development", "browser"],
   },

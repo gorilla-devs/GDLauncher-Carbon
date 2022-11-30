@@ -162,7 +162,8 @@ impl AzureData {
         };
 
         let key = DecodingKey::from_rsa_components(auth_key.modulus(), auth_key.exponent());
-        let valid: TokenData<AzureJwtClaims> = jsonwebtoken::decode(token, &key.unwrap(), &validator)?;
+        let valid: TokenData<AzureJwtClaims> =
+            jsonwebtoken::decode(token, &key.unwrap(), &validator)?;
 
         Ok(valid)
     }

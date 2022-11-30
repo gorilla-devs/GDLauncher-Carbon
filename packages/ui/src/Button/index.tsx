@@ -1,18 +1,10 @@
-import { children, createSignal, createEffect } from "solid-js";
+import { children } from "solid-js";
 import styles from "./Button.module.scss";
 
 type Props = {
   children: HTMLElement | string;
 };
 function Button(props: Props) {
-  const [q, setC] = createSignal(false);
-
-  createEffect(() => {
-    if (q()) {
-      console.log(q());
-    }
-  });
-
   const c = children(() => props.children);
   return <div class={styles.paolo}>{c()}</div>;
 }

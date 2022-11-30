@@ -23,7 +23,7 @@ pub enum JavaArch {
     Aarch64,
 }
 
-impl <'a> From<&JavaArch> for &'a str {
+impl<'a> From<&JavaArch> for &'a str {
     fn from(arch: &JavaArch) -> &'a str {
         match arch {
             JavaArch::Amd64 => "amd64",
@@ -33,7 +33,7 @@ impl <'a> From<&JavaArch> for &'a str {
     }
 }
 
-impl <'a> From<&'a str> for JavaArch {
+impl<'a> From<&'a str> for JavaArch {
     fn from(s: &'a str) -> Self {
         match s {
             "amd64" => JavaArch::Amd64,

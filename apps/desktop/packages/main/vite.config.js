@@ -1,9 +1,9 @@
 import { builtinModules } from "module";
 import { resolve } from "path";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(() => {
   return {
     root: __dirname,
     plugins: [ViteMinifyPlugin({})],

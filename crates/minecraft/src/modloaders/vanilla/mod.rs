@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-
 
 use crate::instance::Instance;
 
@@ -16,9 +15,7 @@ pub struct VanillaModLoader {
 
 impl Modloader for VanillaModLoader {
     fn new(mod_loader_version: ModLoaderVersion, instance: Arc<Instance>) -> Self {
-        VanillaModLoader {
-            mod_loader_version,
-        }
+        VanillaModLoader { mod_loader_version }
     }
     fn install(&self, progress_rcv: mpsc::Sender<()>) -> Result<()> {
         Ok(())

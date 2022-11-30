@@ -1,4 +1,5 @@
-import type { AttributifyNames } from "@unocss/preset-attributify";
+/* eslint-disable no-unused-vars */
+import type { JSX } from "solid-js";
 
 declare module "solid-js" {
   namespace JSX {

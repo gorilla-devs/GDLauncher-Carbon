@@ -1,4 +1,6 @@
-import { BoundsSize } from "./modules/components/minimumBounds";
+/* eslint-disable no-unused-vars */
+/* eslint-disable no-undef */
+import { BoundsSize } from "@/modules/components/minimumBounds";
 
 declare global {
   interface Window {

@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-
 
 use crate::instance::Instance;
 
@@ -16,9 +15,7 @@ pub struct ForgeModloader {
 
 impl Modloader for ForgeModloader {
     fn new(mod_loader_version: ModLoaderVersion, instance: Arc<Instance>) -> Self {
-        ForgeModloader {
-            mod_loader_version,
-        }
+        ForgeModloader { mod_loader_version }
     }
     fn install(&self, progress_rcv: mpsc::Sender<()>) -> Result<()> {
         Ok(())

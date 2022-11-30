@@ -1,5 +1,6 @@
 /** Document ready */
 export const domReady = (
+  // eslint-disable-next-line no-undef
   condition: DocumentReadyState[] = ["complete", "interactive"]
 ) => {
   return new Promise((resolve) => {
