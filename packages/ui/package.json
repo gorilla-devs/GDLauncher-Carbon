@@ -13,7 +13,8 @@
     "build": "vite build --",
     "dev": "vite build --watch",
     "storybook": "concurrently \"npm run dev\" \"start-storybook -p 6006\"",
-    "build-storybook": "build-storybook"
+    "build-storybook": "build-storybook",
+    "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },
   "devDependencies": {
     "@babel/core": "^7.20.2",
@@ -26,8 +27,13 @@
     "@storybook/html": "^6.5.13",
     "@storybook/testing-library": "^0.0.13",
     "@testing-library/jest-dom": "^5.16.5",
+    "@typescript-eslint/parser": "^5.45.0",
     "babel-loader": "^9.1.0",
     "concurrently": "^7.6.0",
+    "eslint": "^8.28.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-solid": "^0.9.1",
     "jsdom": "^20.0.3",
     "solid-js": "1.6.2",
     "solid-testing-library": "^0.5.0",
