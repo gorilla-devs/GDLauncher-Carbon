@@ -2,6 +2,10 @@
  * @type {import('electron-builder').Configuration}
  * @see https://www.electron.build/configuration/configuration
  */
+
+const isDockerBuild = process.env.IS_DOCKER_TEST === "true";
+console.log("Only generating dir executable for test docker build");
+
 module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
@@ -63,12 +67,11 @@ module.exports = {
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: ["dir", "zip"],
+    target: isDockerBuild ? ["dir"] : ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
     const { spawnSync } = require("child_process");
-    const { promises: fs } = require("fs");
 
     if (context.electronPlatformName === "darwin") {
       if (context.arch === 1) {

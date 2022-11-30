@@ -12,7 +12,6 @@
     "release": "node scripts/release.mjs",
     "test": "playwright test",
     "build": "node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
-    "build-test": "node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js --dir",
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\"",
     "check-bundle": "bundlewatch --config bundlewatch.config.js"

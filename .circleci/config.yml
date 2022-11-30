@@ -140,7 +140,10 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm build-linux-x64-test
+      - run:
+          command: build-linux-x64
+          environment:
+            IS_DOCKER_TEST: true
       - run: pnpm lint
       - run: pnpm check-bundle
       - run: pnpm test
