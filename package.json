@@ -20,7 +20,9 @@
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
     "check-bundle": "turbo run check-bundle --filter !@gd/web",
     "dev-web": "turbo run dev --filter=@gd/web",
-    "build-web": "turbo run build --filter @gd/web"
+    "build-web": "turbo run build --filter @gd/web",
+    "lint-web": "turbo run lint --filter @gd/web",
+    "check-bundle-web": "turbo run check-bundle --filter @gd/web"
   },
   "devDependencies": {
     "turbo": "^1.6.3"
