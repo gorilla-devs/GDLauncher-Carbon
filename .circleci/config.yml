@@ -46,6 +46,7 @@ jobs:
             - run: pnpm build-mac-x64
             - run: pnpm lint
             - run: pnpm test
+            - run: pnpm check-bundle
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -64,6 +65,7 @@ jobs:
             - run: pnpm build-mac-arm64
             - run: pnpm lint
             - run: pnpm test
+            - run: pnpm check-bundle
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -100,6 +102,7 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm lint
       - run: pnpm test
+      - run: pnpm check-bundle
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -117,6 +120,7 @@ jobs:
       # - run: pnpm test
       - run: pnpm build-web
       - run: pnpm lint
+      - run: pnpm check-bundle
   testDocker:
     executor: "linux"
     steps:
@@ -139,6 +143,7 @@ jobs:
       - run: pnpm build-linux-x64-test
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm check-bundle
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}
@@ -173,6 +178,7 @@ jobs:
       - run: pnpm build-linux-x64
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm check-bundle
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}
