@@ -141,7 +141,7 @@ jobs:
           pnpm i
           chmod -R a+x node_modules
       - run:
-          command: build-linux-x64
+          command: pnpm build-linux-x64
           environment:
             IS_DOCKER_TEST: true
       - run: pnpm lint
