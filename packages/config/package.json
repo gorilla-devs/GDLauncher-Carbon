@@ -4,8 +4,7 @@
   "main": "index.ts",
   "files": [
     "tsconfig.json",
-    "index.ts",
-    "unocssConfig.ts"
+    "index.ts"
   ],
   "devDependencies": {
     "@iconify-json/heroicons": "^1.1.6",
@@ -13,5 +12,6 @@
     "@unocss/preset-icons": "^0.46.4",
     "@unocss/preset-wind": "^0.45.29",
     "unocss": "^0.45.29"
-  }
+  },
+  "type": "module"
 }

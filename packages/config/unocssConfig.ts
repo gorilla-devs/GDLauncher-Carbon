@@ -21,7 +21,7 @@ const gdlIcons = () => {
   return icons;
 };
 
-const config: any = {
+const unocssConfig: any = {
   include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   presets: [
     presetAttributify({
@@ -75,4 +75,4 @@ const config: any = {
   ],
 };
 
-export default config;
+export { unocssConfig };

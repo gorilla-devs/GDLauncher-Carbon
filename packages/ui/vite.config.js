@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 import Unocss from "unocss/vite";
-import config from "../config/unocssConfig";
+import { unocssConfig } from "@gd/config";
 
 export default defineConfig({
   plugins: [
@@ -13,7 +13,7 @@ export default defineConfig({
       tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
     solidPlugin(),
-    Unocss(config),
+    Unocss(unocssConfig),
   ],
   test: {
     globals: true,
