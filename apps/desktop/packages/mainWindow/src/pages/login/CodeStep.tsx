@@ -8,10 +8,10 @@ import { addNotification } from "@/notificationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 
-type Props = {
+interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
-};
+}
 
 const CodeStep = (props: Props) => {
   const navigate = useNavigate();
@@ -56,8 +56,8 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     // if (accounts.selectedAccountId) {
-      // TODO: save in a store the default / last page
-      navigate("/library");
+    // TODO: save in a store the default / last page
+    navigate("/library");
     // }
   });
 
@@ -89,7 +89,7 @@ const CodeStep = (props: Props) => {
             disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
-              window.copyToClipboard(userCode() || "");
+              navigator.clipboard.writeText(userCode() || "")
               addNotification("The link has been copied");
             }}
           />

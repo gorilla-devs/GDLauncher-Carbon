@@ -37,20 +37,6 @@ export const addNotification = (
   clearNotification();
 };
 
-const getColorByType = (type: string) => {
-  switch (type) {
-    case "success":
-      return "#29A335";
-    case "warning":
-      return "#F7BC3D";
-    case "error":
-      return "#E54B4B";
-
-    default:
-      return "#29A335";
-  }
-};
-
 const Notifications = () => {
   return (
     <div>
@@ -59,21 +45,22 @@ const Notifications = () => {
           <div
             class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center"
             style={{
-              bottom: notification.position === "bottom" ? "20px" : "auto",
-              top: notification.position === "top" ? "50px" : "auto",
               transform: `translate(-50%, ${
                 notification.position === "bottom"
                   ? `-${i() * 45}`
                   : `${i() * 45}`
               }px)`,
               transition: "transform 1s",
-              "background-color": getColorByType(notification.type || ""),
             }}
-            // classList={{
-            //   "bg-status-red": notification.type === "error",
-            //   "bg-status-yellow": notification.type === "warning",
-            //   "bg-status-green": notification.type === "success",
-            // }}
+            classList={{
+              "bottom-10": notification.position === "bottom",
+              "bottom-auto": notification.position !== "bottom",
+              "top-12": notification.position === "top",
+              "top-auto": notification.position !== "top",
+              "bg-status-red": notification.type === "error",
+              "bg-status-yellow": notification.type === "warning",
+              "bg-status-green": notification.type === "success",
+            }}
           >
             {notification.name}
           </div>

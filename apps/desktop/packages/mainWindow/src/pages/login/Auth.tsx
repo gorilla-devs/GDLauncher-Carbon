@@ -5,7 +5,7 @@ import { useNavigate } from "@solidjs/router";
 import { Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
-type Props = {
+interface Props {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
 };

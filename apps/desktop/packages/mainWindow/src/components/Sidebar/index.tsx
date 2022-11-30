@@ -1,23 +1,19 @@
 import { routes } from "@/routes";
-import { useLocation, useParams } from "@solidjs/router";
-import { createEffect, Setter, Show } from "solid-js";
+import { useLocation } from "@solidjs/router";
+import {  Setter, Show } from "solid-js";
 import Library from "./contents/Library";
 
-type Props = {
+interface Props {
   setSidebarCollapsed: Setter<boolean>;
   collapsed: boolean;
 };
 
 const getContent = (location: string) => {
-  // const reg = location.match(/^\/modpacks\/([a-zA-Z]+)/) || [];
-  const regModpack = location.match(/^\/modpacks\//) || [];
-  const isModpacks = regModpack[0];
-
-  const route = routes.find(
-    (route) => route.path === location || route.path.includes(isModpacks)
+  const currentRoute = routes.find(
+    (route) => route.path === location || route.path.includes(location)
   );
-  const SidebarContent = route?.sidebar || Library;
-  if (SidebarContent) return <SidebarContent />;
+  const SidebarContent = currentRoute?.sidebarComponent || Library;
+  return <SidebarContent />;
 };
 
 const Sidebar = (props: Props) => {

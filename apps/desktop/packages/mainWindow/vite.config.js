@@ -1,12 +1,12 @@
 import { resolve, join } from "path";
-import { defineConfig, Plugin } from "vite";
+import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
-import presetAttributify from "@unocss/preset-attributify";
-import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
-import config from "../../../../packages/config/unocssConfig";
+import unocssConfig from "../../../../packages/config/unocssConfig";
+// import { unocssConfig } from "@gd/config";
+// import unocssConfig from "@gd/config/unocssConfig";
 
 /**
  * @see https://vitejs.dev/config/
@@ -14,7 +14,7 @@ import config from "../../../../packages/config/unocssConfig";
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [solidPlugin(), Unocss(config.unoCss), ViteMinifyPlugin({})],
+  plugins: [solidPlugin(), Unocss(unocssConfig), ViteMinifyPlugin({})],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   build: {

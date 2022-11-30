@@ -1,9 +1,9 @@
-type Props = {
+interface Props {
   title: string;
   modloader: string;
   version: string;
   onClick?: () => void;
-};
+}
 
 const InstanceTile = (props: Props) => {
   return (

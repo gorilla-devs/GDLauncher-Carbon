@@ -1,6 +1,6 @@
 import type { ComponentProps, JSX } from "solid-js";
 
-type Props = {
+interface Props {
   icon: (props: ComponentProps<"svg">) => JSX.Element;
   class?: string;
 };

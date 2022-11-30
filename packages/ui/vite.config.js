@@ -3,18 +3,8 @@ import path, { resolve } from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
-import { readdirSync, readFileSync } from "fs";
 import Unocss from "unocss/vite";
 import config from "../config/unocssConfig";
-
-// let icons = {};
-
-// const iconFiles = readdirSync(path.join("./", "icons"));
-
-// for (const iconFile of iconFiles) {
-//   const file = readFileSync(path.join("./", "icons", iconFile));
-//   icons[path.basename(iconFile, ".svg")] = file.toString();
-// }
 
 export default defineConfig({
   plugins: [
@@ -23,7 +13,7 @@ export default defineConfig({
       tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
     solidPlugin(),
-    Unocss(config.unoCss),
+    Unocss(config),
   ],
   test: {
     globals: true,

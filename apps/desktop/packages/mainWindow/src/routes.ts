@@ -6,10 +6,10 @@ import Settings from "./components/Sidebar/contents/Settings";
 
 type CustomRouteDefinition = RouteDefinition & {
   component?: () => JSX.Element;
-  sidebar?: () => JSX.Element;
+  sidebarComponent?: () => JSX.Element;
   visibileInNavbar?: boolean;
   label?: string;
-  children?: CustomRouteDefinition | CustomRouteDefinition[];
+  children?: CustomRouteDefinition[];
 };
 
 /* Defining the routes for the application. */
@@ -38,7 +38,7 @@ export const routes: CustomRouteDefinition[] = [
     visibileInNavbar: true,
     path: "/modpacks",
     data: AboutData,
-    sidebar: Modpacks,
+    sidebarComponent: Modpacks,
     children: [
       {
         path: "/",
@@ -47,14 +47,14 @@ export const routes: CustomRouteDefinition[] = [
       {
         path: "/:id",
         component: lazy(() => import("./pages/modpacks/modpack")),
-        sidebar: Modpacks,
+        sidebarComponent: Modpacks,
       },
-    ],
+    ] as CustomRouteDefinition[],
   },
   {
     path: "/settings",
     component: lazy(() => import("./pages/settings")),
-    sidebar: Settings,
+    sidebarComponent: Settings,
   },
   {
     path: "**",

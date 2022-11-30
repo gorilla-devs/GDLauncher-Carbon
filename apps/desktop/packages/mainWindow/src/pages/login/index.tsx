@@ -7,7 +7,7 @@ export default function Login() {
   const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
 
   return (
-    <div class="flex justify-center items-center w-full h-full bg-image-loginBG p-0">
+    <div class="flex justify-center items-center w-full h-full bg-image-loginBG.jpg p-0">
       <div
         style={{
           "mix-blend-mode": "hard-light",

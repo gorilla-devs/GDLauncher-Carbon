@@ -1,7 +1,7 @@
 import { children, createSignal, createEffect } from "solid-js";
 import styles from "./Select.module.scss";
 
-type Props = {
+interface Props {
   children: HTMLElement | string;
 };
 

@@ -1,6 +1,6 @@
 import { mergeProps, Show } from "solid-js";
 
-type Props = {
+interface Props {
   value?: string | number;
   placeholder?: string;
   error?: string;

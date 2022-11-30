@@ -1,4 +1,4 @@
-type Props = {
+interface Props {
   value?: string;
   icon?: string;
   onClick?: () => void;

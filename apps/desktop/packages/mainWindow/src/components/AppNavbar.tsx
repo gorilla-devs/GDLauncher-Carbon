@@ -4,9 +4,9 @@ import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
 import { routes } from "@/routes";
 
-type Props = {
+interface Props {
   sidebarCollapsed: boolean;
-};
+}
 
 const AppNavbar = (props: Props) => {
   const location = useLocation();
@@ -51,7 +51,7 @@ const AppNavbar = (props: Props) => {
             <div
               class="i-ri:settings-3-fill text-black-lightGray text-2xl cursor-pointer"
               classList={{
-                "bg-accent-main": location.pathname === "/settings"
+                "bg-accent-main": location.pathname === "/settings",
               }}
               onClick={() => navigate("/settings")}
             />

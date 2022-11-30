@@ -2,11 +2,11 @@ import { createSignal, For } from "solid-js";
 import InstanceTile from "../InstanceTile";
 import "./index.css";
 
-type Props = {
+interface Props {
   children?: HTMLElement | Element | string | any;
   class?: string;
   title: string;
-};
+}
 
 const Carousel = (props: Props) => {
   // const [currentSlide, setCurrentSlide] = createSignal(MockCarousel[0]);
