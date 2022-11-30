@@ -38,6 +38,9 @@ jobs:
               - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
+            - run: |
                 node -v
                 cargo --version
                 sudo npm i -g pnpm
@@ -55,6 +58,9 @@ jobs:
             and:
               - equal: ["macm1", <<parameters.os>>]
           steps:
+            - run: |
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                source "$HOME/.cargo/env"
             - run: |
                 node -v
                 cargo --version
@@ -85,6 +91,23 @@ jobs:
             nvm list
             nvm install 18.12.1
             nvm use 18.12.1
+
+      - run:
+          name: "Install Rust"
+          shell: powershell.exe
+          command: |
+            $ProgressPreference = 'Continue'    
+            Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
+            & C:\rustup-init.exe -y --no-modify-path --profile minimal
+            $env:path += ";$env:userprofile\.cargo\bin"
+
+            rustc -Vv
+            node -v
+            cargo --version
+            rustc --version | Out-File -FilePath "rust-version"
+            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
+                cargo generate-lockfile
+            }
       - run:
           command: |
             node -v
@@ -99,7 +122,9 @@ jobs:
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm lint
-      - run: pnpm test
+      - run: |
+          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+          pnpm test
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
