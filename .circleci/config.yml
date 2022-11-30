@@ -45,7 +45,6 @@ jobs:
                 chmod -R a+x node_modules
             - run: pnpm build-mac-x64
             - run: pnpm lint
-            - run: pnpm check-bundle
             - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
@@ -65,7 +64,6 @@ jobs:
             - run: pnpm build-mac-arm64
             - run: pnpm lint
             - run: pnpm test
-            - run: pnpm check-bundle
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -101,7 +99,6 @@ jobs:
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm lint
-      - run: pnpm check-bundle
       - run: pnpm test
       - run:
           command: cd apps && cd desktop && pnpm clean
@@ -125,14 +122,14 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      # - restore_cache:
-      #     name: Restore Cargo Package Cache
-      #     keys:
-      #       - cargo-{{ checksum "Cargo.lock" }}
-      # - restore_cache:
-      #     name: Restore Pnpm Package Cache
-      #     keys:
-      #       - pnpm-{{ checksum "pnpm-lock.yaml" }}
+      - restore_cache:
+          name: Restore Cargo Package Cache
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}
+      - restore_cache:
+          name: Restore Pnpm Package Cache
+          keys:
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}
       - run: |
           node -v
           cargo --version
@@ -145,19 +142,19 @@ jobs:
           environment:
             IS_DOCKER_TEST: true
       - run: pnpm lint
-      - run: pnpm check-bundle
       - run: pnpm test
-      # - save_cache:
-      #     name: Save Cargo Package Cache
-      #     key: cargo-{{ checksum "Cargo.lock" }}
-      #     paths:
-      #       - target
-      #       - packages/core/target
-      # - save_cache:
-      #     name: Save Pnpm Package Cache
-      #     key: pnpm-{{ checksum "pnpm-lock.yaml" }}
-      #     paths:
-      #       - node_modules
+      - run: pnpm check-bundle
+      - save_cache:
+          name: Save Cargo Package Cache
+          key: cargo-{{ checksum "Cargo.lock" }}
+          paths:
+            - target
+            - packages/core/target
+      - save_cache:
+          name: Save Pnpm Package Cache
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
+          paths:
+            - node_modules
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -180,7 +177,6 @@ jobs:
           chmod -R a+x node_modules
       - run: pnpm build-linux-x64
       - run: pnpm lint
-      - run: pnpm check-bundle
       - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
