@@ -4,7 +4,8 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 import Unocss from "unocss/vite";
-import { unocssConfig } from "@gd/config";
+// TODO: fix the import @gd/config problem
+import { unocssConfig } from "../config/unocssConfig";
 
 export default defineConfig({
   plugins: [

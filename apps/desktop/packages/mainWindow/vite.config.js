@@ -4,9 +4,8 @@ import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
 import pkg from "../../package.json";
-// import unocssConfig from "../../../../packages/config/unocssConfig";
-import { unocssConfig } from "@gd/config";
-// import unocssConfig from "@gd/config/unocssConfig";
+// TODO: fix the import @gd/config problem
+import { unocssConfig } from "../../../../packages/config/unocssConfig";
 
 /**
  * @see https://vitejs.dev/config/
