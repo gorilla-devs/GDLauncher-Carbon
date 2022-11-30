@@ -45,8 +45,8 @@ jobs:
                 chmod -R a+x node_modules
             - run: pnpm build-mac-x64
             - run: pnpm lint
-            - run: pnpm test
             - run: pnpm check-bundle
+            - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -101,8 +101,8 @@ jobs:
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm lint
-      - run: pnpm test
       - run: pnpm check-bundle
+      - run: pnpm test
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -142,8 +142,8 @@ jobs:
           chmod -R a+x node_modules
       - run: pnpm build-linux-x64-test
       - run: pnpm lint
-      - run: pnpm test
       - run: pnpm check-bundle
+      - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}
@@ -177,8 +177,8 @@ jobs:
           chmod -R a+x node_modules
       - run: pnpm build-linux-x64
       - run: pnpm lint
-      - run: pnpm test
       - run: pnpm check-bundle
+      - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}
