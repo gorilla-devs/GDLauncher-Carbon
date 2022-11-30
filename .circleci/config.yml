@@ -105,13 +105,6 @@ jobs:
             node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
-            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
-                cargo generate-lockfile
-            }
-      - run:
-          command: |
-            node -v
-            cargo --version
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
