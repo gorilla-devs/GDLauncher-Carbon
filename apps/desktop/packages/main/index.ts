@@ -14,7 +14,6 @@ import {
 } from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
-import { autoUpdater } from "electron-updater";
 import "./preloadListeners";
 
 // Disable GPU Acceleration for Windows 7
@@ -132,7 +131,7 @@ async function createWindow() {
   );
 
   // Handlers
-  ipcMain.handle("getMinimumBounds", async (e) => {
+  ipcMain.handle("getMinimumBounds", async () => {
     return getMinimumBounds();
   });
 
@@ -142,7 +141,9 @@ async function createWindow() {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
-    const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${import.meta.env.VITE_DEV_MAIN_WINDOW_PORT}`;
+    const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${
+      import.meta.env.VITE_DEV_MAIN_WINDOW_PORT
+    }`;
 
     win.loadURL(url, {
       userAgent: "GDLauncher Carbon",

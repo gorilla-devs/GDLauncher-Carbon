@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 import fs from "fs";
-import {
-  clickMenuItemById,
-  ipcMainCallFirstListener,
-  ipcRendererCallFirstListener,
-  ipcMainInvokeHandler,
-  ipcRendererInvoke,
-} from "electron-playwright-helpers";
+// import {
+//   clickMenuItemById,
+//   ipcMainCallFirstListener,
+//   ipcRendererCallFirstListener,
+//   ipcMainInvokeHandler,
+//   ipcRendererInvoke,
+// } from "electron-playwright-helpers";
 import { version } from "../package.json";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
@@ -62,8 +62,6 @@ test.describe("Init Tests", () => {
 
     const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
-
-
   });
 
   test.afterAll(async () => {

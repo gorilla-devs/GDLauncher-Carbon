@@ -34,6 +34,12 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "core.node"],
       "cache": false
+    },
+    "lint": {
+      "cache": false
+    },
+    "check-bundle": {
+      "cache": false
     }
   },
   "globalDependencies": [".env"]

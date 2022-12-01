@@ -3,7 +3,13 @@ use std::path::PathBuf;
 use anyhow::{bail, Result};
 use tokio::process::Command;
 
-use crate::{utils::{PATH_SEPARATOR, locate_java_check_class, JAVA_CHECK_APP_NAME, parse_java_version, parse_java_arch}, JavaComponent};
+use crate::{
+    utils::{
+        locate_java_check_class, parse_java_arch, parse_java_version, JAVA_CHECK_APP_NAME,
+        PATH_SEPARATOR,
+    },
+    JavaComponent,
+};
 
 async fn load_java_paths_from_env() -> Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH")?;

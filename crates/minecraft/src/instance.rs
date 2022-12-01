@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::modloaders::{Modloader, forge::ForgeModloader, vanilla::VanillaModLoader};
+use crate::modloaders::{forge::ForgeModloader, vanilla::VanillaModLoader, Modloader};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JavaMemoryOverride {
@@ -21,5 +21,4 @@ pub struct Instance {
     custom_lwjgl: Option<String>,
 }
 
-impl Instance {
-}
+impl Instance {}
