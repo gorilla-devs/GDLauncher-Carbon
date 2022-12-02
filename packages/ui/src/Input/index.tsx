@@ -42,6 +42,7 @@ function Input(props: Props) {
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
+          // eslint-disable-next-line solid/reactivity
           onInput={props.onInput}
         />
       </div>

@@ -41,6 +41,7 @@ function Button(props: Props) {
           isGlow() && !isDisabled(),
         "bg-black-gray text-black-lightGray": isGlow() && isDisabled(),
       }}
+      // eslint-disable-next-line solid/reactivity
       onClick={props.onClick}
     >
       <Show when={props.icon}>{props.icon}</Show>
