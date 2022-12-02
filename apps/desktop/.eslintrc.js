@@ -6,7 +6,7 @@ module.exports = {
   },
   overrides: [],
   rules: {
-    "prettier/prettier": "error",
+    "prettier/prettier": ["error", { endOfLine: "lf" }],
   },
   parser: "@typescript-eslint/parser",
   plugins: ["solid", "prettier"],
