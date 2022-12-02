@@ -1,15 +1,14 @@
 import { children, Show } from "solid-js";
-import styles from "./Button.module.scss";
 
 interface Props {
   children: HTMLElement | string;
   class?: string;
   type?: string;
   disabled?: boolean;
-  icon?: JSX.Element | Element | any;
+  icon?: Element | any;
   iconRight?: boolean;
   onClick?: () => void;
-};
+}
 
 function Button(props: Props) {
   const c = children(() => props.children);

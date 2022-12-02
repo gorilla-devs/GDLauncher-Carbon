@@ -6,9 +6,9 @@ interface Props {
   error?: string;
   disabled?: boolean;
   class?: string;
-  icon?: JSX.Element | Element | any;
-  onInput?: (e: InputEvent) => void;
-};
+  icon?: Element | any;
+  onInput?: () => void;
+}
 
 function Input(props: Props) {
   const mergedProps = mergeProps({ props: "" }, props);

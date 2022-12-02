@@ -3,7 +3,7 @@ interface Props {
   icon?: string;
   onClick?: () => void;
   disabled?: boolean;
-};
+}
 
 export const CodeInput = (props: Props) => {
   return (
