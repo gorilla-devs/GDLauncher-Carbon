@@ -20,5 +20,5 @@ const Template = ((args) => <Carousel {...args} />) as StoryFn<
 export const Main = Template.bind({});
 
 Main.args = {
-  title: "Recent Played"
+  title: "Recent Played",
 };

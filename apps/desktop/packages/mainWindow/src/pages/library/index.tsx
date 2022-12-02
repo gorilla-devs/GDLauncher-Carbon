@@ -1,4 +1,3 @@
-import { Carousel } from "@/components/Carousel";
 import Page from "@/components/Page";
 import RecentPlayed from "@/components/Carousel/RecentPlayed";
 import "./index.css";
@@ -9,7 +8,7 @@ const Home = () => {
     <Page class="bg-black-black p-6 noScroll overflow-auto">
       <div>
         {/* TODO: News component */}
-        <div class="h-39 bg-green-400 rounded-lg"></div>
+        <div class="h-39 bg-green-400 rounded-lg" />
         <div class="mt-4">
           <RecentPlayed />
         </div>

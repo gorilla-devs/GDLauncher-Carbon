@@ -8,7 +8,7 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 interface Props {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
-};
+}
 
 const Auth = (props: Props) => {
   const navigate = useNavigate();

@@ -1,12 +1,12 @@
 import { routes } from "@/routes";
 import { useLocation } from "@solidjs/router";
-import {  Setter, Show } from "solid-js";
+import { Setter, Show } from "solid-js";
 import Library from "./contents/Library";
 
 interface Props {
   setSidebarCollapsed: Setter<boolean>;
   collapsed: boolean;
-};
+}
 
 const getContent = (location: string) => {
   const currentRoute = routes.find(

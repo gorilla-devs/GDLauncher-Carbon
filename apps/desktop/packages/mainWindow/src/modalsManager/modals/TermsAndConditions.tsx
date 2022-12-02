@@ -1,5 +1,3 @@
-import ModalLayout from "../ModalLayout";
-
 const TermsAndConditions = () => {
   return <div>TermsAndConditions</div>;
 };

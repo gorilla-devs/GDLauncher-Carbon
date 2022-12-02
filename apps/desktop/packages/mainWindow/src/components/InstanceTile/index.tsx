@@ -9,6 +9,7 @@ const InstanceTile = (props: Props) => {
   return (
     <div
       class="flex flex-col justify-center items-start cursor-pointer"
+      // eslint-disable-next-line solid/reactivity
       onClick={props.onClick}
     >
       <div class="h-38 w-38 bg-green-600 rounded-2xl" />

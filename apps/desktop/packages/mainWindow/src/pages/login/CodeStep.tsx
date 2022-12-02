@@ -2,7 +2,7 @@ import { Button, CodeInput } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 // import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 // import { accounts, login } from "@/modules/components/accounts";
 import { addNotification } from "@/notificationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
@@ -27,7 +27,7 @@ const CodeStep = (props: Props) => {
   };
 
   const userCode = () => props.deviceCodeObject?.userCode;
-  const oldUserCode = props.deviceCodeObject?.userCode;
+  const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
   const expiresAtMs = () => expiresAt() - Date.now();
@@ -52,6 +52,7 @@ const CodeStep = (props: Props) => {
     }
   };
 
+  // eslint-disable-next-line no-undef
   let interval: NodeJS.Timer;
 
   createEffect(() => {
@@ -73,7 +74,7 @@ const CodeStep = (props: Props) => {
   });
 
   createEffect(() => {
-    if (userCode() !== oldUserCode) {
+    if (userCode() !== oldUserCode()) {
       resetCountDown();
     }
   });
@@ -89,7 +90,7 @@ const CodeStep = (props: Props) => {
             disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
-              navigator.clipboard.writeText(userCode() || "")
+              navigator.clipboard.writeText(userCode() || "");
               addNotification("The link has been copied");
             }}
           />

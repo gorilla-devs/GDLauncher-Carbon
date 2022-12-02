@@ -1,5 +1,3 @@
-import { createSignal, For } from "solid-js";
-import InstanceTile from "../InstanceTile";
 import "./index.css";
 
 interface Props {
@@ -11,11 +9,11 @@ interface Props {
 const Carousel = (props: Props) => {
   // const [currentSlide, setCurrentSlide] = createSignal(MockCarousel[0]);
 
-  const handleScroll = (direction: string) => {
-    // TODO: scroll on click
-    // const isLeft = direction === "left";
-    // const element = document.getElementById("content");
-  };
+  // const handleScroll = () => {
+  // TODO: scroll on click
+  // const isLeft = direction === "left";
+  // const element = document.getElementById("content");
+  // };
 
   return (
     <div class="flex flex-col w-full">
@@ -24,13 +22,13 @@ const Carousel = (props: Props) => {
         <div class="h-full flex gap-4">
           <div
             class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
-            onClick={() => handleScroll("left")}
+            // onClick={() => handleScroll("left")}
           >
             <div class="i-ri:arrow-drop-left-line text-4xl" />
           </div>
           <div
             class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
-            onClick={() => handleScroll("rigth")}
+            // onClick={() => handleScroll("rigth")}
           >
             <div class="i-ri:arrow-drop-right-line text-4xl" />
           </div>

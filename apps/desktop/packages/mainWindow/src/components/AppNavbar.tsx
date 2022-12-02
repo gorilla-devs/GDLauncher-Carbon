@@ -57,7 +57,7 @@ const AppNavbar = (props: Props) => {
             />
             <div class="i-ri:notification-2-fill text-black-lightGray text-2xl cursor-pointer" />
           </div>
-          <div class="w-40 h-10 bg-black-semiblack"></div>
+          <div class="w-40 h-10 bg-black-semiblack" />
         </div>
       </nav>
     </Show>

@@ -30,7 +30,10 @@ export default function Login() {
             <Auth setStep={setStep} setDeviceCodeObject={setDeviceCodeObject} />
           </Match>
           <Match when={step() === 1}>
-            <CodeStep deviceCodeObject={deviceCodeObject()} setDeviceCodeObject={setDeviceCodeObject}/>
+            <CodeStep
+              deviceCodeObject={deviceCodeObject()}
+              setDeviceCodeObject={setDeviceCodeObject}
+            />
           </Match>
         </Switch>
       </div>
