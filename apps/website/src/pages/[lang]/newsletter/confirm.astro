@@ -18,17 +18,17 @@ const t = useTranslations(Astro.url.pathname);
 />
 
 <BasicLayout>
-  <div class="flex justify-center flex-col items-center pt-20 lg:pt-26 px-10 h-screen overflow-hidden gap-5 lg:gap-auto">
+  <div class="flex max-h-screen justify-center flex-col items-center pt-20 lg:pt-26 px-10 h-screen overflow-hidden gap-5 lg:gap-auto">
     <h1
       class="flex flex-col lg:block text-4xl lg:text-7xl font-bold text-center max-w-[1000px]"
     >
       {t("newsletter.confirm.title")}
     </h1>
-    <div class="h-full">
+    <div class="h-full max-h-[600px]">
       <img
         src={composeCDNAssetLink("gorilla_email.jpg")}
         alt="logo"
-        class="w-full"
+        class="h-full"
       />
     </div>
   </div>
