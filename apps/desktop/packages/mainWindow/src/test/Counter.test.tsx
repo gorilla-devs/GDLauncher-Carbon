@@ -1,6 +1,4 @@
-import { describe, expect, test, assert } from "vitest";
-import { fireEvent, render } from 'solid-testing-library';
-import { Counter } from "../components/Counter";
+import { describe, test, assert } from "vitest";
 
 describe("<Counter />", () => {
   test("Sum", () => {

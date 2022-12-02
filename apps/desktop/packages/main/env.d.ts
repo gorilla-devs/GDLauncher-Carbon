@@ -2,9 +2,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  MODE: string;
+  NODE_ENV: "development" | "production";
+  readonly VITE_DEV_SERVER_HOST: string;
+  readonly VITE_DEV_SERVER_PORT: string;
   VITE_NAPI_ID: string;
-  VITE_POSTHOG_KEY: string;
 }
 
 interface ImportMeta {

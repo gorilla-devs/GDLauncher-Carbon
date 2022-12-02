@@ -1,4 +1,4 @@
-import { Component, createEffect, Suspense } from "solid-js";
+import { Suspense } from "solid-js";
 import { useNavigate, useRouteData } from "@solidjs/router";
 import Page from "@/components/Page";
 

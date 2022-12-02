@@ -50,7 +50,7 @@ function watchNativeCore(mainWindow) {
 
   chokidar
     .watch("../../packages/core/core.node", { ignoreInitial: true })
-    .on("all", (event, path) => {
+    .on("all", (event) => {
       console.log("Reloading app due to native core rebuild", event);
       electronProcess?.kill();
       electronProcess = spawn(electron, ["."], { stdio: "inherit", env });

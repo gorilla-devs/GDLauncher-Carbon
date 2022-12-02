@@ -1,5 +1,5 @@
-pub mod vanilla;
 pub mod forge;
+pub mod vanilla;
 
 type ModLoaderVersion = String;
 pub enum ModLoaderType {

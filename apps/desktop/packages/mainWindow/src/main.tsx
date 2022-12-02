@@ -1,5 +1,5 @@
 /* @refresh reload */
-import { createEffect, onMount } from "solid-js";
+import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";

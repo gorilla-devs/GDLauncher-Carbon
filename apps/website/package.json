@@ -11,7 +11,7 @@
     "check-tsc": "tsc --noEmit",
     "check-eslint": "eslint \"src/**/*.{ts,js,tsx,jsx,astro}\"",
     "fix-eslint": "eslint --fix \"src/**/*.{ts,js,tsx,jsx,astro}\"",
-    "lint": "npm run format && npm run check-astro && npm run check-tsc && npm run check-eslint",
+    "lint": "npm run check-astro && npm run check-tsc && npm run check-eslint",
     "lint-fix": "npm run format && npm run check-astro && npm run check-tsc && npm run fix-eslint",
     "serve": "npm run build -- --config astro.config.node.mjs && node server/index.mjs"
   },

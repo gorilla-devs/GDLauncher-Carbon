@@ -2,7 +2,10 @@ import { useTranslations } from "@/i18n/utils";
 import composeCDNAssetLink from "@/utils/composeCDNAssetLink";
 import { Component } from "solid-js";
 
-const DownloadedSection: Component<{ pathname: string, setIsDownloading: () => void }> = ({ pathname, setIsDownloading }) => {
+const DownloadedSection: Component<{
+  pathname: string;
+  setIsDownloading: () => void;
+}> = ({ pathname, setIsDownloading }) => {
   const t = useTranslations(pathname);
   return (
     <div
@@ -17,7 +20,13 @@ const DownloadedSection: Component<{ pathname: string, setIsDownloading: () => v
             {t("download.downloading")}
           </h3>
           <p class="text-xl mb-12 font-light">
-            {t("download.downloading_text")} <span class="cursor-pointer underline" onclick={() => setIsDownloading()}>{t("download.retry")}</span>
+            {t("download.downloading_text")}{" "}
+            <span
+              class="cursor-pointer underline"
+              onclick={() => setIsDownloading()}
+            >
+              {t("download.retry")}
+            </span>
           </p>
         </div>
         <div>
