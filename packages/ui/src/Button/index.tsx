@@ -7,7 +7,8 @@ interface Props {
   disabled?: boolean;
   icon?: Element | any;
   iconRight?: boolean;
-  onClick?: () => void;
+  /* eslint-disable no-unused-vars */
+  onClick?: (e: MouseEvent) => void;
 }
 
 function Button(props: Props) {
@@ -41,8 +42,7 @@ function Button(props: Props) {
           isGlow() && !isDisabled(),
         "bg-black-gray text-black-lightGray": isGlow() && isDisabled(),
       }}
-      // eslint-disable-next-line solid/reactivity
-      onClick={props.onClick}
+      onClick={(e) => props.onClick?.(e)}
     >
       <Show when={props.icon}>{props.icon}</Show>
       {c()}

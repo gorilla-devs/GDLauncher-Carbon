@@ -7,7 +7,8 @@ interface Props {
   disabled?: boolean;
   class?: string;
   icon?: Element | any;
-  onInput?: () => void;
+  /* eslint-disable no-unused-vars */
+  onInput?: (e: InputEvent) => void;
 }
 
 function Input(props: Props) {
@@ -40,8 +41,7 @@ function Input(props: Props) {
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
-          // eslint-disable-next-line solid/reactivity
-          onInput={props.onInput}
+          onInput={(e: InputEvent) => props?.onInput?.(e)}
         />
       </div>
 
