@@ -1,6 +1,11 @@
 {
   "extends": "@gd/config/tsconfig.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx", "./types.d.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "./types.d.ts",
+    "../../apps/desktop/packages/mainWindow/src/components/Carousels/InstalledInstances.tsx"
+  ],
   "exclude": ["dist/**/*", "node_modules"],
   "compilerOptions": {
     "skipLibCheck": true

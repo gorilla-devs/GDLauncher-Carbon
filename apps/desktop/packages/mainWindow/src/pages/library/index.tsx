@@ -1,7 +1,8 @@
+import InstalledInstances from "@/components/Carousels/InstalledInstances";
+import PopularModpacks from "@/components/Carousels/PopularModpacks";
+import RecentPlayed from "@/components/Carousels/RecentPlayed";
 import Page from "@/components/Page";
-import RecentPlayed from "@/components/Carousel/RecentPlayed";
 import "./index.css";
-import PopularModpacks from "@/components/Carousel/PopularModpacks";
 
 const Home = () => {
   return (
@@ -16,7 +17,7 @@ const Home = () => {
           <PopularModpacks />
         </div>
         <div class="mt-4">
-          <PopularModpacks />
+          <InstalledInstances />
         </div>
       </div>
     </Page>

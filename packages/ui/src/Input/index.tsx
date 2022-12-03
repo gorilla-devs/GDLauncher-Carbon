@@ -1,4 +1,4 @@
-import { mergeProps, Show } from "solid-js";
+import { Show } from "solid-js";
 
 interface Props {
   value?: string | number;
@@ -11,8 +11,6 @@ interface Props {
 }
 
 function Input(props: Props) {
-  const mergedProps = mergeProps({ props: "" }, props);
-
   return (
     <div class="h-10">
       <div
@@ -31,8 +29,8 @@ function Input(props: Props) {
             outline: "none",
           }}
           classList={{
-            "border-status-red": !!mergedProps.error,
-            "border-transparent": !mergedProps.error,
+            "border-status-red": !!props.error,
+            "border-transparent": !props.error,
             "text-black-semiblack": props.disabled,
             "bg-black-semiblack focus-visible:outline-none focus-visible:border-0":
               props.icon,

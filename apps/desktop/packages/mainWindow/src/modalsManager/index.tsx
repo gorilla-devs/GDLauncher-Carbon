@@ -42,7 +42,7 @@ const Modals: Component = () => {
   });
 
   const queryParams = createMemo(() => location.search);
-  const mParam = createMemo(() => new URLSearchParams(queryParams()).get("m"));
+  const mParam = () => new URLSearchParams(queryParams()).get("m");
   const isModal = createMemo(() => mParam() !== null);
 
   const getModal = (type: string) => {

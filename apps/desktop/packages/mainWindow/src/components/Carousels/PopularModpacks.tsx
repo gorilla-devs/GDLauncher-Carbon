@@ -1,7 +1,6 @@
+import { InstanceTile, Carousel } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
-import { Carousel } from ".";
-import InstanceTile from "../InstanceTile";
 
 const MockCarousel = [
   {
@@ -54,11 +53,11 @@ const MockCarousel = [
   },
 ];
 
-const RecentPlayed = () => {
+const PopularModpacks = () => {
   const navigate = useNavigate();
 
   return (
-    <Carousel title="Recent Played">
+    <Carousel title="Your Instances">
       <For each={MockCarousel}>
         {(instance) => (
           <div id={instance.id}>
@@ -75,4 +74,4 @@ const RecentPlayed = () => {
   );
 };
 
-export default RecentPlayed;
+export default PopularModpacks;

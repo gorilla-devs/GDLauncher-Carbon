@@ -22,4 +22,4 @@ const InstanceTile = (props: Props) => {
   );
 };
 
-export default InstanceTile;
+export { InstanceTile };

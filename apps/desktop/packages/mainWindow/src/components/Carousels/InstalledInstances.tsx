@@ -1,7 +1,6 @@
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
-import { Carousel } from ".";
-import InstanceTile from "../InstanceTile";
+import { InstanceTile, Carousel } from "@gd/ui";
 
 const MockCarousel = [
   {
@@ -54,7 +53,7 @@ const MockCarousel = [
   },
 ];
 
-const PopularModpacks = () => {
+const InstalledInstances = () => {
   const navigate = useNavigate();
 
   return (
@@ -75,4 +74,4 @@ const PopularModpacks = () => {
   );
 };
 
-export default PopularModpacks;
+export default InstalledInstances;

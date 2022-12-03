@@ -3,10 +3,10 @@ import presetIcons from "@unocss/preset-icons";
 import { readdirSync, readFileSync } from "fs";
 import presetWind from "@unocss/preset-wind";
 import { presetAttributify } from "unocss";
+// import { theme } from "@gd/ui";
 
 const gdlIcons = () => {
   let icons: { [key: string]: string } = {};
-
   try {
     const iconFiles = readdirSync(path.join(__dirname, "../", "ui", "icons"));
     for (const iconFile of iconFiles) {
