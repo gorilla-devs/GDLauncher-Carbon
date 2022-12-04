@@ -7,7 +7,7 @@ export default {
   component: Button,
   argTypes: {
     type: {
-      options: ["primary", "secondary", "outline"],
+      options: ["primary", "secondary", "outline", "glow"],
       control: { type: "radio" },
     },
   },
