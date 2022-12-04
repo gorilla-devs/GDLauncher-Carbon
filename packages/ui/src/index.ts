@@ -7,5 +7,6 @@ export { CodeInput } from "./CodeInput";
 export { Carousel } from "./Carousel";
 export { InstanceTile } from "./InstanceTile";
 export { Switch } from "./Switch";
+export { Checkbox } from "./Checkbox";
 
 import "virtual:uno.css";

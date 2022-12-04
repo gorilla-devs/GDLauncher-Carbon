@@ -1,7 +1,6 @@
 import style from "./Switch.module.scss";
 
 interface Props {
-  class?: string;
   checked?: boolean;
   disabled?: boolean;
   /* eslint-disable no-unused-vars */

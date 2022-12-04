@@ -5,7 +5,6 @@ import type { ComponentProps } from "solid-js";
 export default {
   title: "Switch",
   component: Switch,
-  argTypes: {},
 };
 
 const Template = ((args) => <Switch {...args} />) as StoryFn<
