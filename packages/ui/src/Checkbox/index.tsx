@@ -19,8 +19,9 @@ function Checkbox(props: Props) {
         props.onChange?.(!checked());
       }}
     >
+      // TODO: Add animation on click
       <Show when={checked()}>
-        <div class="i-ri:check-line text-white animate-bouncescale" />
+        <div class="i-ri:check-line text-white animate-bounce-scale" />
       </Show>
     </div>
   );
