@@ -1,7 +1,7 @@
 import { Component, createSignal, Show } from "solid-js";
 import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
-import { Pattern } from "@gd/ui";
+import { BackgroundPattern } from "@gd/ui";
 import { routes } from "./routes";
 import AppNavbar from "./components/AppNavbar";
 import Sidebar from "./components/Sidebar";
@@ -87,7 +87,7 @@ const App: Component = () => {
           <AdsBanner />
         </Show>
         <Show when={location.pathname !== "/"}>
-          <Pattern class="absolute top-0 left-0 right-0 bottom-0" />
+          <BackgroundPattern class="absolute top-0 left-0 right-0 bottom-0" />
         </Show>
       </div>
       <Notifications />

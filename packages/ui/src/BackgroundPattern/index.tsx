@@ -2,8 +2,8 @@ interface Props {
   class?: string;
 }
 
-export const Pattern = (props: Props) => {
+export const BackgroundPattern = (props: Props) => {
   return <div class={`bg-image-gdlauncher_pattern.svg -z-10 ${props.class}`} />;
 };
 
-export default Pattern;
+export default BackgroundPattern;
