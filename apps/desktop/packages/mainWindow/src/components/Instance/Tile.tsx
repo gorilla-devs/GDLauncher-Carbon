@@ -5,7 +5,7 @@ interface Props {
   onClick?: () => void;
 }
 
-const InstanceTile = (props: Props) => {
+const Tile = (props: Props) => {
   return (
     <div
       class="flex flex-col justify-center items-start cursor-pointer"
@@ -22,4 +22,4 @@ const InstanceTile = (props: Props) => {
   );
 };
 
-export { InstanceTile };
+export default Tile;

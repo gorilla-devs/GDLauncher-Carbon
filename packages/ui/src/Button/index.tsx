@@ -13,7 +13,7 @@ interface Props {
 
 const getStateClasses = (type: string, disabled: boolean) => {
   const isDisabled = () => disabled;
-  const isPrimary = () => type === "primary" || !props.type;
+  const isPrimary = () => type === "primary" || !type;
   const isOutline = () => type === "outline";
   const isSecondary = () => type === "secondary";
   const isGlow = () => type === "glow";
