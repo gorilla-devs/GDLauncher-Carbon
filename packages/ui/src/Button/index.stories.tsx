@@ -17,10 +17,10 @@ const Template = ((args) => <Button {...args} />) as StoryFn<
   ComponentProps<typeof Button>
 >;
 
-export const Disabled = Template.bind({});
+export const Primary = Template.bind({});
 
-Disabled.args = {
-  disabled: true,
+Primary.args = {
+  disabled: false,
   type: "primary",
   children: "Click Here",
 };
