@@ -15,4 +15,5 @@ export const Checked = Template.bind({});
 
 Checked.args = {
   checked: true,
+  disabled: false,
 };
