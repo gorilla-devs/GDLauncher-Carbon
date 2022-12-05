@@ -17,5 +17,15 @@ const theme = {
       green: "#29A335",
     },
   },
+  // TODO: check how to implement animations in unocss
+  keyframes: {
+    bouncescale: {
+      "0%": { transform: "scale(0)" },
+      "100%": { transform: "scale(1)" },
+    },
+  },
+  animation: {
+    "bounce-scale": "bouncescale 1s ease-in-out infinite",
+  },
 };
 export { theme };

@@ -7,7 +7,7 @@ export default {
   component: Button,
   argTypes: {
     type: {
-      options: ["primary", "secondary", "outline"],
+      options: ["primary", "secondary", "outline", "glow"],
       control: { type: "radio" },
     },
   },
@@ -17,10 +17,10 @@ const Template = ((args) => <Button {...args} />) as StoryFn<
   ComponentProps<typeof Button>
 >;
 
-export const Disabled = Template.bind({});
+export const Primary = Template.bind({});
 
-Disabled.args = {
-  disabled: true,
+Primary.args = {
+  disabled: false,
   type: "primary",
   children: "Click Here",
 };
