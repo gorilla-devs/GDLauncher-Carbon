@@ -7,7 +7,7 @@ import Settings from "./components/Sidebar/contents/Settings";
 type CustomRouteDefinition = RouteDefinition & {
   component?: () => JSX.Element;
   sidebarComponent?: () => JSX.Element;
-  // you can show or hiden a route in the navbar by setting it to true/false
+  // you can show or hide a route in the navbar by setting it to true/false
   visibileInNavbar?: boolean;
   // solid router also support multiple path, so path by default can be also string[] https://github.com/solidjs/solid-router#multiple-paths
   // we are overriding it for sake of semplicity because we are not gonna use (at least for now) multiple paths

@@ -2,7 +2,6 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import {
   Component,
   createEffect,
-  createMemo,
   createSignal,
   JSX,
   lazy,
@@ -43,7 +42,7 @@ const Modals: Component = () => {
 
   const queryParams = () => location.search;
   const mParam = () => new URLSearchParams(queryParams()).get("m");
-  const isModal = createMemo(() => mParam() !== null);
+  const isModal = () => mParam() !== null;
 
   const getModal = (type: string) => {
     const Component = () => modals[type]?.component;
