@@ -2,7 +2,6 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import {
   Component,
   createEffect,
-  createMemo,
   createSignal,
   JSX,
   lazy,
