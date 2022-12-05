@@ -6,6 +6,7 @@ interface Props {
   error?: string;
   disabled?: boolean;
   class?: string;
+  inputClass?: string;
   icon?: Element | any;
   /* eslint-disable no-unused-vars */
   onInput?: (e: InputEvent) => void;
@@ -15,29 +16,28 @@ function Input(props: Props) {
   return (
     <div class="h-10">
       <div
-        class="bg-black-black flex items-center gap-2 max-w-max h-full"
-        classList={{
-          "bg-black-semiblack rounded-full px-4": props.icon,
-          "rounded-md": !props.icon,
-        }}
+        class={`bg-black-black flex items-center gap-2 max-w-max h-full ${
+          props.icon ? "bg-black-semiblack rounded-full px-4" : "rounded-md"
+        } ${props.class || ""}`}
       >
-        <span class="text-black-gray">{props.icon}</span>
+        <Show when={props.icon}>
+          <span class="text-black-gray">{props.icon}</span>
+        </Show>
         <input
           class={`bg-black-black border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-black-gray ${
-            props.class || ""
-          }`}
+            props.inputClass || ""
+          }
+           ${props.error ? "border-status-red" : ""}
+           ${props.disabled ? "text-black-semiblack" : "text-white"}
+           ${
+             props.icon
+               ? "bg-black-semiblack focus-visible:outline-none focus-visible:border-0"
+               : "px-4 focus-visible:outline-black-gray hover:border-black-gray active:border-black-gray"
+           }
+          
+          `}
           style={{
             outline: "none",
-          }}
-          classList={{
-            "border-status-red": !!props.error,
-            "border-transparent": !props.error,
-            "text-black-semiblack": props.disabled,
-            "bg-black-semiblack focus-visible:outline-none focus-visible:border-0":
-              props.icon,
-            "text-white": !props.disabled,
-            "px-4 focus-visible:outline-black-gray withIcon": !props.icon,
-            "hover:border-black-gray active:border-black-gray": !props.icon,
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
