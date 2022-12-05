@@ -3,7 +3,7 @@ import { UIDictionaryKeys, useTranslations } from "@/i18n/utils";
 import { createEffect, createSignal, For } from "solid-js";
 import Caret from "../Icons/CaretIcon";
 
-type Props = {
+interface Props {
   children?: HTMLElement | string;
   class?: string;
   pathname: string;

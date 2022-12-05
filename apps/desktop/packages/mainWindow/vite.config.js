@@ -3,9 +3,9 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
-import presetAttributify from "@unocss/preset-attributify";
-import presetWind from "@unocss/preset-wind";
 import pkg from "../../package.json";
+// TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
+import { unocssConfig } from "../../../../packages/config/unocssConfig";
 
 /**
  * @see https://vitejs.dev/config/
@@ -13,41 +13,7 @@ import pkg from "../../package.json";
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [
-    solidPlugin(),
-    Unocss({
-      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
-      presets: [
-        presetAttributify({
-          prefix: "uno:",
-          prefixedOnly: true,
-        }),
-        presetWind(),
-      ],
-      rules: [
-        [
-          /^bg-image-(.*)$/,
-          ([a, d]) => {
-            let img = d.split("-")[0];
-            let extension = a.split(".")[1];
-            const isSvg = extension === "svg";
-            return {
-              background: `url('./${
-                process.env.NODE_ENV === "development" ? "assets/" : ""
-              }images/${isSvg ? img : `${img}.jpg`}')`,
-              "background-size": "100% 100%",
-              "background-repeat": "no-repeat",
-              "box-sizing": "border-box",
-            };
-          },
-        ],
-      ],
-      theme: {
-        colors: {},
-      },
-    }),
-    ViteMinifyPlugin({}),
-  ],
+  plugins: [solidPlugin(), Unocss(unocssConfig), ViteMinifyPlugin({})],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   build: {
@@ -55,14 +21,6 @@ export default defineConfig({
     emptyOutDir: true,
     outDir: "../../dist/mainWindow",
     sourcemap: true,
-    rollupOptions: {
-      output: {
-        // Prevent vendor.js being created
-        minifyInternalExports: true,
-        compact: true,
-        // chunkFileNames: "assets/[hash].js",
-      },
-    },
   },
   resolve: {
     alias: {

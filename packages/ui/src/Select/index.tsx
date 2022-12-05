@@ -1,9 +1,9 @@
 import { children } from "solid-js";
 import styles from "./Select.module.scss";
 
-type Props = {
+interface Props {
   children: HTMLElement | string;
-};
+}
 
 function Select(props: Props) {
   const c = children(() => props.children);

@@ -1,21 +1,64 @@
-import { lazy } from "solid-js";
-import type { RouteDefinition } from "@solidjs/router";
+import { JSX, lazy } from "solid-js";
+import { RouteDefinition } from "@solidjs/router";
 import AboutData from "./pages/about.data";
+import Modpacks from "./components/Sidebar/contents/Modpacks";
+import Settings from "./components/Sidebar/contents/Settings";
+
+type CustomRouteDefinition = RouteDefinition & {
+  component?: () => JSX.Element;
+  sidebarComponent?: () => JSX.Element;
+  // you can show or hide a route in the navbar by setting it to true/false
+  visibileInNavbar?: boolean;
+  // solid router also support multiple path, so path by default can be also string[] https://github.com/solidjs/solid-router#multiple-paths
+  // we are overriding it for sake of semplicity because we are not gonna use (at least for now) multiple paths
+  path: string;
+  label?: string;
+  children?: CustomRouteDefinition[];
+};
 
 /* Defining the routes for the application. */
-export const routes: RouteDefinition[] = [
+export const routes: CustomRouteDefinition[] = [
   {
     path: "/",
-    component: lazy(() => import("./pages/auth")),
+    component: lazy(() => import("./pages/login")),
   },
   {
-    path: "/home",
-    component: lazy(() => import("./pages/home")),
+    label: "Library",
+    visibileInNavbar: true,
+    path: "/library",
+    children: [
+      {
+        path: "/",
+        component: lazy(() => import("./pages/library")),
+      },
+      {
+        path: "/:id",
+        component: lazy(() => import("./pages/library/instance")),
+      },
+    ],
   },
   {
-    path: "/about",
-    component: lazy(() => import("./pages/about")),
+    label: "Modpacks",
+    visibileInNavbar: true,
+    path: "/modpacks",
     data: AboutData,
+    sidebarComponent: Modpacks,
+    children: [
+      {
+        path: "/",
+        component: lazy(() => import("./pages/modpacks")),
+      },
+      {
+        path: "/:id",
+        component: lazy(() => import("./pages/modpacks/modpack")),
+        sidebarComponent: Modpacks,
+      },
+    ] as CustomRouteDefinition[],
+  },
+  {
+    path: "/settings",
+    component: lazy(() => import("./pages/settings")),
+    sidebarComponent: Settings,
   },
   {
     path: "**",

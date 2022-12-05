@@ -2,12 +2,12 @@ export default {
   "generic.donate": "Donate to GDLauncher",
   "generic.donate_kofi_title": "Donate on Ko-fi",
   "generic.donate_kofi_text":
-    "Consider supporting the development of the GDLauncher. Even a dollar helps!",
+    "Consider supporting the development of GDLauncher. Even a dollar helps!",
   "generic.learn_more": "Learn More",
   "generic.getAServer": "Get a Server",
   "generic.partners": "Partners",
   "generic.partner.text":
-    "Consider supporting the development of the GDLauncher. Using our partner's services",
+    "Consider supporting the development of GDLauncher. Using our partner's services",
   "generic.reportIssues": "Report issues",
   "generic.reportAnIssue": "Report an issue",
   "generic.reportIssues_text":
@@ -37,7 +37,7 @@ export default {
   "home.features": "Features",
   "home.donate_title": "Donate to GDLauncher",
   "home.donate_text":
-    "Consider supporting the development of the GDLauncher. Even a dollar helps!",
+    "Consider supporting the development of GDLauncher. Even a dollar helps!",
   "home.features_subitle": "See what makes GDLauncher so special.",
   "features.curseforgeIntegration": "Curseforge Integrations",
   "features.modsManager": "Build-In Mods Manager",

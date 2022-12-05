@@ -1,8 +1,10 @@
 import path, { resolve } from "path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
-import Unocss from "unocss/vite";
 import dts from "vite-plugin-dts";
+import Unocss from "unocss/vite";
+// TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
+import { unocssConfig } from "../config/unocssConfig";
 
 export default defineConfig({
   plugins: [
@@ -10,8 +12,8 @@ export default defineConfig({
       insertTypesEntry: false,
       tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
-    Unocss(),
     solidPlugin(),
+    Unocss(unocssConfig),
   ],
   test: {
     globals: true,

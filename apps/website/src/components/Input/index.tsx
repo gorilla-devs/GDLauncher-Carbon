@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 
-type Props = {
+interface Props {
   class?: string;
   type?: string;
   placeholder?: string;

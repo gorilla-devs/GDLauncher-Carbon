@@ -3,7 +3,7 @@ import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import App from "./app";
-import Modals from "./Modals";
+import Modals from "./ModalsManager";
 import initAnalytics from "./utils/analytics";
 import { initModules } from "./modules";
 import "virtual:uno.css";

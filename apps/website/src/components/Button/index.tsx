@@ -1,6 +1,6 @@
 import { children, JSX } from "solid-js";
 
-type Props = {
+interface Props {
   children: HTMLElement | string | JSX.Element;
   class?: string;
   style?: any;
