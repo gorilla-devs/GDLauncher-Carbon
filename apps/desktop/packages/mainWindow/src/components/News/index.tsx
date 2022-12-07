@@ -1,5 +1,4 @@
 import { createEffect, createSignal, For, onCleanup } from "solid-js";
-// import { styled } from "solid-styled-components";
 
 interface slideProps {
   image: string;
@@ -14,14 +13,6 @@ interface sliderProps {
   disableRedirect?: boolean;
   alignment?: string;
   onClick?: any;
-}
-
-interface selectNewsProps {
-  slides: slideProps[];
-  height?: number;
-  onChange?: any;
-  setCurrentImageIndex: any;
-  currentImageIndex: number;
 }
 
 interface carouselProps {
@@ -43,23 +34,13 @@ interface carouselProps {
 
 const Slider = (props: sliderProps) => {
   createEffect(() => {
-    console.log("Slider", props.currentImageIndex);
+    console.log("Slider");
   });
   return (
-    <div
-      class="flex"
-      style={{
-        transform: `translate3d(
-        ${-100 * (props.currentImageIndex || 0)}%,
-        0,
-        0
-      )`,
-        transition: "transform 0.3s ease-in-out",
-      }}
-    >
+    <div id="slider" class="flex">
       <For each={props.slides}>
         {(slide) => (
-          <div class="min-h-80 min-w-185 flex justify-center items-center bg-red-300">
+          <div class="absolute inset-0 transition-all transform min-h-80 min-w-185 flex justify-center items-center bg-red-300 hidden">
             <h2>{slide.title}</h2>
           </div>
         )}
@@ -70,49 +51,84 @@ const Slider = (props: sliderProps) => {
 
 const News = (props: carouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(0);
-
   let intervaL: any;
 
-  //   createEffect(() => {
-  //     intervaL = setInterval(() => {
-  //       //   const isNotLastElement = rtl
-  //       //     ? currentImageIndex < slides.length - 1
-  //       //     : currentImageIndex > 0;
-  //       const isNotLastElement = currentImageIndex() < props.slides.length - 1;
+  createEffect(() => {
+    intervaL = setInterval(() => {
+      changeSlide("right");
+    }, 5000);
+  });
 
-  //       if (isNotLastElement) {
-  //         setCurrentImageIndex(currentImageIndex() + 1);
-  //       } else setCurrentImageIndex(0);
-  //     }, 5000);
-  //   });
+  const slideInto = (slides: HTMLCollection, position: number) => {
+    const left = () =>
+      position === 0 ? slides[slides.length - 1] : slides[position - 1];
+    const middle = () => slides[position];
+    const right = () =>
+      position === slides.length - 1 ? slides[0] : slides[position + 1];
+
+    console.log("slideInto", position, left(), middle(), right());
+    for (let slide of slides) {
+      slide.classList.add("hidden");
+    }
+    left().classList.remove(
+      "-translate-x-full",
+      "translate-x-full",
+      "translate-x-0",
+      "hidden",
+      "z-20"
+    );
+    left().classList.add("-translate-x-full", "z-10");
+    middle().classList.remove(
+      "-translate-x-full",
+      "translate-x-full",
+      "translate-x-0",
+      "hidden",
+      "z-10"
+    );
+    middle().classList.add("translate-x-0", "z-20");
+    right().classList.remove(
+      "-translate-x-full",
+      "translate-x-full",
+      "translate-x-0",
+      "hidden",
+      "z-20"
+    );
+    right().classList.add("translate-x-full", "z-10");
+    setCurrentImageIndex(position);
+  };
 
   const changeSlide = (direction: string) => {
     const right = direction === "right";
+
+    const slides = document.getElementById("slider")?.children;
 
     const isNotLastElement = right
       ? currentImageIndex() < props.slides.length - 1
       : currentImageIndex() > 0;
 
-    console.log("TEST", direction, isNotLastElement);
-
+    if (!slides) return;
     if (isNotLastElement) {
-      if (right) setCurrentImageIndex(currentImageIndex() + 1);
-      else setCurrentImageIndex(currentImageIndex() - 1);
-    } else setCurrentImageIndex(right ? 0 : props.slides.length - 1);
+      slideInto(
+        slides,
+        right ? currentImageIndex() + 1 : currentImageIndex() - 1
+      );
+    } else {
+      slideInto(slides, right ? 0 : props.slides.length - 1);
+    }
   };
 
   onCleanup(() => clearInterval(intervaL));
 
   return (
-    <div class="h-80 w-185 bg-green-400 rounded-lg relative overflow-hidden">
+    <div class="h-80 w-185 bg-green-400 rounded-lg relative overflow-hidden relative">
       <div
-        class="h-7 w-7 bg-black-black rounded-full absolute left-0 flex justify-center items-center cursor-pointer z-10"
+        class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
         onClick={() => changeSlide("left")}
       >
         <div class="i-ri:arrow-drop-left-line text-3xl" />
       </div>
       <div
-        class="h-7 w-7 bg-black-black rounded-full absolute right-0 flex justify-center items-center cursor-pointer z-10"
+        class="h-7 w-7 bg-black-black rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
         onClick={() => changeSlide("right")}
       >
         <div class="i-ri:arrow-drop-right-line text-3xl" />
