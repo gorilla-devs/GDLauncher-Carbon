@@ -16,7 +16,6 @@ interface sliderProps {
 }
 
 interface carouselProps {
-  style?: any;
   slides: slideProps[];
   speed?: number;
   rtl?: boolean;
@@ -24,23 +23,14 @@ interface carouselProps {
   showArrows?: boolean;
   showSelectMenu?: boolean;
   disableRedirect?: boolean;
-  borderRadius?: number;
-  height?: number;
-  // width,
-  alignment?: string;
-  onChange?: any;
-  onClick?: any;
 }
 
 const Slider = (props: sliderProps) => {
-  createEffect(() => {
-    console.log("Slider");
-  });
   return (
     <div id="slider" class="flex">
       <For each={props.slides}>
         {(slide) => (
-          <div class="absolute inset-0 transition-all transform min-h-80 min-w-185 flex justify-center items-center bg-red-300 hidden">
+          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center bg-red-300 hidden">
             <h2>{slide.title}</h2>
           </div>
         )}
@@ -56,8 +46,10 @@ const News = (props: carouselProps) => {
   createEffect(() => {
     intervaL = setInterval(() => {
       changeSlide("right");
-    }, 5000);
+    }, props.speed || 5000);
   });
+
+  onCleanup(() => clearInterval(intervaL));
 
   const slideInto = (slides: HTMLCollection, position: number) => {
     const left = () =>
@@ -66,7 +58,6 @@ const News = (props: carouselProps) => {
     const right = () =>
       position === slides.length - 1 ? slides[0] : slides[position + 1];
 
-    console.log("slideInto", position, left(), middle(), right());
     for (let slide of slides) {
       slide.classList.add("hidden");
     }
@@ -97,7 +88,7 @@ const News = (props: carouselProps) => {
     setCurrentImageIndex(position);
   };
 
-  const changeSlide = (direction: string) => {
+  const changeSlide = (direction: "right" | "left") => {
     const right = direction === "right";
 
     const slides = document.getElementById("slider")?.children;
@@ -117,10 +108,8 @@ const News = (props: carouselProps) => {
     }
   };
 
-  onCleanup(() => clearInterval(intervaL));
-
   return (
-    <div class="h-80 w-185 bg-green-400 rounded-lg relative overflow-hidden relative">
+    <div class="h-80 bg-green-400 rounded-lg relative overflow-hidden relative">
       <div
         class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
         onClick={() => changeSlide("left")}
