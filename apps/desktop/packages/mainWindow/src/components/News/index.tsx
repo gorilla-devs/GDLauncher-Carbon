@@ -38,8 +38,11 @@ const Slider = (props: sliderProps) => {
     <div id="slider" class="flex">
       <For each={props.slides}>
         {(slide) => (
-          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center bg-red-300 hidden">
-            <h2>{slide.title}</h2>
+          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center bg-red-300 hidden box-border translate">
+            <div class="flex flex-col">
+              <h2 class="mb-0">{slide.title}</h2>
+              <p>{slide.description}</p>
+            </div>
           </div>
         )}
       </For>
@@ -49,7 +52,7 @@ const Slider = (props: sliderProps) => {
 
 const News = (props: carouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(0);
-  let intervaL: any;
+  let interval: any;
 
   const mergedProps = mergeProps(
     { showIndicators: true, showArrows: true },
@@ -59,15 +62,31 @@ const News = (props: carouselProps) => {
 
   onMount(() => {
     slides = document.getElementById("slider")?.children as HTMLCollection;
+
+    const left = () =>
+      currentImageIndex() === 0
+        ? slides[slides.length - 1]
+        : slides[currentImageIndex() - 1];
+    const middle = () => slides[currentImageIndex()];
+    const right = () =>
+      currentImageIndex() === slides.length - 1
+        ? slides[0]
+        : slides[currentImageIndex() + 1];
+
+    left().classList.add("-translate-x-full", "z-10");
+
+    middle().classList.add("translate-x-0", "z-20");
+
+    right().classList.add("translate-x-full", "z-10");
   });
 
   createEffect(() => {
-    intervaL = setInterval(() => {
+    interval = setInterval(() => {
       changeSlide("right");
     }, props.speed || 5000);
   });
 
-  onCleanup(() => clearInterval(intervaL));
+  onCleanup(() => clearInterval(interval));
 
   const slideInto = (slides: HTMLCollection, position: number) => {
     const left = () =>
@@ -76,9 +95,6 @@ const News = (props: carouselProps) => {
     const right = () =>
       position === slides.length - 1 ? slides[0] : slides[position + 1];
 
-    for (let slide of slides) {
-      slide.classList.add("hidden");
-    }
     left().classList.remove(
       "-translate-x-full",
       "translate-x-full",
@@ -107,6 +123,11 @@ const News = (props: carouselProps) => {
   };
 
   const changeSlide = (direction: "right" | "left") => {
+    clearInterval(interval);
+    interval = setInterval(() => {
+      changeSlide("right");
+    }, props.speed || 5000);
+
     const right = direction === "right";
 
     const isNotLastElement = right
@@ -126,18 +147,20 @@ const News = (props: carouselProps) => {
 
   return (
     <div class="h-80 bg-green-400 rounded-lg relative overflow-hidden relative">
-      <div
-        class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
-        onClick={() => changeSlide("left")}
-      >
-        <div class="i-ri:arrow-drop-left-line text-3xl" />
-      </div>
-      <div
-        class="h-7 w-7 bg-black-black rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
-        onClick={() => changeSlide("right")}
-      >
-        <div class="i-ri:arrow-drop-right-line text-3xl" />
-      </div>
+      <Show when={mergedProps.showArrows}>
+        <div
+          class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          onClick={() => changeSlide("left")}
+        >
+          <div class="i-ri:arrow-drop-left-line text-3xl" />
+        </div>
+        <div
+          class="h-7 w-7 bg-black-black rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          onClick={() => changeSlide("right")}
+        >
+          <div class="i-ri:arrow-drop-right-line text-3xl" />
+        </div>
+      </Show>
       <Show when={mergedProps.showIndicators}>
         <div class="flex justify-between items-center gap-2 z-50 absolute bottom-4 left-1/2 -translate-x-1/2">
           <For each={props.slides}>
@@ -154,7 +177,9 @@ const News = (props: carouselProps) => {
           </For>
         </div>
       </Show>
-      <Slider currentImageIndex={currentImageIndex()} slides={props.slides} />
+      <Show when={props.slides}>
+        <Slider currentImageIndex={currentImageIndex()} slides={props.slides} />
+      </Show>
     </div>
   );
 };
