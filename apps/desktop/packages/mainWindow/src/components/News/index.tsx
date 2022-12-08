@@ -1,4 +1,12 @@
-import { createEffect, createSignal, For, onCleanup } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  mergeProps,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 
 interface slideProps {
   image: string;
@@ -42,6 +50,16 @@ const Slider = (props: sliderProps) => {
 const News = (props: carouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(0);
   let intervaL: any;
+
+  const mergedProps = mergeProps(
+    { showIndicators: true, showArrows: true },
+    props
+  );
+  let slides: HTMLCollection;
+
+  onMount(() => {
+    slides = document.getElementById("slider")?.children as HTMLCollection;
+  });
 
   createEffect(() => {
     intervaL = setInterval(() => {
@@ -91,8 +109,6 @@ const News = (props: carouselProps) => {
   const changeSlide = (direction: "right" | "left") => {
     const right = direction === "right";
 
-    const slides = document.getElementById("slider")?.children;
-
     const isNotLastElement = right
       ? currentImageIndex() < props.slides.length - 1
       : currentImageIndex() > 0;
@@ -122,6 +138,22 @@ const News = (props: carouselProps) => {
       >
         <div class="i-ri:arrow-drop-right-line text-3xl" />
       </div>
+      <Show when={mergedProps.showIndicators}>
+        <div class="flex justify-between items-center gap-2 z-50 absolute bottom-4 left-1/2 -translate-x-1/2">
+          <For each={props.slides}>
+            {(_, i) => (
+              <div
+                class={`w-2 h-2 bg-white rounded-full cursor-pointer ${
+                  currentImageIndex() === i() ? "opacity-100" : "opacity-30"
+                }`}
+                onClick={() => {
+                  if (slides) slideInto(slides, i());
+                }}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
       <Slider currentImageIndex={currentImageIndex()} slides={props.slides} />
     </div>
   );
