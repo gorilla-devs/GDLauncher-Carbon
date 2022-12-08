@@ -38,10 +38,10 @@ const Slider = (props: sliderProps) => {
     <div id="slider" class="flex">
       <For each={props.slides}>
         {(slide) => (
-          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center bg-red-300 hidden box-border translate">
-            <div class="flex flex-col">
+          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border">
+            <div class="absolute bottom-10 left-5 flex flex-col">
               <h2 class="mb-0">{slide.title}</h2>
-              <p>{slide.description}</p>
+              <p class="mt-2">{slide.description}</p>
             </div>
           </div>
         )}
@@ -55,7 +55,7 @@ const News = (props: carouselProps) => {
   let interval: any;
 
   const mergedProps = mergeProps(
-    { showIndicators: true, showArrows: true },
+    { showIndicators: true, showArrows: true, rtl: true },
     props
   );
   let slides: HTMLCollection;
@@ -82,7 +82,7 @@ const News = (props: carouselProps) => {
 
   createEffect(() => {
     interval = setInterval(() => {
-      changeSlide("right");
+      changeSlide(mergedProps.rtl ? "right" : "left");
     }, props.speed || 5000);
   });
 
@@ -149,7 +149,7 @@ const News = (props: carouselProps) => {
     <div class="h-80 bg-green-400 rounded-lg relative overflow-hidden relative">
       <Show when={mergedProps.showArrows}>
         <div
-          class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
           onClick={() => changeSlide("left")}
         >
           <div class="i-ri:arrow-drop-left-line text-3xl" />
