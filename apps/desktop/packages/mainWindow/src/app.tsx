@@ -6,7 +6,7 @@ import { routes } from "./routes";
 import AppNavbar from "./components/AppNavbar";
 import Sidebar from "./components/Sidebar";
 import { AdsBanner } from "./components/AdBanner";
-import Notifications from "./notificationManager";
+import { Notifications } from "@gd/ui";
 
 const App: Component = () => {
   const location = useLocation();
