@@ -9,7 +9,7 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="script-src 'self' 'unsafe-inline'; img-src 'self' data:; default-src 'unsafe-inline' 'self';"
+      content="script-src 'self' 'unsafe-inline'; img-src * 'self' data: https:; default-src 'unsafe-inline' 'self';"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
@@ -56,14 +56,15 @@
         transition: transform 0.4s ease-out;
         will-change: transform;
       }
-      
-      #appLoadingState, #appFatalCrashState {
+
+      #appLoadingState,
+      #appFatalCrashState {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: #15181E;
+        background: #15181e;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -75,7 +76,7 @@
         transition: transform 0.4s ease-out;
         will-change: transform;
       }
-      </style>
+    </style>
     <title>GDLauncher Carbon</title>
     <script type="module">
       import config from "@gd/config";

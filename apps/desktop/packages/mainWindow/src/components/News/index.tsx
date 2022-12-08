@@ -38,7 +38,9 @@ const Slider = (props: sliderProps) => {
     <div id="slider" class="flex">
       <For each={props.slides}>
         {(slide) => (
-          <div class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border">
+          <div
+            class={`absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border bg-[url("${slide.image}")]`}
+          >
             <div class="absolute bottom-10 left-5 flex flex-col">
               <h2 class="mb-0">{slide.title}</h2>
               <p class="mt-2">{slide.description}</p>
