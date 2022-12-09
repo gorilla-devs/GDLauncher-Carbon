@@ -3,7 +3,7 @@ import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
 import { Pattern } from "@gd/ui";
 import { routes } from "./routes";
-import AppNavbar from "./components/AppNavbar";
+import AppNavbar from "./components/Navbar";
 import Sidebar from "./components/Sidebar";
 import { AdsBanner } from "./components/AdBanner";
 import Notifications from "./notificationManager";
