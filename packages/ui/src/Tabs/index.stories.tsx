@@ -24,6 +24,7 @@ Main.args = {
     {
       name: "mods",
       component: <div>mods jsx</div>,
+      icon: "image-2-fill",
     },
     {
       name: "modpacks",

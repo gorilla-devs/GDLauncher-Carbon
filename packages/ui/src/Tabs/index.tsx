@@ -11,6 +11,7 @@ import {
 interface TabType {
   name: string;
   component: JSXElement;
+  icon?: string;
 }
 
 interface Props {
@@ -55,18 +56,20 @@ function Tabs(props: Props) {
   };
 
   const BlockTabs = () => {
+    console.log("props.tabs", props.tabs);
     return (
-      <div class="flex items-center bg-black-black p-1 rounded-xl h-10">
+      <div class="flex items-center bg-black-black p-1 rounded-xl h-10 box-border">
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`flex justify-center items-center flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+              class={`flex gap-1 justify-center items-center flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
                 activeTab() === i()
                   ? "text-white bg-black-semiblack"
                   : "text-black-lightGray"
               }`}
               onClick={() => handleClick(i())}
             >
+              <div class={`i-ri:${tab.icon}`} />
               {tab.name}
             </div>
           )}
