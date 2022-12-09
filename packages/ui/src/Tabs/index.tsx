@@ -56,11 +56,11 @@ function Tabs(props: Props) {
 
   const BlockTabs = () => {
     return (
-      <div class="flex items-center bg-black-black p-1 rounded-xl">
+      <div class="flex items-center bg-black-black p-1 rounded-xl h-10">
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`flex justify-center items-center flex-1 py-2 min-h-10 cursor-pointer rounded-xl font-500 capitalize ${
+              class={`flex justify-center items-center flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
                 activeTab() === i()
                   ? "text-white bg-black-semiblack"
                   : "text-black-lightGray"
