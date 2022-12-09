@@ -5,6 +5,12 @@ import type { ComponentProps } from "solid-js";
 export default {
   title: "Tabs",
   component: Tabs,
+  argTypes: {
+    type: {
+      options: ["underline", "block"],
+      control: { type: "radio" },
+    },
+  },
 };
 
 const Template = ((args) => <Tabs {...args} />) as StoryFn<

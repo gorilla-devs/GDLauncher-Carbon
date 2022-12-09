@@ -1,4 +1,12 @@
-import { createSignal, For, JSXElement, Show } from "solid-js";
+import {
+  createSignal,
+  For,
+  JSXElement,
+  Match,
+  mergeProps,
+  Show,
+  Switch,
+} from "solid-js";
 
 interface TabType {
   name: string;
@@ -12,7 +20,7 @@ interface Props {
 
 function Tabs(props: Props) {
   const [activeTab, setActiveTab] = createSignal<null | number>(null);
-  //   const mergedProps = mergeProps({ type: "block" }, props);
+  const mergedProps = mergeProps({ type: "underline" }, props);
 
   const handleClick = (index: number) => {
     if (activeTab() !== null && activeTab() === index) {
@@ -24,8 +32,8 @@ function Tabs(props: Props) {
 
   const Component = () => props.tabs[activeTab() || 0].component;
 
-  return (
-    <div class="flex flex-col">
+  const UnderlinedTabs = () => {
+    return (
       <div class="flex bg-black-black gap-6 border-b-black-semiblack border-b-1 box-border">
         <For each={props.tabs}>
           {(tab, i) => (
@@ -43,6 +51,40 @@ function Tabs(props: Props) {
           )}
         </For>
       </div>
+    );
+  };
+
+  const BlockTabs = () => {
+    return (
+      <div class="flex items-center bg-black-black p-1 rounded-xl">
+        <For each={props.tabs}>
+          {(tab, i) => (
+            <div
+              class={`flex justify-center items-center flex-1 py-2 min-h-10 cursor-pointer rounded-xl ${
+                activeTab() === i()
+                  ? "text-white bg-black-semiblack"
+                  : "text-black-lightGray"
+              }`}
+              onClick={() => handleClick(i())}
+            >
+              {tab.name}
+            </div>
+          )}
+        </For>
+      </div>
+    );
+  };
+
+  return (
+    <div class="flex flex-col">
+      <Switch>
+        <Match when={mergedProps.type === "underline"}>
+          <UnderlinedTabs />
+        </Match>
+        <Match when={mergedProps.type === "block"}>
+          <BlockTabs />
+        </Match>
+      </Switch>
       <div>{Component()}</div>
     </div>
   );
