@@ -38,7 +38,7 @@ function Tabs(props: Props) {
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`py-4 cursor-pointer relative ${
+              class={`py-4 cursor-pointer relative font-500 capitalize ${
                 activeTab() === i() ? "text-white" : "text-black-lightGray"
               }`}
               onClick={() => handleClick(i())}
@@ -60,7 +60,7 @@ function Tabs(props: Props) {
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`flex justify-center items-center flex-1 py-2 min-h-10 cursor-pointer rounded-xl ${
+              class={`flex justify-center items-center flex-1 py-2 min-h-10 cursor-pointer rounded-xl font-500 capitalize ${
                 activeTab() === i()
                   ? "text-white bg-black-semiblack"
                   : "text-black-lightGray"
