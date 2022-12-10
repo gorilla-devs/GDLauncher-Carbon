@@ -43,45 +43,7 @@ const App: Component = () => {
           />
         </Show>
         <main class="relative flex-1 overflow-hidden">
-          <Transition
-            onEnter={(el, done) => {
-              const a = el.animate(
-                [
-                  {
-                    opacity: 0,
-                  },
-                  {
-                    opacity: 1,
-                  },
-                ],
-                {
-                  duration: 120,
-                }
-              );
-              a.finished.then(done);
-            }}
-            onAfterEnter={(el) => {
-              el.classList.remove("opacity-0");
-            }}
-            onExit={(el, done) => {
-              const a = el.animate(
-                [
-                  {
-                    opacity: 1,
-                  },
-                  {
-                    opacity: 0,
-                  },
-                ],
-                {
-                  duration: 0,
-                }
-              );
-              a.finished.then(done);
-            }}
-          >
-            <Route />
-          </Transition>
+          <Route />
         </main>
         <Show when={location.pathname !== "/"}>
           <AdsBanner />
