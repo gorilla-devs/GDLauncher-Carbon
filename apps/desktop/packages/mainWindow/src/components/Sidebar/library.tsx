@@ -1,16 +1,17 @@
 import { Input } from "@gd/ui";
+import SiderbarWrapper from "./wrapper";
 
-const Library = () => {
+const Sidebar = () => {
   return (
-    <div>
+    <SiderbarWrapper>
       <Input
         placeholder="Type Here"
         icon={<div class="i-ri:search-line" />}
         class="w-full rounded-full text-black-lightGray"
       />
-      library
-    </div>
+      Sidebar library
+    </SiderbarWrapper>
   );
 };
 
-export default Library;
+export default Sidebar;
