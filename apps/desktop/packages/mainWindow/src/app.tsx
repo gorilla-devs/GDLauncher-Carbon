@@ -1,14 +1,12 @@
-import { Component, createSignal, Show } from "solid-js";
+import { Component, Show } from "solid-js";
 import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
 import Notifications from "./notificationManager";
 
 const App: Component = () => {
-  const location = useLocation();
   const Route = useRoutes(routes);
   const navigate = useNavigate();
-  const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 
   return (
     <div class="relative w-screen h-screen">
@@ -30,7 +28,7 @@ const App: Component = () => {
           </div>
         </div>
       </Show>
-      <AppNavbar sidebarCollapsed={sidebarCollapsed()} />
+      <AppNavbar />
       <div class="flex h-screen w-screen z-10">
         <main class="relative flex-1 overflow-hidden">
           <Route />

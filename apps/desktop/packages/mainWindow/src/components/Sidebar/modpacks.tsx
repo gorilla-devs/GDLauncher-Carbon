@@ -3,7 +3,9 @@ import { Show } from "solid-js";
 import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
-  return <SiderbarWrapper>SIDEBAR modpacks</SiderbarWrapper>;
+  return (
+    <SiderbarWrapper collapsable={false}>SIDEBAR modpacks</SiderbarWrapper>
+  );
 };
 
 export default Sidebar;
