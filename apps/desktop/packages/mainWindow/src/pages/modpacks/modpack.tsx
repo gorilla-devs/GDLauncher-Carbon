@@ -1,3 +1,4 @@
+import ContentWrapper from "@/layouts/ContentWrapper";
 import { useNavigate, useParams } from "@solidjs/router";
 
 const Modpack = () => {
@@ -5,10 +6,10 @@ const Modpack = () => {
   const params = useParams();
 
   return (
-    <div>
+    <ContentWrapper>
       <div>Modpack {params.id}</div>
       <button onClick={() => navigate("/modpacks")}>back</button>
-    </div>
+    </ContentWrapper>
   );
 };
 
