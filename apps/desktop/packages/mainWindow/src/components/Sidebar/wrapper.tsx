@@ -1,9 +1,9 @@
 import { isSidebarOpened, toggleSidebar } from "@/stores/sidebar";
-import { mergeProps, Show } from "solid-js";
+import { JSXElement, mergeProps, Show } from "solid-js";
 
 interface Props {
   children: any;
-  collapsable?: boolean;
+  collapsable?: JSXElement;
 }
 
 const SiderbarWrapper = (props: Props) => {
