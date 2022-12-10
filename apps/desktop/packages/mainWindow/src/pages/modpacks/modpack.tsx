@@ -1,4 +1,3 @@
-import Page from "@/components/Page";
 import { useNavigate, useParams } from "@solidjs/router";
 
 const Modpack = () => {
@@ -6,10 +5,10 @@ const Modpack = () => {
   const params = useParams();
 
   return (
-    <Page class="bg-black-black">
+    <div>
       <div>Modpack {params.id}</div>
       <button onClick={() => navigate("/modpacks")}>back</button>
-    </Page>
+    </div>
   );
 };
 
