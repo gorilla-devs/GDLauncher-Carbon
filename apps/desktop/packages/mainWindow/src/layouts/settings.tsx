@@ -1,4 +1,4 @@
-import Sidebar from "@/components/Sidebar";
+import Sidebar from "@/components/Sidebar/library";
 import { Outlet } from "@solidjs/router";
 import ContentWrapper from "./ContentWrapper";
 

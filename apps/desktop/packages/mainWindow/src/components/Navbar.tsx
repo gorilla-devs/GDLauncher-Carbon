@@ -1,14 +1,9 @@
 import { Link, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
-import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 
-interface Props {
-  sidebarCollapsed: boolean;
-}
-
-const AppNavbar = (props: Props) => {
+const AppNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -16,17 +11,8 @@ const AppNavbar = (props: Props) => {
     <Show when={location.pathname !== "/"}>
       <nav class="bg-black-black text-white h-15 flex items-center justify-between px-5">
         <div class="flex">
-          <img
-            src={props.sidebarCollapsed ? GDLauncherLogo : GDLauncherWideLogo}
-            class="h-9"
-          />
-          <ul
-            class="flex items-between gap-6 m-0 text-white list-none"
-            classList={{
-              "pl-10": props.sidebarCollapsed,
-              "pl-20": !props.sidebarCollapsed,
-            }}
-          >
+          <img src={GDLauncherWideLogo} class="h-9" />
+          <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
             <For each={NAVBAR_ROUTES}>
               {(route) => {
                 const isActiveRoute = () =>

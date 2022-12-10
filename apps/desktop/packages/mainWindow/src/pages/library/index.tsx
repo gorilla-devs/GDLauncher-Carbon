@@ -6,7 +6,7 @@ import "./index.css";
 const Home = () => {
   return (
     <div>
-      {/* <div>
+      <div>
         <div class="h-39 bg-green-400 rounded-lg" />
         <div class="mt-4">
           <RecentPlayed />
@@ -17,7 +17,7 @@ const Home = () => {
         <div class="mt-4">
           <InstalledInstances />
         </div>
-      </div> */}
+      </div>
     </div>
   );
 };
