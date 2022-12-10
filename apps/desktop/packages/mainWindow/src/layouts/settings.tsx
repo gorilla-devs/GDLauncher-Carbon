@@ -1,11 +1,14 @@
 import Sidebar from "@/components/Sidebar";
 import { Outlet } from "@solidjs/router";
+import ContentWrapper from "./ContentWrapper";
 
 function SettingsLayout() {
   return (
-    <div class="flex">
+    <div class="flex flex-1">
       <Sidebar />
-      <Outlet />
+      <ContentWrapper>
+        <Outlet />
+      </ContentWrapper>
     </div>
   );
 }
