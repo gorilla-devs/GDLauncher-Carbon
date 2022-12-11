@@ -13,19 +13,17 @@ export default {
   },
 };
 
-const Template = ((args) => <ViewList {...args} />) as StoryFn<
-  ComponentProps<typeof ViewList>
->;
+const Template = ((args) => (
+  <ViewList {...args}>
+    <div class="w-20 h-20 bg-green-500" />
+    <div class="w-20 h-20 bg-green-500" />
+    <div class="w-20 h-20 bg-green-500" />
+  </ViewList>
+)) as StoryFn<ComponentProps<typeof ViewList>>;
 
 export const Main = Template.bind({});
 
 Main.args = {
-  list: [
-    { name: "name" },
-    { name: "name" },
-    { name: "name" },
-    { name: "name" },
-  ],
   cols: 4,
   type: "grid",
 };

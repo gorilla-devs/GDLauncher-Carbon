@@ -1,7 +1,7 @@
-import { mergeProps } from "solid-js";
+import { JSXElement, mergeProps } from "solid-js";
 
 interface Props {
-  children: Element[];
+  children: JSXElement[];
   type?: "list" | "grid";
   cols?: number;
 }
