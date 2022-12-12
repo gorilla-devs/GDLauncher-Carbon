@@ -5,11 +5,11 @@ import { Outlet } from "@solidjs/router";
 function withAdsLayout() {
   return (
     <div class="flex h-full">
-      <div class="flex flex-1">
-        <Outlet />
-      </div>
+      <Outlet />
       {/* <Show when={location.pathname !== "/"}> */}
-      <AdsBanner />
+      <div class="flex justify-end flex-initial">
+        <AdsBanner />
+      </div>
       <Pattern class="absolute top-0 left-0 right-0 bottom-0" />
       {/* </Show> */}
     </div>
