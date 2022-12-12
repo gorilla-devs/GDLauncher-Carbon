@@ -7,5 +7,7 @@ export { CodeInput } from "./CodeInput";
 export { Carousel } from "./Carousel";
 export { InstanceTile } from "./InstanceTile";
 export { Progressbar } from "./Progressbar";
+export { Spinner } from "./Spinner";
+export { Notifications, addNotification } from "./NotificationManager";
 
 import "virtual:uno.css";
