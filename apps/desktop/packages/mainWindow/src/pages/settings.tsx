@@ -1,7 +1,5 @@
-import Page from "@/components/Page";
-
 const Settings = () => {
-  return <Page class="bg-black-black">Settings</Page>;
+  return <div class="bg-black-black">Settings</div>;
 };
 
 export default Settings;

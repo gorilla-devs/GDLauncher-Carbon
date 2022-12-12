@@ -1,4 +1,3 @@
-import Page from "@/components/Page";
 import { useNavigate, useParams } from "@solidjs/router";
 
 const Instace = () => {
@@ -6,10 +5,10 @@ const Instace = () => {
   const navigate = useNavigate();
 
   return (
-    <Page class="bg-black-black">
+    <div>
       <div>instace {params.id}</div>
       <button onClick={() => navigate("/library")}>back</button>
-    </Page>
+    </div>
   );
 };
 

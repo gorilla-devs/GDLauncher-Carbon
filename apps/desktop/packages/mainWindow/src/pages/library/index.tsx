@@ -2,7 +2,6 @@ import InstalledInstances from "@/components/Carousels/InstalledInstances";
 import PopularModpacks from "@/components/Carousels/PopularModpacks";
 import RecentPlayed from "@/components/Carousels/RecentPlayed";
 import { News } from "@gd/ui";
-import Page from "@/components/Page";
 import "./index.css";
 
 const newsArticles = [
@@ -38,7 +37,7 @@ const newsArticles = [
 
 const Home = () => {
   return (
-    <Page class="bg-black-black p-6 noScroll overflow-auto">
+    <div>
       <div>
         <News slides={newsArticles} />
         <div class="mt-4">
@@ -51,7 +50,7 @@ const Home = () => {
           <InstalledInstances />
         </div>
       </div>
-    </Page>
+    </div>
   );
 };
 
