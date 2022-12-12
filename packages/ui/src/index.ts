@@ -7,5 +7,6 @@ export { CodeInput } from "./CodeInput";
 export { Carousel } from "./Carousel";
 export { InstanceTile } from "./InstanceTile";
 export { News } from "./News";
+export { Notifications, addNotification } from "./NotificationManager";
 
 import "virtual:uno.css";
