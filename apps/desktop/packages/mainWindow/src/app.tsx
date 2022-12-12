@@ -34,9 +34,6 @@ const App: Component = () => {
         <main class="relative flex-1 overflow-hidden">
           <Route />
         </main>
-        <Show when={location.pathname !== "/"}>
-          <AdsBanner />
-        </Show>
       </div>
       <Notifications />
     </div>
