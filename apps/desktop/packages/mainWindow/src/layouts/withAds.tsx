@@ -4,7 +4,7 @@ import { Outlet } from "@solidjs/router";
 
 function withAdsLayout() {
   return (
-    <div class="flex h-full justify-between">
+    <div class="flex h-full justify-end">
       <Outlet />
       {/* <Show when={location.pathname !== "/"}> */}
       <div class="flex justify-end flex-initial">
