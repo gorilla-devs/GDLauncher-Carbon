@@ -8,23 +8,23 @@ import {
   Show,
 } from "solid-js";
 
-interface slideProps {
+interface SlideProps {
   image: string;
   title: string;
   description: string;
   url?: string;
 }
 
-interface sliderProps {
+interface SliderProps {
   currentImageIndex: number;
-  slides: slideProps[];
+  slides: SlideProps[];
   disableRedirect?: boolean;
   alignment?: string;
   onClick?: any;
 }
 
-interface carouselProps {
-  slides: slideProps[];
+interface CarouselProps {
+  slides: SlideProps[];
   speed?: number;
   rtl?: boolean;
   disableAutoRotation?: boolean;
@@ -33,7 +33,7 @@ interface carouselProps {
   disableRedirect?: boolean;
 }
 
-const News = (props: carouselProps) => {
+const News = (props: CarouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(0);
   let interval: any;
 
@@ -43,7 +43,7 @@ const News = (props: carouselProps) => {
   );
   let slidesRef: HTMLDivElement;
 
-  const Slider = (props: sliderProps) => {
+  const Slider = (props: SliderProps) => {
     return (
       <div ref={slidesRef} id="slider" class="flex">
         <For each={props.slides}>
