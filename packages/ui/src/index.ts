@@ -6,5 +6,11 @@ export { BackgroundPattern } from "./BackgroundPattern";
 export { Carousel } from "./Carousel";
 export { Switch } from "./Switch";
 export { Checkbox } from "./Checkbox";
+export { InstanceTile } from "./InstanceTile";
+export { News } from "./News";
+export { Tabs } from "./Tabs";
+export { Progressbar } from "./Progressbar";
+export { Spinner } from "./Spinner";
+export { Notifications, addNotification } from "./NotificationManager";
 
 import "virtual:uno.css";

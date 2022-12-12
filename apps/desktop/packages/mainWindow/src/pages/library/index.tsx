@@ -1,5 +1,4 @@
 import Tile from "@/components/Instance/Tile";
-import Page from "@/components/Page";
 import { Carousel } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
@@ -60,10 +59,9 @@ const Home = () => {
   const navigate = useNavigate();
 
   return (
-    <Page class="bg-black-black p-6 noScroll overflow-auto">
+    <div>
       <div>
-        {/* TODO: News component */}
-        <div class="h-39 bg-green-400 rounded-lg" />
+        <News slides={newsArticles} />
         <div class="mt-4">
           <Carousel title="Recent played">
             <For each={MockCarousel}>
@@ -113,7 +111,7 @@ const Home = () => {
           </Carousel>
         </div>
       </div>
-    </Page>
+    </div>
   );
 };
 

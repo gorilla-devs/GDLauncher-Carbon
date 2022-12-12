@@ -1,6 +1,7 @@
 import minimumBounds from "@/modules/components/minimumBounds";
 
 export const AdsBanner = () => {
+  console.log("RERENDERING ADS BANNER");
   return (
     <div
       style={{

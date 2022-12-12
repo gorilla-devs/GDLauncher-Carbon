@@ -1,18 +1,13 @@
 import { Component, createSignal, Show } from "solid-js";
 import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
 import { Transition } from "solid-transition-group";
-import { BackgroundPattern } from "@gd/ui";
 import { routes } from "./routes";
-import AppNavbar from "./components/AppNavbar";
-import Sidebar from "./components/Sidebar";
-import { AdsBanner } from "./components/AdBanner";
-import Notifications from "./notificationManager";
+import AppNavbar from "./components/Navbar";
+import { Notifications } from "@gd/ui";
 
 const App: Component = () => {
-  const location = useLocation();
   const Route = useRoutes(routes);
   const navigate = useNavigate();
-  const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false);
 
   return (
     <div class="relative w-screen h-screen">
@@ -34,60 +29,13 @@ const App: Component = () => {
           </div>
         </div>
       </Show>
-      <AppNavbar sidebarCollapsed={sidebarCollapsed()} />
+      <AppNavbar />
       <div class="flex h-screen w-screen z-10">
-        <Show when={location.pathname !== "/"}>
-          <Sidebar
-            collapsed={sidebarCollapsed()}
-            setSidebarCollapsed={setSidebarCollapsed}
-          />
-        </Show>
         <main class="relative flex-1 overflow-hidden">
-          <Transition
-            onEnter={(el, done) => {
-              const a = el.animate(
-                [
-                  {
-                    opacity: 0,
-                  },
-                  {
-                    opacity: 1,
-                  },
-                ],
-                {
-                  duration: 120,
-                }
-              );
-              a.finished.then(done);
-            }}
-            onAfterEnter={(el) => {
-              el.classList.remove("opacity-0");
-            }}
-            onExit={(el, done) => {
-              const a = el.animate(
-                [
-                  {
-                    opacity: 1,
-                  },
-                  {
-                    opacity: 0,
-                  },
-                ],
-                {
-                  duration: 0,
-                }
-              );
-              a.finished.then(done);
-            }}
-          >
-            <Route />
-          </Transition>
+          <Route />
         </main>
         <Show when={location.pathname !== "/"}>
           <AdsBanner />
-        </Show>
-        <Show when={location.pathname !== "/"}>
-          <BackgroundPattern class="absolute top-0 left-0 right-0 bottom-0" />
         </Show>
       </div>
       <Notifications />
