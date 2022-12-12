@@ -70,4 +70,4 @@ const Notifications = () => {
   );
 };
 
-export default Notifications;
+export { Notifications };
