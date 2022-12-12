@@ -33,25 +33,6 @@ interface carouselProps {
   disableRedirect?: boolean;
 }
 
-const Slider = (props: sliderProps) => {
-  return (
-    <div id="slider" class="flex">
-      <For each={props.slides}>
-        {(slide) => (
-          <div
-            class={`absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border bg-[url("${slide.image}")]`}
-          >
-            <div class="absolute bottom-10 left-5 flex flex-col">
-              <h2 class="mb-0">{slide.title}</h2>
-              <p class="mt-2">{slide.description}</p>
-            </div>
-          </div>
-        )}
-      </For>
-    </div>
-  );
-};
-
 const News = (props: carouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(0);
   let interval: any;
@@ -60,26 +41,45 @@ const News = (props: carouselProps) => {
     { showIndicators: true, showArrows: true, rtl: true },
     props
   );
-  let slides: HTMLCollection;
+  let slidesRef: HTMLDivElement;
+
+  const Slider = (props: sliderProps) => {
+    return (
+      <div ref={slidesRef} id="slider" class="flex">
+        <For each={props.slides}>
+          {(slide) => (
+            <div
+              class={`absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border bg-[url("${slide.image}")]`}
+            >
+              <div class="absolute bottom-10 left-5 flex flex-col">
+                <h2 class="mb-0">{slide.title}</h2>
+                <p class="mt-2">{slide.description}</p>
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+    );
+  };
 
   onMount(() => {
-    slides = document.getElementById("slider")?.children as HTMLCollection;
+    const slides = slidesRef?.children as HTMLCollection;
 
-    const left = () =>
+    const leftSlide = () =>
       currentImageIndex() === 0
         ? slides[slides.length - 1]
         : slides[currentImageIndex() - 1];
-    const middle = () => slides[currentImageIndex()];
-    const right = () =>
+    const middleSlide = () => slides[currentImageIndex()];
+    const rightSlide = () =>
       currentImageIndex() === slides.length - 1
         ? slides[0]
         : slides[currentImageIndex() + 1];
 
-    left().classList.add("-translate-x-full", "z-10");
+    leftSlide().classList.add("-translate-x-full", "z-10");
 
-    middle().classList.add("translate-x-0", "z-20");
+    middleSlide().classList.add("translate-x-0", "z-20");
 
-    right().classList.add("translate-x-full", "z-10");
+    rightSlide().classList.add("translate-x-full", "z-10");
   });
 
   createEffect(() => {
@@ -91,36 +91,36 @@ const News = (props: carouselProps) => {
   onCleanup(() => clearInterval(interval));
 
   const slideInto = (slides: HTMLCollection, position: number) => {
-    const left = () =>
+    const leftSlide = () =>
       position === 0 ? slides[slides.length - 1] : slides[position - 1];
-    const middle = () => slides[position];
-    const right = () =>
+    const middleSlide = () => slides[position];
+    const rightSlide = () =>
       position === slides.length - 1 ? slides[0] : slides[position + 1];
 
-    left().classList.remove(
+    leftSlide().classList.remove(
       "-translate-x-full",
       "translate-x-full",
       "translate-x-0",
       "hidden",
       "z-20"
     );
-    left().classList.add("-translate-x-full", "z-10");
-    middle().classList.remove(
+    leftSlide().classList.add("-translate-x-full", "z-10");
+    middleSlide().classList.remove(
       "-translate-x-full",
       "translate-x-full",
       "translate-x-0",
       "hidden",
       "z-10"
     );
-    middle().classList.add("translate-x-0", "z-20");
-    right().classList.remove(
+    middleSlide().classList.add("translate-x-0", "z-20");
+    rightSlide().classList.remove(
       "-translate-x-full",
       "translate-x-full",
       "translate-x-0",
       "hidden",
       "z-20"
     );
-    right().classList.add("translate-x-full", "z-10");
+    rightSlide().classList.add("translate-x-full", "z-10");
     setCurrentImageIndex(position);
   };
 
@@ -130,9 +130,11 @@ const News = (props: carouselProps) => {
       changeSlide("right");
     }, props.speed || 5000);
 
-    const right = direction === "right";
+    const slides = slidesRef?.children as HTMLCollection;
 
-    const isNotLastElement = right
+    const isRight = direction === "right";
+
+    const isNotLastElement = isRight
       ? currentImageIndex() < props.slides.length - 1
       : currentImageIndex() > 0;
 
@@ -140,10 +142,10 @@ const News = (props: carouselProps) => {
     if (isNotLastElement) {
       slideInto(
         slides,
-        right ? currentImageIndex() + 1 : currentImageIndex() - 1
+        isRight ? currentImageIndex() + 1 : currentImageIndex() - 1
       );
     } else {
-      slideInto(slides, right ? 0 : props.slides.length - 1);
+      slideInto(slides, isRight ? 0 : props.slides.length - 1);
     }
   };
 
@@ -172,6 +174,8 @@ const News = (props: carouselProps) => {
                   currentImageIndex() === i() ? "opacity-100" : "opacity-30"
                 }`}
                 onClick={() => {
+                  const slides = slidesRef?.children as HTMLCollection;
+
                   if (slides) slideInto(slides, i());
                 }}
               />
