@@ -35,7 +35,7 @@ const AppNavbar = () => {
             </For>
           </ul>
         </div>
-        <div class="flex gap-5">
+        <div class="flex gap-5 items-center">
           <div class="flex gap-5">
             <div class="i-ri:terminal-box-fill text-black-lightGray text-2xl cursor-pointer" />
             <div
