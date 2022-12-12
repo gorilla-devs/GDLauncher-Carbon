@@ -7,7 +7,7 @@ import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
-import { CodeInput } from "@/components/CodeInput";
+import { DeviceCode } from "@/components/DeviceCode";
 
 interface Props {
   deviceCodeObject: any | null;
@@ -87,7 +87,7 @@ const CodeStep = (props: Props) => {
       <img src={DoorImage} />
       <div>
         <div class="flex flex-col justify-center items-center">
-          <CodeInput
+          <DeviceCode
             disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
