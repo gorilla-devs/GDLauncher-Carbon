@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import GDLauncherLogo from "/assets/images/gdlauncher_logo.svg";
-import { routes } from "@/routes";
+import { NAVBAR_ROUTES } from "@/constants";
 
 interface Props {
   sidebarCollapsed: boolean;
@@ -27,21 +27,25 @@ const AppNavbar = (props: Props) => {
               "pl-20": !props.sidebarCollapsed,
             }}
           >
-            <For each={routes.filter((route) => route.visibileInNavbar)}>
-              {(route) => (
-                <li class="py-2 no-underline">
-                  <Link
-                    href={route.path}
-                    class="no-underline"
-                    classList={{
-                      "text-white": location.pathname === route.path,
-                      "text-slate-400": location.pathname !== route.path,
-                    }}
-                  >
-                    {route.label}
-                  </Link>
-                </li>
-              )}
+            <For each={NAVBAR_ROUTES}>
+              {(route) => {
+                const isActiveRoute = () =>
+                  location.pathname.includes(route.path);
+                return (
+                  <li class="py-2 no-underline">
+                    <Link
+                      href={route.path}
+                      class="no-underline"
+                      classList={{
+                        "text-white": isActiveRoute(),
+                        "text-slate-400": !isActiveRoute(),
+                      }}
+                    >
+                      {route.label}
+                    </Link>
+                  </li>
+                );
+              }}
             </For>
           </ul>
         </div>
