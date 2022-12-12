@@ -33,13 +33,10 @@ function Input(props: Props) {
                ? "bg-black-semiblack focus-visible:outline-none focus-visible:border-0"
                : "px-4 focus-visible:outline-black-gray hover:border-black-gray active:border-black-gray"
            }
-          
+           outline-transparent
           `}
           classList={{
             "border-status-red": !!props.error,
-          }}
-          style={{
-            outline: "none",
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
