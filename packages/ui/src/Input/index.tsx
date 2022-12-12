@@ -27,7 +27,6 @@ function Input(props: Props) {
           class={`bg-black-black border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-black-gray ${
             props.inputClass || ""
           }
-           ${props.error ? "border-status-red" : ""}
            ${props.disabled ? "text-black-semiblack" : "text-white"}
            ${
              props.icon
@@ -36,6 +35,9 @@ function Input(props: Props) {
            }
           
           `}
+          classList={{
+            "border-status-red": !!props.error,
+          }}
           style={{
             outline: "none",
           }}

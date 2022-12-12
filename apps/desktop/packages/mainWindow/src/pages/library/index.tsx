@@ -1,10 +1,10 @@
 import Tile from "@/components/Instance/Tile";
-import { Carousel } from "@gd/ui";
+import { Carousel, News } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
 import "./index.css";
 
-const MockCarousel = [
+const mockCarousel = [
   {
     title: "Minecraft forge",
     modloader: "forge",
@@ -55,6 +55,33 @@ const MockCarousel = [
   },
 ];
 
+const newsArticles = [
+  {
+    title: "title",
+    description: "this is a nice and fair description",
+    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+    url: "https://randomurl.com",
+  },
+  {
+    title: "title1",
+    description: "this is a nice and fair description",
+    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+    url: "https://randomurl.com",
+  },
+  {
+    title: "title2",
+    description: "this is a nice and fair description",
+    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+    url: "https://randomurl.com",
+  },
+  {
+    title: "title3",
+    description: "this is a nice and fair description",
+    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+    url: "https://randomurl.com",
+  },
+];
+
 const Home = () => {
   const navigate = useNavigate();
 
@@ -64,7 +91,7 @@ const Home = () => {
         <News slides={newsArticles} />
         <div class="mt-4">
           <Carousel title="Recent played">
-            <For each={MockCarousel}>
+            <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
@@ -80,7 +107,7 @@ const Home = () => {
         </div>
         <div class="mt-4">
           <Carousel title="Your Instances">
-            <For each={MockCarousel}>
+            <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
@@ -96,7 +123,7 @@ const Home = () => {
         </div>
         <div class="mt-4">
           <Carousel title="Popular Modpacks">
-            <For each={MockCarousel}>
+            <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
