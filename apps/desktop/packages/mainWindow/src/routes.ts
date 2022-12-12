@@ -1,63 +1,73 @@
-import { JSX, lazy } from "solid-js";
+import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
-import AboutData from "./pages/about.data";
-import Modpacks from "./components/Sidebar/contents/Modpacks";
-import Settings from "./components/Sidebar/contents/Settings";
-
-type CustomRouteDefinition = RouteDefinition & {
-  component?: () => JSX.Element;
-  sidebarComponent?: () => JSX.Element;
-  // solid router also support multiple path, so path by default can be also string[] https://github.com/solidjs/solid-router#multiple-paths
-  // we are overriding it for sake of semplicity because we are not gonna use (at least for now) multiple paths
-  path: string;
-  label?: string;
-  children?: CustomRouteDefinition[];
-};
 
 /* Defining the routes for the application. */
-export const routes: CustomRouteDefinition[] = [
+export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("./pages/login")),
   },
   {
-    label: "Library",
-    path: "/library",
+    path: "/",
+    component: lazy(() => import("./layouts/withAds")),
     children: [
       {
-        path: "/",
-        component: lazy(() => import("./pages/library")),
+        path: "/library",
+        component: lazy(() => import("./layouts/library")),
+        data: () => {
+          console.log("Fetching all instances...");
+        },
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("./pages/library")),
+            data: () => {
+              console.log("Fetching instances data...");
+            },
+          },
+          {
+            path: "/:id",
+            component: lazy(() => import("./pages/library/instance")),
+            data: () => {
+              console.log("Fetching specific instance data...");
+            },
+          },
+        ],
       },
       {
-        path: "/:id",
-        component: lazy(() => import("./pages/library/instance")),
+        path: "/modpacks",
+        component: lazy(() => import("./layouts/modpacks")),
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("./pages/modpacks")),
+            data: () => {
+              console.log("Fetching modpacks data...");
+            },
+          },
+        ],
+      },
+      {
+        path: "/modpacks/:id",
+        component: lazy(() => import("./pages/modpacks/modpack")),
+        data: () => {
+          console.log("Fetching specific modpack data...");
+        },
+      },
+      {
+        path: "/settings",
+        component: lazy(() => import("./layouts/settings")),
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("./pages/settings")),
+          },
+        ],
+      },
+      {
+        path: "**",
+        component: lazy(() => import("./errors/404")),
       },
     ],
-  },
-  {
-    label: "Modpacks",
-    path: "/modpacks",
-    data: AboutData,
-    sidebarComponent: Modpacks,
-    children: [
-      {
-        path: "/",
-        component: lazy(() => import("./pages/modpacks")),
-      },
-      {
-        path: "/:id",
-        component: lazy(() => import("./pages/modpacks/modpack")),
-        sidebarComponent: Modpacks,
-      },
-    ] as CustomRouteDefinition[],
-  },
-  {
-    path: "/settings",
-    component: lazy(() => import("./pages/settings")),
-    sidebarComponent: Settings,
-  },
-  {
-    path: "**",
-    component: lazy(() => import("./errors/404")),
   },
 ];
