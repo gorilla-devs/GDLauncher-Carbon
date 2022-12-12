@@ -154,13 +154,13 @@ const News = (props: carouselProps) => {
           class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
           onClick={() => changeSlide("left")}
         >
-          <div class="i-ri:arrow-drop-left-line text-3xl" />
+          <div class="i-ri:arrow-drop-left-line text-3xl text-white" />
         </div>
         <div
           class="h-7 w-7 bg-black-black rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
           onClick={() => changeSlide("right")}
         >
-          <div class="i-ri:arrow-drop-right-line text-3xl" />
+          <div class="i-ri:arrow-drop-right-line text-3xl text-white" />
         </div>
       </Show>
       <Show when={mergedProps.showIndicators}>
