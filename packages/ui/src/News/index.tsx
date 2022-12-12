@@ -29,7 +29,7 @@ interface carouselProps {
   rtl?: boolean;
   disableAutoRotation?: boolean;
   showArrows?: boolean;
-  showSelectMenu?: boolean;
+  showIndicators?: boolean;
   disableRedirect?: boolean;
 }
 
@@ -186,4 +186,4 @@ const News = (props: carouselProps) => {
   );
 };
 
-export default News;
+export { News };

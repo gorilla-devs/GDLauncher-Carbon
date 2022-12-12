@@ -6,5 +6,6 @@ export { Pattern } from "./Pattern";
 export { CodeInput } from "./CodeInput";
 export { Carousel } from "./Carousel";
 export { InstanceTile } from "./InstanceTile";
+export { News } from "./News";
 
 import "virtual:uno.css";

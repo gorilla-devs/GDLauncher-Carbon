@@ -1,7 +1,7 @@
 import InstalledInstances from "@/components/Carousels/InstalledInstances";
 import PopularModpacks from "@/components/Carousels/PopularModpacks";
 import RecentPlayed from "@/components/Carousels/RecentPlayed";
-import News from "@/components/News";
+import { News } from "@gd/ui";
 import Page from "@/components/Page";
 import "./index.css";
 
