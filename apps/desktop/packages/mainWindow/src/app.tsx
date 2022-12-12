@@ -2,7 +2,8 @@ import { Component, Show } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
-import Notifications from "./notificationManager";
+import { AdsBanner } from "./components/AdBanner";
+import { Notifications } from "@gd/ui";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
