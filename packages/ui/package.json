@@ -28,6 +28,7 @@
     "@storybook/testing-library": "^0.0.13",
     "@testing-library/jest-dom": "^5.16.5",
     "@typescript-eslint/parser": "^5.46.0",
+    "@minht11/solid-virtual-container": "^0.2.1",
     "babel-loader": "^9.1.0",
     "concurrently": "^7.6.0",
     "eslint": "^8.29.0",
