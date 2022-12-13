@@ -15,7 +15,7 @@ interface Props {
 const ListItem = (props: any) => (
   <div
     style={props.style}
-    class="w-full border-black border-1"
+    class="w-full"
     tabIndex={props.tabIndex}
     role="listitem"
   >
@@ -32,24 +32,14 @@ function ViewList(props: Props) {
   let scrollTargetElement!: HTMLDivElement;
 
   return (
-    <div
-      ref={scrollTargetElement}
-      style={{
-        "grid-template-columns": `repeat(${mergedProps.cols}, minmax(0, 1fr))`,
-      }}
-    >
+    <div ref={scrollTargetElement}>
       <Switch>
         <Match when={mergedProps.type === "grid"}>
           <VirtualContainer
             items={props.children}
             scrollTarget={scrollTargetElement}
             itemSize={mergedProps.itemSize}
-            crossAxisCount={(measurements) => {
-              console.log(
-                "TEST",
-                measurements,
-                measurements.container.cross / measurements.itemSize.cross
-              );
+            crossAxisCount={() => {
               return props.cols || 3;
             }}
           >
