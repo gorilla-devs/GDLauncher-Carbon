@@ -180,11 +180,10 @@ importers:
       vite: ^3.2.4
       vite-plugin-dts: ^1.7.1
       vitest: ^0.25.6
-    dependencies:
-      '@minht11/solid-virtual-container': 0.2.1_solid-js@1.6.4
     devDependencies:
       '@babel/core': 7.20.5
       '@gd/config': link:../config
+      '@minht11/solid-virtual-container': 0.2.1_solid-js@1.6.4
       '@storybook/addon-actions': 6.5.14_yicqvriqha7ppr6zyvk5y4bjya
       '@storybook/addon-essentials': 6.5.14_pcexcj5hoatmvuqvzd634c66ii
       '@storybook/addon-interactions': 6.5.14_airnygiebsbpdl25l2ujtepxhe
@@ -3397,7 +3396,7 @@ packages:
       solid-js: '>= 1.0.0'
     dependencies:
       solid-js: 1.6.4
-    dev: false
+    dev: true
 
   /@mrmlnc/readdir-enhanced/2.2.1:
     resolution: {integrity: sha512-bPHp6Ji8b41szTOcaP63VlnbbO5Ny6dwAATtY6JTjh5N2OLrb5Qk/Th5cRkRQhkWCt+EJsYrNB0MiL+Gpn6e3g==}
@@ -8562,6 +8561,7 @@ packages:
 
   /csstype/3.1.1:
     resolution: {integrity: sha512-DJR/VvkAvSZW9bTouZue2sSxDwdTN92uHjqeKVm+0dAqdfNykRzQ95tay8aXMBAAPpUiq4Qcug2L7neoRh2Egw==}
+    dev: true
 
   /currently-unhandled/0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
@@ -16268,6 +16268,7 @@ packages:
     resolution: {integrity: sha512-IfJJ1ejAcRTOEB0XXk/J8tzvVNZXAdEuHtWQwTXefUteZPGWOl4aVSOrkoj3y1bjwDayqok3+Vv3TV/j4IhKyw==}
     dependencies:
       csstype: 3.1.1
+    dev: true
 
   /solid-refresh/0.4.1_solid-js@1.6.4:
     resolution: {integrity: sha512-v3tD/OXQcUyXLrWjPW1dXZyeWwP7/+GQNs8YTL09GBq+5FguA6IejJWUvJDrLIA4M0ho9/5zK2e9n+uy+4488g==}
