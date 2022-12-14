@@ -17,6 +17,8 @@ importers:
       '@gd/core': workspace:*
       '@gd/ui': workspace:*
       '@playwright/test': ^1.28.1
+      '@rspc/client': ^0.1.2
+      '@rspc/solid': ^0.1.2
       '@solidjs/router': ^0.5.1
       '@typescript-eslint/parser': ^5.46.0
       chokidar: ^3.5.3
@@ -46,6 +48,8 @@ importers:
       '@gd/core': link:../../packages/core
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.28.1
+      '@rspc/client': 0.1.2
+      '@rspc/solid': 0.1.2_7unfzetqmlehuf72mwv3deaqam
       '@solidjs/router': 0.5.1_solid-js@1.6.4
       '@typescript-eslint/parser': 5.46.0_ha6vam6werchizxrnqvarmz2zu
       chokidar: 3.5.3
@@ -3522,6 +3526,21 @@ packages:
       rollup: 3.7.2
     dev: true
 
+  /@rspc/client/0.1.2:
+    resolution: {integrity: sha512-MfgSZkrqVzzqCN4GU3LKhfy4qG+PS1LpEz/MMays6rtz5EFNJIvEVMA5Ooc+DH8KLe5h4/3bf4dfyEs7czhA2w==}
+    dev: true
+
+  /@rspc/solid/0.1.2_7unfzetqmlehuf72mwv3deaqam:
+    resolution: {integrity: sha512-lnboDerqpCypgHp2dzrr9eltGXN59WiyQgZqYeZCUXTgU92tlJq5yV/1KMtZ0BYmHRIvUDGNJBV2DiRINNqoMg==}
+    peerDependencies:
+      '@tanstack/solid-query': ^4.6.0
+      solid-js: ^1.5.5
+    dependencies:
+      '@rspc/client': 0.1.2
+      '@tanstack/solid-query': 4.19.1_solid-js@1.6.4
+      solid-js: 1.6.4
+    dev: true
+
   /@rushstack/node-core-library/3.53.2:
     resolution: {integrity: sha512-FggLe5DQs0X9MNFeJN3/EXwb+8hyZUTEp2i+V1e8r4Va4JgkjBNY0BuEaQI+3DW6S4apV3UtXU3im17MSY00DA==}
     dependencies:
@@ -5327,6 +5346,19 @@ packages:
     engines: {node: '>=10'}
     dependencies:
       defer-to-connect: 2.0.1
+    dev: true
+
+  /@tanstack/query-core/4.19.1:
+    resolution: {integrity: sha512-Zp0aIose5C8skBzqbVFGk9HJsPtUhRVDVNWIqVzFbGQQgYSeLZMd3Sdb4+EnA5wl1J7X+bre2PJGnQg9x/zHOA==}
+    dev: true
+
+  /@tanstack/solid-query/4.19.1_solid-js@1.6.4:
+    resolution: {integrity: sha512-eYwRXKbmkcaWsGXuhyfCtxYDUGJp6Yp57Vm5sJ9uWJh6wIUax+vii6fF0Mi0R3qzOxtO5xxhyCpL7WRaYvJ9ig==}
+    peerDependencies:
+      solid-js: ^1.5.7
+    dependencies:
+      '@tanstack/query-core': 4.19.1
+      solid-js: 1.6.4
     dev: true
 
   /@testing-library/dom/8.19.0:

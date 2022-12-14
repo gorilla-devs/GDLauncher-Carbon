@@ -1,8 +1,9 @@
 {
   "name": "@gd/core",
   "version": "0.0.1",
-  "main": "./index.js",
+  "main": "./index.ts",
   "files": [
+    "bindings.d.ts",
     "core.node",
     "JavaCheck.class"
   ],

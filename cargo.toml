@@ -4,7 +4,8 @@ members = [
   "packages/app_helper",
   "crates/msauth",
   "crates/java",
-  "crates/minecraft"
+  "crates/minecraft",
+  "crates/rspc_bindings"
 ]
 
 [profile.release]

@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 mod checker;
+pub mod downloader;
 pub mod mc_java;
 mod utils;
 

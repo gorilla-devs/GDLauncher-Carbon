@@ -118,27 +118,20 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
 
     if let Some(subkey_suffix) = subkey_suffix {
         let subkeys = key_reg.enum_keys();
-        for subkey in subkeys {
-            if let Ok(subkey) = subkey {
-                let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
-                let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
-                match subkey_reg.get_value(value) {
-                    Ok(value) => {
-                        let s_value: String = value;
-                        results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
-                    }
-                    Err(_) => continue,
-                };
-            }
+        for subkey in subkeys.flatten() {
+            let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
+            let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
+            match subkey_reg.get_value(value) {
+                Ok(value) => {
+                    let s_value: String = value;
+                    results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
+                }
+                Err(_) => continue,
+            };
         }
     } else {
-        match key_reg.get_value(value) {
-            Ok(value) => {
-                let s_value: String = value;
-                results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
-            }
-            Err(_) => {}
-        };
+        let s_value: String = key_reg.get_value(value)?;
+        results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
     }
     Ok(results)
 }

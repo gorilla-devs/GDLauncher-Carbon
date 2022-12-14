@@ -21,6 +21,8 @@
     "@gd/core": "workspace:*",
     "@gd/ui": "workspace:*",
     "@playwright/test": "^1.28.1",
+    "@rspc/client": "^0.1.2",
+    "@rspc/solid": "^0.1.2",
     "@solidjs/router": "^0.5.1",
     "@typescript-eslint/parser": "^5.46.0",
     "chokidar": "^3.5.3",
