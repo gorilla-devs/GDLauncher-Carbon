@@ -1,5 +1,4 @@
-use anyhow::{bail, Ok, Result};
-use async_zip::read::seek::ZipFileReader;
+use anyhow::{bail, Context, Ok, Result};
 use futures::StreamExt;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
@@ -65,6 +64,7 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     let asset = assets
         .first()
         .ok_or_else(|| anyhow::anyhow!("Can't find a java asset"))?;
+    let release_name = asset.release_name.clone();
 
     // Download to disk
     let mut resp_stream = reqwest::get(&asset.binary.package.link)
@@ -73,7 +73,15 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     let runtime = base_path.join("runtime");
     tokio::fs::create_dir_all(&runtime).await?;
 
-    let mut file = File::create(runtime.join(format!("{}.zip", asset.release_name))).await?;
+    let zip_path = runtime.join(format!("{}.zip", release_name));
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create_new(true)
+        .open(&zip_path)
+        .await
+        .context("Failed to create extracted file")?;
 
     let mut hasher = sha2::Sha256::new();
     while let Some(item) = resp_stream.next().await {
@@ -86,69 +94,68 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
         bail!("Java asset checksum mismatch");
     }
+    let cloned_zip_path = zip_path.clone();
+    tokio::task::spawn_blocking(move || {
+        unzip_file(zip_path, &runtime).unwrap();
+    })
+    .await?;
 
-    // Unzip
-    let mut zip = ZipFileReader::new(&mut file);
+    tokio::fs::remove_file(cloned_zip_path).await?;
 
     Ok(())
 }
 
-fn sanitize_file_path(path: &str) -> PathBuf {
-    // Replaces backwards slashes
-    path.replace('\\', "/")
-        // Sanitizes each component
-        .split('/')
-        .map(sanitize_filename::sanitize)
-        .collect()
-}
+/// Blocking!
+fn unzip_file(fname: PathBuf, dest: &Path) -> Result<()> {
+    let file = std::fs::File::open(&fname).unwrap();
 
-/// Extracts everything from the ZIP archive to the output directory
-async fn unzip_file(archive: File, out_dir: &Path) {
-    let mut reader = ZipFileReader::new(archive)
-        .await
-        .expect("Failed to read ZipFile");
-    for index in 0..reader.file().entries().len() {
-        let entry = &reader.file().entries().get(index).unwrap().entry();
-        let path = out_dir.join(sanitize_file_path(entry.filename()));
-        // If the filename of the entry ends with '/', it is treated as a directory.
-        // This is implemented by previous versions of this crate and the Python Standard Library.
-        // https://docs.rs/async_zip/0.0.8/src/async_zip/read/mod.rs.html#63-65
-        // https://github.com/python/cpython/blob/820ef62833bd2d84a141adedd9a05998595d6b6d/Lib/zipfile.py#L528
-        let entry_is_dir = entry.filename().ends_with('/');
+    let mut archive = zip::ZipArchive::new(file).unwrap();
 
-        let mut entry_reader = reader.entry(index).await.expect("Failed to read ZipEntry");
+    for i in 0..archive.len() {
+        let mut file = archive.by_index(i).unwrap();
+        let outpath = match file.enclosed_name() {
+            Some(path) => Path::new(&dest).join(path),
+            None => continue,
+        };
 
-        if entry_is_dir {
-            // The directory may have been created if iteration is out of order.
-            if !path.exists() {
-                create_dir_all(&path)
-                    .await
-                    .expect("Failed to create extracted directory");
+        {
+            let comment = file.comment();
+            if !comment.is_empty() {
+                println!("File {} comment: {}", i, comment);
             }
+        }
+
+        if (*file.name()).ends_with('/') {
+            println!("File {} extracted to \"{}\"", i, outpath.display());
+            std::fs::create_dir_all(&outpath).unwrap();
         } else {
-            // Creates parent directories. They may not exist if iteration is out of order
-            // or the archive does not contain directory entries.
-            let parent = path
-                .parent()
-                .expect("A file entry should have parent directories");
-            if !parent.is_dir() {
-                create_dir_all(parent)
-                    .await
-                    .expect("Failed to create parent directories");
+            println!(
+                "File {} extracted to \"{}\" ({} bytes)",
+                i,
+                outpath.display(),
+                file.size()
+            );
+            if let Some(p) = outpath.parent() {
+                if !p.exists() {
+                    std::fs::create_dir_all(p).unwrap();
+                }
             }
-            let mut writer = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-                .await
-                .expect("Failed to create extracted file");
-            tokio::io::copy(&mut entry_reader, &mut writer)
-                .await
-                .expect("Failed to copy to extracted file");
+            let mut outfile = std::fs::File::create(&outpath).unwrap();
+            std::io::copy(&mut file, &mut outfile).unwrap();
+        }
 
-            // Closes the file and manipulates its metadata here if you wish to preserve its metadata from the archive.
+        // Get and Set permissions
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            if let Some(mode) = file.unix_mode() {
+                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode)).unwrap();
+            }
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
