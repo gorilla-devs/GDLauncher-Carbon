@@ -105,7 +105,7 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     Ok(())
 }
 
-/// Blocking!
+/// Blocking! Use tokio::task::spawn_blocking or similar to run this in order to not block the tokio runtime
 fn unzip_file(fname: PathBuf, dest: &Path) -> Result<()> {
     let file = std::fs::File::open(&fname).unwrap();
 
