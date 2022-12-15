@@ -1,6 +1,5 @@
-import { Component, createSignal, Show } from "solid-js";
-import { useRoutes, useLocation, useNavigate } from "@solidjs/router";
-import { Transition } from "solid-transition-group";
+import { Component, Show } from "solid-js";
+import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
 import { Notifications } from "@gd/ui";
