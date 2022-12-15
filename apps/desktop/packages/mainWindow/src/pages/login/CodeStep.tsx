@@ -7,8 +7,7 @@ import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
-import { DeviceCode } from "@/components/DeviceCode";
-
+import { DeviceCode } from "@/components/CodeInput";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
