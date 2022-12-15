@@ -6,6 +6,7 @@ export { Pattern } from "./Pattern";
 export { CodeInput } from "./CodeInput";
 export { Carousel } from "./Carousel";
 export { InstanceTile } from "./InstanceTile";
+export { Slider } from "./Slider";
 export { News } from "./News";
 export { Tabs } from "./Tabs";
 export { Progressbar } from "./Progressbar";
