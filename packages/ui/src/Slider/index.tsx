@@ -6,7 +6,7 @@ interface Props {
   max: number;
   value: number;
   // eslint-disable-next-line no-unused-vars
-  onChange?: (val: string) => void;
+  onChange?: (val: string | undefined) => void;
 }
 
 function Slider(props: Props) {
@@ -15,12 +15,12 @@ function Slider(props: Props) {
   onMount(() => {
     if (ref) {
       ref.style.setProperty("--value", ref.value);
-      props?.onChange?.(ref.value);
       ref.style.setProperty("--min", ref.min == "" ? "0" : ref.min);
       ref.style.setProperty("--max", ref.max == "" ? "100" : ref.max);
-      ref.addEventListener("input", () =>
-        ref?.style.setProperty("--value", ref.value)
-      );
+      ref.addEventListener("input", () => {
+        props?.onChange?.(ref?.value);
+        ref?.style.setProperty("--value", ref.value);
+      });
     }
   });
   return (
