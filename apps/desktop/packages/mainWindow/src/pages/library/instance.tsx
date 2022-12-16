@@ -1,9 +1,8 @@
 import { Button, Tabs } from "@gd/ui";
-import { useNavigate, useParams } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 const Instace = () => {
-  const params = useParams();
   const navigate = useNavigate();
 
   return (
@@ -17,13 +16,15 @@ const Instace = () => {
       >
         <div class="mt-64 h-200 bg-black-black">
           <div class="h-65 absolute top-0 left-0">
-            <Button
-              icon={<div class="i-ri:arrow-drop-left-line" />}
-              size="small"
-            >
-              Back
-            </Button>
-            <button onClick={() => navigate("/library")}>back</button>
+            <div class="absolute top-5 left-5">
+              <Button
+                onClick={() => navigate("/library")}
+                icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
+                size="small"
+              >
+                Back
+              </Button>
+            </div>
           </div>
           <div class="mt-65 px-6">
             <Tabs
