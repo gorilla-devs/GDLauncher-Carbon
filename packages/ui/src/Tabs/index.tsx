@@ -24,11 +24,7 @@ function Tabs(props: Props) {
   const mergedProps = mergeProps({ type: "underline" }, props);
 
   const handleClick = (index: number) => {
-    if (activeTab() !== null && activeTab() === index) {
-      setActiveTab(null);
-    } else {
-      setActiveTab(index);
-    }
+    setActiveTab(index);
   };
 
   const Component = () => props.tabs[activeTab() || 0].component;
@@ -88,7 +84,7 @@ function Tabs(props: Props) {
           <BlockTabs />
         </Match>
       </Switch>
-      <div>{Component()}</div>
+      <div class="pt-5">{Component()}</div>
     </div>
   );
 }
