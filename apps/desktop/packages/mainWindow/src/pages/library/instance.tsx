@@ -1,9 +1,41 @@
 import { Button, Tabs } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
+import Overview from "./tabs/Overview";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 const Instace = () => {
   const navigate = useNavigate();
+
+  const tabs = [
+    {
+      name: "Overview",
+      component: <Overview />,
+    },
+    {
+      name: "Mods",
+      component: <div>Mods</div>,
+    },
+    {
+      name: "Resource packs",
+      component: <div>Resource packs</div>,
+    },
+    {
+      name: "Screenshots",
+      component: <div>Screenshots</div>,
+    },
+    {
+      name: "Versions",
+      component: <div>Versions</div>,
+    },
+    {
+      name: "Changelog",
+      component: <div>Changelog</div>,
+    },
+    {
+      name: "Logs",
+      component: <div>Logs</div>,
+    },
+  ];
 
   return (
     <>
@@ -28,19 +60,7 @@ const Instace = () => {
             </div>
           </div>
           <div class="mt-65 px-6">
-            <Tabs
-              tabs={[
-                {
-                  name: "mods",
-                  component: <div>mods jsx</div>,
-                  icon: "image-2-fill",
-                },
-                {
-                  name: "modpacks",
-                  component: <div>modpacks jsx</div>,
-                },
-              ]}
-            />
+            <Tabs tabs={tabs} />
           </div>
         </div>
       </div>
