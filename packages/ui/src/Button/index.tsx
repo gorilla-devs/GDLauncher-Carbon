@@ -29,7 +29,7 @@ function Button(props: Props) {
 
   return (
     <div
-      class={`transition duration-200 ease-in-out font-main max-w-max rounded-full cursor-pointer font-bold flex gap-2 ${
+      class={`transition duration-200 ease-in-out font-main max-w-max rounded-full cursor-pointer font-bold flex items-center gap-2 ${
         props.class || ""
       }`}
       classList={{
