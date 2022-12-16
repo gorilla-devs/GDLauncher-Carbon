@@ -10,6 +10,10 @@ export default {
       options: ["primary", "secondary", "outline", "glow"],
       control: { type: "radio" },
     },
+    size: {
+      options: ["large", "medium", "small"],
+      control: { type: "radio" },
+    },
   },
 };
 
@@ -23,6 +27,7 @@ Primary.args = {
   disabled: false,
   type: "primary",
   children: "Click Here",
+  uppercase: true,
 };
 
 export const Outline = Template.bind({});
@@ -31,6 +36,7 @@ Outline.args = {
   disabled: false,
   type: "outline",
   children: "Click Here",
+  uppercase: true,
 };
 
 export const Icon = Template.bind({});
@@ -41,4 +47,5 @@ Icon.args = {
   children: "Click Here",
   icon: <div class="i-ri:refresh-line" />,
   iconRight: false,
+  uppercase: true,
 };
