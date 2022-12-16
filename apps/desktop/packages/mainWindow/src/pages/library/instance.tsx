@@ -7,13 +7,14 @@ const Instace = () => {
 
   return (
     <>
-      <div
-        class="relative h-full bg-fixed bg-no-repeat max-h-full overflow-auto"
-        style={{
-          "background-image": `url("${headerMockImage}")`,
-          "background-position": "center -5rem",
-        }}
-      >
+      <div class="relative h-full bg-black-black max-h-full overflow-auto">
+        <div
+          class="h-64 absolute top-0 left-0 right-0 bg-fixed bg-cover bg-center bg-no-repeat"
+          style={{
+            "background-image": `url("${headerMockImage}")`,
+            "background-position": "right -5rem",
+          }}
+        />
         <div class="mt-64 h-200 bg-black-black">
           <div class="h-65 absolute top-0 left-0">
             <div class="absolute top-5 left-5">
