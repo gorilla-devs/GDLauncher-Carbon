@@ -1,4 +1,4 @@
-import { Button, CodeInput } from "@gd/ui";
+import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 // import { DeviceCodeObject } from "@gd/core";
 import DoorImage from "/assets/images/door.png";
@@ -7,7 +7,7 @@ import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
-
+import { DeviceCode } from "@/components/CodeInput";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -86,7 +86,7 @@ const CodeStep = (props: Props) => {
       <img src={DoorImage} />
       <div>
         <div class="flex flex-col justify-center items-center">
-          <CodeInput
+          <DeviceCode
             disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
