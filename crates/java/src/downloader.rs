@@ -23,14 +23,14 @@ fn get_download_url(version: &str) -> String {
         "linux" => "linux",
         "windows" => "windows",
         "macos" => "mac",
-        _ => panic!("Unsupported OS"),
+        _ => unreachable!("Unsupported OS"),
     };
 
     let java_arch = match std::env::consts::ARCH {
         "x86_64" => "x64",
         "x86" => "x86",
         "aarch64" => "aarch64",
-        _ => panic!("Unsupported architecture"),
+        _ => unreachable!("Unsupported architecture"),
     };
 
     format!(

@@ -8,7 +8,7 @@ pub mod downloader;
 pub mod mc_java;
 mod utils;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct JavaComponent {
     pub path: String,
     pub arch: JavaArch,
@@ -17,7 +17,7 @@ pub struct JavaComponent {
     pub version: JavaVersion,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub enum JavaArch {
     Amd64,
     X86,
@@ -45,7 +45,7 @@ impl<'a> From<&'a str> for JavaArch {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct JavaVersion {
     pub major: u8,
     pub minor: Option<u8>,
