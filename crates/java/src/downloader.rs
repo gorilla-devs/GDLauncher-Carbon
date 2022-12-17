@@ -34,8 +34,7 @@ fn get_download_url(version: &str) -> String {
     };
 
     format!(
-        "https://api.adoptopenjdk.net/v3/assets/latest/{}/hotspot?architecture={}&image_type=jre&jvm_impl=hotspot&os={}&page=0&page_size=1&project=jdk&sort_method=DEFAULT&sort_order=DESC",
-        version, java_arch, java_os
+        "https://api.adoptopenjdk.net/v3/assets/latest/{version}/hotspot?architecture={java_arch}&image_type=jre&jvm_impl=hotspot&os={java_os}&page=0&page_size=1&project=jdk&sort_method=DEFAULT&sort_order=DESC",
     )
 }
 
@@ -73,7 +72,7 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     let runtime = base_path.join("runtime");
     tokio::fs::create_dir_all(&runtime).await?;
 
-    let zip_path = runtime.join(format!("{}.zip", release_name));
+    let zip_path = runtime.join(format!("{release_name}.zip"));
 
     let mut file = OpenOptions::new()
         .write(true)
@@ -121,7 +120,7 @@ fn unzip_file(fname: PathBuf, dest: &Path) -> Result<()> {
         {
             let comment = file.comment();
             if !comment.is_empty() {
-                println!("File {} comment: {}", i, comment);
+                println!("File {i} comment: {comment}");
             }
         }
 
