@@ -52,11 +52,7 @@ pub async fn download_multiple(
                 Some(size) if path.exists() => {
                     let metadata = tokio::fs::metadata(&path).await;
                     if let Ok(metadata) = metadata {
-                        if metadata.len() == size {
-                            true
-                        } else {
-                            false
-                        }
+                        metadata.len() == size
                     } else {
                         false
                     }
