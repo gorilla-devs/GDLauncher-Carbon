@@ -2,8 +2,8 @@ import { children, mergeProps, Show } from "solid-js";
 
 interface Props {
   children: HTMLElement | string;
-  class?: "primary" | "secondary" | "glow" | "outline";
-  type?: string;
+  class?: string;
+  type?: "primary" | "secondary" | "glow" | "outline";
   disabled?: boolean;
   icon?: Element | any;
   iconRight?: boolean;
