@@ -47,17 +47,27 @@ const Instace = () => {
             "background-position": "right -5rem",
           }}
         />
-        <div class="absolute top-5 left-5">
+        <div class="absolute top-0 left-0 right-0 h-64">
           <Button
+            class="absolute top-5 left-5"
             onClick={() => navigate("/library")}
             icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
             size="small"
           >
             Back
           </Button>
+          <div class="absolute bottom-0 left-0 right-0 flex px-6 gap-4">
+            <div class="h-16 w-16 rounded-xl bg-black-black">
+              {/* <img /> */}
+            </div>
+            <div class="flex flex-col">
+              <h1 class="m-0">Minecraft forge</h1>
+              <div></div>
+            </div>
+          </div>
         </div>
         <div class="mt-64 bg-black-black">
-          <div class="mt-65 p-6 flex justify-center items-center">
+          <div class="mt-64 p-6 flex">
             <div class="max-w-full">
               <Tabs tabs={tabs} />
             </div>
