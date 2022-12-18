@@ -70,9 +70,17 @@ const Instace = () => {
             <div class="flex flex-col">
               <h1 class="m-0">Minecraft forge</h1>
               <div class="flex text-black-lightGray">
-                <div class="px-4">Forge 1.19.2</div>
-                <div class="px-4">1d ago</div>
-                <div class="px-4">ATMTeam</div>
+                <div class="px-4 border-r-2 border-black-gray">
+                  Forge 1.19.2
+                </div>
+                <div class="px-4 border-r-2 border-black-gray flex gap-2 items-center">
+                  <div class="i-ri:time-fill" />
+                  1d ago
+                </div>
+                <div class="px-4 flex gap-2 items-center">
+                  <div class="i-ri:user-fill" />
+                  ATMTeam
+                </div>
               </div>
             </div>
           </div>
