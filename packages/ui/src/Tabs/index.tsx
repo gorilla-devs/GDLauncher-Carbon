@@ -31,7 +31,7 @@ function Tabs(props: Props) {
 
   const UnderlinedTabs = () => {
     return (
-      <div class="flex bg-black-black gap-6	border-b-black-semiblack border-b-1 box-border overflow-auto">
+      <div class="flex bg-black-black gap-6 border-b-black-semiblack border-b-1 box-border overflow-auto">
         <For each={props.tabs}>
           {(tab, i) => (
             <div
@@ -74,7 +74,7 @@ function Tabs(props: Props) {
   };
 
   return (
-    <div class="flex flex-col">
+    <div class="flex flex-col w-full">
       <Switch>
         <Match when={mergedProps.type === "underline"}>
           <UnderlinedTabs />
@@ -83,7 +83,7 @@ function Tabs(props: Props) {
           <BlockTabs />
         </Match>
       </Switch>
-      <div class="pt-5">{Component()}</div>
+      <div class="pt-5 max-w-full">{Component()}</div>
     </div>
   );
 }
