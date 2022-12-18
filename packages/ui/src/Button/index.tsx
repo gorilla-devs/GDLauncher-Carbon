@@ -3,7 +3,7 @@ import { children, mergeProps, Show } from "solid-js";
 interface Props {
   children: HTMLElement | string;
   class?: string;
-  type?: "primary" | "secondary" | "glow" | "outline";
+  type?: "primary" | "secondary" | "glow" | "outline" | "transparent";
   disabled?: boolean;
   icon?: Element | any;
   iconRight?: boolean;
@@ -33,6 +33,7 @@ function Button(props: Props) {
         props.class || ""
       }`}
       classList={{
+        "backdrop-blur-md bg-black-black": mergedProps.type === "transparent",
         "py-4 px-8": mergedProps.size === "large",
         "py-3 px-5": mergedProps.size === "medium",
         "py-2 px-4": mergedProps.size === "small",
@@ -52,6 +53,11 @@ function Button(props: Props) {
         "shadow-md shadow-accent-main bg-accent-main hover:shadow-lg hover:bg-accent-hover":
           isGlow() && !isDisabled(),
         "bg-black-gray text-black-lightGray": isGlow() && isDisabled(),
+      }}
+      style={{
+        ...(mergedProps.type === "transparent" && {
+          background: "rgba(0, 0, 0, 0.4)",
+        }),
       }}
       onClick={(e) => props.onClick?.(e)}
     >
