@@ -58,7 +58,7 @@ const Instace = () => {
         </div>
         <div class="mt-64 bg-black-black">
           <div class="mt-65 p-6 flex justify-center items-center">
-            <div class="w-185">
+            <div class="max-w-full">
               <Tabs tabs={tabs} />
             </div>
           </div>
