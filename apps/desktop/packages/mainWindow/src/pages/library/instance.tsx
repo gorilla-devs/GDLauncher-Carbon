@@ -1,10 +1,11 @@
 import { Button, Tabs } from "@gd/ui";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useParams } from "@solidjs/router";
 import Overview from "./tabs/Overview";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 const Instace = () => {
   const navigate = useNavigate();
+  const params = useParams();
 
   const tabs = [
     {
@@ -58,28 +59,39 @@ const Instace = () => {
             Back
           </Button>
           <div
-            class="absolute bottom-0 left-0 right-0 flex px-6 gap-4"
+            class="absolute bottom-0 left-0 right-0 flex justify-center px-6"
             style={{
               background:
                 "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
             }}
           >
-            <div class="h-16 w-16 rounded-xl bg-black-black">
-              {/* <img /> */}
-            </div>
-            <div class="flex flex-col">
-              <h1 class="m-0">Minecraft forge</h1>
-              <div class="flex text-black-lightGray">
-                <div class="px-4 border-r-2 border-black-gray">
-                  Forge 1.19.2
+            <div class="flex justify-center w-full">
+              <div class="flex justify-between w-full max-w-185">
+                <div class="flex gap-4">
+                  <div class="h-16 w-16 rounded-xl bg-black-black">
+                    {/* <img /> */}
+                  </div>
+                  <div class="flex flex-col max-w-185">
+                    <h1 class="m-0">{params.id}</h1>
+                    <div class="flex text-black-lightGray">
+                      <div class="px-4 border-r-2 border-black-gray">
+                        Forge 1.19.2
+                      </div>
+                      <div class="px-4 border-r-2 border-black-gray flex gap-2 items-center">
+                        <div class="i-ri:time-fill" />
+                        1d ago
+                      </div>
+                      <div class="px-4 flex gap-2 items-center">
+                        <div class="i-ri:user-fill" />
+                        ATMTeam
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="px-4 border-r-2 border-black-gray flex gap-2 items-center">
-                  <div class="i-ri:time-fill" />
-                  1d ago
-                </div>
-                <div class="px-4 flex gap-2 items-center">
-                  <div class="i-ri:user-fill" />
-                  ATMTeam
+                <div class="flex">
+                  <Button uppercase type="glow">
+                    Play
+                  </Button>
                 </div>
               </div>
             </div>
