@@ -1,16 +1,46 @@
-import { mergeProps } from "solid-js";
+import { lazy, mergeProps } from "solid-js";
+import vanillaIcon from "/assets/images/icons/vanilla.png";
+import bookIcon from "/assets/images/icons/book.png";
+import clockIcon from "/assets/images/icons/clock.png";
+import pickAxeIcon from "/assets/images/icons/pickaxe.png";
+import signIcon from "/assets/images/icons/sign.png";
+import cartIcon from "/assets/images/icons/cart.png";
+
+type Icon = "vanilla" | "book" | "cart" | "clock" | "pickaxe" | "sign";
 
 interface Props {
-  icon?: string;
+  icon?: Icon;
   title: string;
   text: string;
 }
 
 const Card = (props: Props) => {
   const mergedProps = mergeProps({ title: "", text: "" }, props);
+
+  const getIcon = (icon: Icon) => {
+    switch (icon) {
+      case "vanilla":
+        return vanillaIcon;
+      case "book":
+        return bookIcon;
+      case "cart":
+        return cartIcon;
+      case "clock":
+        return clockIcon;
+      case "pickaxe":
+        return pickAxeIcon;
+      case "sign":
+        return signIcon;
+      default:
+        return vanillaIcon;
+    }
+  };
+
   return (
     <div class="flex items-center justify-between p-5 h-23 w-59 bg-black-semiblack rounded-xl box-border">
-      <div class="h-13 w-13 bg-black-black rounded-lg"></div>
+      <div class="h-13 w-13 bg-black-black rounded-lg flex justify-center items-center">
+        <img src={getIcon(props.icon || "vanilla")} />
+      </div>
       <div>
         <h5 class="text-black-lightGray uppercase font-medium m-0">
           {mergedProps.title}

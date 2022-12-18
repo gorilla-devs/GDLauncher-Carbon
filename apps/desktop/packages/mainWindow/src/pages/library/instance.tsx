@@ -47,20 +47,20 @@ const Instace = () => {
             "background-position": "right -5rem",
           }}
         />
-        <div class="mt-64 h-200 bg-black-black">
-          <div class="h-65 absolute top-0 left-0">
-            <div class="absolute top-5 left-5">
-              <Button
-                onClick={() => navigate("/library")}
-                icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
-                size="small"
-              >
-                Back
-              </Button>
+        <div class="absolute top-5 left-5">
+          <Button
+            onClick={() => navigate("/library")}
+            icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
+            size="small"
+          >
+            Back
+          </Button>
+        </div>
+        <div class="mt-64 bg-black-black">
+          <div class="mt-65 p-6 flex justify-center items-center">
+            <div class="w-185">
+              <Tabs tabs={tabs} />
             </div>
-          </div>
-          <div class="mt-65 px-6">
-            <Tabs tabs={tabs} />
           </div>
         </div>
       </div>
