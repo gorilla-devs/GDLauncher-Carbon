@@ -20,7 +20,7 @@ interface Props {
 }
 
 function Tabs(props: Props) {
-  const [activeTab, setActiveTab] = createSignal<null | number>(null);
+  const [activeTab, setActiveTab] = createSignal<number>(0);
   const mergedProps = mergeProps({ type: "underline" }, props);
 
   const handleClick = (index: number) => {
