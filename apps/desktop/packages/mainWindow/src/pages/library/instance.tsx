@@ -86,8 +86,8 @@ const Instace = () => {
           </div>
         </div>
         <div class="mt-64 bg-black-black">
-          <div class="mt-64 p-6 flex">
-            <div class="max-w-full">
+          <div class="mt-64 p-6 flex justify-center">
+            <div class="max-w-full w-185">
               <Tabs tabs={tabs} />
             </div>
           </div>
