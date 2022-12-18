@@ -53,6 +53,7 @@ const Instace = () => {
             onClick={() => navigate("/library")}
             icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
             size="small"
+            type="transparent"
           >
             Back
           </Button>
