@@ -59,14 +59,14 @@ const Instace = () => {
             Back
           </Button>
           <div
-            class="absolute bottom-0 left-0 right-0 flex justify-center px-6"
+            class="absolute bottom-0 left-0 right-0 flex justify-center px-6 h-24"
             style={{
               background:
                 "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
             }}
           >
             <div class="flex justify-center w-full">
-              <div class="flex justify-between w-full max-w-185">
+              <div class="flex justify-between items-end w-full max-w-185">
                 <div class="flex gap-4">
                   <div class="h-16 w-16 rounded-xl bg-black-black">
                     {/* <img /> */}
