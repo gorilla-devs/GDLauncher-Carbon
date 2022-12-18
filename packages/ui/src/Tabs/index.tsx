@@ -31,7 +31,7 @@ function Tabs(props: Props) {
 
   const UnderlinedTabs = () => {
     return (
-      <div class="flex bg-black-black gap-6 border-b-black-semiblack border-b-1 box-border overflow-auto">
+      <div class="flex bg-black-black gap-6 min-w-fit	border-b-black-semiblack border-b-1 box-border overflow-auto">
         <For each={props.tabs}>
           {(tab, i) => (
             <div
@@ -57,7 +57,7 @@ function Tabs(props: Props) {
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`flex gap-1 justify-center items-center flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+              class={`flex gap-1 justify-center items-center min-w-fit flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
                 activeTab() === i()
                   ? "text-white bg-black-semiblack"
                   : "text-black-lightGray"
