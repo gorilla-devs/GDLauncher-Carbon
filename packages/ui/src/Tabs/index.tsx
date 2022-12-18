@@ -31,11 +31,11 @@ function Tabs(props: Props) {
 
   const UnderlinedTabs = () => {
     return (
-      <div class="flex bg-black-black gap-6 min-w-fit	border-b-black-semiblack border-b-1 box-border overflow-auto">
+      <div class="flex bg-black-black gap-6	border-b-black-semiblack border-b-1 box-border overflow-auto">
         <For each={props.tabs}>
           {(tab, i) => (
             <div
-              class={`py-4 cursor-pointer relative font-500 capitalize ${
+              class={`py-4 cursor-pointer min-w-fit relative font-500 capitalize ${
                 activeTab() === i() ? "text-white" : "text-black-lightGray"
               }`}
               onClick={() => handleClick(i())}
