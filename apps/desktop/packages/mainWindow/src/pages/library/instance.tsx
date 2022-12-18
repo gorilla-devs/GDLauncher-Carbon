@@ -56,13 +56,23 @@ const Instace = () => {
           >
             Back
           </Button>
-          <div class="absolute bottom-0 left-0 right-0 flex px-6 gap-4">
+          <div
+            class="absolute bottom-0 left-0 right-0 flex px-6 gap-4"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
+            }}
+          >
             <div class="h-16 w-16 rounded-xl bg-black-black">
               {/* <img /> */}
             </div>
             <div class="flex flex-col">
               <h1 class="m-0">Minecraft forge</h1>
-              <div></div>
+              <div class="flex text-black-lightGray">
+                <div class="px-4">Forge 1.19.2</div>
+                <div class="px-4">1d ago</div>
+                <div class="px-4">ATMTeam</div>
+              </div>
             </div>
           </div>
         </div>
