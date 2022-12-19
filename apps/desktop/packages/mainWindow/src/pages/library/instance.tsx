@@ -40,7 +40,12 @@ const Instace = () => {
 
   return (
     <>
-      <div class="relative h-full bg-black-black max-h-full overflow-auto">
+      <div
+        class="relative h-full bg-black-black max-h-full overflow-auto"
+        // style={{
+        //   "scrollbar-gutter": "stable",
+        // }}
+      >
         <div
           class="h-64 absolute top-0 left-0 right-0 bg-fixed bg-cover bg-center bg-no-repeat"
           style={{
