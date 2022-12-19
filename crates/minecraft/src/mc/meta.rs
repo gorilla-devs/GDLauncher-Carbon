@@ -60,7 +60,7 @@ impl Version {
         let resp = match try_download().await {
             Ok(resp) => {
                 if !meta_dir.exists() {
-                    std::fs::create_dir_all(&meta_dir)?;
+                    tokio::fs::create_dir_all(&meta_dir).await?;
                 }
 
                 let meta_path = meta_dir.join(format!("{}.json", self.id));
