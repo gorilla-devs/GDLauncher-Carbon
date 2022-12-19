@@ -42,9 +42,9 @@ const Instace = () => {
     <>
       <div
         class="relative h-full bg-black-black max-h-full overflow-auto"
-        // style={{
-        //   "scrollbar-gutter": "stable",
-        // }}
+        style={{
+          "scrollbar-gutter": "stable",
+        }}
       >
         <div
           class="h-64 absolute top-0 left-0 right-0 bg-fixed bg-cover bg-center bg-no-repeat"
@@ -93,7 +93,23 @@ const Instace = () => {
                     </div>
                   </div>
                 </div>
-                <div class="flex">
+                <div class="flex items-center gap-2">
+                  <div
+                    class="rounded-full w-8 h-8 flex justify-center items-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.1)",
+                    }}
+                  >
+                    <div class="i-ri:more-2-fill text-xl" />
+                  </div>
+                  <div
+                    class="rounded-full w-8 h-8 flex justify-center items-center"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.1)",
+                    }}
+                  >
+                    <div class="i-ri:star-s-fill text-xl" />
+                  </div>
                   <Button uppercase type="glow">
                     Play
                   </Button>
