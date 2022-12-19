@@ -1,6 +1,9 @@
+use std::path::Path;
+
 use super::version::Version as VersionManifest;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,12 +43,43 @@ pub enum Type {
 
 impl Version {
     #[tracing::instrument]
-    pub async fn get_version_meta(&self) -> Result<VersionManifest> {
-        trace!("Downloading version manifest for {}", self.id);
-        let resp = reqwest::get(&self.url)
-            .await?
-            .json::<VersionManifest>()
-            .await?;
+    pub async fn get_version_meta(&self, base_path: &Path) -> Result<VersionManifest> {
+        trace!("Getting version manifest for {}", self.id);
+
+        let try_download = || async move {
+            let resp = reqwest::get(&self.url)
+                .await?
+                .json::<VersionManifest>()
+                .await?;
+
+            Ok::<_, anyhow::Error>(resp)
+        };
+
+        let meta_dir = base_path.join("meta");
+
+        let resp = match try_download().await {
+            Ok(resp) => {
+                if !meta_dir.exists() {
+                    std::fs::create_dir_all(&meta_dir)?;
+                }
+
+                let meta_path = meta_dir.join(format!("{}.json", self.id));
+
+                let mut file = tokio::fs::File::create(&meta_path).await?;
+                file.write_all(serde_json::to_string(&resp)?.as_bytes())
+                    .await?;
+                resp
+            }
+            Err(e) => {
+                trace!("Failed to download asset index meta: {e}. Fallback to trying reading cached file");
+                let meta_path = meta_dir.join(format!("{}.json", self.id));
+
+                let mut file = tokio::fs::File::open(&meta_path).await?;
+                let mut file_str = String::new();
+                file.read_to_string(&mut file_str).await?;
+                serde_json::from_str(&file_str)?
+            }
+        };
 
         Ok(resp)
     }

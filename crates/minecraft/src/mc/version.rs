@@ -1,8 +1,14 @@
-use std::{borrow::Borrow, path::PathBuf};
+use std::{
+    borrow::Borrow,
+    path::{Path, PathBuf},
+};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, trace};
+
+use crate::net::Download;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,9 +109,60 @@ impl Version {
         merged
     }
 
-    pub async fn retrieve_asset_index_meta(&self) -> Result<super::assets::AssetIndex> {
-        let url = self.asset_index.as_ref().unwrap().url.clone();
-        let resp = reqwest::get(&url).await?.json().await?;
+    pub async fn get_asset_index_meta(
+        &self,
+        base_path: &Path,
+    ) -> Result<super::assets::AssetIndex> {
+        let try_download = || async move {
+            let url = self
+                .asset_index
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("No asset index"))?
+                .url
+                .clone();
+            let resp = reqwest::get(&url)
+                .await?
+                .json::<super::assets::AssetIndex>()
+                .await?;
+
+            Ok::<_, anyhow::Error>(resp)
+        };
+
+        let meta_dir = base_path.join("meta");
+
+        let resp = match try_download().await {
+            Ok(resp) => {
+                if !meta_dir.exists() {
+                    std::fs::create_dir_all(&meta_dir)?;
+                }
+
+                let meta_path = meta_dir.join(format!(
+                    "{}.json",
+                    self.id
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("No id for asset"))?
+                ));
+
+                let mut file = tokio::fs::File::create(&meta_path).await?;
+                file.write_all(serde_json::to_string(&resp)?.as_bytes())
+                    .await?;
+                resp
+            }
+            Err(e) => {
+                trace!("Failed to download asset index meta: {e}. Fallback to trying reading cached file");
+                let meta_path = meta_dir.join(format!(
+                    "{}.json",
+                    self.id
+                        .as_ref()
+                        .ok_or_else(|| anyhow::anyhow!("No id for asset"))?
+                ));
+
+                let mut file = tokio::fs::File::open(&meta_path).await?;
+                let mut file_str = String::new();
+                file.read_to_string(&mut file_str).await?;
+                serde_json::from_str(&file_str)?
+            }
+        };
 
         Ok(resp)
     }
@@ -121,31 +178,31 @@ impl Version {
     }
 
     #[tracing::instrument]
-    pub async fn download_allowed_libraries(&self) -> Result<()> {
+    pub async fn get_allowed_libraries(
+        &self,
+        base_path: &Path,
+    ) -> Result<Vec<crate::net::Download>> {
         let libraries = self.filter_allowed_libraries();
 
-        let downloads: Vec<crate::net::Download> = libraries
-            .iter()
-            .filter_map(|library| (*library).try_into().ok())
-            .collect::<Vec<_>>();
+        let mut downloads: Vec<crate::net::Download> = vec![];
 
-        trace!("Downloading libraries {downloads:#?}");
+        for library in libraries {
+            let lib: Result<Download, anyhow::Error> = library.try_into();
+            if let Ok(mut lib) = lib {
+                lib.path = base_path.join(lib.path); // how do we do this from inside the TryFrom impl?
+                downloads.push(lib);
+            }
 
-        let (progress, mut progress_handle) = tokio::sync::watch::channel(0);
-
-        let length = &downloads.len();
-        let handle = tokio::spawn(async move {
-            crate::net::download_multiple(downloads, progress).await?;
-            Ok::<(), anyhow::Error>(())
-        });
-
-        while progress_handle.changed().await.is_ok() {
-            trace!("Progress: {} - {}", *progress_handle.borrow(), length);
+            if let Some(natives) = &library.downloads.classifiers {
+                let native: Result<Download, anyhow::Error> = natives.try_into();
+                if let Ok(mut native) = native {
+                    native.path = base_path.join(native.path); // how do we do this from inside the TryFrom impl?
+                    downloads.push(native);
+                }
+            }
         }
 
-        handle.await??;
-
-        Ok(())
+        Ok(downloads)
     }
 }
 
@@ -286,7 +343,7 @@ impl TryFrom<&Library> for crate::net::Download {
             value.downloads.artifact.clone().ok_or_else(|| {
                 anyhow::anyhow!("Could not find artifact for library {}", value.name)
             })?;
-        let path = std::env::current_dir()?.join("libraries").join(
+        let path = PathBuf::new().join("libraries").join(
             artifact
                 .path
                 .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
@@ -320,6 +377,88 @@ pub struct Classifiers {
     pub sources: Option<MappingsClass>,
     #[serde(rename = "natives-osx")]
     pub natives_osx: Option<MappingsClass>,
+}
+
+impl TryFrom<&Classifiers> for crate::net::Download {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Classifiers) -> Result<Self, Self::Error> {
+        let classifier = value.clone();
+        let download = match std::env::consts::OS {
+            "windows" => {
+                if let Some(windows) = classifier.natives_windows {
+                    let path = PathBuf::new().join("libraries").join(
+                        windows
+                            .path
+                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
+                    );
+                    let checksum = Some(crate::net::Checksum::Sha1(windows.sha1));
+
+                    crate::net::Download {
+                        url: windows.url,
+                        path,
+                        checksum,
+                        size: Some(windows.size),
+                    }
+                } else {
+                    bail!("No windows natives");
+                }
+            }
+            "macos" => {
+                if let Some(macos) = classifier.natives_macos {
+                    let path = PathBuf::new().join("libraries").join(
+                        macos
+                            .path
+                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
+                    );
+                    let checksum = Some(crate::net::Checksum::Sha1(macos.sha1));
+
+                    crate::net::Download {
+                        url: macos.url,
+                        path,
+                        checksum,
+                        size: Some(macos.size),
+                    }
+                } else if let Some(osx) = classifier.natives_osx {
+                    let path = PathBuf::new()
+                        .join("libraries")
+                        .join(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
+                    let checksum = Some(crate::net::Checksum::Sha1(osx.sha1));
+
+                    crate::net::Download {
+                        url: osx.url,
+                        path,
+                        checksum,
+                        size: Some(osx.size),
+                    }
+                } else {
+                    bail!("No macos natives");
+                }
+            }
+            "linux" => {
+                if let Some(linux) = classifier.natives_linux {
+                    let path = PathBuf::new().join("libraries").join(
+                        linux
+                            .path
+                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
+                    );
+                    let checksum = Some(crate::net::Checksum::Sha1(linux.sha1));
+
+                    crate::net::Download {
+                        url: linux.url,
+                        path,
+                        checksum,
+                        size: Some(linux.size),
+                    }
+                } else {
+                    bail!("No linux natives");
+                }
+            }
+            _ => bail!("Unknown OS"),
+        };
+
+        Ok(download)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

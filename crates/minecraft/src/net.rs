@@ -23,9 +23,15 @@ pub struct Download {
     pub size: Option<u64>,
 }
 
+#[derive(Debug)]
+pub struct Progress {
+    pub current_count: u64,
+    pub current_size: u64,
+}
+
 pub async fn download_multiple(
     files: Vec<Download>,
-    progress: tokio::sync::watch::Sender<i32>,
+    progress: tokio::sync::watch::Sender<Progress>,
 ) -> Result<()> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build().unwrap();
@@ -35,7 +41,7 @@ pub async fn download_multiple(
 
     let downloads = Arc::new(tokio::sync::Semaphore::new(10));
 
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<()>>> = vec![];
+    let mut tasks: Vec<tokio::task::JoinHandle<Result<_>>> = vec![];
 
     for file in files {
         let semaphore = Arc::clone(&downloads);
@@ -81,7 +87,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha1(ref hash)) => {
                         let finalized = sha1.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return Ok(());
+                            return Ok(file.size);
                         } else {
                             println!(
                                 "Hash mismatch sha1 for file: {} - expected: {hash} - got: {}",
@@ -93,7 +99,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha256(ref hash)) => {
                         let finalized = sha256.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return Ok(());
+                            return Ok(file.size);
                         } else {
                             println!(
                                 "Hash mismatch sha256 for file: {} - expected: {hash} - got: {}",
@@ -148,16 +154,19 @@ pub async fn download_multiple(
                 None => {}
             }
 
-            Ok(())
+            Ok(file.size)
         }));
     }
 
-    let mut count = 0;
+    let mut curr_size = 0;
 
-    for task in tasks {
-        task.await??;
-        count += 1;
-        progress.send(count)?;
+    for (curr_count, task) in tasks.into_iter().enumerate() {
+        let res = task.await??;
+        curr_size += res.unwrap_or(0);
+        progress.send(Progress {
+            current_count: curr_count as u64,
+            current_size: curr_size / 1024 / 1024,
+        })?;
     }
 
     Ok(())

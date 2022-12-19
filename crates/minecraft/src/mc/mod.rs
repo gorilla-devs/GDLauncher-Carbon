@@ -11,12 +11,15 @@ mod test {
     async fn test_versions_meta() {
         // Test latest and download assets
         let meta = McMeta::download_meta().await.unwrap();
-
+        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
         // Test all versions meta
         let tasks: Vec<_> = meta
             .versions
             .into_iter()
-            .map(|version| tokio::spawn(async move { version.get_version_meta().await.unwrap() }))
+            .map(|version| {
+                let base_dir = base_dir.clone();
+                tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
+            })
             .collect();
 
         for task in tasks {
@@ -30,29 +33,64 @@ mod test {
 
         let version = meta.latest.version_for_release(&meta);
 
-        let version_meta = version.get_version_meta().await.unwrap();
+        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
+
+        let version_meta = version.get_version_meta(&base_dir).await.unwrap();
+
+        let mut downloads = vec![];
 
         let asset_index = version_meta
-            .retrieve_asset_index_meta()
+            .get_asset_index_meta(&base_dir)
             .await
             .expect("Failed to get asset index meta");
 
-        asset_index
-            .download_assets(std::env::current_dir().unwrap().join("assets"))
+        let assets = asset_index
+            .get_asset_downloads(&base_dir)
             .await
             .expect("Failed to download assets");
+        downloads.extend(assets);
 
-        version_meta
-            .download_allowed_libraries()
+        let libs = version_meta
+            .get_allowed_libraries(&base_dir)
             .await
             .expect("Failed to get libraries");
+        downloads.extend(libs);
 
-        tokio::fs::remove_dir_all(std::env::current_dir().unwrap().join("assets"))
+        println!("Downloading {downloads:#?}");
+
+        let total_size = downloads
+            .iter()
+            .map(|download| download.size.unwrap_or(0))
+            .sum::<u64>()
+            / 1024
+            / 1024;
+
+        let (progress, mut progress_handle) = tokio::sync::watch::channel(crate::net::Progress {
+            current_count: 0,
+            current_size: 0,
+        });
+
+        let length = &downloads.len();
+        let handle = tokio::spawn(async move {
+            crate::net::download_multiple(downloads, progress).await?;
+            Ok::<(), anyhow::Error>(())
+        });
+
+        while progress_handle.changed().await.is_ok() {
+            println!(
+                "Progress: {} / {} - {} / {} MB",
+                progress_handle.borrow().current_count,
+                length - 1,
+                progress_handle.borrow().current_size,
+                total_size
+            );
+        }
+
+        handle.await.unwrap().unwrap();
+
+        tokio::fs::remove_dir_all(base_dir)
             .await
-            .expect("Failed to remove assets");
-        tokio::fs::remove_dir_all(std::env::current_dir().unwrap().join("libraries"))
-            .await
-            .expect("Failed to remove libraries");
+            .expect("Failed to remove");
 
         // Should test
         // - Cancellation

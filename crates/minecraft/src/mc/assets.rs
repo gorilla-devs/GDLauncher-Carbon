@@ -23,13 +23,17 @@ pub struct Object {
 
 impl AssetIndex {
     #[tracing::instrument]
-    pub async fn download_assets(&self, assets_path: PathBuf) -> Result<()> {
+    pub async fn get_asset_downloads(
+        &self,
+        base_path: &PathBuf,
+    ) -> Result<Vec<crate::net::Download>> {
         trace!("Downloading assets");
 
         let mut files: Vec<crate::net::Download> = vec![];
 
         for (path, object) in self.objects.iter() {
-            let file_path = assets_path.join(path);
+            // TODO: handle directories for different versions (virtual legacy)
+            let asset_path = base_path.join("assets").join(path);
 
             files.push(crate::net::Download {
                 url: format!(
@@ -37,28 +41,12 @@ impl AssetIndex {
                     &object.hash[0..2],
                     &object.hash
                 ),
-                path: file_path,
+                path: asset_path,
                 checksum: Some(crate::net::Checksum::Sha1(object.hash.clone())),
                 size: Some(object.size as u64),
             });
         }
 
-        let (progress, mut receiver) = tokio::sync::watch::channel(0);
-        let mut last_progress = 0;
-        let download_handle = tokio::spawn(async move {
-            download_multiple(files, progress).await?;
-            Ok(())
-        });
-
-        while (receiver.changed().await).is_ok() {
-            if *receiver.borrow() != last_progress {
-                last_progress = *receiver.borrow();
-                trace!("Downloaded {} - {}", *receiver.borrow(), self.objects.len());
-            }
-        }
-
-        download_handle.await??;
-
-        Ok(())
+        Ok(files)
     }
 }
