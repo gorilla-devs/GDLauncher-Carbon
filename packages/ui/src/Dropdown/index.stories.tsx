@@ -22,4 +22,6 @@ Main.args = {
   ],
   value: "key2",
   onChange: (option) => console.log("change:", option),
+  error: false,
+  disabled: false,
 };
