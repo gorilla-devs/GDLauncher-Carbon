@@ -1,4 +1,4 @@
-import { createSignal, For } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 
 interface Option {
   label: string;
@@ -10,6 +10,8 @@ interface Props {
   value: string;
   error?: boolean;
   disabled?: boolean;
+  rounded?: boolean;
+  label?: string;
   // eslint-disable-next-line no-unused-vars
   onChange: (option: Option) => void;
 }
@@ -31,11 +33,22 @@ function Dropdown(props: Props) {
 
   return (
     <div class="inline-block relative">
+      <Show when={!props.rounded && props.label}>
+        <p
+          class="mt-0 mb-2 font-bold"
+          classList={{
+            "text-white": !props.disabled,
+            "text-black-lightGray": props.disabled,
+          }}
+        >
+          {props.label}
+        </p>
+      </Show>
       <button
-        class="group flex justify-between bg-black-semiblack font-semibold py-2 px-4 rounded-full inline-flex items-center min-w-45 min-h-10 box-border"
+        class="group flex justify-between bg-black-semiblack font-semibold py-2 px-4 inline-flex items-center min-w-45 min-h-10 box-border"
         onClick={() => {
           if (props.disabled) return;
-          setMenuOpened(true);
+          setMenuOpened(!menuOpened());
         }}
         onBlur={() => {
           setMenuOpened(false);
@@ -43,16 +56,19 @@ function Dropdown(props: Props) {
         classList={{
           "border-0": !props.error,
           "border-1 border-status-red": props.error,
-          "text-black-lightGray hover:text-white": !props.disabled,
+          "text-black-lightGray hover:text-white":
+            !props.disabled && !props.error,
           "text-black-gray": props.error,
+          "rounded-full": props.rounded,
+          rounded: !props.rounded,
         }}
       >
         <span
           classList={{
             "text-white": props.error,
             "text-black-lightGray hover:text-white group-hover:text-white":
-              !props.disabled,
-            "text-black-gray": props.error,
+              !props.disabled && !props.error,
+            "text-black-gray": props.disabled,
           }}
         >
           {selectedValue()}
@@ -62,8 +78,10 @@ function Dropdown(props: Props) {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-black-lightGray group-hover:text-white": !props.disabled,
-            "text-black-gray": props.error,
+            "text-black-lightGray group-hover:text-white":
+              !props.disabled && !props.error,
+            "text-white": props.error,
+            "text-black-gray": props.disabled,
           }}
         />
       </button>

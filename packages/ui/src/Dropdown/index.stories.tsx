@@ -24,4 +24,6 @@ Main.args = {
   onChange: (option) => console.log("change:", option),
   error: false,
   disabled: false,
+  rounded: true,
+  label: "Name",
 };
