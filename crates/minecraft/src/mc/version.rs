@@ -1,5 +1,6 @@
 use std::{
     borrow::Borrow,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -128,7 +129,7 @@ impl Version {
             Ok::<_, anyhow::Error>(resp)
         };
 
-        let meta_dir = base_path.join("meta");
+        let meta_dir = base_path.join("assets").join("meta");
 
         let resp = match try_download().await {
             Ok(resp) => {
@@ -189,20 +190,98 @@ impl Version {
         for library in libraries {
             let lib: Result<Download, anyhow::Error> = library.try_into();
             if let Ok(mut lib) = lib {
-                lib.path = base_path.join(lib.path); // how do we do this from inside the TryFrom impl?
+                lib.path = base_path.join("libraries").join(lib.path); // how do we do this from inside the TryFrom impl?
                 downloads.push(lib);
             }
 
             if let Some(natives) = &library.downloads.classifiers {
                 let native: Result<Download, anyhow::Error> = natives.try_into();
                 if let Ok(mut native) = native {
-                    native.path = base_path.join(native.path); // how do we do this from inside the TryFrom impl?
+                    native.path = base_path.join("libraries").join(native.path); // how do we do this from inside the TryFrom impl?
                     downloads.push(native);
                 }
             }
         }
 
         Ok(downloads)
+    }
+
+    pub async fn get_jar_client(&self, base_path: &Path) -> Result<crate::net::Download> {
+        let jar = &self
+            .downloads
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No downloads"))?
+            .client;
+
+        let version_id = self
+            .id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No id for client jar"))?;
+
+        let jar_path = base_path
+            .join("clients")
+            .join(version_id)
+            .join(format!("{version_id}.jar"));
+
+        Ok(crate::net::Download::new(jar.url.clone(), jar_path)
+            .with_checksum(crate::net::Checksum::Sha1(jar.sha1.clone()))
+            .with_size(jar.size))
+    }
+
+    pub async fn extract_natives(&self, base_path: &Path) -> Result<()> {
+        let libraries = self.filter_allowed_libraries();
+
+        for library in libraries {
+            println!("Extracting natives for {library:#?}");
+            if let Some(natives) = &library.downloads.classifiers {
+                let native: Result<Download, anyhow::Error> = natives.try_into();
+                if let Ok(native) = native {
+                    let native_lib_path = base_path.join("libraries").join(native.path);
+                    let extract_dir = base_path.join("natives");
+                    if !extract_dir.exists() {
+                        tokio::fs::create_dir_all(&extract_dir).await?;
+                    }
+                    let mut exclude = vec![];
+                    if let Some(extract) = &library.extract {
+                        exclude.extend(extract.exclude.clone());
+                    }
+
+                    let jh = tokio::task::spawn_blocking(move || async move {
+                        trace!(
+                            "Extracting natives PATH for {native_lib_path:#?} to {extract_dir:#?}"
+                        );
+                        let file = std::fs::File::open(&native_lib_path)?;
+
+                        let mut archive = zip::ZipArchive::new(file)?;
+
+                        'outer_zip: for i in 0..archive.len() {
+                            let mut file = archive.by_index(i)?;
+                            let outpath = file.name();
+
+                            for pattern in &exclude {
+                                if outpath.starts_with(pattern.as_str()) {
+                                    continue 'outer_zip;
+                                }
+                            }
+
+                            if (file.name()).ends_with('/') {
+                                std::fs::create_dir_all(&extract_dir.join(outpath))?;
+                            } else {
+                                let mut outfile =
+                                    std::fs::File::create(&extract_dir.join(outpath))?;
+                                std::io::copy(&mut file, &mut outfile)?;
+                            }
+                        }
+
+                        Ok::<_, anyhow::Error>(())
+                    });
+
+                    jh.await?.await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -387,7 +466,7 @@ impl TryFrom<&Classifiers> for crate::net::Download {
         let download = match std::env::consts::OS {
             "windows" => {
                 if let Some(windows) = classifier.natives_windows {
-                    let path = PathBuf::new().join("libraries").join(
+                    let path = PathBuf::from(
                         windows
                             .path
                             .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
@@ -406,23 +485,21 @@ impl TryFrom<&Classifiers> for crate::net::Download {
             }
             "macos" => {
                 if let Some(macos) = classifier.natives_macos {
-                    let path = PathBuf::new().join("libraries").join(
-                        macos
-                            .path
-                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
-                    );
+                    let path = macos
+                        .path
+                        .ok_or_else(|| anyhow::anyhow!("No path in lib"))?;
+
                     let checksum = Some(crate::net::Checksum::Sha1(macos.sha1));
 
                     crate::net::Download {
                         url: macos.url,
-                        path,
+                        path: PathBuf::from(path),
                         checksum,
                         size: Some(macos.size),
                     }
                 } else if let Some(osx) = classifier.natives_osx {
-                    let path = PathBuf::new()
-                        .join("libraries")
-                        .join(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
+                    let path =
+                        PathBuf::from(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
                     let checksum = Some(crate::net::Checksum::Sha1(osx.sha1));
 
                     crate::net::Download {
@@ -437,7 +514,7 @@ impl TryFrom<&Classifiers> for crate::net::Download {
             }
             "linux" => {
                 if let Some(linux) = classifier.natives_linux {
-                    let path = PathBuf::new().join("libraries").join(
+                    let path = PathBuf::from(
                         linux
                             .path
                             .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,

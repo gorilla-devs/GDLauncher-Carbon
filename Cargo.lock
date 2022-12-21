@@ -1074,6 +1074,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-test",
+ "zip",
 ]
 
 [[package]]

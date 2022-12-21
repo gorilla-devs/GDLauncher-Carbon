@@ -17,6 +17,7 @@ sha1 = "0.10.5"
 futures = { version = "0.3.25" }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
+zip = "0.6.3"
 
 [dev-dependencies]
 tracing-test = "0.2.3"

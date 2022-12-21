@@ -31,11 +31,16 @@ mod test {
     async fn test_download_mc() {
         let meta = McMeta::download_meta().await.unwrap();
 
-        let version = meta.latest.version_for_release(&meta);
-
         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
 
-        let version_meta = version.get_version_meta(&base_dir).await.unwrap();
+        let version_meta = meta
+            .versions
+            .iter()
+            .find(|version| version.id == "1.12.2")
+            .unwrap()
+            .get_version_meta(&base_dir)
+            .await
+            .unwrap();
 
         let mut downloads = vec![];
 
@@ -55,6 +60,12 @@ mod test {
             .await
             .expect("Failed to get libraries");
         downloads.extend(libs);
+
+        let client = version_meta
+            .get_jar_client(&base_dir)
+            .await
+            .expect("Failed to get client download");
+        downloads.push(client);
 
         println!("Downloading {downloads:#?}");
 
@@ -88,9 +99,11 @@ mod test {
 
         handle.await.unwrap().unwrap();
 
-        tokio::fs::remove_dir_all(base_dir)
-            .await
-            .expect("Failed to remove");
+        version_meta.extract_natives(&base_dir).await.unwrap();
+
+        // tokio::fs::remove_dir_all(base_dir)
+        //     .await
+        //     .expect("Failed to remove");
 
         // Should test
         // - Cancellation

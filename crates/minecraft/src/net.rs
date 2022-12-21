@@ -23,6 +23,27 @@ pub struct Download {
     pub size: Option<u64>,
 }
 
+impl Download {
+    pub fn new(url: String, path: PathBuf) -> Self {
+        Self {
+            url,
+            path,
+            checksum: None,
+            size: None,
+        }
+    }
+
+    pub fn with_checksum(mut self, checksum: Checksum) -> Self {
+        self.checksum = Some(checksum);
+        self
+    }
+
+    pub fn with_size(mut self, size: u64) -> Self {
+        self.size = Some(size);
+        self
+    }
+}
+
 #[derive(Debug)]
 pub struct Progress {
     pub current_count: u64,

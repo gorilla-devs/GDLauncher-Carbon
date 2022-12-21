@@ -95,3 +95,4 @@ target
 packages/ui/src/style.dist.css
 apps/desktop/data
 packages/core/data
+MC_TEST
