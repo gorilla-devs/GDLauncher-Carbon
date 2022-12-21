@@ -37,3 +37,10 @@ rspc_bindings = { path = "../../crates/rspc_bindings" }
 napi-build = "2"
 rspc = { version = "0.1.2", features = ["axum"] }
 rspc_bindings = { path = "../../crates/rspc_bindings" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = "symbols"

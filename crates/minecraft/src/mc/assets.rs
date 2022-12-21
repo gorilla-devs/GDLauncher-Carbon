@@ -31,9 +31,13 @@ impl AssetIndex {
 
         let mut files: Vec<crate::net::Download> = vec![];
 
-        for (path, object) in self.objects.iter() {
+        for (_, object) in self.objects.iter() {
             // TODO: handle directories for different versions (virtual legacy)
-            let asset_path = base_path.join("assets").join(path);
+            let asset_path = base_path
+                .join("assets")
+                .join("objects")
+                .join(&object.hash[0..2])
+                .join(&object.hash);
 
             files.push(crate::net::Download {
                 url: format!(

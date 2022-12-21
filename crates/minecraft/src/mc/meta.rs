@@ -55,7 +55,7 @@ impl Version {
             Ok::<_, anyhow::Error>(resp)
         };
 
-        let meta_dir = base_path.join("meta");
+        let meta_dir = base_path.join("meta").join("mc");
 
         let resp = match try_download().await {
             Ok(resp) => {

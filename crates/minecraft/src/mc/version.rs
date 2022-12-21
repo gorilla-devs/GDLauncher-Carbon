@@ -129,7 +129,7 @@ impl Version {
             Ok::<_, anyhow::Error>(resp)
         };
 
-        let meta_dir = base_path.join("assets").join("meta");
+        let meta_dir = base_path.join("assets").join("indexes");
 
         let resp = match try_download().await {
             Ok(resp) => {
@@ -218,10 +218,7 @@ impl Version {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No id for client jar"))?;
 
-        let jar_path = base_path
-            .join("clients")
-            .join(version_id)
-            .join(format!("{version_id}.jar"));
+        let jar_path = base_path.join("clients").join(format!("{version_id}.jar"));
 
         Ok(crate::net::Download::new(jar.url.clone(), jar_path)
             .with_checksum(crate::net::Checksum::Sha1(jar.sha1.clone()))
@@ -422,7 +419,7 @@ impl TryFrom<&Library> for crate::net::Download {
             value.downloads.artifact.clone().ok_or_else(|| {
                 anyhow::anyhow!("Could not find artifact for library {}", value.name)
             })?;
-        let path = PathBuf::new().join("libraries").join(
+        let path = PathBuf::new().join(
             artifact
                 .path
                 .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,

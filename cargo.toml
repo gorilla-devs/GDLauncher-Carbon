@@ -1,7 +1,7 @@
 [workspace]
 members = [
+  "apps/installer/src-tauri",
   "packages/core",
-  "packages/app_helper",
   "crates/msauth",
   "crates/java",
   "crates/minecraft",
