@@ -72,23 +72,25 @@ const Instace = () => {
           >
             <div class="flex justify-center w-full">
               <div class="flex justify-between items-end w-full max-w-185">
-                <div class="flex flex-col lg:flex-row gap-4 justify-end">
+                <div class="flex flex-col lg:flex-row gap-4 justify-end w-full">
                   <div class="h-16 w-16 rounded-xl bg-black-black">
                     {/* <img /> */}
                   </div>
                   <div class="flex flex-1 flex-col max-w-185 ">
                     <h1 class="m-0">{params.id}</h1>
-                    <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-black-lightGray">
-                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-black-gray">
-                        Forge 1.19.2
-                      </div>
-                      <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-black-gray flex gap-2 items-center">
-                        <div class="i-ri:time-fill" />
-                        1d ago
-                      </div>
-                      <div class="p-0 lg:px-4 flex gap-2 items-center">
-                        <div class="i-ri:user-fill" />
-                        ATMTeam
+                    <div class="flex flex-col lg:flex-row justify-between">
+                      <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-black-lightGray">
+                        <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-black-gray">
+                          Forge 1.19.2
+                        </div>
+                        <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-black-gray flex gap-2 items-center">
+                          <div class="i-ri:time-fill" />
+                          1d ago
+                        </div>
+                        <div class="p-0 lg:px-4 flex gap-2 items-center">
+                          <div class="i-ri:user-fill" />
+                          ATMTeam
+                        </div>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <div
