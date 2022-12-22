@@ -1,21 +1,25 @@
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use crate::instance::Instance;
 
 use super::{ModLoaderVersion, Modloader, ModloaderVersion};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct ForgeModloader {
     mod_loader_version: ModLoaderVersion,
+    instance_ref: Weak<Mutex<Instance>>,
 }
 
 impl Modloader for ForgeModloader {
-    fn new(mod_loader_version: ModLoaderVersion, instance: Arc<Instance>) -> Self {
-        ForgeModloader { mod_loader_version }
+    fn new(mod_loader_version: ModLoaderVersion, instance: Weak<Mutex<Instance>>) -> Self {
+        ForgeModloader {
+            mod_loader_version,
+            instance_ref: instance,
+        }
     }
     fn install(&self, progress_rcv: mpsc::Sender<()>) -> Result<()> {
         Ok(())

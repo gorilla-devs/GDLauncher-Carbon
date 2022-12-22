@@ -7,20 +7,28 @@ pub enum ModLoaderType {
     Forge,
 }
 
-use std::sync::Arc;
+use std::sync::Weak;
 
 use anyhow::Result;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 use super::instance::Instance;
 
 pub type ModloaderVersion = String;
 
+pub struct InstallProgress<T> {
+    pub progress: u8,
+    pub stage: T,
+}
+
 pub trait Modloader {
-    fn new(mod_loader_version: ModloaderVersion, instance: Arc<Instance>) -> Self
+    fn new(mod_loader_version: ModloaderVersion, instance: Weak<Mutex<Instance>>) -> Self
     where
         Self: Sized;
-    fn install(&self, progress_recv: mpsc::Sender<()>) -> Result<()>;
+    fn install<T>(
+        &self,
+        progress_recv: tokio::sync::watch::Sender<InstallProgress<T>>,
+    ) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;
     fn get_version(&self) -> ModloaderVersion;

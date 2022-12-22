@@ -225,7 +225,7 @@ impl Version {
             .with_size(jar.size))
     }
 
-    pub async fn extract_natives(&self, base_path: &Path) -> Result<()> {
+    pub async fn extract_natives(&self, base_path: &Path, instance_name: &str) -> Result<()> {
         let libraries = self.filter_allowed_libraries();
 
         for library in libraries {
@@ -234,7 +234,10 @@ impl Version {
                 let native: Result<Download, anyhow::Error> = natives.try_into();
                 if let Ok(native) = native {
                     let native_lib_path = base_path.join("libraries").join(native.path);
-                    let extract_dir = base_path.join("natives");
+                    let extract_dir = base_path
+                        .join("instances")
+                        .join(instance_name)
+                        .join("natives");
                     if !extract_dir.exists() {
                         tokio::fs::create_dir_all(&extract_dir).await?;
                     }

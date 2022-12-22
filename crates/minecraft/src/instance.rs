@@ -9,16 +9,32 @@ struct JavaMemoryOverride {
     perm_gen: u16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Modloaders {
-    forge: Option<ForgeModloader>,
-    vanilla: Option<VanillaModLoader>,
+#[derive(Debug)]
+pub struct Modloaders {
+    pub vanilla: Option<VanillaModLoader>,
+    pub forge: Option<ForgeModloader>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl Modloaders {
+    pub fn new(vanilla: Option<VanillaModLoader>, forge: Option<ForgeModloader>) -> Self {
+        Self { vanilla, forge }
+    }
+}
+
+#[derive(Debug)]
 pub struct Instance {
+    name: String,
     modloaders: Modloaders,
-    custom_lwjgl: Option<String>,
 }
 
-impl Instance {}
+impl Instance {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            modloaders: Modloaders::new(None, None),
+        }
+    }
+    pub fn with_modloaders(&mut self, modloaders: Modloaders) {
+        self.modloaders = modloaders;
+    }
+}

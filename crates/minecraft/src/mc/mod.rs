@@ -4,6 +4,15 @@ mod version;
 
 #[cfg(test)]
 mod test {
+    use std::sync::{Arc, Weak};
+
+    use tokio::sync::Mutex;
+
+    use crate::{
+        instance::{Instance, Modloaders},
+        modloaders::{vanilla::VanillaModLoader, Modloader},
+    };
+
     use super::meta::McMeta;
 
     #[tokio::test]
@@ -29,77 +38,85 @@ mod test {
 
     #[tokio::test]
     async fn test_download_mc() {
-        let meta = McMeta::download_meta().await.unwrap();
+        let my_instance = Arc::new(Mutex::new(Instance::new("test")));
 
-        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
-
-        let version_meta = meta
-            .versions
-            .iter()
-            .find(|version| version.id == "1.12.2")
-            .unwrap()
-            .get_version_meta(&base_dir)
+        let vanilla = VanillaModLoader::new("1.12.2".to_string(), Arc::downgrade(&my_instance));
+        my_instance
+            .lock()
             .await
-            .unwrap();
+            .with_modloaders(Modloaders::new(Some(vanilla), None));
 
-        let mut downloads = vec![];
+        // let meta = McMeta::download_meta().await.unwrap();
 
-        let asset_index = version_meta
-            .get_asset_index_meta(&base_dir)
-            .await
-            .expect("Failed to get asset index meta");
+        // let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
 
-        let assets = asset_index
-            .get_asset_downloads(&base_dir)
-            .await
-            .expect("Failed to download assets");
-        downloads.extend(assets);
+        // let version_meta = meta
+        //     .versions
+        //     .iter()
+        //     .find(|version| version.id == "1.12.2")
+        //     .unwrap()
+        //     .get_version_meta(&base_dir)
+        //     .await
+        //     .unwrap();
 
-        let libs = version_meta
-            .get_allowed_libraries(&base_dir)
-            .await
-            .expect("Failed to get libraries");
-        downloads.extend(libs);
+        // let mut downloads = vec![];
 
-        let client = version_meta
-            .get_jar_client(&base_dir)
-            .await
-            .expect("Failed to get client download");
-        downloads.push(client);
+        // let asset_index = version_meta
+        //     .get_asset_index_meta(&base_dir)
+        //     .await
+        //     .expect("Failed to get asset index meta");
 
-        println!("Downloading {downloads:#?}");
+        // let assets = asset_index
+        //     .get_asset_downloads(&base_dir)
+        //     .await
+        //     .expect("Failed to download assets");
+        // downloads.extend(assets);
 
-        let total_size = downloads
-            .iter()
-            .map(|download| download.size.unwrap_or(0))
-            .sum::<u64>()
-            / 1024
-            / 1024;
+        // let libs = version_meta
+        //     .get_allowed_libraries(&base_dir)
+        //     .await
+        //     .expect("Failed to get libraries");
+        // downloads.extend(libs);
 
-        let (progress, mut progress_handle) = tokio::sync::watch::channel(crate::net::Progress {
-            current_count: 0,
-            current_size: 0,
-        });
+        // let client = version_meta
+        //     .get_jar_client(&base_dir)
+        //     .await
+        //     .expect("Failed to get client download");
+        // downloads.push(client);
 
-        let length = &downloads.len();
-        let handle = tokio::spawn(async move {
-            crate::net::download_multiple(downloads, progress).await?;
-            Ok::<(), anyhow::Error>(())
-        });
+        // println!("Downloading {downloads:#?}");
 
-        while progress_handle.changed().await.is_ok() {
-            println!(
-                "Progress: {} / {} - {} / {} MB",
-                progress_handle.borrow().current_count,
-                length - 1,
-                progress_handle.borrow().current_size,
-                total_size
-            );
-        }
+        // let total_size = downloads
+        //     .iter()
+        //     .map(|download| download.size.unwrap_or(0))
+        //     .sum::<u64>()
+        //     / 1024
+        //     / 1024;
 
-        handle.await.unwrap().unwrap();
+        // let (progress, mut progress_handle) = tokio::sync::watch::channel(crate::net::Progress {
+        //     current_count: 0,
+        //     current_size: 0,
+        // });
 
-        version_meta.extract_natives(&base_dir).await.unwrap();
+        // let length = &downloads.len();
+        // let handle = tokio::spawn(async move {
+        //     crate::net::download_multiple(downloads, progress).await?;
+        //     Ok::<(), anyhow::Error>(())
+        // });
+
+        // while progress_handle.changed().await.is_ok() {
+        //     println!(
+        //         "Progress: {} / {} - {} / {} MB",
+        //         progress_handle.borrow().current_count,
+        //         length - 1,
+        //         progress_handle.borrow().current_size,
+        //         total_size
+        //     );
+        // }
+
+        // handle.await.unwrap().unwrap();
+
+        // version_meta.extract_natives(&base_dir).await.unwrap();
 
         // tokio::fs::remove_dir_all(base_dir)
         //     .await
