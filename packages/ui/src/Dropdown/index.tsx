@@ -18,7 +18,8 @@ interface Props {
 
 function Dropdown(props: Props) {
   const defaultValue = () =>
-    props.options.find((option) => option.key === props.value)?.label || "";
+    props.options.find((option) => option.key === props.value)?.label ||
+    props.options[0]?.label;
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
@@ -51,7 +52,8 @@ function Dropdown(props: Props) {
           setMenuOpened(!menuOpened());
         }}
         onBlur={() => {
-          setMenuOpened(false);
+          console.log("TEST");
+          // setMenuOpened(false);
         }}
         classList={{
           "border-0": !props.error,
@@ -95,6 +97,7 @@ function Dropdown(props: Props) {
             <li
               class="first:rounded-t last:rounded-b bg-black-semiblack hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-black-lightGray no-underline"
               onClick={() => {
+                console.log("OPTIOn", option.label);
                 setSelectedValue(option.label);
                 props.onChange?.(option);
                 toggleMenu();
