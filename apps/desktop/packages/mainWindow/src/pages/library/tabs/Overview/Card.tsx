@@ -1,4 +1,4 @@
-import { lazy, mergeProps } from "solid-js";
+import { mergeProps } from "solid-js";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
 import bookIcon from "/assets/images/icons/book.png";
 import clockIcon from "/assets/images/icons/clock.png";
