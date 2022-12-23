@@ -28,9 +28,9 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: impl Into<String>) -> Self {
         Self {
-            name: name.to_owned(),
+            name: name.into(),
             modloaders: Modloaders::new(None, None),
         }
     }

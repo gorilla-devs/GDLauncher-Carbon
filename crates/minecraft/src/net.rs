@@ -33,8 +33,8 @@ impl Download {
         }
     }
 
-    pub fn with_checksum(mut self, checksum: Checksum) -> Self {
-        self.checksum = Some(checksum);
+    pub fn with_checksum(mut self, checksum: Option<Checksum>) -> Self {
+        self.checksum = checksum;
         self
     }
 

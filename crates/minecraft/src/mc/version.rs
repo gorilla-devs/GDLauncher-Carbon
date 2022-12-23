@@ -221,7 +221,7 @@ impl Version {
         let jar_path = base_path.join("clients").join(format!("{version_id}.jar"));
 
         Ok(crate::net::Download::new(jar.url.clone(), jar_path)
-            .with_checksum(crate::net::Checksum::Sha1(jar.sha1.clone()))
+            .with_checksum(Some(crate::net::Checksum::Sha1(jar.sha1.clone())))
             .with_size(jar.size))
     }
 

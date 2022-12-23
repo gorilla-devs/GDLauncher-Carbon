@@ -22,12 +22,14 @@ pub struct InstallProgress<T> {
 }
 
 pub trait Modloader {
+    type Stages;
+
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<Mutex<Instance>>) -> Self
     where
         Self: Sized;
-    fn install<T>(
+    fn install(
         &self,
-        progress_recv: tokio::sync::watch::Sender<InstallProgress<T>>,
+        progress_recv: tokio::sync::watch::Sender<InstallProgress<Self::Stages>>,
     ) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;

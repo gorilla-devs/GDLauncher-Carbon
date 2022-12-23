@@ -39,16 +39,18 @@ impl AssetIndex {
                 .join(&object.hash[0..2])
                 .join(&object.hash);
 
-            files.push(crate::net::Download {
-                url: format!(
-                    "https://resources.download.minecraft.net/{}/{}",
-                    &object.hash[0..2],
-                    &object.hash
-                ),
-                path: asset_path,
-                checksum: Some(crate::net::Checksum::Sha1(object.hash.clone())),
-                size: Some(object.size as u64),
-            });
+            files.push(
+                crate::net::Download::new(
+                    format!(
+                        "https://resources.download.minecraft.net/{}/{}",
+                        &object.hash[0..2],
+                        &object.hash
+                    ),
+                    asset_path,
+                )
+                .with_checksum(Some(crate::net::Checksum::Sha1(object.hash.clone())))
+                .with_size(object.size as u64),
+            );
         }
 
         Ok(files)

@@ -6,7 +6,12 @@ use tokio::sync::{mpsc, Mutex};
 
 use crate::instance::Instance;
 
-use super::{ModLoaderVersion, Modloader, ModloaderVersion};
+use super::{InstallProgress, ModLoaderVersion, Modloader, ModloaderVersion};
+
+pub enum InstallStages {
+    Downloading,
+    ExtractingNatives,
+}
 
 #[derive(Debug)]
 pub struct ForgeModloader {
@@ -15,13 +20,18 @@ pub struct ForgeModloader {
 }
 
 impl Modloader for ForgeModloader {
+    type Stages = InstallStages;
+
     fn new(mod_loader_version: ModLoaderVersion, instance: Weak<Mutex<Instance>>) -> Self {
         ForgeModloader {
             mod_loader_version,
             instance_ref: instance,
         }
     }
-    fn install(&self, progress_rcv: mpsc::Sender<()>) -> Result<()> {
+    fn install(
+        &self,
+        progress_send: tokio::sync::watch::Sender<InstallProgress<InstallStages>>,
+    ) -> Result<()> {
         Ok(())
     }
     fn remove(&self) -> Result<()> {
