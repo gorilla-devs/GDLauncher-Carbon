@@ -5,6 +5,7 @@ use axum::{extract::Path, routing::get};
 use carbon_bindings::Ctx;
 use rspc::Config;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::trace;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
@@ -35,7 +36,7 @@ async fn start_router() {
             router
                 .clone()
                 .endpoint(|Path(path): Path<String>| {
-                    println!("Client requested operation '{}'", path);
+                    trace!("Client requested operation '{}'", path);
                     Ctx {}
                 })
                 .axum(),
@@ -43,7 +44,7 @@ async fn start_router() {
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
-    println!("listening on http://{}/rspc/version", addr);
+    trace!("listening on http://{}/rspc/version", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

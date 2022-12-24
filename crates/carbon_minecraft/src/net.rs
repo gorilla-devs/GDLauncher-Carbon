@@ -8,6 +8,7 @@ use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
 use tokio::{fs::OpenOptions, io::AsyncReadExt};
+use tracing::trace;
 
 #[derive(Debug)]
 pub enum Checksum {
@@ -110,7 +111,7 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             return Ok(file.size);
                         } else {
-                            println!(
+                            trace!(
                                 "Hash mismatch sha1 for file: {} - expected: {hash} - got: {}",
                                 path.display(),
                                 &format!("{finalized:x}")
@@ -122,7 +123,7 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             return Ok(file.size);
                         } else {
-                            println!(
+                            trace!(
                                 "Hash mismatch sha256 for file: {} - expected: {hash} - got: {}",
                                 path.display(),
                                 &format!("{finalized:x}")

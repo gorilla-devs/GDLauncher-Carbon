@@ -121,13 +121,9 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
         for subkey in subkeys.flatten() {
             let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
-            match subkey_reg.get_value(value) {
-                Ok(value) => {
-                    let s_value: String = value;
-                    results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
-                }
-                Err(_) => continue,
-            };
+            if let Ok(registry_str) = subkey_reg.get_value(value) {
+                results.extend(search_java_binary_in_path(PathBuf::from(registry_str)));
+            }
         }
     } else {
         let s_value: String = key_reg.get_value(value)?;

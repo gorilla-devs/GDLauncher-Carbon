@@ -3,17 +3,18 @@ use futures::StreamExt;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tokio::fs::{create_dir_all, File, OpenOptions};
+use tracing::trace;
 
 pub enum JavaMajorSemVer {
-    _8,
-    _17,
+    Version8,
+    Version17,
 }
 
 impl<'a> From<JavaMajorSemVer> for &'a str {
     fn from(version: JavaMajorSemVer) -> &'a str {
         match version {
-            JavaMajorSemVer::_8 => "8",
-            JavaMajorSemVer::_17 => "17",
+            JavaMajorSemVer::Version8 => "8",
+            JavaMajorSemVer::Version17 => "17",
         }
     }
 }
@@ -120,15 +121,15 @@ fn unzip_file(fname: PathBuf, dest: &Path) -> Result<()> {
         {
             let comment = file.comment();
             if !comment.is_empty() {
-                println!("File {i} comment: {comment}");
+                trace!("File {i} comment: {comment}");
             }
         }
 
         if (*file.name()).ends_with('/') {
-            println!("File {} extracted to \"{}\"", i, outpath.display());
+            trace!("File {} extracted to \"{}\"", i, outpath.display());
             std::fs::create_dir_all(&outpath).unwrap();
         } else {
-            println!(
+            trace!(
                 "File {} extracted to \"{}\" ({} bytes)",
                 i,
                 outpath.display(),
@@ -165,6 +166,8 @@ mod tests {
     async fn test_get_download_url() {
         let current_path = std::env::current_dir().unwrap();
 
-        setup_jre(current_path, JavaMajorSemVer::_8).await.unwrap();
+        setup_jre(current_path, JavaMajorSemVer::Version8)
+            .await
+            .unwrap();
     }
 }

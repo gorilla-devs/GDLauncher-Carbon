@@ -18,6 +18,7 @@ chrono = { version = "0.4.23", features = ["serde"] }
 directories = "4.0.1"
 dotenv = "0.15.0"
 futures = "0.3.25"
+tracing = "0.1.37"
 jsonwebtoken = "8.1.1"
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32.git" }
 napi = { version = "2.10.1", features = ["napi8"] }

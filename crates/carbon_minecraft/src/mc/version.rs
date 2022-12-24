@@ -229,7 +229,7 @@ impl Version {
         let libraries = self.filter_allowed_libraries();
 
         for library in libraries {
-            println!("Extracting natives for {library:#?}");
+            trace!("Extracting natives for {library:#?}");
             if let Some(natives) = &library.downloads.classifiers {
                 let native: Result<Download, anyhow::Error> = natives.try_into();
                 if let Ok(native) = native {

@@ -4,6 +4,7 @@ use async_stream::stream;
 use axum::{extract::Path, routing::get};
 use rspc::Config;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::trace;
 
 pub struct Ctx {}
 
@@ -22,16 +23,16 @@ pub fn build_router() -> rspc::RouterBuilder<Ctx> {
         .query("transformMe", |t| t(|_, _: ()| "Hello, world!".to_string()))
         .mutation("sendMsg", |t| {
             t(|_, v: String| {
-                println!("Client said '{}'", v);
+                trace!("Client said '{}'", v);
                 v
             })
         })
         .subscription("pings", |t| {
             t(|_ctx, _args: ()| {
                 stream! {
-                    println!("Client subscribed to 'pings'");
+                    trace!("Client subscribed to 'pings'");
                     for i in 0..5 {
-                        println!("Sending ping {}", i);
+                        trace!("Sending ping {}", i);
                         yield "ping".to_string();
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     }

@@ -251,6 +251,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -264,6 +265,7 @@ dependencies = [
  "serde",
  "tokio",
  "tower-http",
+ "tracing",
 ]
 
 [[package]]
@@ -278,6 +280,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tokio",
+ "tracing",
  "winreg",
  "zip",
 ]
@@ -394,6 +397,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower-http",
+ "tracing",
 ]
 
 [[package]]
