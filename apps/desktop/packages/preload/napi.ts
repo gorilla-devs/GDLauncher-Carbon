@@ -1,5 +1,5 @@
 import path from "path";
-import core from "@gd/core";
+import core from "@gd/carbon_core";
 import { contextBridge } from "electron";
 
 const isDev = import.meta.env.MODE === "development";

@@ -11,11 +11,11 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": ["^@gd/core#dev", "^@gd/ui#build"],
+      "dependsOn": ["^@gd/carbon_core#dev", "^@gd/ui#build"],
       "outputs": ["dist/**"],
       "cache": false
     },
-    "@gd/core": {
+    "@gd/carbon_core": {
       "outputs": ["core.node"],
       "cache": false
     },

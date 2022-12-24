@@ -1,17 +1,15 @@
 [package]
-name = "msauth"
+name = "carbon_bindings"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.66"
-async-recursion = "1.0.0"
 serde = { version = "1.0.147", features = ["derive", "rc"] }
-serde_json = "1.0.89"
-regex = "1.7.0"
+anyhow = "1.0.51"
 tokio = { version = "1.22.0", features = ["full"] }
-reqwest = { version = "0.11.13", features = ["blocking", "json"] }
-jsonwebtoken = "8.1.1"
-chrono = { version = "0.4.23", features = ["serde"] }
+rspc = { version = "0.1.2", features = ["axum"] }
+async-stream = "0.3.3"
+tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
+axum = { version = "0.5.17", features = ["ws"] }

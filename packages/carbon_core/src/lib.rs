@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use async_stream::stream;
 use axum::{extract::Path, routing::get};
+use carbon_bindings::Ctx;
 use rspc::Config;
-use rspc_bindings::Ctx;
 use tower_http::cors::{Any, CorsLayer};
 
 // Since it's module_init, make sure it's not running during tests
@@ -21,7 +21,7 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router = rspc_bindings::build_router().build().arced();
+    let router = carbon_bindings::build_router().build().arced();
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
         .allow_methods(Any)

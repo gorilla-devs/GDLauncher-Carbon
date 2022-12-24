@@ -1,5 +1,5 @@
 {
-  "name": "@gd/core-msauth",
+  "name": "@gd/carbon_bindings",
   "version": "0.0.1",
   "scripts": {
     "test": "cargo test -- --nocapture",

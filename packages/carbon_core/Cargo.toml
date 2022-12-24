@@ -31,12 +31,12 @@ serde = { version = "1.0.147", features = ["derive", "rc"] }
 serde_json = "1.0.89"
 tokio = { version = "1.22.0", features = ["full"] }
 tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
-rspc_bindings = { path = "../../crates/rspc_bindings" }
+carbon_bindings = { path = "../../crates/carbon_bindings" }
 
 [build-dependencies]
 napi-build = "2"
 rspc = { version = "0.1.2", features = ["axum"] }
-rspc_bindings = { path = "../../crates/rspc_bindings" }
+carbon_bindings = { path = "../../crates/carbon_bindings" }
 
 [profile.release]
 codegen-units = 1

@@ -1,11 +1,10 @@
 [workspace]
 members = [
-  "apps/installer/src-tauri",
-  "packages/core",
-  "crates/msauth",
-  "crates/java",
-  "crates/minecraft",
-  "crates/rspc_bindings"
+  "packages/carbon_core",
+  "crates/carbon_microsoft_auth",
+  "crates/carbon_jre_manager",
+  "crates/carbon_minecraft",
+  "crates/carbon_bindings"
 ]
 
 [profile.release]

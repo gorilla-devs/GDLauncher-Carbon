@@ -1,5 +1,5 @@
 // import { login } from "@/modules/components/accounts";
-// import { DeviceCodeObject } from "@gd/core";
+// import { DeviceCodeObject } from "@gd/carbon_core";
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { Setter } from "solid-js";

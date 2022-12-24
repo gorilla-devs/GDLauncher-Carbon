@@ -1,5 +1,5 @@
 {
-  "name": "@gd/rspc_bindings",
+  "name": "@gd/carbon_jre_manager",
   "version": "0.0.1",
   "scripts": {
     "test": "cargo test -- --nocapture",

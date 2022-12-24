@@ -1,4 +1,4 @@
-import core from "@gd/core";
+import core from "@gd/carbon_core";
 
 let resolvedAddon: typeof core | undefined;
 

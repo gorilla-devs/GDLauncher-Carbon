@@ -21,7 +21,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/core/core.node",
+      from: "../../packages/carbon_core/core.node",
       to: "core.node",
     },
     {

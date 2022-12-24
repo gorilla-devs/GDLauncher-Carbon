@@ -1,5 +1,5 @@
 {
-  "name": "@gd/core",
+  "name": "@gd/carbon_core",
   "version": "0.0.1",
   "main": "./index.ts",
   "files": [

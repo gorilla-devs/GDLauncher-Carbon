@@ -18,7 +18,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.226.0",
     "@gd/config": "workspace:*",
-    "@gd/core": "workspace:*",
+    "@gd/carbon_core": "workspace:*",
     "@gd/ui": "workspace:*",
     "@playwright/test": "^1.28.1",
     "@rspc/client": "^0.1.2",
