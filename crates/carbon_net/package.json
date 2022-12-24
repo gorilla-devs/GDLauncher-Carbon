@@ -1,5 +1,5 @@
 {
-  "name": "@gd/carbon_minecraft",
+  "name": "@gd/carbon_net",
   "version": "0.0.1",
   "scripts": {
     "test": "cargo test -- --nocapture",

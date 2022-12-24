@@ -4,7 +4,8 @@ members = [
   "crates/carbon_microsoft_auth",
   "crates/carbon_jre_manager",
   "crates/carbon_minecraft",
-  "crates/carbon_bindings"
+  "crates/carbon_bindings",
+  "crates/carbon_net",
 ]
 
 [profile.release]

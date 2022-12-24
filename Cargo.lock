@@ -286,6 +286,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "carbon_minecraft"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "carbon_net",
+ "futures",
+ "lazy_static",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2",
+ "tokio",
+ "tracing",
+ "tracing-test",
+ "zip",
+]
+
+[[package]]
+name = "carbon_net"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "sha1",
+ "sha2",
+ "tokio",
+ "tracing",
+ "tracing-test",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1081,26 +1118,6 @@ checksum = "4192263c238a5f0d0c6bfd21f336a313a4ce1c450542449ca191bb657b4642ef"
 dependencies = [
  "mime",
  "unicase",
-]
-
-[[package]]
-name = "minecraft"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "futures",
- "lazy_static",
- "reqwest",
- "reqwest-middleware",
- "reqwest-retry",
- "serde",
- "serde_json",
- "sha1",
- "sha2",
- "tokio",
- "tracing",
- "tracing-test",
- "zip",
 ]
 
 [[package]]

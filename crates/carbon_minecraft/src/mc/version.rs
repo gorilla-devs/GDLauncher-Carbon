@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, trace};
 
-use crate::net::Download;
+use carbon_net::Download;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,10 +182,10 @@ impl Version {
     pub async fn get_allowed_libraries(
         &self,
         base_path: &Path,
-    ) -> Result<Vec<crate::net::Download>> {
+    ) -> Result<Vec<carbon_net::Download>> {
         let libraries = self.filter_allowed_libraries();
 
-        let mut downloads: Vec<crate::net::Download> = vec![];
+        let mut downloads: Vec<carbon_net::Download> = vec![];
 
         for library in libraries {
             let lib: Result<Download, anyhow::Error> = library.try_into();
@@ -206,7 +206,7 @@ impl Version {
         Ok(downloads)
     }
 
-    pub async fn get_jar_client(&self, base_path: &Path) -> Result<crate::net::Download> {
+    pub async fn get_jar_client(&self, base_path: &Path) -> Result<carbon_net::Download> {
         let jar = &self
             .downloads
             .as_ref()
@@ -220,8 +220,8 @@ impl Version {
 
         let jar_path = base_path.join("clients").join(format!("{version_id}.jar"));
 
-        Ok(crate::net::Download::new(jar.url.clone(), jar_path)
-            .with_checksum(Some(crate::net::Checksum::Sha1(jar.sha1.clone())))
+        Ok(carbon_net::Download::new(jar.url.clone(), jar_path)
+            .with_checksum(Some(carbon_net::Checksum::Sha1(jar.sha1.clone())))
             .with_size(jar.size))
     }
 
@@ -414,7 +414,7 @@ impl Library {
     }
 }
 
-impl TryFrom<&Library> for crate::net::Download {
+impl TryFrom<&Library> for carbon_net::Download {
     type Error = anyhow::Error;
 
     fn try_from(value: &Library) -> Result<Self, Self::Error> {
@@ -427,9 +427,9 @@ impl TryFrom<&Library> for crate::net::Download {
                 .path
                 .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
         );
-        let checksum = Some(crate::net::Checksum::Sha1(artifact.sha1));
+        let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
-        Ok(crate::net::Download {
+        Ok(carbon_net::Download {
             url: artifact.url,
             path,
             checksum,
@@ -458,7 +458,7 @@ pub struct Classifiers {
     pub natives_osx: Option<MappingsClass>,
 }
 
-impl TryFrom<&Classifiers> for crate::net::Download {
+impl TryFrom<&Classifiers> for carbon_net::Download {
     type Error = anyhow::Error;
 
     fn try_from(value: &Classifiers) -> Result<Self, Self::Error> {
@@ -471,9 +471,9 @@ impl TryFrom<&Classifiers> for crate::net::Download {
                             .path
                             .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
                     );
-                    let checksum = Some(crate::net::Checksum::Sha1(windows.sha1));
+                    let checksum = Some(carbon_net::Checksum::Sha1(windows.sha1));
 
-                    crate::net::Download {
+                    carbon_net::Download {
                         url: windows.url,
                         path,
                         checksum,
@@ -489,9 +489,9 @@ impl TryFrom<&Classifiers> for crate::net::Download {
                         .path
                         .ok_or_else(|| anyhow::anyhow!("No path in lib"))?;
 
-                    let checksum = Some(crate::net::Checksum::Sha1(macos.sha1));
+                    let checksum = Some(carbon_net::Checksum::Sha1(macos.sha1));
 
-                    crate::net::Download {
+                    carbon_net::Download {
                         url: macos.url,
                         path: PathBuf::from(path),
                         checksum,
@@ -500,9 +500,9 @@ impl TryFrom<&Classifiers> for crate::net::Download {
                 } else if let Some(osx) = classifier.natives_osx {
                     let path =
                         PathBuf::from(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
-                    let checksum = Some(crate::net::Checksum::Sha1(osx.sha1));
+                    let checksum = Some(carbon_net::Checksum::Sha1(osx.sha1));
 
-                    crate::net::Download {
+                    carbon_net::Download {
                         url: osx.url,
                         path,
                         checksum,
@@ -519,9 +519,9 @@ impl TryFrom<&Classifiers> for crate::net::Download {
                             .path
                             .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
                     );
-                    let checksum = Some(crate::net::Checksum::Sha1(linux.sha1));
+                    let checksum = Some(carbon_net::Checksum::Sha1(linux.sha1));
 
-                    crate::net::Download {
+                    carbon_net::Download {
                         url: linux.url,
                         path,
                         checksum,

@@ -1,21 +1,12 @@
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Weak},
-};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use anyhow::Result;
 use lazy_static::lazy_static;
-use modloaders::{
-    vanilla::{InstallStages, VanillaModLoader},
-    InstallProgress, Modloader,
-};
 use tokio::sync::RwLock;
 use tracing::log::trace;
 mod instance;
 mod mc;
 mod modloaders;
-mod net;
 
 pub struct Instances {
     inner: Arc<RwLock<HashMap<String, instance::Instance>>>,
