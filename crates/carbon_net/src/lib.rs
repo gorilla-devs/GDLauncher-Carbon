@@ -187,7 +187,7 @@ pub async fn download_multiple(
         curr_size += res.unwrap_or(0);
         progress.send(Progress {
             current_count: curr_count as u64,
-            current_size: curr_size / 1024 / 1024,
+            current_size: curr_size / (1024 * 1024),
         })?;
     }
 

@@ -1,8 +1,7 @@
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{watch::Sender, RwLock};
 
 use crate::instance::Instance;
 
@@ -16,22 +15,19 @@ pub enum InstallStages {
 #[derive(Debug)]
 pub struct ForgeModloader {
     mod_loader_version: ModLoaderVersion,
-    instance_ref: Weak<Mutex<Instance>>,
+    instance_ref: Weak<RwLock<Instance>>,
 }
 
 impl Modloader for ForgeModloader {
     type Stages = InstallStages;
 
-    fn new(mod_loader_version: ModLoaderVersion, instance: Weak<Mutex<Instance>>) -> Self {
+    fn new(mod_loader_version: ModLoaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
         ForgeModloader {
             mod_loader_version,
-            instance_ref: instance,
+            instance_ref,
         }
     }
-    fn install(
-        &self,
-        progress_send: tokio::sync::watch::Sender<InstallProgress<InstallStages>>,
-    ) -> Result<()> {
+    fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
         Ok(())
     }
     fn remove(&self) -> Result<()> {

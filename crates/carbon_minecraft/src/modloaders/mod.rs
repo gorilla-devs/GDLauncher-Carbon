@@ -10,7 +10,7 @@ pub enum ModLoaderType {
 use std::sync::Weak;
 
 use anyhow::Result;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{watch::Sender, RwLock};
 
 use super::instance::Instance;
 
@@ -24,13 +24,10 @@ pub struct InstallProgress<T> {
 pub trait Modloader {
     type Stages;
 
-    fn new(mod_loader_version: ModloaderVersion, instance: Weak<Mutex<Instance>>) -> Self
+    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
     where
         Self: Sized;
-    fn install(
-        &self,
-        progress_recv: tokio::sync::watch::Sender<InstallProgress<Self::Stages>>,
-    ) -> Result<()>;
+    fn install(&self, progress_recv: Sender<InstallProgress<Self::Stages>>) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;
     fn get_version(&self) -> ModloaderVersion;
