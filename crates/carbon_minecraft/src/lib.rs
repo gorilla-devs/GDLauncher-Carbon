@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use anyhow::Result;
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
-use tracing::log::trace;
+use tracing::trace;
 mod instance;
 mod mc;
 mod modloaders;

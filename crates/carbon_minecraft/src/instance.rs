@@ -19,8 +19,8 @@ pub enum Modloaders {
 
 #[derive(Debug)]
 pub struct Instance {
-    name: String,
-    modloaders: HashSet<Modloaders>,
+    pub name: String,
+    pub modloaders: HashSet<Modloaders>,
 }
 
 impl Instance {

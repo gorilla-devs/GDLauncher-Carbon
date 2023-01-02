@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::sync::Weak;
 use tokio::sync::{watch::Sender, RwLock};
+use tracing::trace;
 
 use crate::{instance::Instance, mc::meta::McMeta};
 
@@ -86,14 +87,24 @@ impl Modloader for VanillaModLoader {
             Ok::<(), anyhow::Error>(())
         });
 
-        while let Ok(progress) = progress_handle.recv().await {
-            progress_send
-                .send(InstallProgress {
-                    stage: InstallStages::DownloadingAssets,
-                    progress: progress.current_size as f64 / total_size as f64,
-                })
-                .unwrap();
+        let instance_ref = self.instance_ref.upgrade().unwrap();
+        let instance = instance_ref.read().await;
+
+        while progress_handle.changed().await.is_ok() {
+            trace!(
+                "Progress: {} / {} - {} / {} MB",
+                progress_handle.borrow().current_count,
+                length - 1,
+                progress_handle.borrow().current_size,
+                total_size
+            );
         }
+
+        handle.await??;
+
+        version_meta
+            .extract_natives(&base_dir, &instance.name)
+            .await?;
 
         Ok(())
     }
