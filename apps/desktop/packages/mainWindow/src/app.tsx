@@ -1,12 +1,19 @@
-import { Component, Show } from "solid-js";
+import { Component, createEffect, Show } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
 import { Notifications } from "@gd/ui";
+import { rspc } from "./utils/rspcClient";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
+
+  const echoMsg = rspc.createQuery(() => ["echo", "something"]);
+
+  createEffect(() => {
+    console.log("pkgVersion", echoMsg.data);
+  });
 
   return (
     <div class="relative w-screen h-screen">

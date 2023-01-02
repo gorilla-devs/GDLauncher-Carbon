@@ -3,7 +3,9 @@ import core from "@gd/carbon_core";
 import { contextBridge } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
-const nAPIPath = isDev ? "../../packages/core" : `${__dirname}/../../../`;
+const nAPIPath = isDev
+  ? "../../packages/carbon_core"
+  : `${__dirname}/../../../`;
 
 let calledOnce = false;
 let addon = new Promise<() => typeof core | undefined>((resolve, reject) => {
