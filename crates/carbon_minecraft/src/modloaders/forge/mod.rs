@@ -1,6 +1,6 @@
-use std::sync::Weak;
-
 use anyhow::Result;
+use async_trait::async_trait;
+use std::sync::Weak;
 use tokio::sync::{watch::Sender, RwLock};
 
 use crate::instance::Instance;
@@ -18,6 +18,7 @@ pub struct ForgeModloader {
     instance_ref: Weak<RwLock<Instance>>,
 }
 
+#[async_trait]
 impl Modloader for ForgeModloader {
     type Stages = InstallStages;
 
@@ -27,7 +28,7 @@ impl Modloader for ForgeModloader {
             instance_ref,
         }
     }
-    fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
+    async fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
         Ok(())
     }
     fn remove(&self) -> Result<()> {

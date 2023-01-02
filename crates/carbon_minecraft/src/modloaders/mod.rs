@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 pub mod forge;
 pub mod vanilla;
 
@@ -17,17 +19,19 @@ use super::instance::Instance;
 pub type ModloaderVersion = String;
 
 pub struct InstallProgress<T> {
-    pub progress: u8,
+    pub count_progress: (u64, u64),
+    pub size_progress: (u64, u64),
     pub stage: T,
 }
 
+#[async_trait]
 pub trait Modloader {
     type Stages;
 
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
     where
         Self: Sized;
-    fn install(&self, progress_recv: Sender<InstallProgress<Self::Stages>>) -> Result<()>;
+    async fn install(&self, progress_recv: Sender<InstallProgress<Self::Stages>>) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;
     fn get_version(&self) -> ModloaderVersion;

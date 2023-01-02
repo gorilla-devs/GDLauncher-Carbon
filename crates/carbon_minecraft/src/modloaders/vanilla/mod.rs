@@ -1,14 +1,15 @@
+use anyhow::{Context, Result};
+use async_trait::async_trait;
 use std::sync::Weak;
-
-use anyhow::Result;
 use tokio::sync::{watch::Sender, RwLock};
 
-use crate::instance::Instance;
+use crate::{instance::Instance, mc::meta::McMeta};
 
 use super::{InstallProgress, ModLoaderVersion, Modloader, ModloaderVersion};
 
 pub enum InstallStages {
-    Downloading,
+    DownloadingAssets,
+    DownloadingLibraries,
     ExtractingNatives,
 }
 
@@ -18,6 +19,7 @@ pub struct VanillaModLoader {
     instance_ref: Weak<RwLock<Instance>>,
 }
 
+#[async_trait]
 impl Modloader for VanillaModLoader {
     type Stages = InstallStages;
 
@@ -27,11 +29,71 @@ impl Modloader for VanillaModLoader {
             instance_ref,
         }
     }
-    fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
-        progress_send.send(InstallProgress {
-            progress: 0,
-            stage: InstallStages::Downloading,
+    async fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
+        let mc_version = &self.mc_version;
+        // TODO: REMOVE HARDCODED
+        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
+
+        let meta = McMeta::download_meta().await?;
+
+        let version_meta = meta
+            .versions
+            .iter()
+            .find(|version| &version.id == mc_version)
+            .ok_or_else(|| anyhow::anyhow!("Cannot find version"))?
+            .get_version_meta(&base_dir)
+            .await?;
+
+        let mut downloads = vec![];
+
+        let asset_index = version_meta
+            .get_asset_index_meta(&base_dir)
+            .await
+            .context("Failed to get asset index meta")?;
+
+        let assets = asset_index
+            .get_asset_downloads(&base_dir)
+            .await
+            .context("Failed to download assets")?;
+        downloads.extend(assets);
+
+        let libs = version_meta
+            .get_allowed_libraries(&base_dir)
+            .await
+            .context("Failed to get libraries")?;
+        downloads.extend(libs);
+
+        let client = version_meta
+            .get_jar_client(&base_dir)
+            .await
+            .context("Failed to get client download")?;
+        downloads.push(client);
+
+        let total_size = downloads
+            .iter()
+            .map(|download| download.size.unwrap_or(0))
+            .sum::<u64>()
+            / (1024 * 1024);
+
+        let (progress, mut progress_handle) = tokio::sync::watch::channel(carbon_net::Progress {
+            current_count: 0,
+            current_size: 0,
         });
+        let length = &downloads.len();
+
+        let handle = tokio::spawn(async move {
+            carbon_net::download_multiple(downloads, progress).await?;
+            Ok::<(), anyhow::Error>(())
+        });
+
+        while let Ok(progress) = progress_handle.recv().await {
+            progress_send
+                .send(InstallProgress {
+                    stage: InstallStages::DownloadingAssets,
+                    progress: progress.current_size as f64 / total_size as f64,
+                })
+                .unwrap();
+        }
 
         Ok(())
     }

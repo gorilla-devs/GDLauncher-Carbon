@@ -19,6 +19,7 @@ reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 zip = "0.6.3"
 lazy_static = "1.4.0"
+async-trait = "0.1.60"
 carbon_net ={ path = "../carbon_net" }
 
 [dev-dependencies]

@@ -1,12 +1,12 @@
-mod assets;
-mod meta;
-mod version;
+pub mod assets;
+pub mod meta;
+pub mod version;
 
 #[cfg(test)]
 mod test {
     use std::sync::{Arc, Weak};
 
-    use tokio::sync::Mutex;
+    use tokio::sync::{Mutex, RwLock};
 
     use crate::{
         instance::{Instance, Modloaders},
@@ -38,13 +38,6 @@ mod test {
 
     #[tokio::test]
     async fn test_download_mc() {
-        let my_instance = Arc::new(Mutex::new(Instance::new("test")));
-
-        let vanilla = VanillaModLoader::new("1.12.2".to_string(), Arc::downgrade(&my_instance));
-        my_instance
-            .lock()
-            .await
-            .with_modloaders(Modloaders::new(Some(vanilla), None));
 
         // let meta = McMeta::download_meta().await.unwrap();
 
