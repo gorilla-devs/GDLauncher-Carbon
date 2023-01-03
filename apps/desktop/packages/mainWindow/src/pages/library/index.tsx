@@ -86,7 +86,7 @@ const Home = () => {
   const navigate = useNavigate();
 
   return (
-    <div>
+    <div class="p-6">
       <div>
         <News slides={newsArticles} />
         <div class="mt-4">
