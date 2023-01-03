@@ -8,11 +8,11 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.65.0-browsers
-    resource_class: small
+    resource_class: medium
   website:
     docker:
       - image: cimg/rust:1.65.0-node
-    resource_class: small
+    resource_class: medium
   mac:
     macos:
       xcode: "14.1.0"
