@@ -49,7 +49,7 @@ importers:
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.28.1
       '@rspc/client': 0.1.2
-      '@rspc/solid': 0.1.2_rv7bdyqe4vx5e674cspbcf7ju4
+      '@rspc/solid': 0.1.2_7unfzetqmlehuf72mwv3deaqam
       '@solidjs/router': 0.5.1_solid-js@1.6.4
       '@typescript-eslint/parser': 5.46.0_ha6vam6werchizxrnqvarmz2zu
       chokidar: 3.5.3
@@ -122,9 +122,6 @@ importers:
     specifiers: {}
 
   crates/carbon_minecraft:
-    specifiers: {}
-
-  crates/carbon_net:
     specifiers: {}
 
   packages/carbon_core:
@@ -370,7 +367,7 @@ packages:
       '@proload/core': 0.3.3
       autoprefixer: 10.4.12_postcss@8.4.18
       postcss: 8.4.18
-      tailwindcss: 3.2.1
+      tailwindcss: 3.2.1_postcss@8.4.20
     dev: true
 
   /@astrojs/telemetry/1.0.1:
@@ -3528,14 +3525,14 @@ packages:
     resolution: {integrity: sha512-MfgSZkrqVzzqCN4GU3LKhfy4qG+PS1LpEz/MMays6rtz5EFNJIvEVMA5Ooc+DH8KLe5h4/3bf4dfyEs7czhA2w==}
     dev: true
 
-  /@rspc/solid/0.1.2_rv7bdyqe4vx5e674cspbcf7ju4:
+  /@rspc/solid/0.1.2_7unfzetqmlehuf72mwv3deaqam:
     resolution: {integrity: sha512-lnboDerqpCypgHp2dzrr9eltGXN59WiyQgZqYeZCUXTgU92tlJq5yV/1KMtZ0BYmHRIvUDGNJBV2DiRINNqoMg==}
     peerDependencies:
       '@tanstack/solid-query': ^4.6.0
       solid-js: ^1.5.5
     dependencies:
       '@rspc/client': 0.1.2
-      '@tanstack/solid-query': 4.20.4_solid-js@1.6.4
+      '@tanstack/solid-query': 4.19.1_solid-js@1.6.4
       solid-js: 1.6.4
     dev: true
 
@@ -5346,16 +5343,16 @@ packages:
       defer-to-connect: 2.0.1
     dev: true
 
-  /@tanstack/query-core/4.20.4:
-    resolution: {integrity: sha512-lhLtGVNJDsJ/DyZXrLzekDEywQqRVykgBqTmkv0La32a/RleILXy6JMLBb7UmS3QCatg/F/0N9/5b0i5j6IKcA==}
+  /@tanstack/query-core/4.19.1:
+    resolution: {integrity: sha512-Zp0aIose5C8skBzqbVFGk9HJsPtUhRVDVNWIqVzFbGQQgYSeLZMd3Sdb4+EnA5wl1J7X+bre2PJGnQg9x/zHOA==}
     dev: true
 
-  /@tanstack/solid-query/4.20.4_solid-js@1.6.4:
-    resolution: {integrity: sha512-90ANnQLdnnkN8q/mn8O22+u5O1BghqITKdrbUbjvxJ+z2NLLWiEdDqnXo4KVJb7/7EPv8ik9gijO7EzqLp39Jw==}
+  /@tanstack/solid-query/4.19.1_solid-js@1.6.4:
+    resolution: {integrity: sha512-eYwRXKbmkcaWsGXuhyfCtxYDUGJp6Yp57Vm5sJ9uWJh6wIUax+vii6fF0Mi0R3qzOxtO5xxhyCpL7WRaYvJ9ig==}
     peerDependencies:
       solid-js: ^1.5.7
     dependencies:
-      '@tanstack/query-core': 4.20.4
+      '@tanstack/query-core': 4.19.1
       solid-js: 1.6.4
     dev: true
 
@@ -6542,8 +6539,10 @@ packages:
       ajv: 6.12.6
     dev: true
 
-  /ajv-formats/2.1.1:
+  /ajv-formats/2.1.1_ajv@8.11.0:
     resolution: {integrity: sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==}
+    peerDependencies:
+      ajv: ^8.0.0
     peerDependenciesMeta:
       ajv:
         optional: true
@@ -6687,10 +6686,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
+      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
-      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -7600,9 +7599,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
+      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
-      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -16003,7 +16002,7 @@ packages:
     dependencies:
       '@types/json-schema': 7.0.11
       ajv: 8.11.0
-      ajv-formats: 2.1.1
+      ajv-formats: 2.1.1_ajv@8.11.0
       ajv-keywords: 5.1.0_ajv@8.11.0
     dev: true
 
@@ -16807,10 +16806,12 @@ packages:
       tslib: 2.4.0
     dev: true
 
-  /tailwindcss/3.2.1:
+  /tailwindcss/3.2.1_postcss@8.4.20:
     resolution: {integrity: sha512-Uw+GVSxp5CM48krnjHObqoOwlCt5Qo6nw1jlCRwfGy68dSYb/LwS9ZFidYGRiM+w6rMawkZiu1mEMAsHYAfoLg==}
     engines: {node: '>=12.13.0'}
     hasBin: true
+    peerDependencies:
+      postcss: ^8.0.9
     dependencies:
       arg: 5.0.2
       chokidar: 3.5.3
