@@ -21,7 +21,7 @@ render(() => {
   });
 
   return (
-    <rspc.Provider client={client} queryClient={queryClient}>
+    <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
         <App />
       </Router>
@@ -31,7 +31,7 @@ render(() => {
 
 render(() => {
   return (
-    <rspc.Provider client={client} queryClient={queryClient}>
+    <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
         <Modals />
       </Router>

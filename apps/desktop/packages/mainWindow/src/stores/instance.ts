@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+/* eslint-disable no-unused-vars */
 import { createStore } from "solid-js/store";
 
 export interface Instance {
