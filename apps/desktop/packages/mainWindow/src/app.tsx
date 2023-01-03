@@ -10,6 +10,9 @@ const App: Component = () => {
   const navigate = useNavigate();
 
   const echoMsg = rspc.createQuery(() => ["echo", "something"]);
+  // const subscription = rspc.createSubscription(() => ["subscriptions.pings"], {
+  //   onData: (e) => console.log(e),
+  // });
 
   createEffect(() => {
     console.log("pkgVersion", echoMsg.data);

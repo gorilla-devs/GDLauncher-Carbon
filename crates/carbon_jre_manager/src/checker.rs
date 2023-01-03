@@ -121,7 +121,8 @@ fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Res
         for subkey in subkeys.flatten() {
             let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
-            if let Ok(registry_str) = subkey_reg.get_value(value) {
+            let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);
+            if let Ok(registry_str) = subkey_reg_value {
                 results.extend(search_java_binary_in_path(PathBuf::from(registry_str)));
             }
         }
