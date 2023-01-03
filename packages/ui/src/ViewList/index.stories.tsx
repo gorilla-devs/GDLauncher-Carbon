@@ -1,6 +1,6 @@
 import { ViewList } from "./index.jsx";
 import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import { ComponentProps, For } from "solid-js";
 
 export default {
   title: "ViewList",
@@ -16,111 +16,9 @@ export default {
 const Template = ((args) => (
   <div class="h-70">
     <ViewList {...args}>
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
-      <div class="w-20 h-20 bg-green-500 border-dark-50" />
+      <For each={new Array(400)}>
+        {() => <div class="w-20 h-20 bg-green-500 border-dark-50" />}
+      </For>
     </ViewList>
   </div>
 )) as StoryFn<ComponentProps<typeof ViewList>>;

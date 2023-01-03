@@ -1,4 +1,4 @@
-import { JSXElement, Match, mergeProps, Switch } from "solid-js";
+import { children, JSXElement, Match, mergeProps, Switch } from "solid-js";
 import { VirtualContainer } from "@minht11/solid-virtual-container";
 
 interface ItemSize {
@@ -6,7 +6,7 @@ interface ItemSize {
   height: number;
 }
 interface Props {
-  children: JSXElement[];
+  children: JSXElement[] | JSXElement;
   type?: "list" | "grid";
   cols?: number;
   itemSize?: ItemSize;
@@ -15,7 +15,7 @@ interface Props {
 const ListItem = (props: any) => (
   <div
     style={props.style}
-    class="w-full"
+    class="w-full h-full"
     tabIndex={props.tabIndex}
     role="listitem"
   >
@@ -29,6 +29,8 @@ function ViewList(props: Props) {
     props
   );
 
+  const c = children(() => props.children);
+
   let scrollTargetElement!: HTMLDivElement;
 
   return (
@@ -36,7 +38,7 @@ function ViewList(props: Props) {
       <Switch>
         <Match when={mergedProps.type === "grid"}>
           <VirtualContainer
-            items={props.children}
+            items={c() as JSXElement[]}
             scrollTarget={scrollTargetElement}
             itemSize={mergedProps.itemSize}
             crossAxisCount={() => {
@@ -48,7 +50,7 @@ function ViewList(props: Props) {
         </Match>
         <Match when={mergedProps.type === "list"}>
           <VirtualContainer
-            items={props.children}
+            items={c() as JSXElement[]}
             scrollTarget={scrollTargetElement}
             itemSize={mergedProps.itemSize}
           >
