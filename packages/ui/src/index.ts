@@ -3,7 +3,6 @@ export { Input } from "./Input";
 export { Select } from "./Select";
 export { Counter } from "./Counter";
 export { Carousel } from "./Carousel";
-export { InstanceTile } from "./InstanceTile";
 export { Slider } from "./Slider";
 export { Switch } from "./Switch";
 export { Checkbox } from "./Checkbox";
