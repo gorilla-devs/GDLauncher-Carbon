@@ -37,7 +37,7 @@ const newsArticles = [
 
 const Home = () => {
   return (
-    <div>
+    <div class="p-6">
       <div>
         <News slides={newsArticles} />
         <div class="mt-4">
