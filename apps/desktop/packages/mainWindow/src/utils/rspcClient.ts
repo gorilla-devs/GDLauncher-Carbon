@@ -1,17 +1,30 @@
 import { QueryClient } from "@tanstack/solid-query";
-import { WebsocketTransport, createClient, FetchTransport } from "@rspc/client";
+import {
+  WebsocketTransport,
+  createClient,
+  FetchTransport,
+  wsLink,
+  createWSClient,
+} from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 
 import type { Procedures } from "@gd/carbon_core"; // These were the bindings exported from your Rust code!
 
+const wsClient = createWSClient({
+  url: "ws://localhost:4000/rspc/ws",
+});
+
 export const client = createClient<Procedures>({
-  transport: new WebsocketTransport("ws://localhost:4000/rspc/ws"),
-  // transport: new FetchTransport("http://localhost:4000/rspc"),
+  links: [
+    wsLink({
+      client: wsClient,
+    }),
+  ],
 });
 
 export const queryClient = new QueryClient();
 export const rspc = createSolidQueryHooks<Procedures>();
 
-client.addSubscription(["pings"], {
+client.subscription(["pings"], {
   onData: (e) => console.log(e),
 });

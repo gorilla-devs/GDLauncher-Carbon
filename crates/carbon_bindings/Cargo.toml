@@ -9,7 +9,7 @@ edition = "2021"
 serde = { version = "1.0.147", features = ["derive", "rc"] }
 anyhow = "1.0.51"
 tokio = { version = "1.22.0", features = ["full"] }
-rspc = { version = "0.1.2", features = ["axum"] }
+rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "650681fdded1cda81eea267e1bd39838098d41f6" }
 tracing = "0.1.37"
 async-stream = "0.3.3"
 tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }

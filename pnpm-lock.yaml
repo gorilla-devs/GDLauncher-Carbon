@@ -17,8 +17,8 @@ importers:
       '@gd/config': workspace:*
       '@gd/ui': workspace:*
       '@playwright/test': ^1.28.1
-      '@rspc/client': ^0.1.2
-      '@rspc/solid': ^0.1.2
+      '@rspc/client': ^0.0.0-main-650681fdded1cda81eea267e1bd39838098d41f6
+      '@rspc/solid': ^0.0.0-main-650681fdded1cda81eea267e1bd39838098d41f6
       '@solidjs/router': ^0.5.1
       '@typescript-eslint/parser': ^5.46.0
       chokidar: ^3.5.3
@@ -48,8 +48,8 @@ importers:
       '@gd/config': link:../../packages/config
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.28.1
-      '@rspc/client': 0.1.2
-      '@rspc/solid': 0.1.2_7unfzetqmlehuf72mwv3deaqam
+      '@rspc/client': 0.0.0-main-7c0a67c1
+      '@rspc/solid': 0.0.0-main-7c0a67c1_7unfzetqmlehuf72mwv3deaqam
       '@solidjs/router': 0.5.1_solid-js@1.6.4
       '@typescript-eslint/parser': 5.46.0_ha6vam6werchizxrnqvarmz2zu
       chokidar: 3.5.3
@@ -122,6 +122,9 @@ importers:
     specifiers: {}
 
   crates/carbon_minecraft:
+    specifiers: {}
+
+  crates/carbon_net:
     specifiers: {}
 
   packages/carbon_core:
@@ -3521,17 +3524,17 @@ packages:
       rollup: 3.7.2
     dev: true
 
-  /@rspc/client/0.1.2:
-    resolution: {integrity: sha512-MfgSZkrqVzzqCN4GU3LKhfy4qG+PS1LpEz/MMays6rtz5EFNJIvEVMA5Ooc+DH8KLe5h4/3bf4dfyEs7czhA2w==}
+  /@rspc/client/0.0.0-main-7c0a67c1:
+    resolution: {integrity: sha512-PpFkqhp8KlfdFSa8f/Ff5nOg8jhHNq12q8p0ZLYU/1K68JVPQRIk432zpXg48QT/MQbMrogx/PF5E7refhEtvw==}
     dev: true
 
-  /@rspc/solid/0.1.2_7unfzetqmlehuf72mwv3deaqam:
-    resolution: {integrity: sha512-lnboDerqpCypgHp2dzrr9eltGXN59WiyQgZqYeZCUXTgU92tlJq5yV/1KMtZ0BYmHRIvUDGNJBV2DiRINNqoMg==}
+  /@rspc/solid/0.0.0-main-7c0a67c1_7unfzetqmlehuf72mwv3deaqam:
+    resolution: {integrity: sha512-z4CJQX+Ci5/p/fC9XAN8x7aWMfm7chMSICQ4ks/PVC2IB1NZ5NYvOfzWA28KxHXJijBOAV45z2RRuxPR57+dqQ==}
     peerDependencies:
       '@tanstack/solid-query': ^4.6.0
       solid-js: ^1.5.5
     dependencies:
-      '@rspc/client': 0.1.2
+      '@rspc/client': 0.0.0-main-7c0a67c1
       '@tanstack/solid-query': 4.19.1_solid-js@1.6.4
       solid-js: 1.6.4
     dev: true
@@ -8262,7 +8265,7 @@ packages:
     dev: true
 
   /concat-map/0.0.1:
-    resolution: {integrity: sha1-2Klr13/Wjfd5OnMDajug1UBdR3s=}
+    resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
     dev: true
 
   /concat-stream/1.6.2:
@@ -17945,7 +17948,7 @@ packages:
       merge-anything: 5.1.4
       solid-js: 1.6.4
       solid-refresh: 0.4.1_solid-js@1.6.4
-      vite: 3.2.5
+      vite: 3.2.5_sass@1.56.2
       vitefu: 0.2.3_vite@3.2.5
     transitivePeerDependencies:
       - supports-color
@@ -18071,7 +18074,7 @@ packages:
       vite:
         optional: true
     dependencies:
-      vite: 3.2.5
+      vite: 3.2.5_sass@1.56.2
     dev: true
 
   /vitest/0.25.6_jsdom@20.0.3:

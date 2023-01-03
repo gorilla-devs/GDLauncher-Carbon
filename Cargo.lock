@@ -386,15 +386,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb4a24b1aaf0fd0ce8b45161144d6f42cd91677fd5940fd431183eb023b3a2b8"
 
 [[package]]
-name = "convert_case"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
-dependencies = [
- "unicode-segmentation",
-]
-
-[[package]]
 name = "cookie"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,6 +599,15 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "document-features"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e493c573fce17f00dcab13b6ac057994f3ce17d1af4dc39bfd482b83c6eb6157"
+dependencies = [
+ "litrs",
 ]
 
 [[package]]
@@ -876,8 +876,7 @@ checksum = "c4a1e36c821dbe04574f602848a19f742f4fb3c98d40449f11bcad18d6b17421"
 [[package]]
 name = "httpz"
 version = "0.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "566824942ad0ee59fd23ded19025b37b51137eab4e467e48f7cab325a43efa50"
+source = "git+https://github.com/oscartbeaumont/httpz.git?rev=1ddbd9ad594ac7ee3e5b167afe689d1ce1228519#1ddbd9ad594ac7ee3e5b167afe689d1ce1228519"
 dependencies = [
  "async-tungstenite",
  "axum",
@@ -888,6 +887,7 @@ dependencies = [
  "http",
  "hyper",
  "sha1",
+ "thiserror",
  "tokio",
 ]
 
@@ -1057,6 +1057,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "litrs"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9275e0933cf8bb20f008924c0cb07a0692fe54d8064996520bf998de9eb79aa"
+
+[[package]]
 name = "lock_api"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1175,7 +1181,7 @@ version = "2.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39f3d8b02ef355898ea98f69082d9a183c8701c836942c2daf3e92364e88a0fa"
 dependencies = [
- "convert_case 0.5.0",
+ "convert_case",
  "napi-derive-backend",
  "proc-macro2",
  "quote",
@@ -1188,7 +1194,7 @@ version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c35640513eb442fcbd1653a1c112fb6b2cc12b54d82f9c141f5859c721cab36"
 dependencies = [
- "convert_case 0.5.0",
+ "convert_case",
  "once_cell",
  "proc-macro2",
  "quote",
@@ -1369,6 +1375,12 @@ dependencies = [
  "rand_core",
  "subtle",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01a5bd0424d00070b0098dd17ebca6f961a959dead1dbcbbbc1d1cd8d3deeba"
 
 [[package]]
 name = "pbkdf2"
@@ -1669,8 +1681,7 @@ dependencies = [
 [[package]]
 name = "rspc"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "712fc4e2fc79297d308fa4575f19f6967bf7610e3292446dfb392738aeab5239"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=650681fdded1cda81eea267e1bd39838098d41f6#650681fdded1cda81eea267e1bd39838098d41f6"
 dependencies = [
  "async-stream",
  "futures",
@@ -1866,21 +1877,21 @@ dependencies = [
 
 [[package]]
 name = "specta"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5886f252f583ae32d4ae21c228c7a4ab3da40a7ebed646886b942f4085047394"
+version = "0.0.6"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=650681fdded1cda81eea267e1bd39838098d41f6#650681fdded1cda81eea267e1bd39838098d41f6"
 dependencies = [
- "convert_case 0.6.0",
+ "document-features",
+ "once_cell",
+ "paste",
+ "serde",
  "serde_json",
  "specta-macros",
- "termcolor",
 ]
 
 [[package]]
 name = "specta-macros"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5ad5db5dea9fa5816615d722b682781214fed875fe56c1bcd0a67ee9c477d84"
+version = "0.0.6"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=650681fdded1cda81eea267e1bd39838098d41f6#650681fdded1cda81eea267e1bd39838098d41f6"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2292,12 +2303,6 @@ checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]
-
-[[package]]
-name = "unicode-segmentation"
-version = "1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fdbf052a0783de01e944a6ce7a8cb939e295b1e7be835a1112c3b9a7f047a5a"
 
 [[package]]
 name = "unicode-width"
