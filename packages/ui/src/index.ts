@@ -6,6 +6,7 @@ export { Carousel } from "./Carousel";
 export { Slider } from "./Slider";
 export { Switch } from "./Switch";
 export { Checkbox } from "./Checkbox";
+export { ViewList } from "./ViewList";
 export { News } from "./News";
 export { Tabs } from "./Tabs";
 export { Progressbar } from "./Progressbar";
