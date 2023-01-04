@@ -18,7 +18,7 @@ const Carousel = (props: Props) => {
   return (
     <div class="flex flex-col w-full">
       <div class="flex justify-between items-center h-9 w-full">
-        <h3>{props.title}</h3>
+        <h3 class="uppercase">{props.title}</h3>
         <div class="h-full flex gap-4">
           <div
             class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"

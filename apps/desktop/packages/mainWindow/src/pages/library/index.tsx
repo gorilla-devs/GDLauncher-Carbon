@@ -1,8 +1,59 @@
-import InstalledInstances from "@/components/Carousels/InstalledInstances";
-import PopularModpacks from "@/components/Carousels/PopularModpacks";
-import RecentPlayed from "@/components/Carousels/RecentPlayed";
-import { News } from "@gd/ui";
+import Tile from "@/components/Instance/Tile";
+import { Carousel, News } from "@gd/ui";
+import { useNavigate } from "@solidjs/router";
+import { For } from "solid-js";
 import "./index.css";
+
+const mockCarousel = [
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "ABDFEAD",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "DDAEDF",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "HDHEJA",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "HUSER",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "PDODK",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "AKFBI",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "AHUUIO",
+  },
+  {
+    title: "Minecraft forge",
+    modloader: "forge",
+    mcVersion: "1.19.2",
+    id: "HFHDJ",
+  },
+];
 
 const newsArticles = [
   {
@@ -10,44 +61,81 @@ const newsArticles = [
     description: "this is a nice and fair description",
     image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
     url: "https://randomurl.com",
-    guid: "843292n",
   },
   {
     title: "title1",
     description: "this is a nice and fair description",
     image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
     url: "https://randomurl.com",
-    guid: "843292n",
   },
   {
     title: "title2",
     description: "this is a nice and fair description",
     image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
     url: "https://randomurl.com",
-    guid: "843292n",
   },
   {
     title: "title3",
     description: "this is a nice and fair description",
     image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
     url: "https://randomurl.com",
-    guid: "843292n",
   },
 ];
 
 const Home = () => {
+  const navigate = useNavigate();
+
   return (
-    <div>
+    <div class="p-6">
       <div>
         <News slides={newsArticles} />
         <div class="mt-4">
-          <RecentPlayed />
+          <Carousel title="Recent played">
+            <For each={mockCarousel}>
+              {(instance) => (
+                <div id={instance.id}>
+                  <Tile
+                    onClick={() => navigate(`/library/${instance.id}`)}
+                    title={instance.title}
+                    modloader={instance.modloader}
+                    version={instance.mcVersion}
+                  />
+                </div>
+              )}
+            </For>
+          </Carousel>
         </div>
         <div class="mt-4">
-          <PopularModpacks />
+          <Carousel title="Your Instances">
+            <For each={mockCarousel}>
+              {(instance) => (
+                <div id={instance.id}>
+                  <Tile
+                    onClick={() => navigate(`/library/${instance.id}`)}
+                    title={instance.title}
+                    modloader={instance.modloader}
+                    version={instance.mcVersion}
+                  />
+                </div>
+              )}
+            </For>
+          </Carousel>
         </div>
         <div class="mt-4">
-          <InstalledInstances />
+          <Carousel title="Popular Modpacks">
+            <For each={mockCarousel}>
+              {(instance) => (
+                <div id={instance.id}>
+                  <Tile
+                    onClick={() => navigate(`/library/${instance.id}`)}
+                    title={instance.title}
+                    modloader={instance.modloader}
+                    version={instance.mcVersion}
+                  />
+                </div>
+              )}
+            </For>
+          </Carousel>
         </div>
       </div>
     </div>

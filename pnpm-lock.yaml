@@ -163,6 +163,7 @@ importers:
     specifiers:
       '@babel/core': ^7.20.5
       '@gd/config': workspace:*
+      '@minht11/solid-virtual-container': ^0.2.1
       '@storybook/addon-actions': ^6.5.14
       '@storybook/addon-essentials': ^6.5.14
       '@storybook/addon-interactions': ^6.5.14
@@ -190,6 +191,7 @@ importers:
     devDependencies:
       '@babel/core': 7.20.5
       '@gd/config': link:../config
+      '@minht11/solid-virtual-container': 0.2.1_solid-js@1.6.4
       '@storybook/addon-actions': 6.5.14_yicqvriqha7ppr6zyvk5y4bjya
       '@storybook/addon-essentials': 6.5.14_pcexcj5hoatmvuqvzd634c66ii
       '@storybook/addon-interactions': 6.5.14_airnygiebsbpdl25l2ujtepxhe
@@ -3394,6 +3396,14 @@ packages:
 
   /@microsoft/tsdoc/0.14.2:
     resolution: {integrity: sha512-9b8mPpKrfeGRuhFH5iO1iwCLeIIsV6+H1sRfxbkoGXIyQE2BTsPd9zqSqQJ+pv5sJ/hT5M1zvOFL02MnEezFug==}
+    dev: true
+
+  /@minht11/solid-virtual-container/0.2.1_solid-js@1.6.4:
+    resolution: {integrity: sha512-HvQWx1uE5NWwx9WsN4waFtmyOjhZKMA/3vBf+j3zGsRfi556LCUk4oOmqZcOvIB5nEpHezvuZ8oUlwxigdO3Xg==}
+    peerDependencies:
+      solid-js: '>= 1.0.0'
+    dependencies:
+      solid-js: 1.6.4
     dev: true
 
   /@mrmlnc/readdir-enhanced/2.2.1:

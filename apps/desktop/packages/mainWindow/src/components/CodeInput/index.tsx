@@ -5,7 +5,7 @@ interface Props {
   disabled?: boolean;
 }
 
-export const CodeInput = (props: Props) => {
+export const DeviceCode = (props: Props) => {
   return (
     <div class="h-13 w-47 bg-black-black opacity-100 rounded-md flex justify-center items-center text-white font-bold  font-ubuntu gap-2">
       <span
