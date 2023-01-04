@@ -4,6 +4,7 @@ use rspc::Config;
 
 fn main() {
     use napi_build::setup;
+    println!("a");
 
     carbon_bindings::build_router()
         .config(

@@ -94,5 +94,5 @@ target
 .turbo
 packages/ui/src/style.dist.css
 apps/desktop/data
-packages/carbon_core/data
+packages/native_interface/data
 MC_TEST

@@ -1,6 +1,6 @@
 import { Button, CodeInput } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
-// import { DeviceCodeObject } from "@gd/carbon_core";
+// import { DeviceCodeObject } from "@gd/native_interface";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 // import { accounts, login } from "@/modules/components/accounts";

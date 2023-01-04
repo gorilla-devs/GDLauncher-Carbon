@@ -14,7 +14,7 @@ module.exports = {
       path: "packages/ui/dist/**/*.*",
     },
     {
-      path: "packages/carbon_core/core.node",
+      path: "packages/native_interface/core.node",
     },
   ],
   defaultCompression: "none",

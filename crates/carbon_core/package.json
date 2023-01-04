@@ -1,5 +1,5 @@
 {
-  "name": "@gd/carbon_microsoft_auth",
+  "name": "@gd/carbon_core",
   "version": "0.0.0",
   "scripts": {
     "test": "cargo test -- --nocapture",

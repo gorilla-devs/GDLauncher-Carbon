@@ -165,7 +165,7 @@ jobs:
           key: cargo-{{ checksum "Cargo.lock" }}
           paths:
             - target
-            - packages/carbon_core/target
+            - packages/native_interface/target
       - save_cache:
           name: Save Pnpm Package Cache
           key: pnpm-{{ checksum "pnpm-lock.yaml" }}

@@ -1,10 +1,10 @@
 import path from "path";
-import core from "@gd/carbon_core";
+import core from "@gd/native_interface";
 import { contextBridge } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
 const nAPIPath = isDev
-  ? "../../packages/carbon_core"
+  ? "../../packages/native_interface"
   : `${__dirname}/../../../`;
 
 let calledOnce = false;

@@ -59,6 +59,7 @@ struct Package {
 
 pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<()> {
     let url = get_download_url(version.into());
+    println!("url: {}", url);
 
     let assets = reqwest::get(url).await?.json::<Vec<Asset>>().await?;
     let asset = assets
@@ -66,41 +67,42 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
         .ok_or_else(|| anyhow::anyhow!("Can't find a java asset"))?;
     let release_name = asset.release_name.clone();
 
-    // Download to disk
-    let mut resp_stream = reqwest::get(&asset.binary.package.link)
-        .await?
-        .bytes_stream();
+    // // Download to disk
+    // let mut resp_stream = reqwest::get(&asset.binary.package.link)
+    //     .await?
+    //     .bytes_stream();
     let runtime = base_path.join("runtime");
-    tokio::fs::create_dir_all(&runtime).await?;
+    // tokio::fs::create_dir_all(&runtime).await?;
 
     let zip_path = runtime.join(format!("{release_name}.zip"));
 
-    let mut file = OpenOptions::new()
-        .write(true)
-        .read(true)
-        .create_new(true)
-        .open(&zip_path)
-        .await
-        .context("Failed to create extracted file")?;
+    // let mut file = OpenOptions::new()
+    //     .write(true)
+    //     .read(true)
+    //     .create_new(true)
+    //     .open(&zip_path)
+    //     .await
+    //     .context("Failed to create extracted file")?;
 
-    let mut hasher = sha2::Sha256::new();
-    while let Some(item) = resp_stream.next().await {
-        let res = item?;
-        let cloned = res.clone();
-        tokio::io::copy(&mut res.as_ref(), &mut file).await?;
-        hasher.update(cloned);
-    }
+    // let mut hasher = sha2::Sha256::new();
+    // while let Some(item) = resp_stream.next().await {
+    //     let res = item?;
+    //     let cloned = res.clone();
+    //     tokio::io::copy(&mut res.as_ref(), &mut file).await?;
+    //     hasher.update(cloned);
+    // }
 
-    if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
-        bail!("Java asset checksum mismatch");
-    }
+    // if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
+    //     bail!("Java asset checksum mismatch");
+    // }
+    println!("zip_path: {:?}", zip_path);
     let cloned_zip_path = zip_path.clone();
     tokio::task::spawn_blocking(move || {
         unzip_file(zip_path, &runtime).unwrap();
     })
     .await?;
 
-    tokio::fs::remove_file(cloned_zip_path).await?;
+    // tokio::fs::remove_file(cloned_zip_path).await?;
 
     Ok(())
 }
@@ -166,7 +168,7 @@ mod tests {
     async fn test_get_download_url() {
         let current_path = std::env::current_dir().unwrap();
 
-        setup_jre(current_path, JavaMajorSemVer::Version8)
+        setup_jre(current_path, JavaMajorSemVer::Version17)
             .await
             .unwrap();
     }

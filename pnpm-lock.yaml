@@ -13,12 +13,12 @@ importers:
   apps/desktop:
     specifiers:
       '@aws-sdk/client-s3': ^3.226.0
-      '@gd/carbon_core': workspace:*
       '@gd/config': workspace:*
+      '@gd/native_interface': workspace:*
       '@gd/ui': workspace:*
       '@playwright/test': ^1.28.1
-      '@rspc/client': ^0.0.0-main-650681fdded1cda81eea267e1bd39838098d41f6
-      '@rspc/solid': ^0.0.0-main-650681fdded1cda81eea267e1bd39838098d41f6
+      '@rspc/client': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
+      '@rspc/solid': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
       '@solidjs/router': ^0.5.1
       '@typescript-eslint/parser': ^5.46.0
       chokidar: ^3.5.3
@@ -44,8 +44,8 @@ importers:
       vite-plugin-solid: ^2.5.0
     devDependencies:
       '@aws-sdk/client-s3': 3.226.0
-      '@gd/carbon_core': link:../../packages/carbon_core
       '@gd/config': link:../../packages/config
+      '@gd/native_interface': link:../../packages/native_interface
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.28.1
       '@rspc/client': 0.0.0-main-7c0a67c1
@@ -115,6 +115,12 @@ importers:
   crates/carbon_bindings:
     specifiers: {}
 
+  crates/carbon_compression:
+    specifiers: {}
+
+  crates/carbon_core:
+    specifiers: {}
+
   crates/carbon_jre_manager:
     specifiers: {}
 
@@ -126,18 +132,6 @@ importers:
 
   crates/carbon_net:
     specifiers: {}
-
-  packages/carbon_core:
-    specifiers:
-      '@gd/config': workspace:*
-      '@napi-rs/cli': ^2.13.2
-      chokidar: ^3.5.3
-      cross-env: ^7.0.3
-    devDependencies:
-      '@gd/config': link:../config
-      '@napi-rs/cli': 2.13.2
-      chokidar: 3.5.3
-      cross-env: 7.0.3
 
   packages/config:
     specifiers:
@@ -152,6 +146,18 @@ importers:
       '@unocss/preset-icons': 0.47.5
       '@unocss/preset-wind': 0.47.5
       unocss: 0.47.5_vite@3.2.5
+
+  packages/native_interface:
+    specifiers:
+      '@gd/config': workspace:*
+      '@napi-rs/cli': ^2.13.2
+      chokidar: ^3.5.3
+      cross-env: ^7.0.3
+    devDependencies:
+      '@gd/config': link:../config
+      '@napi-rs/cli': 2.13.2
+      chokidar: 3.5.3
+      cross-env: 7.0.3
 
   packages/ui:
     specifiers:
@@ -17948,7 +17954,7 @@ packages:
       merge-anything: 5.1.4
       solid-js: 1.6.4
       solid-refresh: 0.4.1_solid-js@1.6.4
-      vite: 3.2.5_sass@1.56.2
+      vite: 3.2.5
       vitefu: 0.2.3_vite@3.2.5
     transitivePeerDependencies:
       - supports-color
@@ -18074,7 +18080,7 @@ packages:
       vite:
         optional: true
     dependencies:
-      vite: 3.2.5_sass@1.56.2
+      vite: 3.2.5
     dev: true
 
   /vitest/0.25.6_jsdom@20.0.3:
