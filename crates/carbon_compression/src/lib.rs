@@ -138,8 +138,12 @@ fn decompress_gzip(archive_path: PathBuf, dest_folder: PathBuf) -> Result<(), Co
 
 // TODO: Ideally decompression would recursively look for another compressed file until it can't find any more.
 
-pub async fn decompress(path: &Path, dest_folder: &Path) -> Result<(), CompressionError> {
-    let path_clone = path.to_path_buf();
+// accept both paths and strings
+pub async fn decompress<T>(path: T, dest_folder: &Path) -> Result<(), CompressionError>
+where
+    T: AsRef<Path> + Send + Sync,
+{
+    let path_clone = path.as_ref().to_path_buf();
     let dest_folder_clone = dest_folder.to_path_buf();
 
     let task_handler = tokio::task::spawn_blocking(move || {
