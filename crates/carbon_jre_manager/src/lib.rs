@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+pub mod auto_setup;
 mod checker;
-pub mod downloader;
 pub mod mc_java;
 mod utils;
 
