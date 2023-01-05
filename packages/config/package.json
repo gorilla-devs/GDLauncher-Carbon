@@ -7,10 +7,10 @@
     "index.ts"
   ],
   "devDependencies": {
-    "@iconify-json/heroicons": "^1.1.6",
+    "@iconify-json/heroicons": "^1.1.8",
     "@iconify-json/ri": "^1.1.4",
-    "@unocss/preset-icons": "^0.47.5",
-    "@unocss/preset-wind": "^0.47.5",
-    "unocss": "^0.47.5"
+    "@unocss/preset-icons": "^0.48.0",
+    "@unocss/preset-wind": "^0.48.0",
+    "unocss": "^0.48.0"
   }
 }
