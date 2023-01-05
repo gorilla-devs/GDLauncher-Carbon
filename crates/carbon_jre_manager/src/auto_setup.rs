@@ -1,9 +1,10 @@
-use anyhow::{bail, Context, Ok, Result};
 use futures::StreamExt;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use tokio::fs::{create_dir_all, File, OpenOptions};
 use tracing::trace;
+
+use crate::error::JREError;
 
 pub enum JavaMajorSemVer {
     Version8,
@@ -19,7 +20,7 @@ impl<'a> From<JavaMajorSemVer> for &'a str {
     }
 }
 
-fn get_download_url(version: &str) -> String {
+async fn get_adoptopenjdk_meta(version: &str) -> Result<Vec<Asset>, JREError> {
     let java_os = match std::env::consts::OS {
         "linux" => "linux",
         "windows" => "windows",
@@ -34,9 +35,13 @@ fn get_download_url(version: &str) -> String {
         _ => unreachable!("Unsupported architecture"),
     };
 
-    format!(
+    let url = format!(
         "https://api.adoptopenjdk.net/v3/assets/latest/{version}/hotspot?architecture={java_arch}&image_type=jre&jvm_impl=hotspot&os={java_os}&page=0&page_size=1&project=jdk&sort_method=DEFAULT&sort_order=DESC",
-    )
+    );
+
+    let res = reqwest::get(url).await?.json().await?;
+
+    Ok(res)
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -57,20 +62,19 @@ struct Package {
     size: u64,
 }
 
-pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<()> {
-    let url = get_download_url(version.into());
-    println!("url: {}", url);
+pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(), JREError> {
+    let adoptopenjdk_meta = get_adoptopenjdk_meta(version.into()).await?;
 
-    let assets = reqwest::get(url).await?.json::<Vec<Asset>>().await?;
-    let asset = assets
+    let asset = adoptopenjdk_meta
         .first()
-        .ok_or_else(|| anyhow::anyhow!("Can't find a java asset"))?;
+        .ok_or(JREError::NoAdoptOpenJDKMetaValidVersion)?;
     let release_name = asset.release_name.clone();
 
     // // Download to disk
     let mut resp_stream = reqwest::get(&asset.binary.package.link)
         .await?
         .bytes_stream();
+
     let runtime = base_path.join("runtime");
     tokio::fs::create_dir_all(&runtime).await?;
 
@@ -81,8 +85,7 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
         .read(true)
         .create_new(true)
         .open(&zip_path)
-        .await
-        .context("Failed to create extracted file")?;
+        .await?;
 
     let mut hasher = sha2::Sha256::new();
     while let Some(item) = resp_stream.next().await {
@@ -93,7 +96,7 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     }
 
     if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
-        bail!("Java asset checksum mismatch");
+        return Err(JREError::ChecksumMismatch);
     }
     carbon_compression::decompress(&zip_path, &runtime).await?;
 

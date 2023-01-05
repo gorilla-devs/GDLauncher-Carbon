@@ -301,7 +301,6 @@ dependencies = [
 name = "carbon_jre_manager"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "carbon_compression",
  "futures",
  "regex",
@@ -309,6 +308,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "thiserror",
  "tokio",
  "tracing",
  "winreg",

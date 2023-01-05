@@ -1,9 +1,8 @@
-use anyhow::{bail, ensure, Result};
 use regex::Regex;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
-use crate::JavaArch;
+use crate::{error::JREError, JavaArch};
 
 use super::JavaVersion;
 
@@ -16,7 +15,7 @@ pub static PATH_SEPARATOR: &'static str = ":";
 const JAVA_CHECK_APP: &'static [u8; 1013] = include_bytes!("JavaCheck.class");
 pub const JAVA_CHECK_APP_NAME: &'static str = "JavaCheck.class";
 
-pub async fn locate_java_check_class() -> Result<PathBuf> {
+pub async fn locate_java_check_class() -> Result<PathBuf, JREError> {
     let temp_dir = std::env::temp_dir();
     let java_check_path = temp_dir.join(JAVA_CHECK_APP_NAME);
     if !java_check_path.exists() {
@@ -27,7 +26,7 @@ pub async fn locate_java_check_class() -> Result<PathBuf> {
     Ok(java_check_path)
 }
 
-pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
+pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JREError> {
     for line in cmd_output.lines() {
         // I spent way too much time on this regex
         let regex = Regex::new(
@@ -77,17 +76,17 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion> {
                         }
                     }
                     _ => {
-                        bail!("Unknown capture group: {}", name);
+                        unreachable!("Regex capture group not handled: {}", name)
                     }
                 }
             }
             return Ok(version);
         }
     }
-    bail!("Could not parse java version")
+    return Err(JREError::ParseVersionError);
 }
 
-pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch> {
+pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JREError> {
     for line in cmd_output.lines() {
         // I spent way too much time on this regex
         let regex = Regex::new(r#"^java.arch=(?P<arch>[[:alnum:]]*)"#)?;
@@ -97,13 +96,11 @@ pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch> {
                 Some(arch) => {
                     return Ok(arch.as_str().into());
                 }
-                None => {
-                    bail!("No arch found in output");
-                }
+                None => return Err(JREError::NoArchInJavaOutput),
             }
         }
     }
-    bail!("Could not parse java arch")
+    return Err(JREError::NoArchInJavaOutput);
 }
 
 #[cfg(test)]

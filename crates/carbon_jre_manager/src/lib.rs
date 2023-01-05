@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use error::JREError;
 use serde::{Deserialize, Serialize};
 
 pub mod auto_setup;
-mod checker;
+mod discovery;
+mod error;
 pub mod mc_java;
 mod utils;
 
@@ -55,13 +56,13 @@ pub struct JavaVersion {
     pub build_metadata: Option<String>,
 }
 
-pub async fn get_available_javas() -> Result<Vec<JavaComponent>> {
-    let mut all_javas = checker::find_java_paths().await;
+pub async fn get_available_javas() -> Result<Vec<JavaComponent>, JREError> {
+    let mut all_javas = discovery::find_java_paths().await;
     all_javas.push(PathBuf::from("java"));
     let mut available_javas = vec![];
 
     for java in all_javas {
-        match checker::gather_java_bin_info(&java).await {
+        match discovery::gather_java_bin_info(&java).await {
             Ok(java_bin_info) => available_javas.push(java_bin_info),
             Err(e) => {
                 eprintln!("Failed to gather Java info for {}: {}", java.display(), e);
