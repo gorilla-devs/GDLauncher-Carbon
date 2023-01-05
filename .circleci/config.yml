@@ -12,15 +12,15 @@ executors:
   website:
     docker:
       - image: cimg/rust:1.65.0-node
-    resource_class: large
+    resource_class: small
   mac:
     macos:
       xcode: "14.1.0"
-    resource_class: large
+    resource_class: medium
   macm1:
     macos:
       xcode: "14.1.0"
-    resource_class: large
+    resource_class: medium
   windows: win/default
 
 jobs:
