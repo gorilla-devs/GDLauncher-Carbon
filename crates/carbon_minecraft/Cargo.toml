@@ -1,6 +1,6 @@
 [package]
 name = "carbon_minecraft"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,6 +21,7 @@ zip = "0.6.3"
 lazy_static = "1.4.0"
 async-trait = "0.1.60"
 carbon_net ={ path = "../carbon_net" }
+carbon_compression = { path = "../carbon_compression" }
 
 [dev-dependencies]
 tracing-test = "0.2.3"

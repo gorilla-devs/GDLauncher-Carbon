@@ -68,94 +68,36 @@ pub async fn setup_jre(base_path: PathBuf, version: JavaMajorSemVer) -> Result<(
     let release_name = asset.release_name.clone();
 
     // // Download to disk
-    // let mut resp_stream = reqwest::get(&asset.binary.package.link)
-    //     .await?
-    //     .bytes_stream();
+    let mut resp_stream = reqwest::get(&asset.binary.package.link)
+        .await?
+        .bytes_stream();
     let runtime = base_path.join("runtime");
-    // tokio::fs::create_dir_all(&runtime).await?;
+    tokio::fs::create_dir_all(&runtime).await?;
 
-    let zip_path = runtime.join(format!("{release_name}.zip"));
+    let zip_path = runtime.join(format!("{release_name}.tar.gz"));
 
-    // let mut file = OpenOptions::new()
-    //     .write(true)
-    //     .read(true)
-    //     .create_new(true)
-    //     .open(&zip_path)
-    //     .await
-    //     .context("Failed to create extracted file")?;
+    let mut file = OpenOptions::new()
+        .write(true)
+        .read(true)
+        .create_new(true)
+        .open(&zip_path)
+        .await
+        .context("Failed to create extracted file")?;
 
-    // let mut hasher = sha2::Sha256::new();
-    // while let Some(item) = resp_stream.next().await {
-    //     let res = item?;
-    //     let cloned = res.clone();
-    //     tokio::io::copy(&mut res.as_ref(), &mut file).await?;
-    //     hasher.update(cloned);
-    // }
+    let mut hasher = sha2::Sha256::new();
+    while let Some(item) = resp_stream.next().await {
+        let res = item?;
+        let cloned = res.clone();
+        tokio::io::copy(&mut res.as_ref(), &mut file).await?;
+        hasher.update(cloned);
+    }
 
-    // if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
-    //     bail!("Java asset checksum mismatch");
-    // }
-    println!("zip_path: {:?}", zip_path);
-    let cloned_zip_path = zip_path.clone();
-    tokio::task::spawn_blocking(move || {
-        unzip_file(zip_path, &runtime).unwrap();
-    })
-    .await?;
+    if format!("{:x}", hasher.finalize()) != asset.binary.package.checksum {
+        bail!("Java asset checksum mismatch");
+    }
+    carbon_compression::decompress(&zip_path, &runtime).await?;
 
     // tokio::fs::remove_file(cloned_zip_path).await?;
-
-    Ok(())
-}
-
-/// Blocking! Use tokio::task::spawn_blocking or similar to run this in order to not block the tokio runtime
-fn unzip_file(fname: PathBuf, dest: &Path) -> Result<()> {
-    let file = std::fs::File::open(&fname).unwrap();
-
-    let mut archive = zip::ZipArchive::new(file).unwrap();
-
-    for i in 0..archive.len() {
-        let mut file = archive.by_index(i).unwrap();
-        let outpath = match file.enclosed_name() {
-            Some(path) => Path::new(&dest).join(path),
-            None => continue,
-        };
-
-        {
-            let comment = file.comment();
-            if !comment.is_empty() {
-                trace!("File {i} comment: {comment}");
-            }
-        }
-
-        if (*file.name()).ends_with('/') {
-            trace!("File {} extracted to \"{}\"", i, outpath.display());
-            std::fs::create_dir_all(&outpath).unwrap();
-        } else {
-            trace!(
-                "File {} extracted to \"{}\" ({} bytes)",
-                i,
-                outpath.display(),
-                file.size()
-            );
-            if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    std::fs::create_dir_all(p).unwrap();
-                }
-            }
-            let mut outfile = std::fs::File::create(&outpath).unwrap();
-            std::io::copy(&mut file, &mut outfile).unwrap();
-        }
-
-        // Get and Set permissions
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-
-            if let Some(mode) = file.unix_mode() {
-                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode)).unwrap();
-            }
-        }
-    }
 
     Ok(())
 }

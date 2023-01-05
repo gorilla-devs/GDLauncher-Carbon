@@ -1,6 +1,6 @@
 [package]
 name = "carbon_jre_manager"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2021"
 
 [dependencies]
@@ -13,7 +13,7 @@ tokio = { version = "1.22.0", features = ["full"] }
 reqwest = { version = "0.11.13", features = ["json", "stream"] }
 futures = { version = "0.3.25" }
 sha2 = "0.10.6"
-zip = { version = "0.5.13", default-features = false, features = ["time", "deflate"] }
+carbon_compression = { path = "../carbon_compression" }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.10.1"
