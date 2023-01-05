@@ -19,6 +19,6 @@ export const client = createClient<Procedures>({
 export const queryClient = new QueryClient();
 export const rspc = createSolidQueryHooks<Procedures>();
 
-client.subscription(["pings"], {
+client.subscription(["pings", null], {
   onData: (e) => console.log(e),
 });
