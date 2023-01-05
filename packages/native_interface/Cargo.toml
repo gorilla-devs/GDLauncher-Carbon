@@ -1,0 +1,47 @@
+[package]
+edition = "2021"
+name = "core"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.66"
+async-recursion = "1.0.0"
+async-stream = "0.3.3"
+axum = { version = "0.5.17", features = ["ws"] }
+base64 = "0.13.1"
+bincode = "1.3.3"
+byteorder = "1.4.3"
+chrono = { version = "0.4.23", features = ["serde"] }
+directories = "4.0.1"
+dotenv = "0.15.0"
+futures = "0.3.25"
+tracing = "0.1.37"
+jsonwebtoken = "8.1.1"
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32.git" }
+napi = { version = "2.10.1", features = ["napi8"] }
+napi-derive = { version = "2.9.1", features = ["type-def"] }
+once_cell = "1.16.0"
+rayon = "1.6.0"
+regex = "1.7.0"
+reqwest = { version = "0.11.13", features = ["blocking", "json"] }
+rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "32fe3d8a6ca525f048e84b78451c493e25e9eeba", features=["axum"] }
+serde = { version = "1.0.147", features = ["derive", "rc"] }
+serde_json = "1.0.89"
+tokio = { version = "1.22.0", features = ["full"] }
+tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
+carbon_bindings = { path = "../../crates/carbon_bindings" }
+
+[build-dependencies]
+napi-build = "2"
+rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "32fe3d8a6ca525f048e84b78451c493e25e9eeba", features=["axum"] }
+carbon_bindings = { path = "../../crates/carbon_bindings" }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = "symbols"

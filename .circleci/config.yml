@@ -8,19 +8,19 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.65.0-browsers
-    resource_class: small
+    resource_class: large
   website:
     docker:
       - image: cimg/rust:1.65.0-node
-    resource_class: small
+    resource_class: large
   mac:
     macos:
       xcode: "14.1.0"
-    resource_class: medium
+    resource_class: large
   macm1:
     macos:
       xcode: "14.1.0"
-    resource_class: medium
+    resource_class: large
   windows: win/default
 
 jobs:
@@ -165,7 +165,7 @@ jobs:
           key: cargo-{{ checksum "Cargo.lock" }}
           paths:
             - target
-            - packages/core/target
+            - packages/native_interface/target
       - save_cache:
           name: Save Pnpm Package Cache
           key: pnpm-{{ checksum "pnpm-lock.yaml" }}

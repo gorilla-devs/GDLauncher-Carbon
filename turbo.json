@@ -11,11 +11,11 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": ["^@gd/core#dev", "^@gd/ui#build"],
+      "dependsOn": ["^@gd/native_interface#dev", "^@gd/ui#build"],
       "outputs": ["dist/**"],
       "cache": false
     },
-    "@gd/core": {
+    "@gd/native_interface": {
       "outputs": ["core.node"],
       "cache": false
     },

@@ -14,7 +14,7 @@ module.exports = {
       path: "packages/ui/dist/**/*.*",
     },
     {
-      path: "packages/core/core.node",
+      path: "packages/native_interface/core.node",
     },
   ],
   defaultCompression: "none",

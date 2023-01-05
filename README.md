@@ -7,22 +7,45 @@ https://flowbite.com/
 
 Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for turborepo examples.
 
+## Requirements
+
+- Node 16.16.0
+- Rust 1.66.0
+
+## Env
+
+First of all you need to create a .env file in the root folder of the source, and add the following variable:
+
+`VITE_NAPI_ID=GDL`
+
+## Pnpm
+
+At this point make sure you have pnpm installed:
+
+`npm install -g pnpm`
+
+## Install Dependencies
+
+`pnpm i`
+
 ## Development
 
 To run in dev please run
 
-`npm i -g pnpm`
+`pnpm dev-app`
 
-`pnpm i`
+## Test
 
-`pnpm dev`
+To run tests please run
+
+`pnpm test`
+
+## Lint
+
+To run lint please run
+
+`pnpm lint`
 
 ## Release
 
-To build the app for release, you need to use `yarn` due to https://github.com/electron-userland/electron-builder/issues/6289 and https://github.com/pnpm/pnpm/issues/4473
-
-`npm i -g yarn`
-
-`yarn`
-
-`yarn build-{mac|win|linux}-{arm64|x64}`
+`pnpm build-{mac|win|linux}-{arm64|x64}`
