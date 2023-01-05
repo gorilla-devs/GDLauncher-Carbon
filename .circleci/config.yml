@@ -167,13 +167,13 @@ jobs:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}-win
           paths:
-            - target
-            - packages/native_interface/target
+            - ./target
+            - ./packages/native_interface/target
       - save_cache:
           name: Save Pnpm Package Cache
           key: pnpm-{{ checksum "pnpm-lock.yaml" }}-win
           paths:
-            - node_modules
+            - ./node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
