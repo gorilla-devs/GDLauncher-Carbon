@@ -1,20 +1,18 @@
-use async_trait::async_trait;
+pub(in crate::modloader) mod forge;
+pub(in crate::modloader) mod vanilla;
 
-pub mod forge;
-pub mod vanilla;
-
-type ModLoaderVersion = String;
-pub enum ModLoaderType {
-    Vanilla,
-    Forge,
-}
-
+use std::clone;
 use std::sync::Weak;
 
 use anyhow::Result;
 use tokio::sync::{watch::Sender, RwLock};
 
 use super::instance::Instance;
+
+enum ModLoader{
+    Vanilla,
+    Forge,
+}
 
 pub type ModloaderVersion = String;
 
@@ -28,9 +26,9 @@ pub struct InstallProgress<T> {
 pub trait Modloader {
     type Stages;
 
-    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
-    where
-        Self: Sized;
+    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self /// instance
+        where
+            Self: Sized;
     async fn install(&self, progress_recv: Sender<InstallProgress<Self::Stages>>) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;

@@ -20,7 +20,10 @@ reqwest-retry = "0.2.1"
 zip = "0.6.3"
 lazy_static = "1.4.0"
 async-trait = "0.1.60"
-carbon_net ={ path = "../carbon_net" }
+uuid = "1.2.2"
+thiserror = "1.0.38"
+carbon_net = { path = "../carbon_net" }
+
 
 [dev-dependencies]
 tracing-test = "0.2.3"

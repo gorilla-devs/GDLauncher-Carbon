@@ -1,0 +1,14 @@
+[package]
+name = "carbon_macro"
+version = "0.0.1"
+authors = ["Lucio Gabriele Pisanello <luciogabriele.pisanello@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1"
+proc-macro2 = "1.0"
+syn = "1.0"
+
