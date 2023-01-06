@@ -14,11 +14,13 @@ use crate::modloaders::{forge::ForgeModloader, vanilla::VanillaModLoader, Modloa
 pub struct Instance{
     pub name: String,
     pub minecraft_package : MinecraftPackage,
-    pub mods : HashSet<MinecraftMod>,
-    mod_loader: ModLoader,
 }
 
 impl Instance {
+
+    fn get_history(&self) -> InstanceHistory{ // FIXME: maybe extract a trait ?
+        todo!()
+    }
 
     fn get_cli_arguments(&self) -> Vec<String>{ // FIXME: maybe extract a trait ?
         todo!()
@@ -29,6 +31,10 @@ impl Instance {
     }
 
 }
+
+
+struct InstanceHistory{}
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

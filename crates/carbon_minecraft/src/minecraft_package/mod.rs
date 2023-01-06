@@ -1,9 +1,12 @@
 use std::collections::HashSet;
 use std::path::Path;
+use crate::minecraft_mod::MinecraftMod;
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct MinecraftPackage{
-    pub version: String
+    pub version: String,
+    pub mods : HashSet<MinecraftMod>,
+    mod_loader: ModLoader,
 }
 
 impl MinecraftPackage{
