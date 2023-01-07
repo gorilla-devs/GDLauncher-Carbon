@@ -66,21 +66,6 @@ package-lock.json
 # next.js build output
 .next
 
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
 # ----
 dist
 **/.tmp
@@ -94,4 +79,6 @@ target
 .turbo
 packages/ui/src/style.dist.css
 apps/desktop/data
-packages/core/data
+packages/native_interface/data
+MC_TEST
+tests_decompressed

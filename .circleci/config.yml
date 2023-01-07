@@ -8,7 +8,7 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.65.0-browsers
-    resource_class: small
+    resource_class: large
   website:
     docker:
       - image: cimg/rust:1.65.0-node
@@ -37,6 +37,14 @@ jobs:
             and:
               - equal: ["mac", <<parameters.os>>]
           steps:
+            - restore_cache:
+                name: Restore Cargo Package Cache
+                keys:
+                  - cargo-{{ checksum "Cargo.lock" }}-mac
+            - restore_cache:
+                name: Restore Pnpm Package Cache
+                keys:
+                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-mac
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
@@ -49,6 +57,17 @@ jobs:
             - run: pnpm build-mac-x64
             - run: pnpm lint
             - run: pnpm test
+            - save_cache:
+                name: Save Cargo Package Cache
+                key: cargo-{{ checksum "Cargo.lock" }}-mac
+                paths:
+                  - target
+                  - packages/native_interface/target
+            - save_cache:
+                name: Save Pnpm Package Cache
+                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-mac
+                paths:
+                  - node_modules
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -58,6 +77,14 @@ jobs:
             and:
               - equal: ["macm1", <<parameters.os>>]
           steps:
+            - restore_cache:
+                name: Restore Cargo Package Cache
+                keys:
+                  - cargo-{{ checksum "Cargo.lock" }}-macm1
+            - restore_cache:
+                name: Restore Pnpm Package Cache
+                keys:
+                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-macm1
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
@@ -70,6 +97,17 @@ jobs:
             - run: pnpm build-mac-arm64
             - run: pnpm lint
             - run: pnpm test
+            - save_cache:
+                name: Save Cargo Package Cache
+                key: cargo-{{ checksum "Cargo.lock" }}-macm1
+                paths:
+                  - target
+                  - packages/native_interface/target
+            - save_cache:
+                name: Save Pnpm Package Cache
+                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-macm1
+                paths:
+                  - node_modules
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -80,6 +118,14 @@ jobs:
       size: medium
     steps:
       - checkout
+      - restore_cache:
+          name: Restore Cargo Package Cache
+          keys:
+            - cargo-{{ checksum "Cargo.lock" }}-win
+      - restore_cache:
+          name: Restore Pnpm Package Cache
+          keys:
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-win
       - run:
           name: Install NVM
           shell: powershell.exe
@@ -91,7 +137,6 @@ jobs:
             nvm list
             nvm install 18.12.1
             nvm use 18.12.1
-
       - run:
           name: "Install Rust"
           shell: powershell.exe
@@ -118,6 +163,17 @@ jobs:
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm test
+      - save_cache:
+          name: Save Cargo Package Cache
+          key: cargo-{{ checksum "Cargo.lock" }}-win
+          paths:
+            - ./target
+            - ./packages/native_interface/target
+      - save_cache:
+          name: Save Pnpm Package Cache
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-win
+          paths:
+            - ./node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -143,11 +199,11 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "Cargo.lock" }}
+            - cargo-{{ checksum "Cargo.lock" }}-testdocker
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-testdocker
       - run: |
           node -v
           cargo --version
@@ -162,13 +218,13 @@ jobs:
       - run: pnpm check-bundle
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}
+          key: cargo-{{ checksum "Cargo.lock" }}-testdocker
           paths:
             - target
-            - packages/core/target
+            - packages/native_interface/target
       - save_cache:
           name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-testdocker
           paths:
             - node_modules
       - run: cd apps && cd desktop && pnpm clean
@@ -179,11 +235,11 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "Cargo.lock" }}
+            - cargo-{{ checksum "Cargo.lock" }}-linux
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-linux
       - run: |
           node -v
           cargo --version
@@ -196,12 +252,12 @@ jobs:
       - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}
+          key: cargo-{{ checksum "Cargo.lock" }}-linux
           paths:
             - target
       - save_cache:
           name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-linux
           paths:
             - node_modules
       - run: cd apps && cd desktop && pnpm clean

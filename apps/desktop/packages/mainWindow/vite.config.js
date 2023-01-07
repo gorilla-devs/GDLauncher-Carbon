@@ -16,6 +16,9 @@ export default defineConfig({
   plugins: [solidPlugin(), Unocss(unocssConfig), ViteMinifyPlugin({})],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
+  optimizeDeps: {
+    exclude: ["@tanstack/solid-query"],
+  },
   build: {
     target: "esnext",
     emptyOutDir: true,

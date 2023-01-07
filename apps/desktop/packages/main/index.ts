@@ -91,8 +91,8 @@ function getMinimumBounds() {
       width: 1560,
       height: 740,
       adSize: {
-        width: 400,
-        height: 300,
+        width: 300,
+        height: 250,
       },
     };
   }

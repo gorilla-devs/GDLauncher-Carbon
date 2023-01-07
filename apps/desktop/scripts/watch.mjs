@@ -37,7 +37,7 @@ function watchMain(mainWindow) {
 
 function watchNativeCore(mainWindow) {
   spawn("pnpm", ["watch"], {
-    cwd: "../../packages/core",
+    cwd: "../../packages/native_interface",
     shell: true,
     stdio: "inherit",
   });
@@ -49,7 +49,9 @@ function watchNativeCore(mainWindow) {
   });
 
   chokidar
-    .watch("../../packages/core/core.node", { ignoreInitial: true })
+    .watch("../../packages/native_interface/core.node", {
+      ignoreInitial: true,
+    })
     .on("all", (event) => {
       console.log("Reloading app due to native core rebuild", event);
       electronProcess?.kill();

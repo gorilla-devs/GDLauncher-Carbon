@@ -1,9 +1,11 @@
 import path from "path";
-import core from "@gd/core";
+import core from "@gd/native_interface";
 import { contextBridge } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
-const nAPIPath = isDev ? "../../packages/core" : `${__dirname}/../../../`;
+const nAPIPath = isDev
+  ? "../../packages/native_interface"
+  : `${__dirname}/../../../`;
 
 let calledOnce = false;
 let addon = new Promise<() => typeof core | undefined>((resolve, reject) => {

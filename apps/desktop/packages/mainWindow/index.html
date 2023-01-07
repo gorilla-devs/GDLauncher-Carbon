@@ -9,7 +9,12 @@
     />
     <meta
       http-equiv="Content-Security-Policy"
-      content="script-src 'self' 'unsafe-inline'; img-src 'self' data: https:; default-src 'unsafe-inline' 'self';"
+      content="
+        script-src 'self' 'unsafe-inline';
+        img-src 'self' data: https:;
+        default-src 'unsafe-inline' 'self';
+        connect-src 'self' ws://localhost:4000
+      "
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
