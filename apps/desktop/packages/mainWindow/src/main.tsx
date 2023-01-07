@@ -1,5 +1,5 @@
 /* @refresh reload */
-import { onMount } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
@@ -10,6 +10,7 @@ import { initModules } from "@/modules";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
+import { LanguagesProvider } from "./languagesProvider";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -20,10 +21,23 @@ render(() => {
     initModules();
   });
 
+  // const dict = {
+  //   in: {
+  //     hello: "bonjour {{ name }}, comment vas-tu ?",
+  //   },
+  //   en: {
+  //     hello: "hello {{ name }}, how are you?",
+  //   },
+  // };
+
+  // const value = createI18nContext(dict, "fr");
+
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <App />
+        <LanguagesProvider>
+          <App />
+        </LanguagesProvider>
       </Router>
     </rspc.Provider>
   );
