@@ -4,7 +4,7 @@ import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
   const [t, changeLang] = useLanguages();
-  console.log("useLanguages", t);
+
   return (
     <SiderbarWrapper>
       <Input
@@ -14,6 +14,7 @@ const Sidebar = () => {
       />
       Sidebar library
       {t("hello")}
+      {t("world")}
       <button onClick={() => changeLang("it")}>IT</button>
       <button onClick={() => changeLang("en")}>EN</button>
     </SiderbarWrapper>
