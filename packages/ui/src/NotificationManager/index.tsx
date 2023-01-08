@@ -1,13 +1,11 @@
 import {
   createContext,
-  createEffect,
   createSignal,
   For,
   JSX,
   onCleanup,
   useContext,
 } from "solid-js";
-import { createStore } from "solid-js/store";
 
 type Notification = {
   name: string;
@@ -34,7 +32,6 @@ const NotificationsProvider = (props: Props) => {
     );
 
   const addNotification = (name: string, type?: string, position?: string) => {
-    console.log("ADDD");
     setNotifications((prev) => [
       ...prev,
       {
@@ -48,10 +45,6 @@ const NotificationsProvider = (props: Props) => {
     clearNotification();
   };
 
-  createEffect(() => {
-    console.log("notifications AAA", notifications());
-  });
-
   onCleanup(() => clearTimeout(clearNotification()));
 
   const value = [addNotification];
@@ -62,7 +55,7 @@ const NotificationsProvider = (props: Props) => {
         <For each={notifications()}>
           {(notification, i) => (
             <div
-              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center"
+              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-50"
               style={{
                 transform: `translate(-50%, ${
                   notification.position === "bottom"
