@@ -11,7 +11,10 @@ export { News } from "./News";
 export { Tabs } from "./Tabs";
 export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
-// export { Notifications, addNotification } from "./NotificationManager";
+export {
+  NotificationsProvider,
+  createNotification,
+} from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
 
 import "virtual:uno.css";

@@ -1,4 +1,12 @@
-import { For, onCleanup } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createSignal,
+  For,
+  JSX,
+  onCleanup,
+  useContext,
+} from "solid-js";
 import { createStore } from "solid-js/store";
 
 type Notification = {
@@ -7,67 +15,87 @@ type Notification = {
   position?: string;
 };
 
-const [notifications, setNotifications] = createStore<Notification[]>([]);
-const clearNotification = () =>
-  setTimeout(
-    () =>
-      setNotifications((notification) =>
-        notification.slice(1, notification.length)
-      ),
-    2000
-  );
-
-onCleanup(() => clearInterval(clearNotification()));
-
-export const addNotification = (
-  name: string,
-  type?: string,
-  position?: string
-) => {
-  setNotifications((prev) => [
-    ...prev,
-    {
-      name,
-      // type can be success, error or warning and it change the style/color of the notification
-      type: type || "success",
-      // position can be bottom or top, if not present, by default is bottom
-      position: position || "bottom",
-    },
-  ]);
-  clearNotification();
+type Props = {
+  children: Element | HTMLElement | JSX.Element | any;
 };
 
-const Notifications = () => {
+const NotificationContext = createContext();
+
+const NotificationsProvider = (props: Props) => {
+  const [notifications, setNotifications] = createSignal<Notification[]>([]);
+
+  const clearNotification = () =>
+    setTimeout(
+      () =>
+        setNotifications((notification) =>
+          notification.slice(1, notification.length)
+        ),
+      2000
+    );
+
+  const addNotification = (name: string, type?: string, position?: string) => {
+    console.log("ADDD");
+    setNotifications((prev) => [
+      ...prev,
+      {
+        name,
+        // type can be success, error or warning and it change the style/color of the notification
+        type: type || "success",
+        // position can be bottom or top, if not present, by default is bottom
+        position: position || "bottom",
+      },
+    ]);
+    clearNotification();
+  };
+
+  createEffect(() => {
+    console.log("notifications AAA", notifications());
+  });
+
+  onCleanup(() => clearTimeout(clearNotification()));
+
+  const value = [addNotification];
+
   return (
-    <div>
-      <For each={notifications}>
-        {(notification, i) => (
-          <div
-            class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center"
-            style={{
-              transform: `translate(-50%, ${
-                notification.position === "bottom"
-                  ? `-${i() * 45}`
-                  : `${i() * 45}`
-              }px)`,
-              transition: "transform 1s",
-            }}
-            classList={{
-              "bottom-10": notification.position === "bottom",
-              "bottom-auto": notification.position !== "bottom",
-              "top-12": notification.position === "top",
-              "top-auto": notification.position !== "top",
-              "bg-status-red": notification.type === "error",
-              "bg-status-yellow": notification.type === "warning",
-              "bg-status-green": notification.type === "success",
-            }}
-          >
-            {notification.name}
-          </div>
-        )}
-      </For>
-    </div>
+    <>
+      <NotificationContext.Provider value={value}>
+        <For each={notifications()}>
+          {(notification, i) => (
+            <div
+              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center"
+              style={{
+                transform: `translate(-50%, ${
+                  notification.position === "bottom"
+                    ? `-${i() * 45}`
+                    : `${i() * 45}`
+                }px)`,
+                transition: "transform 1s",
+              }}
+              classList={{
+                "bottom-10": notification.position === "bottom",
+                "bottom-auto": notification.position !== "bottom",
+                "top-12": notification.position === "top",
+                "top-auto": notification.position !== "top",
+                "bg-status-red": notification.type === "error",
+                "bg-status-yellow": notification.type === "warning",
+                "bg-status-green": notification.type === "success",
+              }}
+            >
+              {notification.name}
+            </div>
+          )}
+        </For>
+        {props.children}
+      </NotificationContext.Provider>
+    </>
   );
 };
 
-export { Notifications };
+const createNotification = () => {
+  return useContext(NotificationContext) as [
+    // eslint-disable-next-line no-unused-vars
+    (name: string, type?: string, position?: string) => void
+  ];
+};
+
+export { NotificationsProvider, createNotification };

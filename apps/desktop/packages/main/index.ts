@@ -157,9 +157,9 @@ async function createWindow() {
     }
   });
 
-  if (import.meta.env.DEV) {
-    win.webContents.openDevTools();
-  }
+  // if (import.meta.env.DEV) {
+  win.webContents.openDevTools();
+  // }
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
