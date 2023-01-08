@@ -43,8 +43,8 @@ pub enum JavaError {
     CannotParseAdoptOpenJDKMeta(reqwest::Error),
     #[error("Cannot create Java OpenJDK runtime directory {0}")]
     CannotCreateJavaOpenJDKRuntimeDirectory(std::io::Error),
-    #[error("Cannot create Java OpenJDK file {0}")]
-    CannotCreateJavaOpenJDKFile(std::io::Error),
+    #[error("Cannot download Java OpenJDK file")]
+    CannotDownloadJavaOpenJDK,
     #[error("Cannot delete previously downloaded Java OpenJDK file {0}")]
     CannotDeletePreviouslyDownloadedJavaOpenJDKFile(std::io::Error),
 
@@ -67,4 +67,8 @@ pub enum JavaError {
     CannotParseMojangJDKRuntimeMeta(reqwest::Error),
     #[error("Cannot create Java Mojang JDK runtime file {0}")]
     CannotCreateJavaMojangJDKRuntimeFile(std::io::Error),
+
+    // Scan javas
+    #[error("Cannot read Java Runtimes directory {0}")]
+    CannotReadJavaRuntimesDirectory(std::io::Error),
 }

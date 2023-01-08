@@ -48,7 +48,7 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JavaError> {
                 build_metadata: None,
             };
 
-            for name in regex.capture_names().filter_map(|n| n) {
+            for name in regex.capture_names().flatten() {
                 match name {
                     "major" => {
                         if let Some(major) = captures.name("major") {
@@ -88,7 +88,7 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JavaError> {
             return Ok(version);
         }
     }
-    return Err(JavaError::ParseVersionError);
+    Err(JavaError::ParseVersionError)
 }
 
 pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JavaError> {
@@ -105,7 +105,7 @@ pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JavaError> {
             }
         }
     }
-    return Err(JavaError::NoArchInJavaOutput);
+    Err(JavaError::NoArchInJavaOutput)
 }
 
 #[cfg(test)]

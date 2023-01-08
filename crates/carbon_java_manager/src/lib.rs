@@ -4,9 +4,9 @@ use error::JavaError;
 use serde::{Deserialize, Serialize};
 
 mod auto_setup;
+mod constants;
 mod discovery;
 mod error;
-mod mc_java;
 mod utils;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]

@@ -13,6 +13,8 @@ tokio = { version = "1.23.1", features = ["full"] }
 reqwest = { version = "0.11.13", features = ["json", "stream"] }
 futures = { version = "0.3.25" }
 sha2 = "0.10.6"
+async-trait = "0.1.61"
+chrono = "0.4.23"
 carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 

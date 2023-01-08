@@ -3,11 +3,14 @@ use sha2::Digest;
 use std::{
     borrow::{Borrow, BorrowMut},
     collections::HashMap,
+    os::unix::prelude::PermissionsExt,
     path::PathBuf,
 };
 use tokio::fs::OpenOptions;
 
 use crate::error::JavaError;
+
+pub struct MojangRuntime {}
 
 pub enum RuntimeEdition {
     Alpha,
@@ -15,64 +18,6 @@ pub enum RuntimeEdition {
     Gamma,
     LegacyJRE,
     MinecraftExe,
-}
-
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct MojangMeta {
-    linux: Option<OsRuntime>,
-    linux_i386: Option<OsRuntime>,
-    mac_os: Option<OsRuntime>,
-    mac_os_arm64: Option<OsRuntime>,
-    windows_x86: Option<OsRuntime>,
-    windows_x64: Option<OsRuntime>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct OsRuntime {
-    java_runtime_alpha: Vec<Runtime>,
-    java_runtime_beta: Vec<Runtime>,
-    java_runtime_gamma: Vec<Runtime>,
-    jre_legacy: Vec<Runtime>,
-    minecraft_java_exe: Vec<Runtime>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct Runtime {
-    manifest: MojangDownloadable,
-    version: Version,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct MojangDownloadable {
-    sha1: String,
-    size: u64,
-    url: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct Version {
-    name: String,
-    released: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct MojangRuntimeJDKMeta {
-    files: HashMap<String, MojangRuntimeJDKMetaAsset>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct MojangRuntimeJDKMetaAsset {
-    #[serde(rename = "type")]
-    _type: String,
-    downloads: Option<MojangRuntimeJDKMetaAssetDownloads>,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct MojangRuntimeJDKMetaAssetDownloads {
-    lzma: Option<MojangDownloadable>,
-    raw: Option<MojangDownloadable>,
 }
 
 async fn get_mojang_runtime_meta(
@@ -155,6 +100,64 @@ async fn get_mojang_runtime_meta(
     Ok(runtime_meta)
 }
 
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct MojangMeta {
+    linux: Option<OsRuntime>,
+    linux_i386: Option<OsRuntime>,
+    mac_os: Option<OsRuntime>,
+    mac_os_arm64: Option<OsRuntime>,
+    windows_x86: Option<OsRuntime>,
+    windows_x64: Option<OsRuntime>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct OsRuntime {
+    java_runtime_alpha: Vec<Runtime>,
+    java_runtime_beta: Vec<Runtime>,
+    java_runtime_gamma: Vec<Runtime>,
+    jre_legacy: Vec<Runtime>,
+    minecraft_java_exe: Vec<Runtime>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Runtime {
+    manifest: MojangDownloadable,
+    version: Version,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangDownloadable {
+    sha1: String,
+    size: u64,
+    url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Version {
+    name: String,
+    released: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMeta {
+    files: HashMap<String, MojangRuntimeJDKMetaAsset>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMetaAsset {
+    #[serde(rename = "type")]
+    _type: String,
+    downloads: Option<MojangRuntimeJDKMetaAssetDownloads>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMetaAssetDownloads {
+    lzma: Option<MojangDownloadable>,
+    raw: Option<MojangDownloadable>,
+}
+
 pub async fn setup_mojang_runtime_jre(
     base_path: PathBuf,
     version: RuntimeEdition,
@@ -168,7 +171,7 @@ pub async fn setup_mojang_runtime_jre(
         let downloadable = asset
             .downloads
             .and_then(|d| d.raw)
-            .map(|d| carbon_net::Download::new(d.url, path));
+            .map(|d| carbon_net::Downloadable::new(d.url, path));
 
         if let Some(downloadable) = downloadable {
             if asset._type == "file" {
@@ -193,7 +196,19 @@ pub async fn setup_mojang_runtime_jre(
 
     task_handle.await.unwrap().unwrap();
 
-    drop(recv);
+    // Fix permissions
+    let java_path = base_path
+        .join("java_runtime")
+        .join("mojang")
+        .join("jre.bundle")
+        .join("Contents")
+        .join("Home")
+        .join("bin")
+        .join("java");
+
+    let mut perms = std::fs::metadata(&java_path).unwrap().permissions();
+    perms.set_mode(0o777);
+    std::fs::set_permissions(&java_path, perms).unwrap();
 
     Ok(())
 }
@@ -205,9 +220,28 @@ mod tests {
     #[tokio::test]
     async fn test_setup_mojang_runtime_jre() {
         let current_path = std::env::current_dir().unwrap();
+        let current_path_clone = current_path.clone();
 
         setup_mojang_runtime_jre(current_path, RuntimeEdition::Gamma)
             .await
             .unwrap();
+
+        // try to run java
+
+        let java_path = current_path_clone
+            .join("java_runtime")
+            .join("mojang")
+            .join("jre.bundle")
+            .join("Contents")
+            .join("Home")
+            .join("bin")
+            .join("java");
+
+        let output = std::process::Command::new(java_path)
+            .arg("-version")
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
     }
 }

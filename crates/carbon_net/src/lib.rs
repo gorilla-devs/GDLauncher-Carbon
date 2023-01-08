@@ -1,14 +1,22 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use anyhow::Result;
+use error::DownloadError;
 use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use sha1::{Digest, Sha1};
 use sha2::Sha256;
-use tokio::{fs::OpenOptions, io::AsyncReadExt};
+use tokio::{
+    fs::OpenOptions,
+    io::{AsyncReadExt, AsyncWriteExt},
+};
 use tracing::trace;
+
+mod error;
 
 #[derive(Debug)]
 pub enum Checksum {
@@ -17,18 +25,18 @@ pub enum Checksum {
 }
 
 #[derive(Debug)]
-pub struct Download {
+pub struct Downloadable {
     pub url: String,
     pub path: PathBuf,
     pub checksum: Option<Checksum>,
     pub size: Option<u64>,
 }
 
-impl Download {
-    pub fn new(url: String, path: PathBuf) -> Self {
+impl Downloadable {
+    pub fn new(url: impl Into<String>, path: impl AsRef<Path>) -> Self {
         Self {
-            url,
-            path,
+            url: url.into(),
+            path: path.as_ref().into(),
             checksum: None,
             size: None,
         }
@@ -45,16 +53,55 @@ impl Download {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Progress {
     pub current_count: u64,
     pub current_size: u64,
 }
 
-pub async fn download_multiple(
-    files: Vec<Download>,
+// Todo: Add checksum/size verification
+pub async fn download_file(
+    file: Downloadable,
     progress: tokio::sync::watch::Sender<Progress>,
-) -> Result<()> {
+) -> Result<(), DownloadError> {
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+    let reqwest_client = Client::builder().build()?;
+    let client = ClientBuilder::new(reqwest_client)
+        .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+        .build();
+
+    let mut response = client.get(&file.url).send().await?;
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&file.path)
+        .await?;
+
+    let mut buf = vec![];
+    while let Some(chunk) = response.chunk().await? {
+        file.write_all(&chunk).await?;
+        buf.extend_from_slice(&chunk);
+        progress.send(Progress {
+            current_count: 0,
+            current_size: buf.len() as u64,
+        });
+    }
+
+    progress.send(Progress {
+        current_count: 0,
+        current_size: 0,
+    });
+
+    Ok(())
+}
+
+// TODO: improve checksum/size verification
+pub async fn download_multiple(
+    files: Vec<Downloadable>,
+    progress: tokio::sync::watch::Sender<Progress>,
+) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build().unwrap();
     let client = ClientBuilder::new(reqwest_client)
@@ -63,7 +110,7 @@ pub async fn download_multiple(
 
     let downloads = Arc::new(tokio::sync::Semaphore::new(10));
 
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<_>>> = vec![];
+    let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
 
     for file in files {
         let semaphore = Arc::clone(&downloads);
@@ -72,7 +119,10 @@ pub async fn download_multiple(
         let client = client.clone();
 
         tasks.push(tokio::spawn(async move {
-            let _permit = semaphore.acquire().await?;
+            let _permit = semaphore
+                .acquire()
+                .await
+                .map_err(|err| DownloadError::GenericDownload(err.to_string()))?;
             let path = path.clone();
             let url = url.clone();
 
@@ -136,10 +186,9 @@ pub async fn download_multiple(
 
             let mut resp_stream = client.get(&url).send().await?.bytes_stream();
 
-            tokio::fs::create_dir_all(
-                path.parent()
-                    .ok_or_else(|| anyhow::anyhow!("Can't find parent path for asset"))?,
-            )
+            tokio::fs::create_dir_all(path.parent().ok_or(DownloadError::GenericDownload(
+                "Can't create folder".to_owned(),
+            ))?)
             .await?;
 
             let mut sha1 = Sha1::new();
@@ -165,12 +214,16 @@ pub async fn download_multiple(
             match file.checksum {
                 Some(Checksum::Sha1(hash)) => {
                     if hash != format!("{:x}", sha1.finalize()) {
-                        return Err(anyhow::anyhow!("Checksum mismatch"));
+                        return Err(DownloadError::GenericDownload(
+                            "Checksum mismatch".to_owned(),
+                        ));
                     }
                 }
                 Some(Checksum::Sha256(hash)) => {
                     if hash != format!("{:x}", sha256.finalize()) {
-                        return Err(anyhow::anyhow!("Checksum mismatch"));
+                        return Err(DownloadError::GenericDownload(
+                            "Checksum mismatch".to_owned(),
+                        ));
                     }
                 }
                 None => {}

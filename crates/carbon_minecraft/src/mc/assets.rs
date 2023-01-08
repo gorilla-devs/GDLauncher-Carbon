@@ -24,10 +24,10 @@ impl AssetIndex {
     pub async fn get_asset_downloads(
         &self,
         base_path: &PathBuf,
-    ) -> Result<Vec<carbon_net::Download>> {
+    ) -> Result<Vec<carbon_net::Downloadable>> {
         trace!("Downloading assets");
 
-        let mut files: Vec<carbon_net::Download> = vec![];
+        let mut files: Vec<carbon_net::Downloadable> = vec![];
 
         for (_, object) in self.objects.iter() {
             // TODO: handle directories for different versions (virtual legacy)
@@ -38,7 +38,7 @@ impl AssetIndex {
                 .join(&object.hash);
 
             files.push(
-                carbon_net::Download::new(
+                carbon_net::Downloadable::new(
                     format!(
                         "https://resources.download.minecraft.net/{}/{}",
                         &object.hash[0..2],
