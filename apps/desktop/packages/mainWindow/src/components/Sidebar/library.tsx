@@ -17,6 +17,7 @@ const Sidebar = () => {
       {t("world")}
       <button onClick={() => changeLang("it")}>IT</button>
       <button onClick={() => changeLang("en")}>EN</button>
+      <button onClick={() => changeLang("de")}>DE</button>
     </SiderbarWrapper>
   );
 };

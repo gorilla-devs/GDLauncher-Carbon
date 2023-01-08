@@ -54,8 +54,18 @@ export const LanguagesProvider = (props: Props) => {
   );
 };
 
-export const useLanguages = () => {
-  return useContext(languagesContext);
-};
+export function useLanguages(): [
+  // eslint-disable-next-line no-unused-vars
+  (key: string) => string,
+  // eslint-disable-next-line no-unused-vars
+  (lang: string) => void
+] {
+  return useContext(languagesContext) as [
+    // eslint-disable-next-line no-unused-vars
+    (key: string) => string,
+    // eslint-disable-next-line no-unused-vars
+    (lang: string) => void
+  ];
+}
 
 export default {};
