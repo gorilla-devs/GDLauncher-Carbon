@@ -2,7 +2,7 @@ import { Component, createEffect, Show } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
-import { Notifications } from "@gd/ui";
+// import { Notifications } from "@gd/ui";
 import { rspc } from "./utils/rspcClient";
 
 const App: Component = () => {
@@ -44,7 +44,7 @@ const App: Component = () => {
           <Route />
         </main>
       </div>
-      <Notifications />
+      {/* <Notifications /> */}
     </div>
   );
 };
