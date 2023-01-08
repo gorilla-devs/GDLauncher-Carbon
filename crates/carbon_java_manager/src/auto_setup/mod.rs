@@ -1,9 +1,8 @@
+use crate::error::JavaError;
+use carbon_net::Downloadable;
+use chrono::{DateTime, FixedOffset};
 use std::path::{Path, PathBuf};
-
 use tokio::sync::watch::Sender;
-use tracing::trace;
-
-use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError};
 
 mod adoptopenjdk;
 mod mojang;
@@ -15,6 +14,11 @@ pub struct JavaProgress {
     pub step: String,
 }
 
+struct JavaMeta {
+    last_updated: DateTime<FixedOffset>,
+    download: Vec<Downloadable>,
+}
+
 #[async_trait::async_trait]
 trait JavaAuto {
     async fn setup(
@@ -22,10 +26,8 @@ trait JavaAuto {
         base_path: &Path,
         progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError>;
-    async fn get_runtime_meta<T>(&self) -> Result<T, JavaError>
-    where
-        T: serde::de::DeserializeOwned + for<'de> serde::Deserialize<'de>;
-    fn locate_binary(&self, base_path: &Path) -> PathBuf;
-    async fn check_for_updates(&self) -> Result<(), JavaError>;
+    async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError>;
+    fn locate_binary(&self, runtime_path: &Path) -> PathBuf;
+    async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError>;
     async fn update(&mut self) -> Result<(), JavaError>;
 }

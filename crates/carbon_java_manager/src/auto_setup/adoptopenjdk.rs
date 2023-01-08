@@ -1,14 +1,11 @@
-use futures::{StreamExt, TryFutureExt};
-use sha2::Digest;
+use carbon_net::Downloadable;
+use futures::TryFutureExt;
 use std::path::{Path, PathBuf};
-use tokio::{
-    fs::OpenOptions,
-    sync::watch::{channel, Sender},
-};
+use tokio::sync::watch::{channel, Sender};
 
 use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError};
 
-use super::{JavaAuto, JavaProgress};
+use super::{JavaAuto, JavaMeta, JavaProgress};
 
 pub enum JavaMajorSemVer {
     Version8,
@@ -37,41 +34,31 @@ impl JavaAuto for AdoptOpenJDK {
         // TODO: implement progress reporting
         progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError> {
-        let adoptopenjdk_meta: Vec<Asset> = self.get_runtime_meta().await?;
+        let runtime = base_path.join(JAVA_RUNTIMES_FOLDER).join("openjdk");
+        let meta = self.get_runtime_assets(&runtime).await?;
 
-        let asset = adoptopenjdk_meta
-            .first()
-            .ok_or(JavaError::NoAdoptOpenJDKMetaValidVersion)?;
-        let release_name = asset.release_name.clone();
-
-        let runtime = base_path.join("java_runtime").join("openjdk");
         tokio::fs::create_dir_all(&runtime)
             .await
             .map_err(JavaError::CannotCreateJavaOpenJDKRuntimeDirectory)?;
 
-        let zip_path = runtime.join(format!("{release_name}.tar.gz"));
-
         let (tx, _) = channel(carbon_net::Progress::default());
 
-        carbon_net::download_file(
-            carbon_net::Downloadable::new(&asset.binary.package.link, &zip_path),
-            tx,
-        )
-        .await
-        .map_err(|_| JavaError::CannotDownloadJavaOpenJDK)?;
-        carbon_compression::decompress(&zip_path, &runtime).await?;
+        let download = &meta.download[0];
+        let download_path = &download.path.clone();
 
-        tokio::fs::remove_file(&zip_path)
+        carbon_net::download_file(download, tx)
+            .await
+            .map_err(|_| JavaError::CannotDownloadJavaOpenJDK)?;
+        carbon_compression::decompress(&download_path, &runtime).await?;
+
+        tokio::fs::remove_file(&download_path)
             .await
             .map_err(JavaError::CannotDeletePreviouslyDownloadedJavaOpenJDKFile)?;
 
         Ok(())
     }
 
-    async fn get_runtime_meta<G>(&self) -> Result<G, JavaError>
-    where
-        G: serde::de::DeserializeOwned + for<'de> serde::Deserialize<'de>,
-    {
+    async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError> {
         let java_os = match std::env::consts::OS {
             "linux" => "linux",
             "windows" => "windows",
@@ -99,9 +86,26 @@ impl JavaAuto for AdoptOpenJDK {
             .await
             .map_err(JavaError::CannotRetrieveOpenJDKAssets)?;
 
-        res.json()
+        let res = res
+            .json::<Vec<Asset>>()
             .map_err(JavaError::CannotParseAdoptOpenJDKMeta)
-            .await
+            .await?;
+
+        let asset = res
+            .first()
+            .ok_or(JavaError::NoAdoptOpenJDKMetaValidVersion)?;
+
+        let meta = JavaMeta {
+            last_updated: chrono::DateTime::parse_from_rfc3339(&asset.binary.updated_at).map_err(
+                |_| JavaError::JavaUpdateDateFromMetaInvalid(asset.binary.updated_at.clone()),
+            )?,
+            download: vec![Downloadable::new(
+                &asset.binary.package.link,
+                runtime_path.join(&asset.binary.package.name),
+            )],
+        };
+
+        Ok(meta)
     }
 
     fn locate_binary(&self, base_path: &Path) -> PathBuf {
@@ -123,8 +127,14 @@ impl JavaAuto for AdoptOpenJDK {
         }
     }
 
-    async fn check_for_updates(&self) -> Result<(), JavaError> {
-        todo!()
+    async fn check_for_updates(&self, base_path: &Path) -> Result<bool, JavaError> {
+        let meta: JavaMeta = self.get_runtime_assets(&base_path).await?;
+
+        if meta.last_updated.timestamp() > self.release_date.parse::<i64>().unwrap() {
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 
     async fn update(&mut self) -> Result<(), JavaError> {
@@ -141,6 +151,7 @@ struct Asset {
 #[derive(Debug, serde::Deserialize)]
 struct Binary {
     package: Package,
+    updated_at: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -148,6 +159,7 @@ struct Package {
     link: String,
     checksum: String,
     size: u64,
+    name: String,
 }
 
 #[cfg(test)]

@@ -68,6 +68,9 @@ pub enum JavaError {
     #[error("Cannot create Java Mojang JDK runtime file {0}")]
     CannotCreateJavaMojangJDKRuntimeFile(std::io::Error),
 
+    #[error("Java update date from meta is invalid {0}")]
+    JavaUpdateDateFromMetaInvalid(String),
+
     // Scan javas
     #[error("Cannot read Java Runtimes directory {0}")]
     CannotReadJavaRuntimesDirectory(std::io::Error),

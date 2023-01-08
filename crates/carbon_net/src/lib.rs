@@ -61,7 +61,7 @@ pub struct Progress {
 
 // Todo: Add checksum/size verification
 pub async fn download_file(
-    file: Downloadable,
+    file: &Downloadable,
     progress: tokio::sync::watch::Sender<Progress>,
 ) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
