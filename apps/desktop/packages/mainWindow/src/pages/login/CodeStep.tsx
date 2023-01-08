@@ -4,7 +4,7 @@ import { useNavigate } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 // import { accounts, login } from "@/modules/components/accounts";
-import { addNotification } from "@gd/ui";
+// import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
@@ -91,7 +91,7 @@ const CodeStep = (props: Props) => {
             value={userCode() || ""}
             onClick={() => {
               navigator.clipboard.writeText(userCode() || "");
-              addNotification("The link has been copied");
+              // addNotification("The link has been copied");
             }}
           />
           <Show when={expired()}>
