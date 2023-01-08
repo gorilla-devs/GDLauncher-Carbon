@@ -1,0 +1,213 @@
+use futures::{StreamExt, TryFutureExt};
+use sha2::Digest;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    collections::HashMap,
+    path::PathBuf,
+};
+use tokio::fs::OpenOptions;
+
+use crate::error::JavaError;
+
+pub enum RuntimeEdition {
+    Alpha,
+    Beta,
+    Gamma,
+    LegacyJRE,
+    MinecraftExe,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct MojangMeta {
+    linux: Option<OsRuntime>,
+    linux_i386: Option<OsRuntime>,
+    mac_os: Option<OsRuntime>,
+    mac_os_arm64: Option<OsRuntime>,
+    windows_x86: Option<OsRuntime>,
+    windows_x64: Option<OsRuntime>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct OsRuntime {
+    java_runtime_alpha: Vec<Runtime>,
+    java_runtime_beta: Vec<Runtime>,
+    java_runtime_gamma: Vec<Runtime>,
+    jre_legacy: Vec<Runtime>,
+    minecraft_java_exe: Vec<Runtime>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Runtime {
+    manifest: MojangDownloadable,
+    version: Version,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangDownloadable {
+    sha1: String,
+    size: u64,
+    url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Version {
+    name: String,
+    released: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMeta {
+    files: HashMap<String, MojangRuntimeJDKMetaAsset>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMetaAsset {
+    #[serde(rename = "type")]
+    _type: String,
+    downloads: Option<MojangRuntimeJDKMetaAssetDownloads>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct MojangRuntimeJDKMetaAssetDownloads {
+    lzma: Option<MojangDownloadable>,
+    raw: Option<MojangDownloadable>,
+}
+
+async fn get_mojang_runtime_meta(
+    version: RuntimeEdition,
+) -> Result<MojangRuntimeJDKMeta, JavaError> {
+    let java_os = match std::env::consts::OS {
+        "linux" => "linux",
+        "windows" => "windows",
+        "macos" => "mac",
+        _ => unreachable!("Unsupported OS"),
+    };
+
+    let java_arch = match std::env::consts::ARCH {
+        "x86_64" => "x64",
+        "x86" => "x86",
+        "aarch64" => "aarch64",
+        _ => unreachable!("Unsupported architecture"),
+    };
+
+    let url = "https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json".to_string();
+
+    let res = reqwest::get(url)
+        .await
+        .map_err(JavaError::CannotRetrieveMojangJDKAssets)?;
+
+    let mojang_meta = res
+        .json::<MojangMeta>()
+        .map_err(JavaError::CannotParseMojangJDKMeta)
+        .await?;
+
+    let runtime_meta = match java_os {
+        "linux" => {
+            if java_arch == "x86" {
+                mojang_meta.linux_i386
+            } else {
+                mojang_meta.linux
+            }
+        }
+        "windows" => {
+            if java_arch == "x86" {
+                mojang_meta.windows_x86
+            } else {
+                mojang_meta.windows_x64
+            }
+        }
+        "mac" => {
+            if java_arch == "aarch64" {
+                mojang_meta.mac_os_arm64.or(mojang_meta.mac_os)
+            } else {
+                mojang_meta.mac_os
+            }
+        }
+        _ => unreachable!("Unsupported OS"),
+    }
+    .ok_or_else(|| JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+
+    let runtime_list = match version {
+        RuntimeEdition::Alpha => runtime_meta.java_runtime_alpha,
+        RuntimeEdition::Beta => runtime_meta.java_runtime_beta,
+        RuntimeEdition::Gamma => runtime_meta.java_runtime_gamma,
+        RuntimeEdition::LegacyJRE => runtime_meta.jre_legacy,
+        RuntimeEdition::MinecraftExe => runtime_meta.minecraft_java_exe,
+    };
+
+    let runtime = runtime_list
+        .first()
+        .ok_or_else(|| JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+
+    let res = reqwest::get(&runtime.manifest.url)
+        .await
+        .map_err(JavaError::CannotRetrieveMojangJDKRuntimeMeta)?;
+
+    let runtime_meta = res
+        .json::<MojangRuntimeJDKMeta>()
+        .map_err(JavaError::CannotParseMojangJDKRuntimeMeta)
+        .await?;
+
+    // println!("{runtime_meta:?}");
+
+    Ok(runtime_meta)
+}
+
+pub async fn setup_mojang_runtime_jre(
+    base_path: PathBuf,
+    version: RuntimeEdition,
+) -> Result<(), JavaError> {
+    let meta = get_mojang_runtime_meta(version).await?;
+
+    let mut files = Vec::new();
+    for (name, asset) in meta.files {
+        let path = base_path.join("java_runtime").join("mojang").join(&name);
+        let path_clone = path.clone();
+        let downloadable = asset
+            .downloads
+            .and_then(|d| d.raw)
+            .map(|d| carbon_net::Download::new(d.url, path));
+
+        if let Some(downloadable) = downloadable {
+            if asset._type == "file" {
+                files.push(downloadable);
+            }
+        }
+    }
+
+    let (progress, mut recv) = tokio::sync::watch::channel(carbon_net::Progress {
+        current_count: 0,
+        current_size: 0,
+    });
+
+    let length = &files.len();
+
+    let task_handle =
+        tokio::spawn(async move { carbon_net::download_multiple(files, progress).await });
+
+    while (recv.borrow_mut().changed().await).is_ok() {
+        println!("{} / {}", recv.borrow().current_count, length);
+    }
+
+    task_handle.await.unwrap().unwrap();
+
+    drop(recv);
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_setup_mojang_runtime_jre() {
+        let current_path = std::env::current_dir().unwrap();
+
+        setup_mojang_runtime_jre(current_path, RuntimeEdition::Gamma)
+            .await
+            .unwrap();
+    }
+}

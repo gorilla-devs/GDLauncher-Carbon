@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::error::JREError;
+use crate::error::JavaError;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -67,7 +67,7 @@ pub struct JavaRuntime {
 
 pub const JAVA_MANIFEST_URL: &str = "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json";
 
-pub async fn fetch_java_manifest() -> Result<JavaManifest, JREError> {
+pub async fn fetch_java_manifest() -> Result<JavaManifest, JavaError> {
     let resp: JavaManifest = reqwest::get(JAVA_MANIFEST_URL).await?.json().await?;
     Ok(resp)
 }

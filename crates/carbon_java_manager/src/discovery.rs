@@ -1,5 +1,5 @@
 use crate::{
-    error::JREError,
+    error::JavaError,
     utils::{
         locate_java_check_class, parse_java_arch, parse_java_version, JAVA_CHECK_APP_NAME,
         PATH_SEPARATOR,
@@ -9,7 +9,7 @@ use crate::{
 use std::path::PathBuf;
 use tokio::process::Command;
 
-async fn load_java_paths_from_env() -> Result<Vec<PathBuf>, JREError> {
+async fn load_java_paths_from_env() -> Result<Vec<PathBuf>, JavaError> {
     let env_path = std::env::var("PATH")?;
     let paths = env_path.split(PATH_SEPARATOR).collect::<Vec<&str>>();
     let mut java_paths = Vec::new();
@@ -44,17 +44,15 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     let library_jvm_dir = PathBuf::from("/Library/Java/JavaVirtualMachines");
     let library_jvm_javas = std::fs::read_dir(library_jvm_dir);
     if let Ok(library_jvm_javas) = library_jvm_javas {
-        for library_jvm_java in library_jvm_javas {
-            if let Ok(library_jvm_java) = library_jvm_java {
-                let library_jvm_java = library_jvm_java.path();
-                javas.extend(
-                    vec![
-                        search_java_binary_in_path(library_jvm_java.join("Contents/Home")),
-                        search_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
-                    ]
-                    .concat(),
-                );
-            }
+        for library_jvm_java in library_jvm_javas.flatten() {
+            let library_jvm_java = library_jvm_java.path();
+            javas.extend(
+                vec![
+                    search_java_binary_in_path(library_jvm_java.join("Contents/Home")),
+                    search_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
+                ]
+                .concat(),
+            );
         }
     }
 
@@ -62,20 +60,16 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
     let system_library_jvm_dir = PathBuf::from("/System/Library/Java/JavaVirtualMachines");
     let system_library_jvm_javas = std::fs::read_dir(system_library_jvm_dir);
     if let Ok(system_library_jvm_javas) = system_library_jvm_javas {
-        for system_library_jvm_java in system_library_jvm_javas {
-            if let Ok(system_library_jvm_java) = system_library_jvm_java {
-                let system_library_jvm_java = system_library_jvm_java.path();
+        for system_library_jvm_java in system_library_jvm_javas.flatten() {
+            let system_library_jvm_java = system_library_jvm_java.path();
 
-                javas.extend(
-                    vec![
-                        search_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
-                        search_java_binary_in_path(
-                            system_library_jvm_java.join("Contents/Commands"),
-                        ),
-                    ]
-                    .concat(),
-                );
-            }
+            javas.extend(
+                vec![
+                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
+                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Commands")),
+                ]
+                .concat(),
+            );
         }
     }
 
@@ -282,22 +276,23 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     result
 }
 
-pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent, JREError> {
+pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent, JavaError> {
     let java_checker_path = locate_java_check_class().await?;
-    if java_bin_path.to_string_lossy().to_string() != "java" && !java_bin_path.exists() {
-        return Err(JREError::JavaBinaryInvalidOrNotFound);
+    if java_bin_path.to_string_lossy() != "java" && !java_bin_path.exists() {
+        return Err(JavaError::JavaBinaryInvalidOrNotFound);
     }
 
     // Run java
     let output = Command::new(java_bin_path)
-        .current_dir(&java_checker_path.parent().expect("This should never fail"))
+        .current_dir(java_checker_path.parent().expect("This should never fail"))
         .arg(
             JAVA_CHECK_APP_NAME
                 .strip_suffix(".class")
                 .expect("This should never fail"),
         )
         .output()
-        .await?;
+        .await
+        .map_err(JavaError::CannotRunJavaInfoDetectProcess)?;
 
     let output = String::from_utf8(output.stdout)?;
     let java_version = parse_java_version(&output)?;

@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use error::JREError;
+use error::JavaError;
 use serde::{Deserialize, Serialize};
 
-pub mod auto_setup;
+mod auto_setup;
 mod discovery;
 mod error;
-pub mod mc_java;
+mod mc_java;
 mod utils;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
@@ -41,7 +41,7 @@ impl<'a> From<&'a str> for JavaArch {
             "amd64" => JavaArch::Amd64,
             "x86" => JavaArch::X86,
             "aarch64" => JavaArch::Aarch64,
-            _ => panic!("Unknown JavaArch: {}", s),
+            _ => panic!("Unknown JavaArch: {s}"),
         }
     }
 }
@@ -56,7 +56,7 @@ pub struct JavaVersion {
     pub build_metadata: Option<String>,
 }
 
-pub async fn get_available_javas() -> Result<Vec<JavaComponent>, JREError> {
+pub async fn detect_available_javas() -> Result<Vec<JavaComponent>, JavaError> {
     let mut all_javas = discovery::find_java_paths().await;
     all_javas.push(PathBuf::from("java"));
     let mut available_javas = vec![];

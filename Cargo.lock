@@ -298,10 +298,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "carbon_jre_manager"
+name = "carbon_java_manager"
 version = "0.0.0"
 dependencies = [
  "carbon_compression",
+ "carbon_net",
  "futures",
  "regex",
  "reqwest",

@@ -86,7 +86,7 @@ pub async fn download_multiple(
                     }
                 }
                 Some(_) => false,
-                None => true,
+                None => path.exists(),
             };
 
             // verify if file exists and checksum matches

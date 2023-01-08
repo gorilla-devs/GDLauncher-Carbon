@@ -2,31 +2,36 @@ use regex::Regex;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
-use crate::{error::JREError, JavaArch};
+use crate::{error::JavaError, JavaArch};
 
 use super::JavaVersion;
 
 #[cfg(target_os = "windows")]
-pub static PATH_SEPARATOR: &'static str = ";";
+pub static PATH_SEPARATOR: &str = ";";
 
 #[cfg(not(target_os = "windows"))]
-pub static PATH_SEPARATOR: &'static str = ":";
+pub static PATH_SEPARATOR: &str = ":";
 
-const JAVA_CHECK_APP: &'static [u8; 1013] = include_bytes!("JavaCheck.class");
-pub const JAVA_CHECK_APP_NAME: &'static str = "JavaCheck.class";
+const JAVA_CHECK_APP: &[u8; 1013] = include_bytes!("JavaCheck.class");
+pub const JAVA_CHECK_APP_NAME: &str = "JavaCheck.class";
 
-pub async fn locate_java_check_class() -> Result<PathBuf, JREError> {
+pub async fn locate_java_check_class() -> Result<PathBuf, JavaError> {
     let temp_dir = std::env::temp_dir();
     let java_check_path = temp_dir.join(JAVA_CHECK_APP_NAME);
     if !java_check_path.exists() {
-        let mut file = tokio::fs::File::create(&java_check_path).await?;
-        file.write_all(JAVA_CHECK_APP).await?;
+        let mut file = tokio::fs::File::create(&java_check_path)
+            .await
+            .map_err(JavaError::CannotWriteJavaDetectFileToDisk)?;
+
+        file.write_all(JAVA_CHECK_APP)
+            .await
+            .map_err(JavaError::CannotWriteJavaDetectFileToDisk)?;
     }
 
     Ok(java_check_path)
 }
 
-pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JREError> {
+pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JavaError> {
     for line in cmd_output.lines() {
         // I spent way too much time on this regex
         let regex = Regex::new(
@@ -83,10 +88,10 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JREError> {
             return Ok(version);
         }
     }
-    return Err(JREError::ParseVersionError);
+    return Err(JavaError::ParseVersionError);
 }
 
-pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JREError> {
+pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JavaError> {
     for line in cmd_output.lines() {
         // I spent way too much time on this regex
         let regex = Regex::new(r#"^java.arch=(?P<arch>[[:alnum:]]*)"#)?;
@@ -96,11 +101,11 @@ pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JREError> {
                 Some(arch) => {
                     return Ok(arch.as_str().into());
                 }
-                None => return Err(JREError::NoArchInJavaOutput),
+                None => return Err(JavaError::NoArchInJavaOutput),
             }
         }
     }
-    return Err(JREError::NoArchInJavaOutput);
+    return Err(JavaError::NoArchInJavaOutput);
 }
 
 #[cfg(test)]
