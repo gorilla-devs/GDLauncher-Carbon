@@ -177,5 +177,16 @@ mod tests {
         let (tx, _) = channel(JavaProgress::default());
 
         adoptopenjdk.setup(&current_path, tx).await.unwrap();
+
+        let java_path = adoptopenjdk.locate_binary(&current_path);
+
+        assert!(java_path.exists());
+
+        let java_version = std::process::Command::new(java_path)
+            .arg("-version")
+            .output()
+            .unwrap();
+
+        assert!(java_version.status.success());
     }
 }

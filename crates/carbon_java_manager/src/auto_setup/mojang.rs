@@ -278,5 +278,16 @@ mod tests {
         let (tx, _) = channel(JavaProgress::default());
 
         mojang.setup(&current_path, tx).await.unwrap();
+
+        let java_path = mojang.locate_binary(&current_path);
+
+        assert!(java_path.exists());
+
+        let java_version = std::process::Command::new(java_path)
+            .arg("-version")
+            .output()
+            .unwrap();
+
+        assert!(java_version.status.success());
     }
 }
