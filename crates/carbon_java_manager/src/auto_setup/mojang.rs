@@ -62,14 +62,7 @@ impl JavaAuto for MojangRuntime {
         task_handle.await.unwrap().unwrap();
 
         // Fix permissions
-        let java_path = base_path
-            .join(JAVA_RUNTIMES_FOLDER)
-            .join("mojang")
-            .join("jre.bundle")
-            .join("Contents")
-            .join("Home")
-            .join("bin")
-            .join("java");
+        let java_path = self.locate_binary(base_path);
 
         let mut perms = std::fs::metadata(&java_path).unwrap().permissions();
         perms.set_mode(0o777);
@@ -159,7 +152,6 @@ impl JavaAuto for MojangRuntime {
 
         for (name, asset) in runtime_meta.files {
             let path = runtime_path.join("mojang").join(&name);
-            let path_clone = path.clone();
             let downloadable = asset
                 .downloads
                 .and_then(|d| d.raw)
@@ -177,12 +169,11 @@ impl JavaAuto for MojangRuntime {
 
     fn locate_binary(&self, base_path: &Path) -> PathBuf {
         match std::env::consts::OS {
-            "linux" => {
-                todo!()
-            }
-            "windows" => {
-                todo!()
-            }
+            "linux" | "windows" => base_path
+                .join(JAVA_RUNTIMES_FOLDER)
+                .join("openjdk")
+                .join("bin")
+                .join("java"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")

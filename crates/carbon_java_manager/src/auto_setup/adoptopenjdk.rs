@@ -82,16 +82,14 @@ impl JavaAuto for AdoptOpenJDK {
             "https://api.adoptopenjdk.net/v3/assets/latest/{version}/hotspot?architecture={java_arch}&image_type=jre&jvm_impl=hotspot&os={java_os}&page=0&page_size=1&project=jdk&sort_method=DEFAULT&sort_order=DESC"
         );
 
-        let res = reqwest::get(url)
+        let json_res = reqwest::get(url)
             .await
-            .map_err(JavaError::CannotRetrieveOpenJDKAssets)?;
-
-        let res = res
+            .map_err(JavaError::CannotRetrieveOpenJDKAssets)?
             .json::<Vec<Asset>>()
             .map_err(JavaError::CannotParseAdoptOpenJDKMeta)
             .await?;
 
-        let asset = res
+        let asset = json_res
             .first()
             .ok_or(JavaError::NoAdoptOpenJDKMetaValidVersion)?;
 
@@ -110,12 +108,11 @@ impl JavaAuto for AdoptOpenJDK {
 
     fn locate_binary(&self, base_path: &Path) -> PathBuf {
         match std::env::consts::OS {
-            "linux" => {
-                todo!()
-            }
-            "windows" => {
-                todo!()
-            }
+            "linux" | "windows" => base_path
+                .join(JAVA_RUNTIMES_FOLDER)
+                .join("openjdk")
+                .join("bin")
+                .join("java"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")
@@ -128,7 +125,7 @@ impl JavaAuto for AdoptOpenJDK {
     }
 
     async fn check_for_updates(&self, base_path: &Path) -> Result<bool, JavaError> {
-        let meta: JavaMeta = self.get_runtime_assets(&base_path).await?;
+        let meta: JavaMeta = self.get_runtime_assets(base_path).await?;
 
         if meta.last_updated.timestamp() > self.release_date.parse::<i64>().unwrap() {
             return Ok(false);

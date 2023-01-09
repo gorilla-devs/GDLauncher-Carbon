@@ -27,7 +27,7 @@ trait JavaAuto {
         progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError>;
     async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError>;
-    fn locate_binary(&self, runtime_path: &Path) -> PathBuf;
+    fn locate_binary(&self, base_path: &Path) -> PathBuf;
     async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError>;
     async fn update(&mut self) -> Result<(), JavaError>;
 }
