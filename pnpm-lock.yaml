@@ -44,8 +44,6 @@ importers:
       vite: ^3.2.4
       vite-plugin-minify: ^1.5.2
       vite-plugin-solid: ^2.5.0
-    dependencies:
-      '@solid-primitives/i18n': 1.1.2_solid-js@1.6.7
     devDependencies:
       '@aws-sdk/client-s3': 3.241.0
       '@gd/config': link:../../packages/config
@@ -55,6 +53,7 @@ importers:
       '@playwright/test': 1.29.1
       '@rspc/client': 0.0.0-main-7c0a67c1
       '@rspc/solid': 0.0.0-main-7c0a67c1_nun5dvb62erieiuboli5utbnxu
+      '@solid-primitives/i18n': 1.1.2_solid-js@1.6.7
       '@solidjs/router': 0.6.0_solid-js@1.6.7
       '@typescript-eslint/parser': 5.48.0_iukboom6ndih5an6iafl45j2fe
       chokidar: 3.5.3
@@ -4025,7 +4024,7 @@ packages:
       solid-js: ^1.5.0
     dependencies:
       solid-js: 1.6.7
-    dev: false
+    dev: true
 
   /@solidjs/router/0.6.0_solid-js@1.6.7:
     resolution: {integrity: sha512-7ug2fzXXhvvDBL4CQyMvMM9o3dgBE6PoRh38T8UTmMnYz4rcCfROqSZc9yq+YEC96qWt5OvJgZ1Uj/4EAQXlfA==}
@@ -9242,6 +9241,7 @@ packages:
 
   /csstype/3.1.1:
     resolution: {integrity: sha512-DJR/VvkAvSZW9bTouZue2sSxDwdTN92uHjqeKVm+0dAqdfNykRzQ95tay8aXMBAAPpUiq4Qcug2L7neoRh2Egw==}
+    dev: true
 
   /currently-unhandled/0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
@@ -17039,6 +17039,7 @@ packages:
     resolution: {integrity: sha512-yLLw9mtTqPEEPxmZfAHZi3DyP25XnQZ42+mDYuzhAdeqa+8EDuNKyxOXKY7PEFddCqp1G2UQI5O3JiJtE7yxBQ==}
     dependencies:
       csstype: 3.1.1
+    dev: true
 
   /solid-refresh/0.4.1_solid-js@1.6.4:
     resolution: {integrity: sha512-v3tD/OXQcUyXLrWjPW1dXZyeWwP7/+GQNs8YTL09GBq+5FguA6IejJWUvJDrLIA4M0ho9/5zK2e9n+uy+4488g==}
