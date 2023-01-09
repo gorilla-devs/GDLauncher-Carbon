@@ -171,12 +171,12 @@ impl JavaAuto for MojangRuntime {
         match std::env::consts::OS {
             "linux" | "windows" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
-                .join("openjdk")
+                .join("mojang")
                 .join("bin")
                 .join("java"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
-                .join("openjdk")
+                .join("mojang")
                 .join("Contents")
                 .join("Home")
                 .join("bin")
@@ -270,13 +270,13 @@ mod tests {
     async fn test_setup_mojang_runtime_jre() {
         let current_path = std::env::current_dir().unwrap();
 
-        let adoptopenjdk = MojangRuntime {
+        let mojang = MojangRuntime {
             version: RuntimeEdition::Gamma,
             release_date: "2021-09-14".to_string(),
         };
 
         let (tx, _) = channel(JavaProgress::default());
 
-        adoptopenjdk.setup(&current_path, tx).await.unwrap();
+        mojang.setup(&current_path, tx).await.unwrap();
     }
 }
