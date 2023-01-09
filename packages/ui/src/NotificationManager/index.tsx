@@ -85,10 +85,12 @@ const NotificationsProvider = (props: Props) => {
 };
 
 const createNotification = () => {
-  return useContext(NotificationContext) as [
-    // eslint-disable-next-line no-unused-vars
-    (name: string, type?: string, position?: string) => void
-  ];
+  return (
+    (useContext(NotificationContext) as [
+      // eslint-disable-next-line no-unused-vars
+      (name: string, type?: string, position?: string) => void
+    ]) || []
+  );
 };
 
 export { NotificationsProvider, createNotification };
