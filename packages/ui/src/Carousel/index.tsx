@@ -8,98 +8,40 @@ interface Props {
 }
 
 const Carousel = (props: Props) => {
-  // const [currentSlide, setCurrentSlide] = createSignal(MockCarousel[0]);
   const [currentSlide, setCurrentSlide] = createSignal(0);
-  const [isDown, setIsDown] = createSignal(false);
-  const [startX, setStartX] = createSignal(null);
+  let horizontalSlider: HTMLDivElement | undefined;
+  let scrollWrapper: HTMLDivElement | undefined;
 
   onMount(() => {
-    const slider = document.getElementById("horizontal-slider");
-    const beginning = slider?.scrollLeft;
+    // const slider = document.getElementById("horizontal-slider");
+    const beginning = horizontalSlider?.scrollLeft;
     setCurrentSlide(beginning || 0);
   });
 
   const handleScroll = (direction: string) => {
-    // TODO: scroll on click
     const isLeft = direction === "left";
-    const slider = document.getElementById("horizontal-slider");
-    const wrapper = document.getElementById("scroll-wrapper");
+    // const slider = document.getElementById("horizontal-slider");
+    // const wrapper = document.getElementById("scroll-wrapper");
 
-    const scrollWidth = slider?.scrollWidth || 0;
-    const scrollLeft = slider?.scrollLeft || 0;
-    const width = wrapper?.getBoundingClientRect()?.width || 0;
+    const scrollWidth = horizontalSlider?.scrollWidth || 0;
+    const scrollLeft = horizontalSlider?.scrollLeft || 0;
+    const width = scrollWrapper?.getBoundingClientRect()?.width || 0;
     const offset = 10;
     const isEnd = scrollWidth - scrollLeft - width < offset;
+    const isStart = currentSlide() === 0;
+
     if (isLeft) {
-      if (currentSlide() === 0) return;
+      if (isStart) return;
       setCurrentSlide(currentSlide() - 168);
     } else {
       if (isEnd) return;
       setCurrentSlide(currentSlide() + 168);
     }
-    console.log("AAA", currentSlide(), currentSlide() === 0);
-    // slider?.classList.add("snap-none");
 
-    console.log("isEnd", isEnd);
-    if (slider) {
-      console.log("END");
-      slider.scrollLeft = currentSlide();
+    if (horizontalSlider) {
+      horizontalSlider.scrollLeft = currentSlide();
     }
-
-    // if (slider) slider.style.transform = `translateX(${currentSlide()}px)`;
   };
-
-  onMount(() => {
-    const slider = document.querySelector("#horizontal-slider");
-    const wrapper = document.getElementById("scroll-wrapper");
-
-    let isDown = false;
-    let startX: any;
-    let scrollLeft: any;
-
-    slider?.addEventListener("mousedown", (e) => {
-      isDown = true;
-      slider.classList.add("snap-none");
-
-      // props.children().forEach((element: Element) => {
-      //   console.log("element", element.classList.add("pointer-events-none"));
-      // });
-      startX = (e as any).pageX - (slider as any).offsetLeft;
-      scrollLeft = slider.scrollLeft;
-    });
-    slider?.addEventListener("mouseleave", () => {
-      isDown = false;
-      slider.classList.remove("snap-none");
-    });
-    slider?.addEventListener("mouseup", () => {
-      isDown = false;
-      slider.classList.remove("snap-none");
-    });
-    slider?.addEventListener("mousemove", (e) => {
-      if (!isDown) return;
-      e.preventDefault();
-      const x = (e as any).pageX - (slider as any).offsetLeft;
-      const walk = (x - startX) * 2;
-      // console.log(
-      //   "walk",
-      //   (e as any).pageX,
-      //   walk,
-      //   scrollLeft,
-      //   scrollLeft - walk
-      // );
-
-      slider.scrollLeft = scrollLeft - walk;
-    });
-  });
-
-  // onCleanup(() => {
-  //   parent.removeEventListener("mousemove", mouseMove);
-  //   parent.removeEventListener("mouseup", mouseUp);
-  //   parent.removeEventListener("mouseleave", mouseLeave);
-  //   parent.removeEventListener("touchmove", touchMove);
-  //   parent.removeEventListener("touchend", touchEnd);
-  //   parent.removeEventListener("touchcancel", touchCancel);
-  // });
 
   return (
     <div class="flex flex-col w-full">
@@ -120,8 +62,9 @@ const Carousel = (props: Props) => {
           </div>
         </div>
       </div>
-      <div id="scroll-wrapper" class="w-full flex gap-4">
+      <div ref={scrollWrapper} id="scroll-wrapper" class="w-full flex gap-4">
         <div
+          ref={horizontalSlider}
           id="horizontal-slider"
           class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
         >
