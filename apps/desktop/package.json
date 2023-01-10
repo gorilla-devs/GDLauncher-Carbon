@@ -18,7 +18,6 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.241.0",
     "@gd/config": "workspace:*",
-    "@gd/i18n": "workspace:*",
     "@gd/native_interface": "workspace:*",
     "@gd/ui": "workspace:*",
     "@playwright/test": "^1.29.1",

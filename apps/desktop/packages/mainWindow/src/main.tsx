@@ -10,37 +10,23 @@ import { initModules } from "@/modules";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
-import { createI18nContext, I18nContext } from "@solid-primitives/i18n";
-import { createStore } from "solid-js/store";
-import { getTranslationByLanguage } from "@gd/i18n";
-interface Translations {
-  [key: string]: string;
-}
-interface LanguagesHashMap {
-  [key: string]: Translations;
-}
+import { NotificationsProvider } from "@gd/ui";
 
 queueMicrotask(() => {
   initAnalytics();
 });
 
 render(() => {
-  const [languages, setLanguages] = createStore<LanguagesHashMap>({});
   onMount(() => {
     initModules();
-    getTranslationByLanguage().then((translations: Translations) => {
-      setLanguages("en", translations);
-    });
   });
-
-  const value = createI18nContext(languages, "en");
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <I18nContext.Provider value={value}>
+        <NotificationsProvider>
           <App />
-        </I18nContext.Provider>
+        </NotificationsProvider>
       </Router>
     </rspc.Provider>
   );

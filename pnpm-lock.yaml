@@ -14,13 +14,11 @@ importers:
     specifiers:
       '@aws-sdk/client-s3': ^3.241.0
       '@gd/config': workspace:*
-      '@gd/i18n': workspace:*
       '@gd/native_interface': workspace:*
       '@gd/ui': workspace:*
       '@playwright/test': ^1.29.1
       '@rspc/client': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
       '@rspc/solid': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
-      '@solid-primitives/i18n': ^1.1.2
       '@solidjs/router': ^0.6.0
       '@typescript-eslint/parser': ^5.48.0
       chokidar: ^3.5.3
@@ -47,7 +45,6 @@ importers:
     devDependencies:
       '@aws-sdk/client-s3': 3.241.0
       '@gd/config': link:../../packages/config
-      '@gd/i18n': link:../../packages/i18n
       '@gd/native_interface': link:../../packages/native_interface
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.29.1
@@ -150,9 +147,6 @@ importers:
       '@unocss/preset-icons': 0.48.0
       '@unocss/preset-wind': 0.48.0
       unocss: 0.48.0_vite@4.0.4
-
-  packages/i18n:
-    specifiers: {}
 
   packages/native_interface:
     specifiers:
@@ -4016,14 +4010,6 @@ packages:
   /@sindresorhus/is/4.6.0:
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
     engines: {node: '>=10'}
-    dev: true
-
-  /@solid-primitives/i18n/1.1.2_solid-js@1.6.7:
-    resolution: {integrity: sha512-eLTqmDKorLa99cXrgS4DgTqrk0n/F4rB0YR76A6gr90by5TLE+HSZ0agiZVBIUGs2g5EFeEnLqwxKsM+F5hcJQ==}
-    peerDependencies:
-      solid-js: ^1.5.0
-    dependencies:
-      solid-js: 1.6.7
     dev: true
 
   /@solidjs/router/0.6.0_solid-js@1.6.7:
