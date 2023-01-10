@@ -9,7 +9,7 @@ use tokio::sync::{watch::Sender, RwLock};
 
 use super::instance::Instance;
 
-enum ModLoader{
+pub enum ModLoader{
     Vanilla,
     Forge,
 }
@@ -23,7 +23,7 @@ pub struct InstallProgress<T> {
 }
 
 #[async_trait]
-pub trait Modloader {
+trait Modloader {
     type Stages;
 
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self /// instance

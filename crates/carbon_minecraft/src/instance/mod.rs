@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 use crate::minecraft_mod::MinecraftMod;
 use crate::minecraft_package::MinecraftPackage;
 
-use crate::modloaders::{forge::ForgeModloader, vanilla::VanillaModLoader, Modloader};
-
 #[derive(Debug, Serialize, Deserialize, Hash)]
 pub struct Instance{
     pub name: String,
@@ -34,13 +32,3 @@ impl Instance {
 
 
 struct InstanceHistory{}
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Serialize, Deserialize)]
-struct JavaMemoryOverride {
-    min_mem_alloc: u16,
-    max_mem_alloc: u16,
-    perm_gen: u16,
-}
