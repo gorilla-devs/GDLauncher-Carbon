@@ -27,7 +27,7 @@ pub async fn scan_for_instances(path_to_search_in: impl AsRef<Path>, search_all_
     // test whether you can recurse infinitely for a link to a self contained folder
 
     let path_to_search_in = path_to_search_in.as_ref();
-    check_directory(path_to_search_in)?;
+    check_instance_directory(path_to_search_in)?;
 
     let minecraft_package = MinecraftPackage::new(
         Default::default(),

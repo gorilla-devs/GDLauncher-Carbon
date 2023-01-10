@@ -1,5 +1,6 @@
 mod instances_scan;
 mod error;
+mod configuration;
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
