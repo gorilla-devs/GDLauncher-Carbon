@@ -8,7 +8,7 @@ interface Props {
 const Tile = (props: Props) => {
   return (
     <div
-      class="flex flex-col justify-center items-start cursor-pointer"
+      class="flex flex-col justify-center items-start cursor-pointer snap-start"
       // eslint-disable-next-line solid/reactivity
       onClick={props.onClick}
     >
