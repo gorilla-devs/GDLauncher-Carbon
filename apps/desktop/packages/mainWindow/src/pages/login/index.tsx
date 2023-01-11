@@ -8,7 +8,7 @@ import CodeStep from "./CodeStep";
 export default function Login() {
   const [step, setStep] = createSignal(0);
   const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
-  const [t, { add, locale }] = useI18n();
+  const [_, { add, locale }] = useI18n();
 
   return (
     <div class="flex justify-center items-center w-full h-full bg-image-loginBG.jpg p-0">
