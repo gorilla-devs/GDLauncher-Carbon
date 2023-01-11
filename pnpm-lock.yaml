@@ -36,7 +36,6 @@ importers:
       eslint-plugin-solid: ^0.9.1
       event-lite: ^0.1.2
       jsdom: ^20.0.3
-      path-browserify: ^1.0.1
       playwright: ^1.29.1
       posthog-js: ^1.39.1
       prettier: ^2.8.1
@@ -69,7 +68,6 @@ importers:
       eslint-plugin-solid: 0.9.1_iukboom6ndih5an6iafl45j2fe
       event-lite: 0.1.2
       jsdom: 20.0.3
-      path-browserify: 1.0.1
       playwright: 1.29.1
       posthog-js: 1.39.1
       prettier: 2.8.1
