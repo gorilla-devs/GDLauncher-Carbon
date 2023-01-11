@@ -52,7 +52,6 @@ function Dropdown(props: Props) {
           setMenuOpened(!menuOpened());
         }}
         onBlur={() => {
-          console.log("TEST");
           // setMenuOpened(false);
         }}
         classList={{
@@ -97,7 +96,6 @@ function Dropdown(props: Props) {
             <li
               class="first:rounded-t last:rounded-b bg-black-semiblack hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-black-lightGray no-underline"
               onClick={() => {
-                console.log("OPTIOn", option.label);
                 setSelectedValue(option.label);
                 props.onChange?.(option);
                 toggleMenu();
