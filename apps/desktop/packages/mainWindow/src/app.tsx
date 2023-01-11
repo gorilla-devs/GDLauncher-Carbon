@@ -8,6 +8,8 @@ import { createInvalidateQuery, rspc } from "./utils/rspcClient";
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
+  let javas = rspc.createQuery(() => ["java.getAvailableJavas", null]);
+
   createInvalidateQuery();
 
   const echoMsg = rspc.createQuery(() => ["echo", "something"]);
@@ -17,6 +19,7 @@ const App: Component = () => {
 
   createEffect(() => {
     console.log("pkgVersion", echoMsg.data);
+    console.log("javas", javas.data);
   });
 
   return (

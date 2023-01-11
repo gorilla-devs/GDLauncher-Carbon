@@ -14,7 +14,11 @@ const AppNavbar = () => {
     <Show when={location.pathname !== "/"}>
       <nav class="bg-black-black text-white h-15 flex items-center justify-between px-5">
         <div class="flex">
-          <img src={GDLauncherWideLogo} class="h-9" />
+          <img
+            src={GDLauncherWideLogo}
+            class="h-9 cursor-pointer"
+            onClick={() => navigate("/library")}
+          />
           <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
             <For each={NAVBAR_ROUTES}>
               {(route) => {
