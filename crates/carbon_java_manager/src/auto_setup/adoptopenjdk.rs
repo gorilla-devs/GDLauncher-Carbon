@@ -173,7 +173,7 @@ mod tests {
     async fn test_setup_openjdk_jre() {
         let current_path = std::env::current_dir().unwrap();
 
-        let mut adoptopenjdk = AdoptOpenJDK::new(JavaVersion::from_major(8));
+        let mut adoptopenjdk = AdoptOpenJDK::new(JavaVersion::from_major(17));
 
         let (tx, _) = channel(JavaProgress::default());
 
