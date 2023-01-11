@@ -17,7 +17,8 @@
       "@/*": ["./packages/mainWindow/src/*"]
     },
     // https://github.com/AlexTorresSk/custom-electron-titlebar/issues/198 🤡🤡🤡🤡🤡
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "declaration": false
   },
   "include": [
     "./packages/**/*.tsx",
