@@ -12,7 +12,7 @@ const settings: Array<settingsItem> = [
   {
     name: "General",
     icon: "settings",
-    path: "/settings/general",
+    path: "/settings",
   },
   {
     name: "Appearance",

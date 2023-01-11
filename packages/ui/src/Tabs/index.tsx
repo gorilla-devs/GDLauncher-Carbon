@@ -36,7 +36,7 @@ function Tabs(props: Props) {
           {(tab, i) => (
             <div
               class={`py-4 cursor-pointer min-w-fit relative font-500 capitalize ${
-                activeTab() === i() ? "text-white" : "text-black-lightGray"
+                activeTab() === i() ? "text-white" : "text-shade-0"
               }`}
               onClick={() => handleClick(i())}
             >
@@ -60,7 +60,7 @@ function Tabs(props: Props) {
               class={`flex gap-1 justify-center items-center min-w-fit flex-1 py-2 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
                 activeTab() === i()
                   ? "text-white bg-black-semiblack"
-                  : "text-black-lightGray"
+                  : "text-shade-0"
               }`}
               onClick={() => handleClick(i())}
             >

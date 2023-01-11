@@ -60,7 +60,11 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("./pages/settings")),
+            component: lazy(() => import("./pages/settings/general")),
+          },
+          {
+            path: "/appearance",
+            component: lazy(() => import("./pages/settings/appearance")),
           },
         ],
       },

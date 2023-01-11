@@ -17,7 +17,7 @@ export const DeviceCode = (props: Props) => {
         {props.value}
       </span>
       <span
-        class="i-ri:file-copy-fill cursor-pointer text-black-lightGray"
+        class="i-ri:file-copy-fill cursor-pointer text-shade-0"
         style={{
           color: props.disabled ? "#404759" : "#8A8B8F",
         }}

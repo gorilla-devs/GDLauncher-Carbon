@@ -37,15 +37,15 @@ const AppNavbar = () => {
         </div>
         <div class="flex gap-5 items-center">
           <div class="flex gap-5">
-            <div class="i-ri:terminal-box-fill text-black-lightGray text-2xl cursor-pointer" />
+            <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
             <div
-              class="i-ri:settings-3-fill text-black-lightGray text-2xl cursor-pointer"
+              class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
               classList={{
                 "bg-accent-main": location.pathname === "/settings",
               }}
               onClick={() => navigate("/settings")}
             />
-            <div class="i-ri:notification-2-fill text-black-lightGray text-2xl cursor-pointer" />
+            <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
           </div>
           <div class="w-40 h-10 bg-black-semiblack" />
         </div>

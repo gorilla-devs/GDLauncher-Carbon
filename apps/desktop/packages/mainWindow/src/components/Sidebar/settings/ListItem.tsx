@@ -1,3 +1,4 @@
+import { useMatch, useNavigate } from "@solidjs/router";
 import { settingsItem } from ".";
 
 interface Props {
@@ -5,7 +6,22 @@ interface Props {
 }
 
 const ListItem = (props: Props) => {
-  return <div class="w-full py-2">{props.item.name}</div>;
+  const navigate = useNavigate();
+  const match = useMatch(() => props.item.path);
+
+  return (
+    <div
+      class="w-full py-2 hover:bg-shade-6 pl-2 cursor-pointer"
+      classList={{
+        "bg-shade-6": match()?.path === props.item.path,
+      }}
+      onClick={() => {
+        navigate(props.item.path);
+      }}
+    >
+      {props.item.name}
+    </div>
+  );
 };
 
 export default ListItem;

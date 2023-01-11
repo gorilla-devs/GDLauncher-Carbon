@@ -7,7 +7,7 @@ const Sidebar = () => {
       <Input
         placeholder="Type Here"
         icon={<div class="i-ri:search-line" />}
-        class="w-full rounded-full text-black-lightGray"
+        class="w-full rounded-full text-shade-0"
       />
       Sidebar library
     </SiderbarWrapper>

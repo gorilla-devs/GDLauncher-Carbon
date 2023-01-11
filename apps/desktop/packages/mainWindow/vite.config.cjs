@@ -14,7 +14,27 @@ const unocssConfig = require("@gd/config").unocssConfig;
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
-  plugins: [solidPlugin(), Unocss(unocssConfig), ViteMinifyPlugin({})],
+  plugins: [
+    solidPlugin(),
+    Unocss({
+      ...unocssConfig,
+      rules: [
+        [
+          /^bg-img-(.*)$/,
+          ([, d]) => {
+            const img = d.split("-")[0];
+            return {
+              background: `url('./assets/images/${img}')`,
+              "background-size": "cover",
+              "background-repeat": "no-repeat",
+              "box-sizing": "border-box",
+            };
+          },
+        ],
+      ],
+    }),
+    ViteMinifyPlugin({}),
+  ],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   optimizeDeps: {

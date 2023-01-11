@@ -1,4 +1,4 @@
-import { isSidebarOpened, toggleSidebar } from "@/stores/sidebar";
+import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import { JSXElement, mergeProps, Show } from "solid-js";
 
 interface Props {

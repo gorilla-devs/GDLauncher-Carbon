@@ -12,7 +12,7 @@ const Overview = () => {
         <Card title="Minecraft version" text="1.19.2" icon="sign" />
       </div>
       <div class="flex flex-col items-start justify-between gap-2 p-5 w-59 bg-black-semiblack rounded-xl box-border w-full">
-        <div class="text-black-lightGray uppercase">Notes</div>
+        <div class="text-shade-0 uppercase">Notes</div>
         <p class="m-0 text-sm leading-6">
           Minecraft Forge is a handy place to store, sort, and keep tabs on all
           your mods. If you’re after more inspiration, our guide to the best

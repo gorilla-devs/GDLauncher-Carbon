@@ -39,7 +39,7 @@ function Dropdown(props: Props) {
           class="mt-0 mb-2 font-bold"
           classList={{
             "text-white": !props.disabled,
-            "text-black-lightGray": props.disabled,
+            "text-shade-0": props.disabled,
           }}
         >
           {props.label}
@@ -58,8 +58,7 @@ function Dropdown(props: Props) {
         classList={{
           "border-0": !props.error,
           "border-1 border-status-red": props.error,
-          "text-black-lightGray hover:text-white":
-            !props.disabled && !props.error,
+          "text-shade-0 hover:text-white": !props.disabled && !props.error,
           "text-black-gray": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
@@ -68,7 +67,7 @@ function Dropdown(props: Props) {
         <span
           classList={{
             "text-white": props.error,
-            "text-black-lightGray hover:text-white group-hover:text-white":
+            "text-shade-0 hover:text-white group-hover:text-white":
               !props.disabled && !props.error,
             "text-black-gray": props.disabled,
           }}
@@ -80,7 +79,7 @@ function Dropdown(props: Props) {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-black-lightGray group-hover:text-white":
+            "text-shade-0 group-hover:text-white":
               !props.disabled && !props.error,
             "text-white": props.error,
             "text-black-gray": props.disabled,
@@ -88,14 +87,14 @@ function Dropdown(props: Props) {
         />
       </button>
       <ul
-        class={`absolute text-black-lightGray pt-1 ${
+        class={`absolute text-shade-0 pt-1 ${
           menuOpened() ? "block" : "hidden"
         } list-none m-0 p-0 w-45`}
       >
         <For each={props.options}>
           {(option) => (
             <li
-              class="first:rounded-t last:rounded-b bg-black-semiblack hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-black-lightGray no-underline"
+              class="first:rounded-t last:rounded-b bg-black-semiblack hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-shade-0 no-underline"
               onClick={() => {
                 console.log("OPTIOn", option.label);
                 setSelectedValue(option.label);

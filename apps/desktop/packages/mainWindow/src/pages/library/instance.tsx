@@ -79,7 +79,7 @@ const Instace = () => {
                   <div class="flex flex-1 flex-col max-w-185 ">
                     <h1 class="m-0">{params.id}</h1>
                     <div class="flex flex-col lg:flex-row justify-between">
-                      <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-black-lightGray">
+                      <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                         <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-black-gray">
                           Forge 1.19.2
                         </div>

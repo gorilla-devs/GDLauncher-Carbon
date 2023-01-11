@@ -97,11 +97,11 @@ const CodeStep = (props: Props) => {
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="mb-0 mt-2 text-black-lightGray">
+          <p class="mb-0 mt-2 text-shade-0">
             <span class="text-white">{countDown()}</span> before the code
             expires
           </p>
-          <p class="text-black-lightGray">
+          <p class="text-shade-0">
             Enter the specified code on the browser page to complete the
             authorization
           </p>

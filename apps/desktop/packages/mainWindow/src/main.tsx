@@ -9,15 +9,6 @@ import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
-import { mainTheme } from "@gd/ui";
-
-// Inject theme
-for (const key in mainTheme) {
-  document.documentElement.style.setProperty(
-    `--${key}`,
-    mainTheme[key as keyof typeof mainTheme]
-  );
-}
 
 queueMicrotask(() => {
   initAnalytics();

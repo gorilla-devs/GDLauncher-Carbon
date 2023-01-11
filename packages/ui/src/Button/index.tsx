@@ -52,7 +52,7 @@ function Button(props: Props) {
         "flex-row-reverse": props.iconRight,
         "shadow-md shadow-accent-main bg-accent-main hover:shadow-lg hover:bg-accent-hover":
           isGlow() && !isDisabled(),
-        "bg-black-gray text-black-lightGray": isGlow() && isDisabled(),
+        "bg-black-gray text-shade-0": isGlow() && isDisabled(),
       }}
       style={{
         ...(mergedProps.type === "transparent" && {
