@@ -10,8 +10,8 @@ declare global {
     updateLoading: (loaded: number, total: number) => void;
     ipcRenderer: import("electron").IpcRenderer;
     report: any;
-    getMinimumBounds: () => Promise<BoundsSize>;
-    minimumBoundsChanged: (
+    getAdSize: () => Promise<BoundsSize>;
+    adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
     openExternalLink: (link: string) => void;

@@ -13,7 +13,7 @@ const ListItem = (props: Props) => {
     <div
       class="w-full py-2 hover:bg-shade-6 pl-2 cursor-pointer"
       classList={{
-        "bg-shade-6": match()?.path === props.item.path,
+        "bg-shade-6": !!match(),
       }}
       onClick={() => {
         navigate(props.item.path);

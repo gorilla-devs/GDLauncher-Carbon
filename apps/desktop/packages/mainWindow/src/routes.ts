@@ -27,10 +27,31 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/:id",
-            component: lazy(() => import("./pages/library/instance")),
+            component: lazy(() => import("./pages/library/Instance")),
             data: () => {
               console.log("Fetching specific instance data...");
             },
+            children: [
+              {
+                path: "/",
+                component: lazy(
+                  () => import("./pages/library/Instance/Overview")
+                ),
+              },
+              {
+                path: "/mods",
+                component: lazy(() => import("./pages/library/Instance/Mods")),
+                data: () => {
+                  console.log("Fetching mods data...");
+                },
+              },
+              {
+                path: "/resourcepacks",
+                component: lazy(
+                  () => import("./pages/library/Instance/ResourcePacks")
+                ),
+              },
+            ],
           },
         ],
       },
@@ -60,11 +81,11 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("./pages/settings/general")),
+            component: lazy(() => import("./pages/Settings/general")),
           },
           {
             path: "/appearance",
-            component: lazy(() => import("./pages/settings/appearance")),
+            component: lazy(() => import("./pages/Settings/appearance")),
           },
         ],
       },

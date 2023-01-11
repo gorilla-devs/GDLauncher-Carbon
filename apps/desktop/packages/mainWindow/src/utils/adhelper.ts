@@ -5,17 +5,20 @@ export interface BoundsSize {
   height: number;
 }
 
-export const [adSize, _setMinimumBounds] = createStore<BoundsSize>({
+export const [adSize, _setAdSize] = createStore<BoundsSize>({
   width: 0,
   height: 0,
 });
 
-export const init = async () => {
-  const bounds = await window.getMinimumBounds();
-  _setMinimumBounds(bounds);
-  window.minimumBoundsChanged((_, newBounds: BoundsSize) => {
-    _setMinimumBounds(newBounds);
+const init = async () => {
+  const bounds = await window.getAdSize();
+  _setAdSize(bounds);
+  console.log("GIANMARCO NON SA FARE LE TABS", bounds);
+  window.adSizeChanged((_, newBounds: BoundsSize) => {
+    _setAdSize(newBounds);
   });
 };
+
+init();
 
 export default adSize;

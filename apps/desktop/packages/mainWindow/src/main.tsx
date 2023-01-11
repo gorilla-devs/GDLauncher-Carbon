@@ -4,6 +4,7 @@ import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import App from "@/app";
+import "@/utils/themeManager";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";

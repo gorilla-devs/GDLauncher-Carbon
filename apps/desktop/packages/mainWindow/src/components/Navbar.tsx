@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "@solidjs/router";
+import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
@@ -6,6 +6,9 @@ import { NAVBAR_ROUTES } from "@/constants";
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isSettings = useMatch(() => "/settings");
+  const isSettingsNested = useMatch(() => "/settings/*");
 
   return (
     <Show when={location.pathname !== "/"}>
@@ -15,16 +18,15 @@ const AppNavbar = () => {
           <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
             <For each={NAVBAR_ROUTES}>
               {(route) => {
-                const isActiveRoute = () =>
-                  location.pathname.includes(route.path);
+                const isMatch = useMatch(() => route.path);
                 return (
                   <li class="py-2 no-underline">
                     <Link
                       href={route.path}
                       class="no-underline"
                       classList={{
-                        "text-white": isActiveRoute(),
-                        "text-slate-400": !isActiveRoute(),
+                        "text-white": !!isMatch(),
+                        "text-slate-400": !isMatch(),
                       }}
                     >
                       {route.label}
@@ -41,7 +43,7 @@ const AppNavbar = () => {
             <div
               class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
               classList={{
-                "bg-accent-main": location.pathname === "/settings",
+                "bg-primary": !!isSettings() || !!isSettingsNested(),
               }}
               onClick={() => navigate("/settings")}
             />

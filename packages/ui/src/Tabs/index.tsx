@@ -42,7 +42,7 @@ function Tabs(props: Props) {
             >
               {tab.name}
               <Show when={activeTab() === i()}>
-                <div class="absolute left-0 right-0 bottom-0 h-1 bg-accent-main" />
+                <div class="absolute left-0 right-0 bottom-0 h-1 bg-primary" />
               </Show>
             </div>
           )}
