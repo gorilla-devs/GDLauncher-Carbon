@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 
-interface Props {
+export interface Props {
   value?: string | number;
   placeholder?: string;
   error?: string;

@@ -1,11 +1,11 @@
 import { createSignal, For, Show } from "solid-js";
 
-interface Option {
+export interface Option {
   label: string;
   key: string;
 }
 
-interface Props {
+export interface Props {
   options: Option[];
   value: string;
   error?: boolean;

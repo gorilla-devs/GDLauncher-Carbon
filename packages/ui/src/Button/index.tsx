@@ -1,6 +1,6 @@
 import { children, mergeProps, Show } from "solid-js";
 
-interface Props {
+export interface Props {
   children: HTMLElement | string;
   class?: string;
   type?: "primary" | "secondary" | "glow" | "outline" | "transparent";

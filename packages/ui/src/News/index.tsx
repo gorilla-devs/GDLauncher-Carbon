@@ -23,7 +23,7 @@ interface SliderProps {
   onClick?: any;
 }
 
-interface CarouselProps {
+export interface CarouselProps {
   slides: SlideProps[];
   speed?: number;
   rtl?: boolean;

@@ -8,13 +8,13 @@ import {
   Switch,
 } from "solid-js";
 
-interface TabType {
+export interface TabType {
   name: string;
   component: JSXElement;
   icon?: string;
 }
 
-interface Props {
+export interface Props {
   tabs: TabType[];
   type?: "underline" | "block";
 }

@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 import type { Component } from "solid-js";
 import { Button } from "../Button";
 
-interface Props {
+export interface Props {
   initialValue?: number;
 }
 

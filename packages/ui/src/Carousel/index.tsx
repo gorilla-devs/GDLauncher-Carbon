@@ -1,6 +1,6 @@
 import "./index.css";
 
-interface Props {
+export interface Props {
   children?: HTMLElement | Element | string | any;
   class?: string;
   title: string;

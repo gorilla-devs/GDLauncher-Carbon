@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 
-interface Props {
+export interface Props {
   checked: boolean;
   disabled: boolean;
   /* eslint-disable no-unused-vars */

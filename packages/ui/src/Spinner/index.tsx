@@ -1,4 +1,4 @@
-interface Props {
+export interface Props {
   loading: boolean;
 }
 
