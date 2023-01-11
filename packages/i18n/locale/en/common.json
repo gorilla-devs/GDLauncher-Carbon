@@ -1,5 +1,8 @@
 {
   "hello": "hello",
   "world": "world",
-  "welcome": "welcome"
+  "welcome": "welcome",
+  "italin": "italiano",
+  "english": "english",
+  "german": "german"
 }
