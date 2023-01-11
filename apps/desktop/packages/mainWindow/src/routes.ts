@@ -77,15 +77,15 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/settings",
-        component: lazy(() => import("./layouts/settings")),
+        component: lazy(() => import("./layouts/Settings")),
         children: [
           {
             path: "/",
-            component: lazy(() => import("./pages/Settings/general")),
+            component: lazy(() => import("./pages/Settings/General")),
           },
           {
             path: "/appearance",
-            component: lazy(() => import("./pages/Settings/appearance")),
+            component: lazy(() => import("./pages/Settings/Appearance")),
           },
         ],
       },
