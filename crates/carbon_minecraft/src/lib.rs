@@ -9,14 +9,22 @@ use uuid::Uuid;
 
 mod mc;
 
-
 mod instance;
 mod app;
 mod minecraft_package;
 mod minecraft_mod;
 mod modloader;
+mod package_file;
 
 type TaskProgressListener = impl Fn();
+
+
+macro_rules! try_path_fmt{
+    () => {
+
+    };
+}
+
 
 trait UUIDIndexed { //
     fn get_uuid(&self) -> uuid;
@@ -26,7 +34,7 @@ trait Validable {
     fn validate() -> bool;
 }
 
-
+/*
 //
 // pub struct Instances {
 //     inner: Arc<RwLock<HashMap<String, instance::Instance>>>,
@@ -68,3 +76,4 @@ trait Validable {
 //         inner: Arc::new(RwLock::new(HashMap::new()))
 //     };
 // }
+*/

@@ -1,9 +1,12 @@
+use std::backtrace::Backtrace;
 use std::borrow::BorrowMut;
 use std::collections::HashSet;
-use std::fs::File;
+use std::fs::{DirEntry, File, read_dir};
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use camino::Utf8Path;
+use cairo::Cairo;
 use serde::Deserialize;
 
 use thiserror::Error;
@@ -11,38 +14,61 @@ use tracing::log;
 use tracing::log::trace;
 use uuid::Variant::Future;
 use crate::instance::configuration::InstanceConfigurationFile;
+use crate::minecraft_package::package_scan::MinecraftPackageScanner;
 
 use crate::instance::Instance;
-use crate::instance::instances_scan::InstanceScanError::{FileStructureDoesNotMatch, FolderStructureDoesNotMatch};
+use crate::instance::instances_scan::InstanceScanError::{FileStructureDoesNotMatch, FolderStructureDoesNotMatch, IoError, NotRepresentablePath};
 use crate::minecraft_package::MinecraftPackage;
+use crate::minecraft_package::package_scan::MinecraftPackageScanResult;
 
-type InstanceScanResult<T> = Result<T, InstanceScanError>;
+type InstanceScanResult = Vec<Result<Instance, InstanceScanError>>;
 type InstanceTestResult = Result<(), InstanceScanError>;
 
+#[derive(Error, Debug)]
+pub enum InstanceScanError {
+    #[error("path `{path}` does not contain any valid instance at ")]
+    NoInstancesInFolder { path: PathBuf, recursive_searched: bool },
 
-// todo : this is a factory method and the method name implies that the operation is only a scan(read), split concerns
-pub async fn scan_for_instances(path_to_search_in: impl AsRef<Path>, search_all_folders_in_depth: bool) -> InstanceScanResult<Vec<Instance>> {
+    #[error("io error: {0} !\n")]
+    IoError { #[from] error: io::Error, backtrace: Backtrace },
 
-    // async but mind that the scan must be executed one level per once in order to avoid possible false positives(could drive to a nasty bug for future change)
-    // test whether you can recurse infinitely for a link to a self contained folder
+    #[error("expected folder `{0}` but not found! \n")]
+    FolderStructureDoesNotMatch(PathBuf),
 
-    let path_to_search_in = path_to_search_in.as_ref();
-    check_instance_directory(path_to_search_in)?;
+    #[error("expected file `{0}` but not found! \n")]
+    FileStructureDoesNotMatch(PathBuf),
 
-    let minecraft_package = MinecraftPackage::new(
-        Default::default(),
-        Default::default(),
-        Default::default(),
-    );
+    #[error("path not representable\n")]
+    NotRepresentablePath
+}
 
-    let found_instances = vec![
-        Instance {
-            name: "".to_string(),
-            minecraft_package,
+pub(crate) trait InstanceScanner {
+    // todo : this is a factory method and the method name implies that the operation is only a scan(read), split concerns
+    async fn scan_for_instances(path_to_search_in: impl AsRef<Path>, search_all_folders_in_depth: bool) -> InstanceScanResult {
+
+        // async but mind that the scan must be executed one level at once in order to avoid possible false positives(could drive to a nasty bug for future change)
+        // test whether you can recurse infinitely for a link to a self contained folder
+
+        let path_to_search_in = path_to_search_in.as_ref();
+
+        async fn scan_for_instances_single_directory(directory_path : Result<DirEntry, io::Error>) -> Result<Instance, InstanceScanError>{
+            let directory_path = &directory_path?.path();
+            trace!("scanning directory {} for instances", Utf8Path::from_path(directory_path.as_path()).map(ToString::to_string).unwrap_or("<<unrepresentable path!>>".to_string()););
+            check_instance_directory(directory_path)?;
+            Ok(
+                Instance{
+                    name: Utf8Path::from_path(directory_path.as_path()).ok_or(NotRepresentablePath )?.to_string() ,
+                    minecraft_package: MinecraftPackageScanner::scan_for_packages(directory_path).await?,
+                }
+            )
         }
-    ];
 
-    Ok(found_instances)
+        read_dir(path_to_search_in)
+            .map_err(Into::into)?
+            .map(|dir_entry|scan_for_instances_single_directory(dir_entry).await)
+            .collect::<Vec<_>>()
+
+    }
 }
 
 // todo : build a chain of responsibility for testing(evaluate possible better pattern because of rust)
@@ -65,10 +91,10 @@ async fn check_directory_structure(target_instance_directory_path: &impl AsRef<P
     let target_instance_directory_path = target_instance_directory_path.as_ref();
     SUBFOLDERS_TREE.iter()
         .map(|folder_path_last_part| PathBuf::from(target_instance_directory_path, folder_path_last_part))
-        .map(|folder_path| if let false = folder_path.exists() && folder_path.is_dir() { FolderStructureDoesNotMatch(folder_path) })?;
+        .map(|folder_path| if let false = folder_path.exists() && folder_path.is_dir() { Err(FolderStructureDoesNotMatch(folder_path)) })?;
     FILES_TREE.iter()
         .map(|file_path_last_part| PathBuf::from(target_instance_directory_path, file_path_last_part))
-        .map(|file_path| if let false = file_path.exists() && file_path.is_file() { FileStructureDoesNotMatch(file_path) })?
+        .map(|file_path| if let false = file_path.exists() && file_path.is_file() { Err(FileStructureDoesNotMatch(file_path)) })?
 }
 
 const CONFIGURATION_FILE_RELATIVE_PATH: PathBuf = PathBuf::from(".conf.json");
@@ -84,41 +110,44 @@ async fn check_configuration_file_sanity(target_instance_directory_path: impl As
     Ok(())
 }
 
-#[derive(Error, Debug)]
-pub enum InstanceScanError {
-    #[error("path `{path}` does not contain any valid instance at ")]
-    NoInstancesInFolder { path: PathBuf, recursive_searched: bool },
-
-    #[error("path not found !\n")]
-    IoError(#[from] io::Error),
-
-    #[error("expected folder `{0}` but not found! \n")]
-    FolderStructureDoesNotMatch(PathBuf),
-
-    #[error("expected file `{0}` but not found! \n")]
-    FileStructureDoesNotMatch(PathBuf),
-}
-
 #[cfg(test)]
 mod unit_tests {
     use std::path::PathBuf;
     use crate::instance::instances_scan::{check_configuration_file_sanity, check_directory_structure};
 
     #[test]
-    fn test_directory_structure_check() {
+    fn test_instance_scan_ok() {
+
+    }
+
+    #[test]
+    fn test_instance_scan_err() {
+
+    }
+
+    #[test]
+    fn test_directory_structure_check_ok() {
         let res = check_directory_structure(&PathBuf::from("test_assets").join("instance_example")).await;
         let affirmative_check = matches!(res, Ok(_));
         assert!(affirmative_check);
+    }
+
+    #[test]
+    fn test_directory_structure_check_err() {
         let res = check_directory_structure(&PathBuf::from("test_assets").join("malformed_instance_example")).await;
         let denial_check = matches!(res, Err(_)); // todo : add every error case
         assert!(denial_check);
     }
 
     #[test]
-    fn test_configuration_file_sanity_check() {
+    fn test_configuration_file_sanity_check_ok() {
         let res = check_configuration_file_sanity(&PathBuf::from("test_assets").join("instance_example")).await;
         let affirmative_check = matches!(res, Ok(_));
         assert!(affirmative_check);
+    }
+
+    #[test]
+    fn test_configuration_file_sanity_check_fail() {
         let res = check_configuration_file_sanity(&PathBuf::from("test_assets").join("malformed_instance_example")).await;
         let denial_check = matches!(res, Err(_)); // todo : add every error case
         assert!(denial_check);

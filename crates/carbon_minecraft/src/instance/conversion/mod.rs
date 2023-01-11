@@ -5,7 +5,6 @@ mod error;
 
 struct PolyMcInstance{
 
-
 }
 
 impl TryInto<Instance> for PolyMcInstance{

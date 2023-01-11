@@ -1,11 +1,13 @@
 mod instances_scan;
 mod error;
 mod configuration;
+mod conversion;
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use crate::instance::configuration::InstanceConfiguration;
 use crate::minecraft_mod::MinecraftMod;
 use crate::minecraft_package::MinecraftPackage;
 

@@ -4,3 +4,10 @@ use thiserror::Error;
 pub enum InstanceConversionError {
 
 }
+
+
+trait InstanceConverter{
+
+
+}
+
