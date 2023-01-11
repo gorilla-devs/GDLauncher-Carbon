@@ -56,6 +56,19 @@ pub struct JavaVersion {
     pub build_metadata: Option<String>,
 }
 
+impl JavaVersion {
+    fn from_major(major: u8) -> Self {
+        Self {
+            major,
+            minor: None,
+            patch: None,
+            update_number: None,
+            prerelease: None,
+            build_metadata: None,
+        }
+    }
+}
+
 pub async fn detect_available_javas() -> Result<Vec<JavaComponent>, JavaError> {
     let mut all_javas = discovery::find_java_paths().await;
     all_javas.push(PathBuf::from("java"));

@@ -80,7 +80,7 @@ function watchPreload(mainWindow) {
 }
 
 const mainWindow = await createServer({
-  configFile: "packages/mainWindow/vite.config.js",
+  configFile: "packages/mainWindow/vite.config.cjs",
 });
 
 await mainWindow.listen();

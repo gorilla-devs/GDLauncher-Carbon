@@ -267,6 +267,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "axum",
+ "carbon_java_manager",
  "rspc",
  "serde",
  "tokio",
@@ -285,16 +286,6 @@ dependencies = [
  "tokio",
  "tracing",
  "zip",
-]
-
-[[package]]
-name = "carbon_core"
-version = "0.0.0"
-dependencies = [
- "futures",
- "thiserror",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -1021,6 +1012,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da2d6f23ffea9d7e76c53eee25dfb67bcd8fde7f1198b0855350698c9f07c780"
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1503,18 +1500,18 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.47"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
+checksum = "57a8eca9f9c4ffde41714334dee777596264c7825420f521abc92b5b5deb63a5"
 dependencies = [
  "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.21"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbe448f377a7d6961e30f5955f9b8d106c3f5e449d493ee1b125c1d43c2b5179"
+checksum = "8856d8364d252a14d474036ea1358d63c9e6965c8e5c1885c18f73d70bff9c7b"
 dependencies = [
  "proc-macro2",
 ]
@@ -1729,7 +1726,7 @@ dependencies = [
 [[package]]
 name = "rspc"
 version = "0.1.2"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=32fe3d8a6ca525f048e84b78451c493e25e9eeba#32fe3d8a6ca525f048e84b78451c493e25e9eeba"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=65db2d6a5ed5585613cad574ceffa61b1b76e084#65db2d6a5ed5585613cad574ceffa61b1b76e084"
 dependencies = [
  "async-stream",
  "futures",
@@ -1926,9 +1923,10 @@ dependencies = [
 [[package]]
 name = "specta"
 version = "0.0.6"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=32fe3d8a6ca525f048e84b78451c493e25e9eeba#32fe3d8a6ca525f048e84b78451c493e25e9eeba"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=65db2d6a5ed5585613cad574ceffa61b1b76e084#65db2d6a5ed5585613cad574ceffa61b1b76e084"
 dependencies = [
  "document-features",
+ "indoc",
  "once_cell",
  "paste",
  "serde",
@@ -1939,7 +1937,7 @@ dependencies = [
 [[package]]
 name = "specta-macros"
 version = "0.0.6"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=32fe3d8a6ca525f048e84b78451c493e25e9eeba#32fe3d8a6ca525f048e84b78451c493e25e9eeba"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=65db2d6a5ed5585613cad574ceffa61b1b76e084#65db2d6a5ed5585613cad574ceffa61b1b76e084"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -2104,9 +2102,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.23.1"
+version = "1.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a54aca0c15d014013256222ba0ebed095673f89345dd79119d912eb561b7a8"
+checksum = "1d9f76183f91ecfb55e1d7d5602bd1d979e38a3a522fe900241cf195624d67ae"
 dependencies = [
  "autocfg",
  "bytes",
@@ -2187,9 +2185,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.3.4"
+version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c530c8675c1dbf98facee631536fa116b5fb6382d7dd6dc1b118d970eafe3ba"
+checksum = "f873044bf02dd1e8239e9c1293ea39dad76dc594ec16185d0a1bf31d8dc8d858"
 dependencies = [
  "bitflags",
  "bytes",

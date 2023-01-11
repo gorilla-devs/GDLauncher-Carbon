@@ -1,11 +1,12 @@
-import { resolve, join } from "path";
+import { resolve, join } from "node:path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import { ViteMinifyPlugin } from "vite-plugin-minify";
 import pkg from "../../package.json";
 // TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
-import { unocssConfig } from "../../../../packages/config/unocssConfig";
+
+const unocssConfig = require("@gd/config").unocssConfig;
 
 /**
  * @see https://vitejs.dev/config/
@@ -17,7 +18,7 @@ export default defineConfig({
   envDir: resolve(__dirname, "../../../../"),
   base: "./",
   optimizeDeps: {
-    exclude: ["@tanstack/solid-query"],
+    exclude: ["@tanstack/solid-query", "path", "fs", "promises"],
   },
   build: {
     target: "esnext",

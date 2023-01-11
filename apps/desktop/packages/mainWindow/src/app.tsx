@@ -3,11 +3,12 @@ import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./routes";
 import AppNavbar from "./components/Navbar";
 import { Notifications } from "@gd/ui";
-import { rspc } from "./utils/rspcClient";
+import { createInvalidateQuery, rspc } from "./utils/rspcClient";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
+  createInvalidateQuery();
 
   const echoMsg = rspc.createQuery(() => ["echo", "something"]);
   // const subscription = rspc.createSubscription(() => ["subscriptions.pings"], {

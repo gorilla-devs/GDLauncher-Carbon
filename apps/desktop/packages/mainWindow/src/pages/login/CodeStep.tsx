@@ -1,9 +1,7 @@
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
-// import { DeviceCodeObject } from "@gd/native_interface";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-// import { accounts, login } from "@/modules/components/accounts";
 import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";

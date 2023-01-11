@@ -19,6 +19,15 @@ export const client = createClient<Procedures>({
 export const queryClient = new QueryClient();
 export const rspc = createSolidQueryHooks<Procedures>();
 
-client.subscription(["pings", null], {
-  onData: (e) => console.log(e),
-});
+export function createInvalidateQuery() {
+  const context = rspc.useContext();
+  client.subscription(["invalidateQuery"], {
+    onData: (invalidateOperation: any) => {
+      const key = [invalidateOperation!.key];
+      if (invalidateOperation.arg !== null) {
+        key.concat(invalidateOperation.arg);
+      }
+      context.queryClient.invalidateQueries(key);
+    },
+  });
+}

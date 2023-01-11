@@ -1,5 +1,3 @@
-// import { login } from "@/modules/components/accounts";
-// import { DeviceCodeObject } from "@gd/native_interface";
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { Setter } from "solid-js";

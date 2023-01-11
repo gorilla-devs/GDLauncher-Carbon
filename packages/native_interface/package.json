@@ -22,7 +22,6 @@
   "devDependencies": {
     "@gd/config": "workspace:*",
     "@napi-rs/cli": "^2.14.1",
-    "chokidar": "^3.5.3",
-    "cross-env": "^7.0.3"
+    "chokidar": "^3.5.3"
   }
 }

@@ -1,38 +1,19 @@
-import path from "path";
 import presetIcons from "@unocss/preset-icons";
-import { readdirSync, readFileSync } from "fs";
 import presetWind from "@unocss/preset-wind";
 import { presetAttributify } from "unocss";
-import { theme } from "./unoCssTheme";
+import { theme } from "./unocss.theme.js";
+import gdlIcons from "./unocss.icons.js";
 
-const gdlIcons = () => {
-  let icons: { [key: string]: string } = {};
-  try {
-    const iconFiles = readdirSync(path.join(__dirname, "../", "ui", "icons"));
-    for (const iconFile of iconFiles) {
-      const file = readFileSync(
-        path.join(__dirname, "../", "ui", "icons", iconFile)
-      );
-
-      icons[path.basename(iconFile, ".svg")] = file.toString();
-    }
-  } catch (error) {}
-
-  return icons;
-};
-
-const unocssConfig: any = {
+const unocssConfig = {
   include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   presets: [
-    presetAttributify({
-      prefix: "uno:",
-      prefixedOnly: true,
-    }),
+    presetAttributify(),
     presetWind(),
     presetIcons({
       collections: {
-        gdl: gdlIcons(),
+        gdl: gdlIcons,
       },
+      // eslint-disable-next-line
       // @ts-ignore
       hero: () =>
         import("@iconify-json/heroicons/icons.json").then((i) => i.default),
@@ -43,8 +24,8 @@ const unocssConfig: any = {
   rules: [
     [
       /^bg-image-(.*)$/,
-      ([a, d]: [string, string]) => {
-        let img = d.split("-")[0];
+      ([, d]: [string, string]) => {
+        const img = d.split("-")[0];
         return {
           background: `url('./assets/images/${img}')`,
           "background-size": "cover",
@@ -54,6 +35,6 @@ const unocssConfig: any = {
       },
     ],
   ],
-};
+} as unknown;
 
 export { unocssConfig };

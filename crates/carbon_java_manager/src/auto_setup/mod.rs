@@ -22,7 +22,7 @@ struct JavaMeta {
 #[async_trait::async_trait]
 trait JavaAuto {
     async fn setup(
-        &self,
+        &mut self,
         base_path: &Path,
         progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError>;

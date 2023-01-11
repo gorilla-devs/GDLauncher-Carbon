@@ -7,7 +7,6 @@ members = [
   "crates/carbon_bindings",
   "crates/carbon_net",
   "crates/carbon_compression",
-  "crates/carbon_core",
 ]
 
 [profile.release]

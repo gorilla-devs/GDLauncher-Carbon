@@ -83,18 +83,11 @@
       }
     </style>
     <title>GDLauncher Carbon</title>
-    <script type="module">
-      import config from "@gd/config";
-      let moduleNames = config.moduleNames;
-      window.document.getElementById(
-        "appLoadingState"
-      ).innerText = `Loaded 0 / ${moduleNames.length} modules`;
-    </script>
   </head>
   <body style="margin: 0; padding: 0">
     <div id="overlay" style="position: absolute; z-index: 100; top: 0"></div>
     <div id="root"></div>
-    <div id="appLoadingState"></div>
+    <div id="appLoadingState">Loading...</div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

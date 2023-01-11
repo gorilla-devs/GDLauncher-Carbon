@@ -7,12 +7,24 @@
       "cache": false
     },
     "@gd/desktop#build": {
-      "dependsOn": ["^@gd/ui#build"],
+      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": ["^@gd/native_interface#dev", "^@gd/ui#build"],
+      "dependsOn": [
+        "^@gd/native_interface#dev",
+        "^@gd/ui#build",
+        "^@gd/config#build"
+      ],
       "outputs": ["dist/**"],
+      "cache": false
+    },
+    "@gd/ui#dev": {
+      "dependsOn": ["^@gd/config#dev"],
+      "cache": false
+    },
+    "@gd/ui#build": {
+      "dependsOn": ["^@gd/config#build"],
       "cache": false
     },
     "@gd/native_interface": {

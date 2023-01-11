@@ -3,27 +3,19 @@ import { createStore } from "solid-js/store";
 export interface BoundsSize {
   width: number;
   height: number;
-  adSize: {
-    width: number;
-    height: number;
-  };
 }
 
-export const [minimumBounds, setMinimumBounds] = createStore<BoundsSize>({
+export const [adSize, _setMinimumBounds] = createStore<BoundsSize>({
   width: 0,
   height: 0,
-  adSize: {
-    width: 0,
-    height: 0,
-  },
 });
 
 export const init = async () => {
   const bounds = await window.getMinimumBounds();
-  setMinimumBounds(bounds);
+  _setMinimumBounds(bounds);
   window.minimumBoundsChanged((_, newBounds: BoundsSize) => {
-    setMinimumBounds(newBounds);
+    _setMinimumBounds(newBounds);
   });
 };
 
-export default minimumBounds;
+export default adSize;

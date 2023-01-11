@@ -1,6 +1,7 @@
 use super::{JavaAuto, JavaMeta, JavaProgress};
 use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError};
 use carbon_net::Downloadable;
+use chrono::{DateTime, FixedOffset};
 use futures::TryFutureExt;
 use std::{
     borrow::BorrowMut,
@@ -20,14 +21,14 @@ pub enum RuntimeEdition {
 
 pub struct MojangRuntime {
     pub version: RuntimeEdition,
-    release_date: String,
+    release_date: Option<DateTime<FixedOffset>>,
 }
 
 impl MojangRuntime {
-    pub fn new(version: RuntimeEdition, release_date: String) -> Self {
+    pub fn new(version: RuntimeEdition) -> Self {
         Self {
             version,
-            release_date,
+            release_date: None,
         }
     }
 }
@@ -35,7 +36,7 @@ impl MojangRuntime {
 #[async_trait::async_trait]
 impl JavaAuto for MojangRuntime {
     async fn setup(
-        &self,
+        &mut self,
         base_path: &Path,
         // TODO: implement progress reporting
         progress_report: Sender<JavaProgress>,
@@ -43,6 +44,8 @@ impl JavaAuto for MojangRuntime {
         let mojang_assets = self
             .get_runtime_assets(&base_path.join(JAVA_RUNTIMES_FOLDER))
             .await?;
+
+        self.release_date = Some(mojang_assets.last_updated);
 
         let (progress, mut recv) = tokio::sync::watch::channel(carbon_net::Progress {
             current_count: 0,
@@ -190,7 +193,12 @@ impl JavaAuto for MojangRuntime {
 
         let updated_at = mojang_assets.last_updated.timestamp();
 
-        if updated_at > self.release_date.parse::<i64>().unwrap() {
+        if updated_at
+            > self
+                .release_date
+                .ok_or(JavaError::NoReleaseDateProvidedForJavaComponent)?
+                .timestamp()
+        {
             return Ok(false);
         }
 
@@ -270,10 +278,7 @@ mod tests {
     async fn test_setup_mojang_runtime_jre() {
         let current_path = std::env::current_dir().unwrap();
 
-        let mojang = MojangRuntime {
-            version: RuntimeEdition::Gamma,
-            release_date: "2021-09-14".to_string(),
-        };
+        let mut mojang = MojangRuntime::new(RuntimeEdition::Gamma);
 
         let (tx, _) = channel(JavaProgress::default());
 

@@ -70,6 +70,10 @@ pub enum JavaError {
 
     #[error("Java update date from meta is invalid {0}")]
     JavaUpdateDateFromMetaInvalid(String),
+    #[error("Java auto setup version is not supported")]
+    JavaAutoSetupVersionNotSupported,
+    #[error("No release date provided for java component")]
+    NoReleaseDateProvidedForJavaComponent,
 
     // Scan javas
     #[error("Cannot read Java Runtimes directory {0}")]

@@ -6,12 +6,14 @@
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
+  "type": "module",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
     "test": "playwright test",
-    "build": "node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
+    "build-vite": "node scripts/build.mjs",
+    "build": "pnpm build-vite && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.cjs",
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },

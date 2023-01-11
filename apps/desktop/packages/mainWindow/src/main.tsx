@@ -6,10 +6,18 @@ import { client, queryClient, rspc } from "@/utils/rspcClient";
 import App from "@/app";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
-import { initModules } from "@/modules";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
+import { mainTheme } from "@gd/ui";
+
+// Inject theme
+for (const key in mainTheme) {
+  document.documentElement.style.setProperty(
+    `--${key}`,
+    mainTheme[key as keyof typeof mainTheme]
+  );
+}
 
 queueMicrotask(() => {
   initAnalytics();
@@ -17,7 +25,7 @@ queueMicrotask(() => {
 
 render(() => {
   onMount(() => {
-    initModules();
+    window.clearLoading();
   });
 
   return (

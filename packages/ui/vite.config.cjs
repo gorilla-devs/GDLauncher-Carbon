@@ -3,8 +3,7 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 import Unocss from "unocss/vite";
-// TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
-import { unocssConfig } from "../config/unocssConfig";
+import { unocssConfig } from "@gd/config";
 
 export default defineConfig({
   plugins: [
@@ -52,6 +51,5 @@ export default defineConfig({
     alias: {
       "@": path.join(__dirname, "src"),
     },
-    conditions: ["development", "browser"],
   },
 });
