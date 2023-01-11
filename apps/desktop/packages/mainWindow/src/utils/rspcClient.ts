@@ -21,7 +21,7 @@ export const rspc = createSolidQueryHooks<Procedures>();
 
 export function createInvalidateQuery() {
   const context = rspc.useContext();
-  client.subscription(["invalidateQuery"], {
+  client.subscription(["invalidateQuery", null], {
     onData: (invalidateOperation: any) => {
       const key = [invalidateOperation!.key];
       if (invalidateOperation.arg !== null) {
