@@ -1,10 +1,14 @@
+import { Dropdown } from "@gd/ui";
 import { createSignal, Switch, Match } from "solid-js";
+import { useI18n } from "@solid-primitives/i18n";
+import { getTranslationByLanguage } from "@gd/i18n";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 
 export default function Login() {
   const [step, setStep] = createSignal(0);
   const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
+  const [t, { add, locale }] = useI18n();
 
   return (
     <div class="flex justify-center items-center w-full h-full bg-image-loginBG.jpg p-0">
@@ -14,6 +18,22 @@ export default function Login() {
         }}
         class="absolute top-0 left-0 right-0 bottom-0 bg-black-black opacity-80"
       />
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 top-5 z-10">
+        <Dropdown
+          options={[
+            { label: "english", key: "en" },
+            { label: "italian", key: "it" },
+          ]}
+          value={"asc"}
+          onChange={(lang) => {
+            getTranslationByLanguage(lang.key).then((translations) => {
+              add(lang.key, translations);
+              locale(lang.key);
+            });
+          }}
+          rounded
+        />
+      </div>
       <div
         class="w-120 h-100 rounded-2xl relative flex flex-col justify-end items-center text-white"
         style={{
