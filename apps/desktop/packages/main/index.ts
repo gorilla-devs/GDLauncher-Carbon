@@ -91,8 +91,8 @@ function getAdSize() {
       width: 1560,
       height: 740,
       adSize: {
-        width: 400,
-        height: 300,
+        width: 300,
+        height: 250,
       },
     };
   }
@@ -148,9 +148,16 @@ async function createWindow() {
     });
   }
 
-  // if (import.meta.env.DEV) {
-  win.webContents.openDevTools();
-  // }
+  win.webContents.on("before-input-event", (event, input) => {
+    if (input.alt && input.shift && input.code === "KeyI") {
+      event.preventDefault();
+      win?.webContents.openDevTools();
+    }
+  });
+
+  if (import.meta.env.DEV) {
+    win.webContents.openDevTools();
+  }
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
