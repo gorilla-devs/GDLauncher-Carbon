@@ -12,12 +12,6 @@ Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for tur
 - Node 16.16.0
 - Rust 1.66.0
 
-## Env
-
-First of all you need to create a .env file in the root folder of the source, and add the following variable:
-
-`VITE_NAPI_ID=GDL`
-
 ## Pnpm
 
 At this point make sure you have pnpm installed:
