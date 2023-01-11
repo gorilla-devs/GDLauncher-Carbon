@@ -109,7 +109,30 @@ fn decompress_tar<R>(
 where
     R: Read,
 {
-    archive.unpack(dest_folder)?;
+    // Canonicalizing the dest_folder directory will prepend the path with '\\?\'
+    // on windows which will allow windows APIs to treat the path as an
+    // extended-length path with a 32,767 character limit. Otherwise all
+    // unpacked paths over 260 characters will fail on creation with a
+    // NotFound exception.
+    let dest_folder = &dest_folder
+        .canonicalize()
+        .unwrap_or(dest_folder.to_path_buf());
+
+    // Delay any directory entries until the end (they will be created if needed by
+    // descendants), to ensure that directory permissions do not interfer with descendant
+    // extraction.
+    let mut directories = Vec::new();
+    for entry in archive.entries()? {
+        let mut file = entry.unwrap();
+        if file.header().entry_type() == tar::EntryType::Directory {
+            directories.push(file);
+        } else {
+            file.unpack_in(dest_folder)?;
+        }
+    }
+    for mut dir in directories {
+        dir.unpack_in(dest_folder)?;
+    }
 
     Ok(())
 }

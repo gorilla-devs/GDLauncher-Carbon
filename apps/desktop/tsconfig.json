@@ -1,5 +1,5 @@
 {
-  "extends": "@gd/config/tsconfig.json",
+  // "extends": "@gd/config/tsconfig.json",
   "compilerOptions": {
     "strict": true,
     "target": "ESNext",
@@ -22,10 +22,11 @@
   },
   "include": [
     "./packages/**/*.tsx",
-    "packages/**/*.ts",
-    "packages/preload/vite.config.js",
-    "packages/mainWindow/vite.config.js",
-    "packages/main/vite.config.js"
+    "./packages/**/*.ts",
+    "./packages/**/*.d.ts",
+    "./packages/preload/vite.config.js",
+    "./packages/mainWindow/vite.config.js",
+    "./packages/main/vite.config.js"
   ],
   "exclude": ["./dist/**/*", "node_modules/**/*"]
 }

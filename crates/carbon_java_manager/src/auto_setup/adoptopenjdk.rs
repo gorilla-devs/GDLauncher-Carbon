@@ -10,6 +10,7 @@ use super::{JavaAuto, JavaMeta, JavaProgress};
 
 pub struct AdoptOpenJDK {
     version: JavaVersion,
+    extract_folder_name: Option<String>,
     release_date: Option<DateTime<FixedOffset>>,
 }
 
@@ -17,6 +18,7 @@ impl AdoptOpenJDK {
     pub fn new(version: JavaVersion) -> Self {
         Self {
             version,
+            extract_folder_name: None,
             release_date: None,
         }
     }
@@ -34,6 +36,7 @@ impl JavaAuto for AdoptOpenJDK {
         let meta = self.get_runtime_assets(&runtime).await?;
 
         self.release_date = Some(meta.last_updated);
+        self.extract_folder_name = Some(meta.extract_folder_name);
 
         tokio::fs::create_dir_all(&runtime)
             .await
@@ -96,6 +99,10 @@ impl JavaAuto for AdoptOpenJDK {
             last_updated: chrono::DateTime::parse_from_rfc3339(&asset.binary.updated_at).map_err(
                 |_| JavaError::JavaUpdateDateFromMetaInvalid(asset.binary.updated_at.clone()),
             )?,
+            extract_folder_name: format!(
+                "{}-{}-{}",
+                asset.binary.project, asset.version.openjdk_version, asset.binary.image_type
+            ),
             download: vec![Downloadable::new(
                 &asset.binary.package.link,
                 runtime_path.join(&asset.binary.package.name),
@@ -105,22 +112,26 @@ impl JavaAuto for AdoptOpenJDK {
         Ok(meta)
     }
 
-    fn locate_binary(&self, base_path: &Path) -> PathBuf {
-        match std::env::consts::OS {
+    fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
+        let path = match std::env::consts::OS {
             "linux" | "windows" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")
+                .join(self.extract_folder_name.clone().unwrap())
                 .join("bin")
                 .join("java"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")
+                .join(self.extract_folder_name.clone().unwrap())
                 .join("Contents")
                 .join("Home")
                 .join("bin")
                 .join("java"),
             _ => unreachable!("Unsupported OS"),
-        }
+        };
+
+        Ok(path)
     }
 
     async fn check_for_updates(&self, base_path: &Path) -> Result<bool, JavaError> {
@@ -147,12 +158,20 @@ impl JavaAuto for AdoptOpenJDK {
 struct Asset {
     binary: Binary,
     release_name: String,
+    version: Version,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Version {
+    openjdk_version: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
 struct Binary {
     package: Package,
     updated_at: String,
+    image_type: String,
+    project: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -179,7 +198,8 @@ mod tests {
 
         adoptopenjdk.setup(&current_path, tx).await.unwrap();
 
-        let java_path = adoptopenjdk.locate_binary(&current_path);
+        let java_path = adoptopenjdk.locate_binary(&current_path).unwrap();
+        println!("{:?}", java_path);
 
         assert!(java_path.exists());
 

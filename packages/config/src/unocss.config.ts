@@ -7,7 +7,10 @@ import gdlIcons from "./unocss.icons.js";
 const unocssConfig = {
   include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   presets: [
-    presetAttributify(),
+    presetAttributify({
+      prefix: "u:",
+      prefixedOnly: true,
+    }),
     presetWind(),
     presetIcons({
       collections: {

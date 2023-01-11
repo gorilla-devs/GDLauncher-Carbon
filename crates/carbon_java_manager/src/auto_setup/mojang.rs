@@ -11,6 +11,7 @@ use std::{
 };
 use tokio::sync::watch::Sender;
 
+#[derive(Debug, Clone)]
 pub enum RuntimeEdition {
     Alpha,
     Beta,
@@ -19,8 +20,21 @@ pub enum RuntimeEdition {
     MinecraftExe,
 }
 
+impl From<RuntimeEdition> for String {
+    fn from(edition: RuntimeEdition) -> Self {
+        match edition {
+            RuntimeEdition::Alpha => "alpha".to_string(),
+            RuntimeEdition::Beta => "beta".to_string(),
+            RuntimeEdition::Gamma => "gamma".to_string(),
+            RuntimeEdition::LegacyJRE => "legacy-jre".to_string(),
+            RuntimeEdition::MinecraftExe => "minecraft-exe".to_string(),
+        }
+    }
+}
+
 pub struct MojangRuntime {
     pub version: RuntimeEdition,
+    extract_folder_name: Option<String>,
     release_date: Option<DateTime<FixedOffset>>,
 }
 
@@ -28,6 +42,7 @@ impl MojangRuntime {
     pub fn new(version: RuntimeEdition) -> Self {
         Self {
             version,
+            extract_folder_name: None,
             release_date: None,
         }
     }
@@ -46,6 +61,7 @@ impl JavaAuto for MojangRuntime {
             .await?;
 
         self.release_date = Some(mojang_assets.last_updated);
+        self.extract_folder_name = Some(mojang_assets.extract_folder_name);
 
         let (progress, mut recv) = tokio::sync::watch::channel(carbon_net::Progress {
             current_count: 0,
@@ -65,7 +81,7 @@ impl JavaAuto for MojangRuntime {
         task_handle.await.unwrap().unwrap();
 
         // Fix permissions
-        let java_path = self.locate_binary(base_path);
+        let java_path = self.locate_binary(base_path).unwrap();
 
         let mut perms = std::fs::metadata(&java_path).unwrap().permissions();
         perms.set_mode(0o777);
@@ -150,11 +166,13 @@ impl JavaAuto for MojangRuntime {
             last_updated: chrono::DateTime::parse_from_rfc3339(&runtime.version.released).map_err(
                 |_| JavaError::JavaUpdateDateFromMetaInvalid(runtime.version.released.clone()),
             )?,
+            extract_folder_name: "jre.bundle".to_string(),
             download: vec![],
         };
 
         for (name, asset) in runtime_meta.files {
-            let path = runtime_path.join("mojang").join(&name);
+            let path_buf = PathBuf::from(Into::<String>::into(self.version.clone()));
+            let path = runtime_path.join("mojang").join(path_buf).join(&name);
             let downloadable = asset
                 .downloads
                 .and_then(|d| d.raw)
@@ -170,22 +188,28 @@ impl JavaAuto for MojangRuntime {
         Ok(assets)
     }
 
-    fn locate_binary(&self, base_path: &Path) -> PathBuf {
-        match std::env::consts::OS {
+    fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
+        let path = match std::env::consts::OS {
             "linux" | "windows" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("mojang")
+                .join(Into::<String>::into(self.version.clone()))
+                .join("jre.bundle")
                 .join("bin")
                 .join("java"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("mojang")
+                .join(Into::<String>::into(self.version.clone()))
+                .join("jre.bundle")
                 .join("Contents")
                 .join("Home")
                 .join("bin")
                 .join("java"),
             _ => unreachable!("Unsupported OS"),
-        }
+        };
+
+        Ok(path)
     }
 
     async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError> {
@@ -284,7 +308,7 @@ mod tests {
 
         mojang.setup(&current_path, tx).await.unwrap();
 
-        let java_path = mojang.locate_binary(&current_path);
+        let java_path = mojang.locate_binary(&current_path).unwrap();
 
         assert!(java_path.exists());
 
