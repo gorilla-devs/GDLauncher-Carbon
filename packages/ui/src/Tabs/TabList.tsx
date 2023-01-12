@@ -1,8 +1,8 @@
-import { Match, Switch, createEffect } from "solid-js";
+import { JSXElement, Match, Switch } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
-  children: Element[];
+  children: Element[] | JSXElement;
 }
 
 const TabList = (props: Props) => {

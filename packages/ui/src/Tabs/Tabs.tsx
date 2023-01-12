@@ -1,4 +1,4 @@
-import { createContext, createSignal, JSXElement, useContext } from "solid-js";
+import { JSXElement, createContext, createSignal, useContext } from "solid-js";
 
 export interface ITabsContext {
   type: string;
@@ -14,8 +14,9 @@ export interface ITabsContext {
 }
 
 export interface Props {
-  children: Element[];
+  children: Element[] | JSXElement;
   defaultIndex?: number;
+  index?: number;
   // eslint-disable-next-line no-unused-vars
   onChange: (index: number) => void;
   type?: "underline" | "block";
@@ -33,7 +34,11 @@ export function useTabsContext() {
 }
 
 function Tabs(props: Props) {
-  const [currentIndex, setCurrentIndex] = createSignal(props.defaultIndex ?? 0);
+  const deafaultIndex = () => props.defaultIndex ?? 0;
+  const index = () => props.index;
+  const [currentIndex, setCurrentIndex] = createSignal(
+    index() !== undefined ? index() : deafaultIndex()
+  );
   const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
 
@@ -66,18 +71,21 @@ function Tabs(props: Props) {
     setSelectedIndex,
     registerTab,
     registerTabPanel,
-    // getTabId,
-    // getTabPanelId,
-    // focusPrevTab,
-    // focusNextTab,
-    // focusFirstTab,
-    // focusLastTab,
     type: type(),
     orientation: orientation(),
   };
+
   return (
     <TabsContext.Provider value={context}>
-      {props.children}
+      <div
+        class="flex"
+        classList={{
+          "flex-row": props.orientation === "vertical",
+          "flex-col": props.orientation === "horizontal",
+        }}
+      >
+        {props.children}
+      </div>
     </TabsContext.Provider>
   );
 }

@@ -14,7 +14,9 @@ const Tab = (props: Props) => {
     <div
       class="cursor-pointer"
       ref={(el: HTMLDivElement) => {
-        setIndex(tabsContext?.registerTab(el));
+        if (tabsContext) {
+          setIndex(tabsContext.registerTab(el));
+        }
       }}
       onClick={() => {
         tabsContext?.setSelectedIndex(index());
@@ -24,17 +26,21 @@ const Tab = (props: Props) => {
         <Match when={tabsContext?.type === "underline"}>
           <div
             class={`cursor-pointer relative font-500 capitalize ${
-              tabsContext.isSelectedIndex() ? "text-white" : "text-shade-0"
+              tabsContext?.isSelectedIndex(index())
+                ? "text-white"
+                : "text-shade-0"
             }`}
             classList={{
-              "pl-0": index() === 0 && tabsContext.orientation === "horizontal",
-              "pr-4": index() !== 0 && tabsContext.orientation === "horizontal",
-              "pt-0": index() === 0 && tabsContext.orientation === "vertical",
-              "pb-4": index() !== 0 && tabsContext.orientation === "vertical",
+              "pl-0":
+                index() === 0 && tabsContext?.orientation === "horizontal",
+              "pr-4":
+                index() !== 0 && tabsContext?.orientation === "horizontal",
+              "pt-0": index() === 0 && tabsContext?.orientation === "vertical",
+              "pb-4": index() !== 0 && tabsContext?.orientation === "vertical",
             }}
           >
             {props.children}
-            <Show when={tabsContext.isSelectedIndex()}>
+            <Show when={tabsContext?.isSelectedIndex(index())}>
               <div class="absolute left-0 right-0 bottom-0 h-1 bg-primary" />
             </Show>
           </div>
@@ -42,15 +48,17 @@ const Tab = (props: Props) => {
         <Match when={tabsContext?.type === "block"}>
           <div
             class={`flex pr-4 gap-1 justify-center items-center flex-1 h-full  cursor-pointer rounded-xl font-500 capitalize box-border ${
-              tabsContext.isSelectedIndex()
+              tabsContext?.isSelectedIndex(index())
                 ? "text-white bg-black-semiblack"
                 : "text-shade-0"
             }`}
             classList={{
-              "pl-0": index() === 0 && tabsContext.orientation === "horizontal",
-              "pr-4": index() !== 0 && tabsContext.orientation === "horizontal",
-              "pt-0": index() === 0 && tabsContext.orientation === "vertical",
-              "pb-4": index() !== 0 && tabsContext.orientation === "vertical",
+              "pl-0":
+                index() === 0 && tabsContext?.orientation === "horizontal",
+              "pr-4":
+                index() !== 0 && tabsContext?.orientation === "horizontal",
+              "pt-0": index() === 0 && tabsContext?.orientation === "vertical",
+              "pb-4": index() !== 0 && tabsContext?.orientation === "vertical",
             }}
           >
             {props.children}

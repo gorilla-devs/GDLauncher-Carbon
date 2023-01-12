@@ -1,4 +1,4 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -15,7 +15,9 @@ const TabPanel = (props: Props) => {
   return (
     <div
       ref={(el: HTMLDivElement) => {
-        setIndex(tabsContext?.registerTabPanel(el));
+        if (tabsContext) {
+          setIndex(tabsContext.registerTabPanel(el));
+        }
       }}
       class="w-full h-full"
       classList={{
