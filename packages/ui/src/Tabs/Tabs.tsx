@@ -18,7 +18,7 @@ export interface Props {
   defaultIndex?: number;
   index?: number;
   // eslint-disable-next-line no-unused-vars
-  onChange: (index: number) => void;
+  onChange?: (index: number) => void;
   type?: "underline" | "block";
   orientation?: "horizontal" | "vertical";
 }
@@ -80,8 +80,8 @@ function Tabs(props: Props) {
       <div
         class="flex"
         classList={{
-          "flex-row": props.orientation === "vertical",
-          "flex-col": props.orientation === "horizontal",
+          "flex-row": orientation() === "vertical",
+          "flex-col": orientation() === "horizontal",
         }}
       >
         {props.children}

@@ -29,4 +29,4 @@ const TabPanel = (props: Props) => {
   );
 };
 
-export default TabPanel;
+export { TabPanel };

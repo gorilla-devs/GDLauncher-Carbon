@@ -36,7 +36,6 @@ const TabList = (props: Props) => {
       </Switch>
     </div>
   );
-  //   return <div>{props.children}</div>;
 };
 
-export default TabList;
+export { TabList };

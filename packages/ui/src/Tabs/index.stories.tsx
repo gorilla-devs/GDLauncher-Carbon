@@ -1,9 +1,10 @@
-import { Tabs } from "./Tabs.jsx";
 import type { StoryFn } from "@storybook/html";
 import type { ComponentProps } from "solid-js";
-import Tab from "./Tab.jsx";
-import TabList from "./TabList.jsx";
-import TabPanel from "./TabPanel.jsx";
+import { mainTheme, Theme } from "../themes";
+import { Tabs } from "./Tabs.jsx";
+import { Tab } from "./Tab.jsx";
+import { TabList } from "./TabList.jsx";
+import { TabPanel } from "./TabPanel.jsx";
 
 export default {
   title: "Tabs",
@@ -33,8 +34,20 @@ const Template = ((args) => (
   </Tabs>
 )) as StoryFn<ComponentProps<typeof Tabs>>;
 
+applyTheme(mainTheme);
+
 export const Main = Template.bind({});
 
 Main.args = {
   index: 0,
 };
+
+function applyTheme(theme: Theme) {
+  // Inject theme
+  for (const key in theme) {
+    document.documentElement.style.setProperty(
+      `--${key}`,
+      theme[key as keyof Theme]
+    );
+  }
+}

@@ -25,7 +25,7 @@ const Tab = (props: Props) => {
       <Switch>
         <Match when={tabsContext?.type === "underline"}>
           <div
-            class={`cursor-pointer relative font-500 capitalize ${
+            class={`cursor-pointer relative bg-shade-8 font-500 capitalize ${
               tabsContext?.isSelectedIndex(index())
                 ? "text-white"
                 : "text-shade-0"
@@ -69,4 +69,4 @@ const Tab = (props: Props) => {
   );
 };
 
-export default Tab;
+export { Tab };
