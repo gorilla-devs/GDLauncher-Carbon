@@ -14,7 +14,7 @@ export default {
       control: { type: "radio" },
     },
     orientation: {
-      options: ["horizontal", "veritcal"],
+      options: ["horizontal", "vertical"],
       control: { type: "radio" },
     },
   },
@@ -35,4 +35,6 @@ const Template = ((args) => (
 
 export const Main = Template.bind({});
 
-Main.args = {};
+Main.args = {
+  index: 0,
+};

@@ -12,7 +12,7 @@ const Tab = (props: Props) => {
 
   return (
     <div
-      class="cursor-pointer h-10 w-10"
+      class="cursor-pointer"
       ref={(el: HTMLDivElement) => {
         setIndex(tabsContext?.registerTab(el));
       }}
@@ -23,10 +23,15 @@ const Tab = (props: Props) => {
       <Switch>
         <Match when={tabsContext?.type === "underline"}>
           <div
-            class={`py-4 cursor-pointer min-w-fit relative font-500 capitalize ${
+            class={`cursor-pointer relative font-500 capitalize ${
               tabsContext.isSelectedIndex() ? "text-white" : "text-shade-0"
             }`}
-            // onClick={() => handleClick(i())}
+            classList={{
+              "pl-0": index() === 0 && tabsContext.orientation === "horizontal",
+              "pr-4": index() !== 0 && tabsContext.orientation === "horizontal",
+              "pt-0": index() === 0 && tabsContext.orientation === "vertical",
+              "pb-4": index() !== 0 && tabsContext.orientation === "vertical",
+            }}
           >
             {props.children}
             <Show when={tabsContext.isSelectedIndex()}>
@@ -34,7 +39,23 @@ const Tab = (props: Props) => {
             </Show>
           </div>
         </Match>
-        <Match when={tabsContext?.type === "block"}>{props.children}</Match>
+        <Match when={tabsContext?.type === "block"}>
+          <div
+            class={`flex pr-4 gap-1 justify-center items-center flex-1 h-full  cursor-pointer rounded-xl font-500 capitalize box-border ${
+              tabsContext.isSelectedIndex()
+                ? "text-white bg-black-semiblack"
+                : "text-shade-0"
+            }`}
+            classList={{
+              "pl-0": index() === 0 && tabsContext.orientation === "horizontal",
+              "pr-4": index() !== 0 && tabsContext.orientation === "horizontal",
+              "pt-0": index() === 0 && tabsContext.orientation === "vertical",
+              "pb-4": index() !== 0 && tabsContext.orientation === "vertical",
+            }}
+          >
+            {props.children}
+          </div>
+        </Match>
       </Switch>
     </div>
   );

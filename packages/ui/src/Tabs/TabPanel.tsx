@@ -1,4 +1,4 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createEffect, createSignal } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -16,6 +16,10 @@ const TabPanel = (props: Props) => {
     <div
       ref={(el: HTMLDivElement) => {
         setIndex(tabsContext?.registerTabPanel(el));
+      }}
+      class="w-full h-full"
+      classList={{
+        hidden: !isTabPanelSelected(),
       }}
     >
       <Show when={isTabPanelSelected()}>{props.children}</Show>
