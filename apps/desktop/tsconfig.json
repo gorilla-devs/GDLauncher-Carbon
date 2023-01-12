@@ -1,5 +1,5 @@
 {
-  // "extends": "@gd/config/tsconfig.json",
+  "extends": "@gd/config/tsconfig.json",
   "compilerOptions": {
     "strict": true,
     "target": "ESNext",

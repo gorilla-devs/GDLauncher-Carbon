@@ -7,16 +7,19 @@ import fs from "fs";
 //   ipcMainInvokeHandler,
 //   ipcRendererInvoke,
 // } from "electron-playwright-helpers";
-import { version } from "../package.json";
+import { readFileSync } from "fs";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
+
+const pkg = readFileSync("./package.json", "utf8");
+const version = JSON.parse(pkg).version;
 
 let electronApp: ElectronApplication;
 
 const isArm64 = () => {
   let arm64 = true;
   try {
-    fs.accessSync(path.join(__dirname, `../release/${version}/mac-arm64`));
+    fs.accessSync(`./release/${version}/mac-arm64`);
   } catch {
     arm64 = false;
   }
@@ -24,7 +27,7 @@ const isArm64 = () => {
 };
 
 const getBinaryPath = async () => {
-  let basePath = path.join(__dirname, `../release/${version}/`);
+  let basePath = `./release/${version}/`;
 
   if (process.platform === "win32") {
     basePath = path.join(basePath, "win-unpacked", "GDLauncher Carbon.exe");
