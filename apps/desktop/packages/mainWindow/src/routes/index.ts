@@ -5,29 +5,29 @@ import { RouteDefinition } from "@solidjs/router";
 export const routes: RouteDefinition[] = [
   {
     path: "/",
-    component: lazy(() => import("../pages/login")),
+    component: lazy(() => import("@/pages/Login")),
   },
   {
     path: "/",
-    component: lazy(() => import("../layouts/withAds")),
+    component: lazy(() => import("@/layouts/withAds")),
     children: [
       {
         path: "/library",
-        component: lazy(() => import("../layouts/library")),
+        component: lazy(() => import("@/pages/Library")),
         data: () => {
           console.log("Fetching all instances...");
         },
         children: [
           {
             path: "/",
-            component: lazy(() => import("../pages/library")),
+            component: lazy(() => import("@/pages/Library/home")),
             data: () => {
               console.log("Fetching instances data...");
             },
           },
           {
             path: "/:id",
-            component: lazy(() => import("../pages/library/Instance")),
+            component: lazy(() => import("@/pages/Library/Instance")),
             data: () => {
               console.log("Fetching specific instance data...");
             },
@@ -35,12 +35,12 @@ export const routes: RouteDefinition[] = [
               {
                 path: "/",
                 component: lazy(
-                  () => import("../pages/library/Instance/Overview")
+                  () => import("@/pages/Library/Instance/Overview")
                 ),
               },
               {
                 path: "/mods",
-                component: lazy(() => import("../pages/library/Instance/Mods")),
+                component: lazy(() => import("@/pages/Library/Instance/Mods")),
                 data: () => {
                   console.log("Fetching mods data...");
                 },
@@ -48,7 +48,7 @@ export const routes: RouteDefinition[] = [
               {
                 path: "/resourcepacks",
                 component: lazy(
-                  () => import("../pages/library/Instance/ResourcePacks")
+                  () => import("@/pages/Library/Instance/ResourcePacks")
                 ),
               },
             ],
@@ -57,11 +57,11 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/modpacks",
-        component: lazy(() => import("../layouts/modpacks")),
+        component: lazy(() => import("@/pages/Modpacks")),
         children: [
           {
             path: "/",
-            component: lazy(() => import("../pages/modpacks")),
+            component: lazy(() => import("@/pages/Modpacks/Browser")),
             data: () => {
               console.log("Fetching modpacks data...");
             },
@@ -70,28 +70,28 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/modpacks/:id",
-        component: lazy(() => import("../pages/modpacks/modpack")),
+        component: lazy(() => import("@/pages/Modpacks/Explore")),
         data: () => {
           console.log("Fetching specific modpack data...");
         },
       },
       {
         path: "/settings",
-        component: lazy(() => import("../layouts/Settings")),
+        component: lazy(() => import("@/pages/Settings")),
         children: [
           {
             path: "/",
-            component: lazy(() => import("../pages/Settings/General")),
+            component: lazy(() => import("@/pages/Settings/General")),
           },
           {
             path: "/appearance",
-            component: lazy(() => import("../pages/Settings/Appearance")),
+            component: lazy(() => import("@/pages/Settings/Appearance")),
           },
         ],
       },
       {
         path: "**",
-        component: lazy(() => import("../errors/404")),
+        component: lazy(() => import("@/errors/404")),
       },
     ],
   },

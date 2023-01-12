@@ -1,15 +1,16 @@
-import { useNavigate } from "@solidjs/router";
+import Sidebar from "@/components/Sidebar/modpacks";
+import { Outlet } from "@solidjs/router";
+import ContentWrapper from "@/components/ContentWrapper";
 
-export default function About() {
-  const navigate = useNavigate();
-
+function ModpacksLayout() {
   return (
-    <div>
-      <div>
-        <button onClick={() => navigate("/modpacks/DDLTR")}>
-          Modpack DDLTR
-        </button>
-      </div>
+    <div class="flex w-full">
+      <Sidebar />
+      <ContentWrapper>
+        <Outlet />
+      </ContentWrapper>
     </div>
   );
 }
+
+export default ModpacksLayout;

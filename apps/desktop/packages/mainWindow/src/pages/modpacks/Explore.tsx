@@ -1,4 +1,4 @@
-import ContentWrapper from "@/layouts/ContentWrapper";
+import ContentWrapper from "@/components/ContentWrapper";
 import { useNavigate, useParams } from "@solidjs/router";
 
 const Modpack = () => {
