@@ -10,6 +10,7 @@ import fs from "fs";
 import { readFileSync } from "fs";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
+import { getActualUrl } from "./tests_helpers.js";
 
 const pkg = readFileSync("./package.json", "utf8");
 const version = JSON.parse(pkg).version;
@@ -48,7 +49,7 @@ const getBinaryPath = async () => {
 };
 
 test.describe("Init Tests", () => {
-  test.skip(() => isArm64(), "Only x64 is supported");
+  // test.skip(() => isArm64(), "Only x64 is supported");
 
   test.beforeAll(async () => {
     // set the CI environment variable to true
@@ -58,22 +59,6 @@ test.describe("Init Tests", () => {
       executablePath: await getBinaryPath(),
     });
 
-    page = await electronApp.firstWindow();
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    await page.screenshot({ path: "initial-screenshot.png" });
-
-    const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
-    expect(innerText).toBe(undefined);
-  });
-
-  test.afterAll(async () => {
-    await electronApp.close();
-  });
-
-  let page: Page;
-
-  test("renders the first page", async () => {
     page = await electronApp.firstWindow();
 
     // capture errors
@@ -85,10 +70,24 @@ test.describe("Init Tests", () => {
       console.log(msg.text());
     });
 
-    await page.screenshot({ path: "post-screenshot.png" });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
     expect(innerText).toBe(undefined);
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
+  });
+
+  test.afterAll(async () => {
+    await electronApp.close();
+  });
+
+  let page: Page;
+
+  test("renders the login page", async () => {
+    page = await electronApp.firstWindow();
+
+    const currentUrl = await page.url();
+    expect(getActualUrl(currentUrl)).toBe("/");
   });
 });

@@ -7,12 +7,8 @@ export default {
   component: Spinner,
 };
 
-const Template = ((args) => <Spinner {...args} />) as StoryFn<
-  ComponentProps<typeof Spinner>
->;
+const Template = (() => <Spinner />) as StoryFn<ComponentProps<typeof Spinner>>;
 
 export const Main = Template.bind({});
 
-Main.args = {
-  loading: true,
-};
+Main.args = {};

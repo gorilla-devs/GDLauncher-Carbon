@@ -1,6 +1,6 @@
 import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
-import { Setter } from "solid-js";
+import { createSignal, Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 interface Props {
@@ -10,16 +10,20 @@ interface Props {
 
 const Auth = (props: Props) => {
   const navigate = useNavigate();
+  const [loading, setLoading] = createSignal(false);
 
   const handleClick = async () => {
     // await login(({ userCode, link, expiresAt }) => {
-    props.setDeviceCodeObject({
-      userCode: "AXDLE",
-      link: "",
-      expiresAt: 548559,
-    });
-    props.setStep(1);
+    // props.setDeviceCodeObject({
+    //   userCode: "AXDLE",
+    //   link: "",
+    //   expiresAt: 548559,
     // });
+    // props.setStep(1);
+    // });
+
+    console.log("Loading");
+    setLoading(true);
   };
 
   return (
@@ -29,7 +33,13 @@ const Auth = (props: Props) => {
         <p class="text-shade-0">v1.1.26</p>
       </div>
       <div class="text-center flex flex-col justify-center items-center">
-        <Button onClick={() => handleClick()}>Sign in with microsoft</Button>
+        <Button
+          id="auth-button"
+          loading={loading()}
+          onClick={() => handleClick()}
+        >
+          Sign in with microsoft
+        </Button>
         <p class="max-w-90 text-sm text-shade-0">
           Sign in with your Microsoft Account. By doing so, you accept all our
           policies and terms stated below.
