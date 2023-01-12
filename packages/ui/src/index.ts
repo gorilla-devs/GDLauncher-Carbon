@@ -8,7 +8,7 @@ export { Switch } from "./Switch";
 export { Checkbox } from "./Checkbox";
 export { ViewList } from "./ViewList";
 export { News } from "./News";
-export { Tabs } from "./Tabs";
+export { Tabs } from "./Tabs/Tabs";
 export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
 // export { Notifications, addNotification } from "./NotificationManager";

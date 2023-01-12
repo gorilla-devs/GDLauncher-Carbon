@@ -44,13 +44,13 @@ function Button(props: Props) {
           isOutline() && !isDisabled(),
         "border-1 hover:border-white border-black-semiblack":
           isSecondary() && !isDisabled(),
-        "bg-accent-main hover:bg-accent-hover": isPrimary() && !isDisabled(),
+        "bg-primary hover:bg-accent-hover": isPrimary() && !isDisabled(),
         "border-1 border-black-semiblack":
           (isSecondary() && isDisabled()) || isOutline(),
         "text-black-semiblack": isDisabled() && isOutline(),
         "text-white": !isDisabled(),
         "flex-row-reverse": props.iconRight,
-        "shadow-md shadow-accent-main bg-accent-main hover:shadow-lg hover:bg-accent-hover":
+        "shadow-md shadow-primary bg-primary hover:shadow-lg hover:bg-accent-hover":
           isGlow() && !isDisabled(),
         "bg-black-gray text-shade-0": isGlow() && isDisabled(),
       }}
