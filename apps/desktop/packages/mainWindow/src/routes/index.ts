@@ -9,7 +9,7 @@ export const routes: RouteDefinition[] = [
   },
   {
     path: "/",
-    component: lazy(() => import("@/layouts/withAds")),
+    component: lazy(() => import("@/pages/withAds")),
     children: [
       {
         path: "/library",
