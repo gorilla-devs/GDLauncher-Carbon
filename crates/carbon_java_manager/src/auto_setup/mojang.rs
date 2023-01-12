@@ -194,7 +194,6 @@ impl JavaAuto for MojangRuntime {
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("mojang")
                 .join(Into::<String>::into(self.version.clone()))
-                .join("jre.bundle")
                 .join("bin")
                 .join("java"),
             "macos" => base_path
