@@ -20,7 +20,7 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Library/home")),
+            component: lazy(() => import("@/pages/Library/Home")),
             data: () => {
               console.log("Fetching instances data...");
             },
