@@ -3,6 +3,8 @@ import { useTabsContext } from "./Tabs";
 
 interface Props {
   children: Element | string | number;
+  // eslint-disable-next-line no-unused-vars
+  onClick?: (index: number) => void;
 }
 
 const Tab = (props: Props) => {
@@ -19,6 +21,7 @@ const Tab = (props: Props) => {
         }
       }}
       onClick={() => {
+        props?.onClick?.(index());
         tabsContext?.setSelectedIndex(index());
       }}
     >
@@ -31,12 +34,8 @@ const Tab = (props: Props) => {
                 : "text-shade-0"
             }`}
             classList={{
-              "pl-0":
-                index() === 0 && tabsContext?.orientation === "horizontal",
-              "pr-4":
-                index() !== 0 && tabsContext?.orientation === "horizontal",
-              "pt-0": index() === 0 && tabsContext?.orientation === "vertical",
-              "pb-4": index() !== 0 && tabsContext?.orientation === "vertical",
+              "py-4": tabsContext?.orientation === "horizontal",
+              "px-4": tabsContext?.orientation === "vertical",
             }}
           >
             {props.children}
@@ -53,12 +52,8 @@ const Tab = (props: Props) => {
                 : "text-shade-0"
             }`}
             classList={{
-              "pl-0":
-                index() === 0 && tabsContext?.orientation === "horizontal",
-              "pr-4":
-                index() !== 0 && tabsContext?.orientation === "horizontal",
-              "pt-0": index() === 0 && tabsContext?.orientation === "vertical",
-              "pb-4": index() !== 0 && tabsContext?.orientation === "vertical",
+              "py-4": tabsContext?.orientation === "horizontal",
+              "px-4": tabsContext?.orientation === "vertical",
             }}
           >
             {props.children}

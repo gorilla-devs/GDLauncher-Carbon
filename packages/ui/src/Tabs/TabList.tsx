@@ -9,7 +9,7 @@ const TabList = (props: Props) => {
   const tabsContext = useTabsContext();
 
   return (
-    <div class="flex h-auto">
+    <div class="flex items-center h-auto bg-shade-8">
       <Switch>
         <Match when={tabsContext?.type === "underline"}>
           <div

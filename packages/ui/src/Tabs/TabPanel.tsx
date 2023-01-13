@@ -1,8 +1,8 @@
-import { Show, createSignal } from "solid-js";
+import { JSXElement, Show, createSignal } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
-  children: Element | string | number;
+  children: Element | JSXElement | string | number | undefined;
 }
 
 const TabPanel = (props: Props) => {
