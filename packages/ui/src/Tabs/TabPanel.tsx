@@ -1,4 +1,10 @@
-import { JSXElement, Show, createSignal, createEffect } from "solid-js";
+import {
+  JSXElement,
+  Show,
+  createSignal,
+  createEffect,
+  onMount,
+} from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -13,14 +19,12 @@ const TabPanel = (props: Props) => {
   const isTabPanelSelected = () => tabsContext?.isSelectedIndex(index());
 
   let prevWidth: number | undefined = undefined;
-  createEffect(() => {
-    if (tabsContext) {
-      const offset = ref()!.offsetWidth;
-      if (offset && offset !== prevWidth) {
-        prevWidth = offset;
+  onMount(() => {
+    queueMicrotask(() => {
+      if (tabsContext) {
         setIndex(tabsContext.registerTabPanel(ref()!));
       }
-    }
+    });
   });
 
   return (

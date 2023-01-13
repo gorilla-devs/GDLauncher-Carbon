@@ -5,6 +5,7 @@ import {
   JSXElement,
   createEffect,
   createMemo,
+  onMount,
 } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
@@ -19,15 +20,12 @@ const Tab = (props: Props) => {
 
   const tabsContext = useTabsContext();
 
-  let prevWidth: number | undefined = undefined;
-  createEffect(() => {
-    if (tabsContext) {
-      const offset = ref()!.offsetWidth;
-      if (offset && offset !== prevWidth) {
-        prevWidth = offset;
+  onMount(() => {
+    queueMicrotask(() => {
+      if (tabsContext) {
         setIndex(tabsContext.registerTab(ref()!));
       }
-    }
+    });
   });
 
   return (
