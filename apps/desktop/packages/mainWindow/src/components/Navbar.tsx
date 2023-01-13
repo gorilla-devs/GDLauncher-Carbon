@@ -2,6 +2,7 @@ import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
+import { Tab, TabList, Tabs } from "@gd/ui";
 
 const AppNavbar = () => {
   const location = useLocation();
@@ -20,25 +21,29 @@ const AppNavbar = () => {
             onClick={() => navigate("/library")}
           />
           <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
-            <For each={NAVBAR_ROUTES}>
-              {(route) => {
-                const isMatch = useMatch(() => route.path);
-                return (
-                  <li class="py-2 no-underline">
-                    <Link
-                      href={route.path}
-                      class="no-underline"
-                      classList={{
-                        "text-white": !!isMatch(),
-                        "text-slate-400": !isMatch(),
-                      }}
-                    >
-                      {route.label}
-                    </Link>
-                  </li>
-                );
-              }}
-            </For>
+            <Tabs>
+              <TabList>
+                <For each={NAVBAR_ROUTES}>
+                  {(route) => {
+                    const isMatch = useMatch(() => route.path);
+                    return (
+                      <Link
+                        href={route.path}
+                        class="no-underline"
+                        classList={{
+                          "text-white": !!isMatch(),
+                          "text-slate-400": !isMatch(),
+                        }}
+                      >
+                        <Tab>
+                          <li class="no-underline">{route.label}</li>
+                        </Tab>
+                      </Link>
+                    );
+                  }}
+                </For>
+              </TabList>
+            </Tabs>
           </ul>
         </div>
         <div class="flex gap-5 items-center">

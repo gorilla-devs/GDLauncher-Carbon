@@ -36,7 +36,7 @@ const TabList = (props: Props) => {
           >
             {props.children}
             <div
-              class="absolute left-0 right-0 bottom-0 h-1 bg-primary transition-all duration-100 ease-in-out"
+              class="absolute left-0 right-0 bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
               style={{
                 width: `${tabsContext
                   ?.getRegisteredTabs()

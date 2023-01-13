@@ -1,10 +1,9 @@
-import { Match, Switch, createSignal } from "solid-js";
+import { Match, Switch, createSignal, JSXElement } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
-  children: Element | string | number;
-  // eslint-disable-next-line no-unused-vars
-  onClick?: (index: number) => void;
+  children: JSXElement | string | number;
+  onClick?: (_: number) => void;
 }
 
 const Tab = (props: Props) => {
@@ -30,7 +29,7 @@ const Tab = (props: Props) => {
           <div
             class="cursor-pointer bg-shade-8 font-500 capitalize"
             classList={{
-              "py-4": tabsContext?.orientation === "horizontal",
+              "py-5": tabsContext?.orientation === "horizontal",
               "px-4": tabsContext?.orientation === "vertical",
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
