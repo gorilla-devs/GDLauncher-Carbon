@@ -22,8 +22,9 @@ const Tab = (props: Props) => {
   let prevWidth: number | undefined = undefined;
   createEffect(() => {
     if (tabsContext) {
-      if (ref() && ref()!.offsetWidth !== prevWidth) {
-        prevWidth = ref()!.offsetWidth;
+      const offset = ref()!.offsetWidth;
+      if (offset && offset !== prevWidth) {
+        prevWidth = offset;
         setIndex(tabsContext.registerTab(ref()!));
       }
     }
