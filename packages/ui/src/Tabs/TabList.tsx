@@ -42,10 +42,10 @@ const TabList = (props: Props) => {
           >
             {props.children}
             <div
-              class="absolute left-0 right-0 bottom-1 h-1 bg-primary transition-transform duration-100 ease-in-out"
+              class="absolute bottom-1 h-1 bg-primary transition-transform duration-100 ease-in-out"
               classList={{
-                "top-0": tabsContext?.orientation === "vertical",
-                "w-1": tabsContext?.orientation === "vertical",
+                "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
+                "left-0": tabsContext?.orientation === "horizontal",
               }}
               style={{
                 ...(tabsContext?.orientation === "horizontal"
