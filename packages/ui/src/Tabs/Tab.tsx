@@ -1,12 +1,4 @@
-import {
-  Match,
-  Switch,
-  createSignal,
-  JSXElement,
-  createEffect,
-  createMemo,
-  onMount,
-} from "solid-js";
+import { Match, Switch, createSignal, JSXElement, onMount } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {

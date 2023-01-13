@@ -28,7 +28,7 @@ const Instance = () => {
           onClick={() => navigate("/library")}
           icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
           size="small"
-          type="transparent"
+          variant="transparent"
         >
           Back
         </Button>
@@ -92,7 +92,7 @@ const Instance = () => {
       <div class="mt-52 lg:mt-64 bg-black-black">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185">
-            <Tabs orientation="horizontal">
+            <Tabs>
               <TabList>
                 <Tab onClick={() => navigate(`/library/${id}`)}>Overview</Tab>
                 <Tab onClick={() => navigate(`/library/${id}/mods`)}>Mods</Tab>

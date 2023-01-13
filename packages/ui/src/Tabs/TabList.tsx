@@ -1,4 +1,4 @@
-import { createEffect, JSXElement, Match, Switch } from "solid-js";
+import { JSXElement, Match, Switch } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -37,10 +37,24 @@ const TabList = (props: Props) => {
             {props.children}
             <div
               class="absolute left-0 right-0 bottom-1 h-1 bg-primary transition-transform duration-100 ease-in-out"
+              classList={{
+                "top-0": tabsContext?.orientation === "vertical",
+                "w-1": tabsContext?.orientation === "vertical",
+              }}
               style={{
-                width: `${
-                  tabsContext?.getRegisteredTabs()[currentIndex()]?.offsetWidth
-                }px`,
+                ...(tabsContext?.orientation === "horizontal"
+                  ? {
+                      width: `${
+                        tabsContext?.getRegisteredTabs()[currentIndex()]
+                          ?.offsetWidth
+                      }px`,
+                    }
+                  : {
+                      height: `${
+                        tabsContext?.getRegisteredTabs()[currentIndex()]
+                          ?.offsetHeight
+                      }px`,
+                    }),
                 ...(tabsContext?.orientation === "horizontal"
                   ? {
                       transform: `translateX(${getPositionPx(

@@ -1,10 +1,4 @@
-import {
-  JSXElement,
-  Show,
-  createSignal,
-  createEffect,
-  onMount,
-} from "solid-js";
+import { JSXElement, Show, createSignal, onMount } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -18,7 +12,6 @@ const TabPanel = (props: Props) => {
 
   const isTabPanelSelected = () => tabsContext?.isSelectedIndex(index());
 
-  let prevWidth: number | undefined = undefined;
   onMount(() => {
     queueMicrotask(() => {
       if (tabsContext) {
