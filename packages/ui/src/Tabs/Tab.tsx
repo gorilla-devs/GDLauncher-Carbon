@@ -23,6 +23,9 @@ const Tab = (props: Props) => {
   return (
     <div
       class="cursor-pointer"
+      classList={{
+        "w-full": tabsContext?.variant === "block",
+      }}
       ref={setRef}
       onClick={() => {
         props?.onClick?.(index());
@@ -45,10 +48,10 @@ const Tab = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "block"}>
           <div
-            class="flex pr-4 gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border"
+            class="flex gap-1 justify-center items-center bg-shade-8 flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border"
             classList={{
-              "py-4": tabsContext?.orientation === "horizontal",
-              "px-4": tabsContext?.orientation === "vertical",
+              "py-5 px-2": tabsContext?.orientation === "horizontal",
+              "px-4 py-2": tabsContext?.orientation === "vertical",
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}

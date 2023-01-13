@@ -24,7 +24,13 @@ const TabList = (props: Props) => {
   };
 
   return (
-    <div class="flex relative items-center h-auto bg-shade-8">
+    <div
+      class="flex relative items-center h-auto"
+      classList={{
+        "bg-shade-8": tabsContext?.variant === "underline",
+        "bg-shade-9": tabsContext?.variant === "block",
+      }}
+    >
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
@@ -72,7 +78,7 @@ const TabList = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "block"}>
           <div
-            class="flex items-center p-1 rounded-xl h-10 box-border overflow-auto"
+            class="flex gap-6 items-center p-2 rounded-xl box-border overflow-auto"
             classList={{
               "flex-row": tabsContext?.orientation === "horizontal",
               "flex-col": tabsContext?.orientation === "vertical",
