@@ -12,7 +12,7 @@ const TabPanel = (props: Props) => {
 
   const isTabPanelSelected = () => tabsContext?.isSelectedIndex(index());
 
-  let prevWidth = 0;
+  let prevWidth: number | undefined = undefined;
   createEffect(() => {
     if (tabsContext) {
       if (ref() && ref()!.offsetWidth !== prevWidth) {

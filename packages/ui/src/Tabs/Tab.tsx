@@ -19,7 +19,7 @@ const Tab = (props: Props) => {
 
   const tabsContext = useTabsContext();
 
-  let prevWidth = 0;
+  let prevWidth: number | undefined = undefined;
   createEffect(() => {
     if (tabsContext) {
       if (ref() && ref()!.offsetWidth !== prevWidth) {
