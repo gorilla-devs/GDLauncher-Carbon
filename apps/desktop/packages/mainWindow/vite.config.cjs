@@ -49,6 +49,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": join(__dirname, "src"),
+      "@package_json": resolve(__dirname, "../../package.json"),
     },
   },
   server: {

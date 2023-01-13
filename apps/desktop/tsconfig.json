@@ -14,7 +14,8 @@
     "noEmit": true,
     "allowJs": true,
     "paths": {
-      "@/*": ["./packages/mainWindow/src/*"]
+      "@/*": ["./packages/mainWindow/src/*"],
+      "@package_json": ["./package.json"]
     },
     // https://github.com/AlexTorresSk/custom-electron-titlebar/issues/198 🤡🤡🤡🤡🤡
     "skipLibCheck": true,
