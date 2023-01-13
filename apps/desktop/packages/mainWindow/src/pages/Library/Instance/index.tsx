@@ -1,3 +1,4 @@
+import getRouteIndex from "@/utils/getRouteIndex";
 import { Tabs, TabList, Tab, TabPanel, Button } from "@gd/ui";
 import { Outlet, useMatch, useNavigate, useParams } from "@solidjs/router";
 import { createSignal, For } from "solid-js";
@@ -28,10 +29,7 @@ const Instance = () => {
     },
   ];
 
-  const selectedIndex = () => {
-    location.pathname;
-    return instancePages.findIndex((route) => useMatch(() => route.path)());
-  };
+  const selectedIndex = () => getRouteIndex(instancePages, location.pathname);
 
   return (
     <div

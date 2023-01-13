@@ -1,8 +1,9 @@
 import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
-import { createEffect, For, Show } from "solid-js";
+import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs } from "@gd/ui";
+import getRouteIndex from "@/utils/getRouteIndex";
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
 // const isLocationMatch = (path: string) => {
@@ -23,10 +24,7 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
 
-  const selectedIndex = () => {
-    location.pathname;
-    return NAVBAR_ROUTES.findIndex((route) => useMatch(() => route.path)());
-  };
+  const selectedIndex = () => getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   return (
     <Show when={!isLogin()}>
