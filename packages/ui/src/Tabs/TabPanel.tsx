@@ -1,4 +1,4 @@
-import { JSXElement, Show, createSignal } from "solid-js";
+import { JSXElement, Show, createSignal, createEffect } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -7,18 +7,24 @@ interface Props {
 
 const TabPanel = (props: Props) => {
   const tabsContext = useTabsContext();
-
+  const [ref, setRef] = createSignal<HTMLDivElement>();
   const [index, setIndex] = createSignal(-1);
 
   const isTabPanelSelected = () => tabsContext?.isSelectedIndex(index());
 
+  let prevWidth = 0;
+  createEffect(() => {
+    if (tabsContext) {
+      if (ref() && ref()!.offsetWidth !== prevWidth) {
+        prevWidth = ref()!.offsetWidth;
+        setIndex(tabsContext.registerTabPanel(ref()!));
+      }
+    }
+  });
+
   return (
     <div
-      ref={(el: HTMLDivElement) => {
-        if (tabsContext) {
-          setIndex(tabsContext.registerTabPanel(el));
-        }
-      }}
+      ref={setRef}
       class="w-full h-full"
       classList={{
         hidden: !isTabPanelSelected(),

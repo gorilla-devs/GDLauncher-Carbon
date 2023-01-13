@@ -1,4 +1,11 @@
-import { Match, Switch, createSignal, JSXElement } from "solid-js";
+import {
+  Match,
+  Switch,
+  createSignal,
+  JSXElement,
+  createEffect,
+  createMemo,
+} from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -8,17 +15,24 @@ interface Props {
 
 const Tab = (props: Props) => {
   const [index, setIndex] = createSignal(-1);
+  const [ref, setRef] = createSignal<HTMLDivElement>();
 
   const tabsContext = useTabsContext();
+
+  let prevWidth = 0;
+  createEffect(() => {
+    if (tabsContext) {
+      if (ref() && ref()!.offsetWidth !== prevWidth) {
+        prevWidth = ref()!.offsetWidth;
+        setIndex(tabsContext.registerTab(ref()!));
+      }
+    }
+  });
 
   return (
     <div
       class="cursor-pointer"
-      ref={(ref: HTMLDivElement) => {
-        if (tabsContext) {
-          setIndex(tabsContext.registerTab(ref));
-        }
-      }}
+      ref={setRef}
       onClick={() => {
         props?.onClick?.(index());
         tabsContext?.setSelectedIndex(index());
@@ -40,7 +54,7 @@ const Tab = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "block"}>
           <div
-            class="flex pr-4 gap-1 justify-center items-center flex-1 h-full  cursor-pointer rounded-xl font-500 capitalize box-border"
+            class="flex pr-4 gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border"
             classList={{
               "py-4": tabsContext?.orientation === "horizontal",
               "px-4": tabsContext?.orientation === "vertical",

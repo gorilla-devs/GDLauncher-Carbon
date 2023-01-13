@@ -37,10 +37,10 @@ export function useTabsContext() {
 }
 
 function Tabs(props: Props) {
-  const deafaultIndex = () => props.defaultIndex ?? 0;
+  const defaultIndex = () => props.defaultIndex ?? 0;
   const index = () => props.index;
   const [currentIndex, setCurrentIndex] = createSignal(
-    index() !== undefined ? index() : deafaultIndex()
+    index() !== undefined ? index() : defaultIndex()
   );
   const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
