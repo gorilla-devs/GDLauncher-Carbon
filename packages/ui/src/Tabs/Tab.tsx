@@ -1,4 +1,4 @@
-import { Match, Show, Switch, createSignal } from "solid-js";
+import { Match, Switch, createSignal } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -15,9 +15,9 @@ const Tab = (props: Props) => {
   return (
     <div
       class="cursor-pointer"
-      ref={(el: HTMLDivElement) => {
+      ref={(ref: HTMLDivElement) => {
         if (tabsContext) {
-          setIndex(tabsContext.registerTab(el));
+          setIndex(tabsContext.registerTab(ref));
         }
       }}
       onClick={() => {
@@ -26,34 +26,27 @@ const Tab = (props: Props) => {
       }}
     >
       <Switch>
-        <Match when={tabsContext?.type === "underline"}>
+        <Match when={tabsContext?.variant === "underline"}>
           <div
-            class={`cursor-pointer relative bg-shade-8 font-500 capitalize ${
-              tabsContext?.isSelectedIndex(index())
-                ? "text-white"
-                : "text-shade-0"
-            }`}
+            class="cursor-pointer bg-shade-8 font-500 capitalize"
             classList={{
               "py-4": tabsContext?.orientation === "horizontal",
               "px-4": tabsContext?.orientation === "vertical",
+              "text-white": tabsContext?.isSelectedIndex(index()),
+              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}
-            <Show when={tabsContext?.isSelectedIndex(index())}>
-              <div class="absolute left-0 right-0 bottom-0 h-1 bg-primary" />
-            </Show>
           </div>
         </Match>
-        <Match when={tabsContext?.type === "block"}>
+        <Match when={tabsContext?.variant === "block"}>
           <div
-            class={`flex pr-4 gap-1 justify-center items-center flex-1 h-full  cursor-pointer rounded-xl font-500 capitalize box-border ${
-              tabsContext?.isSelectedIndex(index())
-                ? "text-white bg-black-semiblack"
-                : "text-shade-0"
-            }`}
+            class="flex pr-4 gap-1 justify-center items-center flex-1 h-full  cursor-pointer rounded-xl font-500 capitalize box-border"
             classList={{
               "py-4": tabsContext?.orientation === "horizontal",
               "px-4": tabsContext?.orientation === "vertical",
+              "text-white": tabsContext?.isSelectedIndex(index()),
+              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}

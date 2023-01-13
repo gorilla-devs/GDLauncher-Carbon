@@ -92,24 +92,16 @@ const Instance = () => {
       <div class="mt-52 lg:mt-64 bg-black-black">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185">
-            <Tabs index={index()}>
+            <Tabs orientation="horizontal">
               <TabList>
                 <Tab onClick={() => navigate(`/library/${id}`)}>Overview</Tab>
                 <Tab onClick={() => navigate(`/library/${id}/mods`)}>Mods</Tab>
-                <Tab onClick={() => navigate(`/library/${id}/mods`)}>
+                <Tab onClick={() => navigate(`/library/${id}/resourcepacks`)}>
                   Resource Packs
                 </Tab>
               </TabList>
-              <TabPanel>
-                <Outlet />
-              </TabPanel>
-              <TabPanel>
-                <Outlet />
-              </TabPanel>
-              <TabPanel>
-                <Outlet />
-              </TabPanel>
             </Tabs>
+            <Outlet />
           </div>
         </div>
       </div>

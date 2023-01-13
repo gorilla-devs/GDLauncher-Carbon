@@ -1,25 +1,28 @@
-import { JSXElement, createContext, createSignal, useContext } from "solid-js";
+import {
+  Accessor,
+  JSXElement,
+  createContext,
+  createSignal,
+  useContext,
+} from "solid-js";
 
 export interface ITabsContext {
-  type: string;
+  variant: string;
   orientation: string;
-  // eslint-disable-next-line no-unused-vars
-  setSelectedIndex: (index: number) => void;
-  // eslint-disable-next-line no-unused-vars
-  registerTab: (node: HTMLDivElement) => number;
-  // eslint-disable-next-line no-unused-vars
-  registerTabPanel: (node: HTMLDivElement) => number;
-  // eslint-disable-next-line no-unused-vars
-  isSelectedIndex: (index: number) => boolean;
+  setSelectedIndex: (_: number) => void;
+  registerTab: (_: HTMLDivElement) => number;
+  currentIndex: Accessor<number | undefined>;
+  getRegisteredTabs: () => HTMLDivElement[];
+  registerTabPanel: (_: HTMLDivElement) => number;
+  isSelectedIndex: (_: number) => boolean;
 }
 
 export interface Props {
   children: Element[] | JSXElement;
   defaultIndex?: number;
   index?: number;
-  // eslint-disable-next-line no-unused-vars
-  onChange?: (index: number) => void;
-  type?: "underline" | "block";
+  onChange?: (_: number) => void;
+  variant?: "underline" | "block";
   orientation?: "horizontal" | "vertical";
 }
 
@@ -43,7 +46,7 @@ function Tabs(props: Props) {
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
 
   const orientation = () => props.orientation || "horizontal";
-  const type = () => props.type || "underline";
+  const variant = () => props.variant || "underline";
 
   const setSelectedIndex = (index: number) => {
     setCurrentIndex(index);
@@ -54,6 +57,10 @@ function Tabs(props: Props) {
     const updatedArray = [...tabs(), node];
     setTabs(updatedArray);
     return updatedArray.length - 1;
+  };
+
+  const getRegisteredTabs = () => {
+    return tabs();
   };
 
   const registerTabPanel = (node: HTMLDivElement) => {
@@ -70,15 +77,17 @@ function Tabs(props: Props) {
     isSelectedIndex,
     setSelectedIndex,
     registerTab,
+    currentIndex,
+    getRegisteredTabs,
     registerTabPanel,
-    type: type(),
+    variant: variant(),
     orientation: orientation(),
   };
 
   return (
     <TabsContext.Provider value={context}>
       <div
-        class="flex"
+        class="flex transition-all duration-100 ease-in-out"
         classList={{
           "flex-row": orientation() === "vertical",
           "flex-col": orientation() === "horizontal",
