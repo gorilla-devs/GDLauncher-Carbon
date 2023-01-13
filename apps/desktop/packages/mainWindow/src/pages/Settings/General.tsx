@@ -1,5 +1,5 @@
 const General = () => {
-  return <div class="bg-black-black">General</div>;
+  return <div class="bg-shade-8">General</div>;
 };
 
 export default General;

@@ -28,7 +28,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-black-black text-white h-15 flex items-center justify-between px-5">
+      <nav class="bg-shade-8 text-white h-15 flex items-center justify-between px-5">
         <div class="flex">
           <img
             src={GDLauncherWideLogo}
@@ -74,7 +74,7 @@ const AppNavbar = () => {
             />
             <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
           </div>
-          <div class="w-40 h-10 bg-black-semiblack" />
+          <div class="w-40 h-10 bg-shade-7" />
         </div>
       </nav>
     </Show>

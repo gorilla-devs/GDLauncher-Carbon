@@ -22,7 +22,7 @@ function Switch(props: Props) {
       <label
         for="isActive"
         class={`${style.slider} relative mr-4 w-12 h-6 rounded-full ${
-          props.disabled ? "bg-black-black" : "bg-accent-main"
+          props.disabled ? "bg-shade-8" : "bg-accent-main"
         } cursor-pointer`}
       />
     </div>

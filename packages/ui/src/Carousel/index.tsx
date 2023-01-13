@@ -21,13 +21,13 @@ const Carousel = (props: Props) => {
         <h3 class="uppercase">{props.title}</h3>
         <div class="h-full flex gap-4">
           <div
-            class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
+            class="h-6 w-6 bg-shade-7 rounded-full flex justify-center items-center"
             // onClick={() => handleScroll("left")}
           >
             <div class="i-ri:arrow-drop-left-line text-4xl" />
           </div>
           <div
-            class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
+            class="h-6 w-6 bg-shade-7 rounded-full flex justify-center items-center"
             // onClick={() => handleScroll("rigth")}
           >
             <div class="i-ri:arrow-drop-right-line text-4xl" />

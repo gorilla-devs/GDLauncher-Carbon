@@ -7,7 +7,7 @@ interface Props {
 
 export const DeviceCode = (props: Props) => {
   return (
-    <div class="h-13 w-47 bg-black-black opacity-100 rounded-md flex justify-center items-center text-white font-bold  font-ubuntu gap-2">
+    <div class="h-13 w-47 bg-shade-8 opacity-100 rounded-md flex justify-center items-center text-white font-bold  font-ubuntu gap-2">
       <span
         class="text-2xl font-normal"
         style={{

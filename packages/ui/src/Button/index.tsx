@@ -54,8 +54,7 @@ function Button(props: Props) {
         classList={{
           "scale-x-75": props.loading,
           "bg-primary hover:bg-accent-hover": isPrimary() && !isDisabled(),
-          "backdrop-blur-md bg-black-black":
-            mergedProps.variant === "transparent",
+          "backdrop-blur-md bg-shade-8": mergedProps.variant === "transparent",
           // Size
           "py-4 px-8": mergedProps.size === "large",
           "py-3 px-5": mergedProps.size === "medium",
@@ -63,20 +62,20 @@ function Button(props: Props) {
           // Cursor
           "cursor-pointer": !props.loading,
           uppercase: mergedProps.uppercase,
-          "bg-black-black text-black-gray": isDisabled() && !isGlow(),
-          "border-1 bg-black-black": isOutline(),
+          "bg-shade-8 text-shade-5": isDisabled() && !isGlow(),
+          "border-1 bg-shade-8": isOutline(),
           "border-white hover:border-accent-hover hover:text-accent-hover":
             isOutline() && !isDisabled(),
-          "border-1 hover:border-white border-black-semiblack":
+          "border-1 hover:border-white border-shade-7":
             isSecondary() && !isDisabled(),
-          "border-1 border-black-semiblack":
+          "border-1 border-shade-7":
             (isSecondary() && isDisabled()) || isOutline(),
-          "text-black-semiblack": isDisabled() && isOutline(),
+          "text-shade-7": isDisabled() && isOutline(),
           "text-white": !isDisabled(),
           "flex-row-reverse": props.iconRight,
           "shadow-md shadow-primary bg-primary hover:shadow-lg hover:bg-accent-hover":
             isGlow() && !isDisabled(),
-          "bg-black-gray text-shade-0": isGlow() && isDisabled(),
+          "bg-shade-5 text-shade-0": isGlow() && isDisabled(),
         }}
         {...props}
       >

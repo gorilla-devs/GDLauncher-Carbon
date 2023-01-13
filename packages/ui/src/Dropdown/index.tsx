@@ -46,7 +46,7 @@ function Dropdown(props: Props) {
         </p>
       </Show>
       <button
-        class="group flex justify-between bg-black-semiblack font-semibold py-2 px-4 inline-flex items-center min-w-45 min-h-10 box-border"
+        class="group flex justify-between bg-shade-7 font-semibold py-2 px-4 inline-flex items-center min-w-45 min-h-10 box-border"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -59,7 +59,7 @@ function Dropdown(props: Props) {
           "border-0": !props.error,
           "border-1 border-status-red": props.error,
           "text-shade-0 hover:text-white": !props.disabled && !props.error,
-          "text-black-gray": props.error,
+          "text-shade-5": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
         }}
@@ -69,7 +69,7 @@ function Dropdown(props: Props) {
             "text-white": props.error,
             "text-shade-0 hover:text-white group-hover:text-white":
               !props.disabled && !props.error,
-            "text-black-gray": props.disabled,
+            "text-shade-5": props.disabled,
           }}
         >
           {selectedValue()}
@@ -82,7 +82,7 @@ function Dropdown(props: Props) {
             "text-shade-0 group-hover:text-white":
               !props.disabled && !props.error,
             "text-white": props.error,
-            "text-black-gray": props.disabled,
+            "text-shade-5": props.disabled,
           }}
         />
       </button>
@@ -94,7 +94,7 @@ function Dropdown(props: Props) {
         <For each={props.options}>
           {(option) => (
             <li
-              class="first:rounded-t last:rounded-b bg-black-semiblack hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-shade-0 no-underline"
+              class="first:rounded-t last:rounded-b bg-shade-7 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-shade-0 no-underline"
               onClick={() => {
                 console.log("OPTIOn", option.label);
                 setSelectedValue(option.label);

@@ -1,7 +1,7 @@
 import getRouteIndex from "@/utils/getRouteIndex";
-import { Tabs, TabList, Tab, TabPanel, Button } from "@gd/ui";
-import { Outlet, useMatch, useNavigate, useParams } from "@solidjs/router";
-import { createSignal, For } from "solid-js";
+import { Tabs, TabList, Tab, Button } from "@gd/ui";
+import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
+import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 type InstancePage = {
@@ -10,7 +10,6 @@ type InstancePage = {
 };
 
 const Instance = () => {
-  const [index, setIndex] = createSignal(1);
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -20,20 +19,21 @@ const Instance = () => {
       path: `/library/${id}`,
     },
     {
-      label: "Mods",
-      path: `/library/${id}/mods`,
-    },
-    {
       label: "Resource Packs",
       path: `/library/${id}/resourcepacks`,
     },
+    {
+      label: "Mods",
+      path: `/library/${id}/mods`,
+    },
   ];
 
-  const selectedIndex = () => getRouteIndex(instancePages, location.pathname);
+  const selectedIndex = () =>
+    getRouteIndex(instancePages, location.pathname, true);
 
   return (
     <div
-      class="relative h-full bg-black-black max-h-full overflow-auto overflow-x-hidden"
+      class="relative h-full bg-shade-8 max-h-full overflow-auto overflow-x-hidden"
       style={{
         "scrollbar-gutter": "stable",
       }}
@@ -65,17 +65,17 @@ const Instance = () => {
           <div class="flex justify-center w-full">
             <div class="flex justify-between items-end w-full max-w-185">
               <div class="flex flex-col lg:flex-row gap-4 justify-end w-full">
-                <div class="h-16 w-16 rounded-xl bg-black-black">
+                <div class="h-16 w-16 rounded-xl bg-shade-8">
                   {/* <img /> */}
                 </div>
                 <div class="flex flex-1 flex-col max-w-185 ">
                   <h1 class="m-0">{id}</h1>
                   <div class="flex flex-col lg:flex-row justify-between">
                     <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-black-lightGray">
-                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-black-gray">
+                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
                         Forge 1.19.2
                       </div>
-                      <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-black-gray flex gap-2 items-center">
+                      <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-shade-5 flex gap-2 items-center">
                         <div class="i-ri:time-fill" />
                         1d ago
                       </div>
@@ -112,14 +112,16 @@ const Instance = () => {
           </div>
         </div>
       </div>
-      <div class="mt-52 lg:mt-64 bg-black-black">
+      <div class="mt-52 lg:mt-64 bg-shade-8">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185">
             <Tabs index={selectedIndex()}>
               <TabList>
                 <For each={instancePages}>
                   {(page: InstancePage) => (
-                    <Tab onClick={() => navigate(page.path)}>{page.label}</Tab>
+                    <Link href={page.path} class="no-underline">
+                      <Tab>{page.label}</Tab>
+                    </Link>
                   )}
                 </For>
               </TabList>
