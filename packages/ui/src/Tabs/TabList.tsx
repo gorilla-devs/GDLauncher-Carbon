@@ -11,8 +11,10 @@ const TabList = (props: Props) => {
   const currentIndex = () => tabsContext?.currentIndex() || 0;
 
   const getPositionPx = (index: number) => {
-    const tabs = tabsContext?.getRegisteredTabs();
-    const filteredTabs = tabs?.slice(0, index) || [];
+    const tabs = tabsContext?.getRegisteredTabs() || [];
+    const filteredTabs = tabs?.slice(0, index);
+
+    if (index < 0 || index > tabs?.length) return 0;
 
     let dimension = 0;
     for (const tab of filteredTabs) {
@@ -21,6 +23,14 @@ const TabList = (props: Props) => {
       } else dimension += tab.offsetHeight + 24;
     }
     return dimension;
+  };
+
+  const getWidth = (index: number) => {
+    const tabs = tabsContext?.getRegisteredTabs() || [];
+    if (index < 0 || index > tabs?.length) return 0;
+
+    const tab = tabs[index];
+    return tab?.offsetWidth;
   };
 
   return (
@@ -50,10 +60,7 @@ const TabList = (props: Props) => {
               style={{
                 ...(tabsContext?.orientation === "horizontal"
                   ? {
-                      width: `${
-                        tabsContext?.getRegisteredTabs()[currentIndex()]
-                          ?.offsetWidth
-                      }px`,
+                      width: `${getWidth(currentIndex())}px`,
                     }
                   : {
                       height: `${

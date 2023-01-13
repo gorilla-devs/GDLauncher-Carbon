@@ -1,18 +1,35 @@
 import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { createEffect, For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs } from "@gd/ui";
+// import { createMatcher, expandOptionals } from "@solidjs/router";
+
+// const isLocationMatch = (path: string) => {
+//   const location = useLocation();
+//   const matchers = expandOptionals(path).map((path) => createMatcher(path));
+
+//   for (const matcher of matchers) {
+//     const match = matcher(location.pathname);
+//     if (match) return match;
+//   }
+// };
 
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
 
+  const selectedIndex = () => {
+    location.pathname;
+    return NAVBAR_ROUTES.findIndex((route) => useMatch(() => route.path)());
+  };
+
   return (
-    <Show when={location.pathname !== "/"}>
+    <Show when={!isLogin()}>
       <nav class="bg-black-black text-white h-15 flex items-center justify-between px-5">
         <div class="flex">
           <img
@@ -21,11 +38,12 @@ const AppNavbar = () => {
             onClick={() => navigate("/library")}
           />
           <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
-            <Tabs>
+            <Tabs index={selectedIndex()}>
               <TabList>
                 <For each={NAVBAR_ROUTES}>
                   {(route) => {
                     const isMatch = useMatch(() => route.path);
+
                     return (
                       <Link
                         href={route.path}

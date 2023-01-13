@@ -1,12 +1,37 @@
 import { Tabs, TabList, Tab, TabPanel, Button } from "@gd/ui";
-import { Outlet, useNavigate, useParams } from "@solidjs/router";
-import { createSignal } from "solid-js";
+import { Outlet, useMatch, useNavigate, useParams } from "@solidjs/router";
+import { createSignal, For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
+
+type InstancePage = {
+  label: string;
+  path: string;
+};
 
 const Instance = () => {
   const [index, setIndex] = createSignal(1);
   const navigate = useNavigate();
   const { id } = useParams();
+
+  const instancePages = [
+    {
+      label: "Overview",
+      path: `/library/${id}`,
+    },
+    {
+      label: "Mods",
+      path: `/library/${id}/mods`,
+    },
+    {
+      label: "Resource Packs",
+      path: `/library/${id}/resourcepacks`,
+    },
+  ];
+
+  const selectedIndex = () => {
+    location.pathname;
+    return instancePages.findIndex((route) => useMatch(() => route.path)());
+  };
 
   return (
     <div
@@ -92,13 +117,13 @@ const Instance = () => {
       <div class="mt-52 lg:mt-64 bg-black-black">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185">
-            <Tabs>
+            <Tabs index={selectedIndex()}>
               <TabList>
-                <Tab onClick={() => navigate(`/library/${id}`)}>Overview</Tab>
-                <Tab onClick={() => navigate(`/library/${id}/mods`)}>Mods</Tab>
-                <Tab onClick={() => navigate(`/library/${id}/resourcepacks`)}>
-                  Resource Packs
-                </Tab>
+                <For each={instancePages}>
+                  {(page: InstancePage) => (
+                    <Tab onClick={() => navigate(page.path)}>{page.label}</Tab>
+                  )}
+                </For>
               </TabList>
             </Tabs>
             <Outlet />

@@ -4,6 +4,7 @@ import {
   createContext,
   createSignal,
   useContext,
+  createEffect,
 } from "solid-js";
 
 export interface ITabsContext {
@@ -38,12 +39,17 @@ export function useTabsContext() {
 
 function Tabs(props: Props) {
   const defaultIndex = () => props.defaultIndex ?? 0;
-  const index = () => props.index;
   const [currentIndex, setCurrentIndex] = createSignal(
-    index() !== undefined ? index() : defaultIndex()
+    props.index !== undefined ? props.index : defaultIndex()
   );
   const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
+
+  createEffect(() => {
+    if (props.index !== undefined) {
+      setCurrentIndex(props.index);
+    }
+  });
 
   const orientation = () => props.orientation || "horizontal";
   const variant = () => props.variant || "underline";
