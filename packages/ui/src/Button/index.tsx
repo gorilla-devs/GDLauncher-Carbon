@@ -38,18 +38,22 @@ const getVariant = (
     "max-w-max": true,
     "font-bold": true,
     flex: true,
+    "justify-center": true,
     "items-center": true,
     "gap-2": true,
     relative: true,
-    "py-4": isLarge,
-    "px-8": isLarge,
-    "py-3": isMedium,
-    "px-5": isMedium,
-    "py-2": isSmall,
-    "px-4": isSmall,
+    "py-4 px-8": isLarge && !isLoading,
+    "py-3 px-5": isMedium && !isLoading,
+    "py-2 px-4": isSmall && !isLoading,
+    "h-12": isLarge,
+    "h-11": isMedium,
+    "h-9": isSmall,
     "rounded-full": true,
     uppercase,
     "cursor-pointer": !isLoading,
+    "box-border": true,
+    "w-12": isLoading,
+    "p-0": isLoading,
     "text-white": !isDisabled,
     "flex-row-reverse": iconRight,
   };
@@ -99,18 +103,12 @@ const getVariant = (
     },
   };
 
+  console.log("TEST", variants[variant]);
   return variants[variant];
 };
 
 function Button(props: Props) {
   const c = children(() => props.children);
-
-  type MergedProps = {
-    variant: Variant;
-    size: Size;
-    uppercase: boolean;
-    iconRight: boolean;
-  };
 
   const mergedProps = mergeProps(
     { variant: "primary", size: "large", uppercase: false, iconRight: false },
@@ -126,7 +124,7 @@ function Button(props: Props) {
         !!props.disabled,
         mergedProps.uppercase,
         !!props.iconRight,
-        props.loading
+        !!props.loading
       )}
     >
       <Show when={props.icon}>{props.icon}</Show>
