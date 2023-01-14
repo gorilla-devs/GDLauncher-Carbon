@@ -31,11 +31,12 @@ const getVariant = (
   const isSmall = size === "small";
 
   const commonStyle = {
-    transition: true,
-    "duration-200": true,
+    "transition-all": true,
+    "duration-500": true,
     "ease-in-out": true,
     "font-main": true,
-    "max-w-max": true,
+    "animate-bounce": isLoading,
+    "max-w-max": !isLoading,
     "font-bold": true,
     flex: true,
     "justify-center": true,
@@ -129,7 +130,7 @@ function Button(props: Props) {
     >
       <Show when={props.icon}>{props.icon}</Show>
       <Show when={props.loading} fallback={c()}>
-        <Spinner class="absolute left-1/2 -translate-x-1/2" />
+        <Spinner />
       </Show>
     </div>
   );

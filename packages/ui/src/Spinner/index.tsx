@@ -7,7 +7,7 @@ function Spinner(props: Props) {
 
   return (
     <svg
-      class={"animate-spin h-5 w-5 text-white " + local.class}
+      class={`animate-spin h-5 w-5 text-whit ${local.class || ""}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       width="24"
