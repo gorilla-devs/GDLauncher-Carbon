@@ -1,6 +1,5 @@
 import { children, mergeProps, Show, JSX, splitProps } from "solid-js";
 import { Spinner } from "../Spinner";
-// import "./Button.css";
 
 type Size = "small" | "medium" | "large";
 type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
@@ -9,6 +8,7 @@ export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string;
   class?: string;
   variant?: Variant;
+  rounded?: boolean;
   disabled?: boolean;
   icon?: Element | any;
   iconRight?: boolean;
@@ -20,6 +20,7 @@ export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const getVariant = (
   variant: Variant,
+  rounded: boolean,
   size: Size,
   isDisabled: boolean,
   uppercase: boolean,
@@ -49,7 +50,8 @@ const getVariant = (
     "h-12": isLarge,
     "h-11": isMedium,
     "h-9": isSmall,
-    "rounded-full": true,
+    "rounded-full": rounded,
+    "rounded-md": !rounded,
     uppercase,
     "cursor-pointer": !isLoading,
     "box-border": true,
@@ -106,10 +108,10 @@ const getVariant = (
       "backdrop-blur-md": true,
       "bg-shade-8": true,
       "text-shade-5": isDisabled,
+      "border-0": true,
     },
   };
 
-  console.log("TEST", variants[variant]);
   return variants[variant];
 };
 
@@ -126,7 +128,13 @@ function Button(props: Props) {
   ]);
 
   const mergedProps = mergeProps(
-    { variant: "primary", size: "large", uppercase: false, iconRight: false },
+    {
+      variant: "primary",
+      size: "large",
+      uppercase: false,
+      iconRight: false,
+      rounded: true,
+    },
     props
   );
 
@@ -134,6 +142,7 @@ function Button(props: Props) {
     <button
       classList={getVariant(
         props.variant || "primary",
+        mergedProps.rounded,
         props.size || "medium",
         !!props.disabled,
         mergedProps.uppercase,
@@ -141,6 +150,11 @@ function Button(props: Props) {
         !!props.loading
       )}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+      style={{
+        ...(mergedProps.variant === "transparent" && {
+          background: "rgba(0, 0, 0, 0.4)",
+        }),
+      }}
     >
       <Show when={props.icon}>{props.icon}</Show>
       <Show when={props.loading} fallback={c()}>
