@@ -12,6 +12,7 @@ interface Props {
   icon?: Icon;
   title: string;
   text: string;
+  class?: string;
 }
 
 const Card = (props: Props) => {
@@ -37,7 +38,11 @@ const Card = (props: Props) => {
   };
 
   return (
-    <div class="flex items-center justify-between p-5 h-23 w-59 bg-shade-7 rounded-xl box-border">
+    <div
+      class={`flex items-center justify-between p-5 h-23 w-59 bg-shade-7 rounded-xl box-border ${
+        props.class || ""
+      }`}
+    >
       <div class="h-13 w-13 bg-shade-8 rounded-lg flex justify-center items-center">
         <img src={getIcon(props.icon || "vanilla")} />
       </div>

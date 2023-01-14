@@ -2,86 +2,137 @@ import { children, mergeProps, Show, JSX } from "solid-js";
 import { Spinner } from "../Spinner";
 // import "./Button.css";
 
+type Size = "small" | "medium" | "large";
+type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
+
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string;
   class?: string;
-  variant?: "primary" | "secondary" | "glow" | "outline" | "transparent";
+  variant?: Variant;
   disabled?: boolean;
   icon?: Element | any;
   iconRight?: boolean;
   uppercase?: boolean;
   loading?: boolean;
-  size?: "small" | "medium" | "large";
-  /* eslint-disable no-unused-vars */
-  onClick?: (e: MouseEvent) => void;
+  size?: Size;
+  onClick?: (_: MouseEvent) => void;
 }
+
+const getVariant = (
+  variant: Variant,
+  size: Size,
+  isDisabled: boolean,
+  uppercase: boolean,
+  iconRight: boolean,
+  isLoading: boolean
+) => {
+  const isLarge = size === "large";
+  const isMedium = size === "medium";
+  const isSmall = size === "small";
+
+  const commonStyle = {
+    transition: true,
+    "duration-200": true,
+    "ease-in-out": true,
+    "font-main": true,
+    "max-w-max": true,
+    "font-bold": true,
+    flex: true,
+    "items-center": true,
+    "gap-2": true,
+    relative: true,
+    "py-4": isLarge,
+    "px-8": isLarge,
+    "py-3": isMedium,
+    "px-5": isMedium,
+    "py-2": isSmall,
+    "px-4": isSmall,
+    "rounded-full": true,
+    uppercase,
+    "cursor-pointer": !isLoading,
+    "text-white": !isDisabled,
+    "flex-row-reverse": iconRight,
+  };
+
+  const variants = {
+    primary: {
+      ...commonStyle,
+      "bg-primary": true,
+      "hover:bg-primary-hover": !isDisabled,
+      "bg-shade-8": isDisabled,
+      "text-shade-5": isDisabled,
+    },
+    secondary: {
+      ...commonStyle,
+      "border-1": true,
+      "hover:border-white": !isDisabled,
+      "border-shade-7": true,
+      "bg-shade-8": isDisabled,
+      "text-shade-5": isDisabled,
+    },
+    outline: {
+      ...commonStyle,
+      "border-1": true,
+      "border-shade-7": true,
+      "text-shade-7": isDisabled,
+      "bg-shade-8": isDisabled,
+      "text-shade-5": isDisabled,
+      "border-white": !isDisabled,
+      "hover:border-accent-hover": !isDisabled,
+      "hover:text-primary-hover": !isDisabled,
+    },
+    glow: {
+      ...commonStyle,
+      "shadow-md": !isDisabled,
+      "shadow-primary": !isDisabled,
+      "bg-primary": !isDisabled,
+      "hover:shadow-lg": !isDisabled,
+      "hover:bg-primary-hover": !isDisabled,
+      "bg-shade-5": isDisabled,
+      "text-shade-0": isDisabled,
+    },
+    transparent: {
+      ...commonStyle,
+      "backdrop-blur-md": true,
+      "bg-shade-8": true,
+      "text-shade-5": isDisabled,
+    },
+  };
+
+  return variants[variant];
+};
 
 function Button(props: Props) {
   const c = children(() => props.children);
+
+  type MergedProps = {
+    variant: Variant;
+    size: Size;
+    uppercase: boolean;
+    iconRight: boolean;
+  };
 
   const mergedProps = mergeProps(
     { variant: "primary", size: "large", uppercase: false, iconRight: false },
     props
   );
 
-  const isDisabled = () => props.disabled;
-  const isOutline = () => props.variant === "outline";
-  const isPrimary = () => mergedProps.variant === "primary";
-  const isSecondary = () => props.variant === "secondary";
-  const isGlow = () => props.variant === "glow";
-
   return (
     <div
-      class={`transition duration-200 ease-in-out font-main max-w-max  font-bold flex items-center gap-2 relative ${
-        props.class || ""
-      }`}
+      class={props.class}
+      classList={getVariant(
+        props.variant || "primary",
+        props.size || "medium",
+        !!props.disabled,
+        mergedProps.uppercase,
+        !!props.iconRight,
+        props.loading
+      )}
     >
       <Show when={props.icon}>{props.icon}</Show>
-      {/* use windicss to clear all default button styles */}
-      <button
-        onClick={(e) => props.onClick?.(e)}
-        class="border-0 m-0 p-0 overflow-visible cursor-pointer transition-transform transform-gpu origin-center duration-300 rounded-full"
-        style={{
-          "font-family": "inherit",
-          "font-size": "inherit",
-          "font-style": "inherit",
-          "font-weight": "inherit",
-          "line-height": "inherit",
-          ...(mergedProps.variant === "transparent" && {
-            background: "rgba(0, 0, 0, 0.4)",
-          }),
-        }}
-        classList={{
-          "scale-x-75": props.loading,
-          "bg-primary hover:bg-accent-hover": isPrimary() && !isDisabled(),
-          "backdrop-blur-md bg-shade-8": mergedProps.variant === "transparent",
-          // Size
-          "py-4 px-8": mergedProps.size === "large",
-          "py-3 px-5": mergedProps.size === "medium",
-          "py-2 px-4": mergedProps.size === "small",
-          // Cursor
-          "cursor-pointer": !props.loading,
-          uppercase: mergedProps.uppercase,
-          "bg-shade-8 text-shade-5": isDisabled() && !isGlow(),
-          "border-1 bg-shade-8": isOutline(),
-          "border-white hover:border-accent-hover hover:text-accent-hover":
-            isOutline() && !isDisabled(),
-          "border-1 hover:border-white border-shade-7":
-            isSecondary() && !isDisabled(),
-          "border-1 border-shade-7":
-            (isSecondary() && isDisabled()) || isOutline(),
-          "text-shade-7": isDisabled() && isOutline(),
-          "text-white": !isDisabled(),
-          "flex-row-reverse": props.iconRight,
-          "shadow-md shadow-primary bg-primary hover:shadow-lg hover:bg-accent-hover":
-            isGlow() && !isDisabled(),
-          "bg-shade-5 text-shade-0": isGlow() && isDisabled(),
-        }}
-        {...props}
-      >
-        {!props.loading && c()}
-      </button>
-      <Spinner class="absolute left-1/2 -translate-x-1/2" />
+      <Show when={props.loading} fallback={c()}>
+        <Spinner class="absolute left-1/2 -translate-x-1/2" />
+      </Show>
     </div>
   );
 }
