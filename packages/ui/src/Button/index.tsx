@@ -1,4 +1,4 @@
-import { children, mergeProps, Show, JSX } from "solid-js";
+import { children, mergeProps, Show, JSX, splitProps } from "solid-js";
 import { Spinner } from "../Spinner";
 // import "./Button.css";
 
@@ -53,6 +53,7 @@ const getVariant = (
     uppercase,
     "cursor-pointer": !isLoading,
     "box-border": true,
+    "border-solid": true,
     "w-12": isLoading,
     "p-0": isLoading,
     "text-white": !isDisabled,
@@ -66,6 +67,7 @@ const getVariant = (
       "hover:bg-primary-hover": !isDisabled,
       "bg-shade-8": isDisabled,
       "text-shade-5": isDisabled,
+      "border-0": true,
     },
     secondary: {
       ...commonStyle,
@@ -77,14 +79,13 @@ const getVariant = (
     },
     outline: {
       ...commonStyle,
-      "border-1": true,
-      "border-shade-7": true,
-      "text-shade-7": isDisabled,
-      "bg-shade-8": isDisabled,
+      "border-2": true,
+      "text-shade-7": true,
       "text-shade-5": isDisabled,
       "border-white": !isDisabled,
-      "hover:border-accent-hover": !isDisabled,
+      "hover:border-primary-hover": !isDisabled,
       "hover:text-primary-hover": !isDisabled,
+      "bg-transparent": true,
     },
     glow: {
       ...commonStyle,
@@ -95,6 +96,7 @@ const getVariant = (
       "hover:bg-primary-hover": !isDisabled,
       "bg-shade-5": isDisabled,
       "text-shade-0": isDisabled,
+      "border-0": true,
     },
     transparent: {
       ...commonStyle,
@@ -111,14 +113,22 @@ const getVariant = (
 function Button(props: Props) {
   const c = children(() => props.children);
 
+  const [_, others] = splitProps(props, [
+    "icon",
+    "iconRight",
+    "uppercase",
+    "loading",
+    "size",
+    "children",
+  ]);
+
   const mergedProps = mergeProps(
     { variant: "primary", size: "large", uppercase: false, iconRight: false },
     props
   );
 
   return (
-    <div
-      class={props.class}
+    <button
       classList={getVariant(
         props.variant || "primary",
         props.size || "medium",
@@ -127,13 +137,13 @@ function Button(props: Props) {
         !!props.iconRight,
         !!props.loading
       )}
-      onClick={props.onClick}
+      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
     >
       <Show when={props.icon}>{props.icon}</Show>
       <Show when={props.loading} fallback={c()}>
         <Spinner />
       </Show>
-    </div>
+    </button>
   );
 }
 
