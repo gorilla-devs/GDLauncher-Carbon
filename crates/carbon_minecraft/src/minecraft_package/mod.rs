@@ -1,57 +1,50 @@
-pub(crate) mod package_scan;
+pub(crate) mod scan;
+pub(crate) mod configuration;
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::collections::BTreeSet;
+use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
 use crate::minecraft_mod::MinecraftMod;
-use crate::modloader::ModLoader;
+use crate::minecraft_package::configuration::MinecraftPackageConfigurationFile;
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd, Clone)]
 pub struct Library {
     name: String,
     file_path: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive( Debug, Serialize, Deserialize, Hash )]
 pub struct MinecraftPackage {
     pub version: String,
-    pub mods: HashSet<MinecraftMod>,
-    mod_loader: Option<ModLoader>,
-    jars: Vec<Library>,
+    pub mods: BTreeSet<MinecraftMod>,
+    // pub mod_loader: Option<ModLoader>,
+    pub core_jars: Vec<Library>,
+    pub path: PathBuf
 }
 
-impl MinecraftPackage {
 
-    fn get_entrypoint_path() -> &Path {
-        todo!()
+
+impl From<MinecraftPackageConfigurationFile> for MinecraftPackage{
+    fn from(value: MinecraftPackageConfigurationFile) -> Self {
+        let core_jars = Vec::new();
+        MinecraftPackage {
+            version: value.version,
+            mods: value.mods,
+            core_jars,
+            path: PathBuf::new() // fixme: provvisory implemetation
+        }
     }
-
-    fn get_libraries_root_folder_path() -> &Path {
-        todo!()
-    }
-
-    fn get_mainclass_classpath() -> String {
-        todo!()
-    }
-
-    fn get_libraries_list() -> HashSet<Library> {
-        todo!()
-    }
-
-    fn get_cli_arguments() -> Vec<String> { //FIXME maybe extract a trait ? see Instance Struct ...
-        todo!()
-    }
-
-    pub fn mod_loader(&self) -> &Option<ModLoader> {
-        &self.mod_loader
-    }
-
-    pub fn new(
-        version: String,
-        mods: HashSet<MinecraftMod>,
-        mod_loader: Option<ModLoader>,
-        jars: Vec<Library>,
-    ) -> Self {
-        Self { version, mods, mod_loader, jars }
-    }
-
 }
+
+impl From<&MinecraftPackageConfigurationFile> for MinecraftPackage{
+    fn from(value: &MinecraftPackageConfigurationFile) -> Self {
+        let core_jars = Vec::new();
+        MinecraftPackage {
+            version: value.version.clone(),
+            mods: value.mods.clone(),
+            core_jars,
+            path: PathBuf::new() // fixme: provvisory implemetation
+        }
+    }
+}
+

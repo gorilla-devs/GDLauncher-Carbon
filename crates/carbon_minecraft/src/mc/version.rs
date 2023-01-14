@@ -1,13 +1,11 @@
 use std::{
-    borrow::Borrow,
-    io::Read,
     path::{Path, PathBuf},
 };
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, trace};
+use tracing::trace;
 
 use carbon_net::Download;
 

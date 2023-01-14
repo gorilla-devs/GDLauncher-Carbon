@@ -23,6 +23,9 @@ lazy_static = "1.4.0"
 async-trait = "0.1.60"
 uuid = "1.2.2"
 thiserror = "1.0.38"
+log="0.4.17"
+trash = "3.0.0"
+inter-struct = "0.2.0"
 carbon_net = { path = "../carbon_net" }
 
 

@@ -1,0 +1,7 @@
+
+
+pub(crate) struct AppConfiguration{
+
+
+
+}

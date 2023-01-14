@@ -1,17 +1,22 @@
 pub(in crate::modloader) mod forge;
 pub(in crate::modloader) mod vanilla;
+mod fabric;
 
-use std::clone;
 use std::sync::Weak;
 
 use anyhow::Result;
-use tokio::sync::{watch::Sender, RwLock};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 use super::instance::Instance;
 
-pub enum ModLoader{
-    Vanilla,
+#[derive(Debug, Serialize, Deserialize, Hash)]
+pub enum ModLoader {
     Forge,
+    Fabric,
+    LiteLoader,
+    Quilt,
 }
 
 pub type ModloaderVersion = String;
@@ -25,11 +30,8 @@ pub struct InstallProgress<T> {
 #[async_trait]
 trait Modloader {
     type Stages;
-
-    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self /// instance
-        where
-            Self: Sized;
-    async fn install(&self, progress_recv: Sender<InstallProgress<Self::Stages>>) -> Result<()>;
+    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self where Self: Sized;
+    async fn install(&self) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;
     fn get_version(&self) -> ModloaderVersion;

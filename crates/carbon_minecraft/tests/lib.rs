@@ -1,6 +1,7 @@
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
     use std::sync::{Arc, Weak};
 
     use tokio::sync::{Mutex, RwLock};
@@ -10,7 +11,34 @@ mod test {
         modloaders::{vanilla::VanillaModLoader, Modloader},
     };
 
+
+
     use super::meta::McMeta;
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn test_instance_crud() {
+
+        use crate::instance::{scan::InstanceScanner, write::InstanceWriter, delete::InstanceDeleter};
+
+        let test_assets_base_dir = std::env::current_dir().unwrap()
+            .join("test_assets")
+            .join("test_assets");
+
+        let instance_scan_results = InstanceScanner::scan_for_instances( &PathBuf::from(&test_assets_base_dir)).await.unwrap();
+
+        for scan_result in instance_scan_results {
+            println!("instance scan result : {:?}", instance_scan_results)
+        }
+
+        let write_base_path = PathBuf::from(&test_assets_base_dir).join("");
+
+
+        let instance = Default::default();
+        let instance = instance::write::InstanceWriter::write_at(instance, &test_assets_base_dir).await.expect("");
+        let delete_result = InstanceDeleter::delete(instance, false).await.expect("");
+
+    }
 
     #[tokio::test]
     #[tracing_test::traced_test]

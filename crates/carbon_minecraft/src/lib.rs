@@ -1,12 +1,3 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
-use std::any::Any;
-
-use anyhow::Result;
-use lazy_static::lazy_static;
-use tokio::sync::RwLock;
-use tracing::trace;
-use uuid::Uuid;
-
 mod mc;
 
 mod instance;
@@ -16,23 +7,35 @@ mod minecraft_mod;
 mod modloader;
 mod package_file;
 
-type TaskProgressListener = impl Fn();
 
-
-macro_rules! try_path_fmt{
-    () => {
-
+#[macro_export]
+macro_rules! try_path_fmt {
+    ($path:expr) => {
+        {
+            camino::Utf8Path::from_path($path).map(ToString::to_string).unwrap_or("<<unrepresentable fs path!>>".to_string())
+        }
     };
 }
 
-
-trait UUIDIndexed { //
-    fn get_uuid(&self) -> uuid;
+/*
+#[macro_export]
+macro_rules! open_file_async {
+    ($path:expr) => {
+        {
+            
+        }
+    };
 }
 
-trait Validable {
-    fn validate() -> bool;
+#[macro_export]
+macro_rules! read_file_async {
+    ($path:expr) => {
+        {
+            
+        }
+    };
 }
+*/
 
 /*
 //
