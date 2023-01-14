@@ -38,6 +38,7 @@ const Auth = (_props: Props) => {
         <Button
           id="auth-button"
           loading={loading()}
+          size="large"
           onClick={() => handleClick()}
         >
           Sign in with microsoft

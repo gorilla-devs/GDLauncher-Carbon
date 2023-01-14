@@ -127,6 +127,7 @@ function Button(props: Props) {
         !!props.iconRight,
         !!props.loading
       )}
+      onClick={props.onClick}
     >
       <Show when={props.icon}>{props.icon}</Show>
       <Show when={props.loading} fallback={c()}>
