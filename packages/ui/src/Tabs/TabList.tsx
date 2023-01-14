@@ -33,6 +33,13 @@ const TabList = (props: Props) => {
     return tab?.offsetWidth;
   };
 
+  const getHeight = (index: number) => {
+    const tabs = tabsContext?.getRegisteredTabs() || [];
+    if (index < 0 || index > tabs?.length) return 0;
+
+    const tab = tabs[index];
+    return tab?.offsetHeight;
+  };
   return (
     <div
       class="flex relative items-center h-auto"
@@ -52,7 +59,7 @@ const TabList = (props: Props) => {
           >
             {props.children}
             <div
-              class="absolute bottom-1 h-1 bg-primary transition-transform duration-100 ease-in-out"
+              class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
               classList={{
                 "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
                 "left-0": tabsContext?.orientation === "horizontal",
@@ -63,10 +70,7 @@ const TabList = (props: Props) => {
                       width: `${getWidth(currentIndex())}px`,
                     }
                   : {
-                      height: `${
-                        tabsContext?.getRegisteredTabs()[currentIndex()]
-                          ?.offsetHeight
-                      }px`,
+                      height: `${getHeight(currentIndex())}px`,
                     }),
                 ...(tabsContext?.orientation === "horizontal"
                   ? {
