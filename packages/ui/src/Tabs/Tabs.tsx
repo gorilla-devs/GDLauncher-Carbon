@@ -39,9 +39,12 @@ export function useTabsContext() {
 
 function Tabs(props: Props) {
   const defaultIndex = () => props.defaultIndex ?? 0;
-  const [currentIndex, setCurrentIndex] = createSignal(
-    props.index !== undefined ? props.index : defaultIndex()
-  );
+  const [currentIndex, setCurrentIndex] = createSignal(0);
+
+  createEffect(() => {
+    setCurrentIndex(props.index !== undefined ? props.index : defaultIndex());
+  });
+
   const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
 

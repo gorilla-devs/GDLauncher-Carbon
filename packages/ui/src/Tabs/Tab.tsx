@@ -13,6 +13,7 @@ const Tab = (props: Props) => {
   const tabsContext = useTabsContext();
 
   onMount(() => {
+    // eslint-disable-next-line solid/reactivity
     queueMicrotask(() => {
       if (tabsContext) {
         setIndex(tabsContext.registerTab(ref()!));

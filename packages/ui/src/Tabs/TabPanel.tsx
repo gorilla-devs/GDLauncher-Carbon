@@ -13,6 +13,7 @@ const TabPanel = (props: Props) => {
   const isTabPanelSelected = () => tabsContext?.isSelectedIndex(index());
 
   onMount(() => {
+    // eslint-disable-next-line solid/reactivity
     queueMicrotask(() => {
       if (tabsContext) {
         setIndex(tabsContext.registerTabPanel(ref()!));
