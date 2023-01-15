@@ -1,4 +1,4 @@
-import { JSXElement, Match, Switch } from "solid-js";
+import { JSXElement, Match, Show, Switch, createEffect } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -8,13 +8,14 @@ interface Props {
 const TabList = (props: Props) => {
   const tabsContext = useTabsContext();
 
+  const tabs = () => tabsContext?.getRegisteredTabs() || [];
+
   const currentIndex = () => tabsContext?.currentIndex() || 0;
 
   const getPositionPx = (index: number) => {
-    const tabs = tabsContext?.getRegisteredTabs() || [];
-    const filteredTabs = tabs?.slice(0, index);
+    const filteredTabs = tabs()?.slice(0, index);
 
-    if (index < 0 || index > tabs?.length) return 0;
+    if (index < 0 || index > tabs()?.length) return 0;
 
     let dimension = 0;
     for (const tab of filteredTabs) {
@@ -26,20 +27,28 @@ const TabList = (props: Props) => {
   };
 
   const getWidth = (index: number) => {
-    const tabs = tabsContext?.getRegisteredTabs() || [];
-    if (index < 0 || index > tabs?.length) return 0;
+    if (index < 0 || index > tabs()?.length) return 0;
 
-    const tab = tabs[index];
+    const tab = tabs()[index];
     return tab?.offsetWidth;
   };
 
   const getHeight = (index: number) => {
-    const tabs = tabsContext?.getRegisteredTabs() || [];
-    if (index < 0 || index > tabs?.length) return 0;
+    if (index < 0 || index > tabs()?.length) return 0;
 
-    const tab = tabs[index];
+    const tab = tabs()[index];
     return tab?.offsetHeight;
   };
+
+  createEffect(() => {
+    console.log(
+      "TEST",
+      getPositionPx(currentIndex()),
+      tabs()[currentIndex()],
+      tabs()
+    );
+  });
+
   return (
     <div
       class="flex relative items-center h-auto"
@@ -58,33 +67,35 @@ const TabList = (props: Props) => {
             }}
           >
             {props.children}
-            <div
-              class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
-              classList={{
-                "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
-                "left-0": tabsContext?.orientation === "horizontal",
-              }}
-              style={{
-                ...(tabsContext?.orientation === "horizontal"
-                  ? {
-                      width: `${getWidth(currentIndex())}px`,
-                    }
-                  : {
-                      height: `${getHeight(currentIndex())}px`,
-                    }),
-                ...(tabsContext?.orientation === "horizontal"
-                  ? {
-                      transform: `translateX(${getPositionPx(
-                        currentIndex()
-                      )}px)`,
-                    }
-                  : {
-                      transform: `translateY(${getPositionPx(
-                        currentIndex()
-                      )}px)`,
-                    }),
-              }}
-            />
+            <Show when={tabs()[currentIndex()]}>
+              <div
+                class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out animate-fade-in"
+                classList={{
+                  "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
+                  "left-0": tabsContext?.orientation === "horizontal",
+                }}
+                style={{
+                  ...(tabsContext?.orientation === "horizontal"
+                    ? {
+                        width: `${getWidth(currentIndex())}px`,
+                      }
+                    : {
+                        height: `${getHeight(currentIndex())}px`,
+                      }),
+                  ...(tabsContext?.orientation === "horizontal"
+                    ? {
+                        transform: `translateX(${getPositionPx(
+                          currentIndex()
+                        )}px)`,
+                      }
+                    : {
+                        transform: `translateY(${getPositionPx(
+                          currentIndex()
+                        )}px)`,
+                      }),
+                }}
+              />
+            </Show>
           </div>
         </Match>
         <Match when={tabsContext?.variant === "block"}>

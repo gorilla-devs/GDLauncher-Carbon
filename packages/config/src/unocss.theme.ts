@@ -41,9 +41,14 @@ const theme = {
       "0%": { transform: "scale(0)" },
       "100%": { transform: "scale(1)" },
     },
+    fadeIn: {
+      "0%": { opacity: 0 },
+      "100%": { opacity: 1 },
+    },
   },
   animation: {
     "bounce-scale": "bouncescale 1s ease-in-out infinite",
+    "fade-in": "fadeIn 0.1s ease-in-out",
   },
 };
 
