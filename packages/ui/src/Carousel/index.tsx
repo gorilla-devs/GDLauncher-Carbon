@@ -9,19 +9,19 @@ interface Props {
 
 const Carousel = (props: Props) => {
   const [currentSlide, setCurrentSlide] = createSignal(0);
+  const [startX, setStartX] = createSignal(0);
+  const [scrollLeft, setScrollLeft] = createSignal(0);
+  const [isDown, setIsDown] = createSignal(false);
   let horizontalSlider: HTMLDivElement | undefined;
   let scrollWrapper: HTMLDivElement | undefined;
 
   onMount(() => {
-    // const slider = document.getElementById("horizontal-slider");
     const beginning = horizontalSlider?.scrollLeft;
     setCurrentSlide(beginning || 0);
   });
 
   const handleScroll = (direction: string) => {
     const isLeft = direction === "left";
-    // const slider = document.getElementById("horizontal-slider");
-    // const wrapper = document.getElementById("scroll-wrapper");
 
     const scrollWidth = horizontalSlider?.scrollWidth || 0;
     const scrollLeft = horizontalSlider?.scrollLeft || 0;
@@ -67,6 +67,32 @@ const Carousel = (props: Props) => {
           ref={horizontalSlider}
           id="horizontal-slider"
           class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
+          onMouseDown={(e) => {
+            setIsDown(true);
+            horizontalSlider?.classList.add("snap-none");
+            const offsetLeft = horizontalSlider?.offsetLeft || 0;
+            setStartX(e.pageX - offsetLeft);
+            setScrollLeft(offsetLeft);
+          }}
+          onMouseMove={(e) => {
+            if (!isDown()) return;
+            e.preventDefault();
+            const x = e.pageX - (horizontalSlider?.offsetLeft || 0);
+            const walk = (x - startX()) * 2;
+
+            if (horizontalSlider) {
+              horizontalSlider.scrollLeft = scrollLeft() - walk;
+              // setCurrentSlide(currentSlide() - walk);
+            }
+          }}
+          onMouseLeave={() => {
+            setIsDown(false);
+            horizontalSlider?.classList.remove("snap-none");
+          }}
+          onMouseUp={() => {
+            setIsDown(false);
+            horizontalSlider?.classList.remove("snap-none");
+          }}
         >
           {props.children}
         </div>
