@@ -36,7 +36,6 @@ const getVariant = (
     "duration-500": true,
     "ease-in-out": true,
     "font-main": true,
-    "animate-bounce": isLoading,
     "max-w-max": !isLoading,
     "font-bold": true,
     flex: true,
@@ -56,7 +55,7 @@ const getVariant = (
     "cursor-pointer": !isLoading,
     "box-border": true,
     "border-solid": true,
-    "w-12": isLoading,
+    "scale-x-100": isLoading,
     "p-0": isLoading,
     "text-white": !isDisabled,
     "flex-row-reverse": iconRight,
@@ -139,28 +138,42 @@ function Button(props: Props) {
   );
 
   return (
-    <button
-      classList={getVariant(
-        props.variant || "primary",
-        mergedProps.rounded,
-        props.size || "medium",
-        !!props.disabled,
-        mergedProps.uppercase,
-        !!props.iconRight,
-        !!props.loading
-      )}
-      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
-      style={{
-        ...(mergedProps.variant === "transparent" && {
-          background: "rgba(0, 0, 0, 0.4)",
-        }),
-      }}
-    >
-      <Show when={props.icon}>{props.icon}</Show>
-      <Show when={props.loading} fallback={c()}>
-        <Spinner />
-      </Show>
-    </button>
+    <div class="w-fit h-fit">
+      <button
+        classList={getVariant(
+          props.variant || "primary",
+          mergedProps.rounded,
+          props.size || "medium",
+          !!props.disabled,
+          mergedProps.uppercase,
+          !!props.iconRight,
+          !!props.loading
+        )}
+        {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+        style={{
+          ...(mergedProps.variant === "transparent" && {
+            background: "rgba(0, 0, 0, 0.4)",
+          }),
+        }}
+      >
+        <Show when={props.icon}>{props.icon}</Show>
+        <Show
+          when={!props.loading}
+          fallback={
+            <div class="w-12 h-12 flex justify-center items-center">
+              <Spinner />
+            </div>
+          }
+        >
+          {c()}
+        </Show>
+      </button>
+      {/* <Show when={props.loading}>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+          <Spinner />
+        </div>
+      </Show> */}
+    </div>
   );
 }
 
