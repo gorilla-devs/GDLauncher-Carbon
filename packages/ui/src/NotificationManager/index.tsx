@@ -22,14 +22,7 @@ const NotificationContext = createContext();
 const NotificationsProvider = (props: Props) => {
   const [notifications, setNotifications] = createSignal<Notification[]>([]);
 
-  const clearNotification = () =>
-    setTimeout(
-      () =>
-        setNotifications((notification) =>
-          notification.slice(1, notification.length)
-        ),
-      2000
-    );
+  let notificationTimeOut: ReturnType<typeof setTimeout> | undefined;
 
   const addNotification = (name: string, type?: string, position?: string) => {
     setNotifications((prev) => [
@@ -42,10 +35,17 @@ const NotificationsProvider = (props: Props) => {
         position: position || "bottom",
       },
     ]);
-    clearNotification();
+
+    notificationTimeOut = setTimeout(
+      () =>
+        setNotifications((notification) =>
+          notification.slice(1, notification.length)
+        ),
+      2000
+    );
   };
 
-  onCleanup(() => clearTimeout(clearNotification()));
+  onCleanup(() => clearTimeout(notificationTimeOut));
 
   const value = [addNotification];
 
@@ -55,7 +55,7 @@ const NotificationsProvider = (props: Props) => {
         <For each={notifications()}>
           {(notification, i) => (
             <div
-              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-50"
+              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-60"
               style={{
                 transform: `translate(-50%, ${
                   notification.position === "bottom"
