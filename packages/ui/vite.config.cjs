@@ -12,7 +12,7 @@ export default defineConfig({
       tsConfigFilePath: resolve(__dirname, "tsconfig.json"),
     }),
     solidPlugin(),
-    Unocss(unocssConfig),
+    process.env.STORYBOOK && Unocss(unocssConfig),
   ],
   test: {
     globals: true,

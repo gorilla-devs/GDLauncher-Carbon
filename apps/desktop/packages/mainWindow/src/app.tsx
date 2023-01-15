@@ -1,6 +1,6 @@
-import { Component, createEffect, Show } from "solid-js";
+import { Component, createEffect, Show, Suspense } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
-import { routes } from "./routes";
+import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 // import { Notifications } from "@gd/ui";
 import { createInvalidateQuery, rspc } from "./utils/rspcClient";
@@ -8,6 +8,7 @@ import { createInvalidateQuery, rspc } from "./utils/rspcClient";
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
+
   let javas = rspc.createQuery(() => ["java.getAvailableJavas", null]);
 
   createInvalidateQuery();
@@ -45,7 +46,9 @@ const App: Component = () => {
       <AppNavbar />
       <div class="flex h-screen w-screen z-10">
         <main class="relative flex-1 overflow-hidden">
-          <Route />
+          <Suspense fallback={<></>}>
+            <Route />
+          </Suspense>
         </main>
       </div>
       {/* <Notifications /> */}

@@ -58,6 +58,11 @@ export const routes: RouteDefinition[] = [
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
+        data: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10000));
+          console.log("Fetching whatever data...");
+          return {};
+        },
         children: [
           {
             path: "/",

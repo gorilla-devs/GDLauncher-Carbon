@@ -1,4 +1,4 @@
-import getRouteIndex from "@/utils/getRouteIndex";
+import getRouteIndex from "@/route/getRouteIndex";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
 import { For } from "solid-js";

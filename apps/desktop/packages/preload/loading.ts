@@ -9,10 +9,6 @@ function useLoading() {
       oDiv!.innerHTML = `<div>Loaded ${loaded} / ${total} modules</div>`;
     },
     async clearLoading() {
-      // const root = document.getElementById("root") as HTMLDivElement;
-      // oDiv!.style.transform = "translateY(-100%)";
-      // root.style.transform = "translateY(0)";
-      // await new Promise((resolve) => setTimeout(resolve, 250));
       oDiv.remove();
     },
     fatalError(error: string, moduleName?: string) {

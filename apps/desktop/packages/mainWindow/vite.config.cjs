@@ -2,15 +2,11 @@ import { resolve, join } from "node:path";
 import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
-import { ViteMinifyPlugin } from "vite-plugin-minify";
 import pkg from "../../package.json";
 // TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
 
 const unocssConfig = require("@gd/config").unocssConfig;
 
-/**
- * @see https://vitejs.dev/config/
- */
 export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
@@ -33,7 +29,6 @@ export default defineConfig({
         ],
       ],
     }),
-    ViteMinifyPlugin({}),
   ],
   envDir: resolve(__dirname, "../../../../"),
   base: "./",

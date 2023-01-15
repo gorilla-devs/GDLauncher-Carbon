@@ -14,5 +14,3 @@ export { Spinner } from "./Spinner";
 // export { Notifications, addNotification } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
 export * from "./themes";
-
-import "virtual:uno.css";

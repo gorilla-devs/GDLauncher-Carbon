@@ -8,11 +8,9 @@ export interface Route {
 
 const getRouteIndex = (
   routes: Route[],
-  pathname: string,
+  _pathname: string, //  for reactivity
   isExact: boolean = false
 ) => {
-  // For reactivity?
-  pathname;
   return routes.findIndex((route) => {
     const matchesBase = useMatch(() => route.path)();
     const matchesChildren = useMatch(() => `${route.path}/*`)();

@@ -1,9 +1,15 @@
-import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import {
+  Link,
+  useIsRouting,
+  useLocation,
+  useMatch,
+  useNavigate,
+} from "@solidjs/router";
+import { createEffect, For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs } from "@gd/ui";
-import getRouteIndex from "@/utils/getRouteIndex";
+import getRouteIndex from "@/route/getRouteIndex";
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
 // const isLocationMatch = (path: string) => {
