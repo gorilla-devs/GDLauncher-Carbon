@@ -70,7 +70,7 @@ const Carousel = (props: Props) => {
           onMouseDown={(e) => {
             setIsDown(true);
             horizontalSlider?.classList.add("snap-none");
-            horizontalSlider?.classList.remove("snap-x");
+            horizontalSlider?.classList.remove("snap-x", "snap-mandatory");
             const offsetLeft = horizontalSlider?.offsetLeft || 0;
             setStartX(e.pageX - offsetLeft);
             setScrollLeft(offsetLeft);
@@ -89,12 +89,12 @@ const Carousel = (props: Props) => {
           onMouseLeave={() => {
             setIsDown(false);
             horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add("snap-x");
+            horizontalSlider?.classList.add("snap-x", "snap-mandatory");
           }}
           onMouseUp={() => {
             setIsDown(false);
             horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add("snap-x");
+            horizontalSlider?.classList.add("snap-x", "snap-mandatory");
           }}
         >
           {props.children}
