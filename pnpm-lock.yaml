@@ -30,6 +30,7 @@ importers:
       electron-updater: ^5.3.0
       eslint: ^8.31.0
       eslint-config-prettier: ^8.6.0
+      eslint-plugin-i18next: 6.0.0-6
       eslint-plugin-prettier: ^4.2.1
       eslint-plugin-solid: ^0.9.1
       event-lite: ^0.1.2
@@ -62,6 +63,7 @@ importers:
       electron-updater: 5.3.0
       eslint: 8.31.0
       eslint-config-prettier: 8.6.0_eslint@8.31.0
+      eslint-plugin-i18next: 6.0.0-6
       eslint-plugin-prettier: 4.2.1_32m5uc2milwdw3tnkcq5del26y
       eslint-plugin-solid: 0.9.1_iukboom6ndih5an6iafl45j2fe
       event-lite: 0.1.2
@@ -10538,6 +10540,14 @@ packages:
       eslint: 8.31.0
     dev: true
 
+  /eslint-plugin-i18next/6.0.0-6:
+    resolution: {integrity: sha512-Wl9Ko3AUORoOXm8Gve8BlfasT2dyIcDu1WgPUpLK3G6D/CDDOH33mF5Nd+TThkRVFKIoFY8QObZtnmn9jf9qxA==}
+    engines: {node: '>=0.10.0'}
+    dependencies:
+      lodash: 4.17.21
+      requireindex: 1.1.0
+    dev: true
+
   /eslint-plugin-prettier/4.2.1_32m5uc2milwdw3tnkcq5del26y:
     resolution: {integrity: sha512-f/0rXLXUt0oFYs8ra4w49wYZBG5GKZpAYsJSm6rnYL5uVDjd+zowwMwVZHnAjf4edNrKpCDYfXDgmRE/Ak7QyQ==}
     engines: {node: '>=12.0.0'}
@@ -16445,6 +16455,11 @@ packages:
   /require-from-string/2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
     engines: {node: '>=0.10.0'}
+    dev: true
+
+  /requireindex/1.1.0:
+    resolution: {integrity: sha512-LBnkqsDE7BZKvqylbmn7lTIVdpx4K/QCduRATpO5R+wtPmky/a8pN1bO2D6wXppn1497AJF9mNjqAXr6bdl9jg==}
+    engines: {node: '>=0.10.5'}
     dev: true
 
   /requires-port/1.0.0:

@@ -18,7 +18,6 @@ const Sidebar = () => {
         icon={<div class="i-ri:search-line" />}
         class="w-full rounded-full text-black-lightGray"
       />
-      Sidebar library
       {t("hello")}
       {t("world")}
       <button onClick={() => changeLang("it")}>IT</button>
