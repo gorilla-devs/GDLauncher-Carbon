@@ -33,7 +33,7 @@ const getVariant = (
 
   const commonStyle = {
     "transition-all": true,
-    "duration-500": true,
+    "duration-300": true,
     "ease-in-out": true,
     "font-main": true,
     "max-w-max": !isLoading,
