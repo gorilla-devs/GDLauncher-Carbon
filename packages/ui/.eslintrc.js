@@ -7,13 +7,10 @@ module.exports = {
   overrides: [],
   rules: {
     "prettier/prettier": ["error", { endOfLine: "lf" }],
-    rules: {
-      "prettier/prettier": ["error", { endOfLine: "lf" }],
-      "no-unused-vars": [
-        "error",
-        { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
-      ],
-    },
+    "no-unused-vars": [
+      "error",
+      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
+    ],
   },
   parser: "@typescript-eslint/parser",
   plugins: ["solid", "prettier"],
