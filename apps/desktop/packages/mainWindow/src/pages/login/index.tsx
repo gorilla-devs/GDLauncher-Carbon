@@ -1,7 +1,5 @@
 import { Dropdown } from "@gd/ui";
 import { createSignal, Switch, Match } from "solid-js";
-import { useI18n } from "@solid-primitives/i18n";
-import { getTranslationByLanguage } from "@gd/i18n";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 
@@ -9,7 +7,6 @@ export default function Login() {
   const [step, setStep] = createSignal(0);
   const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
   // @ts-ignore
-  const [t, { add, locale }] = useI18n();
 
   return (
     <div class="flex justify-center items-center w-full h-full bg-image-loginBG.jpg p-0">
@@ -26,12 +23,12 @@ export default function Login() {
             { label: "italian", key: "it" },
           ]}
           value={"asc"}
-          onChange={(lang) => {
-            getTranslationByLanguage(lang.key).then((translations) => {
-              add(lang.key, translations);
-              locale(lang.key);
-            });
-          }}
+          // onChange={(lang) => {
+          //   getTranslationByLanguage(lang.key).then((translations) => {
+          //     add(lang.key, translations);
+          //     locale(lang.key);
+          //   });
+          // }}
           rounded
         />
       </div>

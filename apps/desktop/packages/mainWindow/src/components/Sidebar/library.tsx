@@ -1,16 +1,14 @@
-import { getTranslationByLanguage } from "@gd/i18n";
+import { loadLanguageFile, useTransContext } from "@gd/i18n";
 import { Input } from "@gd/ui";
-import { useI18n } from "@solid-primitives/i18n";
 import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
-  const [t, { add, locale }] = useI18n();
+  const [t, { changeLanguage, addResources }] = useTransContext();
 
   const changeLang = async (lang: string) => {
-    getTranslationByLanguage(lang).then((translations) => {
-      add(lang, translations);
-      locale(lang);
-    });
+    const langFile = await loadLanguageFile(lang);
+    addResources(lang, "common", langFile);
+    await changeLanguage(lang);
   };
 
   return (

@@ -20,7 +20,6 @@ importers:
       '@playwright/test': ^1.29.1
       '@rspc/client': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
       '@rspc/solid': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
-      '@solid-primitives/i18n': ^1.1.2
       '@solidjs/router': ^0.6.0
       '@typescript-eslint/parser': ^5.48.0
       chokidar: ^3.5.3
@@ -44,8 +43,6 @@ importers:
       vite: ^3.2.4
       vite-plugin-minify: ^1.5.2
       vite-plugin-solid: ^2.5.0
-    dependencies:
-      '@solid-primitives/i18n': 1.1.2_solid-js@1.6.7
     devDependencies:
       '@aws-sdk/client-s3': 3.241.0
       '@gd/config': link:../../packages/config
@@ -153,7 +150,16 @@ importers:
       unocss: 0.48.0_vite@4.0.4
 
   packages/i18n:
-    specifiers: {}
+    specifiers:
+      '@mbarzda/solid-i18next': ^1.2.0
+      html-parse-string: ^0.0.8
+      i18next: ^22.1.5
+      i18next-icu: ^2.1.0
+    devDependencies:
+      '@mbarzda/solid-i18next': 1.2.0_apk5tq3hzmnmypqfjbvurzmbyi
+      html-parse-string: 0.0.8
+      i18next: 22.1.5
+      i18next-icu: 2.1.0_intl-messageformat@10.2.5
 
   packages/native_interface:
     specifiers:
@@ -3470,6 +3476,40 @@ packages:
       - supports-color
     dev: true
 
+  /@formatjs/ecma402-abstract/1.14.3:
+    resolution: {integrity: sha512-SlsbRC/RX+/zg4AApWIFNDdkLtFbkq3LNoZWXZCE/nHVKqoIJyaoQyge/I0Y38vLxowUn9KTtXgusLD91+orbg==}
+    dependencies:
+      '@formatjs/intl-localematcher': 0.2.32
+      tslib: 2.4.0
+    dev: true
+
+  /@formatjs/fast-memoize/1.2.7:
+    resolution: {integrity: sha512-hPeM5LXUUjtCKPybWOUAWpv8lpja8Xz+uKprFPJcg5F2Rd+/bf1E0UUsLRpaAgOReAf5HMRtoIgv/UcyPICrTQ==}
+    dependencies:
+      tslib: 2.4.0
+    dev: true
+
+  /@formatjs/icu-messageformat-parser/2.1.14:
+    resolution: {integrity: sha512-0KqeVOb72losEhUW+59vhZGGd14s1f35uThfEMVKZHKLEObvJdFTiI3ZQwvTMUCzLEMxnS6mtnYPmG4mTvwd3Q==}
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.14.3
+      '@formatjs/icu-skeleton-parser': 1.3.18
+      tslib: 2.4.0
+    dev: true
+
+  /@formatjs/icu-skeleton-parser/1.3.18:
+    resolution: {integrity: sha512-ND1ZkZfmLPcHjAH1sVpkpQxA+QYfOX3py3SjKWMUVGDow18gZ0WPqz3F+pJLYQMpS2LnnQ5zYR2jPVYTbRwMpg==}
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.14.3
+      tslib: 2.4.0
+    dev: true
+
+  /@formatjs/intl-localematcher/0.2.32:
+    resolution: {integrity: sha512-k/MEBstff4sttohyEpXxCmC3MqbUn9VvHGlZ8fauLzkbwXmVrEeyzS+4uhrvAk9DWU9/7otYWxyDox4nT/KVLQ==}
+    dependencies:
+      tslib: 2.4.0
+    dev: true
+
   /@gar/promisify/1.1.3:
     resolution: {integrity: sha512-k2Ty1JcVojjJFwrg/ThKi2ujJ7XNLYaFGNB/bWT9wGR+oSMJHMa5w+CUq6p/pVrKeNNgA7pCqEcjSnHVoqJQFw==}
     dev: true
@@ -3702,6 +3742,16 @@ packages:
       tmp-promise: 3.0.3
     transitivePeerDependencies:
       - supports-color
+    dev: true
+
+  /@mbarzda/solid-i18next/1.2.0_apk5tq3hzmnmypqfjbvurzmbyi:
+    resolution: {integrity: sha512-qMK/85MkT5EFaVOOmj68kPRVefQTAntbGMKT0625GE+pvOiQBb/isiYq5e/laY6n34F9rLIaYI8Ka0VTyvc7fQ==}
+    peerDependencies:
+      i18next: '>=21.x'
+      solid-js: '>=1.5.x'
+    dependencies:
+      i18next: 22.1.5
+      solid-js: 1.6.7
     dev: true
 
   /@mdx-js/mdx/1.6.22:
@@ -4018,14 +4068,6 @@ packages:
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
     engines: {node: '>=10'}
     dev: true
-
-  /@solid-primitives/i18n/1.1.2_solid-js@1.6.7:
-    resolution: {integrity: sha512-eLTqmDKorLa99cXrgS4DgTqrk0n/F4rB0YR76A6gr90by5TLE+HSZ0agiZVBIUGs2g5EFeEnLqwxKsM+F5hcJQ==}
-    peerDependencies:
-      solid-js: ^1.5.0
-    dependencies:
-      solid-js: 1.6.7
-    dev: false
 
   /@solidjs/router/0.6.0_solid-js@1.6.7:
     resolution: {integrity: sha512-7ug2fzXXhvvDBL4CQyMvMM9o3dgBE6PoRh38T8UTmMnYz4rcCfROqSZc9yq+YEC96qWt5OvJgZ1Uj/4EAQXlfA==}
@@ -9242,6 +9284,7 @@ packages:
 
   /csstype/3.1.1:
     resolution: {integrity: sha512-DJR/VvkAvSZW9bTouZue2sSxDwdTN92uHjqeKVm+0dAqdfNykRzQ95tay8aXMBAAPpUiq4Qcug2L7neoRh2Egw==}
+    dev: true
 
   /currently-unhandled/0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
@@ -12114,6 +12157,10 @@ packages:
       terser: 5.15.1
     dev: true
 
+  /html-parse-string/0.0.8:
+    resolution: {integrity: sha512-WHEaU9koioRM6zPZ/iePtpN8B6JbbQTy4hpxOKbXVg79mSUUTWY1gODMET68dj0n7LZhjgjFAIVvUJV4bh61Hg==}
+    dev: true
+
   /html-tags/3.2.0:
     resolution: {integrity: sha512-vy7ClnArOZwCnqZgvv+ddgHgJiAFXe3Ge9ML5/mBctVJoUoYPCdxVucOywjDARn6CVoh3dRSFdPHy2sX80L0Wg==}
     engines: {node: '>=8'}
@@ -12236,6 +12283,14 @@ packages:
       cross-fetch: 3.1.5
     transitivePeerDependencies:
       - encoding
+    dev: true
+
+  /i18next-icu/2.1.0_intl-messageformat@10.2.5:
+    resolution: {integrity: sha512-Z3EsOOItX4atEb2rbu1gq0mtRcQpzJ/muWEyRTKnqWz0qY0HrLfaJ2bo62f+rTF+LPbLXQ1vjHMIv4dSLPW1oQ==}
+    peerDependencies:
+      intl-messageformat: ^10.2.4
+    dependencies:
+      intl-messageformat: 10.2.5
     dev: true
 
   /i18next/22.1.5:
@@ -12373,6 +12428,15 @@ packages:
   /interpret/2.2.0:
     resolution: {integrity: sha512-Ju0Bz/cEia55xDwUWEa8+olFpCiQoypjnQySseKtmjNrnps3P+xfpUmGr90T7yjlVJmOtybRvPXhKMbHr+fWnw==}
     engines: {node: '>= 0.10'}
+    dev: true
+
+  /intl-messageformat/10.2.5:
+    resolution: {integrity: sha512-AievYMN6WLLHwBeCTv4aRKG+w3ZNyZtkObwgsKk3Q7GNTq8zDRvDbJSBQkb2OPeVCcAKcIXvak9FF/bRNavoww==}
+    dependencies:
+      '@formatjs/ecma402-abstract': 1.14.3
+      '@formatjs/fast-memoize': 1.2.7
+      '@formatjs/icu-messageformat-parser': 2.1.14
+      tslib: 2.4.0
     dev: true
 
   /ip/2.0.0:
@@ -17039,6 +17103,7 @@ packages:
     resolution: {integrity: sha512-yLLw9mtTqPEEPxmZfAHZi3DyP25XnQZ42+mDYuzhAdeqa+8EDuNKyxOXKY7PEFddCqp1G2UQI5O3JiJtE7yxBQ==}
     dependencies:
       csstype: 3.1.1
+    dev: true
 
   /solid-refresh/0.4.1_solid-js@1.6.4:
     resolution: {integrity: sha512-v3tD/OXQcUyXLrWjPW1dXZyeWwP7/+GQNs8YTL09GBq+5FguA6IejJWUvJDrLIA4M0ho9/5zK2e9n+uy+4488g==}
