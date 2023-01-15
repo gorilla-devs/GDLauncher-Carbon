@@ -21,8 +21,9 @@ const NotificationContext = createContext();
 
 const NotificationsProvider = (props: Props) => {
   const [notifications, setNotifications] = createSignal<Notification[]>([]);
-
-  let notificationTimeOut: ReturnType<typeof setTimeout> | undefined;
+  const [notificationTimeOut, setNotificationTimeOut] = createSignal<
+    ReturnType<typeof setTimeout>[]
+  >([]);
 
   const addNotification = (name: string, type?: string, position?: string) => {
     setNotifications((prev) => [
@@ -36,16 +37,21 @@ const NotificationsProvider = (props: Props) => {
       },
     ]);
 
-    notificationTimeOut = setTimeout(
-      () =>
+    setNotificationTimeOut((prev) => [
+      ...prev,
+      setTimeout(() => {
         setNotifications((notification) =>
           notification.slice(1, notification.length)
-        ),
-      2000
-    );
+        );
+      }, 2000),
+    ]);
   };
 
-  onCleanup(() => clearTimeout(notificationTimeOut));
+  onCleanup(() => {
+    for (const notificationTimeOutt of notificationTimeOut()) {
+      clearTimeout(notificationTimeOutt);
+    }
+  });
 
   const value = [addNotification];
 
