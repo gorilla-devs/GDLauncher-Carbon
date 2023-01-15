@@ -10,6 +10,7 @@ import { initModules } from "@/modules";
 import "virtual:uno.css";
 import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
+import { NotificationsProvider } from "@gd/ui";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -23,7 +24,9 @@ render(() => {
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <App />
+        <NotificationsProvider>
+          <App />
+        </NotificationsProvider>
       </Router>
     </rspc.Provider>
   );
