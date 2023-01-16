@@ -2,6 +2,7 @@ import { JSXElement, Match, Show, Switch } from "solid-js";
 import { SpacingTab, useTabsContext } from "./Tabs";
 
 interface Props {
+  aligment: "between" | "default";
   children: Element[] | JSXElement;
 }
 
@@ -63,7 +64,7 @@ const TabList = (props: Props) => {
 
   return (
     <div
-      class="flex relative items-center h-auto"
+      class="flex relative items-center h-auto w-full"
       classList={{
         "bg-shade-8": tabsContext?.variant === "underline",
         "bg-shade-9": tabsContext?.variant === "block",
@@ -72,10 +73,11 @@ const TabList = (props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
-            class="flex gap-6 border-b-shade-8 border-b-1 box-border overflow-auto"
+            class="flex gap-6 border-b-shade-8 border-b-1 box-border overflow-auto w-full"
             classList={{
               "flex-row": tabsContext?.orientation === "horizontal",
               "flex-col": tabsContext?.orientation === "vertical",
+              "justify-between": props.aligment === "between",
             }}
           >
             {props.children}
@@ -116,6 +118,7 @@ const TabList = (props: Props) => {
             classList={{
               "flex-row": tabsContext?.orientation === "horizontal",
               "flex-col": tabsContext?.orientation === "vertical",
+              "justify-between": props.aligment === "between",
             }}
           >
             {props.children}

@@ -120,7 +120,7 @@ function Tabs(props: Props) {
   return (
     <TabsContext.Provider value={context}>
       <div
-        class="flex transition-all duration-100 ease-in-out"
+        class="flex transition-all duration-100 ease-in-out w-full"
         classList={{
           "flex-row": orientation() === "vertical",
           "flex-col": orientation() === "horizontal",

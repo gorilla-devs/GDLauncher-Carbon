@@ -28,8 +28,8 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-shade-8 text-white h-15 flex items-center justify-between px-5">
-        <div class="flex">
+      <nav class="bg-shade-8 text-white h-15 flex items-center px-5">
+        <div class="flex w-full">
           <div class="w-36 flex items-center">
             <img
               src={GDLauncherWideLogo}
@@ -37,48 +37,52 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
+          <ul class="flex items-between gap-6 m-0 text-white list-none pl-10 w-full">
             <Tabs index={selectedIndex()}>
-              <TabList>
-                <For each={NAVBAR_ROUTES}>
-                  {(route) => {
-                    const isMatch = useMatch(() => route.path);
+              <TabList aligment="between">
+                <div class="flex gap-6">
+                  <For each={NAVBAR_ROUTES}>
+                    {(route) => {
+                      const isMatch = useMatch(() => route.path);
 
-                    return (
-                      <Link
-                        href={route.path}
-                        class="no-underline"
-                        classList={{
-                          "text-white": !!isMatch(),
-                          "text-slate-400": !isMatch(),
-                        }}
-                      >
-                        <Tab>
-                          <li class="no-underline">{route.label}</li>
-                        </Tab>
-                      </Link>
-                    );
-                  }}
-                </For>
-                <Spacing class="w-50" />
-                <Tab>Pippo Baudo</Tab>
+                      return (
+                        <Link
+                          href={route.path}
+                          class="no-underline"
+                          classList={{
+                            "text-white": !!isMatch(),
+                            "text-slate-400": !isMatch(),
+                          }}
+                        >
+                          <Tab>
+                            <li class="no-underline">{route.label}</li>
+                          </Tab>
+                        </Link>
+                      );
+                    }}
+                  </For>
+                </div>
+                <Spacing class="w-full" />
+                <div class="flex gap-6">
+                  <Tab>
+                    <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
+                  </Tab>
+                  <Tab>
+                    <div
+                      class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
+                      classList={{
+                        "bg-primary": !!isSettings() || !!isSettingsNested(),
+                      }}
+                      onClick={() => navigate("/settings")}
+                    />
+                  </Tab>
+                  <Tab>
+                    <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
+                  </Tab>
+                </div>
               </TabList>
             </Tabs>
           </ul>
-        </div>
-        <div class="flex gap-5 items-center">
-          <div class="flex gap-5">
-            <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
-            <div
-              class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
-              classList={{
-                "bg-primary": !!isSettings() || !!isSettingsNested(),
-              }}
-              onClick={() => navigate("/settings")}
-            />
-            <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
-          </div>
-          <div class="w-40 h-10 bg-shade-7" />
         </div>
       </nav>
     </Show>
