@@ -6,7 +6,6 @@ use futures::TryFutureExt;
 use std::{
     borrow::BorrowMut,
     collections::HashMap,
-    os::unix::prelude::PermissionsExt,
     path::{Path, PathBuf},
 };
 use tokio::sync::watch::Sender;
@@ -81,11 +80,15 @@ impl JavaAuto for MojangRuntime {
         task_handle.await.unwrap().unwrap();
 
         // Fix permissions
-        let java_path = self.locate_binary(base_path).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::prelude::PermissionsExt;
+            let java_path = self.locate_binary(base_path).unwrap();
+            let mut perms = std::fs::metadata(&java_path).unwrap().permissions();
+            perms.set_mode(0o777);
+            std::fs::set_permissions(&java_path, perms).unwrap();
+        }
 
-        let mut perms = std::fs::metadata(&java_path).unwrap().permissions();
-        perms.set_mode(0o777);
-        std::fs::set_permissions(&java_path, perms).unwrap();
         Ok(())
     }
 
@@ -139,7 +142,7 @@ impl JavaAuto for MojangRuntime {
             }
             _ => unreachable!("Unsupported OS"),
         }
-        .ok_or_else(|| JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+        .ok_or(JavaError::NoJavaMojangJDKAvailableForOSArch)?;
 
         let runtime_list = match self.version {
             RuntimeEdition::Alpha => runtime_meta.java_runtime_alpha,
@@ -151,7 +154,7 @@ impl JavaAuto for MojangRuntime {
 
         let runtime = runtime_list
             .first()
-            .ok_or_else(|| JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+            .ok_or(JavaError::NoJavaMojangJDKAvailableForOSArch)?;
 
         let res = reqwest::get(&runtime.manifest.url)
             .await
@@ -190,12 +193,18 @@ impl JavaAuto for MojangRuntime {
 
     fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
         let path = match std::env::consts::OS {
-            "linux" | "windows" => base_path
+            "linux" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("mojang")
                 .join(Into::<String>::into(self.version.clone()))
                 .join("bin")
                 .join("java"),
+            "windows" => base_path
+                .join(JAVA_RUNTIMES_FOLDER)
+                .join("mojang")
+                .join(Into::<String>::into(self.version.clone()))
+                .join("bin")
+                .join("java.exe"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("mojang")

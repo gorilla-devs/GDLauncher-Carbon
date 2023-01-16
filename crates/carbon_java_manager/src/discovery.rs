@@ -103,23 +103,33 @@ fn search_java_binary_in_path(path: PathBuf) -> Vec<PathBuf> {
 }
 
 #[cfg(target_os = "windows")]
-fn read_registry_key(key: &str, value: &str, subkey_suffix: Option<&str>) -> Result<Vec<PathBuf>> {
+fn read_registry_key(
+    key: &str,
+    value: &str,
+    subkey_suffix: Option<&str>,
+) -> Result<Vec<PathBuf>, JavaError> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-    let key_reg = hkcu.open_subkey(key)?;
+    let key_reg = hkcu
+        .open_subkey(key)
+        .map_err(JavaError::CannotReadRegistryKey)?;
     let mut results = vec![];
 
     if let Some(subkey_suffix) = subkey_suffix {
         let subkeys = key_reg.enum_keys();
         for subkey in subkeys.flatten() {
             let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
-            let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
+            let subkey_reg = hkcu
+                .open_subkey(&joined_subkey)
+                .map_err(JavaError::CannotReadRegistryKey)?;
             let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);
             if let Ok(registry_str) = subkey_reg_value {
                 results.extend(search_java_binary_in_path(PathBuf::from(registry_str)));
             }
         }
     } else {
-        let s_value: String = key_reg.get_value(value)?;
+        let s_value: String = key_reg
+            .get_value(value)
+            .map_err(JavaError::CannotReadRegistryKey)?;
         results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
     }
     Ok(results)

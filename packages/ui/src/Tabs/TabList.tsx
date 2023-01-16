@@ -1,4 +1,4 @@
-import { JSXElement, Match, Show, Switch, createEffect } from "solid-js";
+import { JSXElement, Match, Show, Switch } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
 interface Props {
@@ -40,15 +40,6 @@ const TabList = (props: Props) => {
     return tab?.offsetHeight;
   };
 
-  createEffect(() => {
-    console.log(
-      "TEST",
-      getPositionPx(currentIndex()),
-      tabs()[currentIndex()],
-      tabs()
-    );
-  });
-
   return (
     <div
       class="flex relative items-center h-auto"
@@ -69,7 +60,7 @@ const TabList = (props: Props) => {
             {props.children}
             <Show when={tabs()[currentIndex()]}>
               <div
-                class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out animate-fade-in"
+                class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
                 classList={{
                   "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
                   "left-0": tabsContext?.orientation === "horizontal",

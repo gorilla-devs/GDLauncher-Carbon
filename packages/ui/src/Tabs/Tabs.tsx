@@ -11,7 +11,7 @@ export interface ITabsContext {
   variant: string;
   orientation: string;
   setSelectedIndex: (_: number) => void;
-  registerTab: (_: HTMLDivElement) => number;
+  registerTab: (_node: HTMLDivElement, _index?: number) => number;
   currentIndex: Accessor<number | undefined>;
   getRegisteredTabs: () => HTMLDivElement[];
   registerTabPanel: (_: HTMLDivElement) => number;
@@ -62,7 +62,13 @@ function Tabs(props: Props) {
     props?.onChange?.(index);
   };
 
-  const registerTab = (node: HTMLDivElement) => {
+  const registerTab = (node: HTMLDivElement, index?: number) => {
+    if (index !== undefined) {
+      const updatedArray = [...tabs()];
+      updatedArray[index] = node;
+      setTabs(updatedArray);
+      return index;
+    }
     const updatedArray = [...tabs(), node];
     setTabs(updatedArray);
     return updatedArray.length - 1;

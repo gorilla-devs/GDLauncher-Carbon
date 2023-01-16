@@ -1,24 +1,46 @@
-import { Match, Switch, createSignal, JSXElement, onMount } from "solid-js";
+import {
+  Match,
+  Switch,
+  createSignal,
+  JSXElement,
+  onMount,
+  onCleanup,
+  untrack,
+  JSX,
+  splitProps,
+} from "solid-js";
 import { useTabsContext } from "./Tabs";
 
-interface Props {
+interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   children: JSXElement | string | number;
-  onClick?: (_: number) => void;
+  onClick?: () => void;
 }
 
-const Tab = (props: Props) => {
+const Tab = (_props: Props) => {
+  const [onclick, props] = splitProps(_props, ["onClick"]);
   const [index, setIndex] = createSignal(-1);
-  const [ref, setRef] = createSignal<HTMLDivElement>();
+  let ref: HTMLDivElement;
 
   const tabsContext = useTabsContext();
 
+  let observer: ResizeObserver;
+
   onMount(() => {
-    // eslint-disable-next-line solid/reactivity
-    queueMicrotask(() => {
-      if (tabsContext) {
-        setIndex(tabsContext.registerTab(ref()!));
-      }
+    if (tabsContext) {
+      setIndex(tabsContext.registerTab(ref!));
+    }
+
+    observer = new ResizeObserver((args) => {
+      untrack(() => {
+        const cr = args[0].target as HTMLDivElement;
+        tabsContext!.registerTab(cr, index());
+      });
     });
+    observer.observe(ref!);
+  });
+
+  onCleanup(() => {
+    observer.disconnect();
   });
 
   return (
@@ -27,11 +49,14 @@ const Tab = (props: Props) => {
       classList={{
         "w-full": tabsContext?.variant === "block",
       }}
-      ref={setRef}
+      ref={(el) => {
+        ref = el;
+      }}
       onClick={() => {
-        props?.onClick?.(index());
+        if (onclick.onClick) onclick.onClick();
         tabsContext?.setSelectedIndex(index());
       }}
+      {...props}
     >
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>

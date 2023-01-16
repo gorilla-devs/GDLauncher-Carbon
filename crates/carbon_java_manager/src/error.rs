@@ -35,6 +35,8 @@ pub enum JavaError {
     CannotRunJavaInfoDetectProcess(std::io::Error),
     #[error("Cannot write java detect file to disk {0}")]
     CannotWriteJavaDetectFileToDisk(std::io::Error),
+    #[error("Cannot read registry key {0}")]
+    CannotReadRegistryKey(std::io::Error),
 
     // AdoptOpenJDK Errors
     #[error("Cannot retrieve OpenJDK assets")]

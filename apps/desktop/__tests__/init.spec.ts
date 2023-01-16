@@ -64,10 +64,12 @@ test.describe("Init Tests", () => {
     // capture errors
     page.on("pageerror", (error) => {
       console.error(error);
+      expect(error).toBeNull();
     });
     // capture console messages
     page.on("console", (msg) => {
       console.log(msg.text());
+      expect(msg.type()).not.toBe("error");
     });
 
     await new Promise((resolve) => setTimeout(resolve, 1000));

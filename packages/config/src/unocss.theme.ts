@@ -35,21 +35,6 @@ const theme = {
     "yellow-hover": "var(--yellow-hover)",
     // TODO: Move satisfies to the entire theme when possible
   } satisfies Theme,
-  // TODO: check how to implement animations in unocss
-  keyframes: {
-    bouncescale: {
-      "0%": { transform: "scale(0)" },
-      "100%": { transform: "scale(1)" },
-    },
-    fadeIn: {
-      "0%": { opacity: 0 },
-      "100%": { opacity: 1 },
-    },
-  },
-  animation: {
-    "bounce-scale": "bouncescale 1s ease-in-out infinite",
-    "fade-in": "fadeIn 0.1s ease-in-out",
-  },
 };
 
 export { theme };

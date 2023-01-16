@@ -15,12 +15,13 @@ export default defineConfig({
     Unocss({
       ...unocssConfig,
       rules: [
+        ...unocssConfig.rules,
         [
           /^bg-img-(.*)$/,
           ([, d]) => {
             const img = d.split("-")[0];
             return {
-              background: `url('./assets/images/${img}')`,
+              background: `url('./images/${img}')`,
               "background-size": "cover",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",

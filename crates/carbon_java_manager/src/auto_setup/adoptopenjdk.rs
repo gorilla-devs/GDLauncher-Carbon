@@ -114,12 +114,18 @@ impl JavaAuto for AdoptOpenJDK {
 
     fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
         let path = match std::env::consts::OS {
-            "linux" | "windows" => base_path
+            "linux" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")
                 .join(self.extract_folder_name.clone().unwrap())
                 .join("bin")
                 .join("java"),
+            "windows" => base_path
+                .join(JAVA_RUNTIMES_FOLDER)
+                .join("openjdk")
+                .join(self.extract_folder_name.clone().unwrap())
+                .join("bin")
+                .join("java.exe"),
             "macos" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
                 .join("openjdk")

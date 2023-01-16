@@ -8,7 +8,6 @@ import "@/utils/themeManager";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
 
 queueMicrotask(() => {
