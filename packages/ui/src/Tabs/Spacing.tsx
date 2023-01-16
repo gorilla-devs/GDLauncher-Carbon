@@ -13,7 +13,13 @@ const Spacing = (props: Props) => {
 
   onMount(() => {
     if (tabsContext) {
-      setIndex(tabsContext.registerTabSpacing(ref!));
+      setIndex(
+        tabsContext.registerTabSpacing({
+          ref: ref,
+          type: "spacing",
+          space: ref.offsetWidth,
+        })
+      );
     }
 
     observer = new ResizeObserver((args) => {
