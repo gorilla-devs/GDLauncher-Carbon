@@ -7,13 +7,17 @@ import {
   createEffect,
 } from "solid-js";
 
+export type SpacingTab = { ref: HTMLDivElement; type: string; space: number };
+
+type TabArrayElement = HTMLDivElement | SpacingTab;
 export interface ITabsContext {
   variant: string;
   orientation: string;
   setSelectedIndex: (_: number) => void;
   registerTab: (_node: HTMLDivElement, _index?: number) => number;
+  registerTabSpacing: (_obj: SpacingTab, _index?: number) => number;
   currentIndex: Accessor<number | undefined>;
-  getRegisteredTabs: () => HTMLDivElement[];
+  getRegisteredTabs: () => TabArrayElement[];
   registerTabPanel: (_: HTMLDivElement) => number;
   isSelectedIndex: (_: number) => boolean;
 }
@@ -45,7 +49,7 @@ function Tabs(props: Props) {
     setCurrentIndex(props.index !== undefined ? props.index : defaultIndex());
   });
 
-  const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
+  const [tabs, setTabs] = createSignal<TabArrayElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
 
   createEffect(() => {
@@ -74,6 +78,19 @@ function Tabs(props: Props) {
     return updatedArray.length - 1;
   };
 
+  const registerTabSpacing = (obj: SpacingTab, index?: number) => {
+    if (index !== undefined) {
+      const updatedArray = [...tabs()];
+      updatedArray[index] = obj;
+      setTabs(updatedArray);
+      return index;
+    }
+    const updatedArray = [...tabs(), obj] as TabArrayElement[];
+
+    setTabs(updatedArray);
+    return updatedArray.length - 1;
+  };
+
   const getRegisteredTabs = () => {
     return tabs();
   };
@@ -94,6 +111,7 @@ function Tabs(props: Props) {
     registerTab,
     currentIndex,
     getRegisteredTabs,
+    registerTabSpacing,
     registerTabPanel,
     variant: variant(),
     orientation: orientation(),

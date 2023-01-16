@@ -40,7 +40,7 @@ const Tab = (_props: Props) => {
   });
 
   onCleanup(() => {
-    observer.disconnect();
+    observer?.disconnect();
   });
 
   return (

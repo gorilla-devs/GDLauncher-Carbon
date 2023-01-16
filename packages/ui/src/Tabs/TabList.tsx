@@ -1,5 +1,5 @@
 import { JSXElement, Match, Show, Switch } from "solid-js";
-import { useTabsContext } from "./Tabs";
+import { SpacingTab, useTabsContext } from "./Tabs";
 
 interface Props {
   children: Element[] | JSXElement;
@@ -19,9 +19,22 @@ const TabList = (props: Props) => {
 
     let dimension = 0;
     for (const tab of filteredTabs) {
+      const isSpacing =
+        typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
+
       if (tabsContext?.orientation === "horizontal") {
-        dimension += tab.offsetWidth + 24;
-      } else dimension += tab.offsetHeight + 24;
+        if (isSpacing) {
+          dimension += (tab as SpacingTab).space + 24;
+        } else {
+          dimension += (tab as HTMLDivElement).offsetWidth + 24;
+        }
+      } else {
+        if (isSpacing) {
+          dimension += (tab as SpacingTab).space + 24;
+        } else {
+          dimension += (tab as HTMLDivElement).offsetHeight + 24;
+        }
+      }
     }
     return dimension;
   };
@@ -30,14 +43,22 @@ const TabList = (props: Props) => {
     if (index < 0 || index > tabs()?.length) return 0;
 
     const tab = tabs()[index];
-    return tab?.offsetWidth;
+
+    const isSpacing =
+      typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
+
+    return isSpacing ? "auto" : (tab as HTMLDivElement)?.offsetWidth;
   };
 
   const getHeight = (index: number) => {
     if (index < 0 || index > tabs()?.length) return 0;
 
     const tab = tabs()[index];
-    return tab?.offsetHeight;
+
+    const isSpacing =
+      typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
+
+    return isSpacing ? "auto" : (tab as HTMLDivElement)?.offsetHeight;
   };
 
   return (

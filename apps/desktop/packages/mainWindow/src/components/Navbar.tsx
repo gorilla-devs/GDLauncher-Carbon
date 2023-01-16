@@ -2,7 +2,7 @@ import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -30,11 +30,13 @@ const AppNavbar = () => {
     <Show when={!isLogin()}>
       <nav class="bg-shade-8 text-white h-15 flex items-center justify-between px-5">
         <div class="flex">
-          <img
-            src={GDLauncherWideLogo}
-            class="h-9 cursor-pointer"
-            onClick={() => navigate("/library")}
-          />
+          <div class="w-36 flex items-center">
+            <img
+              src={GDLauncherWideLogo}
+              class="h-9 cursor-pointer"
+              onClick={() => navigate("/library")}
+            />
+          </div>
           <ul class="flex items-between gap-6 m-0 text-white list-none pl-10">
             <Tabs index={selectedIndex()}>
               <TabList>
@@ -58,6 +60,8 @@ const AppNavbar = () => {
                     );
                   }}
                 </For>
+                <Spacing class="w-50" />
+                <Tab>Pippo Baudo</Tab>
               </TabList>
             </Tabs>
           </ul>
