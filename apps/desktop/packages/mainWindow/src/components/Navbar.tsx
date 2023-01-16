@@ -2,10 +2,12 @@ import { Link, useLocation, useNavigate } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
+import { useTransContext } from "@gd/i18n";
 
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [t] = useTransContext();
 
   return (
     <Show when={location.pathname !== "/"}>
@@ -27,7 +29,7 @@ const AppNavbar = () => {
                         "text-slate-400": !isActiveRoute(),
                       }}
                     >
-                      {route.label}
+                      {t(route.label)}
                     </Link>
                   </li>
                 );
