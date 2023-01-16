@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use async_stream::stream;
 use axum::{extract::Path, routing::get};
-use carbon_bindings::Ctx;
-use rspc::Config;
+use rspc::{Config, RouterBuilderLike};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
 
@@ -22,7 +21,10 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router = carbon_bindings::build_router().build().arced();
+    let router = carbon_bindings::api::build_router()
+        .expose()
+        .build()
+        .arced();
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
         .allow_methods(Any)
@@ -37,7 +39,6 @@ async fn start_router() {
                 .clone()
                 .endpoint(|Path(path): Path<String>| {
                     trace!("Client requested operation '{}'", path);
-                    Ctx {}
                 })
                 .axum(),
         )

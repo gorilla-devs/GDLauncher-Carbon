@@ -23,7 +23,7 @@ interface SliderProps {
   onClick?: any;
 }
 
-interface CarouselProps {
+export interface CarouselProps {
   slides: SlideProps[];
   speed?: number;
   rtl?: boolean;
@@ -153,13 +153,13 @@ const News = (props: CarouselProps) => {
     <div class="h-80 bg-green-400 rounded-lg relative overflow-hidden relative">
       <Show when={mergedProps.showArrows}>
         <div
-          class="h-7 w-7 bg-black-black rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
+          class="h-7 w-7 bg-shade-8 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
           onClick={() => changeSlide("left")}
         >
           <div class="i-ri:arrow-drop-left-line text-3xl text-white" />
         </div>
         <div
-          class="h-7 w-7 bg-black-black rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          class="h-7 w-7 bg-shade-8 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
           onClick={() => changeSlide("right")}
         >
           <div class="i-ri:arrow-drop-right-line text-3xl text-white" />

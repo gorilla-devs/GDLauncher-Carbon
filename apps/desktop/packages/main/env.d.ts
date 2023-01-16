@@ -5,7 +5,6 @@ interface ImportMetaEnv {
   NODE_ENV: "development" | "production";
   readonly VITE_DEV_SERVER_HOST: string;
   readonly VITE_DEV_SERVER_PORT: string;
-  VITE_NAPI_ID: string;
 }
 
 interface ImportMeta {

@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 
-interface Props {
+export interface Props {
   value?: string | number;
   placeholder?: string;
   error?: string;
@@ -16,22 +16,22 @@ function Input(props: Props) {
   return (
     <div class="h-10">
       <div
-        class={`bg-black-black flex items-center gap-2 max-w-max h-full ${
-          props.icon ? "bg-black-semiblack rounded-full px-4" : "rounded-md"
+        class={`bg-shade-8 flex items-center gap-2 max-w-max h-full ${
+          props.icon ? "bg-shade-7 rounded-full px-4" : "rounded-md"
         } ${props.class || ""}`}
       >
         <Show when={props.icon}>
-          <span class="text-black-gray">{props.icon}</span>
+          <span class="text-shade-5">{props.icon}</span>
         </Show>
         <input
-          class={`bg-black-black border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-black-gray ${
+          class={`bg-shade-8 border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-shade-5 ${
             props.inputClass || ""
           }
-           ${props.disabled ? "text-black-semiblack" : "text-white"}
+           ${props.disabled ? "text-shade-7" : "text-white"}
            ${
              props.icon
-               ? "bg-black-semiblack focus-visible:outline-none focus-visible:border-0"
-               : "px-4 focus-visible:outline-black-gray hover:border-black-gray active:border-black-gray"
+               ? "bg-shade-7 focus-visible:outline-none focus-visible:border-0"
+               : "px-4 focus-visible:outline-shade-5 hover:border-shade-5 active:border-shade-5"
            }
            outline-transparent
           `}

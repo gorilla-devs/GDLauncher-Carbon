@@ -12,7 +12,8 @@
   "scripts": {
     "build": "vite build --",
     "dev": "vite build --watch",
-    "storybook": "concurrently \"npm run dev\" \"start-storybook -p 6006\"",
+    "dev-storybook": "cross-env-shell STORYBOOK=true vite build --watch",
+    "storybook": "concurrently \"npm run dev-storybook\" \"start-storybook -p 6006\"",
     "build-storybook": "build-storybook",
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },

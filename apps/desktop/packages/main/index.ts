@@ -44,7 +44,7 @@ let win: BrowserWindow | null = null;
 const menu = Menu.buildFromTemplate([]);
 Menu.setApplicationMenu(menu);
 
-function getMinimumBounds() {
+function getAdSize() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
 
@@ -99,7 +99,7 @@ function getMinimumBounds() {
 }
 
 async function createWindow() {
-  const { minWidth, minHeight, width, height } = getMinimumBounds();
+  const { minWidth, minHeight, width, height } = getAdSize();
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -119,20 +119,18 @@ async function createWindow() {
   screen.addListener(
     "display-metrics-changed",
     (_, display, changedMetrics) => {
-      const { minWidth, minHeight } = getMinimumBounds();
+      const { minWidth, minHeight } = getAdSize();
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
-        win?.webContents.send("minimumBoundsChanged", {
-          ...getMinimumBounds(),
-        });
+        win?.webContents.send("adSizeChanged", getAdSize().adSize);
       }
     }
   );
 
   // Handlers
-  ipcMain.handle("getMinimumBounds", async () => {
-    return getMinimumBounds();
+  ipcMain.handle("getAdSize", async () => {
+    return getAdSize().adSize;
   });
 
   attachTitlebarToWindow(win);

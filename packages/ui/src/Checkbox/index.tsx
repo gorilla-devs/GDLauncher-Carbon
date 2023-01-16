@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 
-interface Props {
+export interface Props {
   checked: boolean;
   disabled: boolean;
   /* eslint-disable no-unused-vars */
@@ -15,9 +15,9 @@ function Checkbox(props: Props) {
   return (
     <div
       class={`flex justify-center items-center ${
-        checked() ? "bg-accent-main" : "bg-black-gray"
+        checked() ? "bg-accent-main" : "bg-shade-5"
       }  h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border ${
-        props.disabled ? "bg-black-black" : ""
+        props.disabled ? "bg-shade-8" : ""
       }`}
       onClick={() => {
         if (!props.disabled) {

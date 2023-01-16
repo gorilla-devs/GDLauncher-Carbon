@@ -6,12 +6,14 @@
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
+  "type": "module",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
     "release": "node scripts/release.mjs",
     "test": "playwright test",
-    "build": "node scripts/build.mjs && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.js",
+    "build-vite": "node scripts/build.mjs",
+    "build": "pnpm build-vite && cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.cjs",
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },
@@ -24,6 +26,7 @@
     "@rspc/client": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
     "@rspc/solid": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
     "@solidjs/router": "^0.6.0",
+    "@tanstack/solid-query": "^4.22.0",
     "@typescript-eslint/parser": "^5.48.0",
     "chokidar": "^3.5.3",
     "custom-electron-titlebar": "^4.1.5",
@@ -44,9 +47,7 @@
     "solid-transition-group": "^0.0.12",
     "typescript": "^4.9.4",
     "vite": "^3.2.4",
-    "vite-plugin-minify": "^1.5.2",
-    "vite-plugin-solid": "^2.5.0",
-    "@solid-primitives/i18n": "^1.1.2"
+    "vite-plugin-solid": "^2.5.0"
   },
   "env": {
     "//": "Used in build scripts",

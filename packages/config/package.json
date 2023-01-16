@@ -1,16 +1,29 @@
 {
   "name": "@gd/config",
   "version": "0.0.0",
-  "main": "index.ts",
-  "files": [
-    "tsconfig.json",
-    "index.ts"
-  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js"
+    },
+    "./tsconfig.json": "./tsconfig.json"
+  },
+  "scripts": {
+    "dev": "tsc -p . -m commonjs",
+    "build": "tsc -p . -m commonjs && node noop.js",
+    "lint": "tsc -p . -m commonjs --noEmit"
+  },
   "devDependencies": {
     "@iconify-json/heroicons": "^1.1.8",
     "@iconify-json/ri": "^1.1.4",
+    "@typescript-eslint/eslint-plugin": "^5.48.1",
     "@unocss/preset-icons": "^0.48.0",
     "@unocss/preset-wind": "^0.48.0",
-    "unocss": "^0.48.0"
+    "eslint": "^8.31.0",
+    "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "typescript": "^4.9.4",
+    "unocss": "^0.48.3"
   }
 }

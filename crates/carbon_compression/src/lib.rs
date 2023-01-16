@@ -110,7 +110,6 @@ where
     R: Read,
 {
     archive.unpack(dest_folder)?;
-
     Ok(())
 }
 

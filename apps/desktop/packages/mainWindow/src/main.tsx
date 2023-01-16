@@ -4,11 +4,10 @@ import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import App from "@/app";
+import "@/utils/themeManager";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
-import { initModules } from "@/modules";
 import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 
@@ -18,7 +17,7 @@ queueMicrotask(() => {
 
 render(() => {
   onMount(() => {
-    initModules();
+    window.clearLoading();
   });
 
   return (
