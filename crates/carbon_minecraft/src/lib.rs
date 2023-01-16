@@ -1,18 +1,17 @@
 mod mc;
 
-mod instance;
-mod app;
+pub mod app;
+pub mod instance;
 mod minecraft_package;
 mod minecraft_mod;
-mod modloader;
+pub mod modloader;
 mod package_file;
-
 
 #[macro_export]
 macro_rules! try_path_fmt {
     ($path:expr) => {
         {
-            camino::Utf8Path::from_path($path).map(ToString::to_string).unwrap_or("<<unrepresentable fs path!>>".to_string())
+            $path.as_os_str().to_str().unwrap_or("<<unrepresentable fs path!>>")
         }
     };
 }

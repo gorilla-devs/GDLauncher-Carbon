@@ -1,65 +1,89 @@
-
 #[cfg(test)]
 mod test {
+    use std::env;
     use std::path::PathBuf;
-    use std::sync::{Arc, Weak};
+    use env_logger::Builder;
+    use log::{debug, LevelFilter};
 
-    use tokio::sync::{Mutex, RwLock};
-
-    use crate::{
-        instance::{Instance, Modloaders},
-        modloaders::{vanilla::VanillaModLoader, Modloader},
-    };
-
-
-
-    use super::meta::McMeta;
+    use carbon_minecraft::{instance, try_path_fmt};
+    use carbon_minecraft::instance::{Instance, InstanceStatus};
+    use carbon_minecraft::instance::delete::delete;
+    use carbon_minecraft::instance::scan::check_instance_directory;
+    use carbon_minecraft::instance::write::write_at;
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_instance_crud() {
-
-        use crate::instance::{scan::InstanceScanner, write::InstanceWriter, delete::InstanceDeleter};
+        Builder::new().filter_level(LevelFilter::Trace).init();
 
         let test_assets_base_dir = std::env::current_dir().unwrap()
-            .join("test_assets")
             .join("test_assets");
 
-        let instance_scan_results = InstanceScanner::scan_for_instances( &PathBuf::from(&test_assets_base_dir)).await.unwrap();
+        let directory_to_scan = &PathBuf::from(&test_assets_base_dir);
+        debug!("scanning directory at {}", try_path_fmt!(directory_to_scan));
 
-        for scan_result in instance_scan_results {
-            println!("instance scan result : {:?}", instance_scan_results)
-        }
+        let instance_scan_results = instance::scan::scan_for_instances(directory_to_scan).await.unwrap();
 
-        let write_base_path = PathBuf::from(&test_assets_base_dir).join("");
+        debug!("Instance scan result {:?}", instance_scan_results);
 
+        let found_instances = instance_scan_results.into_iter().filter(|r|r.is_ok()).collect::<Vec<_>>();
 
-        let instance = Default::default();
-        let instance = instance::write::InstanceWriter::write_at(instance, &test_assets_base_dir).await.expect("");
-        let delete_result = InstanceDeleter::delete(instance, false).await.expect("");
+        assert_eq!(1, found_instances.len(), "found 0 good instance in {} we expected 1 !", try_path_fmt!(directory_to_scan));
+
+        let found_instance = Result::unwrap(found_instances.first().unwrap().as_ref());
+
+        debug!("Instance found : \n {}", serde_json::to_string_pretty(&found_instance).unwrap());
+
+        let new_instance = Instance::default();
+
+        assert_eq!(new_instance.persistence_status, InstanceStatus::NotPersisted, "newly constructed instance expected to be not persisted but is persisted !");
+
+        debug!("Instance found : \n {}", serde_json::to_string_pretty(&found_instance).unwrap());
+
+        let tmp_directory = env::temp_dir().join("GDLauncher_test");
+        let _ = std::fs::remove_dir_all(&tmp_directory);
+        let _ = std::fs::create_dir(&tmp_directory);
+
+        debug!("used tmp for the test : {}", try_path_fmt!(tmp_directory));
+
+        let new_instance = write_at(new_instance, &tmp_directory).await.unwrap();
+
+        assert!(check_instance_directory(&tmp_directory).await.is_ok());
+
+        debug!("instance correctly wrote at : {}", try_path_fmt!(tmp_directory));
+
+        debug!("trying to delete instance at : {}", try_path_fmt!(tmp_directory));
+
+        let new_instance = delete(new_instance, false).await.unwrap();
+
+        assert!(check_instance_directory(&tmp_directory).await.is_err());
+
+        assert_eq!(new_instance.persistence_status, InstanceStatus::NotPersisted, "deleted instance expected to be not persisted but remain persisted !" );
+
+        debug!("instance  correctly deleted at : {}", try_path_fmt!(tmp_directory));
 
     }
 
-    #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn test_versions_meta() {
-        // Test latest and download assets
-        let meta = McMeta::download_meta().await.unwrap();
-        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
-        // Test all versions meta
-        let tasks: Vec<_> = meta
-            .versions
-            .into_iter()
-            .map(|version| {
-                let base_dir = base_dir.clone();
-                tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
-            })
-            .collect();
+    /* #[tokio::test]
+     #[tracing_test::traced_test]
+     async fn test_versions_meta() {
+         // Test latest and download assets
+         let meta = McMeta::download_meta().await.unwrap();
+         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
+         // Test all versions meta
+         let tasks: Vec<_> = meta
+             .versions
+             .into_iter()
+             .map(|version| {
+                 let base_dir = base_dir.clone();
+                 tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
+             })
+             .collect();
 
-        for task in tasks {
-            task.await.unwrap();
-        }
-    }
+         for task in tasks {
+             task.await.unwrap();
+         }
+     }*/
 
     #[tokio::test]
     async fn test_download_mc() {

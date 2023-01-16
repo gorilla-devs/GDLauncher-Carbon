@@ -7,10 +7,9 @@ pub mod delete;
 
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use crate::instance;
 use crate::minecraft_package::MinecraftPackage;
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
 pub enum InstanceStatus{
     Persisted(PathBuf),
     NotPersisted
@@ -26,7 +25,7 @@ pub struct Instance{
 impl Instance {
 
     pub fn mutate_persistence_status(self, new_persistence_status : InstanceStatus) -> Instance{
-        let mut new_instance = Instance::from(self);
+        let mut new_instance = self;
         new_instance.persistence_status = new_persistence_status;
         new_instance
     }
@@ -51,5 +50,28 @@ impl Default for Instance {
 
 
 
+pub mod consts{
+    #[cfg(not(target_os="windows"))]
+    pub(crate) const SUBFOLDERS_TREE: &[&str] = &[
+        "minecraft",
+        "minecraft/mods",
+        "minecraft/core",
+        "minecraft/save_files",
+    ];
 
+    #[cfg(target_os="windows")]
+    pub(crate) const SUBFOLDERS_TREE: &'static [&'static str] = &[
+        PathBuf::from("minecraft"),
+        PathBuf::from(r"minecraft\mods"),
+        PathBuf::from(r"minecraft\core"),
+        PathBuf::from(r"minecraft\save_files"),
+    ];
+
+    pub(crate) const CONFIGURATION_FILE_RELATIVE_PATH: &str = ".conf.json";
+
+    pub(crate) const MINECRAFT_PACKAGE_RELATIVE_PATH: &str = "minecraft";
+
+    pub(crate) const FILES_TREE: &[&str] = &[CONFIGURATION_FILE_RELATIVE_PATH];
+
+}
 

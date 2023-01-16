@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
-use async_trait::async_trait;
+use log::trace;
 use thiserror::Error;
+use crate::try_path_fmt;
 use crate::minecraft_package::configuration::ConfigurationFileParsingError;
 use crate::minecraft_package::MinecraftPackage;
 
@@ -13,18 +14,15 @@ pub enum MinecraftPackageScanError{
 
 pub(crate) type MinecraftPackageScanResult = Result<MinecraftPackage, MinecraftPackageScanError>;
 
-pub(crate) const CONFIGURATION_FILE_RELATIVE_PATH: PathBuf = PathBuf::from(".conf.json");
+pub(crate) const CONFIGURATION_FILE_RELATIVE_PATH: &str = ".conf.json";
 
-#[async_trait]
-pub(crate) trait MinecraftPackageScanner {
 
-    async fn scan_for_packages<T : AsRef<Path> + Sync>(package_dir_path: & T) -> MinecraftPackageScanResult {
-        //fixme : provvisory implementation
-        let package_dir_path = package_dir_path.as_ref();
-        let configuration_file_path = &PathBuf::from(package_dir_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
-        Ok(crate::minecraft_package::configuration::ConfigurationFileParser::parse_from_file(configuration_file_path).await?.into())
-    }
-
+pub async fn scan_for_packages<T : AsRef<Path> + Sync>(package_dir_path: & T) -> MinecraftPackageScanResult {
+    let package_dir_path = package_dir_path.as_ref();
+    //fixme : provvisory implementation
+    trace!("scanning directory {} for minecraft package", try_path_fmt!(package_dir_path) );
+    let configuration_file_path = &PathBuf::from(package_dir_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
+    Ok(crate::minecraft_package::configuration::parse_from_file(configuration_file_path).await?.into())
 }
 
 

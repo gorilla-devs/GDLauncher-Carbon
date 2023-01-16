@@ -1,22 +1,20 @@
-use std::borrow::BorrowMut;
 use std::io;
 use std::path::Path;
 use log::trace;
 use thiserror::Error;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncReadExt;
 use crate::instance::Instance;
 use crate::try_path_fmt;
 
 #[derive(Debug, Serialize, Deserialize, Hash)]
-pub struct InstanceConfigurationFile {
+pub struct InstanceConfiguration {
     pub instance_name: String,
 }
 
-impl From<&Instance> for InstanceConfigurationFile {
+impl From<&Instance> for InstanceConfiguration {
     fn from(value: &Instance) -> Self {
-        InstanceConfigurationFile{ instance_name: value.name.clone() }
+        InstanceConfiguration { instance_name: value.name.clone() }
     }
 }
 
@@ -31,29 +29,26 @@ pub enum ConfigurationFileParsingError {
 
 }
 
-#[async_trait]
-pub(crate) trait ConfigurationFileParser {
-    async fn parse_from_file<T : AsRef<Path> + Sync>(configuration_file_path: &T) -> Result<InstanceConfigurationFile, ConfigurationFileParsingError> {
-        // todo : evaluate if is better to use a reader
-        let mut conf_file = & tokio::fs::File::open(configuration_file_path).await?;
-        let mut conf_file_content = &String::new();
-        let bytes_read = conf_file.read_to_string(conf_file_content.borrow_mut()).await?;
-        trace!("read {bytes_read} bytes from configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
-        serde_json::from_str(conf_file_content).map_err(Into::into)
-    }
+pub async fn parse_from_file<T : AsRef<Path> + Sync>(configuration_file_path: &T) -> Result<InstanceConfiguration, ConfigurationFileParsingError> {
+    // todo : evaluate if is better to use a reader
+    trace!("prepare reading of instance configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
+    let conf_file = &mut tokio::fs::File::open(configuration_file_path).await?;
+    let mut conf_file_content = String::new();
+    let bytes_read = conf_file.read_to_string(& mut conf_file_content).await?;
+    trace!("read {bytes_read} bytes from configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
+    let instance_configuration : InstanceConfiguration = serde_json::from_str(conf_file_content.as_str())?;
+    Ok(instance_configuration)
+}
 
-    // fixme: move to new trait
-    async fn write_in_file<T : AsRef<Path> + Sync>(instance : &Instance, configuration_file_path: &T) -> Result<InstanceConfigurationFile, ConfigurationFileParsingError> {
-        // todo : evaluate if is better to use a writer
-        let mut conf_file = & tokio::fs::File::create(configuration_file_path).await?;
-        let mut conf_file_content = &String::new();
-        let instance_configuration_file : InstanceConfigurationFile = instance.into();
-        let instance_configuration_file_content =  serde_json::to_string_pretty(&instance_configuration_file)?;
-        tokio::fs::write(configuration_file_path, instance_configuration_file_content).await?;
-        trace!("wrote configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
-        Ok(instance_configuration_file)
-    }
-
+// fixme: move to new trait
+pub async fn write_in_file<T : AsRef<Path> + Sync>(instance : &Instance, configuration_file_path: &T) -> Result<InstanceConfiguration, ConfigurationFileParsingError> {
+    // todo : evaluate if is better to use a writer
+    trace!("prepare writing of instance configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
+    let instance_configuration_file : InstanceConfiguration = instance.into();
+    let instance_configuration_file_content =  serde_json::to_string_pretty(&instance_configuration_file)?;
+    tokio::fs::write(configuration_file_path, instance_configuration_file_content).await?;
+    trace!("wrote instance configuration file at {}", try_path_fmt!(configuration_file_path.as_ref()));
+    Ok(instance_configuration_file)
 }
 
 
