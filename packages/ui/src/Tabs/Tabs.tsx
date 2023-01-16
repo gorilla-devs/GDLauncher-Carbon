@@ -8,13 +8,14 @@ import {
 } from "solid-js";
 
 export type SpacingTab = { ref: HTMLDivElement; type: string; space: number };
+export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
 
-type TabArrayElement = HTMLDivElement | SpacingTab;
+type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
 export interface ITabsContext {
   variant: string;
   orientation: string;
   setSelectedIndex: (_: number) => void;
-  registerTab: (_node: HTMLDivElement, _index?: number) => number;
+  registerTab: (_obj: TabType, _index?: number) => number;
   registerTabSpacing: (_obj: SpacingTab, _index?: number) => number;
   currentIndex: Accessor<number | undefined>;
   getRegisteredTabs: () => TabArrayElement[];
@@ -66,14 +67,14 @@ function Tabs(props: Props) {
     props?.onChange?.(index);
   };
 
-  const registerTab = (node: HTMLDivElement, index?: number) => {
+  const registerTab = (obj: TabType, index?: number) => {
     if (index !== undefined) {
       const updatedArray = [...tabs()];
-      updatedArray[index] = node;
+      updatedArray[index] = obj;
       setTabs(updatedArray);
       return index;
     }
-    const updatedArray = [...tabs(), node];
+    const updatedArray = [...tabs(), obj] as TabArrayElement[];
     setTabs(updatedArray);
     return updatedArray.length - 1;
   };

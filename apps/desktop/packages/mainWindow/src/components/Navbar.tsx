@@ -63,8 +63,8 @@ const AppNavbar = () => {
                   </For>
                 </div>
                 <Spacing class="w-full" />
-                <div class="flex gap-6">
-                  <Tab>
+                <div class="flex gap-6 items-center">
+                  <Tab ignored>
                     <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
                   </Tab>
                   <Tab>
@@ -76,9 +76,7 @@ const AppNavbar = () => {
                       onClick={() => navigate("/settings")}
                     />
                   </Tab>
-                  <Tab>
-                    <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
-                  </Tab>
+                  <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
                 </div>
               </TabList>
             </Tabs>

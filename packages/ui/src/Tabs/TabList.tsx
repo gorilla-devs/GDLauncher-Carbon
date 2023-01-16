@@ -1,5 +1,5 @@
 import { JSXElement, Match, Show, Switch } from "solid-js";
-import { SpacingTab, useTabsContext } from "./Tabs";
+import { SpacingTab, TabType, useTabsContext } from "./Tabs";
 
 interface Props {
   aligment: "between" | "default";
@@ -12,6 +12,9 @@ const TabList = (props: Props) => {
   const tabs = () => tabsContext?.getRegisteredTabs() || [];
 
   const currentIndex = () => tabsContext?.currentIndex() || 0;
+  const currentTab = () => tabs()[currentIndex()];
+
+  const isIgnored = () => (currentTab() as TabType)?.ignored;
 
   const getPositionPx = (index: number) => {
     const filteredTabs = tabs()?.slice(0, index);
@@ -25,15 +28,15 @@ const TabList = (props: Props) => {
 
       if (tabsContext?.orientation === "horizontal") {
         if (isSpacing) {
-          dimension += (tab as SpacingTab).space + 24;
+          if (isSpacing) dimension += (tab as SpacingTab).space + 24;
         } else {
-          dimension += (tab as HTMLDivElement).offsetWidth + 24;
+          dimension += (tab as TabType).ref.offsetWidth + 24;
         }
       } else {
         if (isSpacing) {
-          dimension += (tab as SpacingTab).space + 24;
+          if (isSpacing) dimension += (tab as SpacingTab).space + 24;
         } else {
-          dimension += (tab as HTMLDivElement).offsetHeight + 24;
+          dimension += (tab as TabType).ref.offsetHeight + 24;
         }
       }
     }
@@ -48,7 +51,7 @@ const TabList = (props: Props) => {
     const isSpacing =
       typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
 
-    return isSpacing ? "auto" : (tab as HTMLDivElement)?.offsetWidth;
+    return isSpacing ? "auto" : (tab as TabType).ref.offsetWidth;
   };
 
   const getHeight = (index: number) => {
@@ -59,7 +62,7 @@ const TabList = (props: Props) => {
     const isSpacing =
       typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
 
-    return isSpacing ? "auto" : (tab as HTMLDivElement)?.offsetHeight;
+    return isSpacing ? "auto" : (tab as TabType).ref.offsetHeight;
   };
 
   return (
@@ -81,7 +84,7 @@ const TabList = (props: Props) => {
             }}
           >
             {props.children}
-            <Show when={tabs()[currentIndex()]}>
+            <Show when={tabs()[currentIndex()] && !isIgnored()}>
               <div
                 class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
                 classList={{

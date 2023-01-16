@@ -14,6 +14,7 @@ import { useTabsContext } from "./Tabs";
 interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   children: JSXElement | string | number;
   onClick?: () => void;
+  ignored?: boolean;
 }
 
 const Tab = (_props: Props) => {
@@ -27,13 +28,26 @@ const Tab = (_props: Props) => {
 
   onMount(() => {
     if (tabsContext) {
-      setIndex(tabsContext.registerTab(ref!));
+      setIndex(
+        tabsContext.registerTab({
+          ref: ref,
+          type: "tab",
+          ignored: props.ignored,
+        })
+      );
     }
 
     observer = new ResizeObserver((args) => {
       untrack(() => {
         const cr = args[0].target as HTMLDivElement;
-        tabsContext!.registerTab(cr, index());
+        tabsContext!.registerTab(
+          {
+            ref: cr,
+            type: "tab",
+            ignored: props.ignored,
+          },
+          index()
+        );
       });
     });
     observer.observe(ref!);
