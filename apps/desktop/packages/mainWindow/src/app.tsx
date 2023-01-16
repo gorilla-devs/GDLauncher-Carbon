@@ -2,7 +2,6 @@ import { Component, createEffect, Show, Suspense } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
-// import { Notifications } from "@gd/ui";
 import { createInvalidateQuery, rspc } from "./utils/rspcClient";
 
 const App: Component = () => {
@@ -51,7 +50,6 @@ const App: Component = () => {
           </Suspense>
         </main>
       </div>
-      {/* <Notifications /> */}
     </div>
   );
 };

@@ -11,6 +11,9 @@ export { News } from "./News";
 export { Tabs, TabList, TabPanel, Tab } from "./Tabs";
 export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
-// export { Notifications, addNotification } from "./NotificationManager";
+export {
+  NotificationsProvider,
+  createNotification,
+} from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
 export * from "./themes";

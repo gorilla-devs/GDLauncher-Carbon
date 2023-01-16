@@ -3,10 +3,10 @@ import { useNavigate } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 // import { accounts, login } from "@/modules/components/accounts";
-// import { addNotification } from "@gd/ui";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
+import { createNotification } from "@gd/ui";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -80,6 +80,8 @@ const CodeStep = (props: Props) => {
 
   onCleanup(() => clearInterval(interval));
 
+  const [addNotification] = createNotification();
+
   return (
     <div class="flex flex-col justify-between items-center gap-5 p-10 text-center">
       <img src={DoorImage} />
@@ -90,7 +92,7 @@ const CodeStep = (props: Props) => {
             value={userCode() || ""}
             onClick={() => {
               navigator.clipboard.writeText(userCode() || "");
-              // addNotification("The link has been copied");
+              addNotification("The link has been copied");
             }}
           />
           <Show when={expired()}>

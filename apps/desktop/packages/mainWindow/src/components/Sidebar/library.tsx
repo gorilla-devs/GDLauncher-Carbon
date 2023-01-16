@@ -1,7 +1,8 @@
-import { Input } from "@gd/ui";
+import { createNotification, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
+  const [addNotification] = createNotification();
   return (
     <SiderbarWrapper>
       <Input
@@ -9,6 +10,9 @@ const Sidebar = () => {
         icon={<div class="i-ri:search-line" />}
         class="w-full rounded-full text-shade-0"
       />
+      <button onClick={() => addNotification("Notification Added")}>
+        Add Notification
+      </button>
       Sidebar library
     </SiderbarWrapper>
   );
