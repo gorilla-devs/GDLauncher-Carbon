@@ -1,4 +1,4 @@
-import { setTheme } from "@/utils/themeManager";
+import { setTheme } from "@/utils/theme";
 
 const Appearance = () => {
   return (

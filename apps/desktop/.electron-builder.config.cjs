@@ -12,10 +12,10 @@ console.log(
 module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
-  copyright: "Copyright © 2022 ${author}",
+  copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
   asar: true,
   directories: {
-    output: "release/${version}",
+    output: "release",
     buildResources: "build",
   },
   files: ["dist", "package.json"],
@@ -54,7 +54,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "nsis"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -64,7 +64,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "dmg"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",

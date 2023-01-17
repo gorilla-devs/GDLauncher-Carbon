@@ -5,6 +5,7 @@ use rspc::{internal::BaseMiddleware, RouterBuilderLike, Type};
 use serde::Serialize;
 use tracing::trace;
 
+mod app;
 mod java;
 mod mc;
 
@@ -15,6 +16,7 @@ pub fn build_router() -> impl RouterBuilderLike<()> {
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())
+        .yolo_merge("app.", app::mount())
         .subscription("invalidateQuery", |t| {
             t(|_ctx, _args: ()| {
                 stream! {
