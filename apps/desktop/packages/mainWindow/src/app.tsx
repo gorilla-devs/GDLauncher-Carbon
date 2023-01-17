@@ -25,7 +25,7 @@ const App: Component = () => {
   return (
     <div class="relative w-screen h-screen">
       <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute bottom-0 right-0 h-10 p-2 gap-4 z-50 bg-light-600 flex justify-center items-center cursor-pointer">
+        <div class="absolute bottom-10 right-0 h-10 p-2 gap-4 z-50 bg-light-600 flex justify-center items-center cursor-pointer">
           <div
             onClick={() => {
               navigate("/library");

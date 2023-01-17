@@ -4,6 +4,7 @@ import { JSXElement, mergeProps, Show } from "solid-js";
 interface Props {
   children: JSXElement;
   collapsable?: boolean;
+  noPadding?: boolean;
 }
 
 const SiderbarWrapper = (props: Props) => {
@@ -14,7 +15,10 @@ const SiderbarWrapper = (props: Props) => {
         width: isSidebarOpened() || !mergedProps.collapsable ? "15rem" : "5rem",
         transition: "width .1s ease-in-out",
       }}
-      class="h-full bg-shade-8 relative text-white p-5 box-border overflow-hidden"
+      class="h-full bg-shade-8 relative text-white py-5 box-border overflow-hidden"
+      classList={{
+        "px-5": !props.noPadding,
+      }}
     >
       <Show when={mergedProps.collapsable}>
         <div

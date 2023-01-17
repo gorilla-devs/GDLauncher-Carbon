@@ -78,7 +78,9 @@ const Tab = (_props: Props) => {
             class="cursor-pointer bg-shade-8 font-500 capitalize"
             classList={{
               "py-5": tabsContext?.orientation === "horizontal",
-              "px-4": tabsContext?.orientation === "vertical",
+              "border-box": tabsContext?.orientation === "horizontal",
+              "py-2": tabsContext?.orientation === "vertical",
+              "px-5": tabsContext?.orientation === "vertical",
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}

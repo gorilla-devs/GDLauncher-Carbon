@@ -1,6 +1,7 @@
 import { For } from "solid-js";
 import SiderbarWrapper from "../wrapper";
 import ListItem from "./ListItem";
+import { Tab, TabList, Tabs } from "@gd/ui";
 
 export type settingsItem = {
   name: string;
@@ -23,8 +24,12 @@ const settings: Array<settingsItem> = [
 
 const Sidebar = () => {
   return (
-    <SiderbarWrapper collapsable={false}>
-      <For each={settings}>{(item) => <ListItem item={item} />}</For>
+    <SiderbarWrapper collapsable={false} noPadding>
+      <Tabs orientation="vertical" variant="underline" gap={0}>
+        <TabList>
+          <For each={settings}>{(item) => <Tab>{item.name}</Tab>}</For>
+        </TabList>
+      </Tabs>
     </SiderbarWrapper>
   );
 };
