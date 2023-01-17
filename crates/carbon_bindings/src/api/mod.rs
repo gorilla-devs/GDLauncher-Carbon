@@ -13,8 +13,8 @@ pub struct Ctx {}
 pub fn build_router() -> impl RouterBuilderLike<()> {
     let router = rspc::Router::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
-        .merge("java.", java::mount())
-        // .merge("mc.", mc::mount())
+        .yolo_merge("java.", java::mount())
+        .yolo_merge("mc.", mc::mount())
         .subscription("invalidateQuery", |t| {
             t(|_ctx, _args: ()| {
                 stream! {

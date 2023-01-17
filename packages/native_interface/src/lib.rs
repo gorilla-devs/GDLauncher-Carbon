@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use async_stream::stream;
 use axum::{extract::Path, routing::get};
@@ -21,7 +21,7 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router = carbon_bindings::api::build_router()
+    let router: Arc<rspc::Router> = carbon_bindings::api::build_router()
         .expose()
         .build()
         .arced();
@@ -33,15 +33,7 @@ async fn start_router() {
 
     let app = axum::Router::new()
         .route("/", get(|| async { "Hello 'rspc'!" }))
-        .route(
-            "/rspc/:id",
-            router
-                .clone()
-                .endpoint(|Path(path): Path<String>| {
-                    trace!("Client requested operation '{}'", path);
-                })
-                .axum(),
-        )
+        .nest("/rspc/:id", router.endpoint(|| ()).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
