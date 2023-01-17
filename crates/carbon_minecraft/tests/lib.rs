@@ -8,7 +8,7 @@ mod test {
     use carbon_minecraft::{instance, try_path_fmt};
     use carbon_minecraft::instance::{Instance, InstanceStatus};
     use carbon_minecraft::instance::delete::delete;
-    use carbon_minecraft::instance::scan::check_instance_directory;
+    use carbon_minecraft::instance::scan::check_instance_directory_sanity;
     use carbon_minecraft::instance::write::write_at;
 
     #[tokio::test]
@@ -48,7 +48,7 @@ mod test {
 
         let new_instance = write_at(new_instance, &tmp_directory).await.unwrap();
 
-        assert!(check_instance_directory(&tmp_directory).await.is_ok());
+        assert!(check_instance_directory_sanity(&tmp_directory).await.is_ok());
 
         debug!("instance correctly wrote at : {}", try_path_fmt!(tmp_directory));
 
@@ -56,7 +56,7 @@ mod test {
 
         let new_instance = delete(new_instance, false).await.unwrap();
 
-        assert!(check_instance_directory(&tmp_directory).await.is_err());
+        assert!(check_instance_directory_sanity(&tmp_directory).await.is_err());
 
         assert_eq!(new_instance.persistence_status, InstanceStatus::NotPersisted, "deleted instance expected to be not persisted but remain persisted !" );
 

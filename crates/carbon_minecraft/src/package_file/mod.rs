@@ -1,8 +1,0 @@
-
-
-
-enum PackageFile{
-    Jar(),
-    Asset()
-}
-

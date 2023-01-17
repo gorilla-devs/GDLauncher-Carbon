@@ -1,13 +1,12 @@
-use std::path::PathBuf;
-use futures::future::{join_all, try_join_all};
+use std::path::Path;
 use log::trace;
 use thiserror::Error;
-use tokio::task::spawn_blocking;
+use tokio::task::{JoinError, spawn_blocking};
 use crate::try_path_fmt;
 use crate::instance::{Instance, InstanceStatus};
-use crate::instance::consts::{FILES_TREE, SUBFOLDERS_TREE};
+use crate::instance::consts::{CONFIGURATION_FILE_RELATIVE_PATH, MINECRAFT_PACKAGE_RELATIVE_PATH};
 use crate::instance::delete::InstanceDeleteError::InstanceNotPersisted;
-use crate::instance::scan::{check_instance_directory, InstanceScanError};
+use crate::instance::scan::{check_instance_directory_sanity, InstanceScanError};
 
 
 #[derive(Error, Debug)]
@@ -18,6 +17,9 @@ pub enum InstanceDeleteError {
     #[error("folder does not contain any instance : {0} ")]
     InstanceScanError(#[from] InstanceScanError),
 
+    #[error("folder does not contain any instance : {0} ")]
+    JoinError(#[from] JoinError),
+
     #[error("io-error rise while deleting instance : {0}")]
     IoError(#[from] std::io::Error),
 }
@@ -26,46 +28,28 @@ type InstanceDeleterResult = Result<Instance, InstanceDeleteError>;
 
 pub async fn delete(instance: Instance, put_in_trash_bin: bool) -> InstanceDeleterResult
 {
-
     match &instance.persistence_status {
         InstanceStatus::Persisted(instance_path) if put_in_trash_bin => {
             trace!("checking instance directory structure at {}", try_path_fmt!(instance_path));
-            check_instance_directory(instance_path).await?;
+            check_instance_directory_sanity(instance_path).await?;
             trace!("putting in trash bin instance from fs at {}", try_path_fmt!(instance_path));
-            join_all(
-                SUBFOLDERS_TREE.iter()
-                    .map(|folder_path_last_part| PathBuf::from(instance_path).join(folder_path_last_part))
-                    .map(|folder_path| spawn_blocking(move || trash::delete(folder_path) ))
-            ).await;
-
-            join_all(
-                FILES_TREE.iter()
-                    .map(|file_path_last_part| PathBuf::from(instance_path).join(file_path_last_part))
-                    .map(|file_path| spawn_blocking(move || trash::delete(file_path)))
-            ).await;
+            let configuration_file_path = Path::new(instance_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
+            let minecraft_package_path = Path::new(instance_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
+            let _ = spawn_blocking(move || trash::delete(configuration_file_path)).await?;
+            let _ = spawn_blocking(move || trash::delete(minecraft_package_path) ).await?;
 
             Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
-
         },
         InstanceStatus::Persisted(instance_path) if !put_in_trash_bin=> {
             trace!("checking instance directory structure at {}", try_path_fmt!(instance_path));
-            check_instance_directory(instance_path).await?;
+            check_instance_directory_sanity(instance_path).await?;
             trace!("deleting instance from fs at {}", try_path_fmt!(instance_path));
-            join_all(
-                SUBFOLDERS_TREE.iter()
-                    .map(|folder_path_last_part| PathBuf::from(instance_path).join(folder_path_last_part))
-                    .map(tokio::fs::remove_dir_all)
-            ).await;
-
-            join_all(
-                FILES_TREE.iter()
-                    .map(|file_path_last_part| PathBuf::from(instance_path).join(file_path_last_part))
-                    .map(tokio::fs::remove_file)
-            ).await;
-
+            let configuration_file_path = Path::new(instance_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
+            let minecraft_package_path = Path::new(instance_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
+            let _ = tokio::fs::remove_file(configuration_file_path).await?;
+            let _ = tokio::fs::remove_dir_all(minecraft_package_path).await?;
 
             Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
-
         },
         _ => Err(InstanceNotPersisted)
     }

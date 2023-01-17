@@ -1,4 +1,3 @@
-pub(crate) mod scan;
 pub(crate) mod configuration;
 
 use std::collections::BTreeSet;
@@ -13,38 +12,30 @@ pub struct Library {
     file_path: PathBuf,
 }
 
-#[derive( Debug, Serialize, Deserialize, Hash )]
+#[derive(Debug, Serialize, Deserialize, Hash, Default)]
 pub struct MinecraftPackage {
     pub version: String,
     pub mods: BTreeSet<MinecraftMod>,
-    // pub mod_loader: Option<ModLoader>,
-    pub core_jars: Vec<Library>,
-    pub path: PathBuf
+    pub description: String
 }
-
 
 
 impl From<MinecraftPackageConfigurationFile> for MinecraftPackage{
     fn from(value: MinecraftPackageConfigurationFile) -> Self {
-        let core_jars = Vec::new();
         MinecraftPackage {
             version: value.version,
             mods: value.mods,
-            core_jars,
-            path: PathBuf::new() // fixme: provvisory implemetation
+            description: "".to_string()
         }
     }
 }
 
 impl From<&MinecraftPackageConfigurationFile> for MinecraftPackage{
     fn from(value: &MinecraftPackageConfigurationFile) -> Self {
-        let core_jars = Vec::new();
         MinecraftPackage {
             version: value.version.clone(),
             mods: value.mods.clone(),
-            core_jars,
-            path: PathBuf::new() // fixme: provvisory implemetation
+            description: "".to_string()
         }
     }
 }
-

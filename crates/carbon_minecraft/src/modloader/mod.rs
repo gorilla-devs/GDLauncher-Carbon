@@ -1,6 +1,7 @@
 pub(in crate::modloader) mod forge;
 pub(in crate::modloader) mod vanilla;
-mod fabric;
+pub(in crate::modloader) mod fabric;
+pub(in crate::modloader) mod prism;
 
 use std::sync::Weak;
 
@@ -16,6 +17,7 @@ pub enum ModLoader {
     Forge,
     Fabric,
     LiteLoader,
+    Prism,
     Quilt,
 }
 

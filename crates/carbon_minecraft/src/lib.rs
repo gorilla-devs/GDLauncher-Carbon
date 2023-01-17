@@ -5,7 +5,6 @@ pub mod instance;
 mod minecraft_package;
 mod minecraft_mod;
 pub mod modloader;
-mod package_file;
 
 #[macro_export]
 macro_rules! try_path_fmt {

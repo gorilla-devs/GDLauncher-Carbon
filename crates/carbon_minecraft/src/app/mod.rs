@@ -1,12 +1,12 @@
 mod app_configuration;
 
 use std::collections::HashMap;
+use tokio::sync::RwLock;
 use crate::app::app_configuration::AppConfiguration;
 use crate::instance::Instance;
 
 struct App {
-    /// this MUST be moved outside
-    instances: Vec<Instance>,
+    instances: Vec<RwLock<Instance>>,
     instances_by_name_index: HashMap<String, Instance>,
     app_configuration: AppConfiguration,
 }
