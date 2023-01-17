@@ -75,12 +75,20 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
-            class="cursor-pointer bg-shade-8 font-500 capitalize"
+            class={`cursor-pointer bg-shade-8 font-500 capitalize ${
+              tabsContext?.paddingX || ""
+            } ${tabsContext?.paddingY || ""}`}
             classList={{
-              "py-5": tabsContext?.orientation === "horizontal",
+              "py-5":
+                tabsContext?.orientation === "horizontal" &&
+                !tabsContext?.paddingY,
               "border-box": tabsContext?.orientation === "horizontal",
-              "py-2": tabsContext?.orientation === "vertical",
-              "px-5": tabsContext?.orientation === "vertical",
+              "py-2":
+                tabsContext?.orientation === "vertical" &&
+                !tabsContext?.paddingY,
+              "px-5":
+                tabsContext?.orientation === "vertical" &&
+                !tabsContext?.paddingX,
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}
@@ -90,10 +98,22 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "block"}>
           <div
-            class="flex gap-1 justify-center items-center bg-shade-8 flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border"
+            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+              tabsContext?.paddingX || ""
+            } ${tabsContext?.paddingY || ""}`}
             classList={{
-              "py-5 px-2": tabsContext?.orientation === "horizontal",
-              "px-4 py-2": tabsContext?.orientation === "vertical",
+              "py-5":
+                tabsContext?.orientation === "horizontal" &&
+                !tabsContext?.paddingY,
+              "px-2":
+                tabsContext?.orientation === "horizontal" &&
+                !tabsContext?.paddingX,
+              "px-4":
+                tabsContext?.orientation === "vertical" &&
+                !tabsContext?.paddingX,
+              "py-2":
+                tabsContext?.orientation === "vertical" &&
+                !tabsContext?.paddingY,
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
             }}

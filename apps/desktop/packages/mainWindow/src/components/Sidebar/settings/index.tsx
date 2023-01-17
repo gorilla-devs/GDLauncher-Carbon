@@ -25,7 +25,12 @@ const settings: Array<settingsItem> = [
 const Sidebar = () => {
   return (
     <SiderbarWrapper collapsable={false} noPadding>
-      <Tabs orientation="vertical" variant="underline" gap={0}>
+      <Tabs
+        orientation="vertical"
+        variant="underline"
+        gap={0}
+        paddingY="p-y-3.5"
+      >
         <TabList>
           <For each={settings}>{(item) => <Tab>{item.name}</Tab>}</For>
         </TabList>

@@ -13,6 +13,8 @@ export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
 type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
 export interface ITabsContext {
   gap?: number;
+  paddingX?: string;
+  paddingY?: string;
   variant: string;
   orientation: string;
   setSelectedIndex: (_: number) => void;
@@ -32,6 +34,8 @@ export interface Props {
   variant?: "underline" | "block";
   orientation?: "horizontal" | "vertical";
   gap?: number;
+  paddingX?: string;
+  paddingY?: string;
 }
 
 const TabsContext = createContext<ITabsContext>();
@@ -64,6 +68,8 @@ function Tabs(props: Props) {
   const orientation = () => props.orientation || "horizontal";
   const variant = () => props.variant || "underline";
   const gap = () => props.gap;
+  const paddingX = () => props?.paddingX;
+  const paddingY = () => props?.paddingY;
 
   const setSelectedIndex = (index: number) => {
     setCurrentIndex(index);
@@ -120,6 +126,8 @@ function Tabs(props: Props) {
     gap: gap(),
     variant: variant(),
     orientation: orientation(),
+    paddingX: paddingX(),
+    paddingY: paddingY(),
   };
 
   return (
