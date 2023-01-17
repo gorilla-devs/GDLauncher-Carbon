@@ -24,7 +24,10 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
 
-  const selectedIndex = () => getRouteIndex(NAVBAR_ROUTES, location.pathname);
+  const selectedIndex = () =>
+    !!isSettings() || !!isSettingsNested()
+      ? 4
+      : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   return (
     <Show when={!isLogin()}>
@@ -41,7 +44,7 @@ const AppNavbar = () => {
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
-                  <For each={NAVBAR_ROUTES}>
+                  <For each={NAVBAR_ROUTES.filter((route) => !route?.hide)}>
                     {(route) => {
                       const isMatch = useMatch(() => route.path);
 

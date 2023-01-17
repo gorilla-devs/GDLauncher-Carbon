@@ -68,7 +68,7 @@ const Tab = (_props: Props) => {
       }}
       onClick={() => {
         if (onclick.onClick) onclick.onClick();
-        tabsContext?.setSelectedIndex(index());
+        if (!props.ignored) tabsContext?.setSelectedIndex(index());
       }}
       {...props}
     >
