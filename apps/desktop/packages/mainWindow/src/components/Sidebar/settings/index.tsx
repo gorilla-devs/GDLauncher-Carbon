@@ -2,6 +2,7 @@ import { For } from "solid-js";
 import SiderbarWrapper from "../wrapper";
 import ListItem from "./ListItem";
 import { Tab, TabList, Tabs } from "@gd/ui";
+import { useNavigate } from "@solidjs/router";
 
 export type settingsItem = {
   name: string;
@@ -23,6 +24,8 @@ const settings: Array<settingsItem> = [
 ];
 
 const Sidebar = () => {
+  const navigate = useNavigate();
+
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <Tabs
@@ -32,7 +35,17 @@ const Sidebar = () => {
         paddingY="p-y-3.5"
       >
         <TabList>
-          <For each={settings}>{(item) => <Tab>{item.name}</Tab>}</For>
+          <For each={settings}>
+            {(item) => (
+              <Tab
+                onClick={() => {
+                  navigate(item.path);
+                }}
+              >
+                {item.name}
+              </Tab>
+            )}
+          </For>
         </TabList>
       </Tabs>
     </SiderbarWrapper>
