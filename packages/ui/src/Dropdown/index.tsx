@@ -13,7 +13,7 @@ export interface Props {
   rounded?: boolean;
   label?: string;
   // eslint-disable-next-line no-unused-vars
-  onChange: (option: Option) => void;
+  onChange?: (option: Option) => void;
 }
 
 function Dropdown(props: Props) {
