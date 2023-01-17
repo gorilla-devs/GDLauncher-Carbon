@@ -1,4 +1,4 @@
-import { createNotification, Input, Switch } from "@gd/ui";
+import { createNotification, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
@@ -14,7 +14,6 @@ const Sidebar = () => {
         Add Notification
       </button>
       Sidebar library
-      <Switch />
     </SiderbarWrapper>
   );
 };

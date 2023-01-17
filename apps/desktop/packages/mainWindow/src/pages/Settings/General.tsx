@@ -42,6 +42,7 @@ const General = () => {
           <p class="text-shade-3 max-w-96 m-0">
             Adds more control over the settings of your instances and java.
           </p>
+          <Switch checked={false} />
         </div>
       </div>
       <div class="mb-6">
