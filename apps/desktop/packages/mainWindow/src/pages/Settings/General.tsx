@@ -37,27 +37,32 @@ const General = () => {
       </div>
       <div class="mb-6">
         <h5 class="mt-0 mb-2">Expert user mod</h5>
-
         <div class="flex w-full justify-between">
           <p class="text-shade-3 max-w-96 m-0">
             Adds more control over the settings of your instances and java.
           </p>
-          <Switch checked={false} />
+          <Switch checked={true} />
         </div>
       </div>
       <div class="mb-6">
         <h5 class="mt-0 mb-2">Hide launcher while playing</h5>
-        <p class="text-shade-3 max-w-96 m-0">
-          Automatically hide the launcher when launching an instance. You will
-          still be able to open it from the icon tray.
-        </p>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 max-w-96 m-0">
+            Automatically hide the launcher when launching an instance. You will
+            still be able to open it from the icon tray.
+          </p>
+          <Switch checked={false} />
+        </div>
       </div>
       <div class="mb-6 max">
         <h5 class="mt-0 mb-2">Potato PC mode</h5>
-        <p class="text-shade-3 max-w-96 m-0">
-          You got a potato PC? Don't worry! We got you covered. Enable this and
-          all animations and special effects will be disabled.
-        </p>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 max-w-96 m-0">
+            You got a potato PC? Don't worry! We got you covered. Enable this
+            and all animations and special effects will be disabled.
+          </p>
+          <Switch checked={false} />
+        </div>
       </div>
     </div>
   );
