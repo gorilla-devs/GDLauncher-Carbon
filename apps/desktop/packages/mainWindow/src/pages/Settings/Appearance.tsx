@@ -19,7 +19,7 @@ const Appearance = () => {
             }}
           />
         </div>
-        <div class="flex flex-col w-42 p-1 bg-shade-9 flex justify-center items-center">
+        <div class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center">
           <ThemePreview
             shade1="fill-[#380505]"
             shade2="fill-[#A90F0F]"
@@ -33,7 +33,7 @@ const Appearance = () => {
             }}
           />
         </div>
-        <div class="flex flex-col w-42 p-1 bg-shade-9 flex justify-center items-center">
+        <div class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center">
           <ThemePreview
             shade1="fill-[#162009]"
             shade2="fill-[#43651B]"
