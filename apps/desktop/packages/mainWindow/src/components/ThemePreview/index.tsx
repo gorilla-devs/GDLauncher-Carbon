@@ -8,11 +8,7 @@ interface Props {
 
 const ThemePreview = (props: Props) => {
   const mergedProps = mergeProps(
-    {
-      shade1: "#15181E",
-      shade2: "#1D2028",
-      shade3: "#272B35",
-    },
+    { shade1: "fill-shade-9", shade2: "fill-shade-7", shade3: "fill-shade-6" },
     props
   );
 
@@ -24,10 +20,10 @@ const ThemePreview = (props: Props) => {
       xmlns="http://www.w3.org/2000/svg"
     >
       <g clip-path="url(#clip0_345_14344)">
-        <rect width="1512" height="830" rx="8" fill={mergedProps.shade1} />
+        <rect width="1512" height="830" rx="8" class={mergedProps.shade1} />
         <path
           d="M265 122C265 115.373 270.373 110 277 110H1043C1049.63 110 1055 115.373 1055 122V830H265V122Z"
-          fill={mergedProps.shade2}
+          class={mergedProps.shade2}
         />
         <rect
           x="286"
@@ -35,7 +31,7 @@ const ThemePreview = (props: Props) => {
           width="742"
           height="317"
           rx="12"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="286"
@@ -43,7 +39,7 @@ const ThemePreview = (props: Props) => {
           width="152"
           height="152"
           rx="12"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="286"
@@ -51,7 +47,7 @@ const ThemePreview = (props: Props) => {
           width="120"
           height="19"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="286"
@@ -59,7 +55,7 @@ const ThemePreview = (props: Props) => {
           width="76"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="622"
@@ -67,7 +63,7 @@ const ThemePreview = (props: Props) => {
           width="152"
           height="152"
           rx="12"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="622"
@@ -75,7 +71,7 @@ const ThemePreview = (props: Props) => {
           width="120"
           height="19"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="622"
@@ -83,7 +79,7 @@ const ThemePreview = (props: Props) => {
           width="76"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="454"
@@ -91,7 +87,7 @@ const ThemePreview = (props: Props) => {
           width="152"
           height="152"
           rx="12"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="454"
@@ -99,7 +95,7 @@ const ThemePreview = (props: Props) => {
           width="120"
           height="19"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="454"
@@ -107,7 +103,7 @@ const ThemePreview = (props: Props) => {
           width="76"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="790"
@@ -115,7 +111,7 @@ const ThemePreview = (props: Props) => {
           width="152"
           height="152"
           rx="12"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="790"
@@ -123,7 +119,7 @@ const ThemePreview = (props: Props) => {
           width="120"
           height="19"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="790"
@@ -131,15 +127,15 @@ const ThemePreview = (props: Props) => {
           width="76"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M958 523C958 516.373 963.373 511 970 511H1055V663H970C963.373 663 958 657.627 958 651V523Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M958 677C958 675.895 958.895 675 960 675H1055V694H960C958.895 694 958 693.105 958 692V677Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="958"
@@ -147,41 +143,41 @@ const ThemePreview = (props: Props) => {
           width="78.4255"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M1072 126C1072 117.163 1079.16 110 1088 110H1476C1484.84 110 1492 117.163 1492 126V830H1072V126Z"
-          fill={mergedProps.shade2}
+          class={mergedProps.shade2}
         />
         <path
           d="M286 766C286 759.373 291.373 754 298 754H426C432.627 754 438 759.373 438 766V830H286V766Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M454 766C454 759.373 459.373 754 466 754H594C600.627 754 606 759.373 606 766V830H454V766Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M622 766C622 759.373 627.373 754 634 754H762C768.627 754 774 759.373 774 766V830H622V766Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M790 766C790 759.373 795.373 754 802 754H930C936.627 754 942 759.373 942 766V830H790V766Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <path
           d="M958 766C958 759.373 963.373 754 970 754H1055V830H958V766Z"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
-        <rect y="30" width="1512" height="60" fill={mergedProps.shade2} />
-        <rect y="90" width="242" height="740" fill={mergedProps.shade2} />
+        <rect y="30" width="1512" height="60" class={mergedProps.shade2} />
+        <rect y="90" width="242" height="740" class={mergedProps.shade2} />
         <rect
           x="20"
           y="770"
           width="202"
           height="40"
           rx="20"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -189,7 +185,7 @@ const ThemePreview = (props: Props) => {
           width="190"
           height="46"
           rx="23"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -197,7 +193,7 @@ const ThemePreview = (props: Props) => {
           width="112"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -205,7 +201,7 @@ const ThemePreview = (props: Props) => {
           width="72"
           height="14"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -213,7 +209,7 @@ const ThemePreview = (props: Props) => {
           width="40"
           height="40"
           rx="8"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -221,7 +217,7 @@ const ThemePreview = (props: Props) => {
           width="112"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -229,7 +225,7 @@ const ThemePreview = (props: Props) => {
           width="72"
           height="14"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -237,7 +233,7 @@ const ThemePreview = (props: Props) => {
           width="40"
           height="40"
           rx="8"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -245,7 +241,7 @@ const ThemePreview = (props: Props) => {
           width="112"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -253,7 +249,7 @@ const ThemePreview = (props: Props) => {
           width="72"
           height="14"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -261,7 +257,7 @@ const ThemePreview = (props: Props) => {
           width="40"
           height="40"
           rx="8"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -269,7 +265,7 @@ const ThemePreview = (props: Props) => {
           width="112"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -277,7 +273,7 @@ const ThemePreview = (props: Props) => {
           width="72"
           height="14"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -285,7 +281,7 @@ const ThemePreview = (props: Props) => {
           width="40"
           height="40"
           rx="8"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -293,7 +289,7 @@ const ThemePreview = (props: Props) => {
           width="112"
           height="16"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="70"
@@ -301,7 +297,7 @@ const ThemePreview = (props: Props) => {
           width="72"
           height="14"
           rx="2"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
         <rect
           x="20"
@@ -309,9 +305,9 @@ const ThemePreview = (props: Props) => {
           width="40"
           height="40"
           rx="8"
-          fill={mergedProps.shade3}
+          class={mergedProps.shade3}
         />
-        <rect width="1512" height="30" fill={mergedProps.shade1} />
+        <rect width="1512" height="30" class={mergedProps.shade1} />
       </g>
       <defs>
         <clipPath id="clip0_345_14344">
