@@ -21,3 +21,4 @@ type Theme = {
 export type { Theme };
 export { mainTheme } from "./main";
 export { lightTheme } from "./light";
+export { poisonGreen } from "./poison-green";

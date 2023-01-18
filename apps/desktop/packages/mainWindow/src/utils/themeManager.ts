@@ -1,4 +1,4 @@
-import { mainTheme, lightTheme, Theme } from "@gd/ui";
+import { mainTheme, lightTheme, Theme, poisonGreen } from "@gd/ui";
 
 import { createEffect, createSignal } from "solid-js";
 
@@ -13,6 +13,10 @@ createEffect(() => {
     }
     case 1: {
       applyTheme(lightTheme);
+      break;
+    }
+    case 2: {
+      applyTheme(poisonGreen);
       break;
     }
   }

@@ -35,11 +35,17 @@ const Appearance = () => {
         </div>
         <div class="flex flex-col w-42 p-1 bg-shade-9 flex justify-center items-center">
           <ThemePreview
-            shade1="fill-shade-9"
-            shade2="fill-shade-7"
-            shade3="fill-shade-6"
+            shade1="fill-[#162009]"
+            shade2="fill-[#43651B]"
+            shade3="fill-[#598523]"
           />
-          <input type="radio" name="radio-theme" />
+          <input
+            type="radio"
+            name="radio-theme"
+            onClick={() => {
+              setTheme(2);
+            }}
+          />
         </div>
       </div>
     </div>
