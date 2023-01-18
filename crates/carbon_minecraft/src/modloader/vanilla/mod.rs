@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::sync::Weak;
-use tokio::sync::{watch::Sender, RwLock};
+use tokio::sync::RwLock;
 use tracing::trace;
 
 use crate::{instance::Instance, mc::meta::McMeta};
 
-use super::{InstallProgress, ModLoaderVersion, Modloader, ModloaderVersion};
+use super::{Modloader, ModloaderVersion};
 
 pub enum InstallStages {
     DownloadingAssets,
@@ -16,7 +16,7 @@ pub enum InstallStages {
 
 #[derive(Debug)]
 pub struct VanillaModLoader {
-    mc_version: ModLoaderVersion,
+    mc_version: super::ModloaderVersion,
     instance_ref: Weak<RwLock<Instance>>,
 }
 
@@ -24,13 +24,13 @@ pub struct VanillaModLoader {
 impl Modloader for VanillaModLoader {
     type Stages = InstallStages;
 
-    fn new(mc_version: ModLoaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
+    fn new(mc_version: ModloaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
         VanillaModLoader {
             mc_version,
             instance_ref,
         }
     }
-    async fn install(&self, progress_send: Sender<InstallProgress<InstallStages>>) -> Result<()> {
+    async fn install(&self) -> Result<()> {
         let mc_version = &self.mc_version;
         // TODO: REMOVE HARDCODED
         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
