@@ -13,5 +13,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<()> {
         .query("getTheme", |t| {
             t(|ctx: (), _args: ()| async move { Ok("default") })
         })
-        .mutation("setTheme", |t| t(|_, v: String| {}))
+        .mutation("setTheme", |t| {
+            t(|_, v: String| {
+                // invalidate_query!("app.getTheme");
+            })
+        })
 }
