@@ -1,7 +1,6 @@
-pub(in crate::modloader) mod forge;
-pub(in crate::modloader) mod vanilla;
-pub(in crate::modloader) mod fabric;
-pub(in crate::modloader) mod prism;
+pub(crate) mod forge;
+pub(crate) mod vanilla;
+pub(crate) mod fabric;
 
 use std::sync::Weak;
 
@@ -17,7 +16,6 @@ pub enum ModLoader {
     Forge,
     Fabric,
     LiteLoader,
-    Prism,
     Quilt,
 }
 
@@ -30,7 +28,7 @@ pub struct InstallProgress<T> {
 }
 
 #[async_trait]
-trait Modloader {
+pub trait Modloader {
     type Stages;
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self where Self: Sized;
     async fn install(&self) -> Result<()>;

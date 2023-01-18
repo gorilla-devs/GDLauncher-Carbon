@@ -55,7 +55,7 @@ mod test {
 
         let client = reqwest::Client::new();
         let resp = client
-            .get("http://localhost:4000/rspc/version")
+            .get("http://localhost:4000")
             .send()
             .await
             .unwrap();

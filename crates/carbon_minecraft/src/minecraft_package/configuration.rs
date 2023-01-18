@@ -7,7 +7,6 @@ use crate::minecraft_package::MinecraftPackage;
 pub struct MinecraftPackageConfigurationFile {
     pub version: String,
     pub description: String,
-    pub mods: BTreeSet<MinecraftMod>,
 }
 
 impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {
@@ -15,7 +14,6 @@ impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {
         MinecraftPackageConfigurationFile{
             version: value.version.clone(),
             description: "".to_string(),
-            mods: Default::default(),
         }
     }
 }

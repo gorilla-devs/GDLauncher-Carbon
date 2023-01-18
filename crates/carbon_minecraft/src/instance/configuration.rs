@@ -24,7 +24,6 @@ impl From<&Instance> for InstanceConfigurationFile {
             minecraft_package_configuration: MinecraftPackageConfigurationFile {
                 version: value.minecraft_package.version.clone(),
                 description: value.minecraft_package.description.clone(),
-                mods: value.minecraft_package.mods.clone(),
             },
         }
     }

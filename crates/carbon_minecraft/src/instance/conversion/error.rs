@@ -1,13 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum InstanceConversionError {
+pub enum InstanceConversionError {}
 
-}
-
-
-trait InstanceConverter{
-
-
-}
+trait InstanceConverter {}
 

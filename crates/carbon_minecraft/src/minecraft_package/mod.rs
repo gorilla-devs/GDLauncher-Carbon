@@ -24,7 +24,7 @@ impl From<MinecraftPackageConfigurationFile> for MinecraftPackage{
     fn from(value: MinecraftPackageConfigurationFile) -> Self {
         MinecraftPackage {
             version: value.version,
-            mods: value.mods,
+            mods: Default::default(),
             description: "".to_string()
         }
     }
@@ -34,7 +34,7 @@ impl From<&MinecraftPackageConfigurationFile> for MinecraftPackage{
     fn from(value: &MinecraftPackageConfigurationFile) -> Self {
         MinecraftPackage {
             version: value.version.clone(),
-            mods: value.mods.clone(),
+            mods: Default::default(),
             description: "".to_string()
         }
     }
