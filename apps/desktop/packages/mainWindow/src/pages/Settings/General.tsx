@@ -1,8 +1,10 @@
-import { Dropdown, Switch } from "@gd/ui";
+import { Button, Dropdown, Switch } from "@gd/ui";
+import GDLauncherWideLogo from "/assets/images/gdlauncher_logo.svg";
+import GDLauncherText from "/assets/images/GDLauncher_text.svg";
 
 const General = () => {
   return (
-    <div class="bg-shade-8 w-full h-full flex flex-col py-5	px-6 box-border">
+    <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
       <h2 class="m-0 mb-7 text-4">General</h2>
       <div class="mb-6">
         <h5 class="mt-0 mb-2">Language</h5>
@@ -63,6 +65,22 @@ const General = () => {
           </p>
           <Switch checked={false} />
         </div>
+      </div>
+      <Button rounded={false} variant="secondary" textColor="text-red">
+        Reset all to default
+      </Button>
+      <div class="mt-16 flex gap-24 mb-6">
+        <div class="flex gap-5">
+          <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
+          <div class="flex flex-col">
+            <img src={GDLauncherText} class="h-5 cursor-pointer" />
+            <p class="mb-0 mt-2">v.1.1.26</p>
+          </div>
+        </div>
+        <p class="text-shade-5 m-0">
+          You're currently on the latest version. We automatically check for
+          updates and we will inform you whenever one is available.
+        </p>
       </div>
     </div>
   );

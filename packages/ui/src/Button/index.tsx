@@ -7,6 +7,7 @@ type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string;
   class?: string;
+  textColor?: string;
   variant?: Variant;
   rounded?: boolean;
   disabled?: boolean;
@@ -25,13 +26,15 @@ const getVariant = (
   isDisabled: boolean,
   uppercase: boolean,
   iconRight: boolean,
-  isLoading: boolean
+  isLoading: boolean,
+  textColor?: string
 ) => {
   const isLarge = size === "large";
   const isMedium = size === "medium";
   const isSmall = size === "small";
 
   const commonStyle = {
+    ...(textColor && { [textColor]: true }),
     "transition-all": true,
     "duration-300": true,
     "ease-in-out": true,
@@ -147,7 +150,8 @@ function Button(props: Props) {
           !!props.disabled,
           mergedProps.uppercase,
           !!props.iconRight,
-          !!props.loading
+          !!props.loading,
+          props.textColor
         )}
         {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
         style={{
