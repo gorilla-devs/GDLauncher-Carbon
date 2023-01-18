@@ -96,3 +96,4 @@ packages/ui/src/style.dist.css
 apps/desktop/data
 packages/carbon_core/data
 MC_TEST
+Cargo.lock
