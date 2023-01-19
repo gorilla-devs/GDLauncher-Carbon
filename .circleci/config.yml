@@ -268,7 +268,7 @@ workflows:
     jobs:
       - buildWebsite
       - testDocker
-  master-builds:
+  master-develop-builds:
     jobs:
       - buildMac:
           filters:
