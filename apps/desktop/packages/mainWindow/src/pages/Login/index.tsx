@@ -23,12 +23,12 @@ export default function Login() {
             { label: "italian", key: "it" },
           ]}
           value={"asc"}
-          // onChange={(lang) => {
-          //   getTranslationByLanguage(lang.key).then((translations) => {
-          //     add(lang.key, translations);
-          //     locale(lang.key);
-          //   });
-          // }}
+          onChange={() => {
+            // getTranslationByLanguage(lang.key).then((translations) => {
+            //   add(lang.key, translations);
+            //   locale(lang.key);
+            // });
+          }}
           rounded
         />
       </div>
