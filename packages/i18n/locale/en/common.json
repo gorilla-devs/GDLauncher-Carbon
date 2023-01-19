@@ -1,5 +1,18 @@
 {
   "hello": "hello",
   "world": "world",
-  "welcome": "welcome"
+  "welcome": "welcome",
+  "italin": "italiano",
+  "english": "english",
+  "german": "german",
+  "library": "library",
+  "modpacks": "modpacks",
+  "sign_in_with_microsoft": "Sign in with microsoft",
+  "sign_in_with_microsoft_text": "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
+  "privacy_policy": "Privacy Policy",
+  "terms_and_conditions": "Terms and Conditions",
+  "acceptable_use_policy": "Acceptable Use Policy",
+  "recent_played": "Recent Played",
+  "your_instances": "Your Instances",
+  "popular_modpacks": "Popular Modpacks"
 }

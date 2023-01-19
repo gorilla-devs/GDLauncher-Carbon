@@ -3,6 +3,7 @@ import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery, rspc } from "./utils/rspcClient";
+import { Trans } from "@gd/i18n";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
@@ -31,14 +32,24 @@ const App: Component = () => {
               navigate("/library");
             }}
           >
-            LOGIN
+            <Trans
+              key="login"
+              options={{
+                defaultValue: "login",
+              }}
+            />
           </div>
           <div
             onClick={() => {
               navigate("/");
             }}
           >
-            LOGOUT
+            <Trans
+              key="logout"
+              options={{
+                defaultValue: "logout",
+              }}
+            />
           </div>
         </div>
       </Show>

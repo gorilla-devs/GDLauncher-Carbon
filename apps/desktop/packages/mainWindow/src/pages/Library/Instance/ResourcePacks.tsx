@@ -1,5 +1,5 @@
 const ResourcePacks = () => {
-  return <div>ResourcePacks</div>;
+  return <div />;
 };
 
 export default ResourcePacks;
