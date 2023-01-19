@@ -17,8 +17,11 @@ pub struct InvalidationEvent {
 }
 
 impl InvalidationEvent {
-    pub fn new(key: String, args: Option<serde_json::Value>) -> Self {
-        Self { key, args }
+    pub fn new(key: impl Into<String>, args: Option<serde_json::Value>) -> Self {
+        Self {
+            key: key.into(),
+            args,
+        }
     }
 }
 
@@ -39,7 +42,7 @@ impl GlobalContextInner {
         }
     }
 
-    pub fn invalidate(&self, key: String, args: Option<serde_json::Value>) {
+    pub fn invalidate(&self, key: impl Into<String>, args: Option<serde_json::Value>) {
         match self
             .invalidation_sender
             .send(InvalidationEvent::new(key, args))
@@ -59,11 +62,17 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
         .yolo_merge("mc.", mc::mount())
         .yolo_merge("app.", app::mount())
         .subscription("invalidateQuery", move |t| {
-            t(move |_ctx, _args: ()| {
+            t(move |ctx, _args: ()| {
                 stream! {
                     loop {
-                        let event = _ctx.read().await.invalidation_sender.subscribe().recv().await.unwrap();
-                        yield event;
+                        match ctx.read().await.invalidation_sender.subscribe().recv().await {
+                            Ok(event) => {
+                                yield event;
+                            }
+                            Err(e) => {
+                                println!("Error receiving invalidation request: {}", e);
+                            }
+                        }
                     }
                 }
             })

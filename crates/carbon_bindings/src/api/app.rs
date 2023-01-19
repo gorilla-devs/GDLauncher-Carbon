@@ -20,8 +20,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .mutation("setTheme", |t| {
-            t(|_, v: String| {
-                // invalidate_query!("app.getTheme");
+            t(|ctx: GlobalContext, v: String| async move {
+                ctx.read().await.invalidate("app.getTheme", None);
             })
         })
 }
