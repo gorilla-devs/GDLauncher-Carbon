@@ -13,7 +13,12 @@ module.exports = {
     ],
   },
   parser: "@typescript-eslint/parser",
-  plugins: ["solid", "prettier"],
-  extends: ["eslint:recommended", "plugin:solid/typescript", "prettier"],
+  plugins: ["i18next", "solid", "prettier"],
+  extends: [
+    "eslint:recommended",
+    "plugin:solid/typescript",
+    "plugin:i18next/recommended",
+    "prettier",
+  ],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"],
 };
