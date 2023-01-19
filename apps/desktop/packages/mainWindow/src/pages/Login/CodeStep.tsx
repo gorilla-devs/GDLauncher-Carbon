@@ -7,6 +7,7 @@ import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
+import { Trans } from "@gd/i18n";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -96,17 +97,34 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="text-[#E54B4B] mb-0 mt-2">The code has been expired</p>
+            <p class="text-[#E54B4B] mb-0 mt-2">
+              <Trans
+                key="code_expired_message"
+                options={{
+                  defaultValue: "The code has been expired",
+                }}
+              />
+            </p>
           </Show>
         </div>
         <Show when={!expired()}>
           <p class="mb-0 mt-2 text-shade-0">
-            <span class="text-white">{countDown()}</span> before the code
-            expires
+            <span class="text-white">{countDown()}</span>
+            <Trans
+              key="before_expiring"
+              options={{
+                defaultValue: "before the code expires",
+              }}
+            />
           </p>
           <p class="text-shade-0">
-            Enter the specified code on the browser page to complete the
-            authorization
+            <Trans
+              key="enter_code"
+              options={{
+                defaultValue:
+                  "Enter the specified code on the browser page to complete the authorization",
+              }}
+            />
           </p>
         </Show>
       </div>

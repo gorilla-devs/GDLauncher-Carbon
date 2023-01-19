@@ -5,7 +5,7 @@ type Size = "small" | "medium" | "large";
 type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
 
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: HTMLElement | string;
+  children: HTMLElement | string | JSX.Element;
   class?: string;
   variant?: Variant;
   rounded?: boolean;

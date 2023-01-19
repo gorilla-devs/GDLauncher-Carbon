@@ -1,4 +1,5 @@
 import getRouteIndex from "@/route/getRouteIndex";
+import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
 import { For } from "solid-js";
@@ -53,7 +54,12 @@ const Instance = () => {
           size="small"
           variant="transparent"
         >
-          Back
+          <Trans
+            key="back"
+            options={{
+              defaultValue: "back",
+            }}
+          />
         </Button>
         <div
           class="flex justify-center px-6 h-24"
@@ -73,15 +79,15 @@ const Instance = () => {
                   <div class="flex flex-col lg:flex-row justify-between">
                     <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
-                        Forge 1.19.2
+                        {/* Forge 1.19.2 */}
                       </div>
                       <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-shade-5 flex gap-2 items-center">
                         <div class="i-ri:time-fill" />
-                        1d ago
+                        {/* 1d ago */}
                       </div>
                       <div class="p-0 lg:px-4 flex gap-2 items-center">
                         <div class="i-ri:user-fill" />
-                        ATMTeam
+                        {/* ATMTeam */}
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">

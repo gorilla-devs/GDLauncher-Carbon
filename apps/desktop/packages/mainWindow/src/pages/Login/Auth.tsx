@@ -34,7 +34,7 @@ const Auth = (_props: Props) => {
     <div>
       <div class="absolute left-0 right-0 m-auto -top-15 flex flex-col justify-center items-center">
         <img class="w-40" src={Logo} />
-        <p class="text-shade-0">v{version}</p>
+        <p class="text-shade-0">{version}</p>
       </div>
       <div class="text-center flex flex-col justify-center items-center">
         <Button
