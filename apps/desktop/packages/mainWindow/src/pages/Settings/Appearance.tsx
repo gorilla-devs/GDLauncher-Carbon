@@ -1,4 +1,5 @@
-import { setTheme } from "@/utils/theme";
+/* eslint-disable i18next/no-literal-string */
+import { setTheme } from "@/utils/themeManager";
 
 const Appearance = () => {
   return (

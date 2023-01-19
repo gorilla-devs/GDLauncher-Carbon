@@ -83,3 +83,5 @@ packages/native_interface/data
 MC_TEST
 tests_decompressed
 java_runtimes
+
+**/.idea

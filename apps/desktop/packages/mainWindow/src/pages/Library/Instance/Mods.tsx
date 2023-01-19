@@ -1,5 +1,5 @@
 const Mods = () => {
-  return <div>Mods</div>;
+  return <div />;
 };
 
 export default Mods;
