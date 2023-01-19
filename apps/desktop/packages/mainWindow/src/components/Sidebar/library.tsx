@@ -1,4 +1,4 @@
-import { loadLanguageFile, useTransContext } from "@gd/i18n";
+import { loadLanguageFile, useTransContext, Trans } from "@gd/i18n";
 import { Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 
@@ -18,7 +18,13 @@ const Sidebar = () => {
         icon={<div class="i-ri:search-line" />}
         class="w-full rounded-full text-black-lightGray"
       />
-      {t("hello")}
+      {/* {t("hello")} */}
+      <Trans
+        key="hello"
+        options={{
+          defaultValue: "Hello",
+        }}
+      />
       {t("world")}
       <button onClick={() => changeLang("it")}>IT</button>
       <button onClick={() => changeLang("en")}>EN</button>

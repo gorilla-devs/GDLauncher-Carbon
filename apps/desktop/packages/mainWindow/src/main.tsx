@@ -3,7 +3,7 @@ import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
-import { i18n, TransProvider, icu } from "@gd/i18n";
+import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
@@ -16,8 +16,17 @@ queueMicrotask(() => {
   initAnalytics();
 });
 
-const instance = i18n.createInstance();
+const DEFAULT_LANG = "en";
+
+const instance = i18n.createInstance({
+  defaultNS: "common",
+  fallbackLng: DEFAULT_LANG,
+});
 instance.use(icu);
+
+loadLanguageFile(DEFAULT_LANG).then((langFile) => {
+  instance.addResourceBundle(DEFAULT_LANG, "common", langFile);
+});
 
 render(() => {
   onMount(() => {
@@ -27,13 +36,7 @@ render(() => {
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <TransProvider
-          lng="en"
-          instance={instance}
-          options={{
-            supportedLngs: ["en", "it", "de"],
-          }}
-        >
+        <TransProvider instance={instance}>
           <App />
         </TransProvider>
       </Router>
