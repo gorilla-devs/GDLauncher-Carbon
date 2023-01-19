@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import { loadLanguageFile, useTransContext, Trans } from "@gd/i18n";
 import { createNotification, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
@@ -33,7 +34,6 @@ const Sidebar = () => {
       <button onClick={() => addNotification("Notification Added")}>
         Add Notification
       </button>
-      Sidebar library
     </SiderbarWrapper>
   );
 };
