@@ -11,17 +11,50 @@ mod mc;
 pub type GlobalContext = Arc<tokio::sync::RwLock<GlobalContextInner>>;
 
 #[derive(Clone)]
-pub struct GlobalContextInner {
-    pub base_dir: PathBuf,
+pub struct InvalidationEvent {
+    key: String,
+    args: Option<serde_json::Value>,
 }
 
-impl GlobalContextInner {
-    pub fn new(base_dir: PathBuf) -> Self {
-        Self { base_dir }
+impl InvalidationEvent {
+    pub fn new(key: String, args: Option<serde_json::Value>) -> Self {
+        Self { key, args }
     }
 }
 
-pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
+#[derive(Clone)]
+pub struct GlobalContextInner {
+    pub base_dir: PathBuf,
+    invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
+}
+
+impl GlobalContextInner {
+    pub fn new(
+        base_dir: PathBuf,
+        invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
+    ) -> Self {
+        Self {
+            base_dir,
+            invalidation_sender,
+        }
+    }
+
+    pub fn invalidate(&self, key: String, args: Option<serde_json::Value>) {
+        match self
+            .invalidation_sender
+            .send(InvalidationEvent::new(key, args))
+        {
+            Ok(_) => (),
+            Err(e) => {
+                println!("Error sending invalidation request: {}", e);
+            }
+        }
+    }
+}
+
+pub fn build_rspc_router(
+    invalidation_channel: tokio::sync::broadcast::Receiver<InvalidationEvent>,
+) -> impl RouterBuilderLike<GlobalContext> {
     rspc::Router::<GlobalContext>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
@@ -42,5 +75,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
 }
 
 pub fn build_axum_vanilla_router() -> axum::Router<()> {
-    axum::Router::new().nest("/mc", mc::mount_axum_router())
+    axum::Router::new()
+        .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
+        .nest("/mc", mc::mount_axum_router())
 }

@@ -21,10 +21,13 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
-        .expose()
-        .build()
-        .arced();
+    let (invalidation_sender, invalidation_receiver) = tokio::sync::broadcast::channel(200);
+
+    let router: Arc<rspc::Router<GlobalContext>> =
+        carbon_bindings::api::build_rspc_router(invalidation_receiver)
+            .expose()
+            .build()
+            .arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
@@ -32,7 +35,7 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let global_context = global_context::generate_context();
+    let global_context = global_context::generate_context(invalidation_sender);
 
     let app = axum::Router::new()
         .nest("/", carbon_bindings::api::build_axum_vanilla_router())
