@@ -1,8 +1,7 @@
-use super::Ctx;
+use super::GlobalContext;
 use axum::extract::DefaultBodyLimit;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 #[derive(Type, Serialize)]
 struct Instance {
@@ -13,10 +12,10 @@ struct Instance {
 #[derive(Type, Serialize)]
 struct Instances(Vec<Instance>);
 
-pub(super) fn mount() -> impl RouterBuilderLike<()> {
-    Router::new()
+pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
+    Router::<GlobalContext>::new()
         .query("getInstances", |t| {
-            t(|ctx: (), _args: ()| async move {
+            t(|ctx: GlobalContext, _args: ()| async move {
                 let mut instances = Vec::new();
                 instances.push(Instance {
                     id: "88r39459345939453".to_string(),
@@ -49,7 +48,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<()> {
             })
         })
         .query("getInstance", |t| {
-            t(|ctx: (), args: String| async move {
+            t(|ctx: GlobalContext, args: String| async move {
                 let instance = Instance {
                     id: "82h39459345336457".to_string(),
                     name: "All The Mods 6".to_string(),
@@ -71,7 +70,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<()> {
 pub(super) fn mount_axum_router() -> axum::Router<()> {
     axum::Router::new()
         .route(
-            "getInstanceThumbnail",
+            "/instanceThumbnail",
             axum::routing::get(|| async {
                 // Read params and get the instance id, then return the thumbnail in base64
             }),

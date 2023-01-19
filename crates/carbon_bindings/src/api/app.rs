@@ -1,4 +1,4 @@
-use super::Ctx;
+use super::GlobalContext;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -8,10 +8,16 @@ struct Theme {
     name: String,
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<()> {
+pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::new()
         .query("getTheme", |t| {
-            t(|ctx: (), _args: ()| async move { Ok("default") })
+            t(|ctx: GlobalContext, _args: ()| async move {
+                let time = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                Ok(time as u32)
+            })
         })
         .mutation("setTheme", |t| {
             t(|_, v: String| {

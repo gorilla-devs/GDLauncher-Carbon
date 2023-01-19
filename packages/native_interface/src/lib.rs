@@ -1,10 +1,10 @@
+use carbon_bindings::api::GlobalContext;
+use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
-
-use async_stream::stream;
-use axum::{extract::Path, routing::get};
-use rspc::{Config, RouterBuilderLike};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
+
+mod global_context;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
@@ -21,24 +21,26 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router: Arc<rspc::Router> = carbon_bindings::api::build_rspc_router()
+    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
         .expose()
         .build()
         .arced();
+
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_headers(Any)
         .allow_origin(Any);
 
+    let global_context = global_context::generate_context();
+
     let app = axum::Router::new()
-        .route("/", get(|| async { "Hello 'rspc'!" }))
         .nest("/", carbon_bindings::api::build_axum_vanilla_router())
-        .nest("/rspc", router.endpoint(|| ()).axum())
+        .nest("/rspc", router.endpoint(move || global_context).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
-    trace!("listening on http://{}/rspc/version", addr);
+    trace!("RSPC/Server started on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

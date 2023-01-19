@@ -1,4 +1,4 @@
-use super::Ctx;
+use super::GlobalContext;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
@@ -26,10 +26,10 @@ struct JavaDetails {
 #[derive(Type, Serialize)]
 struct Javas(HashMap<u8, Java>);
 
-pub(super) fn mount() -> impl RouterBuilderLike<()> {
-    Router::new()
+pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
+    Router::<GlobalContext>::new()
         .query("getAvailableJavas", |t| {
-            t(|ctx: (), _args: ()| async move {
+            t(|ctx: GlobalContext, _args: ()| async move {
                 let mut javas = HashMap::new();
                 let mut java8 = Java {
                     default_id: "vseuitruihsruthurt".to_string(),
@@ -98,7 +98,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<()> {
             })
         })
         .query("autoSetupjavaProgress", |t| {
-            t(|ctx: (), _args: ()| async move {
+            t(|ctx: GlobalContext, _args: ()| async move {
                 Ok(0) // progress
             })
         })
