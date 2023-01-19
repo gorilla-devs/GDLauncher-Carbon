@@ -11,7 +11,7 @@ struct Theme {
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::new()
         .query("getTheme", |t| {
-            t(|ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: GlobalContext, _args: ()| async move {
                 let time = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()

@@ -15,32 +15,33 @@ struct Instances(Vec<Instance>);
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::<GlobalContext>::new()
         .query("getInstances", |t| {
-            t(|ctx: GlobalContext, _args: ()| async move {
-                let mut instances = Vec::new();
-                instances.push(Instance {
-                    id: "88r39459345939453".to_string(),
-                    name: "My first instance".to_string(),
-                });
-                instances.push(Instance {
-                    id: "88r39459345939456".to_string(),
-                    name: "My second instance".to_string(),
-                });
-                instances.push(Instance {
-                    id: "88r39459345939451".to_string(),
-                    name: "Instance with a very long name".to_string(),
-                });
-                instances.push(Instance {
-                    id: "88r39459345336457".to_string(),
-                    name: "Vanilla Minecraft".to_string(),
-                });
-                instances.push(Instance {
-                    id: "84439459345336457".to_string(),
-                    name: "Forge Minecraft".to_string(),
-                });
-                instances.push(Instance {
-                    id: "82h39459345336457".to_string(),
-                    name: "All The Mods 6".to_string(),
-                });
+            t(|_ctx: GlobalContext, _args: ()| async move {
+                let mut instances = vec![
+                    Instance {
+                        id: "88r39459345939453".to_string(),
+                        name: "My first instance".to_string(),
+                    },
+                    Instance {
+                        id: "88r39459345939456".to_string(),
+                        name: "My second instance".to_string(),
+                    },
+                    Instance {
+                        id: "88r39459345939451".to_string(),
+                        name: "Instance with a very long name".to_string(),
+                    },
+                    Instance {
+                        id: "88r39459345336457".to_string(),
+                        name: "Vanilla Minecraft".to_string(),
+                    },
+                    Instance {
+                        id: "84439459345336457".to_string(),
+                        name: "Forge Minecraft".to_string(),
+                    },
+                    Instance {
+                        id: "82h39459345336457".to_string(),
+                        name: "All The Mods 6".to_string(),
+                    },
+                ];
 
                 let final_instances = Instances(instances);
 
@@ -48,7 +49,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .query("getInstance", |t| {
-            t(|ctx: GlobalContext, args: String| async move {
+            t(|_ctx: GlobalContext, args: String| async move {
                 let instance = Instance {
                     id: "82h39459345336457".to_string(),
                     name: "All The Mods 6".to_string(),

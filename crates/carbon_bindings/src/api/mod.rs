@@ -15,8 +15,14 @@ pub struct GlobalContextInner {
     pub base_dir: PathBuf,
 }
 
+impl GlobalContextInner {
+    pub fn new(base_dir: PathBuf) -> Self {
+        Self { base_dir }
+    }
+}
+
 pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
-    let router = rspc::Router::<GlobalContext>::new()
+    rspc::Router::<GlobalContext>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())
@@ -32,9 +38,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
                     }
                 }
             })
-        });
-
-    router
+        })
 }
 
 pub fn build_axum_vanilla_router() -> axum::Router<()> {

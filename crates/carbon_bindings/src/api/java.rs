@@ -29,7 +29,7 @@ struct Javas(HashMap<u8, Java>);
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::<GlobalContext>::new()
         .query("getAvailableJavas", |t| {
-            t(|ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: GlobalContext, _args: ()| async move {
                 let mut javas = HashMap::new();
                 let mut java8 = Java {
                     default_id: "vseuitruihsruthurt".to_string(),
@@ -98,7 +98,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .query("autoSetupjavaProgress", |t| {
-            t(|ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: GlobalContext, _args: ()| async move {
                 Ok(0) // progress
             })
         })
