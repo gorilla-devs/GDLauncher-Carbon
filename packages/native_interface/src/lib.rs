@@ -33,7 +33,7 @@ async fn start_router() {
 
     let app = axum::Router::new()
         .route("/", get(|| async { "Hello 'rspc'!" }))
-        .nest("/rspc/:id", router.endpoint(|| ()).axum())
+        .nest("/rspc", router.endpoint(|| ()).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
