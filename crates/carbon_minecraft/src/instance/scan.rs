@@ -77,8 +77,8 @@ pub async fn check_instance_directory_sanity<T: AsRef<Path> + Sync>(target_insta
     let instance_configuration_file_exist = instance_configuration_file_path.exists() && instance_configuration_file_path.is_file();
     let minecraft_package_folder_exist = minecraft_package_path.exists() && minecraft_package_path.is_dir();
     match (instance_configuration_file_exist, minecraft_package_folder_exist) {
-        (false, _) => Err(FolderStructureDoesNotMatch(minecraft_package_path)),
-        (_, false) => Err(FileStructureDoesNotMatch(instance_configuration_file_path)),
+        (false, _) => Err(FolderStructureDoesNotMatch(instance_configuration_file_path)),
+        (_, false) => Err(FileStructureDoesNotMatch(minecraft_package_path)),
         _ => Ok(())
     }
 }
