@@ -1,4 +1,5 @@
 use super::Ctx;
+use axum::extract::DefaultBodyLimit;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -65,4 +66,15 @@ pub(super) fn mount() -> impl RouterBuilderLike<()> {
             }
             t(|_, args: Args| {})
         })
+}
+
+pub(super) fn mount_axum_router() -> axum::Router<()> {
+    axum::Router::new()
+        .route(
+            "getInstanceThumbnail",
+            axum::routing::get(|| async {
+                // Read params and get the instance id, then return the thumbnail in base64
+            }),
+        )
+        .layer(DefaultBodyLimit::max(4096)) // this is probably enough for a thumbnail
 }

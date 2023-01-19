@@ -21,7 +21,7 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router: Arc<rspc::Router> = carbon_bindings::api::build_router()
+    let router: Arc<rspc::Router> = carbon_bindings::api::build_rspc_router()
         .expose()
         .build()
         .arced();
@@ -33,6 +33,7 @@ async fn start_router() {
 
     let app = axum::Router::new()
         .route("/", get(|| async { "Hello 'rspc'!" }))
+        .nest("/", carbon_bindings::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(|| ()).axum())
         .layer(cors);
 

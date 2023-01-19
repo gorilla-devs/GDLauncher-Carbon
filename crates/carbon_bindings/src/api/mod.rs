@@ -11,7 +11,7 @@ mod mc;
 
 pub struct Ctx {}
 
-pub fn build_router() -> impl RouterBuilderLike<()> {
+pub fn build_rspc_router() -> impl RouterBuilderLike<()> {
     let router = rspc::Router::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
@@ -31,4 +31,8 @@ pub fn build_router() -> impl RouterBuilderLike<()> {
         });
 
     router
+}
+
+pub fn build_axum_vanilla_router() -> axum::Router<()> {
+    axum::Router::new().nest("mc.", mc::mount_axum_router())
 }

@@ -6,7 +6,7 @@ fn main() {
     use napi_build::setup;
     println!("a");
 
-    carbon_bindings::api::build_router()
+    carbon_bindings::api::build_rspc_router()
         .expose()
         .config(
             Config::new().export_ts_bindings(
