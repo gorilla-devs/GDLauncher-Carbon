@@ -54,13 +54,12 @@ mod test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let client = reqwest::Client::new();
-        let resp = client
-            .get("http://localhost:4000/rspc/version")
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get("http://localhost:4000").send().await.unwrap();
+        let resp_code = resp.status();
+        let resp_body = resp.text().await.unwrap();
 
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp_code, 200);
+        assert_eq!(resp_body, "Hello 'rspc'!");
 
         server.abort();
     }
