@@ -1,8 +1,8 @@
 use std::{path::PathBuf, sync::Arc};
 
 use async_stream::stream;
-use rspc::RouterBuilderLike;
-use tracing::trace;
+use rspc::{RouterBuilderLike, Type};
+use serde::{Deserialize, Serialize};
 
 mod app;
 mod java;
@@ -10,7 +10,7 @@ mod mc;
 
 pub type GlobalContext = Arc<tokio::sync::RwLock<GlobalContextInner>>;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
     key: String,
     args: Option<serde_json::Value>,
@@ -52,22 +52,18 @@ impl GlobalContextInner {
     }
 }
 
-pub fn build_rspc_router(
-    invalidation_channel: tokio::sync::broadcast::Receiver<InvalidationEvent>,
-) -> impl RouterBuilderLike<GlobalContext> {
+pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
     rspc::Router::<GlobalContext>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())
         .yolo_merge("app.", app::mount())
-        .subscription("invalidateQuery", |t| {
-            t(|_ctx, _args: ()| {
+        .subscription("invalidateQuery", move |t| {
+            t(move |_ctx, _args: ()| {
                 stream! {
-                    trace!("Client subscribed to 'pings'");
-                    for i in 0..5 {
-                        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                        trace!("Sending ping {}", i);
-                        yield "ping".to_string();
+                    loop {
+                        let event = _ctx.read().await.invalidation_sender.subscribe().recv().await.unwrap();
+                        yield event;
                     }
                 }
             })

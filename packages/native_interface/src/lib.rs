@@ -21,13 +21,12 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let (invalidation_sender, invalidation_receiver) = tokio::sync::broadcast::channel(200);
+    let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<GlobalContext>> =
-        carbon_bindings::api::build_rspc_router(invalidation_receiver)
-            .expose()
-            .build()
-            .arced();
+    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
+        .expose()
+        .build()
+        .arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()

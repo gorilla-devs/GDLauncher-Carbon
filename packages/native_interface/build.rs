@@ -5,9 +5,7 @@ use rspc::{Config, RouterBuilderLike};
 fn main() {
     use napi_build::setup;
 
-    let (_, invalidation_receiver) = tokio::sync::broadcast::channel(200);
-
-    carbon_bindings::api::build_rspc_router(invalidation_receiver)
+    carbon_bindings::api::build_rspc_router()
         .expose()
         .config(
             Config::new().export_ts_bindings(
