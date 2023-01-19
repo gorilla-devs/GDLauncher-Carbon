@@ -46,8 +46,8 @@ pub async fn delete(instance: Instance, put_in_trash_bin: bool) -> InstanceDelet
             trace!("deleting instance from fs at {}", try_path_fmt!(instance_path));
             let configuration_file_path = Path::new(instance_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
             let minecraft_package_path = Path::new(instance_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
-            let _ = tokio::fs::remove_file(configuration_file_path).await?;
-            let _ = tokio::fs::remove_dir_all(minecraft_package_path).await?;
+            tokio::fs::remove_file(configuration_file_path).await?;
+            tokio::fs::remove_dir_all(minecraft_package_path).await?;
 
             Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
         },

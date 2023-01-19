@@ -1,6 +1,4 @@
-use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
-use crate::minecraft_mod::MinecraftMod;
 use crate::minecraft_package::MinecraftPackage;
 
 #[derive(Debug, Serialize, Deserialize, Hash)]

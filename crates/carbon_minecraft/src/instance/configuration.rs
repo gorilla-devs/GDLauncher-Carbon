@@ -63,13 +63,6 @@ pub async fn write_in_file<T: AsRef<Path> + Sync>(instance: &Instance, configura
     let temporary_configuration_file_path = PathBuf::from(configuration_file_path).with_file_name(format!("{TEMP_CONFIG_FILE_PREFIX}-{timestamp_nanos}"));
     trace!("writing temporary instance configuration file at {}", try_path_fmt!(temporary_configuration_file_path));
     tokio::fs::write(&temporary_configuration_file_path, instance_configuration_file_content).await?;
-    match  &instance.persistence_status {
-        InstanceStatus::Persisted(path) if configuration_file_path.starts_with(path) => {
-            trace!("removing configuration file at {}", try_path_fmt!(configuration_file_path));
-            tokio::fs::remove_file(configuration_file_path).await?;
-        }
-        _ => ()
-    }
     trace!("renaming configuration file at {} in {}", try_path_fmt!(temporary_configuration_file_path), try_path_fmt!(configuration_file_path));
     tokio::fs::rename(temporary_configuration_file_path, configuration_file_path).await?;
     trace!("wrote instance configuration file at {}", try_path_fmt!(configuration_file_path));
