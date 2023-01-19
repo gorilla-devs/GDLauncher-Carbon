@@ -1,8 +1,9 @@
 import { loadLanguageFile, useTransContext, Trans } from "@gd/i18n";
-import { Input } from "@gd/ui";
+import { createNotification, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 
 const Sidebar = () => {
+  const [addNotification] = createNotification();
   const [t, { changeLanguage, addResources }] = useTransContext();
 
   const changeLang = async (lang: string) => {
@@ -16,7 +17,7 @@ const Sidebar = () => {
       <Input
         placeholder="Type Here"
         icon={<div class="i-ri:search-line" />}
-        class="w-full rounded-full text-black-lightGray"
+        class="w-full rounded-full text-shade-0"
       />
       {/* {t("hello")} */}
       <Trans
@@ -29,6 +30,10 @@ const Sidebar = () => {
       <button onClick={() => changeLang("it")}>IT</button>
       <button onClick={() => changeLang("en")}>EN</button>
       <button onClick={() => changeLang("de")}>DE</button>
+      <button onClick={() => addNotification("Notification Added")}>
+        Add Notification
+      </button>
+      Sidebar library
     </SiderbarWrapper>
   );
 };

@@ -12,12 +12,22 @@
     "jsxImportSource": "solid-js",
     "types": ["vite/client", "vitest/globals"],
     "noEmit": true,
+    "allowJs": true,
     "paths": {
-      "@/*": ["./packages/mainWindow/src/*"]
+      "@/*": ["./packages/mainWindow/src/*"],
+      "@package_json": ["./package.json"]
     },
     // https://github.com/AlexTorresSk/custom-electron-titlebar/issues/198 🤡🤡🤡🤡🤡
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "declaration": false
   },
-  "include": ["./packages/**/*.tsx", "packages/**/*.ts"],
+  "include": [
+    "./packages/**/*.tsx",
+    "./packages/**/*.ts",
+    "./packages/**/*.d.ts",
+    "./packages/preload/vite.config.js",
+    "./packages/mainWindow/vite.config.js",
+    "./packages/main/vite.config.js"
+  ],
   "exclude": ["./dist/**/*", "node_modules/**/*"]
 }

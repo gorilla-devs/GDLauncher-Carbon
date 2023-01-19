@@ -2,12 +2,11 @@
 members = [
   "packages/native_interface",
   "crates/carbon_microsoft_auth",
-  "crates/carbon_jre_manager",
+  "crates/carbon_java_manager",
   "crates/carbon_minecraft",
   "crates/carbon_bindings",
   "crates/carbon_net",
   "crates/carbon_compression",
-  "crates/carbon_core",
 ]
 
 [profile.release]

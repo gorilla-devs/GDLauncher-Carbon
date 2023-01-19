@@ -1,8 +1,5 @@
 {
   "extends": "@gd/config/tsconfig.json",
   "include": ["src/**/*.ts", "src/**/*.tsx", "./types.d.ts"],
-  "exclude": ["dist/**/*", "node_modules"],
-  "compilerOptions": {
-    "skipLibCheck": true
-  }
+  "exclude": ["dist/**/*", "node_modules"]
 }

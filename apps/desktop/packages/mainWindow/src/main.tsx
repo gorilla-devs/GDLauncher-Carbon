@@ -5,12 +5,12 @@ import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
+import "@/utils/themeManager";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
-import { initModules } from "@/modules";
 import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
+import { NotificationsProvider } from "@gd/ui";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -30,14 +30,16 @@ loadLanguageFile(DEFAULT_LANG).then((langFile) => {
 
 render(() => {
   onMount(() => {
-    initModules();
+    window.clearLoading();
   });
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
         <TransProvider instance={instance}>
-          <App />
+          <NotificationsProvider>
+            <App />
+          </NotificationsProvider>
         </TransProvider>
       </Router>
     </rspc.Provider>

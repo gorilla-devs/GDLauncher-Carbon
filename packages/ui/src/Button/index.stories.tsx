@@ -25,7 +25,7 @@ export const Primary = Template.bind({});
 
 Primary.args = {
   disabled: false,
-  type: "primary",
+  variant: "primary",
   children: "Click Here",
   uppercase: true,
 };
@@ -34,7 +34,7 @@ export const Outline = Template.bind({});
 
 Outline.args = {
   disabled: false,
-  type: "outline",
+  variant: "outline",
   children: "Click Here",
   uppercase: true,
 };
@@ -43,7 +43,7 @@ export const Icon = Template.bind({});
 
 Icon.args = {
   disabled: false,
-  type: "primary",
+  variant: "primary",
   children: "Click Here",
   icon: <div class="i-ri:refresh-line" />,
   iconRight: false,

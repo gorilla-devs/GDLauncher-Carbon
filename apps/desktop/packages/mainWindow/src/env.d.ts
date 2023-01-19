@@ -3,7 +3,6 @@
 
 interface ImportMetaEnv {
   MODE: string;
-  VITE_NAPI_ID: string;
 }
 
 interface ImportMeta {
