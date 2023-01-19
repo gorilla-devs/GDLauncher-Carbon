@@ -108,7 +108,12 @@ const Instance = () => {
                         <div class="i-ri:star-s-fill text-xl" />
                       </div>
                       <Button uppercase variant="glow" size="small">
-                        Play
+                        <Trans
+                          key="play"
+                          options={{
+                            defaultValue: "play",
+                          }}
+                        />
                       </Button>
                     </div>
                   </div>

@@ -119,7 +119,7 @@ const CodeStep = (props: Props) => {
           </p>
           <p class="text-shade-0">
             <Trans
-              key="enter_code"
+              key="enter_code_in_browser"
               options={{
                 defaultValue:
                   "Enter the specified code on the browser page to complete the authorization",
@@ -135,7 +135,12 @@ const CodeStep = (props: Props) => {
             window.openExternalLink(deviceCodeLink() || "");
           }}
         >
-          Insert the code
+          <Trans
+            key="insert_code"
+            options={{
+              defaultValue: "Insert Code",
+            }}
+          />
         </Button>
       </Show>
       <Show when={expired()}>
@@ -144,7 +149,15 @@ const CodeStep = (props: Props) => {
           onClick={() => handleRefersh()}
         >
           <span class="i-ri:refresh-line" />
-          <h3 class="m-0">Refresh</h3>
+          <h3 class="m-0">
+            {" "}
+            <Trans
+              key="refresh"
+              options={{
+                defaultValue: "refresh",
+              }}
+            />
+          </h3>
         </div>
       </Show>
     </div>
