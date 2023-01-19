@@ -1,7 +1,7 @@
 import { onMount } from "solid-js";
 import Style from "./Slider.module.scss";
 
-interface Props {
+export interface Props {
   min: number;
   max: number;
   value: number;

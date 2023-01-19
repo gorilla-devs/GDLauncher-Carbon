@@ -9,8 +9,9 @@ edition = "2021"
 serde = { version = "1.0.147", features = ["derive", "rc"] }
 anyhow = "1.0.51"
 tokio = { version = "1.22.0", features = ["full"] }
-rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "32fe3d8a6ca525f048e84b78451c493e25e9eeba" }
+rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46" }
 tracing = "0.1.37"
 async-stream = "0.3.3"
 tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
-axum = { version = "0.5.17", features = ["ws"] }
+axum = { version = "0.6.2", features = ["ws"] }
+carbon_java_manager ={ path = "../carbon_java_manager" }

@@ -1,12 +1,11 @@
 import { resolve } from "path";
 import { builtinModules } from "module";
 import { defineConfig } from "vite";
-import { ViteMinifyPlugin } from "vite-plugin-minify";
 
 export default defineConfig({
   root: __dirname,
   envDir: resolve(__dirname, "../../../../"),
-  plugins: [ViteMinifyPlugin({})],
+  plugins: [],
   build: {
     outDir: "../../dist/preload",
     lib: {

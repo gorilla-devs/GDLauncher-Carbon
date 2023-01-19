@@ -8,7 +8,7 @@ export { Switch } from "./Switch";
 export { Checkbox } from "./Checkbox";
 export { ViewList } from "./ViewList";
 export { News } from "./News";
-export { Tabs } from "./Tabs";
+export { Tabs, TabList, TabPanel, Tab } from "./Tabs";
 export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
 export {
@@ -16,5 +16,4 @@ export {
   createNotification,
 } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
-
-import "virtual:uno.css";
+export * from "./themes";

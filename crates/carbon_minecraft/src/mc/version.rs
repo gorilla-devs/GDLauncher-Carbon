@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, trace};
 
-use carbon_net::Download;
+use carbon_net::Downloadable;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,20 +182,20 @@ impl Version {
     pub async fn get_allowed_libraries(
         &self,
         base_path: &Path,
-    ) -> Result<Vec<carbon_net::Download>> {
+    ) -> Result<Vec<carbon_net::Downloadable>> {
         let libraries = self.filter_allowed_libraries();
 
-        let mut downloads: Vec<carbon_net::Download> = vec![];
+        let mut downloads: Vec<carbon_net::Downloadable> = vec![];
 
         for library in libraries {
-            let lib: Result<Download, anyhow::Error> = library.try_into();
+            let lib: Result<Downloadable, anyhow::Error> = library.try_into();
             if let Ok(mut lib) = lib {
                 lib.path = base_path.join("libraries").join(lib.path); // how do we do this from inside the TryFrom impl?
                 downloads.push(lib);
             }
 
             if let Some(natives) = &library.downloads.classifiers {
-                let native: Result<Download, anyhow::Error> = natives.try_into();
+                let native: Result<Downloadable, anyhow::Error> = natives.try_into();
                 if let Ok(mut native) = native {
                     native.path = base_path.join("libraries").join(native.path); // how do we do this from inside the TryFrom impl?
                     downloads.push(native);
@@ -206,7 +206,7 @@ impl Version {
         Ok(downloads)
     }
 
-    pub async fn get_jar_client(&self, base_path: &Path) -> Result<carbon_net::Download> {
+    pub async fn get_jar_client(&self, base_path: &Path) -> Result<carbon_net::Downloadable> {
         let jar = &self
             .downloads
             .as_ref()
@@ -220,7 +220,7 @@ impl Version {
 
         let jar_path = base_path.join("clients").join(format!("{version_id}.jar"));
 
-        Ok(carbon_net::Download::new(jar.url.clone(), jar_path)
+        Ok(carbon_net::Downloadable::new(jar.url.clone(), jar_path)
             .with_checksum(Some(carbon_net::Checksum::Sha1(jar.sha1.clone())))
             .with_size(jar.size))
     }
@@ -231,7 +231,7 @@ impl Version {
         for library in libraries {
             trace!("Extracting natives for {library:#?}");
             if let Some(natives) = &library.downloads.classifiers {
-                let native: Result<Download, anyhow::Error> = natives.try_into();
+                let native: Result<Downloadable, anyhow::Error> = natives.try_into();
                 if let Ok(native) = native {
                     let native_lib_path = base_path.join("libraries").join(native.path);
                     let extract_dir = base_path
@@ -414,7 +414,7 @@ impl Library {
     }
 }
 
-impl TryFrom<&Library> for carbon_net::Download {
+impl TryFrom<&Library> for carbon_net::Downloadable {
     type Error = anyhow::Error;
 
     fn try_from(value: &Library) -> Result<Self, Self::Error> {
@@ -429,7 +429,7 @@ impl TryFrom<&Library> for carbon_net::Download {
         );
         let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
-        Ok(carbon_net::Download {
+        Ok(carbon_net::Downloadable {
             url: artifact.url,
             path,
             checksum,
@@ -458,7 +458,7 @@ pub struct Classifiers {
     pub natives_osx: Option<MappingsClass>,
 }
 
-impl TryFrom<&Classifiers> for carbon_net::Download {
+impl TryFrom<&Classifiers> for carbon_net::Downloadable {
     type Error = anyhow::Error;
 
     fn try_from(value: &Classifiers) -> Result<Self, Self::Error> {
@@ -473,7 +473,7 @@ impl TryFrom<&Classifiers> for carbon_net::Download {
                     );
                     let checksum = Some(carbon_net::Checksum::Sha1(windows.sha1));
 
-                    carbon_net::Download {
+                    carbon_net::Downloadable {
                         url: windows.url,
                         path,
                         checksum,
@@ -491,7 +491,7 @@ impl TryFrom<&Classifiers> for carbon_net::Download {
 
                     let checksum = Some(carbon_net::Checksum::Sha1(macos.sha1));
 
-                    carbon_net::Download {
+                    carbon_net::Downloadable {
                         url: macos.url,
                         path: PathBuf::from(path),
                         checksum,
@@ -502,7 +502,7 @@ impl TryFrom<&Classifiers> for carbon_net::Download {
                         PathBuf::from(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
                     let checksum = Some(carbon_net::Checksum::Sha1(osx.sha1));
 
-                    carbon_net::Download {
+                    carbon_net::Downloadable {
                         url: osx.url,
                         path,
                         checksum,
@@ -521,7 +521,7 @@ impl TryFrom<&Classifiers> for carbon_net::Download {
                     );
                     let checksum = Some(carbon_net::Checksum::Sha1(linux.sha1));
 
-                    carbon_net::Download {
+                    carbon_net::Downloadable {
                         url: linux.url,
                         path,
                         checksum,

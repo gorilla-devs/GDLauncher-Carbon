@@ -3,12 +3,12 @@ import { onMount } from "solid-js";
 import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
+import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
+import "@/utils/themeManager";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
-import { initModules } from "@/modules";
 import "virtual:uno.css";
-import "virtual:unocss-devtools";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 
@@ -16,17 +16,31 @@ queueMicrotask(() => {
   initAnalytics();
 });
 
+const DEFAULT_LANG = "en";
+
+const instance = i18n.createInstance({
+  defaultNS: "common",
+  fallbackLng: DEFAULT_LANG,
+});
+instance.use(icu);
+
+loadLanguageFile(DEFAULT_LANG).then((langFile) => {
+  instance.addResourceBundle(DEFAULT_LANG, "common", langFile);
+});
+
 render(() => {
   onMount(() => {
-    initModules();
+    window.clearLoading();
   });
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <NotificationsProvider>
-          <App />
-        </NotificationsProvider>
+        <TransProvider instance={instance}>
+          <NotificationsProvider>
+            <App />
+          </NotificationsProvider>
+        </TransProvider>
       </Router>
     </rspc.Provider>
   );

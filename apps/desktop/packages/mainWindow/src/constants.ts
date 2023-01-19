@@ -1,10 +1,10 @@
 export const NAVBAR_ROUTES = [
   {
-    label: "Library",
+    label: "library",
     path: "/library",
   },
   {
-    label: "Modpacks",
+    label: "modpacks",
     path: "/modpacks",
   },
 ];

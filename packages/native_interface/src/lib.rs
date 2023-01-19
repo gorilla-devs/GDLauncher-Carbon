@@ -1,9 +1,8 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 use async_stream::stream;
 use axum::{extract::Path, routing::get};
-use carbon_bindings::Ctx;
-use rspc::Config;
+use rspc::{Config, RouterBuilderLike};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
 
@@ -22,7 +21,10 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router = carbon_bindings::build_router().build().arced();
+    let router: Arc<rspc::Router> = carbon_bindings::api::build_router()
+        .expose()
+        .build()
+        .arced();
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
         .allow_methods(Any)
@@ -31,16 +33,7 @@ async fn start_router() {
 
     let app = axum::Router::new()
         .route("/", get(|| async { "Hello 'rspc'!" }))
-        .route(
-            "/rspc/:id",
-            router
-                .clone()
-                .endpoint(|Path(path): Path<String>| {
-                    trace!("Client requested operation '{}'", path);
-                    Ctx {}
-                })
-                .axum(),
-        )
+        .nest("/rspc", router.endpoint(|| ()).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
@@ -61,13 +54,12 @@ mod test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let client = reqwest::Client::new();
-        let resp = client
-            .get("http://localhost:4000/rspc/version")
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get("http://localhost:4000").send().await.unwrap();
+        let resp_code = resp.status();
+        let resp_body = resp.text().await.unwrap();
 
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp_code, 200);
+        assert_eq!(resp_body, "Hello 'rspc'!");
 
         server.abort();
     }
