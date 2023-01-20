@@ -1,8 +1,8 @@
-mod app_configuration;
+mod configuration;
 
 use std::collections::HashMap;
 use tokio::sync::RwLock;
-use crate::app::app_configuration::AppConfiguration;
+use crate::app::configuration::AppConfiguration;
 use crate::instance::Instance;
 
 struct App {

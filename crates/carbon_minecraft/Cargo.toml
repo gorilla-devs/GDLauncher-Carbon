@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0.147", features = ["derive", "rc"] }
+serde = { version = "1.0.152", features = ["derive", "rc"] }
 anyhow = "1.0.51"
 tokio = { version = "1.22.0", features = ["full"] }
 tokio-stream = { version = "0.1.11", features = ["fs"] }
@@ -27,6 +27,7 @@ log="0.4.17"
 trash = "3.0.0"
 inter-struct = "0.2.0"
 carbon_net = { path = "../carbon_net" }
+prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", ], default_features = false  }
 
 
 [dev-dependencies]

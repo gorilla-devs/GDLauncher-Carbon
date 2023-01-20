@@ -1,0 +1,4 @@
+[alias]
+prisma = "run -p prisma-cli --"
+prisma-generate = "run -p prisma-cli --"
+
