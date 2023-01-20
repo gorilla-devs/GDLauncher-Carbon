@@ -1,4 +1,11 @@
-import { children, createEffect, createSignal, onMount, JSX } from "solid-js";
+import {
+  children,
+  createEffect,
+  createSignal,
+  onMount,
+  JSX,
+  onCleanup,
+} from "solid-js";
 import "./index.css";
 
 export interface Props {
@@ -8,7 +15,6 @@ export interface Props {
 }
 
 const Carousel = (props: Props) => {
-  const [currentSlide, setCurrentSlide] = createSignal(0);
   const [startX, setStartX] = createSignal(0);
   const [scrollLeft, setScrollLeft] = createSignal(0);
   const [isDown, setIsDown] = createSignal(false);
@@ -17,40 +23,96 @@ const Carousel = (props: Props) => {
 
   onMount(() => {
     const beginning = horizontalSlider?.scrollLeft;
-    setCurrentSlide(beginning || 0);
+    if (beginning) setScrollLeft(beginning);
+  });
+
+  const toggleClickEventTile = (enable?: boolean) => {
+    const tiles = document.getElementsByClassName("instance-tile");
+
+    for (const tile of tiles) {
+      if (enable) {
+        tile.classList.add("pointer-events-none");
+      } else tile.classList.remove("pointer-events-none");
+    }
+  };
+
+  const mousedown = (e: MouseEvent) => {
+    if (horizontalSlider) {
+      setIsDown(true);
+      horizontalSlider?.classList.add("snap-none");
+      horizontalSlider?.classList.remove(
+        "snap-x",
+        "snap-mandatory",
+        "scroll-smooth"
+      );
+      setStartX(e.pageX - horizontalSlider?.offsetLeft);
+      setScrollLeft(horizontalSlider.scrollLeft);
+    }
+  };
+
+  const mouseleave = () => {
+    if (horizontalSlider) {
+      setIsDown(false);
+      horizontalSlider?.classList.remove("snap-none");
+      horizontalSlider?.classList.add(
+        "snap-x",
+        "snap-mandatory",
+        "scroll-smooth"
+      );
+    }
+  };
+  const mousemove = (e: MouseEvent) => {
+    if (horizontalSlider) {
+      if (!isDown()) return;
+      e.preventDefault();
+
+      const x = e.pageX - horizontalSlider.offsetLeft;
+      const walk = (x - startX()) * 3;
+      horizontalSlider.scrollLeft = scrollLeft() - walk;
+      setScrollLeft(scrollLeft());
+    }
+  };
+
+  createEffect(() => {
+    if (horizontalSlider) {
+      horizontalSlider.addEventListener("mousedown", mousedown);
+      horizontalSlider.addEventListener("mouseleave", mouseleave);
+      horizontalSlider.addEventListener("mouseup", mouseleave);
+      horizontalSlider.addEventListener("mousemove", mousemove);
+    }
+  });
+
+  onCleanup(() => {
+    if (horizontalSlider) {
+      horizontalSlider.removeEventListener("mousedown", mousedown);
+      horizontalSlider.removeEventListener("mouseleave", mouseleave);
+      horizontalSlider.removeEventListener("mouseup", mouseleave);
+      horizontalSlider.removeEventListener("mousemove", mousemove);
+    }
   });
 
   const handleScroll = (direction: string) => {
     const isLeft = direction === "left";
 
     const scrollWidth = horizontalSlider?.scrollWidth || 0;
-    const scrollLeft = horizontalSlider?.scrollLeft || 0;
+    const scrollLeftt = horizontalSlider?.scrollLeft || 0;
     const width = scrollWrapper?.getBoundingClientRect()?.width || 0;
     const offset = 10;
-    const isEnd = scrollWidth - scrollLeft - width < offset;
-    const isStart = currentSlide() === 0;
+    const isEnd = scrollWidth - scrollLeftt - width < offset;
+    const isStart = scrollLeft() === 0;
 
     if (isLeft) {
       if (isStart) return;
-      setCurrentSlide(currentSlide() - 168);
+      setScrollLeft((prev) => prev - 168);
     } else {
       if (isEnd) return;
-      setCurrentSlide(currentSlide() + 168);
+      setScrollLeft((prev) => prev + 168);
     }
 
     if (horizontalSlider) {
-      horizontalSlider.scrollLeft = currentSlide();
+      horizontalSlider.scrollLeft = scrollLeft();
     }
   };
-
-  const c = children(() => props.children);
-  createEffect(() => {
-    (c() as JSX.Element[])?.forEach((item: JSX.Element) => {
-      if (isDown()) {
-        (item as HTMLElement).classList.add("pointer-events-none");
-      } else (item as HTMLElement).classList.remove("pointer-events-none");
-    });
-  });
 
   return (
     <div class="flex flex-col w-full">
@@ -76,48 +138,54 @@ const Carousel = (props: Props) => {
           ref={horizontalSlider}
           id="horizontal-slider"
           class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
-          onMouseDown={(e) => {
-            setIsDown(true);
-            horizontalSlider?.classList.add("snap-none");
-            horizontalSlider?.classList.remove(
-              "snap-x",
-              "snap-mandatory",
-              "scroll-smooth"
-            );
+          // onMouseDown={(e) => {
+          //   console.log("MOUSEDOWN");
 
-            const offsetLeft = horizontalSlider?.offsetLeft || 0;
-            setStartX(e.pageX - offsetLeft);
-            setScrollLeft(offsetLeft);
-          }}
-          onMouseMove={(e) => {
-            if (!isDown()) return;
-            e.preventDefault();
-            const x = e.pageX - (horizontalSlider?.offsetLeft || 0);
-            const walk = (x - startX()) * 2;
+          //   setIsDown(true);
+          //   if (horizontalSlider) {
+          //     horizontalSlider?.classList.add("snap-none");
+          //     horizontalSlider?.classList.remove(
+          //       "snap-x",
+          //       "snap-mandatory",
+          //       "scroll-smooth"
+          //     );
 
-            setCurrentSlide(scrollLeft() - walk);
-            if (horizontalSlider) {
-              horizontalSlider.scrollLeft = scrollLeft() - walk;
-            }
-          }}
-          onMouseLeave={() => {
-            setIsDown(false);
-            horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add(
-              "snap-x",
-              "snap-mandatory",
-              "scroll-smooth"
-            );
-          }}
-          onMouseUp={() => {
-            setIsDown(false);
-            horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add(
-              "snap-x",
-              "snap-mandatory",
-              "scroll-smooth"
-            );
-          }}
+          //     setStartX(e.pageX - horizontalSlider?.offsetLeft);
+          //     setScrollLeft(horizontalSlider?.offsetLeft);
+          //   }
+          // }}
+          // onMouseMove={(e) => {
+          //   console.log("MOVE");
+          //   if (horizontalSlider) {
+          //     if (!isDown()) return;
+          //     e.preventDefault();
+          //     const x = e.pageX - horizontalSlider?.offsetLeft;
+          //     const walk = (x - startX()) * 2;
+          //     // setScrollLeft(horizontalSlider.scrollLeft);
+          //     console.log("TEST", scrollLeft(), horizontalSlider.scrollLeft);
+          //     // horizontalSlider.scrollLeft = horizontalSlider.scrollLeft - walk;
+          //     horizontalSlider.scrollLeft = scrollLeft() - walk;
+          //   }
+          // }}
+          // onMouseLeave={() => {
+          //   setIsDown(false);
+          //   horizontalSlider?.classList.remove("snap-none");
+          //   horizontalSlider?.classList.add(
+          //     "snap-x",
+          //     "snap-mandatory",
+          //     "scroll-smooth"
+          //   );
+          // }}
+          // onMouseUp={() => {
+          //   setIsDown(false);
+          //   toggleClickEventTile(true);
+          //   horizontalSlider?.classList.remove("snap-none");
+          //   horizontalSlider?.classList.add(
+          //     "snap-x",
+          //     "snap-mandatory",
+          //     "scroll-smooth"
+          //   );
+          // }}
         >
           {props.children}
         </div>
