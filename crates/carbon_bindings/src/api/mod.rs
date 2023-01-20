@@ -28,6 +28,7 @@ impl InvalidationEvent {
 #[derive(Clone)]
 pub struct GlobalContextInner {
     pub base_dir: PathBuf,
+    // Not sure how to hide this..
     invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
 }
 
@@ -62,6 +63,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
         .yolo_merge("mc.", mc::mount())
         .yolo_merge("app.", app::mount())
         .subscription("invalidateQuery", move |t| {
+            // https://twitter.com/ep0k_/status/494284207821447168
             t(move |ctx, _args: ()| {
                 stream! {
                     loop {
