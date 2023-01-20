@@ -166,11 +166,13 @@ importers:
       html-parse-string: ^0.0.8
       i18next: ^22.1.5
       i18next-icu: ^2.1.0
+      intl-messageformat: ^10.2.5
     devDependencies:
       '@mbarzda/solid-i18next': 1.2.0_apk5tq3hzmnmypqfjbvurzmbyi
       html-parse-string: 0.0.8
       i18next: 22.1.5
       i18next-icu: 2.1.0_intl-messageformat@10.2.5
+      intl-messageformat: 10.2.5
 
   packages/native_interface:
     specifiers:
@@ -7680,10 +7682,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
-      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
+      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -8593,9 +8595,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
-      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
+      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -12433,20 +12435,6 @@ packages:
       param-case: 3.0.4
       relateurl: 0.2.7
       terser: 4.8.1
-    dev: true
-
-  /html-minifier-terser/6.1.0:
-    resolution: {integrity: sha512-YXxSlJBZTP7RS3tWnQw74ooKa6L9b9i9QYXY21eUEvhZ3u9XLfv6OnFsQq6RxkhHygsaUMvYsZRV5rU/OVNZxw==}
-    engines: {node: '>=12'}
-    hasBin: true
-    dependencies:
-      camel-case: 4.1.2
-      clean-css: 5.3.1
-      commander: 8.3.0
-      he: 1.2.0
-      param-case: 3.0.4
-      relateurl: 0.2.7
-      terser: 5.15.1
     dev: true
 
   /html-parse-string/0.0.8:
