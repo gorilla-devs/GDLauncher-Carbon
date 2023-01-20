@@ -9,8 +9,8 @@ mod test {
     use tokio::sync::{Mutex, RwLock};
 
     use crate::{
-        instance::{Instance, Modloaders},
-        modloaders::{vanilla::VanillaModLoader, Modloader},
+        instance::{Instance},
+        modloader::{vanilla::VanillaModLoader, Modloader},
     };
 
     use super::meta::McMeta;

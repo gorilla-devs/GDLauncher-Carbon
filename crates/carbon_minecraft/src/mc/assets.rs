@@ -1,12 +1,7 @@
-use anyhow::{bail, Context, Ok, Result};
-use futures::StreamExt;
-use reqwest::Client;
-use reqwest_middleware::ClientBuilder;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use anyhow::{Ok, Result};
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
-use std::{borrow::Borrow, collections::HashMap, path::PathBuf, sync::Arc};
-use tracing::{debug, trace};
+use std::{collections::HashMap, path::PathBuf};
+use tracing::trace;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AssetIndex {
