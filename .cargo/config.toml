@@ -1,4 +1,5 @@
 [alias]
 prisma-generate = "run -p prisma-cli -- generate --schema=./crates/carbon_minecraft/prisma/schema.prisma"
+prisma-migrate = "run -p prisma-cli -- migrate dev --schema=./crates/carbon_minecraft/prisma/schema.prisma"
 prisma = "run -p prisma-cli --"
 
