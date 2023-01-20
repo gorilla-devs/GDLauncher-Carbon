@@ -1,8 +1,8 @@
-import { createSignal, onMount } from "solid-js";
+import { children, createEffect, createSignal, onMount, JSX } from "solid-js";
 import "./index.css";
 
 export interface Props {
-  children?: HTMLElement | Element | string | any;
+  children?: JSX.Element;
   class?: string;
   title: string;
 }
@@ -43,6 +43,15 @@ const Carousel = (props: Props) => {
     }
   };
 
+  const c = children(() => props.children);
+  createEffect(() => {
+    (c() as JSX.Element[])?.forEach((item: JSX.Element) => {
+      if (isDown()) {
+        (item as HTMLElement).classList.add("pointer-events-none");
+      } else (item as HTMLElement).classList.remove("pointer-events-none");
+    });
+  });
+
   return (
     <div class="flex flex-col w-full">
       <div class="flex justify-between items-center h-9 w-full">
@@ -75,6 +84,7 @@ const Carousel = (props: Props) => {
               "snap-mandatory",
               "scroll-smooth"
             );
+
             const offsetLeft = horizontalSlider?.offsetLeft || 0;
             setStartX(e.pageX - offsetLeft);
             setScrollLeft(offsetLeft);
@@ -83,7 +93,7 @@ const Carousel = (props: Props) => {
             if (!isDown()) return;
             e.preventDefault();
             const x = e.pageX - (horizontalSlider?.offsetLeft || 0);
-            const walk = (x - startX()) * 3;
+            const walk = (x - startX()) * 2;
 
             setCurrentSlide(scrollLeft() - walk);
             if (horizontalSlider) {
