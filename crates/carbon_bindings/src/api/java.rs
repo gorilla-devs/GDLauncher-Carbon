@@ -5,7 +5,7 @@ use std::{collections::HashMap, path::PathBuf};
 #[derive(Type, Serialize)]
 enum JavaType {
     Local,
-    AutoSetup,
+    Controlled,
 }
 
 #[derive(Type, Serialize)]
@@ -28,7 +28,7 @@ struct Javas(HashMap<u8, Java>);
 
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::<GlobalContext>::new()
-        .query("getAvailableJavas", |t| {
+        .query("getAvailable", |t| {
             t(|_ctx: GlobalContext, _args: ()| async move {
                 let mut javas = HashMap::new();
                 let mut java8 = Java {
@@ -63,7 +63,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
                     id: "vseuitruihsruuuuuu".to_string(),
                     version: "11.0.1".to_string(),
                     path: PathBuf::from("C:\\Some Path\\\\AppData\\gdlauncher\\Java\\jre1.8.0_51"),
-                    _type: JavaType::AutoSetup,
+                    _type: JavaType::Controlled,
                 });
 
                 javas.insert(11, java11);
@@ -71,7 +71,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
                 Ok(Javas(javas))
             })
         })
-        .mutation("setDefaultJava", |t| {
+        .mutation("setDefault", |t| {
             #[derive(Type, Deserialize)]
             struct Args {
                 major_version: u8,
@@ -79,7 +79,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             }
             t(|_, args: Args| {})
         })
-        .mutation("autoSetupJava", |t| {
+        .mutation("setupControlled", |t| {
             #[derive(Type, Deserialize)]
             struct Args {
                 major_version: u8,
@@ -97,14 +97,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
                 // invalidate_query!("java.autoSetupjavaProgress");
             })
         })
-        .query("autoSetupjavaProgress", |t| {
+        .query("getControlledInstallStatus", |t| {
             t(|_ctx: GlobalContext, _args: ()| async move {
                 Ok(0) // progress
             })
         })
-        .mutation("deleteAutoSetupJava", |t| {
-            t(|_, major_version: u8| {
-                // invalidate_query!("app.getTheme");
-            })
-        })
+        .mutation("deleteControlled", |t| t(|_, major_version: u8| {}))
 }

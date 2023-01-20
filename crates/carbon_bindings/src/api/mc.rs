@@ -37,7 +37,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::<GlobalContext>::new()
         .query("getInstances", |t| {
             t(|_ctx: GlobalContext, _args: ()| async move {
-                let mut instances = vec![
+                let instances = vec![
                     Instance {
                         id: "88r39459345939453".to_string(),
                         name: "My first instance".to_string(),
