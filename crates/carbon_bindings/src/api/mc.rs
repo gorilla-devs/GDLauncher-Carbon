@@ -11,11 +11,13 @@ struct Instance {
     modloader: String,
 }
 
+#[derive(Type, Serialize)]
 struct Mod {
     id: String,
     name: String,
 }
 
+#[derive(Type, Serialize)]
 struct InstanceDetails {
     id: String,
     name: String,
@@ -81,21 +83,45 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
         })
         .query("getInstanceDetails", |t| {
             t(|_ctx: GlobalContext, args: String| async move {
-                let instance = Instance {
-                    id: "82h39459345336457".to_string(),
-                    name: "All The Mods 6".to_string(),
+                let instance = InstanceDetails {
+                    id: "88r39459345939453".to_string(),
+                    name: "My first instance".to_string(),
+                    mc_version: "1.16.5".to_string(),
+                    modloader: "Forge".to_string(),
+                    modloader_version: "1.16.5".to_string(),
+                    mods: vec![
+                        Mod {
+                            id: "88r39459345939453".to_string(),
+                            name: "My first instance".to_string(),
+                        },
+                        Mod {
+                            id: "88r39459345939456".to_string(),
+                            name: "My second instance".to_string(),
+                        },
+                        Mod {
+                            id: "88r39459345939451".to_string(),
+                            name: "Instance with a very long name".to_string(),
+                        },
+                        Mod {
+                            id: "88r39459345336457".to_string(),
+                            name: "Vanilla Minecraft".to_string(),
+                        },
+                        Mod {
+                            id: "84439459345336457".to_string(),
+                            name: "Forge Minecraft".to_string(),
+                        },
+                        Mod {
+                            id: "82h39459345336457".to_string(),
+                            name: "All The Mods 6".to_string(),
+                        },
+                    ],
+                    played_time: 0,
+                    last_played: 0,
+                    notes: "This is a test instance".to_string(),
                 };
 
                 Ok(instance)
             })
-        })
-        .mutation("updateInstanceName", |t| {
-            #[derive(Type, Deserialize)]
-            struct Args {
-                id: String,
-                new_name: String,
-            }
-            t(|_, args: Args| {})
         })
         .mutation("openInstanceFolderPath", |t| t(|_, args: String| {}))
         .mutation("startInstance", |t| t(|_, args: String| {}))
@@ -106,6 +132,27 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
         .mutation("disableMod", |t| t(|_, args: String| {}))
         .mutation("removeMod", |t| t(|_, args: String| {}))
         .mutation("removeMods", |t| t(|_, args: Vec<String>| {}))
+        // Change versions
+        .mutation("switchMinecraftVersion", |t| t(|_, args: String| {}))
+        .mutation("switchModloader", |t| t(|_, args: String| {}))
+        .mutation("switchModloaderVersion", |t| t(|_, args: String| {}))
+        // Instance settings
+        .mutation("updateInstanceName", |t| {
+            #[derive(Type, Deserialize)]
+            struct Args {
+                id: String,
+                new_name: String,
+            }
+            t(|_, args: Args| {})
+        })
+        .query("getInstanceMemory", |t| {
+            t(|_ctx: GlobalContext, args: String| async move {})
+        })
+        .mutation("updateInstanceMemory", |t| t(|_, args: u8| {}))
+        .query("getInstanceJavaArgs", |t| {
+            t(|_ctx: GlobalContext, args: String| async move {})
+        })
+        .mutation("updateInstanceJavaArgs", |t| t(|_, args: String| {}))
 }
 
 pub(super) fn mount_axum_router() -> axum::Router<()> {
