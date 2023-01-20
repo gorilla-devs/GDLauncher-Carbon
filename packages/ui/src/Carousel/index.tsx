@@ -70,7 +70,11 @@ const Carousel = (props: Props) => {
           onMouseDown={(e) => {
             setIsDown(true);
             horizontalSlider?.classList.add("snap-none");
-            horizontalSlider?.classList.remove("snap-x", "snap-mandatory");
+            horizontalSlider?.classList.remove(
+              "snap-x",
+              "snap-mandatory",
+              "scroll-smooth"
+            );
             const offsetLeft = horizontalSlider?.offsetLeft || 0;
             setStartX(e.pageX - offsetLeft);
             setScrollLeft(offsetLeft);
@@ -79,22 +83,30 @@ const Carousel = (props: Props) => {
             if (!isDown()) return;
             e.preventDefault();
             const x = e.pageX - (horizontalSlider?.offsetLeft || 0);
-            const walk = (x - startX()) * 2;
+            const walk = (x - startX()) * 3;
 
             setCurrentSlide(scrollLeft() - walk);
             if (horizontalSlider) {
-              horizontalSlider.scrollLeft = currentSlide();
+              horizontalSlider.scrollLeft = scrollLeft() - walk;
             }
           }}
           onMouseLeave={() => {
             setIsDown(false);
             horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add("snap-x", "snap-mandatory");
+            horizontalSlider?.classList.add(
+              "snap-x",
+              "snap-mandatory",
+              "scroll-smooth"
+            );
           }}
           onMouseUp={() => {
             setIsDown(false);
             horizontalSlider?.classList.remove("snap-none");
-            horizontalSlider?.classList.add("snap-x", "snap-mandatory");
+            horizontalSlider?.classList.add(
+              "snap-x",
+              "snap-mandatory",
+              "scroll-smooth"
+            );
           }}
         >
           {props.children}
