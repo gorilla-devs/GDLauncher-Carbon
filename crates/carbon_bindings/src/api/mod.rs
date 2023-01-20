@@ -30,6 +30,8 @@ pub struct GlobalContextInner {
     pub base_dir: PathBuf,
     // Not sure how to hide this..
     invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
+    // instances: Vec<Instance>,
+    // javas: Vec<Javas>
 }
 
 impl GlobalContextInner {
