@@ -28,22 +28,6 @@ module.exports = {
       from: "./JavaCheck.class",
       to: "JavaCheck.class",
     },
-    {
-      from: "../../target/aarch64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-pc-windows-msvc/release/app_helper.exe",
-      to: "app_helper.exe",
-    },
-    {
-      from: "../../target/x86_64-unknown-linux-gnu/release/app_helper",
-      to: "app_helper",
-    },
   ],
   npmRebuild: false,
   protocols: [

@@ -31,9 +31,6 @@
       "outputs": ["core.node"],
       "cache": false
     },
-    "@gd/app_helper": {
-      "cache": false
-    },
     "dev": {
       "outputs": ["dist/**"],
       "cache": false
