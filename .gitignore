@@ -85,3 +85,4 @@ tests_decompressed
 java_runtimes
 
 **/.idea
+**/Cargo.lock

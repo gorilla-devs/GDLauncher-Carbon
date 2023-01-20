@@ -1,4 +1,4 @@
 [alias]
+prisma-generate = "run -p prisma-cli -- generate --schema=./crates/carbon_minecraft/prisma/schema.prisma"
 prisma = "run -p prisma-cli --"
-prisma-generate = "run -p prisma-cli --"
 
