@@ -20,6 +20,7 @@
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.241.0",
     "@gd/config": "workspace:*",
+    "@gd/i18n": "workspace:*",
     "@gd/native_interface": "workspace:*",
     "@gd/ui": "workspace:*",
     "@playwright/test": "^1.29.1",
@@ -36,6 +37,7 @@
     "electron-updater": "^5.3.0",
     "eslint": "^8.31.0",
     "eslint-config-prettier": "^8.6.0",
+    "eslint-plugin-i18next": "6.0.0-6",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-solid": "^0.9.1",
     "event-lite": "^0.1.2",

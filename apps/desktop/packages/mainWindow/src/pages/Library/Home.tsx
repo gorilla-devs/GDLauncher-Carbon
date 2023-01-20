@@ -3,6 +3,7 @@ import { Carousel, News } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
 import "./index.css";
+import { useTransContext } from "@gd/i18n";
 
 const mockCarousel = [
   {
@@ -84,13 +85,14 @@ const newsArticles = [
 
 const Home = () => {
   const navigate = useNavigate();
+  const [t] = useTransContext();
 
   return (
     <div class="p-6">
       <div>
         <News slides={newsArticles} />
         <div class="mt-4">
-          <Carousel title="Recent played">
+          <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>
@@ -106,7 +108,7 @@ const Home = () => {
           </Carousel>
         </div>
         <div class="mt-4">
-          <Carousel title="Your Instances">
+          <Carousel title={t("your_instances")}>
             <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>
@@ -122,7 +124,7 @@ const Home = () => {
           </Carousel>
         </div>
         <div class="mt-4">
-          <Carousel title="Popular Modpacks">
+          <Carousel title={t("popular_modpacks")}>
             <For each={mockCarousel}>
               {(instance) => (
                 <div id={instance.id}>

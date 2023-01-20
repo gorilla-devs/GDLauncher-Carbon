@@ -7,7 +7,7 @@ export default function About() {
     <div>
       <div>
         <button onClick={() => navigate("/modpacks/DDLTR")}>
-          Modpack DDLTR
+          {/* Modpack DDLTR */}
         </button>
       </div>
     </div>

@@ -7,6 +7,8 @@ type Theme = {
   shade: {
     [key in shade]: string;
   };
+  blue: string;
+  "blue-hover": string;
   red: string;
   "red-hover": string;
   yellow: string;
@@ -29,6 +31,8 @@ const theme = {
       8: "var(--shade8)",
       9: "var(--shade9)",
     },
+    blue: "var(--primary)",
+    "blue-hover": "var(--primary-hover)",
     red: "var(--red)",
     "red-hover": "var(--red-hover)",
     yellow: "var(--yellow)",

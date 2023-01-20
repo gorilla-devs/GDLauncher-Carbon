@@ -2,6 +2,7 @@ import { Button } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { createSignal, Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+import { useTransContext } from "@gd/i18n";
 // Forgive me for I have sinned
 import { version } from "@package_json";
 
@@ -12,6 +13,7 @@ interface Props {
 
 const Auth = (_props: Props) => {
   const navigate = useNavigate();
+  const [t] = useTransContext();
   const [loading, setLoading] = createSignal(false);
 
   const handleClick = async () => {
@@ -32,7 +34,7 @@ const Auth = (_props: Props) => {
     <div>
       <div class="absolute left-0 right-0 m-auto -top-15 flex flex-col justify-center items-center">
         <img class="w-40" src={Logo} />
-        <p class="text-shade-0">v{version}</p>
+        <p class="text-shade-0">{version}</p>
       </div>
       <div class="text-center flex flex-col justify-center items-center">
         <Button
@@ -41,30 +43,29 @@ const Auth = (_props: Props) => {
           size="large"
           onClick={() => handleClick()}
         >
-          Sign in with microsoft
+          {t("sign_in_with_microsoft") || ""}
         </Button>
         <p class="max-w-90 text-sm text-shade-0">
-          Sign in with your Microsoft Account. By doing so, you accept all our
-          policies and terms stated below.
+          {t("sign_in_with_microsoft_text")}
         </p>
         <ul class="flex gap-3 list-none p-0 mb-8 underline text-sm">
           <li
             class="cursor-pointer"
             onClick={() => navigate("?m=privacyPolicy")}
           >
-            Privacy Policy
+            {t("privacy_policy")}
           </li>
           <li
             class="cursor-pointer"
             onClick={() => navigate("?m=termsAndConditions")}
           >
-            Terms and Conditions
+            {t("terms_and_conditions")}
           </li>
           <li
             class="cursor-pointer"
             onClick={() => navigate("?m=acceptableUsePolicy")}
           >
-            Acceptable Use Policy
+            {t("acceptable_use_policy")}
           </li>
         </ul>
       </div>
