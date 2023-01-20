@@ -99,6 +99,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
         })
         .mutation("openInstanceFolderPath", |t| t(|_, args: String| {}))
         .mutation("startInstance", |t| t(|_, args: String| {}))
+        .mutation("stopInstance", |t| t(|_, args: String| {}))
         .mutation("deleteInstance", |t| t(|_, args: String| {}))
         // Actions on mods
         .mutation("enableMod", |t| t(|_, args: String| {}))
