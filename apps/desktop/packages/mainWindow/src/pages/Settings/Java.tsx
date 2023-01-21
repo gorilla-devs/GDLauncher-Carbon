@@ -1,5 +1,5 @@
 import { useRouteData } from "@solidjs/router";
-import { For, createEffect } from "solid-js";
+import { For, createEffect, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface JavaObj {
@@ -17,7 +17,7 @@ const Java = () => {
   const routeData = useRouteData();
   const javas = () => routeData?.data?.data;
 
-  createEffect(() => {
+  onMount(() => {
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
       const defaultId = javaObj.default_id;

@@ -1,9 +1,26 @@
 import ThemePreview from "@/components/ThemePreview";
 import { setTheme } from "@/utils/theme";
+import { Trans } from "@gd/i18n";
+import { useRouteData } from "@solidjs/router";
+import { onMount } from "solid-js";
 
 const Appearance = () => {
+  const routeData = useRouteData();
+
+  onMount(() => {
+    console.log("appereance", routeData.data);
+  });
+
   return (
-    <div class="py-5 px-6 flex justify-center">
+    <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
+      <h2 class="m-0 mb-7 text-4">
+        <Trans
+          key="appearance"
+          options={{
+            defaultValue: "Appearance",
+          }}
+        />
+      </h2>
       <div class="flex justify-between border-box w-full max-w-[35rem]">
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
