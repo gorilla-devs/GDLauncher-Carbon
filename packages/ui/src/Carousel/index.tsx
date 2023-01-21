@@ -26,16 +26,6 @@ const Carousel = (props: Props) => {
     if (beginning) setScrollLeft(beginning);
   });
 
-  const toggleClickEventTile = (enable?: boolean) => {
-    const tiles = document.getElementsByClassName("instance-tile");
-
-    for (const tile of tiles) {
-      if (enable) {
-        tile.classList.add("pointer-events-none");
-      } else tile.classList.remove("pointer-events-none");
-    }
-  };
-
   const mousedown = (e: MouseEvent) => {
     if (horizontalSlider) {
       setIsDown(true);
@@ -69,7 +59,6 @@ const Carousel = (props: Props) => {
       const x = e.pageX - horizontalSlider.offsetLeft;
       const walk = (x - startX()) * 3;
       horizontalSlider.scrollLeft = scrollLeft() - walk;
-      setScrollLeft(scrollLeft());
     }
   };
 
