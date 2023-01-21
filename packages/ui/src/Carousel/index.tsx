@@ -1,11 +1,4 @@
-import {
-  children,
-  createEffect,
-  createSignal,
-  onMount,
-  JSX,
-  onCleanup,
-} from "solid-js";
+import { createEffect, createSignal, onMount, JSX, onCleanup } from "solid-js";
 import "./index.css";
 
 export interface Props {
@@ -127,54 +120,6 @@ const Carousel = (props: Props) => {
           ref={horizontalSlider}
           id="horizontal-slider"
           class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
-          // onMouseDown={(e) => {
-          //   console.log("MOUSEDOWN");
-
-          //   setIsDown(true);
-          //   if (horizontalSlider) {
-          //     horizontalSlider?.classList.add("snap-none");
-          //     horizontalSlider?.classList.remove(
-          //       "snap-x",
-          //       "snap-mandatory",
-          //       "scroll-smooth"
-          //     );
-
-          //     setStartX(e.pageX - horizontalSlider?.offsetLeft);
-          //     setScrollLeft(horizontalSlider?.offsetLeft);
-          //   }
-          // }}
-          // onMouseMove={(e) => {
-          //   console.log("MOVE");
-          //   if (horizontalSlider) {
-          //     if (!isDown()) return;
-          //     e.preventDefault();
-          //     const x = e.pageX - horizontalSlider?.offsetLeft;
-          //     const walk = (x - startX()) * 2;
-          //     // setScrollLeft(horizontalSlider.scrollLeft);
-          //     console.log("TEST", scrollLeft(), horizontalSlider.scrollLeft);
-          //     // horizontalSlider.scrollLeft = horizontalSlider.scrollLeft - walk;
-          //     horizontalSlider.scrollLeft = scrollLeft() - walk;
-          //   }
-          // }}
-          // onMouseLeave={() => {
-          //   setIsDown(false);
-          //   horizontalSlider?.classList.remove("snap-none");
-          //   horizontalSlider?.classList.add(
-          //     "snap-x",
-          //     "snap-mandatory",
-          //     "scroll-smooth"
-          //   );
-          // }}
-          // onMouseUp={() => {
-          //   setIsDown(false);
-          //   toggleClickEventTile(true);
-          //   horizontalSlider?.classList.remove("snap-none");
-          //   horizontalSlider?.classList.add(
-          //     "snap-x",
-          //     "snap-mandatory",
-          //     "scroll-smooth"
-          //   );
-          // }}
         >
           {props.children}
         </div>
