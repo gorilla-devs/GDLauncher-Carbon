@@ -18,7 +18,12 @@ const settings: Array<settingsItem> = [
   {
     name: "Appearance",
     icon: "palette",
-    path: "/settings/Appearance",
+    path: "/settings/appearance",
+  },
+  {
+    name: "Java",
+    icon: "palette",
+    path: "/settings/java",
   },
 ];
 
