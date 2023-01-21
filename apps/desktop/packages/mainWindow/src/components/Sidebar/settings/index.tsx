@@ -1,6 +1,5 @@
 import { For } from "solid-js";
 import SiderbarWrapper from "../wrapper";
-import ListItem from "./ListItem";
 import { Tab, TabList, Tabs } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 
@@ -19,7 +18,7 @@ const settings: Array<settingsItem> = [
   {
     name: "Appearance",
     icon: "palette",
-    path: "/settings/appearance",
+    path: "/settings/Appearance",
   },
 ];
 
