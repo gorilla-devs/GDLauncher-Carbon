@@ -1,5 +1,6 @@
 import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
+import SettingsJavaData from "@/pages/Settings/settings.java.data";
 
 /* Defining the routes for the application. */
 export const routes: RouteDefinition[] = [
@@ -91,6 +92,11 @@ export const routes: RouteDefinition[] = [
           {
             path: "/appearance",
             component: lazy(() => import("@/pages/Settings/Appearance")),
+          },
+          {
+            path: "/java",
+            component: lazy(() => import("@/pages/Settings/Java")),
+            data: SettingsJavaData,
           },
         ],
       },

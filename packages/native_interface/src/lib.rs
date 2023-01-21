@@ -1,10 +1,10 @@
-use std::path::PathBuf;
-
-use async_stream::stream;
-use axum::{extract::Path, routing::get};
-use rspc::{Config, RouterBuilderLike};
+use carbon_bindings::api::GlobalContext;
+use rspc::RouterBuilderLike;
+use std::{path::PathBuf, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
+
+mod global_context;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
@@ -21,31 +21,28 @@ fn init_core() {
 }
 
 async fn start_router() {
-    let router = carbon_bindings::api::build_router()
+    let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
+
+    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
         .expose()
         .build()
         .arced();
+
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
         .allow_methods(Any)
         .allow_headers(Any)
         .allow_origin(Any);
 
+    let global_context = global_context::generate_context(invalidation_sender);
+
     let app = axum::Router::new()
-        .route("/", get(|| async { "Hello 'rspc'!" }))
-        .route(
-            "/rspc/:id",
-            router
-                .clone()
-                .endpoint(|Path(path): Path<String>| {
-                    trace!("Client requested operation '{}'", path);
-                })
-                .axum(),
-        )
+        .nest("/", carbon_bindings::api::build_axum_vanilla_router())
+        .nest("/rspc", router.endpoint(move || global_context).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
-    trace!("listening on http://{}/rspc/version", addr);
+    trace!("RSPC/Server started on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
@@ -62,13 +59,12 @@ mod test {
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let client = reqwest::Client::new();
-        let resp = client
-            .get("http://localhost:4000/rspc/version")
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get("http://localhost:4000").send().await.unwrap();
+        let resp_code = resp.status();
+        let resp_body = resp.text().await.unwrap();
 
-        assert_eq!(resp.status(), 200);
+        assert_eq!(resp_code, 200);
+        assert_eq!(resp_body, "Hello 'rspc'!");
 
         server.abort();
     }

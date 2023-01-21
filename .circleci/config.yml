@@ -268,13 +268,14 @@ workflows:
     jobs:
       - buildWebsite
       - testDocker
-  master-builds:
+  master-develop-builds:
     jobs:
       - buildMac:
           filters:
             branches:
               only:
                 - master
+                - develop
           matrix:
             parameters:
               os: ["mac", "macm1"]
@@ -283,8 +284,10 @@ workflows:
             branches:
               only:
                 - master
+                - develop
       - buildLinux:
           filters:
             branches:
               only:
                 - master
+                - develop

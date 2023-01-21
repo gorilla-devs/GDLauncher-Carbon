@@ -3,7 +3,6 @@ import { mainTheme, lightTheme, Theme, poisonGreen } from "@gd/ui";
 import { createEffect, createSignal } from "solid-js";
 
 const [theme, setTheme] = createSignal(0);
-applyTheme(mainTheme);
 
 createEffect(() => {
   switch (theme()) {

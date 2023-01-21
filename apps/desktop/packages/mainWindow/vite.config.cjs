@@ -21,7 +21,10 @@ export default defineConfig({
           ([, d]) => {
             const img = d.split("-")[0];
             return {
-              background: `url('./images/${img}')`,
+              background:
+                process.env.NODE_ENV === "development"
+                  ? `url('./assets/images/${img}')`
+                  : `url('./images/${img}')`,
               "background-size": "cover",
               "background-repeat": "no-repeat",
               "box-sizing": "border-box",
