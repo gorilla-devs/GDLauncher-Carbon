@@ -1,7 +1,8 @@
 import { Trans } from "@gd/i18n";
+import { Java as JavaType } from "@gd/native_interface/bindings";
 import { Checkbox } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, onMount } from "solid-js";
+import { For, createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface JavaObj {
@@ -17,17 +18,17 @@ interface DefaultJavasObj extends JavaObj {
 const Java = () => {
   const [defaultJavas, setDefaultJavas] = createStore<DefaultJavasObj[]>([]);
   const routeData = useRouteData();
-  const javas = () => routeData?.data?.data;
+  const javasData = () => routeData?.data;
+  const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
 
-  onMount(() => {
+  createEffect(() => {
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
       const defaultId = javaObj.default_id;
       const javaDefaultVersion = java[1]?.java.find((j) => j.id === defaultId);
-      const newObj = javaDefaultVersion;
+      let newObj: any = javaDefaultVersion;
       newObj.majorVersion = java[0];
-      console.log("TEST", java[0]);
-      setDefaultJavas((prev) => [...prev, newObj]);
+      setDefaultJavas([newObj]);
     });
   });
 
@@ -72,7 +73,7 @@ const Java = () => {
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].java as []}>
                     {(j) => (
-                      <div class="flex justify-around py-5 px-6 bg-shade-9 rounded-md">
+                      <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
                         <p class="m-0">
                           <Trans
                             key="java"
@@ -82,7 +83,9 @@ const Java = () => {
                           />
                           {j?.version}
                         </p>
-                        <p class="m-0">{j?.path}</p>
+                        <p class="m-0 text-ellipsis max-w-[245px] overflow-hidden">
+                          {j?.path}
+                        </p>
                         <p class="m-0">{j?.type}</p>
                         <Checkbox checked disabled={false} />
                       </div>
