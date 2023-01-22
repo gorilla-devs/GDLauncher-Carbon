@@ -1,4 +1,5 @@
 import { Trans } from "@gd/i18n";
+import { Checkbox } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -72,9 +73,18 @@ const Java = () => {
                   <For each={javas[1].java as []}>
                     {(j) => (
                       <div class="flex justify-around py-5 px-6 bg-shade-9 rounded-md">
-                        <p class="m-0">Java {j?.version}</p>
+                        <p class="m-0">
+                          <Trans
+                            key="java"
+                            options={{
+                              defaultValue: "Java",
+                            }}
+                          />
+                          {j?.version}
+                        </p>
                         <p class="m-0">{j?.path}</p>
                         <p class="m-0">{j?.type}</p>
+                        <Checkbox checked disabled={false} />
                       </div>
                     )}
                   </For>
