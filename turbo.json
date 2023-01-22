@@ -31,8 +31,12 @@
       "dependsOn": ["^@gd/config#build"],
       "cache": false
     },
-    "@gd/native_interface": {
-      "outputs": ["core.node"],
+    "@gd/native_interface#dev": {
+      "outputs": ["core.node", "bindings.d.ts"],
+      "cache": false
+    },
+    "@gd/native_interface#build": {
+      "outputs": ["core.node", "bindings.d.ts"],
       "cache": false
     },
     "dev": {
