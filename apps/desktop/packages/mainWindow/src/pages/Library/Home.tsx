@@ -7,49 +7,49 @@ import { useTransContext } from "@gd/i18n";
 
 const mockCarousel = [
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 1",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "ABDFEAD",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 2",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "DDAEDF",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 3",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "HDHEJA",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 4",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "HUSER",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 5",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "PDODK",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 6",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "AKFBI",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 7",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "AHUUIO",
   },
   {
-    title: "Minecraft forge",
+    title: "Minecraft forge 8",
     modloader: "forge",
     mcVersion: "1.19.2",
     id: "HFHDJ",
