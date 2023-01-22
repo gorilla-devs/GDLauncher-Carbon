@@ -1,5 +1,6 @@
+import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { For, createEffect, onMount } from "solid-js";
+import { For, onMount } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface JavaObj {
@@ -31,37 +32,57 @@ const Java = () => {
 
   return (
     <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
-      <div class="flex flex-col gap-2">
-        <For each={defaultJavas}>
-          {(java) => (
-            <div class="flex flex-col justify-start">
-              <h3 class="mt-0 mb-4">{java?.majorVersion}</h3>
-              <div class="flex justify-around py-5	px-6 bg-shade-9 rounded-md">
-                <p class="m-0">Java {java?.version}</p>
-                <p class="m-0">{java?.path}</p>
-                <p class="m-0">{java?.type}</p>
+      <h2 class="m-0 mb-7 text-4">
+        <Trans
+          key="java"
+          options={{
+            defaultValue: "Java",
+          }}
+        />
+      </h2>
+      <div class="flex flex-col">
+        <div class="flex flex-col gap-4 mb-10 border-2 border-solid border-shade-7 p-4">
+          <For each={defaultJavas}>
+            {(java) => (
+              <div class="flex flex-col justify-start">
+                <h4 class="mt-0 mb-4 text-shade-5">{java?.majorVersion}</h4>
+                <div class="flex justify-around py-5	px-6 bg-shade-9 rounded-md">
+                  <p class="m-0">
+                    <Trans
+                      key="java"
+                      options={{
+                        defaultValue: "Java",
+                      }}
+                    />
+                    {java?.version}
+                  </p>
+                  <p class="m-0">{java?.path}</p>
+                  <p class="m-0">{java?.type}</p>
+                </div>
               </div>
-            </div>
-          )}
-        </For>
-        <For each={Object.entries(javas())}>
-          {(javas) => (
-            <div class="flex flex-col justify-start">
-              <h3 class="mt-0 mb-4">{javas[0]}</h3>
-              <div class="flex flex-col gap-2">
-                <For each={javas[1].java as []}>
-                  {(j) => (
-                    <div class="flex justify-around py-5 px-6 bg-shade-9 rounded-md">
-                      <p class="m-0">Java {j?.version}</p>
-                      <p class="m-0">{j?.path}</p>
-                      <p class="m-0">{j?.type}</p>
-                    </div>
-                  )}
-                </For>
+            )}
+          </For>
+        </div>
+        <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
+          <For each={Object.entries(javas())}>
+            {(javas) => (
+              <div class="flex flex-col justify-start">
+                <h5 class="mt-0 mb-4">{javas[0]}</h5>
+                <div class="flex flex-col gap-4">
+                  <For each={javas[1].java as []}>
+                    {(j) => (
+                      <div class="flex justify-around py-5 px-6 bg-shade-9 rounded-md">
+                        <p class="m-0">Java {j?.version}</p>
+                        <p class="m-0">{j?.path}</p>
+                        <p class="m-0">{j?.type}</p>
+                      </div>
+                    )}
+                  </For>
+                </div>
               </div>
-            </div>
-          )}
-        </For>
+            )}
+          </For>
+        </div>
       </div>
     </div>
   );
