@@ -5,6 +5,8 @@ use rspc::{Config, RouterBuilderLike};
 fn main() {
     use napi_build::setup;
 
+    println!("cargo:rerun-if-changed=bindings.d.ts");
+
     carbon_bindings::api::build_rspc_router()
         .expose()
         .config(

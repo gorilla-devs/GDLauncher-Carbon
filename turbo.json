@@ -7,7 +7,11 @@
       "cache": false
     },
     "@gd/desktop#build": {
-      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
+      "dependsOn": [
+        "@gd/native_interface#build",
+        "^@gd/ui#build",
+        "^@gd/config#build"
+      ],
       "cache": false
     },
     "@gd/desktop#dev": {
