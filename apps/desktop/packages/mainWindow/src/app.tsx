@@ -9,7 +9,7 @@ const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
 
-  let javas = rspc.createQuery(() => ["java.getAvailableJavas", null]);
+  let javas = rspc.createQuery(() => ["java.getAvailable", null]);
 
   let _theme = rspc.createQuery(() => ["app.getTheme", null], {});
 
