@@ -13,6 +13,8 @@ module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
+  buildVersion: "5.0.0",
+  buildNumber: "5.0.0",
   asar: true,
   directories: {
     output: "release",
@@ -55,7 +57,7 @@ module.exports = {
   },
   linux: {
     target: isDockerBuild ? ["dir"] : ["dir", "zip"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
     const { spawnSync } = require("child_process");

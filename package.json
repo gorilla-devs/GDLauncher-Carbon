@@ -2,7 +2,6 @@
   "name": "corbium",
   "productName": "GDLauncher",
   "private": true,
-  "version": "2.0.0",
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",

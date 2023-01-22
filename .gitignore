@@ -80,6 +80,7 @@ target
 packages/ui/src/style.dist.css
 apps/desktop/data
 packages/native_interface/data
+packages/native_interface/bindings.d.ts
 MC_TEST
 tests_decompressed
 java_runtimes

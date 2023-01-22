@@ -1,6 +1,5 @@
 {
   "name": "@gd/native_interface",
-  "version": "0.0.0",
   "main": "./index.ts",
   "files": [
     "bindings.d.ts",

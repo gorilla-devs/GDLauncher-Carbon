@@ -12,6 +12,9 @@ module.exports = {
       { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
     ],
   },
+  globals: {
+    __APP_VERSION__: "readonly",
+  },
   parser: "@typescript-eslint/parser",
   plugins: ["i18next", "solid", "prettier"],
   extends: [

@@ -3,9 +3,6 @@ import { useNavigate } from "@solidjs/router";
 import { createSignal, Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
-// Forgive me for I have sinned
-import { version } from "@package_json";
-
 interface Props {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
@@ -30,11 +27,13 @@ const Auth = (_props: Props) => {
     setLoading(true);
   };
 
+  console.log(__APP_VERSION__);
+
   return (
     <div>
       <div class="absolute left-0 right-0 m-auto -top-15 flex flex-col justify-center items-center">
         <img class="w-40" src={Logo} />
-        <p class="text-shade-0">{version}</p>
+        <p class="text-shade-0">{__APP_VERSION__}</p>
       </div>
       <div class="text-center flex flex-col justify-center items-center">
         <Button

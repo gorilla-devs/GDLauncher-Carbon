@@ -2,10 +2,10 @@
   "name": "@gd/desktop",
   "productName": "GDLauncher",
   "private": true,
-  "version": "0.0.1",
   "description": "GDLauncher Carbon.",
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
+  "version": "0.9.0",
   "type": "module",
   "main": "dist/main/index.cjs",
   "scripts": {
