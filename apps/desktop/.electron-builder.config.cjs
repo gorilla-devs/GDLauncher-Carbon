@@ -12,10 +12,12 @@ console.log(
 module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
-  copyright: "Copyright © 2022 ${author}",
+  copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
+  buildVersion: "5.0.0",
+  buildNumber: "5.0.0",
   asar: true,
   directories: {
-    output: "release/${version}",
+    output: "release",
     buildResources: "build",
   },
   files: ["dist", "package.json"],
@@ -28,22 +30,6 @@ module.exports = {
       from: "./JavaCheck.class",
       to: "JavaCheck.class",
     },
-    {
-      from: "../../target/aarch64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-pc-windows-msvc/release/app_helper.exe",
-      to: "app_helper.exe",
-    },
-    {
-      from: "../../target/x86_64-unknown-linux-gnu/release/app_helper",
-      to: "app_helper",
-    },
   ],
   npmRebuild: false,
   protocols: [
@@ -54,7 +40,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "nsis"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -64,14 +50,14 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "dmg"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
     target: isDockerBuild ? ["dir"] : ["dir", "zip"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
     const { spawnSync } = require("child_process");

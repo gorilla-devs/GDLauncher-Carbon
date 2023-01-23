@@ -1,12 +1,11 @@
 import fs from "fs";
 import path from "path";
-import packageJson from "../package.json" assert { type: "json" };
 
-const files = fs.readdirSync(path.join("release", packageJson.version));
+const files = fs.readdirSync("release");
 
 for (const file of files) {
   if (!(file.endsWith(".zip") || file.endsWith(".png"))) {
-    fs.rmSync(path.join("release", packageJson.version, file), {
+    fs.rmSync(path.join("release", file), {
       recursive: true,
       force: true,
     });
