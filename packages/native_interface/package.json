@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
-    "codegen": "cargo test codegen_bindings::generate  -- --exact",
+    "codegen": "CARGO_NET_GIT_FETCH_WITH_CLI=true cargo test codegen_bindings::generate  -- --exact",
     "watch": "node scripts/watch.mjs",
     "test": "cargo test -- --nocapture",
     "_build_": "cross-env-shell RUSTFLAGS=-Csymbol-mangling-version=v0 CARGO_NET_GIT_FETCH_WITH_CLI=true napi build --dts index.d.ts --release",
