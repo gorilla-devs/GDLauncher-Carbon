@@ -1,5 +1,4 @@
-mod configuration;
-mod app_configuration;
+pub mod configuration;
 
 use std::collections::HashMap;
 use tokio::sync::RwLock;
