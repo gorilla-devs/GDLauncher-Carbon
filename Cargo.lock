@@ -382,6 +382,7 @@ dependencies = [
  "carbon_java_manager",
  "rspc",
  "serde",
+ "serde_json",
  "tokio",
  "tower-http",
  "tracing",

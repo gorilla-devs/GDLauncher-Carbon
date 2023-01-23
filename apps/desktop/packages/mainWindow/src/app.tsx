@@ -2,21 +2,26 @@ import { Component, createEffect, Show, Suspense } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
-import { createInvalidateQuery, rspc } from "./utils/rspcClient";
+import { createInvalidateQuery, queryClient, rspc } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
 
-  let javas = rspc.createQuery(() => ["java.getAvailableJavas", null]);
+  let javas = rspc.createQuery(() => ["java.getAvailable", null]);
+
+  let _theme = rspc.createQuery(() => ["app.getTheme", null], {});
+
+  let _mutateTheme = rspc.createMutation(["app.setTheme"], {
+    onMutate: (newTheme) => {
+      queryClient.setQueryData(["app.getTheme", null], newTheme);
+    },
+  });
 
   createInvalidateQuery();
 
   const echoMsg = rspc.createQuery(() => ["echo", "something"]);
-  // const subscription = rspc.createSubscription(() => ["subscriptions.pings"], {
-  //   onData: (e) => console.log(e),
-  // });
 
   createEffect(() => {
     console.log("pkgVersion", echoMsg.data);

@@ -2,15 +2,14 @@ interface Props {
   title: string;
   modloader: string;
   version: string;
-  onClick?: () => void;
+  onClick?: (_e: MouseEvent) => void;
 }
 
 const Tile = (props: Props) => {
   return (
     <div
-      class="flex flex-col justify-center items-start cursor-pointer"
-      // eslint-disable-next-line solid/reactivity
-      onClick={props.onClick}
+      class="instance-tile flex flex-col justify-center items-start cursor-pointer snap-start"
+      // onClick={(e) => props?.onClick?.(e)}
     >
       <div class="h-38 w-38 bg-green-600 rounded-2xl" />
       <h4 class="my-2">{props.title}</h4>

@@ -39,6 +39,8 @@ carbon_minecraft = { path = "../../crates/carbon_minecraft" }
 napi-build = "2.0.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46", features=["axum"] }
 carbon_bindings = { path = "../../crates/carbon_bindings" }
+tokio = { version = "1.22.0", features = ["full"] }
+
 
 [profile.release]
 codegen-units = 1

@@ -1,7 +1,5 @@
 {
   "name": "@gd/web",
-  "version": "0.0.0",
-  "private": false,
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

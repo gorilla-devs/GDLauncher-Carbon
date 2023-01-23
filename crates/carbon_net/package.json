@@ -1,6 +1,5 @@
 {
   "name": "@gd/carbon_net",
-  "version": "0.0.0",
   "scripts": {
     "test": "cargo test -- --nocapture",
     "lint": "cargo clippy --all-targets --all-features -- -D warnings"
