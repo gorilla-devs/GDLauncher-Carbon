@@ -12,4 +12,8 @@ if (!version) {
 
 delete packageJson.version;
 
-fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), "utf8");
+fs.writeFileSync(
+  packageJsonPath,
+  `${JSON.stringify(packageJson, null, 2)}\n`,
+  "utf8"
+);
