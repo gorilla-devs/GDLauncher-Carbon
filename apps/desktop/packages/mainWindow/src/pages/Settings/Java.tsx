@@ -1,3 +1,4 @@
+import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Java as JavaType } from "@gd/native_interface/bindings";
 import { Checkbox } from "@gd/ui";
@@ -20,6 +21,12 @@ const Java = () => {
   const routeData = useRouteData();
   const javasData = () => routeData?.data;
   const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
+
+  let mutation = rspc.createMutation(["java.setDefault"], {
+    onMutate: (newTheme) => {
+      queryClient.setQueryData(["java.setDefault", null], newTheme);
+    },
+  });
 
   createEffect(() => {
     Object.entries(javas()).forEach((java) => {
@@ -87,7 +94,14 @@ const Java = () => {
                           {j?.path}
                         </p>
                         <p class="m-0">{j?.type}</p>
-                        <Checkbox checked disabled={false} />
+                        <Checkbox
+                          onChange={() => {
+                            mutation.mutate({
+                              major_version: parseInt(javas[0], 10),
+                              id: j?.id,
+                            });
+                          }}
+                        />
                       </div>
                     )}
                   </For>
