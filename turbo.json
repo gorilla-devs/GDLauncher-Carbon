@@ -31,8 +31,24 @@
       "outputs": ["core.node"],
       "cache": false
     },
-    "@gd/app_helper": {
+    "@gd/native_interface#dev": {
+      "outputs": ["core.node"],
+      "dependsOn": ["^@gd/carbon_minecraft#prebuild"],
       "cache": false
+    },
+    "@gd/native_interface#build": {
+      "outputs": ["core.node"],
+      "dependsOn": ["^@gd/carbon_minecraft#prebuild"],
+      "cache": false
+    },
+    "@gd/native_interface#test": {
+      "outputs": ["core.node"],
+      "dependsOn": ["^@gd/carbon_minecraft#prebuild"],
+      "cache": false
+    },
+    "@gd/carbon_minecraft#prebuild": {
+      "cache": false,
+      "outputs": ["src/db.rs"]
     },
     "dev": {
       "outputs": ["dist/**"],
@@ -51,6 +67,9 @@
       "cache": false
     },
     "check-bundle": {
+      "cache": false
+    },
+    "prebuild": {
       "cache": false
     }
   },
