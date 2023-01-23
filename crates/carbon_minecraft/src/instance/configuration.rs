@@ -1,5 +1,5 @@
 use crate::instance::consts::TEMP_CONFIG_FILE_PREFIX;
-use crate::instance::{Instance, InstanceStatus};
+use crate::instance::Instance;
 use crate::minecraft_package::configuration::MinecraftPackageConfigurationFile;
 use crate::try_path_fmt;
 use log::trace;
@@ -24,6 +24,7 @@ impl From<&Instance> for InstanceConfigurationFile {
             minecraft_package_configuration: MinecraftPackageConfigurationFile {
                 version: value.minecraft_package.version.clone(),
                 description: value.minecraft_package.description.clone(),
+                modloader: value.minecraft_package.modloader.clone(),
             },
         }
     }

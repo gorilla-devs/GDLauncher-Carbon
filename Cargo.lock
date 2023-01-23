@@ -271,6 +271,7 @@ dependencies = [
  "async-stream",
  "axum",
  "carbon_java_manager",
+ "carbon_minecraft",
  "rspc",
  "serde",
  "serde_json",

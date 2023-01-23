@@ -45,15 +45,15 @@ pub enum InstanceScanError {
 
 impl Instances {
     pub async fn scan_for_instances(&mut self) -> InstanceScanResult {
-        let base_path = self.base_path.clone().join("instances");
+        let instances_path = self.instances_path.clone().join("instances");
         // todo : add recursive mode
         trace!(
             "scanning directory {} for instances",
-            try_path_fmt!(base_path)
+            try_path_fmt!(instances_path)
         );
-        match base_path.is_dir() {
+        match instances_path.is_dir() {
             true => Ok(future::join_all(
-                ReadDirStream::new(read_dir(base_path).await?)
+                ReadDirStream::new(read_dir(instances_path).await?)
                     .map(scan_for_instances_single_directory)
                     .collect::<Vec<_>>()
                     .await,
@@ -62,9 +62,9 @@ impl Instances {
             false => {
                 trace!(
                     "path {} is not pointing to a directory! aborting instance scan process ...",
-                    try_path_fmt!(base_path)
+                    try_path_fmt!(instances_path)
                 );
-                Err(PathNotIsNotPointingToAFolder(base_path.to_path_buf()))
+                Err(PathNotIsNotPointingToAFolder(instances_path.to_path_buf()))
             }
         }
     }

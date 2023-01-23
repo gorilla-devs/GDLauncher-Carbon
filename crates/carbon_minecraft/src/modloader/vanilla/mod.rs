@@ -6,7 +6,7 @@ use tracing::trace;
 
 use crate::{instance::Instance, mc::meta::McMeta};
 
-use super::{Modloader, ModloaderVersion};
+use super::{ModLoader, ModloaderVersion};
 
 pub enum InstallStages {
     DownloadingAssets,
@@ -21,8 +21,8 @@ pub struct VanillaModLoader {
 }
 
 #[async_trait]
-impl Modloader for VanillaModLoader {
-    type Stages = InstallStages;
+impl ModLoader for VanillaModLoader {
+    // type Stages = InstallStages;
 
     fn new(mc_version: ModloaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
         VanillaModLoader {

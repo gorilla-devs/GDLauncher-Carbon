@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 use crate::instance::Instance;
 
-use super::{Modloader, ModloaderVersion};
+use super::{ModLoader, ModloaderVersion};
 
 pub enum InstallStages {
     Downloading,
@@ -19,8 +19,8 @@ pub struct ForgeModloader {
 }
 
 #[async_trait]
-impl Modloader for ForgeModloader {
-    type Stages = InstallStages;
+impl ModLoader for ForgeModloader {
+    // type Stages = InstallStages;
 
     fn new(mod_loader_version: ModloaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
         ForgeModloader {
@@ -28,7 +28,9 @@ impl Modloader for ForgeModloader {
             instance_ref,
         }
     }
-    async fn install(&self, /*progress_send: Sender<InstallProgress<InstallStages>>*/) -> Result<()> {
+    async fn install(
+        &self, /*progress_send: Sender<InstallProgress<InstallStages>>*/
+    ) -> Result<()> {
         Ok(())
     }
     fn remove(&self) -> Result<()> {

@@ -1,6 +1,6 @@
+pub(crate) mod fabric;
 pub(crate) mod forge;
 pub(crate) mod vanilla;
-pub(crate) mod fabric;
 
 use std::sync::Weak;
 
@@ -11,12 +11,19 @@ use tokio::sync::RwLock;
 
 use super::instance::Instance;
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
-pub enum ModLoader {
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
+pub enum ModLoaderOptions {
+    Vanilla,
     Forge,
     Fabric,
     LiteLoader,
     Quilt,
+}
+
+impl Default for ModLoaderOptions {
+    fn default() -> Self {
+        ModLoaderOptions::Vanilla
+    }
 }
 
 pub type ModloaderVersion = String;
@@ -28,9 +35,14 @@ pub struct InstallProgress<T> {
 }
 
 #[async_trait]
-pub trait Modloader {
-    type Stages;
-    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self where Self: Sized;
+pub trait ModLoader
+where
+    Self: Sized,
+{
+    // type Stages;
+    fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
+    where
+        Self: Sized;
     async fn install(&self) -> Result<()>;
     fn remove(&self) -> Result<()>;
     fn verify(&self) -> Result<()>;

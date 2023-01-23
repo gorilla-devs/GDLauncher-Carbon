@@ -44,14 +44,14 @@ pub mod consts {
 }
 
 pub struct Instances {
-    pub base_path: PathBuf,
+    pub instances_path: PathBuf,
     pub instances: Vec<Instance>,
 }
 
 impl Instances {
-    pub fn new(base_path: PathBuf) -> Self {
+    pub fn new(instances_path: PathBuf) -> Self {
         Instances {
-            base_path,
+            instances_path,
             instances: Vec::new(),
         }
     }

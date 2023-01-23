@@ -4,14 +4,6 @@ pub mod version;
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, Weak};
-
-    use tokio::sync::{Mutex, RwLock};
-
-    use crate::{
-        instance::{Instance},
-        modloader::{vanilla::VanillaModLoader, Modloader},
-    };
 
     use super::meta::McMeta;
 
