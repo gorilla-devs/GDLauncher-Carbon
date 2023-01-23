@@ -24,27 +24,23 @@
       "cache": false
     },
     "@gd/native_interface#dev": {
-      "dependsOn": [
-        "@gd/carbon_minecraft#prebuild",
-        "@gd/native_interface#codegen"
-      ],
+      "dependsOn": ["@gd/native_interface#codegen"],
       "outputs": ["core.node", "bindings.d.ts"],
       "cache": false
     },
     "@gd/native_interface#build": {
       "outputs": ["core.node"],
-      "dependsOn": [
-        "@gd/carbon_minecraft#prebuild",
-        "@gd/native_interface#codegen"
-      ],
+      "dependsOn": ["@gd/native_interface#codegen"],
       "cache": false
     },
     "@gd/native_interface#test": {
       "outputs": ["core.node"],
-      "dependsOn": [
-        "@gd/carbon_minecraft#prebuild",
-        "@gd/native_interface#codegen"
-      ],
+      "dependsOn": ["@gd/native_interface#codegen"],
+      "cache": false
+    },
+    "@gd/native_interface#codegen": {
+      "outputs": ["bindings.d.ts"],
+      "dependsOn": ["@gd/native_interface#prebuild"],
       "cache": false
     },
     "@gd/carbon_minecraft#prebuild": {
@@ -67,10 +63,6 @@
     },
     "prebuild": {
       "cache": false
-    },
-    "codegen": {
-      "cache": false,
-      "outputs": ["bindings.d.ts"]
     }
   },
   "globalDependencies": [".env"]
