@@ -28,7 +28,6 @@ inter-struct = "0.2.0"
 dirs = "4.0.0"
 carbon_net = { path = "../carbon_net" }
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
-prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
 
 [dev-dependencies]
 mockall = "0.11.3"
