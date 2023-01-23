@@ -25,8 +25,8 @@
     },
     "@gd/native_interface#dev": {
       "dependsOn": [
-        "@gd/native_interface#codegen",
-        "@gd/carbon_minecraft#prebuild"
+        "@gd/carbon_minecraft#prebuild",
+        "@gd/native_interface#codegen"
       ],
       "outputs": ["core.node", "bindings.d.ts"],
       "cache": false
@@ -34,8 +34,8 @@
     "@gd/native_interface#build": {
       "outputs": ["core.node"],
       "dependsOn": [
-        "@gd/native_interface#codegen",
-        "@gd/carbon_minecraft#prebuild"
+        "@gd/carbon_minecraft#prebuild",
+        "@gd/native_interface#codegen"
       ],
       "cache": false
     },
@@ -43,7 +43,7 @@
       "outputs": ["core.node"],
       "dependsOn": [
         "@gd/carbon_minecraft#prebuild",
-        "@gd/carbon_minecraft#prebuild"
+        "@gd/native_interface#codegen"
       ],
       "cache": false
     },
