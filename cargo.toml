@@ -6,11 +6,13 @@ members = [
   "crates/carbon_minecraft",
   "crates/carbon_bindings",
   "crates/carbon_net",
+  "crates/prisma-cli",
   "crates/carbon_compression",
 ]
 
 [profile.release]
 codegen-units = 1
+resolver = "2"
 lto = true
 opt-level = 3
 panic = "abort"

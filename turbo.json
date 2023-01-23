@@ -29,9 +29,23 @@
       "cache": false
     },
     "@gd/native_interface#build": {
+      "outputs": ["core.node"],
       "dependsOn": ["@gd/native_interface#codegen"],
-      "outputs": ["core.node", "bindings.d.ts"],
       "cache": false
+    },
+    "@gd/native_interface#test": {
+      "outputs": ["core.node"],
+      "dependsOn": ["@gd/native_interface#codegen"],
+      "cache": false
+    },
+    "@gd/native_interface#codegen": {
+      "outputs": ["bindings.d.ts"],
+      "dependsOn": ["@gd/carbon_minecraft#prebuild"],
+      "cache": false
+    },
+    "@gd/carbon_minecraft#prebuild": {
+      "cache": false,
+      "outputs": ["src/db.rs"]
     },
     "dev": {
       "outputs": ["dist/**"],
@@ -47,9 +61,8 @@
     "check-bundle": {
       "cache": false
     },
-    "codegen": {
-      "cache": false,
-      "outputs": ["bindings.d.ts"]
+    "prebuild": {
+      "cache": false
     }
   },
   "globalDependencies": [".env"]
