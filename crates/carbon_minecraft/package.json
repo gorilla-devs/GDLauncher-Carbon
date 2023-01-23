@@ -2,9 +2,9 @@
   "name": "@gd/carbon_minecraft",
   "version": "0.0.0",
   "scripts": {
-    "prebuild": "cargo prisma migrate reset --force --schema=${PWD}/prisma/schema.prisma",
-    "pretest": "cargo prisma migrate reset --force --schema=${PWD}/prisma/schema.prisma",
-    "test": "cargo prisma migrate reset --force --schema=${PWD}/prisma/schema.prisma && cargo test -- --nocapture",
+    "prebuild": "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- migrate reset --force --schema=${PWD}/prisma/schema.prisma",
+    "pretest": "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- migrate reset --force --schema=${PWD}/prisma/schema.prisma",
+    "test": "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- migrate reset --force --schema=${PWD}/prisma/schema.prisma && cargo test -- --nocapture",
     "lint": "cargo clippy --all-targets --all-features -- -D warnings"
   }
 }

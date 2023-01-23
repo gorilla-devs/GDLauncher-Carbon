@@ -435,6 +435,7 @@ dependencies = [
  "log",
  "mockall",
  "prisma-client-rust",
+ "prisma-client-rust-cli",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
