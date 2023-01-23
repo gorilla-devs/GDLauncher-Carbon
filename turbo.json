@@ -40,7 +40,7 @@
     },
     "@gd/native_interface#codegen": {
       "outputs": ["bindings.d.ts"],
-      "dependsOn": ["@gd/native_interface#prebuild"],
+      "dependsOn": ["@gd/carbon_minecraft#prebuild"],
       "cache": false
     },
     "@gd/carbon_minecraft#prebuild": {
