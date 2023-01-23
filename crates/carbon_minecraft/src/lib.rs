@@ -1,4 +1,4 @@
-mod mc;
+mod minecraft;
 
 pub mod app;
 pub mod instance;

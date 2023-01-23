@@ -21,7 +21,7 @@ reqwest-retry = "0.2.1"
 zip = "0.6.3"
 lazy_static = "1.4.0"
 async-trait = "0.1.60"
-uuid = "1.2.2"
+uuid = { version = "1.2.2", features = ["v4", "fast-rng","macro-diagnostics"] }
 thiserror = "1.0.38"
 log="0.4.17"
 trash = "3.0.0"

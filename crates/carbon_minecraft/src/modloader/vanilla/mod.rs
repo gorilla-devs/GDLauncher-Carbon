@@ -4,7 +4,7 @@ use std::sync::Weak;
 use tokio::sync::RwLock;
 use tracing::trace;
 
-use crate::{instance::Instance, mc::meta::McMeta};
+use crate::{instance::Instance, minecraft::meta::McMeta};
 
 use super::{ModLoader, ModloaderVersion};
 
