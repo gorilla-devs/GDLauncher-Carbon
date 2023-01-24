@@ -1,22 +1,20 @@
 #[cfg(test)]
 mod test {
     use env_logger::Builder;
+    use log::trace;
     use log::{debug, LevelFilter};
     use std::env;
     use std::path::PathBuf;
-    use env_logger::Builder;
-    use log::{debug, LevelFilter, trace};
 
-    use carbon_minecraft::{db, instance, try_path_fmt};
     use carbon_minecraft::db::app_configuration::SetParam::SetId;
     use carbon_minecraft::db::app_configuration::WhereParam;
     use carbon_minecraft::db::read_filters::IntFilter;
-    use carbon_minecraft::instance::{Instance, InstanceStatus};
     use carbon_minecraft::instance::delete::delete;
     use carbon_minecraft::instance::scan::check_instance_directory_sanity;
     use carbon_minecraft::instance::write::write_at;
-    use carbon_minecraft::instance::{Instance, InstanceStatus, Instances};
-    use carbon_minecraft::try_path_fmt;
+    use carbon_minecraft::instance::Instances;
+    use carbon_minecraft::instance::{Instance, InstanceStatus};
+    use carbon_minecraft::{db, instance, try_path_fmt};
 
     #[tokio::test]
     #[tracing_test::traced_test]
@@ -109,9 +107,9 @@ mod test {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn persistence_ok() {
-
         trace!("trying to connect to db ");
-        let client = db::new_client().await
+        let client = db::new_client()
+            .await
             .expect("unable to build app_configuration client using db_url ");
         trace!("connected to db");
 
@@ -122,14 +120,16 @@ mod test {
             .await
             .expect("unable to exec create query for app_configuration");
 
-        trace!("wrote correctly in db : {:#?}",configuration);
+        trace!("wrote correctly in db : {:#?}", configuration);
 
         let _serialized_configuration = serde_json::to_string_pretty(&configuration)
             .expect("unable to serialize app_configuration");
 
-        let _count = client.app_configuration()
+        let _count = client
+            .app_configuration()
             .count(vec![WhereParam::Id(IntFilter::Equals(0))])
-            .exec().await
+            .exec()
+            .await
             .expect("unable to select app_configuration");
 
         trace!("read correctly from db ");
