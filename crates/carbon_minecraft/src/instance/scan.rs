@@ -51,7 +51,7 @@ impl Instances {
             "scanning directory {} for instances",
             try_path_fmt!(instances_path)
         );
-        match instances_path.is_dir() {
+        let res = match instances_path.is_dir() {
             true => Ok(future::join_all(
                 ReadDirStream::new(read_dir(instances_path).await?)
                     .map(scan_for_instances_single_directory)
@@ -66,7 +66,19 @@ impl Instances {
                 );
                 Err(PathNotIsNotPointingToAFolder(instances_path.to_path_buf()))
             }
+        };
+
+        if let Ok(instances) = res {
+            self.instances = instances
+                .into_iter()
+                .filter_map(|instance| match instance {
+                    Ok(instance) => Some(instance),
+                    Err(_) => None,
+                })
+                .collect();
         }
+
+        unimplemented!()
     }
 }
 

@@ -22,7 +22,7 @@ impl Default for InstanceStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Instance {
     pub name: String,
     pub uuid: String,

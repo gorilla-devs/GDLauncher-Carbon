@@ -10,8 +10,8 @@ pub(crate) mod vanilla;
 
 pub trait ModLoaderError: std::error::Error + Send + Sync + 'static {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum ModLoaderOptions {
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub enum ModLoader {
     Vanilla,
     Forge,
     Fabric,
@@ -19,9 +19,9 @@ pub enum ModLoaderOptions {
     Quilt,
 }
 
-impl Default for ModLoaderOptions {
+impl Default for ModLoader {
     fn default() -> Self {
-        ModLoaderOptions::Vanilla
+        ModLoader::Vanilla
     }
 }
 
@@ -34,7 +34,7 @@ pub struct InstallProgress<T> {
 }
 
 #[async_trait]
-pub trait ModLoader
+pub trait ModLoaderT
 where
     Self: Sized,
 {

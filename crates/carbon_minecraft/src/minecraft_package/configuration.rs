@@ -1,11 +1,13 @@
-use crate::{minecraft_package::MinecraftPackage, modloader::ModLoaderOptions};
+use std::collections::HashSet;
+
+use crate::{minecraft_package::MinecraftPackage, modloader::ModLoader};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MinecraftPackageConfigurationFile {
     pub version: String,
     pub description: String,
-    pub modloader: ModLoaderOptions,
+    pub modloader: HashSet<ModLoader>,
 }
 
 impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {

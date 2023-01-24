@@ -10,7 +10,7 @@ use std::time::{SystemTime, SystemTimeError};
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InstanceConfigurationFile {
     pub instance_name: String,
     #[serde(rename = "minecraft_package")]
