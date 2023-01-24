@@ -426,7 +426,6 @@ dependencies = [
 name = "carbon_minecraft"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "carbon_net",
  "dirs",

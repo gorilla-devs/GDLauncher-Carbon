@@ -6,7 +6,6 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.152", features = ["derive", "rc"] }
-anyhow = "1.0.51"
 tokio = { version = "1.22.0", features = ["full"] }
 tokio-stream = { version = "0.1.11", features = ["fs"] }
 tracing = "0.1.37"

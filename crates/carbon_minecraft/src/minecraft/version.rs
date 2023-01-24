@@ -1,13 +1,45 @@
-use std::{
-    path::{Path, PathBuf},
-};
-
-use anyhow::{bail, Result};
+use carbon_net::Downloadable;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 
-use carbon_net::Downloadable;
+#[derive(Error, Debug)]
+pub enum VersionError {
+    #[error("io error: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error("json error: {0}")]
+    JsonError(#[from] serde_json::Error),
+    #[error("network error: {0}")]
+    NetworkError(#[from] reqwest::Error),
+    #[error("Join error????: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+    #[error("No asset index found")]
+    NoAssetIndexFound,
+    #[error("Could not find artifact for library {0}")]
+    NoArtifactFoundInLib(String),
+    #[error("Could not find path for library {0}")]
+    NoPathFoundInLib(String),
+    #[error("Could not find artifact for classifier")]
+    NoArtifactFoundInClassifier,
+    #[error("Could not find path for classifier")]
+    NoPathFoundInClassifier,
+    #[error("Window natives expected but not found in classifier")]
+    NoWindowNativesFoundInClassifier,
+    #[error("MacOS natives expected but not found in classifier")]
+    NoMacOSNativesFoundInClassifier,
+    #[error("Linux natives expected but not found in classifier")]
+    NoLinuxNativesFoundInClassifier,
+    #[error("Version Id not found. Should this happen?")]
+    NoVersionIdFound,
+    #[error("No valid downloads for this version")]
+    NoValidDownloads,
+    #[error("Cannot uncompress natives")]
+    CannotUncompressNatives,
+    #[error("Cannot uncompress native file")]
+    CannotUncompressNativeFile,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,12 +143,12 @@ impl Version {
     pub async fn get_asset_index_meta(
         &self,
         base_path: &Path,
-    ) -> Result<super::assets::AssetIndex> {
+    ) -> Result<super::assets::AssetIndex, VersionError> {
         let try_download = || async move {
             let url = self
                 .asset_index
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("No asset index"))?
+                .ok_or(VersionError::NoAssetIndexFound)?
                 .url
                 .clone();
             let resp = reqwest::get(&url)
@@ -124,7 +156,7 @@ impl Version {
                 .json::<super::assets::AssetIndex>()
                 .await?;
 
-            Ok::<_, anyhow::Error>(resp)
+            Ok::<_, VersionError>(resp)
         };
 
         let meta_dir = base_path.join("assets").join("indexes");
@@ -137,9 +169,7 @@ impl Version {
 
                 let meta_path = meta_dir.join(format!(
                     "{}.json",
-                    self.id
-                        .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("No id for asset"))?
+                    self.id.as_ref().ok_or(VersionError::NoVersionIdFound)?
                 ));
 
                 let mut file = tokio::fs::File::create(&meta_path).await?;
@@ -151,9 +181,7 @@ impl Version {
                 trace!("Failed to download asset index meta: {e}. Fallback to trying reading cached file");
                 let meta_path = meta_dir.join(format!(
                     "{}.json",
-                    self.id
-                        .as_ref()
-                        .ok_or_else(|| anyhow::anyhow!("No id for asset"))?
+                    self.id.as_ref().ok_or(VersionError::NoVersionIdFound)?
                 ));
 
                 let mut file = tokio::fs::File::open(&meta_path).await?;
@@ -180,20 +208,20 @@ impl Version {
     pub async fn get_allowed_libraries(
         &self,
         base_path: &Path,
-    ) -> Result<Vec<carbon_net::Downloadable>> {
+    ) -> Result<Vec<carbon_net::Downloadable>, VersionError> {
         let libraries = self.filter_allowed_libraries();
 
         let mut downloads: Vec<carbon_net::Downloadable> = vec![];
 
         for library in libraries {
-            let lib: Result<Downloadable, anyhow::Error> = library.try_into();
+            let lib: Result<Downloadable, VersionError> = library.try_into();
             if let Ok(mut lib) = lib {
                 lib.path = base_path.join("libraries").join(lib.path); // how do we do this from inside the TryFrom impl?
                 downloads.push(lib);
             }
 
             if let Some(natives) = &library.downloads.classifiers {
-                let native: Result<Downloadable, anyhow::Error> = natives.try_into();
+                let native: Result<Downloadable, VersionError> = natives.try_into();
                 if let Ok(mut native) = native {
                     native.path = base_path.join("libraries").join(native.path); // how do we do this from inside the TryFrom impl?
                     downloads.push(native);
@@ -204,17 +232,17 @@ impl Version {
         Ok(downloads)
     }
 
-    pub async fn get_jar_client(&self, base_path: &Path) -> Result<carbon_net::Downloadable> {
+    pub async fn get_jar_client(
+        &self,
+        base_path: &Path,
+    ) -> Result<carbon_net::Downloadable, VersionError> {
         let jar = &self
             .downloads
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No downloads"))?
+            .ok_or(VersionError::NoValidDownloads)?
             .client;
 
-        let version_id = self
-            .id
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("No id for client jar"))?;
+        let version_id = self.id.as_ref().ok_or(VersionError::NoVersionIdFound)?;
 
         let jar_path = base_path.join("clients").join(format!("{version_id}.jar"));
 
@@ -223,13 +251,17 @@ impl Version {
             .with_size(jar.size))
     }
 
-    pub async fn extract_natives(&self, base_path: &Path, instance_name: &str) -> Result<()> {
+    pub async fn extract_natives(
+        &self,
+        base_path: &Path,
+        instance_name: &str,
+    ) -> Result<(), VersionError> {
         let libraries = self.filter_allowed_libraries();
 
         for library in libraries {
             trace!("Extracting natives for {library:#?}");
             if let Some(natives) = &library.downloads.classifiers {
-                let native: Result<Downloadable, anyhow::Error> = natives.try_into();
+                let native: Result<Downloadable, VersionError> = natives.try_into();
                 if let Ok(native) = native {
                     let native_lib_path = base_path.join("libraries").join(native.path);
                     let extract_dir = base_path
@@ -250,10 +282,13 @@ impl Version {
                         );
                         let file = std::fs::File::open(&native_lib_path)?;
 
-                        let mut archive = zip::ZipArchive::new(file)?;
+                        let mut archive = zip::ZipArchive::new(file)
+                            .map_err(|_| VersionError::CannotUncompressNatives)?;
 
                         'outer_zip: for i in 0..archive.len() {
-                            let mut file = archive.by_index(i)?;
+                            let mut file = archive
+                                .by_index(i)
+                                .map_err(|_| VersionError::CannotUncompressNativeFile)?;
                             let outpath = file.name();
 
                             for pattern in &exclude {
@@ -271,7 +306,7 @@ impl Version {
                             }
                         }
 
-                        Ok::<_, anyhow::Error>(())
+                        Ok::<_, VersionError>(())
                     });
 
                     jh.await?.await?;
@@ -413,17 +448,18 @@ impl Library {
 }
 
 impl TryFrom<&Library> for carbon_net::Downloadable {
-    type Error = anyhow::Error;
+    type Error = VersionError;
 
     fn try_from(value: &Library) -> Result<Self, Self::Error> {
-        let artifact =
-            value.downloads.artifact.clone().ok_or_else(|| {
-                anyhow::anyhow!("Could not find artifact for library {}", value.name)
-            })?;
+        let artifact = value
+            .downloads
+            .artifact
+            .clone()
+            .ok_or_else(|| VersionError::NoArtifactFoundInLib(value.name.clone()))?;
         let path = PathBuf::new().join(
             artifact
                 .path
-                .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
+                .ok_or_else(|| VersionError::NoPathFoundInLib(value.name.clone()))?,
         );
         let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
@@ -457,18 +493,15 @@ pub struct Classifiers {
 }
 
 impl TryFrom<&Classifiers> for carbon_net::Downloadable {
-    type Error = anyhow::Error;
+    type Error = VersionError;
 
     fn try_from(value: &Classifiers) -> Result<Self, Self::Error> {
         let classifier = value.clone();
         let download = match std::env::consts::OS {
             "windows" => {
                 if let Some(windows) = classifier.natives_windows {
-                    let path = PathBuf::from(
-                        windows
-                            .path
-                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
-                    );
+                    let path =
+                        PathBuf::from(windows.path.ok_or(VersionError::NoPathFoundInClassifier)?);
                     let checksum = Some(carbon_net::Checksum::Sha1(windows.sha1));
 
                     carbon_net::Downloadable {
@@ -478,14 +511,12 @@ impl TryFrom<&Classifiers> for carbon_net::Downloadable {
                         size: Some(windows.size),
                     }
                 } else {
-                    bail!("No windows natives");
+                    return Err(VersionError::NoWindowNativesFoundInClassifier);
                 }
             }
             "macos" => {
                 if let Some(macos) = classifier.natives_macos {
-                    let path = macos
-                        .path
-                        .ok_or_else(|| anyhow::anyhow!("No path in lib"))?;
+                    let path = macos.path.ok_or(VersionError::NoPathFoundInClassifier)?;
 
                     let checksum = Some(carbon_net::Checksum::Sha1(macos.sha1));
 
@@ -497,7 +528,7 @@ impl TryFrom<&Classifiers> for carbon_net::Downloadable {
                     }
                 } else if let Some(osx) = classifier.natives_osx {
                     let path =
-                        PathBuf::from(osx.path.ok_or_else(|| anyhow::anyhow!("No path in lib"))?);
+                        PathBuf::from(osx.path.ok_or(VersionError::NoPathFoundInClassifier)?);
                     let checksum = Some(carbon_net::Checksum::Sha1(osx.sha1));
 
                     carbon_net::Downloadable {
@@ -507,16 +538,13 @@ impl TryFrom<&Classifiers> for carbon_net::Downloadable {
                         size: Some(osx.size),
                     }
                 } else {
-                    bail!("No macos natives");
+                    return Err(VersionError::NoMacOSNativesFoundInClassifier);
                 }
             }
             "linux" => {
                 if let Some(linux) = classifier.natives_linux {
-                    let path = PathBuf::from(
-                        linux
-                            .path
-                            .ok_or_else(|| anyhow::anyhow!("No path in lib"))?,
-                    );
+                    let path =
+                        PathBuf::from(linux.path.ok_or(VersionError::NoPathFoundInClassifier)?);
                     let checksum = Some(carbon_net::Checksum::Sha1(linux.sha1));
 
                     carbon_net::Downloadable {
@@ -526,10 +554,10 @@ impl TryFrom<&Classifiers> for carbon_net::Downloadable {
                         size: Some(linux.size),
                     }
                 } else {
-                    bail!("No linux natives");
+                    return Err(VersionError::NoLinuxNativesFoundInClassifier);
                 }
             }
-            _ => bail!("Unknown OS"),
+            _ => panic!("Unsupported OS"),
         };
 
         Ok(download)

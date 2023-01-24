@@ -1,15 +1,14 @@
+use super::instance::Instance;
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::sync::Weak;
+use tokio::sync::RwLock;
+
 pub(crate) mod fabric;
 pub(crate) mod forge;
 pub(crate) mod vanilla;
 
-use std::sync::Weak;
-
-use anyhow::Result;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
-
-use super::instance::Instance;
+pub trait ModLoaderError: std::error::Error + Send + Sync + 'static {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum ModLoaderOptions {
@@ -39,12 +38,13 @@ pub trait ModLoader
 where
     Self: Sized,
 {
-    // type Stages;
+    type Error: ModLoaderError;
+
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
     where
         Self: Sized;
-    async fn install(&self) -> Result<()>;
-    fn remove(&self) -> Result<()>;
-    fn verify(&self) -> Result<()>;
+    async fn install(&self) -> Result<(), Self::Error>;
+    fn remove(&self) -> Result<(), Self::Error>;
+    fn verify(&self) -> Result<(), Self::Error>;
     fn get_version(&self) -> ModloaderVersion;
 }

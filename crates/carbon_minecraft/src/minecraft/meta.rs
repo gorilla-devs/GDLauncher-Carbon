@@ -1,10 +1,19 @@
-use std::path::Path;
-
 use super::version::Version as VersionManifest;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
+
+#[derive(Error, Debug)]
+pub enum MetaError {
+    #[error("failed to download meta")]
+    DownloadError(#[from] reqwest::Error),
+    #[error("failed to parse meta")]
+    ParseError(#[from] serde_json::Error),
+    #[error("failed to write meta")]
+    WriteError(#[from] std::io::Error),
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct McMeta {
@@ -43,7 +52,7 @@ pub enum Type {
 
 impl Version {
     #[tracing::instrument]
-    pub async fn get_version_meta(&self, base_path: &Path) -> Result<VersionManifest> {
+    pub async fn get_version_meta(&self, base_path: &Path) -> Result<VersionManifest, MetaError> {
         trace!("Getting version manifest for {}", self.id);
 
         let try_download = || async move {
@@ -52,7 +61,7 @@ impl Version {
                 .json::<VersionManifest>()
                 .await?;
 
-            Ok::<_, anyhow::Error>(resp)
+            Ok::<_, MetaError>(resp)
         };
 
         let meta_dir = base_path.join("meta").join("mc");
