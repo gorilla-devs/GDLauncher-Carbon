@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use std::sync::Weak;
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::sync::{watch::Sender, RwLock};
 
 use crate::instance::Instance;
 
-use super::{ModLoader, ModLoaderError, ModloaderVersion};
+use super::{InstallProgress, ModLoaderError, ModLoaderHandler, ModloaderVersion};
 
 #[derive(Error, Debug)]
 pub enum ForgeError {}
@@ -24,8 +24,9 @@ pub struct ForgeModloader {
 }
 
 #[async_trait]
-impl ModLoader for ForgeModloader {
+impl ModLoaderHandler for ForgeModloader {
     type Error = ForgeError;
+    type Stages = InstallStages;
 
     fn new(mod_loader_version: ModloaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
         ForgeModloader {
@@ -34,7 +35,8 @@ impl ModLoader for ForgeModloader {
         }
     }
     async fn install(
-        &self, /*progress_send: Sender<InstallProgress<InstallStages>>*/
+        &self,
+        progress_send: Sender<InstallProgress<InstallStages>>,
     ) -> Result<(), ForgeError> {
         Ok(())
     }

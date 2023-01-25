@@ -205,7 +205,7 @@ impl Version {
     }
 
     #[tracing::instrument]
-    pub async fn get_allowed_libraries(
+    pub async fn get_allowed_libraries_downloadable(
         &self,
         base_path: &Path,
     ) -> Result<Vec<carbon_net::Downloadable>, VersionError> {
@@ -232,7 +232,7 @@ impl Version {
         Ok(downloads)
     }
 
-    pub async fn get_jar_client(
+    pub async fn get_jar_client_downloadable(
         &self,
         base_path: &Path,
     ) -> Result<carbon_net::Downloadable, VersionError> {

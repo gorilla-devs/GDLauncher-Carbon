@@ -30,12 +30,12 @@ pub struct Instance {
     pub persistence_status: InstanceStatus,
 }
 
-impl Default for Instance {
-    fn default() -> Self {
+impl Instance {
+    fn new(mc_version: impl Into<String>) -> Self {
         Instance {
             name: String::from("Unnamed Instance"),
             uuid: Uuid::new_v4().to_string(),
-            minecraft_package: MinecraftPackage::default(),
+            minecraft_package: MinecraftPackage::new(mc_version),
             persistence_status: InstanceStatus::default(),
         }
     }

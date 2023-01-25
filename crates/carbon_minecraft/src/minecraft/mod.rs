@@ -11,7 +11,7 @@ mod test {
     #[tracing_test::traced_test]
     async fn test_versions_meta() {
         // Test latest and download assets
-        let meta = McMeta::download_meta().await.unwrap();
+        let meta = McMeta::download_manifest_meta().await.unwrap();
         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
         // Test all versions meta
         let tasks: Vec<_> = meta

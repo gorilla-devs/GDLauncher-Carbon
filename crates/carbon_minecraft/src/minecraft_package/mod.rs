@@ -13,12 +13,29 @@ pub struct Library {
     file_path: PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MinecraftPackage {
     pub version: String,
     pub mods: BTreeSet<MinecraftMod>,
     pub description: String,
     pub modloader: HashSet<ModLoader>,
+}
+
+impl MinecraftPackage {
+    pub fn new(mc_version: impl Into<String>) -> Self {
+        let default_modloaders = {
+            let mut default_modloaders = HashSet::new();
+            default_modloaders.insert(ModLoader::Vanilla);
+            default_modloaders
+        };
+
+        MinecraftPackage {
+            version: mc_version.into(),
+            mods: Default::default(),
+            description: "".to_string(),
+            modloader: default_modloaders,
+        }
+    }
 }
 
 impl From<MinecraftPackageConfigurationFile> for MinecraftPackage {

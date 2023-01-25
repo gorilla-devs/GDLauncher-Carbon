@@ -116,7 +116,7 @@ impl Latest {
 
 impl McMeta {
     #[tracing::instrument]
-    pub async fn download_meta() -> Result<Self, reqwest::Error> {
+    pub async fn download_manifest_meta() -> Result<Self, reqwest::Error> {
         let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
         trace!("Downloading launcher meta from {}", server_url);
         reqwest::get(server_url).await?.json::<McMeta>().await
