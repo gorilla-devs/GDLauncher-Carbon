@@ -6,6 +6,8 @@ use thiserror::Error;
 use tokio::sync::{watch::Sender, RwLock};
 use tracing::trace;
 
+mod tests;
+
 #[derive(Error, Debug)]
 pub enum VanillaError {
     #[error("Failed to download manifest meta")]
@@ -30,6 +32,7 @@ pub enum VanillaError {
 
 impl ModLoaderError for VanillaError {}
 
+#[derive(Debug)]
 pub enum InstallStages {
     DownloadingAssets,
     DownloadingLibraries,
@@ -105,6 +108,7 @@ impl ModLoaderHandler for VanillaModLoader {
             .sum::<u64>()
             / (1024 * 1024);
 
+        // TODO: Map to InstallStages progress (?)
         let (progress, mut progress_handle) = tokio::sync::watch::channel(carbon_net::Progress {
             current_count: 0,
             current_size: 0,
@@ -118,8 +122,8 @@ impl ModLoaderHandler for VanillaModLoader {
             Ok::<_, VanillaError>(())
         });
 
-        let instance_ref = self.instance_ref.upgrade().unwrap();
-        let instance = instance_ref.read().await;
+        // let instance_ref = self.instance_ref.upgrade().unwrap();
+        // let instance = instance_ref.read().await;
 
         while progress_handle.changed().await.is_ok() {
             trace!(
@@ -134,7 +138,7 @@ impl ModLoaderHandler for VanillaModLoader {
         handle.await.expect("Join failed???")?;
 
         version_meta
-            .extract_natives(&base_dir, &instance.name)
+            .extract_natives(&base_dir, mc_version)
             .await
             .map_err(|_| VanillaError::ExtractNativesFailed)?;
 

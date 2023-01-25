@@ -1,7 +1,7 @@
 use super::instance::Instance;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::sync::Weak;
+use std::{fmt::Debug, sync::Weak};
 use tokio::sync::{watch::Sender, RwLock};
 
 pub(crate) mod fabric;
@@ -27,7 +27,11 @@ impl Default for ModLoader {
 
 pub type ModloaderVersion = String;
 
-pub struct InstallProgress<T> {
+#[derive(Debug)]
+pub struct InstallProgress<T>
+where
+    T: Debug,
+{
     pub count_progress: Option<(u64, u64)>,
     pub size_progress: Option<(u64, u64)>,
     pub stage: Option<T>,
@@ -39,7 +43,7 @@ where
     Self: Sized,
 {
     type Error: ModLoaderError;
-    type Stages;
+    type Stages: Debug;
 
     fn new(mod_loader_version: ModloaderVersion, instance: Weak<RwLock<Instance>>) -> Self
     where

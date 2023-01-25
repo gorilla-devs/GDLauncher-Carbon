@@ -254,7 +254,7 @@ impl Version {
     pub async fn extract_natives(
         &self,
         base_path: &Path,
-        instance_name: &str,
+        mc_version: &str,
     ) -> Result<(), VersionError> {
         let libraries = self.filter_allowed_libraries();
 
@@ -264,10 +264,7 @@ impl Version {
                 let native: Result<Downloadable, VersionError> = natives.try_into();
                 if let Ok(native) = native {
                     let native_lib_path = base_path.join("libraries").join(native.path);
-                    let extract_dir = base_path
-                        .join("instances")
-                        .join(instance_name)
-                        .join("natives");
+                    let extract_dir = base_path.join("natives").join(&mc_version);
                     if !extract_dir.exists() {
                         tokio::fs::create_dir_all(&extract_dir).await?;
                     }

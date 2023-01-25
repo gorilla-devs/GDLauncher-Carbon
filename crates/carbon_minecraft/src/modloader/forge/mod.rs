@@ -12,6 +12,7 @@ pub enum ForgeError {}
 
 impl ModLoaderError for ForgeError {}
 
+#[derive(Debug)]
 pub enum InstallStages {
     Downloading,
     ExtractingNatives,
