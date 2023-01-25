@@ -1,12 +1,15 @@
 use super::{InstallProgress, ModLoaderError, ModLoaderHandler, ModloaderVersion};
-use crate::{instance::Instance, minecraft::meta::McMeta};
+use crate::instance::Instance;
 use async_trait::async_trait;
 use std::sync::Weak;
 use thiserror::Error;
 use tokio::sync::{watch::Sender, RwLock};
 use tracing::trace;
 
+mod assets;
+mod meta;
 mod tests;
+mod version;
 
 #[derive(Error, Debug)]
 pub enum VanillaError {
@@ -64,7 +67,7 @@ impl ModLoaderHandler for VanillaModLoader {
         // TODO: GET BASE_DIR FROM SOMEWHERE
         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
 
-        let meta = McMeta::download_manifest_meta()
+        let meta = meta::McMeta::download_manifest_meta()
             .await
             .map_err(|_| VanillaError::DownloadManifestMetaFailed)?;
 

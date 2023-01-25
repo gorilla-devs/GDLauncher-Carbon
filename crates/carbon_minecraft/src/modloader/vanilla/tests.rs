@@ -23,3 +23,26 @@ async fn test_vanilla_modloader() {
 
     handle.await.unwrap().unwrap();
 }
+
+#[tokio::test]
+#[tracing_test::traced_test]
+async fn test_versions_meta() {
+    use super::meta::McMeta;
+
+    // Test latest and download assets
+    let meta = McMeta::download_manifest_meta().await.unwrap();
+    let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
+    // Test all versions meta
+    let tasks: Vec<_> = meta
+        .versions
+        .into_iter()
+        .map(|version| {
+            let base_dir = base_dir.clone();
+            tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
+        })
+        .collect();
+
+    for task in tasks {
+        task.await.unwrap();
+    }
+}
