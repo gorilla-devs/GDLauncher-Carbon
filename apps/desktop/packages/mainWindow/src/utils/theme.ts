@@ -2,19 +2,19 @@ import { mainTheme, lightTheme, Theme, poisonGreen } from "@gd/ui";
 
 import { createEffect, createSignal } from "solid-js";
 
-const [theme, setTheme] = createSignal(0);
+const [theme, setTheme] = createSignal("default");
 
 createEffect(() => {
   switch (theme()) {
-    case 0: {
+    case "default": {
       applyTheme(mainTheme);
       break;
     }
-    case 1: {
+    case "light": {
       applyTheme(lightTheme);
       break;
     }
-    case 2: {
+    case "poison-green": {
       applyTheme(poisonGreen);
       break;
     }

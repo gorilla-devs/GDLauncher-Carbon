@@ -3,6 +3,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { setTheme } from "@/utils/theme";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
+import { createEffect } from "solid-js";
 
 const Appearance = () => {
   const routeData = useRouteData();
@@ -11,6 +12,11 @@ const Appearance = () => {
     onMutate: (newTheme) => {
       queryClient.setQueryData(["app.getTheme", null], newTheme);
     },
+  });
+
+  createEffect(() => {
+    const themeName = () => routeData.data.data;
+    setTheme(themeName());
   });
 
   return (
@@ -27,8 +33,7 @@ const Appearance = () => {
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
           onClick={() => {
-            setTheme(0);
-            mutation.mutate("0");
+            mutation.mutate("default");
           }}
         >
           <ThemePreview
@@ -40,8 +45,7 @@ const Appearance = () => {
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
           onClick={() => {
-            setTheme(1);
-            mutation.mutate("1");
+            mutation.mutate("light");
           }}
         >
           <ThemePreview
@@ -53,8 +57,7 @@ const Appearance = () => {
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
           onClick={() => {
-            setTheme(2);
-            mutation.mutate("2");
+            mutation.mutate("poison-green");
           }}
         >
           <ThemePreview
