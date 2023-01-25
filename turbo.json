@@ -11,11 +11,7 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": [
-        "^@gd/native_interface#dev",
-        "^@gd/ui#build",
-        "^@gd/config#build"
-      ],
+      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
       "outputs": ["dist/**"],
       "cache": false
     },
@@ -27,9 +23,29 @@
       "dependsOn": ["^@gd/config#build"],
       "cache": false
     },
-    "@gd/native_interface": {
-      "outputs": ["core.node"],
+    "@gd/native_interface#dev": {
+      "dependsOn": ["@gd/native_interface#codegen"],
+      "outputs": ["core.node", "bindings.d.ts"],
       "cache": false
+    },
+    "@gd/native_interface#build": {
+      "outputs": ["core.node"],
+      "dependsOn": ["@gd/native_interface#codegen"],
+      "cache": false
+    },
+    "@gd/native_interface#test": {
+      "outputs": ["core.node"],
+      "dependsOn": ["@gd/native_interface#codegen"],
+      "cache": false
+    },
+    "@gd/native_interface#codegen": {
+      "outputs": ["bindings.d.ts"],
+      "dependsOn": ["@gd/carbon_minecraft#prebuild"],
+      "cache": false
+    },
+    "@gd/carbon_minecraft#prebuild": {
+      "cache": false,
+      "outputs": ["src/db.rs"]
     },
     "dev": {
       "outputs": ["dist/**"],
@@ -39,15 +55,13 @@
       "dependsOn": ["^test"],
       "cache": false
     },
-    "build-test": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "core.node"],
-      "cache": false
-    },
     "lint": {
       "cache": false
     },
     "check-bundle": {
+      "cache": false
+    },
+    "prebuild": {
       "cache": false
     }
   },

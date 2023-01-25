@@ -1,3 +1,5 @@
+// Eventually we can get rid of this bloated i18next lib and write our own lightweight solution
+
 const loadLanguageFile = async (lang: string) => {
   try {
     const language = await import(`./locale/${lang}/common.json`);

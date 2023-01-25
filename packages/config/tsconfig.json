@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "inlineSources": false,
     "isolatedModules": false,
-    "module": "ESNext",
+    "module": "esnext",
     "target": "ESNext",
     "moduleResolution": "node",
     "noUnusedLocals": false,

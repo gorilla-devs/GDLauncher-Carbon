@@ -3,9 +3,10 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import pkg from "../../package.json";
-// TODO: fix the import @gd/config problem, right now it's not possible to import as "@gd/config" from here
 
-const unocssConfig = require("@gd/config").unocssConfig;
+const config = require("@gd/config");
+const unocssConfig = config.unocssConfig;
+const appVersion = config.appVersion;
 
 export default defineConfig({
   mode: process.env.NODE_ENV,
@@ -39,6 +40,9 @@ export default defineConfig({
     }),
   ],
   envDir: resolve(__dirname, "../../../../"),
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   base: "./",
   optimizeDeps: {
     exclude: ["@tanstack/solid-query", "path", "fs", "promises"],

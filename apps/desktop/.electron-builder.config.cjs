@@ -13,6 +13,8 @@ module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
+  buildVersion: "5.0.0",
+  buildNumber: "5.0.0",
   asar: true,
   directories: {
     output: "release",
@@ -55,22 +57,24 @@ module.exports = {
   },
   linux: {
     target: isDockerBuild ? ["dir"] : ["dir", "zip"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
     const { spawnSync } = require("child_process");
 
+    let spawnHandler = null;
+
     if (context.electronPlatformName === "darwin") {
       if (context.arch === 1) {
         // x64
-        spawnSync("pnpm", ["core-build", "-- darwin-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
         });
       } else if (context.arch === 3) {
         // arm64
-        spawnSync("pnpm", ["core-build", "-- darwin-arm64"], {
+        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-arm64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
@@ -79,7 +83,7 @@ module.exports = {
     } else if (context.electronPlatformName === "win32") {
       if (context.arch === 1) {
         // x64
-        spawnSync("pnpm", ["core-build", "-- win32-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core-build", "-- win32-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
@@ -88,12 +92,16 @@ module.exports = {
     } else if (context.electronPlatformName === "linux") {
       if (context.arch === 1) {
         // x64
-        spawnSync("pnpm", ["core-build", "-- linux-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core-build", "-- linux-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
         });
       }
+    }
+
+    if (spawnHandler && spawnHandler.status !== 0) {
+      throw new Error("Native interface build failed!");
     }
   },
 };

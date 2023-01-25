@@ -1,0 +1,13 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli --"
+  output   = "../src/db.rs"
+}
+
+model AppConfiguration {
+  id     Int   @id @default(autoincrement())
+}

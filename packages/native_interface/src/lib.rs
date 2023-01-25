@@ -1,9 +1,10 @@
 use carbon_bindings::api::GlobalContext;
 use rspc::RouterBuilderLike;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
 
+mod codegen_bindings;
 mod global_context;
 
 // Since it's module_init, make sure it's not running during tests
