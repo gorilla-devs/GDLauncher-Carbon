@@ -1,8 +1,6 @@
 pub mod error;
 
-struct PolyMcInstance{
-
-}
+struct PolyMcInstance {}
 
 /*impl TryInto<Instance> for PolyMcInstance{
     type Error = InstanceConversionError;
