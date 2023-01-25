@@ -5,7 +5,7 @@ function withAdsLayout() {
   return (
     <div class="flex h-full justify-end">
       <Outlet />
-      <div class="flex justify-start flex-initial flex-col gap-4 mx-5 mt-5">
+      <div class="flex justify-start flex-initial flex-col gap-4 px-5 pt-5 bg-shade-8">
         <AdsBanner />
         <div class="bg-blue w-full h-16" />
       </div>
