@@ -1,5 +1,3 @@
-mod minecraft;
-
 pub mod app;
 pub mod db;
 pub mod instance;
