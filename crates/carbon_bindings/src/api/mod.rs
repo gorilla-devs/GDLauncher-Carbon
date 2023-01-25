@@ -1,15 +1,12 @@
-use std::path::PathBuf;
 
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
-use crate::api::app::AppContainer;
+use crate::app;
+use crate::app::AppContainer;
 
-pub mod app;
 mod java;
 mod mc;
-mod configuration;
-mod persistence;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
@@ -22,42 +19,6 @@ impl InvalidationEvent {
         Self {
             key: key.into(),
             args,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct GlobalContextInner {
-    pub base_dir: PathBuf,
-    pub app: AppContainer,// todo : make app our GlobalContext(lot more organic) ?
-    // Not sure how to hide this..
-    invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
-    // instances: Vec<Instance>,
-    // javas: Vec<Javas>
-}
-
-impl GlobalContextInner {
-    pub fn new(
-        app: AppContainer,
-        base_dir: PathBuf,
-        invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
-    ) -> Self {
-        Self {
-            base_dir,
-            app,
-            invalidation_sender,
-        }
-    }
-
-    pub fn invalidate(&self, key: impl Into<String>, args: Option<serde_json::Value>) {
-        match self
-            .invalidation_sender
-            .send(InvalidationEvent::new(key, args))
-        {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Error sending invalidation request: {}", e);
-            }
         }
     }
 }

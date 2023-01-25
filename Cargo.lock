@@ -380,6 +380,7 @@ dependencies = [
  "async-stream",
  "axum",
  "carbon_java_manager",
+ "env_logger",
  "log",
  "prisma-client-rust",
  "rspc",
@@ -389,6 +390,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]

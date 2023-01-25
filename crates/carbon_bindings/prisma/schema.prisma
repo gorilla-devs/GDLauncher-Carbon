@@ -9,6 +9,6 @@ generator client {
 }
 
 model AppConfiguration {
-  id    Int @id @default(autoincrement())
+  id    Int @id @default(0)
   theme String?
 }

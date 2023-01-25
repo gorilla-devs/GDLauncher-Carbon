@@ -1,11 +1,14 @@
+mod persistence;
+mod configuration;
+
 use std::sync::Arc;
 use rspc::{Router, RouterBuilderLike};
 use thiserror::Error;
 use tokio::sync::{broadcast, RwLock, RwLockReadGuard};
 use tokio::sync::broadcast::error::RecvError;
-use crate::api::configuration::ConfigurationManager;
 use crate::api::InvalidationEvent;
-use crate::api::persistence::PersistenceManager;
+use crate::app::configuration::ConfigurationManager;
+use crate::app::persistence::PersistenceManager;
 
 pub type AppContainer = Arc<RwLock<App>>;
 type AppComponentContainer<M> = Option<RwLock<M>>;
@@ -45,7 +48,7 @@ impl App {
     {
         Ok(
             self.persistence_manager.as_ref()
-                .ok_or(AppError::ManagerNotFound("".to_string()))?
+                .ok_or_else(|| AppError::ManagerNotFound("".to_string()))?
                 .read().await
         )
     }
@@ -77,4 +80,39 @@ pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
                 ctx.read().await.invalidate("app.getTheme", None);
             })
         })
+}
+
+
+mod test {
+    use env_logger::Builder;
+    use log::{LevelFilter, trace};
+    use crate::app::App;
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn read_write_theme_ok() {
+        Builder::new().filter_level(LevelFilter::Trace).init();
+
+        let theme = "super good theme";
+        trace!("trying write theme {}", theme);
+
+        let (invalidation_channel, _) = tokio::sync::broadcast::channel(1);
+        let app = App::new_with_invalidation_channel(invalidation_channel).await;
+        let app = app.read().await;
+
+
+        let configuration_manager = app.configuration_manager.as_ref().expect("");
+        let configuration_manager = configuration_manager.read().await;
+
+        configuration_manager.set_theme(theme.to_string()).await
+            .expect("unable to write theme");
+
+
+        let read_theme = configuration_manager.get_theme().await
+            .expect("unable to read theme");
+
+        assert_eq!(read_theme, theme);
+
+        trace!("read correctly theme from configuration");
+    }
 }

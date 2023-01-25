@@ -1,8 +1,9 @@
 use std::sync::{Arc, Weak};
+use log::trace;
 use prisma_client_rust::NewClientError;
 use thiserror::Error;
 use tokio::sync::RwLock;
-use crate::api::app::App;
+use crate::app::App;
 use crate::db::PrismaClient;
 
 #[derive(Error, Debug)]
@@ -25,7 +26,10 @@ impl PersistenceManager{
     }
 
     pub async fn get_db_client(&self) -> Result<PrismaClient, PersistenceManagerError>{
-        Ok(crate::db::new_client().await?)
+        trace!("retrieving db client");
+        let client = crate::db::new_client().await?;
+        trace!("db client correctly retrieved");
+        Ok(client)
     }
 
 }
