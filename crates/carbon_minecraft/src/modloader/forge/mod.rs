@@ -1,12 +1,18 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::Weak;
-use tokio::sync::RwLock;
+use thiserror::Error;
+use tokio::sync::{watch::Sender, RwLock};
 
 use crate::instance::Instance;
 
-use super::{Modloader, ModloaderVersion};
+use super::{InstallProgress, ModLoaderError, ModLoaderHandler, ModloaderVersion};
 
+#[derive(Error, Debug)]
+pub enum ForgeError {}
+
+impl ModLoaderError for ForgeError {}
+
+#[derive(Debug)]
 pub enum InstallStages {
     Downloading,
     ExtractingNatives,
@@ -19,7 +25,8 @@ pub struct ForgeModloader {
 }
 
 #[async_trait]
-impl Modloader for ForgeModloader {
+impl ModLoaderHandler for ForgeModloader {
+    type Error = ForgeError;
     type Stages = InstallStages;
 
     fn new(mod_loader_version: ModloaderVersion, instance_ref: Weak<RwLock<Instance>>) -> Self {
@@ -28,13 +35,16 @@ impl Modloader for ForgeModloader {
             instance_ref,
         }
     }
-    async fn install(&self, /*progress_send: Sender<InstallProgress<InstallStages>>*/) -> Result<()> {
+    async fn install(
+        &self,
+        progress_send: Sender<InstallProgress<InstallStages>>,
+    ) -> Result<(), ForgeError> {
         Ok(())
     }
-    fn remove(&self) -> Result<()> {
+    fn remove(&self) -> Result<(), ForgeError> {
         Ok(())
     }
-    fn verify(&self) -> Result<()> {
+    fn verify(&self) -> Result<(), ForgeError> {
         Ok(())
     }
     fn get_version(&self) -> ModloaderVersion {

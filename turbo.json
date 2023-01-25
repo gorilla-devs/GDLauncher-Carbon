@@ -11,7 +11,11 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
+      "dependsOn": [
+        "^@gd/ui#build",
+        "^@gd/config#build",
+        "@gd/native_interface#dev"
+      ],
       "outputs": ["dist/**"],
       "cache": false
     },

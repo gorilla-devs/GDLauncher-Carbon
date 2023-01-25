@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use async_stream::stream;
+use carbon_minecraft::instance::Instances;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -25,12 +26,11 @@ impl InvalidationEvent {
     }
 }
 
-#[derive(Clone)]
 pub struct GlobalContextInner {
     pub base_dir: PathBuf,
     // Not sure how to hide this..
     invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
-    // instances: Vec<Instance>,
+    instances: Instances,
     // javas: Vec<Javas>
 }
 
@@ -40,7 +40,8 @@ impl GlobalContextInner {
         invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
     ) -> Self {
         Self {
-            base_dir,
+            base_dir: base_dir.clone(),
+            instances: Instances::new(base_dir.join("instances")),
             invalidation_sender,
         }
     }

@@ -1,17 +1,21 @@
-use serde::{Deserialize, Serialize};
-use crate::minecraft_package::MinecraftPackage;
+use std::collections::HashSet;
 
-#[derive(Debug, Serialize, Deserialize, Hash)]
+use crate::{minecraft_package::MinecraftPackage, modloader::ModLoader};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MinecraftPackageConfigurationFile {
     pub version: String,
     pub description: String,
+    pub modloader: HashSet<ModLoader>,
 }
 
 impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {
     fn from(value: &MinecraftPackage) -> Self {
-        MinecraftPackageConfigurationFile{
+        MinecraftPackageConfigurationFile {
             version: value.version.clone(),
             description: "".to_string(),
+            modloader: value.modloader.clone(),
         }
     }
 }
