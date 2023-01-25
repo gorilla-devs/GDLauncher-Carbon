@@ -21,7 +21,7 @@ mod test {
     async fn test_instance_crud() {
         Builder::new().filter_level(LevelFilter::Trace).init();
 
-        let test_assets_base_dir = std::env::current_dir().unwrap().join("test_assets");
+        let test_assets_base_dir = std::env::current_dir().unwrap().join("fixtures");
 
         let directory_to_scan = PathBuf::from(&test_assets_base_dir);
         debug!("scanning directory at {}", try_path_fmt!(directory_to_scan));

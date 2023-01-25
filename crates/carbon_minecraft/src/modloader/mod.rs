@@ -10,7 +10,7 @@ pub(crate) mod vanilla;
 
 pub trait ModLoaderError: std::error::Error + Send + Sync + 'static {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ModLoader {
     Vanilla,
     Forge,

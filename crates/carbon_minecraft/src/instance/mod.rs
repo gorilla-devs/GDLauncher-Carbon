@@ -4,9 +4,13 @@ pub mod delete;
 pub mod scan;
 pub mod write;
 
-use crate::instance::InstanceStatus::NotPersisted;
 use crate::minecraft_package::MinecraftPackage;
+use crate::{
+    instance::InstanceStatus::NotPersisted,
+    minecraft_package::configuration::MinecraftPackageConfigurationFile,
+};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -22,7 +26,7 @@ impl Default for InstanceStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct Instance {
     pub name: String,
     pub uuid: String,
@@ -49,6 +53,26 @@ impl Instance {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct InstanceConfigurationFile {
+    pub instance_name: String,
+    #[serde(rename = "minecraft_package")]
+    pub minecraft_package_configuration: MinecraftPackageConfigurationFile,
+}
+
+impl From<&Instance> for InstanceConfigurationFile {
+    fn from(value: &Instance) -> Self {
+        InstanceConfigurationFile {
+            instance_name: value.name.clone(),
+            minecraft_package_configuration: MinecraftPackageConfigurationFile {
+                version: value.minecraft_package.version.clone(),
+                description: value.minecraft_package.description.clone(),
+                modloader: value.minecraft_package.modloader.clone(),
+            },
+        }
+    }
+}
+
 pub mod consts {
     pub(crate) const TEMP_CONFIG_FILE_PREFIX: &str = ".temp";
     pub(crate) const CONFIGURATION_FILE_RELATIVE_PATH: &str = ".conf.json";
@@ -57,14 +81,14 @@ pub mod consts {
 
 pub struct Instances {
     pub instances_path: PathBuf,
-    pub instances: Vec<Instance>,
+    pub instances: HashSet<Instance>,
 }
 
 impl Instances {
     pub fn new(instances_path: PathBuf) -> Self {
         Instances {
             instances_path,
-            instances: Vec::new(),
+            instances: HashSet::new(),
         }
     }
 }

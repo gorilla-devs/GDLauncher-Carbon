@@ -1,34 +1,14 @@
 use crate::instance::consts::TEMP_CONFIG_FILE_PREFIX;
 use crate::instance::Instance;
-use crate::minecraft_package::configuration::MinecraftPackageConfigurationFile;
 use crate::try_path_fmt;
 use log::trace;
-use serde::{Deserialize, Serialize};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, SystemTimeError};
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InstanceConfigurationFile {
-    pub instance_name: String,
-    #[serde(rename = "minecraft_package")]
-    pub minecraft_package_configuration: MinecraftPackageConfigurationFile,
-}
-
-impl From<&Instance> for InstanceConfigurationFile {
-    fn from(value: &Instance) -> Self {
-        InstanceConfigurationFile {
-            instance_name: value.name.clone(),
-            minecraft_package_configuration: MinecraftPackageConfigurationFile {
-                version: value.minecraft_package.version.clone(),
-                description: value.minecraft_package.description.clone(),
-                modloader: value.minecraft_package.modloader.clone(),
-            },
-        }
-    }
-}
+use super::InstanceConfigurationFile;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationFileParsingError {
@@ -103,14 +83,14 @@ pub async fn write_in_file<T: AsRef<Path> + Sync>(
 mod unit_tests {
     #[test]
     fn test_configuration_file_parsing_ok() {
-        /* let res = check_configuration_file_sanity(&PathBuf::from("test_assets").join("instance_example")).await;
+        /* let res = check_configuration_file_sanity(&PathBuf::from("fixtures").join("instance_example")).await;
         let affirmative_check = matches!(res, Ok(_));
         assert!(affirmative_check);*/
     }
 
     #[test]
     fn test_configuration_file_parsing_fail() {
-        /* let res = check_configuration_file_sanity(&PathBuf::from("test_assets").join("malformed_instance_example")).await;
+        /* let res = check_configuration_file_sanity(&PathBuf::from("fixtures").join("malformed_instance_example")).await;
         let denial_check = matches!(res, Err(_)); // todo : add every error case
         assert!(denial_check);*/
     }

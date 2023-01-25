@@ -69,13 +69,11 @@ impl Instances {
         };
 
         if let Ok(instances) = res {
-            self.instances = instances
-                .into_iter()
-                .filter_map(|instance| match instance {
-                    Ok(instance) => Some(instance),
-                    Err(_) => None,
-                })
-                .collect();
+            for instance in instances.into_iter() {
+                if let Ok(instance) = instance {
+                    self.instances.insert(instance);
+                }
+            }
         }
 
         unimplemented!()
@@ -147,14 +145,14 @@ mod unit_tests {
 
     #[test]
     fn test_directory_structure_check_ok() {
-        /*let res = InstanceScanner::check_directory_structure(&PathBuf::from("test_assets").join("instance_example")).await;
+        /*let res = InstanceScanner::check_directory_structure(&PathBuf::from("test_snapshots").join("instance_example")).await;
         let affirmative_check = matches!(res, Ok(_));
         assert!(affirmative_check);*/
     }
 
     #[test]
     fn test_directory_structure_check_err() {
-        /*let res = InstanceScanner::check_directory_structure(&PathBuf::from("test_assets").join("malformed_instance_example")).await;
+        /*let res = InstanceScanner::check_directory_structure(&PathBuf::from("test_snapshots").join("malformed_instance_example")).await;
         let denial_check = matches!(res, Err(_)); // todo : add every error case
         assert!(denial_check);*/
     }
