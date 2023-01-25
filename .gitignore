@@ -86,6 +86,6 @@ tests_decompressed
 java_runtimes
 
 **/.idea
-crates/carbon_minecraft/src/db.rs
-/crates/carbon_minecraft/prisma/dev.db
-/crates/carbon_minecraft/prisma/dev.db-journal
+crates/carbon_bindings/src/db.rs
+/crates/carbon_bindings/prisma/dev.db
+/crates/carbon_bindings/prisma/dev.db-journal

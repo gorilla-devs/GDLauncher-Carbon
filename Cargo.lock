@@ -380,9 +380,12 @@ dependencies = [
  "async-stream",
  "axum",
  "carbon_java_manager",
+ "log",
+ "prisma-client-rust",
  "rspc",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
  "tower-http",
  "tracing",
@@ -419,6 +422,14 @@ dependencies = [
  "tokio",
  "tracing",
  "winreg",
+]
+
+[[package]]
+name = "carbon_macro"
+version = "0.0.0"
+dependencies = [
+ "quote",
+ "syn",
 ]
 
 [[package]]

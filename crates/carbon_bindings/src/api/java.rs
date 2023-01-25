@@ -1,7 +1,8 @@
-use super::GlobalContext;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
+use crate::api::app::AppContainer;
+
 #[derive(Type, Serialize)]
 enum JavaType {
     Local,
@@ -26,10 +27,10 @@ struct JavaDetails {
 #[derive(Type, Serialize)]
 struct Javas(HashMap<u8, Java>);
 
-pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
-    Router::<GlobalContext>::new()
+pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
+    Router::<AppContainer>::new()
         .query("getAvailable", |t| {
-            t(|_ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: AppContainer, _args: ()| async move {
                 let mut javas = HashMap::new();
                 let mut java8 = Java {
                     default_id: "vseuitruihsruthurt".to_string(),
@@ -98,7 +99,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .query("getControlledInstallStatus", |t| {
-            t(|_ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: AppContainer, _args: ()| async move {
                 Ok(0) // progress
             })
         })

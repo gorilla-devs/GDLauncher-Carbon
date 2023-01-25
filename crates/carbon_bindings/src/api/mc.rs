@@ -1,7 +1,7 @@
-use super::GlobalContext;
 use axum::extract::DefaultBodyLimit;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use crate::api::app::AppContainer;
 
 #[derive(Type, Serialize)]
 struct Instance {
@@ -33,10 +33,10 @@ struct InstanceDetails {
 #[derive(Type, Serialize)]
 struct Instances(Vec<Instance>);
 
-pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
-    Router::<GlobalContext>::new()
+pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
+    Router::<AppContainer>::new()
         .query("getInstances", |t| {
-            t(|_ctx: GlobalContext, _args: ()| async move {
+            t(|_ctx: AppContainer, _args: ()| async move {
                 let instances = vec![
                     Instance {
                         id: "88r39459345939453".to_string(),
@@ -82,7 +82,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .query("getInstanceDetails", |t| {
-            t(|_ctx: GlobalContext, args: String| async move {
+            t(|_ctx: AppContainer, args: String| async move {
                 let instance = InstanceDetails {
                     id: "88r39459345939453".to_string(),
                     name: "My first instance".to_string(),
@@ -146,11 +146,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             t(|_, args: Args| {})
         })
         .query("getInstanceMemory", |t| {
-            t(|_ctx: GlobalContext, args: String| async move {})
+            t(|_ctx: AppContainer, args: String| async move {})
         })
         .mutation("updateInstanceMemory", |t| t(|_, args: u8| {}))
         .query("getInstanceJavaArgs", |t| {
-            t(|_ctx: GlobalContext, args: String| async move {})
+            t(|_ctx: AppContainer, args: String| async move {})
         })
         .mutation("updateInstanceJavaArgs", |t| t(|_, args: String| {}))
 }

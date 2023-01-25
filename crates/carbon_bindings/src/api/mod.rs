@@ -1,14 +1,15 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use crate::api::app::AppContainer;
 
-mod app;
+pub mod app;
 mod java;
 mod mc;
-
-pub type GlobalContext = Arc<tokio::sync::RwLock<GlobalContextInner>>;
+mod configuration;
+mod persistence;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
@@ -28,6 +29,7 @@ impl InvalidationEvent {
 #[derive(Clone)]
 pub struct GlobalContextInner {
     pub base_dir: PathBuf,
+    pub app: AppContainer,// todo : make app our GlobalContext(lot more organic) ?
     // Not sure how to hide this..
     invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
     // instances: Vec<Instance>,
@@ -36,11 +38,13 @@ pub struct GlobalContextInner {
 
 impl GlobalContextInner {
     pub fn new(
+        app: AppContainer,
         base_dir: PathBuf,
         invalidation_sender: tokio::sync::broadcast::Sender<InvalidationEvent>,
     ) -> Self {
         Self {
             base_dir,
+            app,
             invalidation_sender,
         }
     }
@@ -58,18 +62,19 @@ impl GlobalContextInner {
     }
 }
 
-pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
-    rspc::Router::<GlobalContext>::new()
+pub fn build_rspc_router() -> impl RouterBuilderLike<AppContainer> {
+    rspc::Router::<AppContainer>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())
         .yolo_merge("app.", app::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
-            t(move |ctx, _args: ()| {
+            // XD
+            t(move |app_container, _args: ()| {
                 stream! {
                     loop {
-                        match ctx.read().await.invalidation_sender.subscribe().recv().await {
+                        match app_container.read().await.wait_for_invalidation().await {
                             Ok(event) => {
                                 yield event;
                             }

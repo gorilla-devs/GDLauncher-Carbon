@@ -1,13 +1,14 @@
 [workspace]
 members = [
-  "packages/native_interface",
-  "crates/carbon_microsoft_auth",
-  "crates/carbon_java_manager",
-  "crates/carbon_minecraft",
-  "crates/carbon_bindings",
-  "crates/carbon_net",
-  "crates/prisma-cli",
-  "crates/carbon_compression",
+    "packages/native_interface",
+    "crates/carbon_microsoft_auth",
+    "crates/carbon_java_manager",
+    "crates/carbon_minecraft",
+    "crates/carbon_macro",
+    "crates/prisma-cli",
+    "crates/carbon_bindings",
+    "crates/carbon_net",
+    "crates/carbon_compression",
 ]
 
 [profile.release]
