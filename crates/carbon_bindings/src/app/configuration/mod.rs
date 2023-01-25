@@ -8,6 +8,7 @@ use crate::app::{App, AppError};
 use crate::app::configuration::ConfigurationManagerError::{AppConfigurationNotFound, AppNotFoundError, ThemeNotFound};
 use crate::app::persistence::PersistenceManagerError;
 use crate::db::app_configuration::{SetParam, UniqueWhereParam};
+use crate::db::app_configuration::SetParam::{SetId, SetTheme};
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
@@ -75,7 +76,7 @@ impl ConfigurationManager {
         persistence_manager.get_db_client()
             .await?
             .app_configuration()
-            .upsert(UniqueWhereParam::IdEquals(0), vec![], vec![SetParam::SetTheme(theme.into())])
+            .upsert(UniqueWhereParam::IdEquals(0), vec![SetId(0),SetTheme(theme.clone().into())], vec![SetTheme(theme.into())])
             .exec()
             .await?;
         trace!("wrote theme into db");

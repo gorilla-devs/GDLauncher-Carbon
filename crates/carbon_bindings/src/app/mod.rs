@@ -84,6 +84,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
 
 
 mod test {
+    use std::time::Duration;
     use env_logger::Builder;
     use log::{LevelFilter, trace};
     use crate::app::App;
@@ -106,7 +107,6 @@ mod test {
 
         configuration_manager.set_theme(theme.to_string()).await
             .expect("unable to write theme");
-
 
         let read_theme = configuration_manager.get_theme().await
             .expect("unable to read theme");
