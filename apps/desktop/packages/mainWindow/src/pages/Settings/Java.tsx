@@ -2,7 +2,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Java as JavaType } from "@gd/native_interface/bindings";
 import { Button } from "@gd/ui";
-import { useRouteData } from "@solidjs/router";
+import { useNavigate, useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 
@@ -28,6 +28,7 @@ const Java = () => {
   const routeData: RouteData = useRouteData();
   const javasData = () => routeData?.data;
   const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
+  const navigate = useNavigate();
 
   let mutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -100,7 +101,13 @@ const Java = () => {
               }}
             />
           </h5>
-          <Button rounded={false} variant="secondary">
+          <Button
+            rounded={false}
+            variant="secondary"
+            onClick={() => {
+              navigate("?m=addjava");
+            }}
+          >
             <div class="i-ri:add-fill text-shade-5 text-xl" />
           </Button>
         </div>

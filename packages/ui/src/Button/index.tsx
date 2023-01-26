@@ -16,7 +16,6 @@ export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   uppercase?: boolean;
   loading?: boolean;
   size?: Size;
-  onClick?: (_: MouseEvent) => void;
 }
 
 const getVariant = (
