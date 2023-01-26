@@ -17,5 +17,15 @@
   "popular_modpacks": "Popular Modpacks",
   "general": "General",
   "language": "Language",
-  "choose_a_language": "Choose a language that is convenient for you and the launcher will be restarted"
+  "choose_a_language": "Choose a language that is convenient for you and the launcher will be restarted",
+  "instance_sorting": "Instance Sorting",
+  "select_instance_sorting_method": "Select the method in which instances should be sorted.",
+  "expert_user_mod": "Expert user mod",
+  "settings_more_control": "Adds more control over the settings of your instances and java.",
+  "settings_hide_launcher_playing_title": "Hide launcher while playing",
+  "settings_hide_launcher_playing_text": "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
+  "settings_potatp_mode_title": "Potato PC mode",
+  "settings_potatp_mode_text": "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
+  "settings_reset": "Reset all to default",
+  "settings_last_version": "You're currently on the latest version. We automatically check for updates and we will inform you whenever one is available."
 }
