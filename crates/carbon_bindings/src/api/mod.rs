@@ -3,7 +3,7 @@ use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use crate::app;
-use crate::app::AppContainer;
+use crate::app::GlobalContext;
 
 mod java;
 mod mc;
@@ -23,8 +23,8 @@ impl InvalidationEvent {
     }
 }
 
-pub fn build_rspc_router() -> impl RouterBuilderLike<AppContainer> {
-    rspc::Router::<AppContainer>::new()
+pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
+    rspc::Router::<GlobalContext>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())

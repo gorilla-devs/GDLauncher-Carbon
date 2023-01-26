@@ -10,7 +10,7 @@ use crate::api::InvalidationEvent;
 use crate::app::configuration::ConfigurationManager;
 use crate::app::persistence::PersistenceManager;
 
-pub type AppContainer = Arc<RwLock<App>>;
+pub type GlobalContext = Arc<RwLock<App>>;
 type AppComponentContainer<M> = Option<RwLock<M>>;
 
 #[derive(Error, Debug)]
@@ -30,7 +30,7 @@ pub struct App {
 
 impl App {
 
-    pub async fn new_with_invalidation_channel(invalidation_channel: broadcast::Sender<InvalidationEvent>) -> AppContainer
+    pub async fn new_with_invalidation_channel(invalidation_channel: broadcast::Sender<InvalidationEvent>) -> GlobalContext
     {
         let app = Arc::new(RwLock::new(App{
             configuration_manager: None,
@@ -70,13 +70,13 @@ impl App {
 }
 
 
-pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
+pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     Router::new()
         .query("getTheme", |t| {
-            t(|_ctx: AppContainer, _args: ()| async move { Ok("main") })
+            t(|_ctx: GlobalContext, _args: ()| async move { Ok("main") })
         })
         .mutation("setTheme", |t| {
-            t(|ctx: AppContainer, v: String| async move {
+            t(|ctx: GlobalContext, v: String| async move {
                 ctx.read().await.invalidate("app.getTheme", None);
             })
         })
