@@ -1,17 +1,37 @@
 import { Button, Dropdown, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_logo.svg";
 import GDLauncherText from "/assets/images/GDLauncher_text.svg";
+import { Trans } from "@gd/i18n";
 
 const General = () => {
   return (
     <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
-      <h2 class="m-0 mb-7 text-4">General</h2>
+      <h2 class="m-0 mb-7 text-4">
+        <Trans
+          key="general"
+          options={{
+            defaultValue: "General",
+          }}
+        />
+      </h2>
       <div class="mb-6">
-        <h5 class="mt-0 mb-2">Language</h5>
+        <h5 class="mt-0 mb-2">
+          <Trans
+            key="language"
+            options={{
+              defaultValue: "Language",
+            }}
+          />
+        </h5>
         <div class="flex w-full justify-between">
           <p class="text-shade-3 max-w-96 m-0">
-            Choose a language that is convenient for you and the launcher will
-            be restarted
+            <Trans
+              key="choose_a_language"
+              options={{
+                defaultValue:
+                  "Choose a language that is convenient for you and the launcher will be restarted",
+              }}
+            />
           </p>
           <Dropdown
             value="en"

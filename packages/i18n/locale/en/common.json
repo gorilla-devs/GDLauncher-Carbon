@@ -14,5 +14,8 @@
   "acceptable_use_policy": "Acceptable Use Policy",
   "recent_played": "Recent Played",
   "your_instances": "Your Instances",
-  "popular_modpacks": "Popular Modpacks"
+  "popular_modpacks": "Popular Modpacks",
+  "general": "General",
+  "language": "Language",
+  "choose_a_language": "Choose a language that is convenient for you and the launcher will be restarted"
 }
