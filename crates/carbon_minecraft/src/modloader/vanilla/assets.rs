@@ -1,7 +1,17 @@
-use anyhow::{Ok, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
+use thiserror::Error;
 use tracing::trace;
+
+#[derive(Error, Debug)]
+pub enum AssetsError {
+    #[error("failed to download asset index")]
+    DownloadError(#[from] reqwest::Error),
+    #[error("failed to parse asset index")]
+    ParseError(#[from] serde_json::Error),
+    #[error("failed to write asset index")]
+    WriteError(#[from] std::io::Error),
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AssetIndex {
@@ -16,10 +26,10 @@ pub struct Object {
 
 impl AssetIndex {
     #[tracing::instrument]
-    pub async fn get_asset_downloads(
+    pub async fn get_asset_files_downloadable(
         &self,
         base_path: &PathBuf,
-    ) -> Result<Vec<carbon_net::Downloadable>> {
+    ) -> Result<Vec<carbon_net::Downloadable>, AssetsError> {
         trace!("Downloading assets");
 
         let mut files: Vec<carbon_net::Downloadable> = vec![];

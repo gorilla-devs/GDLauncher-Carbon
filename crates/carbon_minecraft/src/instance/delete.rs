@@ -1,13 +1,14 @@
-use std::path::Path;
-use log::trace;
-use thiserror::Error;
-use tokio::task::{JoinError, spawn_blocking};
-use crate::try_path_fmt;
-use crate::instance::{Instance, InstanceStatus};
 use crate::instance::consts::{CONFIGURATION_FILE_RELATIVE_PATH, MINECRAFT_PACKAGE_RELATIVE_PATH};
 use crate::instance::delete::InstanceDeleteError::InstanceNotPersisted;
 use crate::instance::scan::{check_instance_directory_sanity, InstanceScanError};
+use crate::instance::{Instance, InstanceStatus};
+use crate::try_path_fmt;
+use log::trace;
+use std::path::Path;
+use thiserror::Error;
+use tokio::task::{spawn_blocking, JoinError};
 
+use super::Instances;
 
 #[derive(Error, Debug)]
 pub enum InstanceDeleteError {
@@ -26,34 +27,42 @@ pub enum InstanceDeleteError {
 
 type InstanceDeleterResult = Result<Instance, InstanceDeleteError>;
 
-pub async fn delete(instance: Instance, put_in_trash_bin: bool) -> InstanceDeleterResult
-{
-    match &instance.persistence_status {
-        InstanceStatus::Persisted(instance_path) if put_in_trash_bin => {
-            trace!("checking instance directory structure at {}", try_path_fmt!(instance_path));
-            check_instance_directory_sanity(instance_path).await?;
-            trace!("putting in trash bin instance from fs at {}", try_path_fmt!(instance_path));
-            let configuration_file_path = Path::new(instance_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
-            let minecraft_package_path = Path::new(instance_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
-            let _ = spawn_blocking(move || trash::delete(configuration_file_path)).await?;
-            let _ = spawn_blocking(move || trash::delete(minecraft_package_path) ).await?;
+impl Instances {
+    pub async fn delete(instance: Instance, put_in_trash_bin: bool) -> InstanceDeleterResult {
+        match &instance.persistence_status {
+            InstanceStatus::Persisted(instance_path) if put_in_trash_bin => {
+                trace!(
+                    "checking instance directory structure at {}",
+                    try_path_fmt!(instance_path)
+                );
+                check_instance_directory_sanity(instance_path).await?;
+                trace!(
+                    "putting in trash bin instance from fs at {}",
+                    try_path_fmt!(instance_path)
+                );
+                let path_new = Path::new(instance_path).to_path_buf();
+                let _ = spawn_blocking(move || trash::delete(path_new)).await?;
 
-            Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
-        },
-        InstanceStatus::Persisted(instance_path) if !put_in_trash_bin=> {
-            trace!("checking instance directory structure at {}", try_path_fmt!(instance_path));
-            check_instance_directory_sanity(instance_path).await?;
-            trace!("deleting instance from fs at {}", try_path_fmt!(instance_path));
-            let configuration_file_path = Path::new(instance_path).join(CONFIGURATION_FILE_RELATIVE_PATH);
-            let minecraft_package_path = Path::new(instance_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
-            tokio::fs::remove_file(configuration_file_path).await?;
-            tokio::fs::remove_dir_all(minecraft_package_path).await?;
+                Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
+            }
+            InstanceStatus::Persisted(instance_path) if !put_in_trash_bin => {
+                trace!(
+                    "checking instance directory structure at {}",
+                    try_path_fmt!(instance_path)
+                );
+                check_instance_directory_sanity(instance_path).await?;
+                trace!(
+                    "deleting instance from fs at {}",
+                    try_path_fmt!(instance_path)
+                );
+                let path_new = Path::new(instance_path).to_path_buf();
+                tokio::fs::remove_dir_all(path_new).await?;
 
-            Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
-        },
-        _ => Err(InstanceNotPersisted)
+                Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
+            }
+            _ => Err(InstanceNotPersisted),
+        }
     }
-
 }
 
 // fixme : finish refactor down here V
