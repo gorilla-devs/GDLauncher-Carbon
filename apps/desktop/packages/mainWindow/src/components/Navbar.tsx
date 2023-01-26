@@ -45,7 +45,7 @@ const AppNavbar = () => {
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
-                  <For each={NAVBAR_ROUTES.filter((route) => !route?.hide)}>
+                  <For each={NAVBAR_ROUTES}>
                     {(route) => {
                       const isMatch = useMatch(() => route.path);
 
