@@ -25,6 +25,8 @@ interface RouteData {
 const Java = () => {
   const [defaultJavas, setDefaultJavas] = createStore<DefaultJavasObj[]>([]);
   const routeData: RouteData = useRouteData();
+  const javasData = () => routeData?.data;
+  const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
 
   let mutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -33,8 +35,6 @@ const Java = () => {
   });
 
   createEffect(() => {
-    const javasData = () => routeData?.data;
-    const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
       const defaultId = javaObj.default_id;
@@ -85,7 +85,7 @@ const Java = () => {
                 <h5 class="mt-0 mb-4">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].java as []}>
-                    {(j) => (
+                    {(j: JavaObj) => (
                       <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
                         <p class="m-0">
                           <Trans
