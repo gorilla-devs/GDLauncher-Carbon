@@ -1,9 +1,9 @@
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Java as JavaType } from "@gd/native_interface/bindings";
-import { Checkbox } from "@gd/ui";
+import { Button } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, createEffect } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 
 interface JavaObj {
@@ -24,6 +24,7 @@ interface RouteData {
 
 const Java = () => {
   const [defaultJavas, setDefaultJavas] = createStore<DefaultJavasObj[]>([]);
+  const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: RouteData = useRouteData();
   const javasData = () => routeData?.data;
   const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
@@ -40,8 +41,12 @@ const Java = () => {
       const defaultId = javaObj.default_id;
       const javaDefaultVersion = java[1]?.java.find((j) => j.id === defaultId);
       let newObj: any = javaDefaultVersion;
+      setDefaultJavasIds((prev) => [...prev, defaultId]);
       newObj.majorVersion = java[0];
-      setDefaultJavas([newObj]);
+      setDefaultJavas((prev) => {
+        const filteredPrev = prev.filter((j) => j.id !== newObj.id);
+        return [...filteredPrev, newObj];
+      });
     });
   });
 
@@ -64,7 +69,7 @@ const Java = () => {
             }}
           />
         </h5>
-        <div class="flex flex-col gap-4 mb-5 border-2 border-solid border-shade-7 p-4">
+        <div class="flex flex-col gap-4 mb-10 border-2 border-solid border-shade-7 p-4">
           <For each={defaultJavas}>
             {(java) => (
               <div class="flex flex-col justify-start">
@@ -86,14 +91,19 @@ const Java = () => {
             )}
           </For>
         </div>
-        <h5>
-          <Trans
-            key="all_versions"
-            options={{
-              defaultValue: "All versions",
-            }}
-          />
-        </h5>
+        <div class="flex justify-between">
+          <h5>
+            <Trans
+              key="all_versions"
+              options={{
+                defaultValue: "All versions",
+              }}
+            />
+          </h5>
+          <Button rounded={false} variant="secondary">
+            <div class="i-ri:add-fill text-shade-5 text-xl" />
+          </Button>
+        </div>
         <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
           <For each={Object.entries(javas())}>
             {(javas) => (
@@ -116,14 +126,25 @@ const Java = () => {
                           {j?.path}
                         </p>
                         <p class="m-0">{j?.type}</p>
-                        <Checkbox
+
+                        <div
+                          class="cursor-pointer"
                           onChange={() => {
                             mutation.mutate({
                               major_version: parseInt(javas[0], 10),
                               id: j?.id,
                             });
                           }}
-                        />
+                        >
+                          <Show
+                            when={defaultJavasIds().includes(j?.id)}
+                            fallback={
+                              <div class="i-ri:star-line text-shade-5 text-xl" />
+                            }
+                          >
+                            <div class="i-ri:star-fill text-yellow text-xl" />
+                          </Show>
+                        </div>
                       </div>
                     )}
                   </For>
