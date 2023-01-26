@@ -5,8 +5,14 @@ import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 
+interface RouteData {
+  data: {
+    data: string;
+  };
+}
+
 const Appearance = () => {
-  const routeData = useRouteData();
+  const routeData: RouteData = useRouteData();
 
   let mutation = rspc.createMutation(["app.setTheme"], {
     onMutate: (newTheme) => {

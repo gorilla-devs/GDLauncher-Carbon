@@ -16,11 +16,15 @@ interface DefaultJavasObj extends JavaObj {
   majorVersion: string;
 }
 
+interface RouteData {
+  data: {
+    data: { [key: number]: JavaType };
+  };
+}
+
 const Java = () => {
   const [defaultJavas, setDefaultJavas] = createStore<DefaultJavasObj[]>([]);
-  const routeData = useRouteData();
-  const javasData = () => routeData?.data;
-  const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
+  const routeData: RouteData = useRouteData();
 
   let mutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -29,6 +33,8 @@ const Java = () => {
   });
 
   createEffect(() => {
+    const javasData = () => routeData?.data;
+    const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
       const defaultId = javaObj.default_id;
