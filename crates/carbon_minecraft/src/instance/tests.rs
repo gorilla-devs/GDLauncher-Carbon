@@ -1,68 +1,44 @@
 #[cfg(test)]
 mod test {
-    use env_logger::Builder;
-    use log::trace;
-    use log::{debug, LevelFilter};
     use std::env;
     use std::path::PathBuf;
+    use env_logger::Builder;
+    use log::{debug, LevelFilter};
 
-    use carbon_minecraft::db::app_configuration::SetParam::SetId;
-    use carbon_minecraft::db::app_configuration::WhereParam;
-    use carbon_minecraft::db::read_filters::IntFilter;
+    use carbon_minecraft::{instance, try_path_fmt};
+    use carbon_minecraft::instance::{Instance, InstanceStatus};
     use carbon_minecraft::instance::delete::delete;
     use carbon_minecraft::instance::scan::check_instance_directory_sanity;
     use carbon_minecraft::instance::write::write_at;
-    use carbon_minecraft::instance::Instances;
-    use carbon_minecraft::instance::{Instance, InstanceStatus};
-    use carbon_minecraft::{db, instance, try_path_fmt};
 
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_instance_crud() {
         Builder::new().filter_level(LevelFilter::Trace).init();
 
-        let test_assets_base_dir = std::env::current_dir().unwrap().join("fixtures");
+        let test_assets_base_dir = std::env::current_dir().unwrap()
+            .join("test_assets");
 
-        let directory_to_scan = PathBuf::from(&test_assets_base_dir);
+        let directory_to_scan = &PathBuf::from(&test_assets_base_dir);
         debug!("scanning directory at {}", try_path_fmt!(directory_to_scan));
 
-        let mut instances = Instances::new(directory_to_scan.clone());
-
-        let instance_scan_results = instances.scan_for_instances().await.unwrap();
+        let instance_scan_results = instance::scan::scan_for_instances(directory_to_scan).await.unwrap();
 
         debug!("Instance scan result {:?}", instance_scan_results);
 
-        let found_instances = instance_scan_results
-            .into_iter()
-            .filter(|r| r.is_ok())
-            .collect::<Vec<_>>();
+        let found_instances = instance_scan_results.into_iter().filter(|r|r.is_ok()).collect::<Vec<_>>();
 
-        assert_eq!(
-            1,
-            found_instances.len(),
-            "found 0 good instance in {} we expected 1 !",
-            try_path_fmt!(directory_to_scan)
-        );
+        assert_eq!(1, found_instances.len(), "found 0 good instance in {} we expected 1 !", try_path_fmt!(directory_to_scan));
 
         let found_instance = Result::unwrap(found_instances.first().unwrap().as_ref());
 
-        debug!(
-            "Instance found : \n {}",
-            serde_json::to_string_pretty(&found_instance).unwrap()
-        );
+        debug!("Instance found : \n {}", serde_json::to_string_pretty(&found_instance).unwrap());
 
         let new_instance = Instance::default();
 
-        assert_eq!(
-            new_instance.persistence_status,
-            InstanceStatus::NotPersisted,
-            "newly constructed instance expected to be not persisted but is persisted !"
-        );
+        assert_eq!(new_instance.persistence_status, InstanceStatus::NotPersisted, "newly constructed instance expected to be not persisted but is persisted !");
 
-        debug!(
-            "Instance found : \n {}",
-            serde_json::to_string_pretty(&found_instance).unwrap()
-        );
+        debug!("Instance found : \n {}", serde_json::to_string_pretty(&found_instance).unwrap());
 
         let tmp_directory = env::temp_dir().join("GDLauncher_test");
         let _ = std::fs::remove_dir_all(&tmp_directory);
@@ -72,89 +48,42 @@ mod test {
 
         let new_instance = write_at(new_instance, &tmp_directory).await.unwrap();
 
-        assert!(check_instance_directory_sanity(&tmp_directory)
-            .await
-            .is_ok());
+        assert!(check_instance_directory_sanity(&tmp_directory).await.is_ok());
 
-        debug!(
-            "instance correctly wrote at : {}",
-            try_path_fmt!(tmp_directory)
-        );
+        debug!("instance correctly wrote at : {}", try_path_fmt!(tmp_directory));
 
-        debug!(
-            "trying to delete instance at : {}",
-            try_path_fmt!(tmp_directory)
-        );
+        debug!("trying to delete instance at : {}", try_path_fmt!(tmp_directory));
 
         let new_instance = delete(new_instance, false).await.unwrap();
 
-        assert!(check_instance_directory_sanity(&tmp_directory)
-            .await
-            .is_err());
+        assert!(check_instance_directory_sanity(&tmp_directory).await.is_err());
 
-        assert_eq!(
-            new_instance.persistence_status,
-            InstanceStatus::NotPersisted,
-            "deleted instance expected to be not persisted but remain persisted !"
-        );
+        assert_eq!(new_instance.persistence_status, InstanceStatus::NotPersisted, "deleted instance expected to be not persisted but remain persisted !" );
 
-        debug!(
-            "instance  correctly deleted at : {}",
-            try_path_fmt!(tmp_directory)
-        );
-    }
+        debug!("instance  correctly deleted at : {}", try_path_fmt!(tmp_directory));
 
-    #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn persistence_ok() {
-        trace!("trying to connect to db ");
-        let client = db::new_client()
-            .await
-            .expect("unable to build app_configuration client using db_url ");
-        trace!("connected to db");
-
-        let configuration = client
-            .app_configuration()
-            .create(vec![SetId(0)])
-            .exec()
-            .await
-            .expect("unable to exec create query for app_configuration");
-
-        trace!("wrote correctly in db : {:#?}", configuration);
-
-        let _serialized_configuration = serde_json::to_string_pretty(&configuration)
-            .expect("unable to serialize app_configuration");
-
-        let _count = client
-            .app_configuration()
-            .count(vec![WhereParam::Id(IntFilter::Equals(0))])
-            .exec()
-            .await
-            .expect("unable to select app_configuration");
-
-        trace!("read correctly from db ");
     }
 
     /* #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn test_versions_meta() {
-        // Test latest and download assets
-        let meta = McMeta::download_meta().await.unwrap();
-        let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
-        // Test all versions meta
-        let tasks: Vec<_> = meta
-            .versions
-            .into_iter()
-            .map(|version| {
-                let base_dir = base_dir.clone();
-                tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
-            })
-            .collect();
+     #[tracing_test::traced_test]
+     async fn test_versions_meta() {
+         // Test latest and download assets
+         let meta = McMeta::download_meta().await.unwrap();
+         let base_dir = std::env::current_dir().unwrap().join("MC_TEST");
+         // Test all versions meta
+         let tasks: Vec<_> = meta
+             .versions
+             .into_iter()
+             .map(|version| {
+                 let base_dir = base_dir.clone();
+                 tokio::spawn(async move { version.get_version_meta(&base_dir).await.unwrap() })
+             })
+             .collect();
 
-        for task in tasks {
-            task.await.unwrap();
-        }
-    }*/
+         for task in tasks {
+             task.await.unwrap();
+         }
+     }*/
 
     #[tokio::test]
     async fn test_download_mc() {

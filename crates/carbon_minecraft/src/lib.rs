@@ -1,5 +1,4 @@
 pub mod app;
-pub mod db;
 pub mod instance;
 mod minecraft_mod;
 mod minecraft_package;

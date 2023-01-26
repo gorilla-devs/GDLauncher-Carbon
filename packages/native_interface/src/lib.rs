@@ -1,11 +1,10 @@
-use carbon_bindings::api::GlobalContext;
 use rspc::RouterBuilderLike;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
+use carbon_bindings::app::{App, GlobalContext};
 
 mod codegen_bindings;
-mod global_context;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
@@ -35,11 +34,11 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let global_context = global_context::generate_context(invalidation_sender);
+    let app = App::new_with_invalidation_channel(invalidation_sender).await;
 
     let app = axum::Router::new()
         .nest("/", carbon_bindings::api::build_axum_vanilla_router())
-        .nest("/rspc", router.endpoint(move || global_context).axum())
+        .nest("/rspc", router.endpoint(move || app).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
