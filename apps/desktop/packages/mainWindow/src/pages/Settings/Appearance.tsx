@@ -3,7 +3,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { setTheme } from "@/utils/theme";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { createEffect } from "solid-js";
+import { Show, createEffect } from "solid-js";
 
 interface RouteData {
   data: {
@@ -13,6 +13,7 @@ interface RouteData {
 
 const Appearance = () => {
   const routeData: RouteData = useRouteData();
+  const themeName = () => routeData.data.data || "default";
 
   let mutation = rspc.createMutation(["app.setTheme"], {
     onMutate: (newTheme) => {
@@ -21,7 +22,6 @@ const Appearance = () => {
   });
 
   createEffect(() => {
-    const themeName = () => routeData.data.data;
     setTheme(themeName());
   });
 
@@ -47,6 +47,19 @@ const Appearance = () => {
             shade2="fill-[#272B35]"
             shade3="fill-[#333947]"
           />
+          <div class="flex justify-start gap-2 items-center w-full py-1 px-2 box-border">
+            <Show when={true}>
+              <div class="i-ri:check-fill text-shade-0" />
+            </Show>
+            <p class="m-0 text-shade-0">
+              <Trans
+                key="default"
+                options={{
+                  defaultValue: "default",
+                }}
+              />
+            </p>
+          </div>
         </div>
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
@@ -59,6 +72,19 @@ const Appearance = () => {
             shade2="fill-[#A90F0F]"
             shade3="fill-[#E11313]"
           />
+          <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
+            <Show when={themeName() === "light"}>
+              <div class="i-ri:check-fill text-shade-0" />
+            </Show>
+            <p class="m-0 text-shade-0">
+              <Trans
+                key="light"
+                options={{
+                  defaultValue: "light",
+                }}
+              />
+            </p>
+          </div>
         </div>
         <div
           class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
@@ -71,6 +97,19 @@ const Appearance = () => {
             shade2="fill-[#43651B]"
             shade3="fill-[#598523]"
           />
+          <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
+            <Show when={themeName() === "poison-green"}>
+              <div class="i-ri:check-fill text-shade-0" />
+            </Show>
+            <p class="m-0 text-shade-0">
+              <Trans
+                key="poison-green"
+                options={{
+                  defaultValue: "poison-green",
+                }}
+              />
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -56,7 +56,15 @@ const Java = () => {
         />
       </h2>
       <div class="flex flex-col">
-        <div class="flex flex-col gap-4 mb-10 border-2 border-solid border-shade-7 p-4">
+        <h5>
+          <Trans
+            key="default"
+            options={{
+              defaultValue: "Default",
+            }}
+          />
+        </h5>
+        <div class="flex flex-col gap-4 mb-5 border-2 border-solid border-shade-7 p-4">
           <For each={defaultJavas}>
             {(java) => (
               <div class="flex flex-col justify-start">
@@ -78,11 +86,19 @@ const Java = () => {
             )}
           </For>
         </div>
+        <h5>
+          <Trans
+            key="all_versions"
+            options={{
+              defaultValue: "All versions",
+            }}
+          />
+        </h5>
         <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
           <For each={Object.entries(javas())}>
             {(javas) => (
               <div class="flex flex-col justify-start">
-                <h5 class="mt-0 mb-4">{javas[0]}</h5>
+                <h5 class="mt-0 mb-4 text-shade-5">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].java as []}>
                     {(j: JavaObj) => (
