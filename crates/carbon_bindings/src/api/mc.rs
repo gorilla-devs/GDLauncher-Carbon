@@ -1,7 +1,7 @@
-use super::GlobalContext;
 use axum::extract::DefaultBodyLimit;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use crate::api::app::GlobalContext;
 
 #[derive(Type, Serialize)]
 struct Instance {
