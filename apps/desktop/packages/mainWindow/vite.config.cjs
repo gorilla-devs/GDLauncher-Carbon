@@ -32,6 +32,10 @@ export default defineConfig({
             };
           },
         ],
+        [
+          /^content-\[(.*)\]$/,
+          ([, content]) => ({ content: JSON.stringify(content) }),
+        ],
       ],
     }),
   ],
