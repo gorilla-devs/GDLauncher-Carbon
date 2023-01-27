@@ -1,7 +1,7 @@
 {
   "name": "@gd/carbon_bindings",
   "scripts": {
-    "prebuild": "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- migrate reset --force --schema=./prisma/schema.prisma",
+    "prebuild": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- migrate reset --force --schema=./prisma/schema.prisma",
     "test": "pnpm prebuild && cargo test -- --nocapture",
     "lint": "cargo clippy --all-targets --all-features -- -D warnings"
   }
