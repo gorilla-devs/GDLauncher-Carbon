@@ -82,7 +82,7 @@ const getVariant = (
     outline: {
       ...commonStyle,
       "border-2": true,
-      "text-shade-7": !isDisabled,
+      "text-white": !isDisabled,
       "text-shade-5": isDisabled,
       "border-white": !isDisabled,
       "border-shade-5": isDisabled,
