@@ -380,6 +380,7 @@ dependencies = [
  "async-stream",
  "axum",
  "carbon_java_manager",
+ "carbon_macro",
  "env_logger",
  "log",
  "prisma-client-rust",

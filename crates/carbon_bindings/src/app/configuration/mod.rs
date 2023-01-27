@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use crate::app::{App, AppError};
 use crate::app::configuration::ConfigurationManagerError::{AppConfigurationNotFound, AppNotFoundError, ThemeNotFound};
 use crate::app::persistence::PersistenceManagerError;
-use crate::db::app_configuration::{SetParam, UniqueWhereParam};
+use crate::db::app_configuration::UniqueWhereParam;
 use crate::db::app_configuration::SetParam::{SetId, SetTheme};
 
 #[derive(Error, Debug)]
@@ -49,6 +49,11 @@ impl ConfigurationManager {
         }
     }
 
+    fn get_app(&self) -> Result<Arc<RwLock<App>>, ConfigurationManagerError>{
+        self.app.upgrade()
+            .ok_or(AppNotFoundError)
+    }
+
     pub async fn get_theme(&self) -> Result<String, ConfigurationManagerError> {
         trace!("retrieving current theme from db");
         let app = self.app.upgrade()
@@ -56,7 +61,7 @@ impl ConfigurationManager {
         let app = app.read().await;
         let persistence_manager = app.get_persistence_manager().await?;
         let app_config = persistence_manager.get_db_client()
-            .await?
+            .await.read().await
             .app_configuration()
             .find_first(vec![])
             .exec()
@@ -74,7 +79,7 @@ impl ConfigurationManager {
         let app = app.read().await;
         let persistence_manager = app.get_persistence_manager().await?;
         persistence_manager.get_db_client()
-            .await?
+            .await.read().await
             .app_configuration()
             .upsert(UniqueWhereParam::IdEquals(0), vec![SetId(0),SetTheme(theme.clone().into())], vec![SetTheme(theme.into())])
             .exec()
