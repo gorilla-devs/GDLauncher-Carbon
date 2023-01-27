@@ -20,12 +20,12 @@ const Instance = () => {
       path: `/library/${id}`,
     },
     {
-      label: "Resource Packs",
-      path: `/library/${id}/resourcepacks`,
-    },
-    {
       label: "Mods",
       path: `/library/${id}/mods`,
+    },
+    {
+      label: "Resource Packs",
+      path: `/library/${id}/resourcepacks`,
     },
   ];
 

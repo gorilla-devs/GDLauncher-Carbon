@@ -1,25 +1,26 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
+import { Trans } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
 const mods = [
   {
-    title: "modpack1",
+    title: "Mods1",
     enabled: true,
     modloader: "forge",
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
   },
   {
-    title: "modpack2",
+    title: "Mods2",
     enabled: true,
     modloader: "forge",
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
   },
   {
-    title: "modpack3",
+    title: "Mods3",
     enabled: true,
     modloader: "forge",
     mcversion: "1.19.2",
@@ -33,11 +34,21 @@ const NoMods = () => {
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-shade-0 max-w-100">
-          At the moment this modpack does not contain resource packs, but you
-          can add packs yourself from your folder
+          <Trans
+            key="no_mods_text"
+            options={{
+              defaultValue:
+                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+            }}
+          />
         </p>
-        <Button type="outline" size="medium">
-          + Add pack
+        <Button variant="outline" size="medium">
+          <Trans
+            key="add_pack"
+            options={{
+              defaultValue: "+ Add pack",
+            }}
+          />
         </Button>
       </div>
     </div>
@@ -46,7 +57,7 @@ const NoMods = () => {
 
 const Mods = () => {
   return (
-    <div>
+    <div class="mt-10">
       <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
         <Input
           placeholder="Type Here"
@@ -66,7 +77,12 @@ const Mods = () => {
           />
         </div>
         <Button variant="outline" size="medium">
-          + Add Mod
+          <Trans
+            key="add_mod"
+            options={{
+              defaultValue: "+ Add Mod",
+            }}
+          />
         </Button>
       </div>
       <div class="flex justify-between text-shade-0 mb-6">
