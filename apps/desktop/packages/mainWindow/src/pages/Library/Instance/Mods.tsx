@@ -4,7 +4,16 @@ import { Trans } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
-const mods = [
+type Modloader = "forge" | "vanilla" | "fabric";
+interface IMod {
+  title: string;
+  enabled: boolean;
+  modloader: Modloader;
+  mcversion: string;
+  modloaderVersion: string;
+}
+
+const mods: IMod[] = [
   {
     title: "Mods1",
     enabled: true,
