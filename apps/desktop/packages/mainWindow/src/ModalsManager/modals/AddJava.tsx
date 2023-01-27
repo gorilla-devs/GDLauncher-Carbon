@@ -1,4 +1,4 @@
-import { Trans } from "@gd/i18n";
+// import { Trans } from "@gd/i18n";
 import { Button, Input } from "@gd/ui";
 
 /* eslint-disable i18next/no-literal-string */
