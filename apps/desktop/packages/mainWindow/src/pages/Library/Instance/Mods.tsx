@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
@@ -75,7 +76,14 @@ const Mods = () => {
           inputClass=""
         />
         <div class="flex gap-3 items-center">
-          <p class="text-shade-0">Sort by: </p>
+          <p class="text-shade-0">
+            <Trans
+              key="sort_by"
+              options={{
+                defaultValue: "Sort by:",
+              }}
+            />
+          </p>
           <Dropdown
             options={[
               { label: "A to Z", key: "asc" },
@@ -98,19 +106,39 @@ const Mods = () => {
         <div class="flex gap-4">
           <div class="flex items-center gap-2 cursor-pointer">
             <Checkbox checked={true} disabled={false} />
-            Select All
+            <Trans
+              key="select_all"
+              options={{
+                defaultValue: "Select All",
+              }}
+            />
           </div>
           <div class="flex items-center gap-2 cursor-pointer">
             <span class="i-ri:folder-open-fill text-2xl" />
-            Open sources
+            <Trans
+              key="open_folder"
+              options={{
+                defaultValue: "Open folder",
+              }}
+            />
           </div>
           <div class="flex items-center gap-2 cursor-pointer">
             <span class="i-ri:forbid-line text-2xl" />
-            Disable
+            <Trans
+              key="disable"
+              options={{
+                defaultValue: "disable",
+              }}
+            />
           </div>
           <div class="flex items-center gap-2 cursor-pointer">
             <span class="i-ri:delete-bin-2-fill text-2xl" />
-            Delete
+            <Trans
+              key="delete"
+              options={{
+                defaultValue: "delete",
+              }}
+            />
           </div>
         </div>
         <div>173 Resource packs</div>
