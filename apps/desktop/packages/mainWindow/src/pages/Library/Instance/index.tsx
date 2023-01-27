@@ -47,22 +47,23 @@ const Instance = () => {
         }}
       />
       <div class="absolute top-0 left-0 right-0 h-52 lg:h-64 flex flex-col justify-between items-stretch">
-        <Button
-          class="mt-5 ml-5"
-          onClick={() => navigate("/library")}
-          icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
-          size="small"
-          variant="transparent"
-        >
-          <Trans
-            key="back"
-            options={{
-              defaultValue: "back",
-            }}
-          />
-        </Button>
+        <div class="sticky top-5 left-5 w-fit">
+          <Button
+            onClick={() => navigate("/library")}
+            icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
+            size="small"
+            variant="transparent"
+          >
+            <Trans
+              key="back"
+              options={{
+                defaultValue: "back",
+              }}
+            />
+          </Button>
+        </div>
         <div
-          class="flex justify-center px-6 h-24"
+          class="flex justify-center px-6 h-24 absolute bottom-0 right-0 left-0"
           style={{
             background:
               "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
@@ -123,7 +124,7 @@ const Instance = () => {
           </div>
         </div>
       </div>
-      <div class="mt-52 lg:mt-64 bg-shade-8">
+      <div class="min-h-lg lg:mt-64 bg-shade-8">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185">
             <Tabs index={selectedIndex()}>
