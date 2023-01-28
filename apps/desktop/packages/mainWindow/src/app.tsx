@@ -61,7 +61,7 @@ const App: Component = () => {
       <AppNavbar />
       <div class="flex h-screen w-screen z-10">
         <main class="relative flex-1 overflow-hidden">
-          <Suspense fallback={<></>}>
+          <Suspense fallback={null}>
             <Route />
           </Suspense>
         </main>
