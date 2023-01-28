@@ -1,11 +1,16 @@
 import { mainTheme, lightTheme, Theme, poisonGreen } from "@gd/ui";
 
-import { createEffect, createSignal } from "solid-js";
+import { createEffect } from "solid-js";
+import { rspc } from "./rspcClient";
 
-const [theme, setTheme] = createSignal("default");
+let theme = rspc.createQuery(() => ["app.getTheme", null]);
 
 createEffect(() => {
-  switch (theme()) {
+  if (!theme.data) {
+    applyTheme(mainTheme);
+    return;
+  }
+  switch (theme.data) {
     case "default": {
       applyTheme(mainTheme);
       break;
@@ -30,5 +35,3 @@ function applyTheme(theme: Theme) {
     );
   }
 }
-
-export { theme, setTheme };

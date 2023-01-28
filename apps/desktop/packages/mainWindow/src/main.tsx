@@ -5,7 +5,6 @@ import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
-import "@/utils/theme";
 import Modals from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";

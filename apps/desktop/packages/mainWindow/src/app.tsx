@@ -10,9 +10,6 @@ const App: Component = () => {
   const navigate = useNavigate();
 
   let javas = rspc.createQuery(() => ["java.getAvailable", null]);
-
-  let _theme = rspc.createQuery(() => ["app.getTheme", null], {});
-
   let _mutateTheme = rspc.createMutation(["app.setTheme"], {
     onMutate: (newTheme) => {
       queryClient.setQueryData(["app.getTheme", null], newTheme);
@@ -61,7 +58,7 @@ const App: Component = () => {
       <AppNavbar />
       <div class="flex h-screen w-screen z-10">
         <main class="relative flex-1 overflow-hidden">
-          <Suspense fallback={null}>
+          <Suspense fallback={<></>}>
             <Route />
           </Suspense>
         </main>
