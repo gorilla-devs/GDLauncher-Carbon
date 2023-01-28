@@ -28,10 +28,6 @@ loadLanguageFile(DEFAULT_LANG).then((langFile) => {
 });
 
 render(() => {
-  onMount(() => {
-    window.clearLoading();
-  });
-
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
