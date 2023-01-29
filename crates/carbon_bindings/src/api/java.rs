@@ -1,7 +1,7 @@
+use crate::api::app::GlobalContext;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
-use crate::api::app::GlobalContext;
 
 #[derive(Type, Serialize)]
 enum JavaType {
@@ -51,17 +51,17 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
                 javas.insert(8, java8);
 
                 let mut java11 = Java {
-                    default_id: "vseuitruihsruthurt".to_string(),
+                    default_id: "vseuitruihsruthurt12".to_string(),
                     java: Vec::new(),
                 };
                 java11.java.push(JavaDetails {
-                    id: "vseuitruihsruthurt".to_string(),
+                    id: "vseuitruihsruthurt12".to_string(),
                     version: "11.0.1".to_string(),
                     path: PathBuf::from("C:\\Program Files\\Java\\jre1.8.0_51"),
                     _type: JavaType::Local,
                 });
                 java11.java.push(JavaDetails {
-                    id: "vseuitruihsruuuuuu".to_string(),
+                    id: "vseuitruihsruuuuuugg".to_string(),
                     version: "11.0.1".to_string(),
                     path: PathBuf::from("C:\\Some Path\\\\AppData\\gdlauncher\\Java\\jre1.8.0_51"),
                     _type: JavaType::Controlled,
