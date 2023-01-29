@@ -36,6 +36,90 @@ const mods: IMod[] = [
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
   },
+  {
+    title: "Mods4",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods5",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods6",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods7",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods8",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods9",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods8",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods9",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods8",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods9",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods8",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
+  {
+    title: "Mods9",
+    enabled: true,
+    modloader: "forge",
+    mcversion: "1.19.2",
+    modloaderVersion: "2.1.3",
+  },
 ];
 
 const NoMods = () => {
@@ -67,87 +151,87 @@ const NoMods = () => {
 
 const Mods = () => {
   return (
-    <div class="mt-10">
-      <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
-        <Input
-          placeholder="Type Here"
-          icon={<div class="i-ri:search-line" />}
-          class="w-full rounded-full text-shade-0"
-          inputClass=""
-        />
-        <div class="flex gap-3 items-center">
-          <p class="text-shade-0">
-            <Trans
-              key="sort_by"
-              options={{
-                defaultValue: "Sort by:",
-              }}
-            />
-          </p>
-          <Dropdown
-            options={[
-              { label: "A to Z", key: "asc" },
-              { label: "Z to A", key: "desc" },
-            ]}
-            value={"asc"}
-            rounded
+    <div>
+      <div class="flex flex-col sticky top-0 bg-shade-8 z-20 pt-10">
+        <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
+          <Input
+            placeholder="Type Here"
+            icon={<div class="i-ri:search-line" />}
+            class="w-full rounded-full text-shade-0"
+            inputClass=""
           />
+          <div class="flex gap-3 items-center">
+            <p class="text-shade-0">
+              <Trans
+                key="sort_by"
+                options={{
+                  defaultValue: "Sort by:",
+                }}
+              />
+            </p>
+            <Dropdown
+              options={[
+                { label: "A to Z", key: "asc" },
+                { label: "Z to A", key: "desc" },
+              ]}
+              value={"asc"}
+              rounded
+            />
+          </div>
+          <Button variant="outline" size="medium">
+            <Trans
+              key="add_mod"
+              options={{
+                defaultValue: "+ Add Mod",
+              }}
+            />
+          </Button>
         </div>
-        <Button variant="outline" size="medium">
-          <Trans
-            key="add_mod"
-            options={{
-              defaultValue: "+ Add Mod",
-            }}
-          />
-        </Button>
-      </div>
-      <div class="flex justify-between text-shade-0 mb-6">
-        <div class="flex gap-4">
-          <div class="flex items-center gap-2 cursor-pointer">
-            <Checkbox checked={true} disabled={false} />
-            <Trans
-              key="select_all"
-              options={{
-                defaultValue: "Select All",
-              }}
-            />
+        <div class="flex justify-between text-shade-0 mb-6 z-10">
+          <div class="flex gap-4">
+            <div class="flex items-center gap-2 cursor-pointer">
+              <Checkbox checked={true} disabled={false} />
+              <Trans
+                key="select_all"
+                options={{
+                  defaultValue: "Select All",
+                }}
+              />
+            </div>
+            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+              <span class="i-ri:folder-open-fill text-2xl" />
+              <Trans
+                key="open_folder"
+                options={{
+                  defaultValue: "Open folder",
+                }}
+              />
+            </div>
+            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+              <span class="i-ri:forbid-line text-2xl" />
+              <Trans
+                key="disable"
+                options={{
+                  defaultValue: "disable",
+                }}
+              />
+            </div>
+            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+              <span class="i-ri:delete-bin-2-fill text-2xl" />
+              <Trans
+                key="delete"
+                options={{
+                  defaultValue: "delete",
+                }}
+              />
+            </div>
           </div>
-          <div class="flex items-center gap-2 cursor-pointer">
-            <span class="i-ri:folder-open-fill text-2xl" />
-            <Trans
-              key="open_folder"
-              options={{
-                defaultValue: "Open folder",
-              }}
-            />
-          </div>
-          <div class="flex items-center gap-2 cursor-pointer">
-            <span class="i-ri:forbid-line text-2xl" />
-            <Trans
-              key="disable"
-              options={{
-                defaultValue: "disable",
-              }}
-            />
-          </div>
-          <div class="flex items-center gap-2 cursor-pointer">
-            <span class="i-ri:delete-bin-2-fill text-2xl" />
-            <Trans
-              key="delete"
-              options={{
-                defaultValue: "delete",
-              }}
-            />
-          </div>
+          <div>{mods.length} Resource packs</div>
         </div>
-        <div>173 Resource packs</div>
       </div>
-      <div class="h-full">
+      <div class="h-full overflow-y-hidden">
         <Show when={mods.length > 0} fallback={<NoMods />}>
-          <div>
-            <For each={mods}>{(props) => <Mod mod={props} />}</For>
-          </div>
+          <For each={mods}>{(props) => <Mod mod={props} />}</For>
         </Show>
       </div>
     </div>

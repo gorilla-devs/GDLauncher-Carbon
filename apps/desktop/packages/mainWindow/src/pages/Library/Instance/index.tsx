@@ -126,7 +126,7 @@ const Instance = () => {
       </div>
       <div class="min-h-lg lg:mt-64 bg-shade-8">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
-          <div class="max-w-full w-185">
+          <div class="max-w-full w-185 sticky top-5">
             <Tabs index={selectedIndex()}>
               <TabList>
                 <For each={instancePages}>
