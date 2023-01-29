@@ -62,8 +62,8 @@ const Java = () => {
         />
       </h2>
       <div class="flex flex-col">
-        <div class="flex justify-between">
-          <h5 class="m-0">
+        <div class="flex justify-between mb-4">
+          <h5 class="m-0 flex items-center">
             <Trans
               key="all_versions"
               options={{
