@@ -62,38 +62,8 @@ const Java = () => {
         />
       </h2>
       <div class="flex flex-col">
-        <h5>
-          <Trans
-            key="default"
-            options={{
-              defaultValue: "Default",
-            }}
-          />
-        </h5>
-        <div class="flex flex-col gap-4 mb-10 border-2 border-solid border-shade-7 p-4">
-          <For each={defaultJavas}>
-            {(java) => (
-              <div class="flex flex-col justify-start">
-                <h4 class="mt-0 mb-4 text-shade-5">{java?.majorVersion}</h4>
-                <div class="flex justify-around py-5	px-6 bg-shade-9 rounded-md">
-                  <p class="m-0">
-                    <Trans
-                      key="java"
-                      options={{
-                        defaultValue: "Java",
-                      }}
-                    />
-                    {java?.version}
-                  </p>
-                  <p class="m-0">{java?.path}</p>
-                  <p class="m-0">{java?.type}</p>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
         <div class="flex justify-between">
-          <h5>
+          <h5 class="m-0">
             <Trans
               key="all_versions"
               options={{
