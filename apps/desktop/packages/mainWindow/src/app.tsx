@@ -1,31 +1,17 @@
-import { Component, createEffect, Show, Suspense } from "solid-js";
+import { Component, onMount, Show, Suspense } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
-import { createInvalidateQuery, queryClient, rspc } from "./utils/rspcClient";
+import initThemes from "@/utils/theme";
 import { Trans } from "@gd/i18n";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
-
-  let javas = rspc.createQuery(() => ["java.getAvailable", null]);
-
-  let _theme = rspc.createQuery(() => ["app.getTheme", null], {});
-
-  let _mutateTheme = rspc.createMutation(["app.setTheme"], {
-    onMutate: (newTheme) => {
-      queryClient.setQueryData(["app.getTheme", null], newTheme);
-    },
-  });
-
-  createInvalidateQuery();
-
-  const echoMsg = rspc.createQuery(() => ["echo", "something"]);
-
-  createEffect(() => {
-    console.log("pkgVersion", echoMsg.data);
-    console.log("javas", javas.data);
+  onMount(() => {
+    // TODO: maybe wait for initThemes to finish before clearing loading
+    initThemes();
+    window.clearLoading();
   });
 
   return (
