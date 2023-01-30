@@ -40,7 +40,7 @@ To build native code please run
 
 To generate a new migration please run
 
-`cargo prisma-migrate --name [migration_name]`
+`pnpm prisma-migrate --name [migration_name]`
 
 Replace `[migration_name]` with the name of the migration you want to create.
 
