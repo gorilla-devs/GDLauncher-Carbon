@@ -7,11 +7,11 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.66.0-browsers
+      - image: cimg/rust:1.67.0-browsers
     resource_class: large
   website:
     docker:
-      - image: cimg/rust:1.66.0-node
+      - image: cimg/rust:1.67.0-node
     resource_class: small
   mac:
     macos:
@@ -48,7 +48,6 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0-x86_64-apple-darwin
             - run: |
                 node -v
                 cargo --version
@@ -88,7 +87,6 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0-aarch64-apple-darwin
 
             - run: |
                 node -v
@@ -146,8 +144,6 @@ jobs:
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
-
-            rustup install 1.66.0-x86_64-pc-windows-msvc
 
             rustc -Vv
             node -v
