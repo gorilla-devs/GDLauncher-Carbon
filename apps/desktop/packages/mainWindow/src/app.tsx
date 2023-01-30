@@ -11,13 +11,13 @@ const App: Component = () => {
 
   let javas = rspc.createQuery(() => ["java.getAvailable", null]);
 
-  let _theme = rspc.createQuery(() => ["app.getTheme", null], {});
+  let theme = rspc.createQuery(() => ["app.getTheme", null], {});
 
-  let _mutateTheme = rspc.createMutation(["app.setTheme"], {
-    onMutate: (newTheme) => {
-      queryClient.setQueryData(["app.getTheme", null], newTheme);
-    },
-  });
+  // let _mutateTheme = rspc.createMutation(["app.setTheme"], {
+  //   onMutate: (newTheme) => {
+  //     queryClient.setQueryData(["app.getTheme", null], newTheme);
+  //   },
+  // });
 
   createInvalidateQuery();
 
@@ -26,6 +26,7 @@ const App: Component = () => {
   createEffect(() => {
     console.log("pkgVersion", echoMsg.data);
     console.log("javas", javas.data);
+    console.log("theme", theme.data);
   });
 
   return (

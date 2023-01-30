@@ -1,10 +1,11 @@
+use carbon_app::app::{App, GlobalContext};
 use rspc::RouterBuilderLike;
+use runtime_directory::set_runtime_directory_override;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::trace;
-use carbon_bindings::app::{App, GlobalContext};
 
 mod codegen_bindings;
+mod runtime_directory;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
@@ -23,7 +24,7 @@ fn init_core() {
 async fn start_router() {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
+    let router: Arc<rspc::Router<GlobalContext>> = carbon_app::api::build_rspc_router()
         .expose()
         .build()
         .arced();
@@ -34,15 +35,16 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
+    set_runtime_directory_override().await;
+
     let app = App::new_with_invalidation_channel(invalidation_sender).await;
 
     let app = axum::Router::new()
-        .nest("/", carbon_bindings::api::build_axum_vanilla_router())
+        .nest("/", carbon_app::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(move || app).axum())
         .layer(cors);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
-    trace!("RSPC/Server started on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

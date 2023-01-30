@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "packages/native_interface",
+    "crates/*",
+]
+
+[profile.release]
+codegen-units = 1
+resolver = "2"
+lto = true
+opt-level = 3
+panic = "abort"
+strip = "symbols"

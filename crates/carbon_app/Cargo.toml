@@ -1,5 +1,5 @@
 [package]
-name = "carbon_bindings"
+name = "carbon_app"
 version = "0.0.0"
 edition = "2021"
 

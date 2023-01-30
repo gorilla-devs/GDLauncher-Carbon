@@ -4,11 +4,11 @@ datasource db {
 }
 
 generator client {
-  provider = "cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli --"
+  provider = "cargo prisma"
   output   = "../src/db.rs"
 }
 
 model AppConfiguration {
-  id    Int @id @default(0)
-  theme String?
+  id    Int    @id @default(0)
+  theme String @default("main")
 }
