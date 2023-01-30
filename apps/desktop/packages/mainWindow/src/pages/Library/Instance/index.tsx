@@ -40,14 +40,9 @@ const Instance = () => {
     observer = new IntersectionObserver(
       ([e]) => {
         const header = document.getElementById("inline-header");
-        const innerContainer = document.getElementById(
-          "mods-inline-inner-container"
-        );
 
         if (e.intersectionRatio < 1) {
           if (header) {
-            innerContainer?.classList.remove("pt-10");
-            innerContainer?.classList.add("pt-5");
             header.classList.remove("hidden");
             header.classList.add("flex");
             header.classList.remove("opacity-100");
@@ -55,8 +50,6 @@ const Instance = () => {
           }
         } else {
           if (header) {
-            innerContainer?.classList.add("pt-10");
-            innerContainer?.classList.remove("pt-5");
             header.classList.add("hidden");
             header.classList.remove("flex");
             header.classList.remove("opacity-0");
@@ -169,7 +162,7 @@ const Instance = () => {
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185 bg-shade-8">
             <div
-              class="sticky -top-1 z-10 flex flex-col bg-shade-8"
+              class="sticky -top-1 z-10 flex flex-col bg-shade-8 pb-10"
               ref={(el) => {
                 ref = el;
               }}
@@ -207,7 +200,7 @@ const Instance = () => {
                           ATMTeam
                         </div>
                       </div>
-                      <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                      <div class="flex items-center gap-2 mt-2 lg:mt-0 z-10">
                         <Button uppercase variant="glow" size="small">
                           <Trans
                             key="play"
