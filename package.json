@@ -19,7 +19,8 @@
     "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "dev-web": "turbo run dev --filter=@gd/web",
     "build-web": "turbo run build --filter @gd/web",
-    "lint-web": "turbo run lint --filter @gd/web"
+    "lint-web": "turbo run lint --filter @gd/web",
+    "prisma-studio": "npx prisma studio --schema ./crates/carbon_app/prisma/schema.prisma"
   },
   "devDependencies": {
     "bundlewatch": "^0.3.3",

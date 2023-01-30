@@ -9,6 +9,13 @@ generator client {
 }
 
 model AppConfiguration {
-  id    Int    @id @default(0)
-  theme String @default("main")
+  id                 Int     @id @default(0)
+  theme              String  @default("main")
+  reducedMotion      Boolean @default(false)
+  discordIntegration Boolean @default(true)
+  releaseChannel     String  @default("stable")
+}
+
+model Accounts {
+  id Int @id @unique
 }

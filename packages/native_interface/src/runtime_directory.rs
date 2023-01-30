@@ -23,6 +23,15 @@ pub(crate) async fn set_runtime_directory_override() {
     } else {
         let path = path.parent().unwrap();
 
+        // open finder to this directory
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("open")
+                .arg(path)
+                .output()
+                .expect("failed to open finder");
+        }
+
         tokio::fs::create_dir_all(path).await.unwrap();
         std::env::set_current_dir(path).unwrap();
     }
