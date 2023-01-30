@@ -48,7 +48,7 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0
+                rustup install 1.66.0-x86_64-apple-darwin
 
                 rustup default 1.66.0-x86_64-apple-darwin
             - run: |
@@ -90,7 +90,7 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0
+                rustup install 1.66.0-aarch64-apple-darwin
 
                 rustup default 1.66.0-aarch64-apple-darwin
             - run: |
@@ -150,7 +150,7 @@ jobs:
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
 
-            rustup install 1.66.0
+            rustup install 1.66.0-x86_64-pc-windows-msvc
 
             rustup default 1.66.0-x86_64-pc-windows-msvc
 
