@@ -162,7 +162,7 @@ const Instance = () => {
           </div>
         </div>
       </div>
-      <div class="min-h-lg lg:mt-64 bg-shade-8">
+      <div class="min-h-2xl lg:mt-64 bg-shade-8">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185 bg-shade-8">
             <div
