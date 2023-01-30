@@ -2,7 +2,10 @@ import { contextBridge } from "electron";
 import path from "path";
 
 const isDev = import.meta.env.MODE === "development";
-const nAPIPath = isDev ? "../../../../packages/native_interface" : "../../../";
+
+const prodPath = process.platform === "darwin" ? "../../../" : "../../";
+
+const nAPIPath = isDev ? "../../../../packages/native_interface" : prodPath;
 
 let napiLoaded = new Promise((resolve, reject) => {
   import(path.resolve(__dirname, nAPIPath, "core.node"))
