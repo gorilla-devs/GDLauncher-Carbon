@@ -16,6 +16,7 @@ declare global {
     ) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
+    napiLoaded: Promise<void>;
   }
 }
 

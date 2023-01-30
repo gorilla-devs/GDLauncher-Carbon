@@ -16,6 +16,7 @@ fn init_core() {
         runtime
             .unwrap() /* This should never fail */
             .block_on(async {
+                set_runtime_directory_override().await;
                 start_router().await;
             })
     });
@@ -34,8 +35,6 @@ async fn start_router() {
         .allow_methods(Any)
         .allow_headers(Any)
         .allow_origin(Any);
-
-    set_runtime_directory_override().await;
 
     let app = App::new_with_invalidation_channel(invalidation_sender).await;
 
