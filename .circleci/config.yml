@@ -7,11 +7,11 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.65.0-browsers
+      - image: cimg/rust:1.66.0-browsers
     resource_class: large
   website:
     docker:
-      - image: cimg/rust:1.65.0-node
+      - image: cimg/rust:1.66.0-node
     resource_class: small
   mac:
     macos:
@@ -40,14 +40,15 @@ jobs:
             - restore_cache:
                 name: Restore Cargo Package Cache
                 keys:
-                  - cargo-{{ checksum "Cargo.lock" }}-mac
+                  - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-mac
             - restore_cache:
                 name: Restore Pnpm Package Cache
                 keys:
-                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-mac
+                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-mac
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
+                rustup install 1.66.0-x86_64-apple-darwin
             - run: |
                 node -v
                 cargo --version
@@ -59,13 +60,12 @@ jobs:
             - run: pnpm test
             - save_cache:
                 name: Save Cargo Package Cache
-                key: cargo-{{ checksum "Cargo.lock" }}-mac
+                key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-mac
                 paths:
-                  - target
-                  - packages/native_interface/target
+                  - rust_target
             - save_cache:
                 name: Save Pnpm Package Cache
-                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-mac
+                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-mac
                 paths:
                   - node_modules
             - run: cd apps && cd desktop && pnpm clean
@@ -80,14 +80,16 @@ jobs:
             - restore_cache:
                 name: Restore Cargo Package Cache
                 keys:
-                  - cargo-{{ checksum "Cargo.lock" }}-macm1
+                  - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-macm1
             - restore_cache:
                 name: Restore Pnpm Package Cache
                 keys:
-                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-macm1
+                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-macm1
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
+                rustup install 1.66.0-aarch64-apple-darwin
+
             - run: |
                 node -v
                 cargo --version
@@ -99,13 +101,12 @@ jobs:
             - run: pnpm test
             - save_cache:
                 name: Save Cargo Package Cache
-                key: cargo-{{ checksum "Cargo.lock" }}-macm1
+                key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-macm1
                 paths:
-                  - target
-                  - packages/native_interface/target
+                  - rust_target
             - save_cache:
                 name: Save Pnpm Package Cache
-                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-macm1
+                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-macm1
                 paths:
                   - node_modules
             - run: cd apps && cd desktop && pnpm clean
@@ -121,11 +122,11 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "Cargo.lock" }}-win
+            - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-win
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
       - run:
           name: Install NVM
           shell: powershell.exe
@@ -146,6 +147,8 @@ jobs:
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
 
+            rustup install 1.66.0-x86_64-pc-windows-msvc
+
             rustc -Vv
             node -v
             cargo --version
@@ -165,15 +168,14 @@ jobs:
           pnpm test
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}-win
+          key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - ./target
-            - ./packages/native_interface/target
+            - rust_target
       - save_cache:
           name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-win
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - ./node_modules
+            - node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -199,11 +201,11 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "Cargo.lock" }}-testdocker
+            - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-testdocker
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-testdocker
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-testdocker
       - run: |
           node -v
           cargo --version
@@ -218,13 +220,12 @@ jobs:
       - run: pnpm check-bundle
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}-testdocker
+          key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-testdocker
           paths:
-            - target
-            - packages/native_interface/target
+            - rust_target
       - save_cache:
           name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-testdocker
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-testdocker
           paths:
             - node_modules
       - run: cd apps && cd desktop && pnpm clean
@@ -235,11 +236,11 @@ jobs:
       - restore_cache:
           name: Restore Cargo Package Cache
           keys:
-            - cargo-{{ checksum "Cargo.lock" }}-linux
+            - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-linux
       - restore_cache:
           name: Restore Pnpm Package Cache
           keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-linux
+            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-linux
       - run: |
           node -v
           cargo --version
@@ -252,12 +253,12 @@ jobs:
       - run: pnpm test
       - save_cache:
           name: Save Cargo Package Cache
-          key: cargo-{{ checksum "Cargo.lock" }}-linux
+          key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-linux
           paths:
-            - target
+            - rust_target
       - save_cache:
           name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-linux
+          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-linux
           paths:
             - node_modules
       - run: cd apps && cd desktop && pnpm clean

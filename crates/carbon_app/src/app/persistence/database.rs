@@ -24,10 +24,23 @@ pub(super) async fn load_and_migrate() -> Result<PrismaClient, DatabaseError> {
     .await
     .map_err(DatabaseError::ClientError)?;
 
-    db_client
-        ._migrate_deploy()
-        .await
-        .map_err(DatabaseError::MigrationError)?;
+    let try_migrate = db_client._migrate_deploy().await;
+
+    #[cfg(debug_assertions)]
+    {
+        if try_migrate.is_err() {
+            db_client
+                ._db_push()
+                .accept_data_loss()
+                .force_reset()
+                .await
+                .unwrap();
+        }
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        try_migrate.map_err(DatabaseError::MigrationError)?;
+    }
 
     // Add default settings if they don't exist
     if db_client

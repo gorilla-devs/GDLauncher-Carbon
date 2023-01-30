@@ -19,7 +19,12 @@
     "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "dev-web": "turbo run dev --filter=@gd/web",
     "build-web": "turbo run build --filter @gd/web",
-    "lint-web": "turbo run lint --filter @gd/web"
+    "lint-web": "turbo run lint --filter @gd/web",
+    "prisma-studio": "npx prisma studio --schema ./crates/carbon_app/prisma/schema.prisma",
+    "prisma-generate": "cross-env-shell CARGO_TARGET_DIR=./rust_target cargo run -p prisma-cli -- generate --schema=./crates/carbon_app/prisma/schema.prisma",
+    "prisma-migrate": "cross-env-shell CARGO_TARGET_DIR=./rust_target cargo run -p prisma-cli -- migrate dev --schema=./crates/carbon_app/prisma/schema.prisma",
+    "prisma-reset": "cross-env-shell CARGO_TARGET_DIR=./rust_target cargo run -p prisma-cli -- migrate reset --force --schema=./crates/carbon_app/prisma/schema.prisma",
+    "prisma": "cross-env-shell CARGO_TARGET_DIR=./rust_target cargo run -p prisma-cli --"
   },
   "devDependencies": {
     "bundlewatch": "^0.3.3",
