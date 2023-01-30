@@ -44,10 +44,10 @@
     },
     "@gd/native_interface#codegen": {
       "outputs": ["bindings.d.ts"],
-      "dependsOn": ["@gd/carbon_bindings#prebuild"],
+      "dependsOn": ["@gd/carbon_app#prebuild"],
       "cache": false
     },
-    "@gd/carbon_bindings#prebuild": {
+    "@gd/carbon_app#prebuild": {
       "cache": false,
       "outputs": ["src/db.rs"]
     },

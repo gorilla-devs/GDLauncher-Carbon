@@ -270,15 +270,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bincode"
-version = "1.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -373,13 +364,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "carbon_bindings"
+name = "carbon_app"
 version = "0.0.0"
 dependencies = [
  "anyhow",
  "async-stream",
  "axum",
  "carbon_java_manager",
+ "carbon_macro",
  "env_logger",
  "log",
  "prisma-client-rust",
@@ -403,6 +395,38 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "zip",
+]
+
+[[package]]
+name = "carbon_domain"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "carbon_net",
+ "dirs",
+ "env_logger",
+ "futures",
+ "inter-struct",
+ "lazy_static",
+ "log",
+ "mockall",
+ "prisma-client-rust",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde",
+ "serde_json",
+ "sha1",
+ "sha2 0.10.6",
+ "temp-dir",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-test",
+ "trash",
+ "uuid",
  "zip",
 ]
 
@@ -432,38 +456,6 @@ version = "0.0.0"
 dependencies = [
  "quote",
  "syn",
-]
-
-[[package]]
-name = "carbon_minecraft"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "carbon_net",
- "dirs",
- "env_logger",
- "futures",
- "inter-struct",
- "lazy_static",
- "log",
- "mockall",
- "prisma-client-rust",
- "reqwest",
- "reqwest-middleware",
- "reqwest-retry",
- "serde",
- "serde_json",
- "sha1",
- "sha2 0.10.6",
- "temp-dir",
- "thiserror",
- "tokio",
- "tokio-stream",
- "tracing",
- "tracing-test",
- "trash",
- "uuid",
- "zip",
 ]
 
 [[package]]
@@ -602,34 +594,20 @@ dependencies = [
 name = "core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-recursion",
- "async-stream",
  "axum",
- "base64 0.20.0",
- "bincode",
- "byteorder",
- "carbon_bindings",
- "carbon_minecraft",
- "chrono",
+ "carbon_app",
+ "carbon_domain",
  "directories",
  "dotenv",
- "futures",
- "jsonwebtoken",
- "murmurhash32",
  "napi",
  "napi-build",
  "napi-derive",
- "once_cell",
- "rayon",
- "regex",
  "reqwest",
  "rspc",
  "serde",
  "serde_json",
  "tokio",
  "tower-http",
- "tracing",
 ]
 
 [[package]]
@@ -673,17 +651,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2dd04ddaf88237dc3b8d8f9a3c1004b506b54b3313403944054d23c0870c521"
 dependencies = [
  "cfg-if",
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-deque"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "715e8152b692bba2d374b53d4875445368fdf21a94751410af607a5ac677d1fc"
-dependencies = [
- "cfg-if",
- "crossbeam-epoch",
  "crossbeam-utils",
 ]
 
@@ -2021,14 +1988,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "murmurhash32"
-version = "0.2.0"
-source = "git+https://github.com/gorilla-devs/murmurhash32.git#401640895f352c88ccc61670993eec49c10e730b"
-dependencies = [
- "byteorder",
-]
-
-[[package]]
 name = "napi"
 version = "2.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2951,28 +2910,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6823ea29436221176fe662da99998ad3b4db2c7f31e7b6f5fe43adccd6320bb"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "rayon"
-version = "1.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db3a213adf02b3bcfd2d3846bb41cb22857d131789e01df434fb7e7bc0759b7"
-dependencies = [
- "either",
- "rayon-core",
-]
-
-[[package]]
-name = "rayon-core"
-version = "1.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cac410af5d00ab6884528b4ab69d1e8e146e8d471201800fa1b4524126de6ad3"
-dependencies = [
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-utils",
- "num_cpus",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [package]
-name = "carbon_bindings"
+name = "carbon_app"
 version = "0.0.0"
 edition = "2021"
 
@@ -19,6 +19,7 @@ tracing = "0.1.37"
 async-stream = "0.3.3"
 tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
 axum = { version = "0.6.2", features = ["ws"] }
+carbon_macro ={ path = "../carbon_macro" }
 carbon_java_manager ={ path = "../carbon_java_manager" }
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
 
