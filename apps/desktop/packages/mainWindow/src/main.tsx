@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { onMount } from "solid-js";
-import { render } from "solid-js/web";
+import { Portal, render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -30,7 +30,14 @@ loadLanguageFile(DEFAULT_LANG).then((langFile) => {
 
 render(() => {
   onMount(() => {
-    window.clearLoading();
+    window.napiLoaded
+      .then(() => {
+        window.clearLoading();
+      })
+      .catch((e) => {
+        console.error(e);
+        window.fatalError("Failed to load native core");
+      });
   });
 
   return (
@@ -39,19 +46,12 @@ render(() => {
         <TransProvider instance={instance}>
           <NotificationsProvider>
             <App />
+            <Portal mount={document.getElementById("overlay") as HTMLElement}>
+              <Modals />
+            </Portal>
           </NotificationsProvider>
         </TransProvider>
       </Router>
     </rspc.Provider>
   );
 }, document.getElementById("root") as HTMLElement);
-
-render(() => {
-  return (
-    <rspc.Provider client={client as any} queryClient={queryClient}>
-      <Router source={hashIntegration()}>
-        <Modals />
-      </Router>
-    </rspc.Provider>
-  );
-}, document.getElementById("overlay") as HTMLElement);
