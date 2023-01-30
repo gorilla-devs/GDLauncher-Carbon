@@ -1,17 +1,19 @@
-use std::sync::{Arc, Weak};
-use log::trace;
-use prisma_client_rust::NewClientError;
-use thiserror::Error;
-use tokio::sync::RwLock;
 use crate::app::App;
 use crate::db;
 use crate::db::PrismaClient;
+use log::trace;
+use prisma_client_rust::NewClientError;
+use std::{
+    path::Path,
+    sync::{Arc, Weak},
+};
+use thiserror::Error;
+use tokio::sync::RwLock;
+
+mod database;
 
 #[derive(Error, Debug)]
-pub enum PersistenceManagerError {
-    #[error("error raised while trying to build the client for DB : {0}")]
-    ClientError(#[from]NewClientError)
-}
+pub enum PersistenceManagerError {}
 
 pub(crate) struct PersistenceManager {
     app: Weak<RwLock<App>>,
@@ -20,7 +22,9 @@ pub(crate) struct PersistenceManager {
 
 impl PersistenceManager {
     pub async fn make_for_app(app: &Arc<RwLock<App>>) -> PersistenceManager {
-        let db_client = db::new_client().await.expect("unable to connect to db!");
+        // TODO: don't unwrap. Managers should return a result
+        let db_client = database::load_and_migrate().await.unwrap();
+
         PersistenceManager {
             app: Arc::downgrade(app),
             db_client: Arc::new(RwLock::new(db_client)),
@@ -32,4 +36,3 @@ impl PersistenceManager {
         self.db_client.clone()
     }
 }
-
