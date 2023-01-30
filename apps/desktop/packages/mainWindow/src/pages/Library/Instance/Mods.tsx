@@ -152,7 +152,10 @@ const NoMods = () => {
 const Mods = () => {
   return (
     <div>
-      <div class="flex flex-col sticky top-13 bg-shade-8 z-20 pt-10">
+      <div
+        id="mods-inline-inner-container"
+        class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-10 transition-all duration-100 ease-in-out"
+      >
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
