@@ -87,11 +87,7 @@ impl ConfigurationManager {
             .read()
             .await
             .app_configuration()
-            .upsert(
-                UniqueWhereParam::IdEquals(0),
-                vec![SetId(0), SetTheme(theme.clone().into())],
-                vec![SetTheme(theme.into())],
-            )
+            .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
             .exec()
             .await?;
         trace!("wrote theme into db");
