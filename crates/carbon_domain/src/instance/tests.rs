@@ -5,11 +5,11 @@ mod test {
     use env_logger::Builder;
     use log::{debug, LevelFilter};
 
-    use carbon_minecraft::{instance, try_path_fmt};
-    use carbon_minecraft::instance::{Instance, InstanceStatus};
-    use carbon_minecraft::instance::delete::delete;
-    use carbon_minecraft::instance::scan::check_instance_directory_sanity;
-    use carbon_minecraft::instance::write::write_at;
+    use carbon_domain::{instance, try_path_fmt};
+    use carbon_domain::instance::{Instance, InstanceStatus};
+    use carbon_domain::instance::delete::delete;
+    use carbon_domain::instance::scan::check_instance_directory_sanity;
+    use carbon_domain::instance::write::write_at;
 
     #[tokio::test]
     #[tracing_test::traced_test]

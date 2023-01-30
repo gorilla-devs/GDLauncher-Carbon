@@ -24,9 +24,25 @@ At this point make sure you have pnpm installed:
 
 ## Development
 
+### Run app in dev mode
+
 To run in dev please run
 
 `pnpm dev-app`
+
+### Build native code
+
+To build native code please run
+
+`pnpm build-core`
+
+### Generate DB migration
+
+To generate a new migration please run
+
+`cargo prisma-migrate --name [migration_name]`
+
+Replace `[migration_name]` with the name of the migration you want to create.
 
 ## Test
 
