@@ -154,7 +154,7 @@ const ResourcePacks = () => {
     <div>
       <div
         id="inline-inner-container"
-        class="flex flex-col sticky top-35 bg-shade-8 z-20 pt-10 transition-all duration-100 ease-in-out"
+        class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-10 transition-all duration-100 ease-in-out"
       >
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
