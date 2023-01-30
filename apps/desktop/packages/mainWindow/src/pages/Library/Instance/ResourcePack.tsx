@@ -1,6 +1,4 @@
 import { Checkbox, Switch } from "@gd/ui";
-import forgeIcon from "/assets/images/icons/forge.png";
-import vanillaIcon from "/assets/images/icons/vanilla.png";
 
 interface IResourcePack {
   title: string;
