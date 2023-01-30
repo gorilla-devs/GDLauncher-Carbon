@@ -28,6 +28,14 @@ const Instance = () => {
       label: "Resource Packs",
       path: `/library/${id}/resourcepacks`,
     },
+    {
+      label: "Screenshots",
+      path: `/library/${id}/screenshots`,
+    },
+    {
+      label: "Versions",
+      path: `/library/${id}/versions`,
+    },
   ];
 
   const selectedIndex = () =>
@@ -169,7 +177,7 @@ const Instance = () => {
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185 bg-shade-8">
             <div
-              class="sticky -top-1 z-10 flex flex-col bg-shade-8"
+              class="sticky -top-1 z-10 flex flex-col bg-shade-8 mb-2"
               ref={(el) => {
                 ref = el;
               }}
@@ -208,6 +216,22 @@ const Instance = () => {
                         </div>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0 z-10">
+                        <div
+                          class="rounded-full w-8 h-8 flex justify-center items-center"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.1)",
+                          }}
+                        >
+                          <div class="i-ri:more-2-fill text-xl" />
+                        </div>
+                        <div
+                          class="rounded-full w-8 h-8 flex justify-center items-center"
+                          style={{
+                            background: "rgba(255, 255, 255, 0.1)",
+                          }}
+                        >
+                          <div class="i-ri:star-s-fill text-xl" />
+                        </div>
                         <Button uppercase variant="glow" size="small">
                           <Trans
                             key="play"
