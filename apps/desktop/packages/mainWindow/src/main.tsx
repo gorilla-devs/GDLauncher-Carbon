@@ -1,5 +1,4 @@
 /* @refresh reload */
-import { onMount } from "solid-js";
 import { Portal, render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
@@ -29,16 +28,14 @@ loadLanguageFile(DEFAULT_LANG).then((langFile) => {
 });
 
 render(() => {
-  onMount(() => {
-    window.napiLoaded
-      .then(() => {
-        window.clearLoading();
-      })
-      .catch((e) => {
-        console.error(e);
-        window.fatalError("Failed to load native core");
-      });
-  });
+  window.napiLoaded
+    .then(() => {
+      window.clearLoading();
+    })
+    .catch((e) => {
+      console.error(e);
+      window.fatalError("Failed to load native core");
+    });
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
