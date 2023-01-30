@@ -207,7 +207,7 @@ const Instance = () => {
                           ATMTeam
                         </div>
                       </div>
-                      <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                      <div class="flex items-center gap-2 mt-2 lg:mt-0 z-10">
                         <Button uppercase variant="glow" size="small">
                           <Trans
                             key="play"
