@@ -1,7 +1,7 @@
 pub mod app;
 pub mod instance;
-mod minecraft_mod;
-mod minecraft_package;
+pub mod minecraft_mod;
+pub mod minecraft_package;
 pub mod modloader;
 
 #[macro_export]

@@ -43,6 +43,7 @@ pub(crate) struct ConfigurationManager {
 }
 
 impl ConfigurationManager {
+    
     pub fn make_for_app(app: &Arc<RwLock<App>>) -> ConfigurationManager {
         ConfigurationManager {
             app: Arc::downgrade(app),

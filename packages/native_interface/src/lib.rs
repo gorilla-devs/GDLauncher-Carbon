@@ -2,7 +2,7 @@ use rspc::RouterBuilderLike;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
-use carbon_bindings::app::{App, GlobalContext};
+use carbon_bindings::app::{App, AppContainer};
 
 mod codegen_bindings;
 
@@ -23,7 +23,7 @@ fn init_core() {
 async fn start_router() {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<GlobalContext>> = carbon_bindings::api::build_rspc_router()
+    let router: Arc<rspc::Router<AppContainer>> = carbon_bindings::api::build_rspc_router()
         .expose()
         .build()
         .arced();

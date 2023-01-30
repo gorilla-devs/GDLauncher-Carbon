@@ -1,5 +1,8 @@
 mod persistence;
 mod configuration;
+mod instance;
+mod java;
+mod minecraft_mod;
 
 use std::sync::Arc;
 use rspc::{ErrorCode, Router, RouterBuilderLike};
@@ -8,10 +11,11 @@ use tokio::sync::{broadcast, RwLock, RwLockReadGuard};
 use tokio::sync::broadcast::error::RecvError;
 use crate::api::InvalidationEvent;
 use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
+use crate::app::instance::InstanceManager;
 use crate::app::persistence::PersistenceManager;
 
-pub type GlobalContext = Arc<RwLock<App>>;
-type AppComponentContainer<M> = Option<RwLock<M>>;
+pub type AppContainer = Arc<RwLock<App>>;
+type AppComponentContainer<M> = Arc<Option<RwLock<M>>>;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -20,7 +24,7 @@ pub enum AppError {
 }
 
 pub struct App {
-    //instances: Instances,
+    instance_manager: AppComponentContainer<InstanceManager>,
     configuration_manager: AppComponentContainer<ConfigurationManager>,
     persistence_manager: AppComponentContainer<PersistenceManager>,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
@@ -28,17 +32,20 @@ pub struct App {
 
 
 impl App {
-    pub async fn new_with_invalidation_channel(invalidation_channel: broadcast::Sender<InvalidationEvent>) -> GlobalContext
+    pub async fn new_with_invalidation_channel(invalidation_channel: broadcast::Sender<InvalidationEvent>) -> AppContainer
     {
         let app = Arc::new(RwLock::new(App {
+            instance_manager: None,
             configuration_manager: None,
             persistence_manager: None,
             invalidation_channel,
         }));
         let persistence_manager = PersistenceManager::make_for_app(&app).await;
         let configuration_manager = ConfigurationManager::make_for_app(&app);
+        let instance_manager = InstanceManager::make_for_app(&app);
         app.write().await.persistence_manager = Some(RwLock::new(persistence_manager));
         app.write().await.configuration_manager = Some(RwLock::new(configuration_manager));
+        app.write().await.instance_manager = Some(RwLock::new(instance_manager));
         app
     }
 
@@ -60,6 +67,15 @@ impl App {
         )
     }
 
+    pub(crate) async fn get_instance_manager(&self) -> Result<RwLockReadGuard<InstanceManager>, AppError>
+    {
+        Ok(
+            self.instance_manager.as_ref()
+                .ok_or_else(|| AppError::ManagerNotFound("".to_string()))?
+                .read().await
+        )
+    }
+    
     pub fn invalidate(&self, key: impl Into<String>, args: Option<serde_json::Value>) {
         match self.invalidation_channel.send(InvalidationEvent::new(key, args))
         {
@@ -103,10 +119,10 @@ impl Into<rspc::Error> for ConfigurationManagerError {
 }
 
 
-pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
+pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
     Router::new()
         .query("getTheme", |t| {
-            t(|app: GlobalContext, _args: ()| async move {
+            t(|app: AppContainer, _args: ()| async move {
                 let app = app.read().await;
                 let configuration_manager = app.get_configuration_manager().await
                     .map_err(|error| rspc::Error::new(
@@ -118,7 +134,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             })
         })
         .mutation("setTheme", |t| {
-            t(|app: GlobalContext, new_theme: String| async move {
+            t(|app: AppContainer, new_theme: String| async move {
                 let app = app.read().await;
                 let configuration_manager = app.get_configuration_manager().await
                     .map_err(|error| rspc::Error::new(

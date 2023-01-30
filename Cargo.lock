@@ -381,6 +381,7 @@ dependencies = [
  "axum",
  "carbon_java_manager",
  "carbon_macro",
+ "carbon_minecraft",
  "env_logger",
  "log",
  "prisma-client-rust",

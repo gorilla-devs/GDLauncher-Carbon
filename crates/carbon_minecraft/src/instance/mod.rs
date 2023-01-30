@@ -12,12 +12,14 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Duration;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum InstanceStatus {
-    Persisted(PathBuf),
     NotPersisted,
+    Installing,
+    Ready(PathBuf),
 }
 
 impl Default for InstanceStatus {
@@ -26,10 +28,13 @@ impl Default for InstanceStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Instance {
     pub name: String,
-    pub uuid: String,
+    pub id: u128,
+    pub played_time: Duration,
+    pub last_played: std::time::SystemTime,
+    pub notes: String,
     pub minecraft_package: MinecraftPackage,
     pub persistence_status: InstanceStatus,
 }
@@ -38,7 +43,10 @@ impl Instance {
     fn new(mc_version: impl Into<String>) -> Self {
         Instance {
             name: String::from("Unnamed Instance"),
-            uuid: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4().to_string(),
+            played_time: Default::default(),
+            last_played: (),
+            notes: "".to_string(),
             minecraft_package: MinecraftPackage::new(mc_version),
             persistence_status: InstanceStatus::default(),
         }
@@ -67,7 +75,7 @@ impl From<&Instance> for InstanceConfigurationFile {
             minecraft_package_configuration: MinecraftPackageConfigurationFile {
                 version: value.minecraft_package.version.clone(),
                 description: value.minecraft_package.description.clone(),
-                modloader: value.minecraft_package.modloader.clone(),
+                modloader: value.minecraft_package.modloaders.clone(),
             },
         }
     }
