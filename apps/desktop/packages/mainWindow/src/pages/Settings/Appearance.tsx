@@ -40,7 +40,7 @@ const Appearance = () => {
               shade3="fill-[#333947]"
             />
             <div class="flex justify-start gap-2 items-center w-full py-1 px-2 box-border">
-              <Show when={true}>
+              <Show when={themeName() === "default"}>
                 <div class="i-ri:check-fill text-shade-0" />
               </Show>
               <p class="m-0 text-shade-0">

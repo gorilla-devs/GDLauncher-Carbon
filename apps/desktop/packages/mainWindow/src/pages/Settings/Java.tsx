@@ -1,10 +1,9 @@
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Java as JavaType } from "@gd/native_interface/bindings";
 import { Button } from "@gd/ui";
 import { useNavigate, useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
-import { createStore } from "solid-js/store";
+import SettingsJavaData from "./settings.java.data";
 
 interface JavaObj {
   id: string;
@@ -12,22 +11,12 @@ interface JavaObj {
   type: string;
   version: string;
 }
-interface DefaultJavasObj extends JavaObj {
-  majorVersion: string;
-}
-
-interface RouteData {
-  data: {
-    data: { [key: number]: JavaType };
-  };
-}
 
 const Java = () => {
-  const [defaultJavas, setDefaultJavas] = createStore<DefaultJavasObj[]>([]);
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
-  const routeData: RouteData = useRouteData();
+  const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
-  const javas: () => { [key: number]: JavaType } = () => javasData()?.data;
+  const javas = () => javasData()?.data || [];
   const navigate = useNavigate();
 
   let mutation = rspc.createMutation(["java.setDefault"], {
@@ -40,14 +29,7 @@ const Java = () => {
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
       const defaultId = javaObj.default_id;
-      const javaDefaultVersion = java[1]?.java.find((j) => j.id === defaultId);
-      let newObj: any = javaDefaultVersion;
       setDefaultJavasIds((prev) => [...prev, defaultId]);
-      newObj.majorVersion = java[0];
-      setDefaultJavas((prev) => {
-        const filteredPrev = prev.filter((j) => j.id !== newObj.id);
-        return [...filteredPrev, newObj];
-      });
     });
   });
 
