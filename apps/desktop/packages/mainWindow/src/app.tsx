@@ -1,4 +1,4 @@
-import { Component, onMount, Show, Suspense } from "solid-js";
+import { Component, createEffect, onMount, Show, Suspense } from "solid-js";
 import { useRoutes, useNavigate } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
