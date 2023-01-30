@@ -1,8 +1,9 @@
+/* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
-import { For } from "solid-js";
+import { For, createEffect, onCleanup, onMount } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 type InstancePage = {
@@ -31,6 +32,43 @@ const Instance = () => {
 
   const selectedIndex = () =>
     getRouteIndex(instancePages, location.pathname, true);
+
+  let ref: HTMLDivElement;
+  let observer: ResizeObserver;
+
+  onMount(() => {
+    observer = new IntersectionObserver(
+      ([e]) => {
+        const btn = document.getElementById("inline-back-btn");
+
+        if (e.intersectionRatio < 1) {
+          if (btn) {
+            btn.classList.remove("hidden");
+            btn.classList.add("flex");
+            btn.classList.remove("opacity-100");
+            btn.classList.add("mt-4");
+          }
+        } else {
+          if (btn) {
+            btn.classList.add("hidden");
+            btn.classList.remove("flex");
+            btn.classList.remove("opacity-0");
+            btn.classList.remove("mt-0");
+          }
+        }
+      },
+      { threshold: [1] }
+    );
+
+    console.log("REF", ref);
+    if (ref) observer.observe(ref);
+
+    observer.observe(ref!);
+  });
+
+  onCleanup(() => {
+    observer.disconnect();
+  });
 
   return (
     <div
@@ -80,15 +118,15 @@ const Instance = () => {
                   <div class="flex flex-col lg:flex-row justify-between">
                     <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
-                        {/* Forge 1.19.2 */}
+                        Forge 1.19.2
                       </div>
                       <div class="p-0 lg:px-4 border-0 lg:border-r-2 border-shade-5 flex gap-2 items-center">
                         <div class="i-ri:time-fill" />
-                        {/* 1d ago */}
+                        1d ago
                       </div>
                       <div class="p-0 lg:px-4 flex gap-2 items-center">
                         <div class="i-ri:user-fill" />
-                        {/* ATMTeam */}
+                        ATMTeam
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
@@ -127,7 +165,30 @@ const Instance = () => {
       <div class="min-h-lg lg:mt-64 bg-shade-8">
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185 bg-shade-8">
-            <div class="sticky top-0 z-10">
+            <div
+              class="sticky -top-1 z-10 flex bg-shade-8"
+              ref={(el) => {
+                ref = el;
+              }}
+            >
+              <div
+                id="inline-back-btn"
+                class="h-fit justify-center items-center mr-4 hidden transition duration-100 ease-in-out"
+              >
+                <Button
+                  onClick={() => navigate("/library")}
+                  icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
+                  size="small"
+                  variant="transparent"
+                >
+                  <Trans
+                    key="back"
+                    options={{
+                      defaultValue: "back",
+                    }}
+                  />
+                </Button>
+              </div>
               <Tabs index={selectedIndex()}>
                 <TabList>
                   <For each={instancePages}>

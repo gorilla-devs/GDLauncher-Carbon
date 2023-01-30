@@ -152,7 +152,7 @@ const NoMods = () => {
 const Mods = () => {
   return (
     <div>
-      <div class="flex flex-col sticky top-14 bg-shade-8 z-20 pt-10">
+      <div class="flex flex-col sticky top-13 bg-shade-8 z-20 pt-10">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
