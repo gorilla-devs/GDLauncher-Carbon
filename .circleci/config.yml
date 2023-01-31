@@ -166,12 +166,12 @@ jobs:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - ~/rust_target
+            - ~/project/rust_target
       - save_cache:
           name: Save Pnpm Package Cache
           key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - ~//node_modules
+            - ~/project/node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
