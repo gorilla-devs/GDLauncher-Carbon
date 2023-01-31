@@ -151,7 +151,7 @@ jobs:
             rustc --version | Out-File -FilePath "rust-version"
       - run:
           command: |
-            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            source "$HOME/.cargo/env"
             npm i -g pnpm
             pnpm i
           shell: bash.exe
@@ -160,17 +160,17 @@ jobs:
           shell: bash.exe
       - run:
           command: |
-            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            source "$HOME/.cargo/env"
             pnpm build-win-x64
           shell: bash.exe
       - run:
           command: |
-            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            source "$HOME/.cargo/env"
             pnpm lint
           shell: bash.exe
       - run:
           command: |
-            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            source "$HOME/.cargo/env"
             pnpm test
           shell: bash.exe
       - save_cache:
