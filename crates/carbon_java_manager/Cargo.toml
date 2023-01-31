@@ -3,20 +3,23 @@ name = "carbon_java_manager"
 version = "0.0.0"
 edition = "2021"
 
+[lib]
+crate-type = ["lib"]
+
 [dependencies]
-thiserror = "1.0.38"
-serde = { version = "1.0.152", features = ["derive", "rc"] }
-serde_json = "1.0.91"
-regex = "1.7.0"
-tracing = "0.1.37"
-tokio = { version = "1.23.1", features = ["full"] }
-reqwest = { version = "0.11.13", features = ["json", "stream"] }
-futures = { version = "0.3.25" }
-sha2 = "0.10.6"
-async-trait = "0.1.61"
-chrono = "0.4.23"
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+serde_json = { workspace = true }
+regex = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+reqwest = { workspace = true, features = ["json", "stream"] }
+futures = { workspace = true }
+sha2 = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
 carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.10.1"
+winreg = { workspace = true }

@@ -3,23 +3,28 @@ name = "carbon_app"
 version = "0.0.0"
 edition = "2021"
 
+[lib]
+crate-type = ["lib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thiserror = "1.0.38"
-env_logger = "0.10.0"
-log = "0.4.17"
-serde = { version = "1.0.147", features = ["derive", "rc"] }
-serde_json = "1.0.91"
-tracing-test = "0.2.3"
-anyhow = "1.0.51"
-tokio = { version = "1.22.0", features = ["full"] }
-rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46" }
-tracing = "0.1.37"
-async-stream = "0.3.3"
-tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
-axum = { version = "0.6.2", features = ["ws"] }
-carbon_macro ={ path = "../carbon_macro" }
-carbon_java_manager ={ path = "../carbon_java_manager" }
-prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
-
+thiserror = { workspace = true }
+env_logger = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+serde_json = { workspace = true }
+tracing-test = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+rspc = { workspace = true }
+tracing = { workspace = true }
+async-stream = { workspace = true }
+axum = { workspace = true, features = ["ws"] }
+carbon_macro = { path = "../carbon_macro" }
+carbon_java_manager = { path = "../carbon_java_manager" }
+prisma-client-rust = { workspace = true, features = [
+    "sqlite-create-many",
+    "sqlite",
+    "migrations",
+], default_features = false }

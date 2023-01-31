@@ -11,5 +11,8 @@
   "rust-analyzer.checkOnSave.command": "clippy",
   "[prisma]": {
     "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
   }
 }

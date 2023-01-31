@@ -41,10 +41,6 @@ jobs:
                 name: Restore Cargo Package Cache
                 keys:
                   - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-mac
-            - restore_cache:
-                name: Restore Pnpm Package Cache
-                keys:
-                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-mac
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
@@ -62,11 +58,6 @@ jobs:
                 key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-mac
                 paths:
                   - rust_target
-            - save_cache:
-                name: Save Pnpm Package Cache
-                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-mac
-                paths:
-                  - node_modules
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -80,10 +71,6 @@ jobs:
                 name: Restore Cargo Package Cache
                 keys:
                   - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-macm1
-            - restore_cache:
-                name: Restore Pnpm Package Cache
-                keys:
-                  - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-macm1
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
@@ -102,11 +89,6 @@ jobs:
                 key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-macm1
                 paths:
                   - rust_target
-            - save_cache:
-                name: Save Pnpm Package Cache
-                key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-macm1
-                paths:
-                  - node_modules
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -121,10 +103,6 @@ jobs:
           name: Restore Cargo Package Cache
           keys:
             - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
-      - restore_cache:
-          name: Restore Pnpm Package Cache
-          keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
       - run:
           name: Install NVM
           shell: powershell.exe
@@ -149,32 +127,35 @@ jobs:
             node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          npm i -g pnpm
-          pnpm i
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            npm i -g pnpm
+            pnpm i
+          shell: bash.exe
       - run:
           command: chmod -R a+x node_modules
           shell: bash.exe
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm build-win-x64
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm lint
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm test
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            pnpm build-win-x64
+          shell: bash.exe
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            pnpm lint
+          shell: bash.exe
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            pnpm test
+          shell: bash.exe
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
             - ~/project/rust_target
-      - save_cache:
-          name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
-          paths:
-            - ~/project/node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -201,10 +182,6 @@ jobs:
           name: Restore Cargo Package Cache
           keys:
             - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-testdocker
-      - restore_cache:
-          name: Restore Pnpm Package Cache
-          keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-testdocker
       - run: |
           node -v
           cargo --version
@@ -222,11 +199,6 @@ jobs:
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-testdocker
           paths:
             - rust_target
-      - save_cache:
-          name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-testdocker
-          paths:
-            - node_modules
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -236,10 +208,6 @@ jobs:
           name: Restore Cargo Package Cache
           keys:
             - cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-linux
-      - restore_cache:
-          name: Restore Pnpm Package Cache
-          keys:
-            - pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-linux
       - run: |
           node -v
           cargo --version
@@ -255,11 +223,6 @@ jobs:
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-linux
           paths:
             - rust_target
-      - save_cache:
-          name: Save Pnpm Package Cache
-          key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-linux
-          paths:
-            - node_modules
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
