@@ -591,26 +591,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "core"
-version = "0.1.0"
-dependencies = [
- "axum",
- "carbon_app",
- "carbon_domain",
- "directories",
- "dotenv",
- "napi",
- "napi-build",
- "napi-derive",
- "reqwest",
- "rspc",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2058,6 +2038,26 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
+]
+
+[[package]]
+name = "native_interface"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "carbon_app",
+ "carbon_domain",
+ "directories",
+ "dotenv",
+ "napi",
+ "napi-build",
+ "napi-derive",
+ "reqwest",
+ "rspc",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower-http",
 ]
 
 [[package]]
