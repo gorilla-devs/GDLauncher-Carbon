@@ -149,22 +149,30 @@ jobs:
             node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          npm i -g pnpm
-          pnpm i
+      - run:
+          command: |
+            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            npm i -g pnpm
+            pnpm i
+          shell: bash.exe
       - run:
           command: chmod -R a+x node_modules
           shell: bash.exe
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm build-win-x64
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm lint
-      - run: |
-          $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
-          pnpm test
+      - run:
+          command: |
+            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            pnpm build-win-x64
+          shell: bash.exe
+      - run:
+          comand: |
+            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            pnpm lint
+          shell: bash.exe
+      - run:
+          command: |
+            $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
+            pnpm test
+          shell: bash.exe
       - save_cache:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
