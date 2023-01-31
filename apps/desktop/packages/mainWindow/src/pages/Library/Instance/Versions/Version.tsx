@@ -1,5 +1,6 @@
 import { Trans } from "@gd/i18n";
 import { Show } from "solid-js";
+import { format } from "date-fns";
 
 type TypeProps = {
   title: string;
@@ -48,11 +49,14 @@ const Version = (props: Props) => {
         <div class="flex gap-4 justify-between items-center">
           <div class="flex items-center gap-2">
             <div class="flex flex-col">
-              {props.version.title}
+              <p class="mt-0 mb-2">{props.version.title}</p>
               <div class="flex gap-2">
                 <div class="m-0 text-shade-3 text-sm flex items-center gap-2">
                   {props.version.modloader} {props.version.mcversion}
-                  <div class="h-2 w-px bg-shade-3" /> {props.version.date}
+                  <div class="h-2 w-px bg-shade-3" />
+                  <p class="m-0 text-shade-3 text-md">
+                    {format(new Date(props.version.date), "dd-MM-yyyy")}
+                  </p>
                   <div class="h-2 w-px bg-shade-3" />
                   <span class={getColor(props.version.stable)}>
                     {props.version.stable}

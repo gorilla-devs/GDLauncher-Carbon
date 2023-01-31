@@ -1,16 +1,16 @@
 import { Checkbox, Switch } from "@gd/ui";
 
-interface IResourcePack {
+type IResourcePack = {
   title: string;
   enabled: boolean;
   mcversion: string;
   modloaderVersion: string;
   resourcePackVersion: string;
-}
+};
 
-interface Props {
+type Props = {
   resourcePack: IResourcePack;
-}
+};
 
 const ResourcePack = (props: Props) => {
   return (

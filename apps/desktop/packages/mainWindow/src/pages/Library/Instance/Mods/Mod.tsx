@@ -3,17 +3,17 @@ import forgeIcon from "/assets/images/icons/forge.png";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
 
 type Modloader = "forge" | "vanilla" | "fabric";
-interface ModType {
+type ModType = {
   title: string;
   enabled: boolean;
   modloader: Modloader;
   mcversion: string;
   modloaderVersion: string;
-}
+};
 
-interface Props {
+type Props = {
   mod: ModType;
-}
+};
 
 const getIcon = (modloader: Modloader) => {
   switch (modloader) {

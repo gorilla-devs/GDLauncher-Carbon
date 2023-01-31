@@ -1,11 +1,10 @@
-/* eslint-disable i18next/no-literal-string */
-
 import { Trans } from "@gd/i18n";
 import { Checkbox } from "@gd/ui";
 import { For, Show, createEffect } from "solid-js";
 import screenshot1 from "/assets/images/screenshot-1.jpg";
 import pictureImage from "/assets/images/icons/picture.png";
 import { createStore } from "solid-js/store";
+import { format } from "date-fns";
 
 type ScreenshotsType = {
   img: string;
@@ -183,8 +182,10 @@ const Screenshots = () => {
                       <div class="flex flex-col">
                         <img class="w-60 h-32" src={screenshot.img} />
                         <div class="flex justify-between items-center mt-2">
-                          <p class="m-0">{screenshot.date}</p>
-                          <div class="i-ri:more-2-fill text-shade-5" />
+                          <p class="m-0 text-shade-0 text-md">
+                            {format(new Date(screenshot.date), "dd-MM-yyyy")}
+                          </p>
+                          <div class="i-ri:more-2-fill text-shade-0" />
                         </div>
                       </div>
                     )}

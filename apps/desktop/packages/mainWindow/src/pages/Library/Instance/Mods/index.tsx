@@ -6,7 +6,7 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 
 type Modloader = "forge" | "vanilla" | "fabric";
 
-type IMod = {
+type ModType = {
   title: string;
   enabled: boolean;
   modloader: Modloader;
@@ -14,7 +14,7 @@ type IMod = {
   modloaderVersion: string;
 };
 
-const mods: IMod[] = [
+const mods: ModType[] = [
   {
     title: "Mods1",
     enabled: true,

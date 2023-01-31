@@ -5,13 +5,13 @@ import { Trans } from "@gd/i18n";
 import ResourcePack from "./ResourcePack";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
-interface IResourcepack {
+type IResourcepack = {
   title: string;
   enabled: boolean;
   mcversion: string;
   modloaderVersion: string;
   resourcePackVersion: string;
-}
+};
 
 const resourcePacks: IResourcepack[] = [
   {
