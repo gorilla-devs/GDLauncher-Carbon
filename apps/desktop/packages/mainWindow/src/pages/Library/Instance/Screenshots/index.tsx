@@ -23,19 +23,19 @@ const screenshots: ScreenshotsType[] = [
   },
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-28T09:20:53.513Z",
   },
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-29T09:20:53.513Z",
   },
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-30T09:20:53.513Z",
   },
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-29T09:20:53.513Z",
   },
 ];
 
@@ -84,7 +84,7 @@ const Screenshots = () => {
       });
     });
     const sortedScreenshots = filteredscreenshots.sort(
-      (a, b) => (a.timestamp as any) - (b.timestamp as any)
+      (a, b) => (b.timestamp as any) - (a.timestamp as any)
     );
 
     const hashmapDates = new Map();
@@ -107,7 +107,8 @@ const Screenshots = () => {
     const parsedDays = Number.parseInt(days, 10);
     if (parsedDays === 0) return "Today";
     else if (parsedDays === 1) return "Yesterday";
-    else if (parsedDays > 1 && parsedDays < 30) return `${days} days ago`;
+    else if (parsedDays > 1 && parsedDays < 30)
+      return `${Math.floor(parsedDays)} days ago`;
     else if (parsedDays >= 30 && parsedDays < 365)
       return `${Math.floor(parsedDays / 30)} months ago`;
     else if (parsedDays >= 365)
@@ -120,7 +121,7 @@ const Screenshots = () => {
         id="inline-inner-container"
         class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-2 transition-all duration-100 ease-in-out"
       >
-        <div class="flex justify-between text-shade-0 mb-6 z-10">
+        <div class="flex justify-between text-shade-0 mb-5 z-10">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
@@ -159,8 +160,8 @@ const Screenshots = () => {
               />
             </div>
           </div>
-          <div>
-            {screenshots.length}
+          <div class="flex gap-2">
+            <p class="m-0">{screenshots.length}</p>
             <Trans
               key="screenshots"
               options={{
@@ -170,7 +171,7 @@ const Screenshots = () => {
           </div>
         </div>
       </div>
-      <div class="h-full overflow-y-hidden">
+      <div class="h-full overflow-y-hidden flex flex-col gap-10">
         <Show when={screenshots.length > 0} fallback={<NoMods />}>
           <For each={Object.entries(filteredScreenshots)}>
             {([days, screenshots]) => (
