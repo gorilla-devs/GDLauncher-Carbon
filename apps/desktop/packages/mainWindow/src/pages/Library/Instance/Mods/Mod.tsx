@@ -3,7 +3,7 @@ import forgeIcon from "/assets/images/icons/forge.png";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
 
 type Modloader = "forge" | "vanilla" | "fabric";
-interface IMod {
+interface ModType {
   title: string;
   enabled: boolean;
   modloader: Modloader;
@@ -12,7 +12,7 @@ interface IMod {
 }
 
 interface Props {
-  mod: IMod;
+  mod: ModType;
 }
 
 const getIcon = (modloader: Modloader) => {

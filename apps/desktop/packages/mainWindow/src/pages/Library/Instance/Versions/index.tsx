@@ -4,7 +4,7 @@ import { Trans } from "@gd/i18n";
 import Version from "./Version";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
-type TypeVersion = {
+type VersionType = {
   title: string;
   mcversion: string;
   modloader: string;
@@ -13,7 +13,7 @@ type TypeVersion = {
   isActive: boolean;
 };
 
-const versions: TypeVersion[] = [
+const versions: VersionType[] = [
   {
     title: "Mods1",
     mcversion: "1.19.2",

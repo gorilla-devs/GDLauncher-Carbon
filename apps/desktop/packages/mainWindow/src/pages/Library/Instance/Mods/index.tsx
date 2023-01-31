@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
@@ -6,13 +5,14 @@ import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
 type Modloader = "forge" | "vanilla" | "fabric";
-interface IMod {
+
+type IMod = {
   title: string;
   enabled: boolean;
   modloader: Modloader;
   mcversion: string;
   modloaderVersion: string;
-}
+};
 
 const mods: IMod[] = [
   {
@@ -229,7 +229,15 @@ const Mods = () => {
               />
             </div>
           </div>
-          <div>{mods.length} Resource packs</div>
+          <div>
+            {mods.length}{" "}
+            <Trans
+              key="mods"
+              options={{
+                defaultValue: "Mods",
+              }}
+            />
+          </div>
         </div>
       </div>
       <div class="h-full overflow-y-hidden">
