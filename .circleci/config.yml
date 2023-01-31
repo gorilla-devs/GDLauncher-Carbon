@@ -7,11 +7,11 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.66.0-browsers
+      - image: cimg/rust:1.67.0-browsers
     resource_class: large
   website:
     docker:
-      - image: cimg/rust:1.66.0-node
+      - image: cimg/rust:1.67.0-node
     resource_class: small
   mac:
     macos:
@@ -48,9 +48,6 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0-x86_64-apple-darwin
-
-                rustup default 1.66.0-x86_64-apple-darwin
             - run: |
                 node -v
                 cargo --version
@@ -90,9 +87,7 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-                rustup install 1.66.0-aarch64-apple-darwin
 
-                rustup default 1.66.0-aarch64-apple-darwin
             - run: |
                 node -v
                 cargo --version
@@ -119,7 +114,7 @@ jobs:
     working_directory: ./
     executor:
       name: win/default
-      size: medium
+      size: large
     steps:
       - checkout
       - restore_cache:
@@ -150,10 +145,6 @@ jobs:
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
 
-            rustup install 1.66.0-x86_64-pc-windows-msvc
-
-            rustup default 1.66.0-x86_64-pc-windows-msvc
-
             rustc -Vv
             node -v
             cargo --version
@@ -162,6 +153,9 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
+      - run:
+          command: chmod -R a+x node_modules
+          shell: bash.exe
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm build-win-x64
@@ -175,12 +169,12 @@ jobs:
           name: Save Cargo Package Cache
           key: cargo-{{ checksum "Cargo.lock" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - rust_target
+            - ~/project/rust_target
       - save_cache:
           name: Save Pnpm Package Cache
           key: pnpm-{{ checksum "pnpm-lock.yaml" }}-{{ checksum ".circleci/config.yml" }}-win
           paths:
-            - node_modules
+            - ~/project/node_modules
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -273,7 +267,12 @@ workflows:
   every-commit:
     jobs:
       - buildWebsite
-      - testDocker
+      - testDocker:
+          filters:
+            branches:
+              ignore:
+                - master
+                - develop
   master-develop-builds:
     jobs:
       - buildMac:

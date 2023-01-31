@@ -40,7 +40,8 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip", "nsis"],
+    // target: ["dir", "zip", "nsis"],
+    target: ["dir"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -50,13 +51,14 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip", "dmg"],
+    // target: ["dir", "zip", "dmg"],
+    target: ["dir"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: isDockerBuild ? ["dir"] : ["dir", "zip"],
+    target: isDockerBuild ? ["dir"] : ["dir"],
     artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
   beforePack: async (context) => {
