@@ -5,13 +5,6 @@ import { useNavigate, useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 
-interface JavaObj {
-  id: string;
-  path: string;
-  type: string;
-  version: string;
-}
-
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -69,8 +62,8 @@ const Java = () => {
               <div class="flex flex-col justify-start">
                 <h5 class="mt-0 mb-4 text-shade-5">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
-                  <For each={javas[1].java as []}>
-                    {(j: JavaObj) => (
+                  <For each={javas[1].java}>
+                    {(j) => (
                       <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
                         <p class="m-0">
                           <Trans
