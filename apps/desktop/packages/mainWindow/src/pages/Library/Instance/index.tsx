@@ -177,7 +177,7 @@ const Instance = () => {
         <div class="mt-52 lg:mt-64 p-6 flex justify-center">
           <div class="max-w-full w-185 bg-shade-8">
             <div
-              class="sticky -top-1 z-10 flex flex-col bg-shade-8 mb-2"
+              class="sticky -top-1 z-10 flex flex-col bg-shade-8 mb-4"
               ref={(el) => {
                 ref = el;
               }}
