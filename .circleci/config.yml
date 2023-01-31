@@ -16,11 +16,11 @@ executors:
   mac:
     macos:
       xcode: "14.1.0"
-    resource_class: large
+    resource_class: medium
   macm1:
     macos:
       xcode: "14.1.0"
-    resource_class: large
+    resource_class: medium
   windows: win/default
 
 jobs:
