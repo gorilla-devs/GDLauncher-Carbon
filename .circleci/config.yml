@@ -16,11 +16,11 @@ executors:
   mac:
     macos:
       xcode: "14.1.0"
-    resource_class: medium
+    resource_class: large
   macm1:
     macos:
       xcode: "14.1.0"
-    resource_class: medium
+    resource_class: large
   windows: win/default
 
 jobs:
@@ -114,7 +114,7 @@ jobs:
     working_directory: ./
     executor:
       name: win/default
-      size: medium
+      size: large
     steps:
       - checkout
       - restore_cache:
@@ -153,6 +153,9 @@ jobs:
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           npm i -g pnpm
           pnpm i
+      - run:
+          command: chmod -R a+x node_modules
+          shell: bash.exe
       - run: |
           $env:path += ";$env:userprofile\.cargo\bin;$env:appdata\npm"
           pnpm build-win-x64
