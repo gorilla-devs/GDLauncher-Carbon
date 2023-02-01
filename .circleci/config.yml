@@ -46,6 +46,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: pnpm codegen
             - run: pnpm build:mac-x64
             - run: pnpm lint
             - run: pnpm test
@@ -68,6 +69,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
+            - run: pnpm codegen
             - run: pnpm build:mac-arm64
             - run: pnpm lint
             - run: pnpm test
@@ -117,6 +119,11 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            pnpm codegen
+          shell: bash.exe
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
             pnpm build:win-x64
           shell: bash.exe
       - run:
@@ -158,8 +165,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm prisma:generate
-      - run: pnpm rspc-bindings:generate
+      - run: pnpm codegen
       - run: IS_DOCKER_TEST=true pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
@@ -176,6 +182,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
+      - run: pnpm codegen
       - run: pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test

@@ -26,9 +26,9 @@ At this point make sure you have pnpm installed:
 
 ### Run app in dev mode
 
-First of all you'll need to generate the prisma code. To do that run
+First of all you'll need to generate the prisma code and rspc bindings. To do that run
 
-`pnpm prisma:generate`
+`pnpm codegen`
 
 Now you can run the native core in watch mode
 
@@ -40,23 +40,15 @@ Now open a new terminal and run the actual app
 
 ## Production
 
-### Build Native Core
-
-To build native code please run
-
-`cd packages/core_module && pnpm build:[rust_target]`
-
-### Build Entire App
-
-`pnpm build:[target]`
+`pnpm build:{win|mac|linux}-{x64|arm64}`
 
 ### Generate DB migration
 
 To generate a new migration please run
 
-`pnpm prisma-migrate --name [migration_name]`
+`pnpm prisma-migrate --name {migration_name}`
 
-Replace `[migration_name]` with the name of the migration you want to create.
+Replace `{migration_name}` with the name of the migration you want to create.
 
 ## Test
 
@@ -69,7 +61,3 @@ To run tests please run
 To run lint please run
 
 `pnpm lint`
-
-## Release
-
-`pnpm build-{mac|win|linux}-{arm64|x64}`

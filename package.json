@@ -7,6 +7,7 @@
   "license": "ARR",
   "scripts": {
     "prebuild": "npm i -g pnpm@7.15.0 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i && pnpm build-web",
+    "codegen": "pnpm prisma:generate && rspc-bindings:generate",
     "watch:app": "turbo run dev --filter=!@gd/web --filter=!@gd/core_module",
     "watch:core": "cd packages/core_module && pnpm _watch_",
     "build:linux-x64": "cd packages/core_module && pnpm build:linux-x64 && cd ../../ && turbo run build --filter=!@gd/web --filter=!@gd/core_module -- --x64 --linux",
