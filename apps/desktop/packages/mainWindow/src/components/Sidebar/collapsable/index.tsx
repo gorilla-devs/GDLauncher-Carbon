@@ -10,7 +10,7 @@ const Collapsable = (props: Props) => {
 
   return (
     <div
-      class="w-full py-2 box-border overflow-hidden"
+      class="w-full py-2 box-border overflow-hidden flex flex-col"
       classList={{
         "h-auto": opened(),
         "h-8": !opened(),

@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { Input } from "@gd/ui";
+import { Button, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
@@ -33,6 +33,9 @@ const Sidebar = () => {
         <Collapsable title="VANILLA">test</Collapsable>
         <Collapsable title="FAVOURITED">test</Collapsable>
         <Collapsable title="CURSEFORGE">test</Collapsable>
+        <div class="absolute bottom-5 w-full flex justify-scratch">
+          <Button variant="outline">+ Add Instance</Button>
+        </div>
       </div>
     </SiderbarWrapper>
   );
