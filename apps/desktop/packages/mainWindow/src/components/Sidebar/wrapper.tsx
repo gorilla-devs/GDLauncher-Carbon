@@ -35,10 +35,10 @@ const SiderbarWrapper = (props: Props) => {
           <Show
             when={!isSidebarOpened()}
             fallback={
-              <span class="i-ri:arrow-right-s-line text-shade-5 text-3xl" />
+              <span class="i-ri:arrow-left-s-line text-shade-5 text-3xl" />
             }
           >
-            <span class="i-ri:arrow-left-s-line text-shade-5 text-3xl" />
+            <span class="i-ri:arrow-right-s-line text-shade-5 text-3xl" />
           </Show>
         </div>
       </Show>

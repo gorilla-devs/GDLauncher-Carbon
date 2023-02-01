@@ -1,19 +1,15 @@
+/* eslint-disable i18next/no-literal-string */
 import { Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
+import Collapsable from "./collapsable";
 
 const Sidebar = () => {
   return (
     <SiderbarWrapper noPadding>
-      <div
-        class="h-full w-full pt-5 pb-5"
-        classList={{
-          "pl-5": isSidebarOpened(),
-          "pl-3": !isSidebarOpened(),
-        }}
-      >
-        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)]">
+      <div class="h-full w-full pt-5 pb-5 px-3 box-border">
+        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}
             fallback={
@@ -23,17 +19,20 @@ const Sidebar = () => {
                   toggleSidebar();
                 }}
               >
-                <div class="i-ri:search-line text-shade-0" />
+                <div class="i-ri:search-line text-shade-5" />
               </div>
             }
           >
             <Input
               placeholder="Type Here"
               icon={<div class="i-ri:search-line" />}
-              class="w-full rounded-full text-shade-0"
+              class="w-full rounded-full"
             />
           </Show>
         </div>
+        <Collapsable title="VANILLA">test</Collapsable>
+        <Collapsable title="FAVOURITED">test</Collapsable>
+        <Collapsable title="CURSEFORGE">test</Collapsable>
       </div>
     </SiderbarWrapper>
   );
