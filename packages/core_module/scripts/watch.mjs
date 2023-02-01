@@ -1,12 +1,6 @@
-import os from "os";
 import { spawnSync } from "child_process";
 import chokidar from "chokidar";
-import targetMapping from "./targetMapping.mjs";
-
-await new Promise((r) => setTimeout(r, 350));
-
-const argPlatform = (process.argv[2] || "").split("-")[0];
-const argArch = (process.argv[2] || "").split("-")[1];
+import path from "path";
 
 function debounce(func, timeout) {
   let timer;
@@ -24,14 +18,8 @@ function debounce(func, timeout) {
 let debouncedFn = debounce(() => {
   console.log("Rebuilding native core");
   spawnSync(
-    "npm",
-    [
-      "run",
-      "_dev_",
-      "--",
-      "--target",
-      targetMapping[`${argPlatform || os.platform()}-${argArch || os.arch()}`],
-    ],
+    path.join(process.cwd(), "node_modules", ".bin", "napi"),
+    ["build"],
     {
       stdio: "inherit",
       shell: true,
@@ -44,6 +32,8 @@ let debouncedFn = debounce(() => {
 // This only works on Unix systems, as in windows you cannot delete a file while it's being used (core.node).
 // The workaround for windows would be to build the native core to a different file, and then reload the app
 // targetting the new file.
-chokidar.watch("./src", { ignoreInitial: true }).on("all", (event, path) => {
-  debouncedFn();
-});
+chokidar
+  .watch(["./src", "../../crates"], { ignoreInitial: false })
+  .on("all", (event, path) => {
+    debouncedFn();
+  });

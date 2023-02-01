@@ -5,7 +5,7 @@ module.exports = {
       path: "apps/desktop/dist/**/*.*",
     },
     {
-      path: "packages/native_interface/core.node",
+      path: "packages/core_module/core.node",
     },
   ],
   defaultCompression: "none",

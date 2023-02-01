@@ -1,5 +1,5 @@
 [workspace]
-members = ["packages/native_interface", "crates/*"]
+members = ["packages/core_module", "crates/*"]
 resolver = "2"
 
 [profile.release]
@@ -44,6 +44,7 @@ mockall = "0.11.3"
 env_logger = "0.10.0"
 temp-dir = "0.1.11"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd" }
+prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd" }
 anyhow = "1.0.51"
 async-stream = "0.3.3"
 flate2 = "1.0.25"

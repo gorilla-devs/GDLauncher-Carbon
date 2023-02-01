@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/solid-query";
 import { createClient, wsLink, createWSClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
-import type { Procedures } from "@gd/native_interface";
+import type { Procedures } from "@gd/core_module";
 
 const wsClient = createWSClient({
   url: "ws://localhost:4000/rspc/ws",

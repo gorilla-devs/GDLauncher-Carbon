@@ -16,8 +16,8 @@ importers:
     specifiers:
       '@aws-sdk/client-s3': ^3.241.0
       '@gd/config': workspace:*
+      '@gd/core_module': workspace:*
       '@gd/i18n': workspace:*
-      '@gd/native_interface': workspace:*
       '@gd/ui': workspace:*
       '@playwright/test': ^1.29.1
       '@rspc/client': ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
@@ -49,8 +49,8 @@ importers:
     devDependencies:
       '@aws-sdk/client-s3': 3.241.0
       '@gd/config': link:../../packages/config
+      '@gd/core_module': link:../../packages/core_module
       '@gd/i18n': link:../../packages/i18n
-      '@gd/native_interface': link:../../packages/native_interface
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.29.1
       '@rspc/client': 0.0.0-main-7c0a67c1
@@ -118,24 +118,6 @@ importers:
       unocss: 0.47.5_rollup@3.7.2+vite@3.2.5
       vite-plugin-solid: 2.5.0_solid-js@1.6.4+vite@3.2.5
 
-  crates/carbon_bindings:
-    specifiers: {}
-
-  crates/carbon_compression:
-    specifiers: {}
-
-  crates/carbon_java_manager:
-    specifiers: {}
-
-  crates/carbon_microsoft_auth:
-    specifiers: {}
-
-  crates/carbon_minecraft:
-    specifiers: {}
-
-  crates/carbon_net:
-    specifiers: {}
-
   packages/config:
     specifiers:
       '@iconify-json/heroicons': ^1.1.8
@@ -160,6 +142,16 @@ importers:
       typescript: 4.9.4
       unocss: 0.48.3_vite@4.0.4
 
+  packages/core_module:
+    specifiers:
+      '@gd/config': workspace:*
+      '@napi-rs/cli': ^2.14.1
+      chokidar: ^3.5.3
+    devDependencies:
+      '@gd/config': link:../config
+      '@napi-rs/cli': 2.14.1
+      chokidar: 3.5.3
+
   packages/i18n:
     specifiers:
       '@mbarzda/solid-i18next': ^1.2.0
@@ -173,16 +165,6 @@ importers:
       i18next: 22.1.5
       i18next-icu: 2.1.0_intl-messageformat@10.2.5
       intl-messageformat: 10.2.5
-
-  packages/native_interface:
-    specifiers:
-      '@gd/config': workspace:*
-      '@napi-rs/cli': ^2.14.1
-      chokidar: ^3.5.3
-    devDependencies:
-      '@gd/config': link:../config
-      '@napi-rs/cli': 2.14.1
-      chokidar: 3.5.3
 
   packages/ui:
     specifiers:
@@ -7682,10 +7664,10 @@ packages:
     resolution: {integrity: sha512-dQYDuqm/rmy8GSCE6Xl/3ShJg6Ab4bZJMT8KaTKGzT436gl1DN4REP3FCWfXoh75qGTJ+u+WsdnnpO9Jl8nyMA==}
     engines: {node: '>=14.0.0'}
     dependencies:
+      7zip-bin: 5.1.1
       '@develar/schema-utils': 2.6.5
       '@electron/universal': 1.2.1
       '@malept/flatpak-bundler': 0.4.0
-      7zip-bin: 5.1.1
       async-exit-hook: 2.0.1
       bluebird-lst: 1.0.9
       builder-util: 23.6.0
@@ -8595,9 +8577,9 @@ packages:
   /builder-util/23.6.0:
     resolution: {integrity: sha512-QiQHweYsh8o+U/KNCZFSvISRnvRctb8m/2rB2I1JdByzvNKxPeFLlHFRPQRXab6aYeXc18j9LpsDLJ3sGQmWTQ==}
     dependencies:
+      7zip-bin: 5.1.1
       '@types/debug': 4.1.7
       '@types/fs-extra': 9.0.13
-      7zip-bin: 5.1.1
       app-builder-bin: 4.0.0
       bluebird-lst: 1.0.9
       builder-util-runtime: 9.1.1
@@ -19263,7 +19245,7 @@ packages:
       vite:
         optional: true
     dependencies:
-      vite: 3.2.5_sass@1.56.2
+      vite: 3.2.5
     dev: true
 
   /vitest/0.26.3_jsdom@20.0.3:

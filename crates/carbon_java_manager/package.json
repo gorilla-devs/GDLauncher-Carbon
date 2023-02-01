@@ -1,7 +1,0 @@
-{
-  "name": "@gd/carbon_java_manager",
-  "scripts": {
-    "test": "cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo test -- --nocapture",
-    "lint": "cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo clippy --all-targets --all-features -- -D warnings"
-  }
-}

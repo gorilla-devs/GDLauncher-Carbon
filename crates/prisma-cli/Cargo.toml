@@ -6,4 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
+prisma-client-rust-cli = { workspace = true, features = [
+    "sqlite-create-many",
+    "sqlite",
+    "migrations",
+], default_features = false }
