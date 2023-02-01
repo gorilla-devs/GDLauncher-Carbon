@@ -33,6 +33,7 @@ First of all you'll need to generate the prisma code and rspc bindings. To do th
 Now you can run the native core in watch mode
 
 `pnpm watch:core`
+Note: Core module hot reload doesn't currently work on windows
 
 Now open a new terminal and run the actual app
 

@@ -556,7 +556,6 @@ dependencies = [
 name = "carbon_app"
 version = "0.0.0"
 dependencies = [
- "anyhow",
  "async-stream",
  "axum",
  "carbon_java_manager",
