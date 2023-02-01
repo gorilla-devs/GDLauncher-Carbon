@@ -1,5 +1,6 @@
 import { spawnSync } from "child_process";
 import chokidar from "chokidar";
+import path from "path";
 
 function debounce(func, timeout) {
   let timer;
@@ -16,10 +17,14 @@ function debounce(func, timeout) {
 
 let debouncedFn = debounce(() => {
   console.log("Rebuilding native core");
-  spawnSync("./node_modules/.bin/napi", ["build"], {
-    stdio: "inherit",
-    shell: true,
-  });
+  spawnSync(
+    path.join(process.cwd(), "node_modules", ".bin", "napi"),
+    ["build"],
+    {
+      stdio: "inherit",
+      shell: true,
+    }
+  );
   console.log("Rebuilding native core done");
 }, 1000);
 
