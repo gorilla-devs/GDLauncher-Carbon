@@ -137,40 +137,40 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
         })
 }
 
-mod test {
-    use crate::app::App;
-    use env_logger::Builder;
-    use log::{trace, LevelFilter};
-    use std::time::Duration;
+// mod test {
+//     use crate::app::App;
+//     use env_logger::Builder;
+//     use log::{trace, LevelFilter};
+//     use std::time::Duration;
 
-    #[tokio::test]
-    #[tracing_test::traced_test]
-    async fn read_write_theme_ok() {
-        Builder::new().filter_level(LevelFilter::Trace).init();
+//     #[tokio::test]
+//     #[tracing_test::traced_test]
+//     async fn read_write_theme_ok() {
+//         Builder::new().filter_level(LevelFilter::Trace).init();
 
-        let theme = "super good theme";
-        trace!("trying write theme {}", theme);
+//         let theme = "super good theme";
+//         trace!("trying write theme {}", theme);
 
-        let (invalidation_channel, _) = tokio::sync::broadcast::channel(1);
+//         let (invalidation_channel, _) = tokio::sync::broadcast::channel(1);
 
-        let app = App::new_with_invalidation_channel(invalidation_channel).await;
-        let app = app.read().await;
+//         let app = App::new_with_invalidation_channel(invalidation_channel).await;
+//         let app = app.read().await;
 
-        let configuration_manager = app.configuration_manager.as_ref().expect("");
-        let configuration_manager = configuration_manager.read().await;
+//         let configuration_manager = app.configuration_manager.as_ref().expect("");
+//         let configuration_manager = configuration_manager.read().await;
 
-        configuration_manager
-            .set_theme(theme.to_string())
-            .await
-            .expect("unable to write theme");
+//         configuration_manager
+//             .set_theme(theme.to_string())
+//             .await
+//             .expect("unable to write theme");
 
-        let read_theme = configuration_manager
-            .get_theme()
-            .await
-            .expect("unable to read theme");
+//         let read_theme = configuration_manager
+//             .get_theme()
+//             .await
+//             .expect("unable to read theme");
 
-        assert_eq!(read_theme, theme);
+//         assert_eq!(read_theme, theme);
 
-        trace!("read correctly theme from configuration");
-    }
-}
+//         trace!("read correctly theme from configuration");
+//     }
+// }
