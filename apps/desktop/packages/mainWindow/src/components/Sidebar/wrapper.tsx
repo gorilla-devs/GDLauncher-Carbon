@@ -3,17 +3,17 @@ import { JSXElement, mergeProps, Show } from "solid-js";
 
 interface Props {
   children: JSXElement;
-  collapsed?: boolean;
+  collapsable?: boolean;
   noPadding?: boolean;
   onCollapse?: (_opened: boolean) => void;
 }
 
 const SiderbarWrapper = (props: Props) => {
-  const mergedProps = mergeProps({ collapsed: true }, props);
+  const mergedProps = mergeProps({ collapsable: true }, props);
   return (
     <div
       style={{
-        width: isSidebarOpened() || !mergedProps.collapsed ? "15rem" : "5rem",
+        width: isSidebarOpened() || !mergedProps.collapsable ? "15rem" : "5rem",
         transition: "width .1s ease-in-out",
       }}
       classList={{
@@ -21,12 +21,14 @@ const SiderbarWrapper = (props: Props) => {
       }}
       class="h-full bg-shade-8 relative text-white box-border overflow-hidden"
     >
-      <Show when={mergedProps.collapsed}>
+      <Show when={mergedProps.collapsable}>
         <div
           class="bg-shade-7 absolute top-10 right-0 w-4 h-10 rounded-l-md flex justify-center items-center cursor-pointer"
           onClick={() => {
-            if (mergedProps.collapsed) {
-              props?.onCollapse?.(toggleSidebar());
+            if (mergedProps.collapsable) {
+              if (props?.onCollapse) {
+                props?.onCollapse?.(toggleSidebar());
+              } else toggleSidebar();
             }
           }}
         >

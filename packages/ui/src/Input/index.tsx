@@ -8,8 +8,7 @@ export interface Props {
   class?: string;
   inputClass?: string;
   icon?: Element | any;
-  /* eslint-disable no-unused-vars */
-  onInput?: (e: InputEvent) => void;
+  onInput?: (_e: InputEvent) => void;
 }
 
 function Input(props: Props) {
