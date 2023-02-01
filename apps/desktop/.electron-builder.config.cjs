@@ -23,7 +23,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/native_interface/core.node",
+      from: "../../packages/core_module/core.node",
       to: "core.node",
     },
     {
@@ -69,14 +69,14 @@ module.exports = {
     if (context.electronPlatformName === "darwin") {
       if (context.arch === 1) {
         // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core:build", "-- darwin-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
         });
       } else if (context.arch === 3) {
         // arm64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-arm64"], {
+        spawnHandler = spawnSync("pnpm", ["core:build", "-- darwin-arm64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
@@ -85,7 +85,7 @@ module.exports = {
     } else if (context.electronPlatformName === "win32") {
       if (context.arch === 1) {
         // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- win32-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core:build", "-- win32-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",
@@ -94,7 +94,7 @@ module.exports = {
     } else if (context.electronPlatformName === "linux") {
       if (context.arch === 1) {
         // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- linux-x64"], {
+        spawnHandler = spawnSync("pnpm", ["core:build", "-- linux-x64"], {
           stdio: "inherit",
           shell: true,
           cwd: "../../",

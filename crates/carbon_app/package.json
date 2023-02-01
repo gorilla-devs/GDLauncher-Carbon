@@ -1,8 +1,7 @@
 {
   "name": "@gd/carbon_app",
   "scripts": {
-    "prebuild": "cross-env-shell CARGO_NET_GIT_FETCH_WITH_CLI=true CARGO_TARGET_DIR=../../rust_target cargo run --manifest-path ../prisma-cli/Cargo.toml --bin prisma-cli -- generate --schema=./prisma/schema.prisma",
-    "test": "pnpm prebuild && cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo test -- --nocapture",
-    "lint": "cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo clippy --all-targets --all-features -- -D warnings"
+    "test": "cross-env-shell cargo test -- --nocapture",
+    "lint": "cross-env-shell cargo clippy --all-targets --all-features -- -D warnings"
   }
 }

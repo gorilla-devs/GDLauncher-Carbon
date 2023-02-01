@@ -26,15 +26,23 @@ At this point make sure you have pnpm installed:
 
 ### Run app in dev mode
 
-To run in dev please run
+First of all you'll need to generate the prisma code. To do that run
 
-`pnpm dev-app`
+`pnpm prisma:generate`
+
+Now you can run the native core in watch mode
+
+`pnpm core:watch`
+
+Now open a new terminal and run the actual app
+
+`pnpm app:watch`
 
 ### Build native code
 
 To build native code please run
 
-`pnpm build-core`
+`pnpm core:build`
 
 ### Generate DB migration
 

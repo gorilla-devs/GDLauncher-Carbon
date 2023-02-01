@@ -6,12 +6,11 @@ const argPlatform = (process.argv[2] || "").split("-")[0];
 const argArch = (process.argv[2] || "").split("-")[1];
 
 spawnSync(
-  "npm",
+  "./node_modules/.bin/napi",
   [
-    "run",
-    "_dev_",
-    "--",
-    "--target",
+    "build",
+    "--release",
+    "--platform",
     targetMapping[`${argPlatform || os.platform()}-${argArch || os.arch()}`],
   ],
   {

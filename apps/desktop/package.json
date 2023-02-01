@@ -23,7 +23,7 @@
     "@aws-sdk/client-s3": "^3.241.0",
     "@gd/config": "workspace:*",
     "@gd/i18n": "workspace:*",
-    "@gd/native_interface": "workspace:*",
+    "@gd/core_module": "workspace:*",
     "@gd/ui": "workspace:*",
     "@playwright/test": "^1.29.1",
     "@rspc/client": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",

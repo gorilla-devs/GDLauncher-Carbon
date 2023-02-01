@@ -5,7 +5,7 @@ const isDev = import.meta.env.MODE === "development";
 
 // const prodPath = process.platform === "darwin" ? "../../../" : "../../";
 
-const nAPIPath = isDev ? "../../../../packages/native_interface" : "../../../";
+const nAPIPath = isDev ? "../../../../packages/core_module" : "../../../";
 
 let napiLoaded = new Promise((resolve, reject) => {
   import(path.resolve(__dirname, nAPIPath, "core.node"))

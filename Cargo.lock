@@ -561,14 +561,17 @@ dependencies = [
  "axum",
  "carbon_java_manager",
  "carbon_macro",
+ "directories",
  "env_logger",
  "log",
  "prisma-client-rust",
+ "reqwest",
  "rspc",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "tower-http",
  "tracing",
  "tracing-test",
 ]
@@ -818,6 +821,15 @@ name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
+
+[[package]]
+name = "core_module"
+version = "0.1.0"
+dependencies = [
+ "carbon_app",
+ "napi",
+ "napi-build",
+]
 
 [[package]]
 name = "cpufeatures"
@@ -2842,23 +2854,6 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "tempfile",
-]
-
-[[package]]
-name = "native_interface"
-version = "0.1.0"
-dependencies = [
- "axum",
- "carbon_app",
- "directories",
- "napi",
- "napi-build",
- "reqwest",
- "rspc",
- "serde",
- "serde_json",
- "tokio",
- "tower-http",
 ]
 
 [[package]]

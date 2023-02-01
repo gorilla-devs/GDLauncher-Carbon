@@ -1,0 +1,23 @@
+{
+  "name": "@gd/core_module",
+  "main": "./index.ts",
+  "files": [
+    "bindings.d.ts",
+    "core.node",
+    "JavaCheck.class"
+  ],
+  "scripts": {
+    "_build_": "node scripts/build.mjs",
+    "_dev_": "node scripts/dev.mjs",
+    "_watch_": "node scripts/watch.mjs",
+    "test": "cargo test -- --nocapture"
+  },
+  "napi": {
+    "name": "core"
+  },
+  "devDependencies": {
+    "@gd/config": "workspace:*",
+    "@napi-rs/cli": "^2.14.1",
+    "chokidar": "^3.5.3"
+  }
+}

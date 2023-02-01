@@ -11,11 +11,7 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": [
-        "^@gd/ui#build",
-        "^@gd/config#build",
-        "@gd/native_interface#dev"
-      ],
+      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
       "outputs": ["dist/**"],
       "cache": false
     },
@@ -26,30 +22,6 @@
     "@gd/ui#build": {
       "dependsOn": ["^@gd/config#build"],
       "cache": false
-    },
-    "@gd/native_interface#dev": {
-      "dependsOn": ["@gd/native_interface#codegen"],
-      "outputs": ["core.node", "bindings.d.ts"],
-      "cache": false
-    },
-    "@gd/native_interface#build": {
-      "outputs": ["core.node"],
-      "dependsOn": ["@gd/native_interface#codegen"],
-      "cache": false
-    },
-    "@gd/native_interface#test": {
-      "outputs": ["core.node"],
-      "dependsOn": ["@gd/native_interface#codegen"],
-      "cache": false
-    },
-    "@gd/native_interface#codegen": {
-      "outputs": ["bindings.d.ts"],
-      "dependsOn": ["@gd/carbon_app#prebuild"],
-      "cache": false
-    },
-    "@gd/carbon_app#prebuild": {
-      "cache": false,
-      "outputs": ["src/db.rs"]
     },
     "dev": {
       "outputs": ["dist/**"],
@@ -63,9 +35,6 @@
       "cache": false
     },
     "check-bundle": {
-      "cache": false
-    },
-    "prebuild": {
       "cache": false
     }
   },

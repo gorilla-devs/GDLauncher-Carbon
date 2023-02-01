@@ -1,7 +1,7 @@
 {
   "name": "@gd/carbon_net",
   "scripts": {
-    "test": "cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo test -- --nocapture",
-    "lint": "cross-env-shell CARGO_TARGET_DIR=../../rust_target cargo clippy --all-targets --all-features -- -D warnings"
+    "test": "cross-env-shell cargo test -- --nocapture",
+    "lint": "cross-env-shell cargo clippy --all-targets --all-features -- -D warnings"
   }
 }
