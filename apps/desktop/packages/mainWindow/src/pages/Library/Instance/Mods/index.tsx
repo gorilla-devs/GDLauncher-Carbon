@@ -230,7 +230,7 @@ const Mods = () => {
             </div>
           </div>
           <div>
-            {mods.length}{" "}
+            {mods.length}
             <Trans
               key="mods"
               options={{
