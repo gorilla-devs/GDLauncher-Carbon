@@ -12,8 +12,7 @@ export interface Props {
   disabled?: boolean;
   rounded?: boolean;
   label?: string;
-  // eslint-disable-next-line no-unused-vars
-  onChange?: (option: Option) => void;
+  onChange?: (_option: Option) => void;
 }
 
 function Dropdown(props: Props) {
@@ -23,6 +22,7 @@ function Dropdown(props: Props) {
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
+  const [focusIn, setFocusIn] = createSignal(false);
 
   const toggleMenu = () => {
     if (props.disabled) return;
@@ -52,7 +52,9 @@ function Dropdown(props: Props) {
           setMenuOpened(!menuOpened());
         }}
         onBlur={() => {
-          // setMenuOpened(false);
+          if (!focusIn()) {
+            setMenuOpened(false);
+          }
         }}
         classList={{
           "border-0": !props.error,
@@ -88,7 +90,13 @@ function Dropdown(props: Props) {
       <ul
         class={`absolute text-shade-0 pt-1 z-20 ${
           menuOpened() ? "block" : "hidden"
-        } list-none m-0 p-0 w-45`}
+        } list-none m-0 p-0 w-45 z-20`}
+        onMouseOut={() => {
+          setFocusIn(false);
+        }}
+        onMouseOver={() => {
+          setFocusIn(true);
+        }}
       >
         <For each={props.options}>
           {(option) => (
