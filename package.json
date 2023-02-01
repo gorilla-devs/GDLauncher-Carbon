@@ -15,7 +15,7 @@
     "build:mac-x64": "cd packages/core_module && pnpm build:mac-x64 && cd ../../ && turbo run build --filter=!@gd/web --filter=!@gd/core_module -- --x64 --mac",
     "build:mac-arm64": "cd packages/core_module && pnpm build:mac-arm64 && cd ../../ && turbo run build --filter=!@gd/web --filter=!@gd/core_module -- --arm64 --mac",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
-    "test": "turbo run test",
+    "test": "cargo test && turbo run test",
     "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "dev-web": "turbo run dev --filter=@gd/web",
     "build-web": "turbo run build --filter @gd/web",
