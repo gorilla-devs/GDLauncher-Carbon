@@ -32,17 +32,23 @@ First of all you'll need to generate the prisma code. To do that run
 
 Now you can run the native core in watch mode
 
-`pnpm core:watch`
+`pnpm watch:core`
 
 Now open a new terminal and run the actual app
 
-`pnpm app:watch`
+`pnpm watch:app`
 
-### Build native code
+## Production
+
+### Build Native Core
 
 To build native code please run
 
-`pnpm core:build`
+`cd packages/core_module && pnpm build:[rust_target]`
+
+### Build Entire App
+
+`pnpm build:[target]`
 
 ### Generate DB migration
 

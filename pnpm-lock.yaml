@@ -118,24 +118,6 @@ importers:
       unocss: 0.47.5_rollup@3.7.2+vite@3.2.5
       vite-plugin-solid: 2.5.0_solid-js@1.6.4+vite@3.2.5
 
-  crates/carbon_app:
-    specifiers: {}
-
-  crates/carbon_compression:
-    specifiers: {}
-
-  crates/carbon_domain:
-    specifiers: {}
-
-  crates/carbon_java_manager:
-    specifiers: {}
-
-  crates/carbon_microsoft_auth:
-    specifiers: {}
-
-  crates/carbon_net:
-    specifiers: {}
-
   packages/config:
     specifiers:
       '@iconify-json/heroicons': ^1.1.8

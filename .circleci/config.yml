@@ -158,8 +158,9 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run:
-          command: IS_DOCKER_TEST=true pnpm build:linux-x64
+      - run: pnpm prisma:generate
+      - run: pnpm rspc-bindings:generate
+      - run: IS_DOCKER_TEST=true pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm check-bundle

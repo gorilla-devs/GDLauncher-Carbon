@@ -19,6 +19,7 @@
     "dev-web": "turbo run dev --filter=@gd/web",
     "build-web": "turbo run build --filter @gd/web",
     "lint-web": "turbo run lint --filter @gd/web",
+    "rspc-bindings:generate": "cd packages/core_module && pnpm rspc-bindings:generate",
     "prisma:studio": "npx prisma studio --schema ./crates/carbon_app/prisma/schema.prisma",
     "prisma:generate": "cargo run -p prisma-cli -- generate --schema=./crates/carbon_app/prisma/schema.prisma",
     "prisma:migrate": "cargo run -p prisma-cli -- migrate dev --schema=./crates/carbon_app/prisma/schema.prisma",

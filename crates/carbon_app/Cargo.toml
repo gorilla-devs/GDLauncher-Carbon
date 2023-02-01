@@ -31,5 +31,3 @@ prisma-client-rust = { workspace = true, features = [
     "sqlite",
     "migrations",
 ], default_features = false }
-
-[build-dependencies]

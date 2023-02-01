@@ -12,6 +12,7 @@
     "build:mac-arm64": "node scripts/build.mjs aarch64-apple-darwin",
     "build:linux-x64": "node scripts/build.mjs x86_64-unknown-linux-gnu",
     "build:linux-arm64": "node scripts/build.mjs aarch64-unknown-linux-gnu",
+    "rspc-bindings:generate": "cargo test generate_rspc_ts_bindings -- --exact",
     "_watch_": "node scripts/watch.mjs",
     "test": "cargo test -- --nocapture"
   },
