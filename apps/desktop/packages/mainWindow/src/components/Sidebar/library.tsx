@@ -1,39 +1,41 @@
-/* eslint-disable i18next/no-literal-string */
-import { loadLanguageFile, useTransContext, Trans } from "@gd/i18n";
-import { createNotification, Input } from "@gd/ui";
+import { Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
+import { Show, createSignal } from "solid-js";
 
 const Sidebar = () => {
-  const [addNotification] = createNotification();
-  const [t, { changeLanguage, addResources }] = useTransContext();
-
-  const changeLang = async (lang: string) => {
-    const langFile = await loadLanguageFile(lang);
-    addResources(lang, "common", langFile);
-    await changeLanguage(lang);
-  };
+  const [opened, setOpened] = createSignal(true);
 
   return (
-    <SiderbarWrapper>
-      <Input
-        placeholder="Type Here"
-        icon={<div class="i-ri:search-line" />}
-        class="w-full rounded-full text-shade-0"
-      />
-      {/* {t("hello")} */}
-      <Trans
-        key="hello"
-        options={{
-          defaultValue: "Hello",
+    <SiderbarWrapper
+      noPadding
+      onCollapse={(opened) => {
+        setOpened(opened);
+      }}
+    >
+      <div
+        class="h-full w-full pt-5 pb-5"
+        classList={{
+          "pl-5": opened(),
+          "pl-3": !opened(),
         }}
-      />
-      {t("world")}
-      <button onClick={() => changeLang("it")}>IT</button>
-      <button onClick={() => changeLang("en")}>EN</button>
-      <button onClick={() => changeLang("de")}>DE</button>
-      <button onClick={() => addNotification("Notification Added")}>
-        Add Notification
-      </button>
+      >
+        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)]">
+          <Show
+            when={opened()}
+            fallback={
+              <div class="w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center">
+                <div class="i-ri:search-line text-shade-0" />
+              </div>
+            }
+          >
+            <Input
+              placeholder="Type Here"
+              icon={<div class="i-ri:search-line" />}
+              class="w-full rounded-full text-shade-0"
+            />
+          </Show>
+        </div>
+      </div>
     </SiderbarWrapper>
   );
 };
