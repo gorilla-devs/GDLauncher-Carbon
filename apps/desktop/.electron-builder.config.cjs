@@ -23,7 +23,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/native_interface/core.node",
+      from: "../../packages/core_module/core.node",
       to: "core.node",
     },
     {
@@ -61,49 +61,27 @@ module.exports = {
     target: isDockerBuild ? ["dir"] : ["dir"],
     artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
-  beforePack: async (context) => {
-    const { spawnSync } = require("child_process");
+  afterAllArtifactBuild: () => {
+    const path = require("path");
+    const fs = require("fs");
 
-    let spawnHandler = null;
+    const packageJsonPath = path.join(__dirname, "package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
-    if (context.electronPlatformName === "darwin") {
-      if (context.arch === 1) {
-        // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      } else if (context.arch === 3) {
-        // arm64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- darwin-arm64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
-    } else if (context.electronPlatformName === "win32") {
-      if (context.arch === 1) {
-        // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- win32-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
-    } else if (context.electronPlatformName === "linux") {
-      if (context.arch === 1) {
-        // x64
-        spawnHandler = spawnSync("pnpm", ["core-build", "-- linux-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
+    const version = packageJson.version;
+
+    if (!version) {
+      throw new Error(
+        "App version removed before end of build! May be corrupted!"
+      );
     }
 
-    if (spawnHandler && spawnHandler.status !== 0) {
-      throw new Error("Native interface build failed!");
-    }
+    delete packageJson.version;
+
+    fs.writeFileSync(
+      packageJsonPath,
+      `${JSON.stringify(packageJson, null, 2)}\n`,
+      "utf8"
+    );
   },
 };
