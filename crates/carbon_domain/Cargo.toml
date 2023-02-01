@@ -3,33 +3,32 @@ name = "carbon_domain"
 version = "0.0.0"
 edition = "2021"
 
+[lib]
+crate-type = ["lib"]
 
 [dependencies]
-serde = { version = "1.0.152", features = ["derive", "rc"] }
-tokio = { version = "1.22.0", features = ["full"] }
-tokio-stream = { version = "0.1.11", features = ["fs"] }
-tracing = "0.1.37"
-reqwest = { version = "0.11.13", features = ["json", "stream"] }
-serde_json = "1.0.89"
-sha2 = "0.10.6"
-sha1 = "0.10.5"
-futures = { version = "0.3.25" }
-reqwest-middleware = "0.2.0"
-reqwest-retry = "0.2.1"
-zip = "0.6.3"
-lazy_static = "1.4.0"
-async-trait = "0.1.60"
-uuid = { version = "1.2.2", features = ["v4", "fast-rng","macro-diagnostics"] }
-thiserror = "1.0.38"
-log = "0.4.17"
-trash = "3.0.0"
-inter-struct = "0.2.0"
-dirs = "4.0.0"
+serde = { workspace = true, features = ["derive", "rc"] }
+tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true, features = ["fs"] }
+tracing = { workspace = true }
+reqwest = { workspace = true, features = ["json", "stream"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+sha1 = { workspace = true }
+futures = { workspace = true }
+reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
+zip = { workspace = true }
+lazy_static = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
+thiserror = { workspace = true }
+log = { workspace = true }
+trash = { workspace = true }
 carbon_net = { path = "../carbon_net" }
-prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
 
 [dev-dependencies]
-mockall = "0.11.3"
-env_logger = "0.10.0"
-temp-dir = "0.1.11"
-tracing-test = "0.2.3"
+mockall = { workspace = true }
+env_logger = { workspace = true }
+temp-dir = { workspace = true }
+tracing-test = { workspace = true }
