@@ -1,7 +1,0 @@
-{
-  "name": "@gd/carbon_domain",
-  "scripts": {
-    "test": "cross-env-shell cargo test --",
-    "lint": "cross-env-shell cargo clippy --all-targets --all-features -- -D warnings"
-  }
-}

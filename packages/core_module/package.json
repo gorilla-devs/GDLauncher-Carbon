@@ -7,8 +7,11 @@
     "JavaCheck.class"
   ],
   "scripts": {
-    "_build_": "node scripts/build.mjs",
-    "_dev_": "node scripts/dev.mjs",
+    "build:win-x64": "node scripts/build.mjs x86_64-pc-windows-msvc",
+    "build:mac-x64": "node scripts/build.mjs x86_64-apple-darwin",
+    "build:mac-arm64": "node scripts/build.mjs aarch64-apple-darwin",
+    "build:linux-x64": "node scripts/build.mjs x86_64-unknown-linux-gnu",
+    "build:linux-arm64": "node scripts/build.mjs aarch64-unknown-linux-gnu",
     "_watch_": "node scripts/watch.mjs",
     "test": "cargo test -- --nocapture"
   },

@@ -46,7 +46,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm build-mac-x64
+            - run: pnpm build:mac-x64
             - run: pnpm lint
             - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
@@ -68,7 +68,7 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm build-mac-arm64
+            - run: pnpm build:mac-arm64
             - run: pnpm lint
             - run: pnpm test
             - run: cd apps && cd desktop && pnpm clean
@@ -117,7 +117,7 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            pnpm build-win-x64
+            pnpm build:win-x64
           shell: bash.exe
       - run:
           command: |
@@ -159,7 +159,7 @@ jobs:
           pnpm i
           chmod -R a+x node_modules
       - run:
-          command: IS_DOCKER_TEST=true pnpm build-linux-x64
+          command: IS_DOCKER_TEST=true pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm check-bundle
@@ -175,7 +175,7 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm build-linux-x64
+      - run: pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
       - run: cd apps && cd desktop && pnpm clean

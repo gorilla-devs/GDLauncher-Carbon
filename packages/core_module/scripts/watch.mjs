@@ -1,7 +1,5 @@
-import os from "os";
 import { spawnSync } from "child_process";
 import chokidar from "chokidar";
-import targetMapping from "./targetMapping.mjs";
 
 function debounce(func, timeout) {
   let timer;

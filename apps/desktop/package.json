@@ -13,9 +13,8 @@
     "test": "playwright test",
     "build-vite": "node scripts/build.mjs",
     "patch-version": "node scripts/monkeypatchVersion.cjs",
-    "clear-version": "node scripts/clearVersion.cjs",
     "build-electron": "cross-env-shell DEBUG=electron-builder electron-builder --config .electron-builder.config.cjs",
-    "build": "pnpm patch-version && pnpm build-vite && pnpm build-electron && pnpm clear-version",
+    "build": "pnpm patch-version && pnpm build-vite && pnpm build-electron",
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },

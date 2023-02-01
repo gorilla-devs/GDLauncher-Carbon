@@ -1,7 +1,0 @@
-{
-  "name": "@gd/carbon_compression",
-  "scripts": {
-    "test": "cross-env-shell cargo test -- --nocapture",
-    "lint": "cross-env-shell cargo clippy --all-targets --all-features -- -D warnings"
-  }
-}
