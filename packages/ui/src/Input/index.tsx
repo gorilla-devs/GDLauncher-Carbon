@@ -8,15 +8,14 @@ export interface Props {
   class?: string;
   inputClass?: string;
   icon?: Element | any;
-  /* eslint-disable no-unused-vars */
-  onInput?: (e: InputEvent) => void;
+  onInput?: (_e: InputEvent) => void;
 }
 
 function Input(props: Props) {
   return (
     <div class="h-10">
       <div
-        class={`bg-shade-8 flex items-center gap-2 max-w-max h-full ${
+        class={`bg-shade-5 flex items-center gap-2 max-w-max h-full ${
           props.icon ? "bg-shade-7 rounded-full px-4" : "rounded-md"
         } ${props.class || ""}`}
       >
@@ -24,7 +23,7 @@ function Input(props: Props) {
           <span class="text-shade-5">{props.icon}</span>
         </Show>
         <input
-          class={`bg-shade-8 border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-shade-5 ${
+          class={`bg-shade-5 border-1 border-transparent h-full box-border py-2 rounded-md placeholder:text-shade-5 ${
             props.inputClass || ""
           }
            ${props.disabled ? "text-shade-7" : "text-white"}

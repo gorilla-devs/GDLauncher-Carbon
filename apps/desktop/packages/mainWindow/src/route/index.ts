@@ -52,6 +52,18 @@ export const routes: RouteDefinition[] = [
                   () => import("@/pages/Library/Instance/ResourcePacks")
                 ),
               },
+              {
+                path: "/screenshots",
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Screenshots")
+                ),
+              },
+              {
+                path: "/versions",
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Versions")
+                ),
+              },
             ],
           },
         ],

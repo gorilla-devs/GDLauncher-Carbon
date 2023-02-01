@@ -4,7 +4,7 @@ import { Trans } from "@gd/i18n";
 
 const Overview = () => {
   return (
-    <div class="flex flex-col gap-4 max-w-185">
+    <div class="flex flex-col gap-4 max-w-185 mt-10">
       <div class="w-full flex justify-center flex-wrap gap-4">
         <Card title="Minecraft version" text="1.19.2" icon="vanilla" />
         <Card title="Minecraft version" text="1.19.2" icon="book" />
