@@ -30,7 +30,7 @@ const App: Component = () => {
   });
 
   return (
-    <div class="relative w-screen h-[calc(100vh-60px-28px)]">
+    <div class="relative w-screen">
       <Show when={process.env.NODE_ENV === "development"}>
         <div class="absolute top-0 right-0 h-10 p-2 gap-4 z-50 bg-light-600 flex justify-center items-center cursor-pointer">
           <div
@@ -60,7 +60,7 @@ const App: Component = () => {
         </div>
       </Show>
       <AppNavbar />
-      <div class="flex h-[calc(100vh-60px-28px)] w-screen z-10">
+      <div class="flex w-screen h-auto z-10">
         <main class="relative flex-1 overflow-hidden">
           <Suspense fallback={<></>}>
             <Route />

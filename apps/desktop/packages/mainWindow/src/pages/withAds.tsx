@@ -3,7 +3,7 @@ import { Outlet } from "@solidjs/router";
 
 function withAdsLayout() {
   return (
-    <div class="flex h-full justify-end">
+    <div class="flex h-[calc(100vh-60px-28px)] justify-end">
       <Outlet />
       <div class="flex justify-start flex-initial flex-col gap-4 mx-5 mt-5">
         <AdsBanner />
