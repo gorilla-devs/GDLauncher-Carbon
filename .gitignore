@@ -84,6 +84,7 @@ packages/native_interface/bindings.d.ts
 MC_TEST
 tests_decompressed
 java_runtimes
+apps/desktop/playwright-report/index.html
 
 **/.idea
 crates/carbon_app/src/db.rs
