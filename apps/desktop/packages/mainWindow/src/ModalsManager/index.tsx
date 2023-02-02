@@ -34,6 +34,10 @@ const Modals: Component = () => {
       component: lazy(() => import("./modals/TermsAndConditions")),
       title: "Terms and Conditions",
     },
+    addjava: {
+      component: lazy(() => import("./modals/AddJava")),
+      title: "Add java version",
+    },
     acceptableUsePolicy: {
       component: lazy(() => import("./modals/AcceptableUsePolicy")),
       title: "Acceptable Use Policy",

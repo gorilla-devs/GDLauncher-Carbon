@@ -88,7 +88,7 @@ function Dropdown(props: Props) {
         />
       </button>
       <ul
-        class={`absolute text-shade-0 pt-1 ${
+        class={`absolute text-shade-0 pt-1 z-20 ${
           menuOpened() ? "block" : "hidden"
         } list-none m-0 p-0 w-45 z-20`}
         onMouseOut={() => {

@@ -1,8 +1,8 @@
-import type { RouteDataFunc } from "@solidjs/router";
+import { rspc } from "@/utils/rspcClient";
 
-const SettingsJavaData: RouteDataFunc = () => {
-  //   const data = rspc.createQuery(...);
-  //   return { data };
+const SettingsJavaData = () => {
+  let data = rspc.createQuery(() => ["java.getAvailable", null]);
+  return { data };
 };
 
 export default SettingsJavaData;
