@@ -27,9 +27,9 @@ pub struct InstanceDetails {
     notes: String,
 }
 
-impl Into<InstanceDetails> for Instance {
-    fn into(self) -> InstanceDetails {
-        let instance = &self;
+impl From<&Instance> for InstanceDetails {
+    fn from(value: &Instance) -> InstanceDetails {
+        let instance = &value;
         let last_played = instance.last_played.map(|system_time| {
             system_time
                 .duration_since(UNIX_EPOCH)
@@ -63,7 +63,13 @@ impl Into<InstanceDetails> for Instance {
             mods,
             played_time: instance.played_time.as_millis().to_string(),
             last_played,
-            notes: self.notes,
+            notes: value.notes.clone(),
         }
+    }
+}
+
+impl From<Instance> for InstanceDetails {
+    fn from(value: Instance) -> InstanceDetails {
+        InstanceDetails::from(value)
     }
 }

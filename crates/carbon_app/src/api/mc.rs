@@ -1,70 +1,113 @@
 use crate::api::app::AppContainer;
 use crate::app::instance::representation::CreateInstanceDto;
-use crate::try_in_router;
+use crate::app::representation::InstanceDetails;
+use crate::{
+    into_router_mutation_response, into_router_mutation_responses, into_router_query_response,
+    into_router_query_responses_ok, try_in_router,
+};
 use axum::extract::DefaultBodyLimit;
 use rspc::{ErrorCode, Router, RouterBuilderLike, Type};
 use serde::Deserialize;
+use std::path::PathBuf;
 
 pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
     Router::<AppContainer>::new()
         .mutation("createInstance", |t| {
             t(|app: AppContainer, dto: CreateInstanceDto| async move {
-                let app = app.read().await;
-                let instance_manager = try_in_router!(app.get_instance_manager().await)?;
-                instance_manager.add_instance(dto).await?
-            })
-        })
-        .query("getInstances", |t| {
-            t(|app: AppContainer, _args: ()| async move {
-                let app = app.read().await;
-                let instance_manager = try_in_router!(app.get_instance_manager().await).await?;
-                instance_manager.get_all_instances()
-            })
-        })
-        .query("getInstanceDetails", |t| {
-            t(|app: AppContainer, instance_id: String| async move {
-                let app = app.read().await;
-                let instance_id = try_in_router!(instance_id.parse::<u128>())?;
-                let instance_manager = try_in_router!(app.get_instance_manager().await)?;
-                let instance =
-                    try_in_router!(instance_manager.get_instance_by_id(instance_id).await)?;
-                Ok(instance)
-            })
-        })
-        .mutation("openInstanceFolderPath", |t| t(|_, args: String| {}))
-        .mutation("startInstance", |t| {
-            t(|app: AppContainer, instance_id: String| async move {
-                let app = app.read().await;
-                let instance_manager = try_in_router!(app.get_instance_manager().await)?;
-                let instance =
-                    try_in_router!(instance_manager.start_instance_by_id(instance_id).await)?;
-                Ok(instance)
-            })
-        })
-        .mutation("stopInstance", |t| {
-            struct RemoveInstanceDto {}
-            t(|app: AppContainer, instance_id: String| async move {
-                let app = app.read().await;
-                let instance_manager = try_in_router!(app.get_instance_manager().await)?;
-                let instance_id = try_in_router!(instance_id.parse::<u128>())?;
-                let instance =
-                    try_in_router!(instance_manager.stop_instance_by_id(instance_id).await)?;
-                Ok(instance)
+                into_router_query_response!(
+                    {
+                        let app = app.read().await;
+                        let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                        instance_manager.add_instance(dto).await
+                    },
+                    InstanceDetails
+                )
             })
         })
         .mutation("deleteInstance", |t| {
             t(|app: AppContainer, instance_id: String| async move {
-                let app = app.read().await;
-                let instance_manager = try_in_router!(app.get_instance_manager().await)?;
-                let instance_id = try_in_router!(instance_id.parse::<u128>())?;
-                let instance = try_in_router!(
-                    instance_manager
-                        .delete_instance_by_id(instance_id, false)
-                        .await
-                );
-                Ok(instance)
+                into_router_mutation_response! {
+                   app,
+                   "mc.deleteInstance",
+                   InstanceDetails,
+                   {
+                       let app = app.read().await;
+                       let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                       let instance_id = try_in_router!(instance_id.parse::<u128>())?;
+                       instance_manager.delete_instance_by_id(instance_id, true).await
+                   }
+                }
             })
         })
+        .query("getInstances", |t| {
+            t(|app: AppContainer, _args: ()| async move {
+                into_router_query_responses_ok!(
+                    {
+                        let app = app.read().await;
+                        let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                        instance_manager.get_all_instances().await
+                    },
+                    InstanceDetails
+                )
+            })
+        })
+        .query("getInstanceDetails", |t| {
+            t(|app: AppContainer, instance_id: String| async move {
+                into_router_query_responses_ok!(
+                    {
+                        let app = app.read().await;
+                        let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                        instance_manager.get_all_instances().await
+                    },
+                    InstanceDetails
+                )
+            })
+        })
+        .mutation("scanFolderForInstances", |t| {
+            t(|app: AppContainer, folder_path: String| async move {
+                // into_router_mutation_responses! {
+                //     app,
+                //     "mc.scanFolderForInstances",
+                //     InstanceDetails,
+                //     {
+                //         let app = app.read().await;
+                //         let folder_path : PathBuf = folder_path.into();
+                //         let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                //         instance_manager.read_instances_from_directory(&folder_path).await
+                //     }
+                // }
+            })
+        })
+        .mutation("startInstance", |t| {
+            t(|app: AppContainer, instance_id: String| async move {
+                into_router_mutation_response! {
+                    app,
+                    "mc.startInstance",
+                    InstanceDetails,
+                    {
+                        let app = app.read().await;
+                        let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                        instance_manager.start_instance_by_id(instance_id).await
+                    }
+                }
+            })
+        })
+        .mutation("stopInstance", |t| {
+            t(|app: AppContainer, instance_id: String| async move {
+                into_router_mutation_response! {
+                    app,
+                    "mc.stopInstance",
+                    InstanceDetails,
+                    {
+                        let app = app.read().await;
+                        let instance_manager = try_in_router!(app.get_instance_manager().await)?;
+                        let instance_id = try_in_router!(instance_id.parse::<u128>())?;
+                        instance_manager.stop_instance_by_id(instance_id).await
+                    }
+                }
+            })
+        })
+        .mutation("openInstanceFolderPath", |t| t(|_, args: String| {}))
         // Actions on mods
         .mutation("enableMod", |t| {
             t(|app: AppContainer, args: String| async move {})

@@ -15,12 +15,7 @@ impl InstanceStore {
     }
 
     pub async fn get_all_instances(&self) -> BTreeSet<Instance> {
-        self.instances_pool
-            .read()
-            .await
-            .iter()
-            .map(|i| i.clone())
-            .collect()
+        self.instances_pool.read().await.iter().cloned().collect()
     }
 
     pub async fn get_instance_by_id(&self, id: u128) -> Option<Instance> {
@@ -39,7 +34,7 @@ impl InstanceStore {
     pub async fn save_instance(&self, instance: Instance) -> Instance {
         let instance_id = &instance.id;
         if let true = self.instances_by_id.read().await.contains_key(instance_id) {
-            self.delete_instance_by_id(instance_id);
+            self.delete_instance_by_id(instance_id).await;
         };
         self.instances_by_id
             .write()

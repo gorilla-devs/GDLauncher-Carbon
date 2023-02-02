@@ -42,7 +42,7 @@ fn expand_app_field_getter(field: &Field) -> TokenStream2 {
     let getter_name = format_ident!("get_{field_name}");
 
     quote! {
-        pub async fn #getter_name(&self) -> Result<RwLockReadGuard<#field_type>, AppError> {
+        pub(super) async fn #getter_name(&self) -> Result<RwLockReadGuard<#field_type>, AppError> {
             Ok(self
                 .#field_name
                 .as_ref()

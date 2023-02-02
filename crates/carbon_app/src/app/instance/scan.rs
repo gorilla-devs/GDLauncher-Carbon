@@ -89,7 +89,12 @@ impl InstanceManager {
         let instance_configuration_file = self
             .parse_configuration_from_file(&configuration_file_path)
             .await?;
-        let instance_id = self.instances.read().await.get_next_available_id().await;
+        let instance_id = self
+            .instance_store
+            .read()
+            .await
+            .get_next_available_id()
+            .await;
         Ok(Instance {
             name: instance_configuration_file.instance_name,
             id: instance_id,

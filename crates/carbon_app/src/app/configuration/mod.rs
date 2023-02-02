@@ -24,7 +24,7 @@ pub enum ConfigurationManagerError {
 
     #[error("error raised while executing query ")]
     AppConfigurationNotFound,
-    
+
     #[error("error raised while executing query : {0}")]
     QueryError(#[from] QueryError),
 }
@@ -67,7 +67,7 @@ impl ConfigurationManager {
         Ok(theme.clone())
     }
 
-    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
+    pub async fn set_theme(&self, theme: String) -> Result<String, ConfigurationManagerError> {
         trace!("writing theme in db : {theme}");
         let app = self.app.upgrade().ok_or(AppNotFoundError)?;
         let app = app.read().await;
@@ -77,11 +77,11 @@ impl ConfigurationManager {
             .upsert(
                 UniqueWhereParam::IdEquals(0),
                 vec![SetId(0), SetTheme(theme.clone().into())],
-                vec![SetTheme(theme.into())],
+                vec![SetTheme(theme.clone().into())],
             )
             .exec()
             .await?;
         trace!("wrote theme into db");
-        Ok(())
+        Ok(theme)
     }
 }

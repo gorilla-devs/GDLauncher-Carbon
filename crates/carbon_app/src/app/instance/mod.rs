@@ -15,14 +15,12 @@ use crate::app::instance::write::InstanceWriteError;
 use crate::app::App;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
-use futures::FutureExt;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::RwLock;
-use tokio_stream::StreamExt;
 
 #[derive(Error, Debug)]
 pub enum InstanceManagerError {
@@ -40,23 +38,23 @@ pub enum InstanceManagerError {
 
 pub(crate) struct InstanceManager {
     app: Weak<RwLock<App>>,
-    instances: RwLock<InstanceStore>,
+    instance_store: RwLock<InstanceStore>,
 }
 
 impl InstanceManager {
     pub fn make_for_app(app: &Arc<RwLock<App>>) -> InstanceManager {
         InstanceManager {
             app: Arc::downgrade(app),
-            instances: Default::default(),
+            instance_store: Default::default(),
         }
     }
 
     pub async fn get_all_instances(&self) -> BTreeSet<Instance> {
-        self.instances.read().await.get_all_instances().await
+        self.instance_store.read().await.get_all_instances().await
     }
 
     pub async fn get_instance_by_id(&self, id: u128) -> Result<Instance, InstanceManagerError> {
-        self.instances
+        self.instance_store
             .read()
             .await
             .get_instance_by_id(id)
@@ -70,7 +68,12 @@ impl InstanceManager {
     ) -> Result<Instance, InstanceManagerError> {
         let instance = Instance {
             name: dto.name,
-            id: self.instances.read().await.get_next_available_id().await,
+            id: self
+                .instance_store
+                .read()
+                .await
+                .get_next_available_id()
+                .await,
             played_time: Duration::default(),
             last_played: None,
             minecraft_package: MinecraftPackage {
@@ -83,14 +86,24 @@ impl InstanceManager {
             persistence_status: InstanceStatus::NotPersisted,
             notes: "".to_string(),
         };
-        let instance = self.instances.read().await.save_instance(instance).await;
+        let instance = self
+            .instance_store
+            .read()
+            .await
+            .save_instance(instance)
+            .await;
         //todo: handle path collision between instances
         let instance = if let Some(path_to_write_in) = dto.path_to_save_at {
             self.write_at(instance, &path_to_write_in).await?
         } else {
             instance
         };
-        Ok(self.instances.read().await.save_instance(instance).await)
+        Ok(self
+            .instance_store
+            .read()
+            .await
+            .save_instance(instance)
+            .await)
     }
 
     pub async fn delete_instance_by_id(
@@ -99,7 +112,7 @@ impl InstanceManager {
         remove_from_fs: bool,
     ) -> Result<Instance, InstanceManagerError> {
         let deleted_instance = self
-            .instances
+            .instance_store
             .read()
             .await
             .delete_instance_by_id(&id)
@@ -121,7 +134,11 @@ impl InstanceManager {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
         for instance in found_instances.clone() {
-            self.instances.read().await.save_instance(instance);
+            self.instance_store
+                .read()
+                .await
+                .save_instance(instance)
+                .await;
         }
         Ok(found_instances)
     }

@@ -1,7 +1,7 @@
+use crate::api::app::AppContainer;
 use rspc::{Router, RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
-use crate::api::app::AppContainer;
 
 #[derive(Type, Serialize)]
 enum JavaType {
