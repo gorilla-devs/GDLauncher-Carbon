@@ -86,6 +86,6 @@ tests_decompressed
 java_runtimes
 
 **/.idea
-crates/carbon_bindings/src/db.rs
-/crates/carbon_bindings/prisma/dev.db
-/crates/carbon_bindings/prisma/dev.db-journal
+crates/carbon_app/src/db.rs
+crates/carbon_app/prisma/dev.db
+crates/carbon_app/prisma/dev.db-journal
