@@ -6,7 +6,7 @@ type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
 
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string | JSX.Element;
-  class?: string;
+  style?: any;
   variant?: Variant;
   rounded?: boolean;
   disabled?: boolean;
@@ -36,7 +36,7 @@ const getVariant = (
     "duration-300": true,
     "ease-in-out": true,
     "font-main": true,
-    "max-w-max": !isLoading,
+    "max-w-48": !isLoading,
     "font-bold": true,
     flex: true,
     "justify-center": true,
@@ -138,37 +138,36 @@ function Button(props: Props) {
   );
 
   return (
-    <div class="w-fit h-fit">
-      <button
-        classList={getVariant(
-          props.variant || "primary",
-          mergedProps.rounded,
-          props.size || "medium",
-          !!props.disabled,
-          mergedProps.uppercase,
-          !!props.iconRight,
-          !!props.loading
-        )}
-        {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
-        style={{
-          ...(mergedProps.variant === "transparent" && {
-            background: "rgba(0, 0, 0, 0.4)",
-          }),
-        }}
+    <button
+      classList={getVariant(
+        props.variant || "primary",
+        mergedProps.rounded,
+        props.size || "medium",
+        !!props.disabled,
+        mergedProps.uppercase,
+        !!props.iconRight,
+        !!props.loading
+      )}
+      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+      style={{
+        ...(mergedProps.variant === "transparent" && {
+          background: "rgba(0, 0, 0, 0.4)",
+        }),
+        ...props.style,
+      }}
+    >
+      <Show when={props.icon}>{props.icon}</Show>
+      <Show
+        when={!props.loading}
+        fallback={
+          <div class="w-12 h-12 flex justify-center items-center">
+            <Spinner />
+          </div>
+        }
       >
-        <Show when={props.icon}>{props.icon}</Show>
-        <Show
-          when={!props.loading}
-          fallback={
-            <div class="w-12 h-12 flex justify-center items-center">
-              <Spinner />
-            </div>
-          }
-        >
-          {c()}
-        </Show>
-      </button>
-    </div>
+        {c()}
+      </Show>
+    </button>
   );
 }
 

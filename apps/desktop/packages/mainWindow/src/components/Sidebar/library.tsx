@@ -33,8 +33,19 @@ const Sidebar = () => {
         <Collapsable title="VANILLA">test</Collapsable>
         <Collapsable title="FAVOURITED">test</Collapsable>
         <Collapsable title="CURSEFORGE">test</Collapsable>
-        <div class="absolute bottom-5 w-full flex justify-scratch">
-          <Button variant="outline">+ Add Instance</Button>
+        <div class="absolute left-0 right-0 bottom-5 w-full flex justify-center">
+          <Button
+            variant="outline"
+            style={{
+              ...(isSidebarOpened()
+                ? { width: "100%" }
+                : { width: "40px", height: "40px", padding: "12px" }),
+            }}
+          >
+            <Show when={isSidebarOpened()} fallback={"+"}>
+              + Add Instance
+            </Show>
+          </Button>
         </div>
       </div>
     </SiderbarWrapper>
