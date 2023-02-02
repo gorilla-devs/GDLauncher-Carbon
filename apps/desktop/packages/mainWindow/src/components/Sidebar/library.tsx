@@ -4,6 +4,8 @@ import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Collapsable from "./collapsable";
+import Tile from "../Instance/Tile";
+import Style from "./style.module.scss";
 
 const Sidebar = () => {
   return (
@@ -30,10 +32,109 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Collapsable title="VANILLA">test</Collapsable>
-        <Collapsable title="FAVOURITED">test</Collapsable>
-        <Collapsable title="CURSEFORGE">test</Collapsable>
-        <div class="absolute left-0 right-0 bottom-5 w-full flex justify-center">
+        <Show when={isSidebarOpened()}>
+          <Collapsable title="VANILLA">test</Collapsable>
+          <Collapsable title="FAVOURITED">test</Collapsable>
+          <Collapsable title="CURSEFORGE">test</Collapsable>
+        </Show>
+        <Show when={!isSidebarOpened()}>
+          <div
+            class={`${Style.scrollbarHide} h-full w-full max-h-[calc(100vh-60px-28px-80px-80px)] overflow-auto flex flex-col gap-4 items-center mt-6`}
+          >
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+          </div>
+        </Show>
+        <div class="absolute left-0 right-0 bottom-0 py-5 w-full flex justify-center bg-shade-8">
           <Button
             variant="outline"
             style={{
