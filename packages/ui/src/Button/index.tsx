@@ -36,7 +36,7 @@ const getVariant = (
     "duration-300": true,
     "ease-in-out": true,
     "font-main": true,
-    "max-w-48": !isLoading,
+    "max-w-max": !isLoading,
     "font-bold": true,
     flex: true,
     "justify-center": true,

@@ -10,8 +10,8 @@ import Style from "./style.module.scss";
 const Sidebar = () => {
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full pt-5 pb-5 px-3 box-border">
-        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
+      <div class="h-full w-full pt-5 pb-5 box-border">
+        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3 px-3">
           <Show
             when={isSidebarOpened()}
             fallback={
@@ -33,9 +33,38 @@ const Sidebar = () => {
           </Show>
         </div>
         <Show when={isSidebarOpened()}>
-          <Collapsable title="VANILLA">test</Collapsable>
-          <Collapsable title="FAVOURITED">test</Collapsable>
-          <Collapsable title="CURSEFORGE">test</Collapsable>
+          <Collapsable title="VANILLA">
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="FAVOURITED">
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="CURSEFORGE">
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
         </Show>
         <Show when={!isSidebarOpened()}>
           <div
@@ -139,7 +168,7 @@ const Sidebar = () => {
             variant="outline"
             style={{
               ...(isSidebarOpened()
-                ? { width: "100%" }
+                ? { width: "100%", "max-width": "200px" }
                 : { width: "40px", height: "40px", padding: "12px" }),
             }}
           >
