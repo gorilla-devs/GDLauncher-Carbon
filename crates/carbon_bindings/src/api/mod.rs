@@ -1,12 +1,22 @@
-
+use crate::app::AppContainer;
+use crate::{api, app};
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
-use crate::app;
-use crate::app::AppContainer;
 
+mod configuration;
+mod dev;
 mod java;
 mod mc;
+
+#[macro_export]
+macro_rules! try_in_router {
+    ($result:expr) => {{
+        $result.map_err(|error| {
+            rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
+        })
+    }};
+}
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
@@ -28,7 +38,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<AppContainer> {
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge("java.", java::mount())
         .yolo_merge("mc.", mc::mount())
-        .yolo_merge("app.", app::mount())
+        //.yolo_merge("app.", api::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD

@@ -1,10 +1,10 @@
 use super::instance::Instance;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, sync::Weak};
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+use std::{fmt::Debug, sync::Weak};
 use tokio::sync::{watch::Sender, RwLock};
 
 pub(crate) mod fabric;
@@ -13,17 +13,13 @@ pub(crate) mod vanilla;
 
 pub trait ModLoaderError: std::error::Error + Send + Sync + 'static {}
 
-enum ModLoaderInstanceStatus{
+enum ModLoaderInstanceStatus {
     NotPersisted,
     Queued,
-    Ready
+    Ready,
 }
 
-struct ModLoaderInstance {
-
-
-}
-
+struct ModLoaderInstance {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ModLoader {
@@ -35,14 +31,12 @@ pub enum ModLoader {
 }
 
 impl ModLoader {
-
-    pub fn get_version(&self)-> String{
+    pub fn get_version(&self) -> String {
         "".to_string()
     }
-
 }
 
-impl Display for ModLoader{
+impl Display for ModLoader {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let enum_name = match self {
             ModLoader::Vanilla => "vanilla",
@@ -51,7 +45,7 @@ impl Display for ModLoader{
             ModLoader::LiteLoader => "lite-loader",
             ModLoader::Quilt => "quilt",
         };
-        write!(enum_name)
+        write!(f, "{}", enum_name)
     }
 }
 
@@ -85,12 +79,14 @@ where
     where
         Self: Sized;
 
-    async fn install(&self, progress_send: Sender<InstallProgress<Self::Stages>>) -> Result<(), Self::Error>;
+    async fn install(
+        &self,
+        progress_send: Sender<InstallProgress<Self::Stages>>,
+    ) -> Result<(), Self::Error>;
 
     fn remove(&self) -> Result<(), Self::Error>;
 
     fn verify(&self) -> Result<(), Self::Error>;
 
     fn get_version(&self) -> ModloaderVersion;
-
 }

@@ -16,7 +16,7 @@ impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {
         MinecraftPackageConfigurationFile {
             version: value.version.clone(),
             description: "".to_string(),
-            modloader: value.modloaders.clone(),
+            modloader: value.mod_loaders.clone(),
         }
     }
 }

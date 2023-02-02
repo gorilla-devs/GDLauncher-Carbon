@@ -2,6 +2,15 @@ pub mod api;
 pub mod app;
 pub(crate) mod db;
 
+#[macro_export]
+macro_rules! try_path_fmt {
+    ($path:expr) => {{
+        $path
+            .as_os_str()
+            .to_str()
+            .unwrap_or("<<unrepresentable fs path!>>")
+    }};
+}
 
 #[cfg(test)]
 mod e2e {

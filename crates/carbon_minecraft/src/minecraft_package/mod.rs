@@ -16,7 +16,7 @@ pub enum MinecraftPackageInstallationStage {
     InstallingMod,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum MinecraftPackageStatus {
     NotPersisted,
     Queued,
@@ -24,13 +24,13 @@ pub enum MinecraftPackageStatus {
     Ready(PathBuf),
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MinecraftPackage {
     pub version: String,
     pub mods: BTreeSet<MinecraftMod>,
     pub description: String,
-    pub modloaders: BTreeSet<ModLoader>,
-    pub status: MinecraftPackageStatus
+    pub mod_loaders: BTreeSet<ModLoader>,
+    pub status: MinecraftPackageStatus,
 }
 
 impl MinecraftPackage {
@@ -45,7 +45,7 @@ impl MinecraftPackage {
             version: mc_version.into(),
             mods: Default::default(),
             description: "".to_string(),
-            modloaders: default_modloader,
+            mod_loaders: default_modloader,
             status: MinecraftPackageStatus::NotPersisted,
         }
     }
@@ -57,7 +57,7 @@ impl From<MinecraftPackageConfigurationFile> for MinecraftPackage {
             version: value.version,
             mods: Default::default(),
             description: "".to_string(),
-            modloaders: value.modloader,
+            mod_loaders: value.modloader,
             status: MinecraftPackageStatus::NotPersisted,
         }
     }
@@ -69,7 +69,7 @@ impl From<&MinecraftPackageConfigurationFile> for MinecraftPackage {
             version: value.version.clone(),
             mods: Default::default(),
             description: "".to_string(),
-            modloaders: value.modloader.clone(),
+            mod_loaders: value.modloader.clone(),
             status: MinecraftPackageStatus::NotPersisted,
         }
     }

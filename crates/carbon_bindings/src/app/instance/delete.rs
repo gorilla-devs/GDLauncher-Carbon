@@ -1,14 +1,12 @@
-use crate::instance::consts::{CONFIGURATION_FILE_RELATIVE_PATH, MINECRAFT_PACKAGE_RELATIVE_PATH};
-use crate::instance::delete::InstanceDeleteError::InstanceNotPersisted;
-use crate::instance::scan::{check_instance_directory_sanity, InstanceScanError};
-use crate::instance::{Instance, InstanceStatus};
+use crate::app::instance::delete::InstanceDeleteError::InstanceNotPersisted;
+use crate::app::instance::scan::InstanceScanError;
+use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
+use carbon_minecraft::instance::{Instance, InstanceStatus};
 use log::trace;
 use std::path::Path;
 use thiserror::Error;
 use tokio::task::{spawn_blocking, JoinError};
-
-use super::Instances;
 
 #[derive(Error, Debug)]
 pub enum InstanceDeleteError {
@@ -27,15 +25,19 @@ pub enum InstanceDeleteError {
 
 type InstanceDeleterResult = Result<Instance, InstanceDeleteError>;
 
-impl Instances {
-    pub async fn delete(instance: Instance, put_in_trash_bin: bool) -> InstanceDeleterResult {
+impl InstanceManager {
+    pub(in crate::app::instance) async fn delete_from_fs(
+        &self,
+        instance: Instance,
+        put_in_trash_bin: bool,
+    ) -> InstanceDeleterResult {
         match &instance.persistence_status {
-            InstanceStatus::Persisted(instance_path) if put_in_trash_bin => {
+            InstanceStatus::Ready(instance_path) if put_in_trash_bin => {
                 trace!(
                     "checking instance directory structure at {}",
                     try_path_fmt!(instance_path)
                 );
-                check_instance_directory_sanity(instance_path).await?;
+                self.check_instance_directory_sanity(instance_path).await?;
                 trace!(
                     "putting in trash bin instance from fs at {}",
                     try_path_fmt!(instance_path)
@@ -45,12 +47,12 @@ impl Instances {
 
                 Ok(instance.mutate_persistence_status(InstanceStatus::NotPersisted))
             }
-            InstanceStatus::Persisted(instance_path) if !put_in_trash_bin => {
+            InstanceStatus::Ready(instance_path) if !put_in_trash_bin => {
                 trace!(
                     "checking instance directory structure at {}",
                     try_path_fmt!(instance_path)
                 );
-                check_instance_directory_sanity(instance_path).await?;
+                self.check_instance_directory_sanity(instance_path).await?;
                 trace!(
                     "deleting instance from fs at {}",
                     try_path_fmt!(instance_path)
