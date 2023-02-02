@@ -36,12 +36,6 @@ function watchMain(mainWindow) {
 }
 
 function watchNativeCore(mainWindow) {
-  spawn("pnpm", ["watch"], {
-    cwd: "../../packages/native_interface",
-    shell: true,
-    stdio: "inherit",
-  });
-
   const addressMainWindow = mainWindow.httpServer.address();
   const env = Object.assign(process.env, {
     VITE_DEV_SERVER_HOST: "localhost",
@@ -49,7 +43,7 @@ function watchNativeCore(mainWindow) {
   });
 
   chokidar
-    .watch("../../packages/native_interface/core.node", {
+    .watch("../../packages/core_module/core.node", {
       ignoreInitial: true,
     })
     .on("all", (event) => {

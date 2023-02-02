@@ -1,9 +1,8 @@
-
+use crate::app;
+use crate::app::GlobalContext;
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
-use crate::app;
-use crate::app::GlobalContext;
 
 mod java;
 mod mc;
@@ -40,7 +39,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
                                 yield event;
                             }
                             Err(e) => {
-                                println!("Error receiving invalidation request: {}", e);
+                              println!("Error receiving invalidation request: {}", e);
                             }
                         }
                     }

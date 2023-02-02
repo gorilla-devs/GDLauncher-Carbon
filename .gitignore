@@ -79,12 +79,11 @@ target
 .turbo
 packages/ui/src/style.dist.css
 apps/desktop/data
-packages/native_interface/data
-packages/native_interface/bindings.d.ts
+packages/core_module/data
+packages/core_module/bindings.d.ts
 MC_TEST
 tests_decompressed
 java_runtimes
-rust_target
 
 **/.idea
 crates/carbon_app/src/db.rs
