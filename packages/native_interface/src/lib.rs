@@ -1,8 +1,8 @@
+use carbon_app::app::{App, AppContainer};
 use rspc::RouterBuilderLike;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::trace;
-use carbon_bindings::app::{App, AppContainer};
 
 mod codegen_bindings;
 
@@ -23,7 +23,7 @@ fn init_core() {
 async fn start_router() {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<AppContainer>> = carbon_bindings::api::build_rspc_router()
+    let router: Arc<rspc::Router<AppContainer>> = carbon_app::api::build_rspc_router()
         .expose()
         .build()
         .arced();
@@ -37,7 +37,7 @@ async fn start_router() {
     let app = App::new_with_invalidation_channel(invalidation_sender).await;
 
     let app = axum::Router::new()
-        .nest("/", carbon_bindings::api::build_axum_vanilla_router())
+        .nest("/", carbon_app::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(move || app).axum())
         .layer(cors);
 

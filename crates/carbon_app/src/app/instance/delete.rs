@@ -2,7 +2,7 @@ use crate::app::instance::delete::InstanceDeleteError::InstanceNotPersisted;
 use crate::app::instance::scan::InstanceScanError;
 use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
-use carbon_minecraft::instance::{Instance, InstanceStatus};
+use carbon_domain::instance::{Instance, InstanceStatus};
 use log::trace;
 use std::path::Path;
 use thiserror::Error;

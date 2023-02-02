@@ -1,13 +1,13 @@
+use crate::app::instance::instance_configuration::consts::TEMP_CONFIG_FILE_PREFIX;
 use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
-use carbon_minecraft::instance::{Instance, InstanceConfigurationFile};
+use carbon_domain::instance::{Instance, InstanceConfigurationFile};
 use log::trace;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, SystemTimeError};
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
-use crate::app::instance::instance_configuration::consts::TEMP_CONFIG_FILE_PREFIX;
 
 pub mod consts {
     pub(crate) const TEMP_CONFIG_FILE_PREFIX: &str = ".temp";

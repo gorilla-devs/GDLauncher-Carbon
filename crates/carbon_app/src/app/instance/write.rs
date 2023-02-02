@@ -4,7 +4,7 @@ use crate::app::instance::instance_configuration::consts::{
 use crate::app::instance::instance_configuration::ConfigurationFileParsingError;
 use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
-use carbon_minecraft::instance::{Instance, InstanceStatus};
+use carbon_domain::instance::{Instance, InstanceStatus};
 use log::trace;
 use std::path::{Path, PathBuf};
 use thiserror::Error;

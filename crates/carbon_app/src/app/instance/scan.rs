@@ -7,8 +7,8 @@ use crate::app::instance::scan::InstanceScanError::{
 };
 use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
-use carbon_minecraft::instance::{Instance, InstanceStatus};
-use carbon_minecraft::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
+use carbon_domain::instance::{Instance, InstanceStatus};
+use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
 use log::trace;
 use std::path::{Path, PathBuf};
 use std::{future, io};

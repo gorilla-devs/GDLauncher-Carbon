@@ -1,4 +1,4 @@
-use carbon_minecraft::instance::Instance;
+use carbon_domain::instance::Instance;
 use rspc::Type;
 use serde::Serialize;
 use std::time::UNIX_EPOCH;

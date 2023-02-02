@@ -1,5 +1,5 @@
 [package]
-name = "carbon_bindings"
+name = "carbon_app"
 version = "0.0.0"
 edition = "2021"
 
@@ -24,7 +24,7 @@ uuid = "1.2.2"
 trash = "3.0.1"
 futures = "0.3.26"
 tokio-stream = { version = "0.1.11", features = ["fs"] }
-carbon_minecraft = { path = "../carbon_minecraft" }
+carbon_domain = { path = "../carbon_domain" }
 carbon_java_manager = { path = "../carbon_java_manager" }
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = ["sqlite-create-many", "sqlite", "migrations"], default_features = false }
 

@@ -32,13 +32,13 @@ serde = { version = "1.0.147", features = ["derive", "rc"] }
 serde_json = "1.0.89"
 tokio = { version = "1.22.0", features = ["full"] }
 tower-http = { version = "0.3.4", default-features = false, features = ["cors"] }
-carbon_bindings = { path = "../../crates/carbon_bindings" }
-carbon_minecraft = { path = "../../crates/carbon_minecraft" }
+carbon_app = { path = "../../crates/carbon_app" }
+carbon_domain = { path = "../../crates/carbon_domain" }
 
 [build-dependencies]
 napi-build = "2.0.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46", features=["axum"] }
-carbon_bindings = { path = "../../crates/carbon_bindings" }
+carbon_app = { path = "../../crates/carbon_app" }
 tokio = { version = "1.22.0", features = ["full"] }
 
 
