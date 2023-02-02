@@ -28,7 +28,7 @@ pub enum ConfigurationFileParsingError {
 }
 
 impl InstanceManager {
-    pub(in crate::app::instance) async fn parse_configuration_from_file<T: AsRef<Path> + Sync>(
+    pub(super) async fn parse_configuration_from_file<T: AsRef<Path> + Sync>(
         &self,
         configuration_file_path: &T,
     ) -> Result<InstanceConfigurationFile, ConfigurationFileParsingError> {
@@ -48,7 +48,7 @@ impl InstanceManager {
         Ok(instance_configuration)
     }
 
-    pub(in crate::app::instance) async fn write_configuration_in_file<T: AsRef<Path> + Sync>(
+    pub(super) async fn write_configuration_in_file<T: AsRef<Path> + Sync>(
         &self,
         instance: &Instance,
         configuration_file_path: &T,

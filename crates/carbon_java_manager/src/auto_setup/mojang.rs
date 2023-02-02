@@ -1,6 +1,5 @@
 use super::{JavaAuto, JavaMeta, JavaProgress};
 use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError};
-use carbon_net::Downloadable;
 use chrono::{DateTime, FixedOffset};
 use futures::TryFutureExt;
 use std::{
@@ -53,7 +52,7 @@ impl JavaAuto for MojangRuntime {
         &mut self,
         base_path: &Path,
         // TODO: implement progress reporting
-        progress_report: Sender<JavaProgress>,
+        _progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError> {
         let mojang_assets = self
             .get_runtime_assets(&base_path.join(JAVA_RUNTIMES_FOLDER))

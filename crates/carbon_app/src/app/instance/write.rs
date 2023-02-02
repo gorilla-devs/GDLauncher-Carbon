@@ -30,7 +30,7 @@ pub enum InstanceWriteError {
 type InstanceWriteResult = Result<Instance, InstanceWriteError>;
 
 impl InstanceManager {
-    pub(in crate::app::instance) async fn write_at<T: AsRef<Path> + Sync>(
+    pub(super) async fn write_at<T: AsRef<Path> + Sync>(
         &self,
         instance: Instance,
         path: &T,

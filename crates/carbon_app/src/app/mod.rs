@@ -1,8 +1,8 @@
-mod configuration;
-pub mod instance;
-mod java;
-mod minecraft_mod;
-mod representation;
+pub(crate) mod configuration;
+pub(crate) mod instance;
+pub(crate) mod java;
+pub(crate) mod minecraft_mod;
+pub(crate) mod representation;
 
 use crate::api::InvalidationEvent;
 use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
@@ -11,8 +11,6 @@ use crate::app::java::JavaInstanceManager;
 use crate::db;
 use crate::db::PrismaClient;
 use carbon_macro::gd_launcher_app;
-use log::trace;
-use rspc::{ErrorCode, Router, RouterBuilderLike};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
@@ -82,18 +80,6 @@ pub enum ApiError {
 
     #[error("app not found in ctx")]
     AppNotFound(),
-}
-
-impl Into<rspc::Error> for ApiError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
-    }
-}
-
-impl Into<rspc::Error> for ConfigurationManagerError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
-    }
 }
 
 mod test {

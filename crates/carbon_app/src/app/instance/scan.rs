@@ -3,15 +3,15 @@ use crate::app::instance::instance_configuration::consts::{
 };
 use crate::app::instance::instance_configuration::ConfigurationFileParsingError;
 use crate::app::instance::scan::InstanceScanError::{
-    FileStructureDoesNotMatch, FolderStructureDoesNotMatch,
+    FileStructureDoesNotMatch, FolderStructureDoesNotMatch, PathNotIsNotPointingToAFolder,
 };
 use crate::app::instance::InstanceManager;
 use crate::try_path_fmt;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
 use log::trace;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::{future, io};
 use thiserror::Error;
 use tokio::fs::{read_dir, DirEntry};
 use tokio_stream::wrappers::ReadDirStream;
@@ -45,33 +45,19 @@ type InstanceScanResult = Result<Vec<Result<Instance, InstanceScanError>>, Insta
 type InstanceTestResult = Result<(), InstanceScanError>;
 
 impl InstanceManager {
-    pub(in crate::app::instance) async fn scan_for_instances(
-        &mut self,
+    pub(super) async fn scan_for_instances(
+        &self,
         folder_path: impl AsRef<Path>,
     ) -> InstanceScanResult {
-        let folder_path = folder_path.as_ref();
+        let path_to_search_in = folder_path.as_ref();
         trace!(
             "scanning directory {} for instances",
-            try_path_fmt!(folder_path)
+            try_path_fmt!(path_to_search_in)
         );
-        let aaa = futures::future::join_all(
-            ReadDirStream::new(read_dir(folder_path).await?)
-                .map(|dir_entry| async move {
-                    self.scan_for_instances_single_directory_entry(dir_entry)
-                        .await
-                })
-                .into(),
-        );
-
-        /*let aaa = futures::future::join_all(
-            ReadDirStream::new(read_dir(folder_path).await?)
-                .map(|dir_entry| self.scan_for_instances_single_directory_entry(dir_entry)),
-        );*/
-
-        let res = match folder_path.is_dir() {
-            true => Ok(future::join_all(
-                ReadDirStream::new(read_dir(folder_path).await?)
-                    .map(self.scan_for_instances_single_directory_entry)
+        match path_to_search_in.is_dir() {
+            true => Ok(futures::future::join_all(
+                ReadDirStream::new(read_dir(path_to_search_in).await?)
+                    .map(|dir_entry| self.scan_for_instances_single_directory_entry(dir_entry))
                     .collect::<Vec<_>>()
                     .await,
             )
@@ -79,24 +65,16 @@ impl InstanceManager {
             false => {
                 trace!(
                     "path {} is not pointing to a directory! aborting instance scan process ...",
-                    try_path_fmt!(folder_path)
+                    try_path_fmt!(path_to_search_in)
                 );
-                Err(InstanceScanError::PathNotIsNotPointingToAFolder(
-                    folder_path.to_path_buf(),
+                Err(PathNotIsNotPointingToAFolder(
+                    path_to_search_in.to_path_buf(),
                 ))
-            }
-        };
-
-        if let Ok(instances) = res {
-            for instance in instances.into_iter() {
-                if let Ok(instance) = instance {
-                    self.instances.read().await.save_instance(instance);
-                }
             }
         }
     }
 
-    pub(in crate::app::instance) async fn scan_for_instances_single_directory_entry(
+    pub(super) async fn scan_for_instances_single_directory_entry(
         &self,
         directory_path: Result<DirEntry, io::Error>,
     ) -> Result<Instance, InstanceScanError> {
@@ -131,7 +109,7 @@ impl InstanceManager {
         })
     }
 
-    pub(in crate::app::instance) async fn check_instance_directory_sanity<T: AsRef<Path> + Sync>(
+    pub(super) async fn check_instance_directory_sanity<T: AsRef<Path> + Sync>(
         &self,
         target_instance_directory_path: &T,
     ) -> InstanceTestResult {

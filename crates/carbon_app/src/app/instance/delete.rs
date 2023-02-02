@@ -26,7 +26,7 @@ pub enum InstanceDeleteError {
 type InstanceDeleterResult = Result<Instance, InstanceDeleteError>;
 
 impl InstanceManager {
-    pub(in crate::app::instance) async fn delete_from_fs(
+    pub(super) async fn delete_from_fs(
         &self,
         instance: Instance,
         put_in_trash_bin: bool,

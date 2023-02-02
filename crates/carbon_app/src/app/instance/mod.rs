@@ -9,16 +9,20 @@ mod write;
 
 use crate::app::instance::delete::InstanceDeleteError;
 use crate::app::instance::representation::CreateInstanceDto;
+use crate::app::instance::scan::InstanceScanError;
 use crate::app::instance::store::InstanceStore;
 use crate::app::instance::write::InstanceWriteError;
 use crate::app::App;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use futures::FutureExt;
+use std::collections::BTreeSet;
+use std::path::Path;
 use std::sync::{Arc, Weak};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tokio_stream::StreamExt;
 
 #[derive(Error, Debug)]
 pub enum InstanceManagerError {
@@ -30,6 +34,8 @@ pub enum InstanceManagerError {
     InstanceDeleteError(#[from] InstanceDeleteError),
     #[error("unable to write instance : {0} ")]
     InstanceWriteError(#[from] InstanceWriteError),
+    #[error("unable to scan directory for instances : {0} ")]
+    InstanceScanError(#[from] InstanceScanError),
 }
 
 pub(crate) struct InstanceManager {
@@ -102,6 +108,22 @@ impl InstanceManager {
         Ok(self
             .delete_from_fs(deleted_instance, !remove_from_fs)
             .await?)
+    }
+
+    pub async fn read_instances_from_directory(
+        &self,
+        path: &impl AsRef<Path>,
+    ) -> Result<Vec<Instance>, InstanceManagerError> {
+        let found_instances = self
+            .scan_for_instances(path.as_ref())
+            .await?
+            .into_iter()
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+        for instance in found_instances.clone() {
+            self.instances.read().await.save_instance(instance);
+        }
+        Ok(found_instances)
     }
 
     pub async fn start_instance_by_id(&self, id: String) -> Result<Instance, InstanceManagerError> {

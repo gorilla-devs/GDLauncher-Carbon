@@ -61,7 +61,6 @@ fn expand_gd_launcher_app(app_struct: ItemStruct) -> TokenStream {
         .filter(is_app_component_field)
         .map(expand_app_field_getter)
         .collect();
-    let getter = getters.get(0).unwrap();
 
     let tokens = quote! {
         #app_struct
