@@ -1,10 +1,11 @@
+import { ModloaderType, getModloaderIcon } from "@/utils/sidebar";
 import { Match, Show, Switch, mergeProps } from "solid-js";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   title: string;
-  modloader: string;
+  modloader: ModloaderType;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
@@ -45,10 +46,10 @@ const Tile = (props: Props) => {
           </Show>
 
           <div class="absolute right-5 gap-2 hidden group-hover:flex transition-all duration-100 ease-in-out">
-            <div class="h-7 w-7 bg-shade-5 rounded-full flex justify-center items-center">
+            <div class="h-7 w-7 bg-shade-5 rounded-full flex justify-center items-center cursor-pointer">
               <div class="i-ri:more-2-fill text-white text-lg" />
             </div>
-            <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center">
+            <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center cursor-pointer">
               <div class="i-ri:play-fill text-white text-lg" />
             </div>
           </div>
@@ -78,6 +79,7 @@ const Tile = (props: Props) => {
               {props.title}
             </h4>
             <div class="flex justify-between text-shade-0">
+              <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
               <p class="m-0">{props.modloader}</p>
               <p class="m-0">{props.version}</p>
             </div>
