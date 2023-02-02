@@ -1,10 +1,11 @@
-import { Match, Switch, mergeProps } from "solid-js";
+import { Match, Show, Switch, mergeProps } from "solid-js";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   title: string;
   modloader: string;
+  selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
   version: string;
@@ -35,9 +36,23 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="h-14 w-full flex items-center gap-4 hover:bg-primary bg-opacity-10 px-3"
+          class="group relative h-14 w-full flex items-center gap-4 px-3 box-border cursor pointer"
           onClick={(e) => props?.onClick?.(e)}
         >
+          <Show when={props.selected}>
+            <div class="r:bg-primary opacity-10 transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0" />
+            <div class="w-1 absolute right-0 top-0 bottom-0 bg-primary" />
+          </Show>
+
+          <div class="absolute right-5 gap-2 hidden group-hover:flex transition-all duration-100 ease-in-out">
+            <div class="h-7 w-7 bg-shade-5 rounded-full flex justify-center items-center">
+              <div class="i-ri:more-2-fill text-white text-lg" />
+            </div>
+            <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center">
+              <div class="i-ri:play-fill text-white text-lg" />
+            </div>
+          </div>
+
           <div class="h-10 w-10 bg-green-600 rounded-lg" />
           <div class="flex flex-col">
             <h4
