@@ -8,6 +8,7 @@ import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 
 const Sidebar = () => {
+  // TODO: adapt to real data
   return (
     <SiderbarWrapper noPadding>
       <div class="h-full w-full pt-5 pb-5 box-border">
@@ -16,12 +17,12 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center"
+                class="group w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center"
                 onClick={() => {
                   toggleSidebar();
                 }}
               >
-                <div class="i-ri:search-line text-shade-5" />
+                <div class="i-ri:search-line text-shade-5 group-hover:text-shade-0 transition duration-100 ease-in-out" />
               </div>
             }
           >
@@ -35,6 +36,8 @@ const Sidebar = () => {
         <Show when={isSidebarOpened()}>
           <Collapsable title="VANILLA">
             <Tile
+              isLoading={true}
+              percentage={50}
               // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
@@ -78,84 +81,72 @@ const Sidebar = () => {
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar-small"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
               modloader={"forge"}
               version={"1.19.2"}
@@ -169,7 +160,7 @@ const Sidebar = () => {
             style={{
               ...(isSidebarOpened()
                 ? { width: "100%", "max-width": "200px" }
-                : { width: "40px", height: "40px", padding: "12px" }),
+                : { width: "40px", height: "40px", padding: "16px" }),
             }}
           >
             <Show when={isSidebarOpened()} fallback={"+"}>

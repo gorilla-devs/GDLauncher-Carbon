@@ -39,8 +39,8 @@ const Tile = (props: Props) => {
           class="group relative h-14 w-full flex items-center gap-4 px-3 box-border cursor pointer"
           onClick={(e) => props?.onClick?.(e)}
         >
-          <Show when={props.selected}>
-            <div class="r:bg-primary opacity-10 transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0" />
+          <Show when={props.selected && !props.isLoading}>
+            <div class="bg-primary opacity-10 transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0" />
             <div class="w-1 absolute right-0 top-0 bottom-0 bg-primary" />
           </Show>
 
@@ -53,7 +53,20 @@ const Tile = (props: Props) => {
             </div>
           </div>
 
-          <div class="h-10 w-10 bg-green-600 rounded-lg" />
+          <Show when={props.isLoading && props.percentage !== undefined}>
+            <div
+              class="absolute left-0 top-0 bottom-0 bg-white opacity-10"
+              style={{
+                width: `${props.percentage}%`,
+              }}
+            />
+          </Show>
+          <div
+            class="h-10 w-10 bg-green-600 rounded-lg"
+            classList={{
+              grayscale: props.isLoading,
+            }}
+          />
           <div class="flex flex-col">
             <h4
               class="m-0"
