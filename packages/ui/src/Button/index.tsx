@@ -1,4 +1,12 @@
-import { children, mergeProps, Show, JSX, splitProps } from "solid-js";
+import {
+  children,
+  mergeProps,
+  Show,
+  JSX,
+  splitProps,
+  Switch,
+  Match,
+} from "solid-js";
 import { Spinner } from "../Spinner";
 
 type Size = "small" | "medium" | "large";
@@ -7,6 +15,7 @@ type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string | JSX.Element;
   class?: string;
+  textColor?: string;
   variant?: Variant;
   rounded?: boolean;
   disabled?: boolean;
@@ -15,7 +24,7 @@ export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   uppercase?: boolean;
   loading?: boolean;
   size?: Size;
-  onClick?: (_: MouseEvent) => void;
+  percentage?: number;
 }
 
 const getVariant = (
@@ -25,14 +34,17 @@ const getVariant = (
   isDisabled: boolean,
   uppercase: boolean,
   iconRight: boolean,
-  isLoading: boolean
+  isLoading: boolean,
+  textColor?: string
 ) => {
   const isLarge = size === "large";
   const isMedium = size === "medium";
   const isSmall = size === "small";
 
   const commonStyle = {
+    ...(textColor && { [textColor]: true }),
     "transition-all": true,
+    "overflow-hidden": true,
     "duration-300": true,
     "ease-in-out": true,
     "font-main": true,
@@ -114,6 +126,34 @@ const getVariant = (
   return variants[variant];
 };
 
+const Loading = (props: {
+  children: HTMLElement | string | JSX.Element;
+  percentage: number | undefined;
+}) => {
+  return (
+    <Switch>
+      <Match when={props.percentage === undefined}>
+        <div class="w-12 h-12 flex justify-center items-center">
+          <Spinner />
+        </div>
+      </Match>
+      <Match when={props.percentage !== undefined}>
+        <div class="w-20 h-11 flex justify-center items-center relative">
+          <div
+            class="bg-green-500 text-xs leading-none py-1 absolute top-0 left-0 bottom-0"
+            style={{ width: `${props.percentage}%` }}
+          />
+          <div>
+            <span class="z-10 absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2">
+              {props.children}
+            </span>
+          </div>
+        </div>
+      </Match>
+    </Switch>
+  );
+};
+
 function Button(props: Props) {
   const c = children(() => props.children);
 
@@ -147,7 +187,8 @@ function Button(props: Props) {
           !!props.disabled,
           mergedProps.uppercase,
           !!props.iconRight,
-          !!props.loading
+          !!props.loading,
+          props.textColor
         )}
         {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
         style={{
@@ -159,11 +200,7 @@ function Button(props: Props) {
         <Show when={props.icon}>{props.icon}</Show>
         <Show
           when={!props.loading}
-          fallback={
-            <div class="w-12 h-12 flex justify-center items-center">
-              <Spinner />
-            </div>
-          }
+          fallback={<Loading percentage={props.percentage}>{c()}</Loading>}
         >
           {c()}
         </Show>

@@ -7,13 +7,21 @@ import {
   createEffect,
 } from "solid-js";
 
+export type SpacingTab = { ref: HTMLDivElement; type: string; space: number };
+export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
+
+type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
 export interface ITabsContext {
+  gap?: number;
+  paddingX?: string;
+  paddingY?: string;
   variant: string;
   orientation: string;
   setSelectedIndex: (_: number) => void;
-  registerTab: (_node: HTMLDivElement, _index?: number) => number;
+  registerTab: (_obj: TabType, _index?: number) => number;
+  registerTabSpacing: (_obj: SpacingTab, _index?: number) => number;
   currentIndex: Accessor<number | undefined>;
-  getRegisteredTabs: () => HTMLDivElement[];
+  getRegisteredTabs: () => TabArrayElement[];
   registerTabPanel: (_: HTMLDivElement) => number;
   isSelectedIndex: (_: number) => boolean;
 }
@@ -25,6 +33,9 @@ export interface Props {
   onChange?: (_: number) => void;
   variant?: "underline" | "block";
   orientation?: "horizontal" | "vertical";
+  gap?: number;
+  paddingX?: string;
+  paddingY?: string;
 }
 
 const TabsContext = createContext<ITabsContext>();
@@ -45,7 +56,7 @@ function Tabs(props: Props) {
     setCurrentIndex(props.index !== undefined ? props.index : defaultIndex());
   });
 
-  const [tabs, setTabs] = createSignal<HTMLDivElement[]>([]);
+  const [tabs, setTabs] = createSignal<TabArrayElement[]>([]);
   const [tabPanels, setTabPanels] = createSignal<HTMLDivElement[]>([]);
 
   createEffect(() => {
@@ -56,20 +67,36 @@ function Tabs(props: Props) {
 
   const orientation = () => props.orientation || "horizontal";
   const variant = () => props.variant || "underline";
+  const gap = () => props.gap;
+  const paddingX = () => props?.paddingX;
+  const paddingY = () => props?.paddingY;
 
   const setSelectedIndex = (index: number) => {
     setCurrentIndex(index);
     props?.onChange?.(index);
   };
 
-  const registerTab = (node: HTMLDivElement, index?: number) => {
+  const registerTab = (obj: TabType, index?: number) => {
     if (index !== undefined) {
       const updatedArray = [...tabs()];
-      updatedArray[index] = node;
+      updatedArray[index] = obj;
       setTabs(updatedArray);
       return index;
     }
-    const updatedArray = [...tabs(), node];
+    const updatedArray = [...tabs(), obj] as TabArrayElement[];
+    setTabs(updatedArray);
+    return updatedArray.length - 1;
+  };
+
+  const registerTabSpacing = (obj: SpacingTab, index?: number) => {
+    if (index !== undefined) {
+      const updatedArray = [...tabs()];
+      updatedArray[index] = obj;
+      setTabs(updatedArray);
+      return index;
+    }
+    const updatedArray = [...tabs(), obj] as TabArrayElement[];
+
     setTabs(updatedArray);
     return updatedArray.length - 1;
   };
@@ -94,15 +121,19 @@ function Tabs(props: Props) {
     registerTab,
     currentIndex,
     getRegisteredTabs,
+    registerTabSpacing,
     registerTabPanel,
+    gap: gap(),
     variant: variant(),
     orientation: orientation(),
+    paddingX: paddingX(),
+    paddingY: paddingY(),
   };
 
   return (
     <TabsContext.Provider value={context}>
       <div
-        class="flex transition-all duration-100 ease-in-out"
+        class="flex transition-all duration-100 ease-in-out w-full"
         classList={{
           "flex-row": orientation() === "vertical",
           "flex-col": orientation() === "horizontal",
