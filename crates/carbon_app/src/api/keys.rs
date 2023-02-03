@@ -3,17 +3,23 @@ macro_rules! keys {
         $(pub mod $group {
             pub const GROUP_PREFIX: &'static str = concat!(stringify!($group), ".");
 
-            #[doc = "full key names"]
-            pub mod full {
-                $(pub const $name: &'static str = concat!(stringify!($group), ".", $value);)*
-            }
-
-            #[doc = "relative key names"]
-            pub mod local {
-                $(pub const $name: &'static str = $value;)*
-            }
+            $(
+                pub const $name: $crate::api::keys::Key = $crate::api::keys::Key {
+                    local: $value,
+                    full: concat!(stringify!($group), ".", $value),
+                };
+            )*
         })*
     }
+}
+
+/// Api endpoint keys
+#[derive(Copy, Clone)]
+pub struct Key {
+    /// local keypoath `mykey`
+    pub local: &'static str,
+    /// full keypath `mygroup.mykey`
+    pub full: &'static str,
 }
 
 keys! {

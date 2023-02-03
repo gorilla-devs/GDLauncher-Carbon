@@ -1,7 +1,7 @@
 mod configuration;
 mod persistence;
 
-use crate::api::keys::app::{full, local::*};
+use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
@@ -66,10 +66,10 @@ impl App {
             .await)
     }
 
-    pub fn invalidate(&self, key: impl Into<String>, args: Option<serde_json::Value>) {
+    pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
         match self
             .invalidation_channel
-            .send(InvalidationEvent::new(key, args))
+            .send(InvalidationEvent::new(key.full, args))
         {
             Ok(_) => (),
             Err(e) => {
@@ -130,7 +130,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
                 .map_err(|error| {
                     rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
                 })?;
-            app.invalidate(full::GET_THEME, Some(new_theme.into()));
+            app.invalidate(GET_THEME, Some(new_theme.into()));
             Ok(())
         }
     }
