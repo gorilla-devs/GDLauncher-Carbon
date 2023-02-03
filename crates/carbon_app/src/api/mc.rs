@@ -43,7 +43,7 @@ struct UpdateInstanceArgs {
 
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     router! {
-        query GET_INSTANCES[_ctx, _args: ()] {
+        query GET_INSTANCES[_, _args: ()] {
             let instances = vec![
                 Instance {
                     id: "88r39459345939453".to_string(),
@@ -88,7 +88,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             Ok(final_instances)
         }
 
-        query GET_INSTANCE_DETAILS[_ctx, args: String] {
+        query GET_INSTANCE_DETAILS[_, args: String] {
             let instance = InstanceDetails {
                 id: "88r39459345939453".to_string(),
                 name: "My first instance".to_string(),
@@ -128,25 +128,25 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
 
             Ok(instance)
         }
-        mutation OPEN_INSTANCE_FOLDER_PATH[_ctx, args: String] {}
-        mutation START_INSTANCE[_ctx, args: String] {}
-        mutation STOP_INSTANCE[_ctx, args: String] {}
-        mutation DELETE_INSTANCE[_ctx, args: String] {}
+        mutation OPEN_INSTANCE_FOLDER_PATH[_, args: String] {}
+        mutation START_INSTANCE[_, args: String] {}
+        mutation STOP_INSTANCE[_, args: String] {}
+        mutation DELETE_INSTANCE[_, args: String] {}
         // Actions on mods
-        mutation ENABLE_MOD[_ctx, args: String] {}
-        mutation DISABLE_MOD[_ctx, args: String] {}
-        mutation REMOVE_MOD[_ctx, args: String] {}
-        mutation REMOVE_MODS[_ctx, args: Vec<String>] {}
+        mutation ENABLE_MOD[_, args: String] {}
+        mutation DISABLE_MOD[_, args: String] {}
+        mutation REMOVE_MOD[_, args: String] {}
+        mutation REMOVE_MODS[_, args: Vec<String>] {}
         // Change versions
-        mutation SWITCH_MINECRAFT_VERSION[_ctx, args: String] {}
-        mutation SWITCH_MODLOADER[_ctx, args: String] {}
-        mutation SWITCH_MODLOADER_VERSION[_ctx, args: String] {}
+        mutation SWITCH_MINECRAFT_VERSION[_, args: String] {}
+        mutation SWITCH_MODLOADER[_, args: String] {}
+        mutation SWITCH_MODLOADER_VERSION[_, args: String] {}
         // Instance settings
-        mutation UPDATE_INSTANCE_NAME[_ctx, args: UpdateInstanceArgs] {}
-        query GET_INSTANCE_MEMORY[_ctx, args: String] {}
-        mutation UPDATE_INSTANCE_MEMORY[_ctx, args: u8] {}
-        query GET_INSTANCE_JAVA_ARGS[_ctx, args: String] {}
-        mutation UPDATE_INSTANCE_JAVA_ARGS[_ctx, args: String] {}
+        mutation UPDATE_INSTANCE_NAME[_, args: UpdateInstanceArgs] {}
+        query GET_INSTANCE_MEMORY[_, args: String] {}
+        mutation UPDATE_INSTANCE_MEMORY[_, args: u8] {}
+        query GET_INSTANCE_JAVA_ARGS[_, args: String] {}
+        mutation UPDATE_INSTANCE_JAVA_ARGS[_, args: String] {}
     }
 }
 

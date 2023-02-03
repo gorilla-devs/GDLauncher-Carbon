@@ -7,7 +7,7 @@ macro_rules! router {
 }
 
 macro_rules! route_boilerplate {
-    ($func:ident ($router:expr, $endpoint:path [$app:ident, $args:ident: $args_ty:ty]) $block:block) => {
+    ($func:ident ($router:expr, $endpoint:path [$app:tt, $args:tt: $args_ty:ty]) $block:block) => {
         $router = $router.$func($endpoint.local, |t| {
             t(|$app: $crate::app::GlobalContext, $args: $args_ty| async move { $block })
         });

@@ -50,7 +50,7 @@ struct SetDefaultArgs {
 
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
     router! {
-        query GET_AVAILABLE[_ctx, _args: ()] {
+        query GET_AVAILABLE[_, _args: ()] {
             let mut javas = HashMap::new();
             let mut java8 = Java {
                 default_id: "vseuitruihsruthurt".to_string(),
@@ -92,16 +92,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
             Ok(Javas(javas))
         }
 
-        mutation SET_DEFAULT[_ctx, args: SetDefaultArgs] {}
+        mutation SET_DEFAULT[_, args: SetDefaultArgs] {}
 
-        mutation SETUP_CONTROLLED[_ctx, args: SetupArgs] {
+        mutation SETUP_CONTROLLED[_, args: SetupArgs] {
             // invalidate_query!("java.autoSetupjavaProgress");
         }
 
-        query GET_CONTROLLED_INSTALL_STATUS[_ctx, _args: ()] {
+        query GET_CONTROLLED_INSTALL_STATUS[_, _args: ()] {
             Ok(0) // progress
         }
 
-        mutation DELETE_CONTROLLED[_ctx, major_version: u8] {}
+        mutation DELETE_CONTROLLED[_, major_version: u8] {}
     }
 }
