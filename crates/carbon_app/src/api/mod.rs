@@ -11,14 +11,14 @@ pub mod router;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
-    key: String,
+    key: &'static str,
     args: Option<serde_json::Value>,
 }
 
 impl InvalidationEvent {
-    pub fn new(key: impl Into<String>, args: Option<serde_json::Value>) -> Self {
+    pub fn new(key: &'static str, args: Option<serde_json::Value>) -> Self {
         Self {
-            key: key.into(),
+            key,
             args,
         }
     }
