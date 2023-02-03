@@ -5,11 +5,19 @@ mod test {
     use std::env;
     use std::path::PathBuf;
 
+<<<<<<<< HEAD:crates/carbon_app/src/app/instance/tests.rs
     use carbon_domain::instance::delete::delete;
     use carbon_domain::instance::scan::check_instance_directory_sanity;
     use carbon_domain::instance::write::write_at;
     use carbon_domain::instance::{Instance, InstanceStatus};
     use carbon_domain::{instance, try_path_fmt};
+========
+    use carbon_domain::{instance, try_path_fmt};
+    use carbon_domain::instance::{Instance, InstanceStatus};
+    use carbon_domain::instance::delete::delete;
+    use carbon_domain::instance::scan::check_instance_directory_sanity;
+    use carbon_domain::instance::write::write_at;
+>>>>>>>> develop:crates/carbon_domain/src/instance/tests.rs
 
     #[tokio::test]
     #[tracing_test::traced_test]

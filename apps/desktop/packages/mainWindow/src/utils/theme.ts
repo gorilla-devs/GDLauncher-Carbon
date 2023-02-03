@@ -1,30 +1,46 @@
-import { mainTheme, lightTheme, Theme } from "@gd/ui";
+import { mainTheme, lightTheme, Theme as UITheme, poisonGreen } from "@gd/ui";
+import { createEffect } from "solid-js";
+import { rspc } from "./rspcClient";
 
-import { createEffect, createSignal } from "solid-js";
-
-const [theme, setTheme] = createSignal(0);
-
-createEffect(() => {
-  switch (theme()) {
-    case 0: {
-      applyTheme(mainTheme);
-      break;
-    }
-    case 1: {
-      applyTheme(lightTheme);
-      break;
-    }
-  }
-});
-
-function applyTheme(theme: Theme) {
-  // Inject theme
-  for (const key in theme) {
-    document.documentElement.style.setProperty(
-      `--${key}`,
-      theme[key as keyof Theme]
-    );
-  }
+enum _Theme {
+  _Default = "default",
+  _Light = "light",
+  _PoisonGreen = "poison-green",
 }
 
-export { theme, setTheme };
+const initThemes = () => {
+  let theme = rspc.createQuery(() => ["app.getTheme", null]);
+
+  createEffect(() => {
+    if (!theme.data) {
+      applyTheme(mainTheme);
+      return;
+    }
+    switch (theme.data) {
+      case _Theme._Default: {
+        applyTheme(mainTheme);
+        break;
+      }
+      case _Theme._Light: {
+        applyTheme(lightTheme);
+        break;
+      }
+      case _Theme._PoisonGreen: {
+        applyTheme(poisonGreen);
+        break;
+      }
+    }
+  });
+
+  function applyTheme(theme: UITheme) {
+    // Inject theme
+    for (const key in theme) {
+      document.documentElement.style.setProperty(
+        `--${key}`,
+        theme[key as keyof UITheme]
+      );
+    }
+  }
+};
+
+export default initThemes;

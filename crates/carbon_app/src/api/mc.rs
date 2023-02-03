@@ -2,13 +2,12 @@ use crate::api::app::AppContainer;
 use crate::app::instance::representation::CreateInstanceDto;
 use crate::app::representation::InstanceDetails;
 use crate::{
-    into_router_mutation_response, into_router_mutation_responses, into_router_query_response,
-    into_router_query_responses_ok, try_in_router,
+    into_router_mutation_response, into_router_query_response, into_router_query_responses_ok,
+    try_in_router,
 };
 use axum::extract::DefaultBodyLimit;
 use rspc::{ErrorCode, Router, RouterBuilderLike, Type};
 use serde::Deserialize;
-use std::path::PathBuf;
 
 pub(super) fn mount() -> impl RouterBuilderLike<AppContainer> {
     Router::<AppContainer>::new()
