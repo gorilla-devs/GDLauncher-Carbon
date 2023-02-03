@@ -5,8 +5,9 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 mod java;
+pub mod keys;
 mod mc;
-mod keys;
+pub mod router;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
