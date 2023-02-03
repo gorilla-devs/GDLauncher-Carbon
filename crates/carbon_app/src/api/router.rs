@@ -9,7 +9,7 @@
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// router! {
 ///     query QUERY_KEY[app, args: MyArgsType] {
 ///         todo!()
