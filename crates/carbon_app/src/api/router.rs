@@ -1,18 +1,13 @@
 macro_rules! router {
-    {$($type:ident $endpoint:path [$($args:tt)*] $block:block)*} => {{
+    {$($type:ident $endpoint:path [$app:tt, $args:tt: $args_ty:ty] $block:block)*} => {{
         let mut router = ::rspc::Router::<$crate::app::GlobalContext>::new();
-        $($crate::api::router::route_boilerplate! { $type(router, $endpoint [$($args)*]) $block })*
+        $(
+            router = router.$type($endpoint.local, |t| {
+                t(|$app: $crate::app::GlobalContext, $args: $args_ty| async move { $block })
+            });
+        )*
         router
     }}
 }
 
-macro_rules! route_boilerplate {
-    ($func:ident ($router:expr, $endpoint:path [$app:tt, $args:tt: $args_ty:ty]) $block:block) => {
-        $router = $router.$func($endpoint.local, |t| {
-            t(|$app: $crate::app::GlobalContext, $args: $args_ty| async move { $block })
-        });
-    };
-}
-
-pub(crate) use route_boilerplate;
 pub(crate) use router;
