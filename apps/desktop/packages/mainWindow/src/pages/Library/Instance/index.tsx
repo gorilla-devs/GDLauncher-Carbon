@@ -43,7 +43,7 @@ const Instance = () => {
 
   let ref: HTMLDivElement;
 
-  let opacityIn = 100;
+  let opacityIn = 1;
   let opacityOut = 0;
 
   return (
@@ -61,34 +61,17 @@ const Instance = () => {
           "inline-header-container"
         );
 
-        console.log(
-          "Scroll",
-          // ref,
-          e.currentTarget.getBoundingClientRect().top,
-          ref.getBoundingClientRect().top,
-          header?.getBoundingClientRect().top
-        );
-        if (
-          innerContainerTop - containerTop <= 100 &&
-          innerContainerTop - containerTop > 50
-        ) {
-          if (header?.style.opacity) {
-            opacityIn += 1;
-            header.style.opacity = opacityIn.toString();
-          }
-        } else if (innerContainerTop - containerTop >= 100) {
+        if (innerContainerTop - containerTop >= 100) {
           if (header?.style && headerContainer?.style) {
-            header.classList.remove("flex");
+            if (opacityOut > 0) opacityOut -= 0.1;
             headerContainer.style.height = "0";
-            header.style.transform = "scale(0)";
-            opacityOut -= 1;
             header.style.opacity = opacityOut.toString();
           }
         } else if (innerContainerTop - containerTop <= 50) {
           if (header?.style && headerContainer?.style) {
-            headerContainer.style.height = "auto";
-            header.style.transform = "scale(1)";
-            header.classList.add("flex");
+            if (opacityIn < 1) opacityIn += 0.1;
+            headerContainer.style.height = "80px";
+            header.style.opacity = opacityIn.toString();
           }
         }
       }}
@@ -188,18 +171,16 @@ const Instance = () => {
               }}
             >
               <div
-                class="flex flex-col lg:flex-row gap-4 justify-end w-full"
+                class="flex flex-col lg:flex-row gap-4 justify-end w-full z-10 transition-height duration-200 ease-in-out"
                 id="inline-header-container"
                 style={{
                   height: 0,
                 }}
               >
                 <div
-                  class="fitems-start w-full transition-transform duration-200 ease-in-out mt-5"
+                  class="flex items-start w-full transition-opacity duration-300 ease-in-out mt-5"
                   id="inline-header"
                   style={{
-                    transform: "scale(0)",
-                    "transform-origin": "top",
                     opacity: 0,
                   }}
                 >
