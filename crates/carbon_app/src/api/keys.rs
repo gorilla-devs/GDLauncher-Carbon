@@ -1,18 +1,16 @@
 macro_rules! keys {
     {$($group:ident { $($name:ident = $value:literal;)* })*} => {
-        #[doc = "full key names"]
-        pub mod full {
-            $(pub mod $group {
+        $(pub mod $group {
+            #[doc = "full key names"]
+            pub mod full {
                 $(pub const $name: &'static str = concat!(stringify!($group), ".", $value);)*
-            })*
-        }
+            }
 
-        #[doc = "relative key names"]
-        pub mod local {
-            $(pub mod $group {
+            #[doc = "relative key names"]
+            pub mod local {
                 $(pub const $name: &'static str = $value;)*
-            })*
-        }
+            }
+        })*
     }
 }
 
