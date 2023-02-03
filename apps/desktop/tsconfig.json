@@ -25,6 +25,7 @@
     "./packages/**/*.tsx",
     "./packages/**/*.ts",
     "./packages/**/*.d.ts",
+    "./packages/mainWindow/src/env.d.ts",
     "./packages/preload/vite.config.js",
     "./packages/mainWindow/vite.config.js",
     "./packages/main/vite.config.js"

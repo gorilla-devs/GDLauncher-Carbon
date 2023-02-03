@@ -12,37 +12,23 @@ console.log(
 module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
-  copyright: "Copyright © 2022 ${author}",
+  copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
+  buildVersion: "5.0.0",
+  buildNumber: "5.0.0",
   asar: true,
   directories: {
-    output: "release/${version}",
+    output: "release",
     buildResources: "build",
   },
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/native_interface/core.node",
+      from: "../../packages/core_module/core.node",
       to: "core.node",
     },
     {
       from: "./JavaCheck.class",
       to: "JavaCheck.class",
-    },
-    {
-      from: "../../target/aarch64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-apple-darwin/release/app_helper",
-      to: "app_helper",
-    },
-    {
-      from: "../../target/x86_64-pc-windows-msvc/release/app_helper.exe",
-      to: "app_helper.exe",
-    },
-    {
-      from: "../../target/x86_64-unknown-linux-gnu/release/app_helper",
-      to: "app_helper",
     },
   ],
   npmRebuild: false,
@@ -54,7 +40,8 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip"],
+    // target: ["dir", "zip", "nsis"],
+    target: ["dir"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -64,52 +51,37 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip"],
+    // target: ["dir", "zip", "dmg"],
+    target: ["dir"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: isDockerBuild ? ["dir"] : ["dir", "zip"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    target: isDockerBuild ? ["dir"] : ["dir"],
+    artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
-  beforePack: async (context) => {
-    const { spawnSync } = require("child_process");
+  afterAllArtifactBuild: () => {
+    const path = require("path");
+    const fs = require("fs");
 
-    if (context.electronPlatformName === "darwin") {
-      if (context.arch === 1) {
-        // x64
-        spawnSync("pnpm", ["core-build", "-- darwin-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      } else if (context.arch === 3) {
-        // arm64
-        spawnSync("pnpm", ["core-build", "-- darwin-arm64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
-    } else if (context.electronPlatformName === "win32") {
-      if (context.arch === 1) {
-        // x64
-        spawnSync("pnpm", ["core-build", "-- win32-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
-    } else if (context.electronPlatformName === "linux") {
-      if (context.arch === 1) {
-        // x64
-        spawnSync("pnpm", ["core-build", "-- linux-x64"], {
-          stdio: "inherit",
-          shell: true,
-          cwd: "../../",
-        });
-      }
+    const packageJsonPath = path.join(__dirname, "package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+
+    const version = packageJson.version;
+
+    if (!version) {
+      throw new Error(
+        "App version removed before end of build! May be corrupted!"
+      );
     }
+
+    delete packageJson.version;
+
+    fs.writeFileSync(
+      packageJsonPath,
+      `${JSON.stringify(packageJson, null, 2)}\n`,
+      "utf8"
+    );
   },
 };

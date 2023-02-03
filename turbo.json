@@ -11,11 +11,7 @@
       "cache": false
     },
     "@gd/desktop#dev": {
-      "dependsOn": [
-        "^@gd/native_interface#dev",
-        "^@gd/ui#build",
-        "^@gd/config#build"
-      ],
+      "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
       "outputs": ["dist/**"],
       "cache": false
     },
@@ -27,24 +23,12 @@
       "dependsOn": ["^@gd/config#build"],
       "cache": false
     },
-    "@gd/native_interface": {
-      "outputs": ["core.node"],
-      "cache": false
-    },
-    "@gd/app_helper": {
-      "cache": false
-    },
     "dev": {
       "outputs": ["dist/**"],
       "cache": false
     },
     "test": {
       "dependsOn": ["^test"],
-      "cache": false
-    },
-    "build-test": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "core.node"],
       "cache": false
     },
     "lint": {

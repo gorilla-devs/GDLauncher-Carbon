@@ -24,9 +24,32 @@ At this point make sure you have pnpm installed:
 
 ## Development
 
-To run in dev please run
+### Run app in dev mode
 
-`pnpm dev-app`
+First of all you'll need to generate the prisma code and rspc bindings. To do that run
+
+`pnpm codegen`
+
+Now you can run the native core in watch mode
+
+`pnpm watch:core`
+Note: Core module hot reload doesn't currently work on windows
+
+Now open a new terminal and run the actual app
+
+`pnpm watch:app`
+
+## Production
+
+`pnpm build:{win|mac|linux}-{x64|arm64}`
+
+### Generate DB migration
+
+To generate a new migration please run
+
+`pnpm prisma:migrate --name {migration_name}`
+
+Replace `{migration_name}` with the name of the migration you want to create.
 
 ## Test
 
@@ -39,7 +62,3 @@ To run tests please run
 To run lint please run
 
 `pnpm lint`
-
-## Release
-
-`pnpm build-{mac|win|linux}-{arm64|x64}`

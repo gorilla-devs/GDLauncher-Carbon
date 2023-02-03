@@ -1,0 +1,21 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "cargo prisma"
+  output   = "../src/db.rs"
+}
+
+model AppConfiguration {
+  id                 Int     @id @default(0)
+  theme              String  @default("main")
+  reducedMotion      Boolean @default(false)
+  discordIntegration Boolean @default(true)
+  releaseChannel     String  @default("stable")
+}
+
+model Accounts {
+  id Int @id @unique
+}
