@@ -6,8 +6,14 @@ import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Collapsable from "./collapsable";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
+import { useLocation, useNavigate } from "@solidjs/router";
 
 const Sidebar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const instanceId = () => location.pathname.match(/\/([^/]*)$/)![1];
+
   // TODO: adapt to real data
   return (
     <SiderbarWrapper noPadding>
@@ -38,15 +44,15 @@ const Sidebar = () => {
             <Tile
               isLoading={true}
               percentage={50}
-              // onClick={() => navigate(`/library/${instance.id}`)}
-              title={"InstanceName"}
+              title={"Instance"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar"
             />
             <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
-              title={"InstanceName"}
+              onClick={() => navigate(`/library/ABDFEAD`)}
+              selected={instanceId() === "ABDFEAD"}
+              title={"Instance ABDFEAD"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar"
@@ -54,7 +60,9 @@ const Sidebar = () => {
           </Collapsable>
           <Collapsable title="FAVOURITED">
             <Tile
-              title={"InstanceName"}
+              onClick={() => navigate(`/library/DDAEDF`)}
+              selected={instanceId() === "DDAEDF"}
+              title={"Instance DDAEDF"}
               modloader={"forge"}
               version={"1.19.2"}
               variant="sidebar"
