@@ -1,7 +1,9 @@
+pub mod account;
 mod configuration;
 mod persistence;
 
 use crate::api::InvalidationEvent;
+use crate::app::account::AccountManager;
 use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
 use crate::app::persistence::PersistenceManager;
 use rspc::{ErrorCode, Router, RouterBuilderLike};
@@ -20,11 +22,22 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
+impl From<AppError> for rspc::Error {
+    fn from(value: AppError) -> Self {
+        rspc::Error::new(
+            ErrorCode::InternalServerError,
+            format!("App Error: {}", value),
+        )
+    }
+}
+
 pub struct App {
     //instances: Instances,
+    account_manager: AppComponentContainer<AccountManager>,
     configuration_manager: AppComponentContainer<ConfigurationManager>,
     persistence_manager: AppComponentContainer<PersistenceManager>,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
+    reqwest_client: reqwest::Client,
 }
 
 impl App {
@@ -32,15 +45,30 @@ impl App {
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
     ) -> GlobalContext {
         let app = Arc::new(RwLock::new(App {
+            account_manager: None,
             configuration_manager: None,
             persistence_manager: None,
             invalidation_channel,
+            reqwest_client: reqwest::Client::new(),
         }));
+        let account_manager = AccountManager::make_for_app(&app);
         let configuration_manager = ConfigurationManager::make_for_app(&app);
         let persistence_manager = PersistenceManager::make_for_app(&app).await;
+        app.write().await.account_manager = Some(RwLock::new(account_manager));
         app.write().await.persistence_manager = Some(RwLock::new(persistence_manager));
         app.write().await.configuration_manager = Some(RwLock::new(configuration_manager));
         app
+    }
+
+    pub(crate) async fn get_account_manager(
+        &self,
+    ) -> Result<RwLockReadGuard<AccountManager>, AppError> {
+        Ok(self
+            .account_manager
+            .as_ref()
+            .ok_or_else(|| AppError::ManagerNotFound("".to_string()))?
+            .read()
+            .await)
     }
 
     pub(crate) async fn get_persistence_manager(

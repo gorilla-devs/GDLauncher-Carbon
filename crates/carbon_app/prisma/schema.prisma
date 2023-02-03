@@ -9,13 +9,18 @@ generator client {
 }
 
 model AppConfiguration {
-  id                 Int     @id @default(0)
-  theme              String  @default("main")
-  reducedMotion      Boolean @default(false)
-  discordIntegration Boolean @default(true)
-  releaseChannel     String  @default("stable")
+  id                 Int      @id @default(0)
+  theme              String   @default("main")
+  reducedMotion      Boolean  @default(false)
+  discordIntegration Boolean  @default(true)
+  releaseChannel     String   @default("stable")
+  activeAccountUuid  String?
 }
 
-model Accounts {
-  id Int @id @unique
+model Account {
+  uuid             String   @id
+  username         String
+  accessToken      String?
+  tokenExpires     DateTime?
+  msRefreshToken   String?
 }
