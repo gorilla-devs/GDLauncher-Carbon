@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 mod java;
 mod mc;
+mod keys;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
