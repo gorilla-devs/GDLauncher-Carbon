@@ -1,6 +1,8 @@
 macro_rules! keys {
     {$($group:ident { $($name:ident = $value:literal;)* })*} => {
         $(pub mod $group {
+            pub const GROUP_PREFIX: &'static str = concat!(stringify!($group), ".");
+
             #[doc = "full key names"]
             pub mod full {
                 $(pub const $name: &'static str = concat!(stringify!($group), ".", $value);)*

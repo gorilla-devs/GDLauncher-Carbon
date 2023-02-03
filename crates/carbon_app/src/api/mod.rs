@@ -27,9 +27,9 @@ impl InvalidationEvent {
 pub fn build_rspc_router() -> impl RouterBuilderLike<GlobalContext> {
     rspc::Router::<GlobalContext>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
-        .yolo_merge("java.", java::mount())
-        .yolo_merge("mc.", mc::mount())
-        .yolo_merge("app.", app::mount())
+        .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
+        .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
+        .yolo_merge(keys::app::GROUP_PREFIX, app::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
