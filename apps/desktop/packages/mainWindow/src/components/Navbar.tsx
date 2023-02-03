@@ -32,16 +32,16 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-shade-8 text-white h-15 flex items-center px-5">
+      <nav class="flex bg-shade-8 text-white h-15 items-center px-5">
         <div class="flex w-full">
-          <div class="w-36 flex items-center">
+          <div class="flex items-center w-36">
             <img
               src={GDLauncherWideLogo}
-              class="h-9 cursor-pointer"
+              class="cursor-pointer h-9"
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex items-between gap-6 m-0 text-white list-none pl-10 w-full">
+          <ul class="flex m-0 text-white w-full items-between gap-6 list-none pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -69,18 +69,18 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
+                    <div class="text-shade-0 cursor-pointer i-ri:terminal-box-fill text-2xl" />
                   </Tab>
                   <Tab>
                     <div
-                      class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
+                      class="text-shade-0 text-2xl cursor-pointer i-ri:settings-3-fill"
                       classList={{
                         "bg-primary": !!isSettings() || !!isSettingsNested(),
                       }}
                       onClick={() => navigate("/settings")}
                     />
                   </Tab>
-                  <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
+                  <div class="text-shade-0 text-2xl cursor-pointer i-ri:notification-2-fill" />
                 </div>
               </TabList>
             </Tabs>

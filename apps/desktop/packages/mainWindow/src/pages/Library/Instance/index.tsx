@@ -124,7 +124,7 @@ const Instance = () => {
                 <div class="h-16 w-16 rounded-xl bg-shade-8">
                   {/* <img /> */}
                 </div>
-                <div class="flex flex-1 flex-col max-w-185 ">
+                <div class="flex flex-1 flex-col max-w-185">
                   <h1 class="m-0">{id}</h1>
                   <div class="flex flex-col lg:flex-row justify-between">
                     <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
@@ -199,18 +199,18 @@ const Instance = () => {
                       />
                     </Button>
                   </div>
-                  <div class="flex flex-1 flex-col max-w-185 ">
+                  <div class="flex flex-1 flex-col max-w-185">
                     <h4 class="m-0">{id}</h4>
                     <div class="flex flex-col lg:flex-row justify-between">
                       <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
-                        <div class="text-xs	 p-0 lg:pr-2 border-0 lg:border-r-2 border-shade-5">
+                        <div class="text-xs p-0 lg:pr-2 border-0 lg:border-r-2 border-shade-5">
                           Forge 1.19.2
                         </div>
-                        <div class="text-xs	p-0 lg:px-2 border-0 lg:border-r-2 border-shade-5 flex gap-2 items-center">
+                        <div class="text-xs p-0 lg:px-2 border-0 lg:border-r-2 border-shade-5 flex gap-2 items-center">
                           <div class="i-ri:time-fill" />
                           1d ago
                         </div>
-                        <div class="text-xs	p-0 lg:px-2 flex gap-2 items-center">
+                        <div class="text-xs p-0 lg:px-2 flex gap-2 items-center">
                           <div class="i-ri:user-fill" />
                           ATMTeam
                         </div>
