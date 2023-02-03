@@ -41,6 +41,7 @@ keys! {
         ENABLE_MOD                    = "enableMod";
         DISABLE_MOD                   = "disableMod";
         REMOVE_MOD                    = "removeMod";
+        REMOVE_MODS                   = "removeMods";
         SWITCH_MINECRAFT_VERSION      = "switchMinecraftVersion";
         SWITCH_MODLOADER              = "switchModloader";
         SWITCH_MODLOADER_VERSION      = "switchModloaderVersion";

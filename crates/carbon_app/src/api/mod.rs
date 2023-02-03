@@ -17,10 +17,7 @@ pub struct InvalidationEvent {
 
 impl InvalidationEvent {
     pub fn new(key: &'static str, args: Option<serde_json::Value>) -> Self {
-        Self {
-            key,
-            args,
-        }
+        Self { key, args }
     }
 }
 
