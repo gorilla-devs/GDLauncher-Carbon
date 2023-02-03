@@ -3,7 +3,7 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
-import { For, onCleanup, onMount } from "solid-js";
+import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 type InstancePage = {
@@ -42,50 +42,55 @@ const Instance = () => {
     getRouteIndex(instancePages, location.pathname, true);
 
   let ref: HTMLDivElement;
-  let observer: ResizeObserver;
 
-  onMount(() => {
-    observer = new IntersectionObserver(
-      ([e]) => {
-        const header = document.getElementById("inline-header");
-        const innerContainer = document.getElementById(
-          "inline-inner-container"
-        );
-
-        if (e.intersectionRatio < 1) {
-          if (header) {
-            innerContainer?.classList.remove("pt-10");
-            innerContainer?.classList.add("pt-5");
-            header.classList.remove("hidden");
-            header.classList.add("flex");
-            header.classList.remove("opacity-100");
-            header.classList.add("mt-4");
-          }
-        } else {
-          if (header) {
-            innerContainer?.classList.add("pt-10");
-            innerContainer?.classList.remove("pt-5");
-            header.classList.add("hidden");
-            header.classList.remove("flex");
-            header.classList.remove("opacity-0");
-            header.classList.remove("mt-0");
-          }
-        }
-      },
-      { threshold: [1] }
-    );
-    observer.observe(ref!);
-  });
-
-  onCleanup(() => {
-    observer.disconnect();
-  });
+  let opacityIn = 100;
+  let opacityOut = 0;
 
   return (
     <div
       class="relative h-full bg-shade-8 max-h-full overflow-auto overflow-x-hidden"
       style={{
         "scrollbar-gutter": "stable",
+      }}
+      onScroll={(e) => {
+        const containerTop = e.currentTarget.getBoundingClientRect().top;
+        const innerContainerTop = ref.getBoundingClientRect().top;
+
+        const header = document.getElementById("inline-header");
+        const headerContainer = document.getElementById(
+          "inline-header-container"
+        );
+
+        console.log(
+          "Scroll",
+          // ref,
+          e.currentTarget.getBoundingClientRect().top,
+          ref.getBoundingClientRect().top,
+          header?.getBoundingClientRect().top
+        );
+        if (
+          innerContainerTop - containerTop <= 100 &&
+          innerContainerTop - containerTop > 50
+        ) {
+          if (header?.style.opacity) {
+            opacityIn += 1;
+            header.style.opacity = opacityIn.toString();
+          }
+        } else if (innerContainerTop - containerTop >= 100) {
+          if (header?.style && headerContainer?.style) {
+            header.classList.remove("flex");
+            headerContainer.style.height = "0";
+            header.style.transform = "scale(0)";
+            opacityOut -= 1;
+            header.style.opacity = opacityOut.toString();
+          }
+        } else if (innerContainerTop - containerTop <= 50) {
+          if (header?.style && headerContainer?.style) {
+            headerContainer.style.height = "auto";
+            header.style.transform = "scale(1)";
+            header.classList.add("flex");
+          }
+        }
       }}
     >
       <div
@@ -182,8 +187,22 @@ const Instance = () => {
                 ref = el;
               }}
             >
-              <div class="flex flex-col lg:flex-row gap-4 justify-end w-full">
-                <div class="flex items-start w-full hidden" id="inline-header">
+              <div
+                class="flex flex-col lg:flex-row gap-4 justify-end w-full"
+                id="inline-header-container"
+                style={{
+                  height: 0,
+                }}
+              >
+                <div
+                  class="fitems-start w-full transition-transform duration-200 ease-in-out mt-5"
+                  id="inline-header"
+                  style={{
+                    transform: "scale(0)",
+                    "transform-origin": "top",
+                    opacity: 0,
+                  }}
+                >
                   <div class="h-fit w-fit justify-center items-center mr-4 transition duration-100 ease-in-out">
                     <Button
                       onClick={() => navigate("/library")}
