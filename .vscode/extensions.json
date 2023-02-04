@@ -15,6 +15,7 @@
     "esbenp.prettier-vscode",
     "rust-lang.rust-analyzer",
     "voorjaar.windicss-intellisense",
-    "prisma.prisma"
+    "prisma.prisma",
+    "editorconfig.editorconfig"
   ]
 }
