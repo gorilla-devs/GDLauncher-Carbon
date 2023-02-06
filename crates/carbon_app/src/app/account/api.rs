@@ -3,9 +3,11 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
+use thiserror::Error;
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
+#[derive(Clone)]
 pub struct DeviceCode {
     pub user_code: String,
     device_code: String,
@@ -69,7 +71,7 @@ impl DeviceCode {
                 .send()
                 .await?;
 
-            match response {
+            match response.status() {
                 StatusCode::BAD_REQUEST => {
                     #[derive(Deserialize)]
                     struct BadRequestError {
@@ -77,7 +79,7 @@ impl DeviceCode {
                     }
 
                     let error = response.json::<BadRequestError>().await?;
-                    match &error.error {
+                    match &error.error as &str {
                         "authorization_pending" => continue,
                         _ => break Err(DeviceCodePollError::BadRequest(error.error))
                     }
@@ -100,12 +102,16 @@ impl DeviceCode {
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     })
                 },
+                status => {
+                    break Err(DeviceCodePollError::UnexpectedResponse(status))
+                }
             }
         }
     }
 }
 
 #[derive(Error, Debug)]
+#[error("reqwest error: {0}")]
 pub struct DeviceCodeRequestError(#[from] reqwest::Error);
 
 #[derive(Error, Debug)]
