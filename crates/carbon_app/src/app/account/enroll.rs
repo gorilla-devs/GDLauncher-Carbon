@@ -39,23 +39,13 @@ impl EnrollmentTask {
                 invalidate();
             };
 
-            let task = || -> Result<(), EntrollmentError> {
+            let task = || -> Result<(), EnrollmentError> {
                 // request device code
                 let device_code = DeviceCode::request_code(&client).await?;
 
-
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone()));
-
-                let ms_auth = loop {
-                    tokio::time::sleep(device_code.polling_interval).await;
-
-                    match code.poll(&client).await {
-                        Ok(Some(todo)) => break Ok(todo),
-                        Err(e) => break Err(e),
-                        Ok(None) => {},
-                    }
-                };
+                let ms_auth = device_code.poll(&client).await?;
 
                 // TODO
 
