@@ -1,5 +1,4 @@
 import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
-import Style from "./Slider.module.scss";
 
 interface Marks {
   [mark: number]: string;
@@ -7,7 +6,7 @@ interface Marks {
 export interface Props {
   min: number;
   max: number;
-  value: number;
+  steps: number;
   marks: Marks;
   defaultValue: number;
   onChange?: (_val: string | undefined) => void;
@@ -29,27 +28,30 @@ function Slider(props: Props) {
   const mousedown = (e: MouseEvent) => {
     e.preventDefault();
     setDragging(true);
-    setXElem(xPos() - handleRef.offsetLeft);
+    let elementPercentage =
+      (handleRef.offsetLeft * 100) / sliderRef.offsetWidth;
+    setXElem(xPos() - elementPercentage);
   };
 
   const mousemove = (e: MouseEvent) => {
-    setXPos(e.pageX);
+    const offsetWidth = sliderRef.offsetWidth;
+    let pageXPercentage = (e.pageX / offsetWidth) * 100;
+
+    setXPos(pageXPercentage);
 
     if (dragging()) {
-      const offsetWidth = sliderRef.offsetWidth;
-
       if (newPos() < 0) {
         setNewPos(0);
       }
 
-      if (newPos() > offsetWidth) {
-        setNewPos(offsetWidth);
+      if (newPos() > 100) {
+        setNewPos(100);
       }
 
-      // if (newPos % 10 === 0) {
-      //   handleRef.style.left = newPos + "px";
-      // }
-      handleRef.style.left = newPos() + "px";
+      if (newPos() % (props.steps || 1) === 0) {
+        handleRef.style.left = newPos() + "px";
+      }
+      handleRef.style.left = newPos() + "%";
     }
   };
 
@@ -92,14 +94,15 @@ function Slider(props: Props) {
         class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move"
         style={{
           position: "absolute",
-          left: `${props.defaultValue}px`,
+          left: `${props.defaultValue}%`,
+          transform: `translateX(-50%)`,
         }}
       />
       <div
         ref={(el) => {
           sliderRef = el;
         }}
-        class={`${Style.slider} ${Style.sliderProgress} w-full h-2 bg-primary rounded-full`}
+        class="w-full h-2 bg-primary rounded-full"
       />
     </div>
   );
