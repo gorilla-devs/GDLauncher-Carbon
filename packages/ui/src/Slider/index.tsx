@@ -6,7 +6,8 @@ interface Marks {
 export interface Props {
   min: number;
   max: number;
-  steps: number;
+  steps?: number;
+  snap?: boolean;
   marks: Marks;
   defaultValue: number;
   onChange?: (_val: string | undefined) => void;
@@ -33,11 +34,31 @@ function Slider(props: Props) {
     setXElem(xPos() - elementPercentage);
   };
 
+  const findClosestNumberAndIndex = (arr: string[], target: number) => {
+    let closest = parseInt(arr[0], 10);
+    let index = 0;
+    let minDiff = Math.abs(target - closest);
+    for (let i = 1; i < arr.length; i++) {
+      let diff = Math.abs(target - parseInt(arr[i], 10));
+      if (diff < minDiff) {
+        closest = parseInt(arr[i], 10);
+        index = i;
+        minDiff = diff;
+      }
+    }
+    return { number: closest, index: index };
+  };
+
   const mousemove = (e: MouseEvent) => {
     const offsetWidth = sliderRef.offsetWidth;
     let pageXPercentage = (e.pageX / offsetWidth) * 100;
 
     setXPos(pageXPercentage);
+
+    const closest = findClosestNumberAndIndex(
+      Object.keys(props.marks),
+      newPos()
+    );
 
     if (dragging()) {
       if (newPos() < 0) {
@@ -48,10 +69,13 @@ function Slider(props: Props) {
         setNewPos(100);
       }
 
-      if (newPos() % (props.steps || 1) === 0) {
-        handleRef.style.left = newPos() + "px";
+      if (!props.snap) {
+        if (newPos() % (props.steps || 1) === 0) {
+          handleRef.style.left = newPos() + "%";
+        }
+      } else {
+        handleRef.style.left = closest.number + "%";
       }
-      handleRef.style.left = newPos() + "%";
     }
   };
 
@@ -95,7 +119,7 @@ function Slider(props: Props) {
         style={{
           position: "absolute",
           left: `${props.defaultValue}%`,
-          transform: `translateX(-50%)`,
+          transform: !props.snap ? `translateX(-50%)` : "",
         }}
       />
       <div
