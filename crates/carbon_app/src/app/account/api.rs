@@ -53,7 +53,7 @@ impl DeviceCode {
         })
     }
 
-    pub async fn poll(&self, client: &Client) -> Result<MsAuth, DeviceCodePollError> {
+    pub async fn poll_ms_auth(&self, client: &Client) -> Result<MsAuth, DeviceCodePollError> {
         loop {
             tokio::time::sleep(self.polling_interval).await;
 
@@ -132,3 +132,46 @@ pub struct MsAuth {
     pub refresh_token: String,
     pub expires_at: DateTime<Utc>,
 }
+
+impl MsAuth {
+    /// Refresh the auth token, returning a new token if the current one
+    /// has expired.
+    pub async fn refresh(&mut self, client: &Client) -> Result<bool, MsAuthRefreshError> {
+        if self.expires_at > Utc::now() {
+            #[derive(Deserialize)]
+            struct RefreshResponse {
+                access_token: String,
+                refresh_token: String,
+                expires_in: i64,
+            }
+
+            let response = client
+                .post("https://login.live.com/oauth20_token.srf")
+                .form(&[
+                    ("client_id", MS_KEY),
+                    ("refresh_token", &self.refresh_token),
+                    ("grant_type", "refresh_token"),
+                    (
+                        "redirect_uri",
+                        "https://login.microsoftonline.com/common/oauth2/nativeclient",
+                    ),
+                ])
+                .send()
+                .await?
+                .error_for_status()?
+                .json::<RefreshResponse>()
+                .await?;
+
+            self.access_token = response.access_token;
+            self.refresh_token = response.refresh_token;
+            self.expires_at = Utc::now() + chrono::Duration::seconds(response.expires_in);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("reqwest error: {0}")]
+pub struct MsAuthRefreshError(#[from] reqwest::Error);

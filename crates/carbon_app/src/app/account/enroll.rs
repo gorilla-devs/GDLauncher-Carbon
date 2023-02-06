@@ -1,7 +1,6 @@
-use std::{thread::JoinHandle, sync::Arc, mem::MaybeUninit};
+use std::sync::Arc;
 
 use futures::{future::abortable, stream::AbortHandle};
-use reqwest::Client;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -23,31 +22,30 @@ enum EnrollmentStatus {
 impl EnrollmentTask {
     /// Begin account enrollment. `invalidate_fn` will be called
     /// whenever the task's status updates.
-    pub fn begin(client: reqwest::Client, invalidate: impl Fn() + Send + Sync + 'static) -> Self {
+    pub fn begin(
+        client: reqwest::Client,
+        invalidate: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
         let status = Arc::new(RwLock::new(EnrollmentStatus::RequestingCode));
         let task_status = status.clone();
 
         let task = async move {
-            let update_status = |status: EnrollmentStatus| {
-                async {
-                    *task_status.write().await = status;
-                    invalidate();
-                }
+            let update_status = |status: EnrollmentStatus| async {
+                *task_status.write().await = status;
+                invalidate();
             };
 
-            let task = || {
-                async {
-                    // request device code
-                    let device_code = DeviceCode::request_code(&client).await?;
+            let task = || async {
+                // request device code
+                let device_code = DeviceCode::request_code(&client).await?;
 
-                    // poll ms auth
-                    update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
-                    let ms_auth = device_code.poll(&client).await?;
+                // poll ms auth
+                update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
+                let ms_auth = device_code.poll_ms_auth(&client).await?;
 
-                    // TODO
+                // TODO
 
-                    Ok::<_, EnrollmentError>(())
-                }
+                Ok(())
             };
 
             match task().await {
@@ -58,7 +56,6 @@ impl EnrollmentTask {
 
         let (task, abort_handle) = abortable(task);
         tokio::task::spawn(task);
-
 
         Self {
             status,
