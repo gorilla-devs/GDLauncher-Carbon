@@ -49,7 +49,7 @@ function Slider(props: Props) {
       // if (newPos % 10 === 0) {
       //   handleRef.style.left = newPos + "px";
       // }
-      handleRef.style.transform = newPos() + "px";
+      handleRef.style.left = newPos() + "px";
     }
   };
 
@@ -72,14 +72,17 @@ function Slider(props: Props) {
   return (
     <div class="relative">
       <For each={Object.entries(props.marks)}>
-        {([value]) => (
-          <div
-            class="w-2 h-2 bg-primary rounded-full border-4 border-solid border-primary -top-1"
+        {([value, label]) => (
+          <span
+            class="flex flex-col -top-1"
             style={{
               position: "absolute",
               left: `${value}%`,
             }}
-          />
+          >
+            <div class="w-2 h-2 bg-primary rounded-full border-4 border-solid border-primary" />
+            <span class="mt-4">{label}</span>
+          </span>
         )}
       </For>
       <div
