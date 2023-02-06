@@ -2,12 +2,13 @@ pub mod account;
 mod configuration;
 mod persistence;
 
+use crate::api::keys::{app::*, Key};
+use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::app::account::AccountManager;
 use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
 use crate::app::persistence::PersistenceManager;
-use rspc::{ErrorCode, Router, RouterBuilderLike};
-use std::path::PathBuf;
+use rspc::{ErrorCode, RouterBuilderLike};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
@@ -93,10 +94,10 @@ impl App {
             .await)
     }
 
-    pub fn invalidate(&self, key: impl Into<String>, args: Option<serde_json::Value>) {
+    pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
         match self
             .invalidation_channel
-            .send(InvalidationEvent::new(key, args))
+            .send(InvalidationEvent::new(key.full, args))
         {
             Ok(_) => (),
             Err(e) => {
@@ -132,37 +133,35 @@ impl Into<rspc::Error> for ConfigurationManagerError {
 }
 
 pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
-    Router::new()
-        .query("getTheme", |t| {
-            t(|app: GlobalContext, _args: ()| async move {
-                let app = app.read().await;
-                let configuration_manager =
-                    app.get_configuration_manager().await.map_err(|error| {
-                        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                    })?;
-                configuration_manager
-                    .get_theme()
-                    .await
-                    .map_err(|error| error.into())
-            })
-        })
-        .mutation("setTheme", |t| {
-            t(|app: GlobalContext, new_theme: String| async move {
-                let app = app.read().await;
-                let configuration_manager =
-                    app.get_configuration_manager().await.map_err(|error| {
-                        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                    })?;
-                configuration_manager
-                    .set_theme(new_theme.clone())
-                    .await
-                    .map_err(|error| {
-                        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                    })?;
-                app.invalidate("app.getTheme", Some(new_theme.into()));
-                Ok(())
-            })
-        })
+    router! {
+        query GET_THEME[app, _args: ()] {
+            let app = app.read().await;
+            let configuration_manager =
+                app.get_configuration_manager().await.map_err(|error| {
+                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
+                })?;
+            configuration_manager
+                .get_theme()
+                .await
+                .map_err(|error| error.into())
+        }
+
+        mutation SET_THEME[app, new_theme: String] {
+            let app = app.read().await;
+            let configuration_manager =
+                app.get_configuration_manager().await.map_err(|error| {
+                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
+                })?;
+            configuration_manager
+                .set_theme(new_theme.clone())
+                .await
+                .map_err(|error| {
+                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
+                })?;
+            app.invalidate(GET_THEME, Some(new_theme.into()));
+            Ok(())
+        }
+    }
 }
 
 // mod test {

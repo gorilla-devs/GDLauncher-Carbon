@@ -62,3 +62,7 @@ To run tests please run
 To run lint please run
 
 `pnpm lint`
+
+## Code Formatting
+
+A [`.editorconfig`](https://editorconfig.org/) is in the repo to normalize inconsistencies your editor may make when saving a file such as indentation and line endings. Make sure the plugin is installed for your editor.
