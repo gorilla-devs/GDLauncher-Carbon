@@ -10,6 +10,9 @@ use tokio::sync::RwLock;
 
 use super::AppError;
 
+mod api;
+mod enroll;
+
 pub(crate) struct AccountManager {
     app: Weak<RwLock<App>>,
     currently_refreshing: RwLock<Vec<String>>,
