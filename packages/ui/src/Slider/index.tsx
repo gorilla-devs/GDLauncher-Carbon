@@ -1,19 +1,20 @@
 import {
   For,
-  createEffect,
+  Match,
+  Switch,
   createSignal,
-  mergeProps,
   onCleanup,
   onMount,
+  JSX,
 } from "solid-js";
 
 interface Marks {
-  [mark: number]: string;
+  [mark: number]: string | { label: JSX.Element };
 }
 export interface Props {
   max: number;
   min: number;
-  steps?: number;
+  steps?: number | null;
   snap?: boolean;
   marks: Marks;
   defaultValue: number;
@@ -21,31 +22,15 @@ export interface Props {
 }
 
 function Slider(props: Props) {
-  const minValue = () => props.min;
-  const [currentValue, setCurrentValue] = createSignal<number>(minValue() || 0);
+  const [currentValue, setCurrentValue] = createSignal<number>(
+    props.defaultValue || 0
+  );
   const [startPosition, setStartPosition] = createSignal<number>(0);
   const [startValue, setStartValue] = createSignal<number>(0);
   const [dragging, setDragging] = createSignal(false);
 
   let handleRef: HTMLDivElement;
   let sliderRef: HTMLDivElement;
-
-  const mergedProps = mergeProps({ steps: 1 }, props);
-
-  const findClosestNumberAndIndex = (arr: string[], target: number) => {
-    let closest = parseInt(arr[0], 10);
-    let index = 0;
-    let minDiff = Math.abs(target - closest);
-    for (let i = 1; i < arr.length; i++) {
-      let diff = Math.abs(target - parseInt(arr[i], 10));
-      if (diff < minDiff) {
-        closest = parseInt(arr[i], 10);
-        index = i;
-        minDiff = diff;
-      }
-    }
-    return { number: closest, index: index };
-  };
 
   const getSliderStart = () => {
     const rect = sliderRef.getBoundingClientRect();
@@ -85,18 +70,17 @@ function Slider(props: Props) {
     }
 
     const points = Object.keys(props.marks).map(parseFloat);
-    if (mergedProps.steps !== null) {
+    if (props.steps !== null && props.steps !== undefined) {
       const closestStep =
-        Math.round((val - props.min) / mergedProps.steps) * mergedProps.steps +
-        props.min;
+        Math.round((val - props.min) / props.steps) * props.steps + props.min;
       points.push(closestStep);
     }
 
     const diffs = points.map((point) => Math.abs(val - point));
     const closestPoint = points[diffs.indexOf(Math.min.apply(Math, diffs))];
 
-    return mergedProps.steps !== null
-      ? parseFloat(closestPoint.toFixed(getPrecision(mergedProps.steps)))
+    return props.steps !== null && props.steps !== undefined
+      ? parseFloat(closestPoint.toFixed(getPrecision(props.steps)))
       : closestPoint;
   };
 
@@ -162,35 +146,60 @@ function Slider(props: Props) {
     <div class="relative">
       <For each={Object.entries(props.marks)}>
         {([value, label]) => (
-          <span
-            class="flex flex-col -top-1"
-            style={{
-              position: "absolute",
-              left: `${value}%`,
-            }}
-          >
-            <div class="w-2 h-2 bg-primary rounded-full border-4 border-solid border-primary" />
-            <p class="mt-2 mb-0 text-xs">{label}</p>
-          </span>
+          <>
+            <div
+              class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
+              style={{
+                position: "absolute",
+                left: `${calcOffset(parseInt(value, 10))}%`,
+                "margin-left": -(16 / 2) + "px",
+              }}
+              classList={{
+                "bg-shade-9 border-shade-9":
+                  calcOffset(parseInt(value, 10)) >= calcOffset(currentValue()),
+                "bg-primary border-primary":
+                  calcOffset(parseInt(value, 10)) <= calcOffset(currentValue()),
+              }}
+            />
+            <p
+              class="flex flex-col mt-2 mb-0 text-xs text-shade-5"
+              style={{
+                position: "absolute",
+                left: `${calcOffset(parseInt(value, 10))}%`,
+                top: "10px",
+              }}
+            >
+              <Switch>
+                <Match when={typeof label === "string"}>{label}</Match>
+                <Match when={typeof label === "object"}>{label.label}</Match>
+              </Switch>
+            </p>
+          </>
         )}
       </For>
       <div
         ref={(el) => {
           handleRef = el;
         }}
-        class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move"
+        class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
         style={{
           position: "absolute",
-          // left: `${props.defaultValue}%`,
           left: `${calcOffset(currentValue())}%`,
           transform: !props.snap ? `translateX(-50%)` : "",
+        }}
+      />
+      <div
+        class=" h-2 bg-primary rounded-full"
+        style={{
+          position: "absolute",
+          width: `${calcOffset(currentValue())}%`,
         }}
       />
       <div
         ref={(el) => {
           sliderRef = el;
         }}
-        class="w-full h-2 bg-primary rounded-full"
+        class="w-full h-2 bg-shade-9 rounded-full"
       />
     </div>
   );
