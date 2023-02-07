@@ -61,13 +61,13 @@ const Instance = () => {
           "inline-header-container"
         );
 
-        if (innerContainerTop - containerTop >= 100) {
+        if (innerContainerTop - containerTop >= 50) {
           if (header?.style && headerContainer?.style) {
             if (opacityOut > 0) opacityOut -= 0.1;
             headerContainer.style.height = "0";
             header.style.opacity = opacityOut.toString();
           }
-        } else if (innerContainerTop - containerTop <= 50) {
+        } else if (innerContainerTop - containerTop <= 10) {
           if (header?.style && headerContainer?.style) {
             if (opacityIn < 1) opacityIn += 0.1;
             headerContainer.style.height = "80px";
