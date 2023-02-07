@@ -319,7 +319,7 @@ impl XboxAuthError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct McAuth {
     pub access_token: String,
     pub expires_at: DateTime<Utc>,
@@ -355,33 +355,8 @@ impl McAuth {
             expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
         })
     }
-}
 
-#[derive(Error, Debug)]
-pub enum McAuthError {
-    #[error("reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("error getting xbox auth: {0}")]
-    Xbox(#[from] XboxAuthError),
-}
-
-pub enum McEntitlement {
-    None,
-    Owned,
-    XboxGamepass,
-}
-
-impl McEntitlement {
-    fn mojang_jwt_key() -> DecodingKey {
-        // The test at the bottom of this file makes sure this unwrap is fine.
-        DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
-    }
-
-    pub async fn check_entitlements(
-        mc_auth: &McAuth,
-        client: &Client,
-    ) -> Result<McEntitlement, McEntitlementCheckError> {
+    pub async fn get_entitlement(&self, client: &Client) -> Result<McEntitlement, McEntitlementCheckError> {
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -389,7 +364,7 @@ impl McEntitlement {
 
         let response = client
             .get("https://api.minecraftservices.com/entitlements/mcstore")
-            .bearer_auth(&mc_auth.access_token)
+            .bearer_auth(&self.access_token)
             .send()
             .await?
             .error_for_status()?
@@ -411,7 +386,7 @@ impl McEntitlement {
         // everything we actually need to check game ownership.
         let entitlements = jsonwebtoken::decode::<SignedEntitlements>(
             &response.signature,
-            &Self::mojang_jwt_key(),
+            &McEntitlement::mojang_jwt_key(),
             &Validation::new(Algorithm::RS256),
         );
 
@@ -439,10 +414,67 @@ impl McEntitlement {
         let owns_game = entitlements.entitlements.iter()
             .any(|SignedEntitlement { name }| name == "product_minecraft");
 
-        Ok(match owns_game {
-            true => McEntitlement::Owned,
-            false => McEntitlement::None,
+        match owns_game {
+            true => Ok(McEntitlement::Owned),
+            false => Err(McEntitlementCheckError::NoEntitlement),
+        }
+    }
+
+    pub async fn get_profile(&self, client: &Client) -> Result<McProfile, McProfileRequestError> {
+        let response = client
+            .get("https://api.minecraftservices.com/minecraft/profile")
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        match response.status() {
+            StatusCode::NOT_FOUND => Err(McProfileRequestError::NoProfile),
+            StatusCode::OK => {
+                #[derive(Debug, Deserialize)]
+                struct McProfileResponse {
+                    id: String,
+                    name: String,
+                }
+
+                let response = response.json::<McProfileResponse>().await?;
+
+                Ok(McProfile {
+                    uuid: response.id,
+                    username: response.name,
+                })
+            },
+            status => Err(McProfileRequestError::UnexpectedResponse(status)),
+        }
+    }
+
+    pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
+        Ok(McAccount {
+            auth: self.clone(),
+            entitlement: self.get_entitlement(&client).await?,
+            profile: self.get_profile(&client).await?,
         })
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum McAuthError {
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("error getting xbox auth: {0}")]
+    Xbox(#[from] XboxAuthError),
+}
+
+#[derive(Debug)]
+pub enum McEntitlement {
+    Owned,
+    XboxGamepass,
+}
+
+impl McEntitlement {
+    fn mojang_jwt_key() -> DecodingKey {
+        // The test at the bottom of this file makes sure this unwrap is fine.
+        DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
     }
 }
 
@@ -462,6 +494,43 @@ pub enum McEntitlementCheckError {
 
     #[error("JWT error: {0}")]
     Jwt(jsonwebtoken::errors::Error),
+
+    #[error("no game entitlement")]
+    NoEntitlement,
+}
+
+#[derive(Debug)]
+pub struct McProfile {
+    pub uuid: String,
+    pub username: String,
+}
+
+#[derive(Error, Debug)]
+pub enum McProfileRequestError {
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("no profile present")]
+    NoProfile,
+
+    #[error("unexpected response: {0}")]
+    UnexpectedResponse(StatusCode),
+}
+
+#[derive(Debug)]
+pub struct McAccount {
+    pub auth: McAuth,
+    pub entitlement: McEntitlement,
+    pub profile: McProfile,
+}
+
+#[derive(Error, Debug)]
+pub enum McAccountPopulateError {
+    #[error("entitlement check error: {0}")]
+    Entitlement(#[from] McEntitlementCheckError),
+
+    #[error("profile retrieval error: {0}")]
+    Profile(#[from] McProfileRequestError),
 }
 
 #[cfg(test)]

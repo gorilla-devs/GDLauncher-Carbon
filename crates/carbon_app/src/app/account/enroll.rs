@@ -5,7 +5,9 @@ use futures::{future::abortable, stream::AbortHandle, Future};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use super::api::{DeviceCode, MsAuth, DeviceCodePollError, DeviceCodeRequestError, McAuth, McAuthError};
+use super::api::{
+    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, McAuth, McAuthError, McAccount, McAccountPopulateError,
+};
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
@@ -18,7 +20,8 @@ enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
-    Complete(McAuth),
+    PopulateAccount,
+    Complete(McAccount),
     Aborted,
     Failed(EnrollmentError),
 }
@@ -51,14 +54,16 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::McLogin).await;
                 let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
 
-                // TODO: verify the user actually owns minecraft
-                update_status(EnrollmentStatus::Complete(mc_auth)).await;
+                update_status(EnrollmentStatus::PopulateAccount).await;
+                let populated = mc_auth.populate(&client).await?;
+
+                update_status(EnrollmentStatus::Complete(populated)).await;
 
                 Ok(())
             };
 
             match task().await {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(e) => update_status(EnrollmentStatus::Failed(e)).await,
             };
         };
@@ -94,6 +99,9 @@ pub enum EnrollmentError {
 
     #[error("error getting mc auth: {0}")]
     McAuth(#[from] McAuthError),
+
+    #[error("error populating account details: {0}")]
+    Populate(#[from] McAccountPopulateError),
 }
 
 /*
@@ -120,7 +128,8 @@ mod test {
             async fn invalidate(&self) {
                 println!(
                     "Invalidate: {:#?}",
-                    self.enrollment.read()
+                    self.enrollment
+                        .read()
                         .await
                         .as_ref()
                         .unwrap()
@@ -132,7 +141,8 @@ mod test {
         }
 
         *enrollment.write().await = Some(EnrollmentTask::begin(
-            reqwest::Client::new(), Printer {
+            reqwest::Client::new(),
+            Printer {
                 enrollment: enrollment.clone(),
             },
         ));
