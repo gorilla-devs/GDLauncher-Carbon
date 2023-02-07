@@ -4,7 +4,7 @@ use futures::{future::abortable, stream::AbortHandle};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use super::api::{DeviceCode, MsAuth, DeviceCodePollError, DeviceCodeRequestError};
+use super::api::{DeviceCode, MsAuth, DeviceCodePollError, DeviceCodeRequestError, McAuth, McAuthError};
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
@@ -15,6 +15,7 @@ pub struct EnrollmentTask {
 enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
+    McLogin,
     Aborted,
     Failed(EnrollmentError),
 }
@@ -42,6 +43,10 @@ impl EnrollmentTask {
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
                 let ms_auth = device_code.poll_ms_auth(&client).await?;
+
+                // authenticate with MC
+                update_status(EnrollmentStatus::McLogin).await;
+                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
 
                 // TODO
 
@@ -77,4 +82,7 @@ pub enum EnrollmentError {
 
     #[error("error polling device code: {0}")]
     DeviceCodePoll(#[from] DeviceCodePollError),
+
+    #[error("error getting mc auth: {0}")]
+    McAuth(#[from] McAuthError),
 }

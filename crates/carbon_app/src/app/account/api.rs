@@ -3,6 +3,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
+use serde_json::json;
 use thiserror::Error;
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
@@ -175,3 +176,191 @@ impl MsAuth {
 #[derive(Error, Debug)]
 #[error("reqwest error: {0}")]
 pub struct MsAuthRefreshError(#[from] reqwest::Error);
+
+struct XboxAuth {
+    xsts_token: String,
+    userhash: String,
+}
+
+impl XboxAuth {
+    /// Obtain an Xbox account from a MS account (without refreshing it)
+    pub async fn from_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, XboxAuthError> {
+        let xbl_token = {
+            #[derive(Deserialize)]
+            struct XblToken {
+                #[serde(rename = "Token")]
+                token: String,
+            }
+
+            let json = json!({
+                "Properties": {
+                    "AuthMethod": "RPS",
+                    "SiteName":   "user.auth.xboxlive.com",
+                    "RpsTicket": format!("d={}", &ms_auth.access_token),
+                },
+                "RelyingParty": "http://auth.xboxlive.com",
+                "TokenType":    "JWT",
+            });
+
+            let response = client
+                .post("https://user.auth.xboxlive.com/user/authenticate")
+                .header("Accept", "application/json")
+                .json(&json)
+                .send()
+                .await?
+                .error_for_status()?
+                .json::<XblToken>()
+                .await?;
+
+            response.token
+        };
+
+        // get xsts token
+
+        let json = json!({
+            "Properties": {
+                "SandboxId":  "RETAIL",
+                "UserTokens": [xbl_token],
+            },
+            "RelyingParty": "rp://api.minecraftservices.com/",
+            "TokenType":    "JWT",
+        });
+
+        let response = client
+            .post("https://xsts.auth.xboxlive.com/xsts/authorize")
+            .header("Content-Type", "application/json")
+            .json(&json)
+            .send()
+            .await?;
+
+        match response.status() {
+            StatusCode::OK => {
+                #[derive(Deserialize)]
+                struct XstsToken {
+                    #[serde(rename = "Token")]
+                    token: String,
+                    #[serde(rename = "DisplayClaims")]
+                    display_claims: DisplayClaims,
+                }
+
+                #[derive(Deserialize)]
+                struct DisplayClaims {
+                    xui: Vec<Xui>
+                }
+
+                #[derive(Deserialize)]
+                struct Xui {
+                    uhs: String,
+                }
+
+                let response = response.json::<XstsToken>().await?;
+                Ok(Self {
+                    xsts_token: response.token,
+                    userhash: response.display_claims
+                        .xui
+                        .get(0)
+                        .ok_or(XboxAuthError::MissingUserhash)?
+                        .uhs
+                        .clone(),
+                })
+            },
+            StatusCode::UNAUTHORIZED => {
+                #[derive(Deserialize)]
+                struct XstsError {
+                    #[serde(rename = "XErr")]
+                    xerr: u64,
+                }
+
+                let xsts_err = response.json::<XstsError>().await?;
+                Err(XboxAuthError::from_xerr(xsts_err.xerr))
+            },
+            status => Err(XboxAuthError::UnexpectedResponse(status)),
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum XboxAuthError {
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("missing userhash")]
+    MissingUserhash,
+
+    #[error("unexpected response: {0}")]
+    UnexpectedResponse(StatusCode),
+
+    #[error("no xbox account is associated with this microsoft account")]
+    NoAccount,
+
+    #[error("xbox live is not availible in this country")]
+    XboxServicesBanned,
+
+    #[error("this xbox account must be verified as an adult")]
+    AdultVerificationRequired,
+
+    #[error("this xbox account is a child account, and must have a family associated")]
+    ChildAccount,
+
+    #[error("unknown xbox error code: {0}")]
+    Unknown(u64),
+}
+
+impl XboxAuthError {
+    // error code from an XErr code returned by the XSTS auth endpoint
+    fn from_xerr(xerr: u64) -> Self {
+        match xerr {
+            2148916233 => Self::NoAccount,
+            2148916235 => Self::XboxServicesBanned,
+            2148916236 | 2148916237 => Self::AdultVerificationRequired,
+            2148916238 => Self::ChildAccount,
+            xerr => Self::Unknown(xerr),
+        }
+    }
+}
+
+pub struct McAuth {
+    pub access_token: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+impl McAuth {
+    /// Authenticate with a MS account (without refreshing it)
+    pub async fn auth_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, McAuthError> {
+        let xbox_auth = XboxAuth::from_ms(ms_auth, client).await?;
+
+        let json = json!({
+            "identityToken": format!("XBL3.0 x={};{}", xbox_auth.userhash, xbox_auth.xsts_token)
+        });
+
+        #[derive(Deserialize)]
+        struct McAuthResponse {
+            access_token: String,
+            expires_in: i64,
+        }
+
+        let response = client
+            .post("https://api.minecraftservices.com/authentication/login_with_xbox")
+            .header("Accept", "application/json")
+            .json(&json)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<McAuthResponse>()
+            .await?;
+
+        Ok(Self {
+            access_token: response.access_token,
+            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum McAuthError {
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("error getting xbox auth: {0}")]
+    Xbox(#[from] XboxAuthError),
+}
