@@ -557,6 +557,7 @@ name = "carbon_app"
 version = "0.0.0"
 dependencies = [
  "async-stream",
+ "async-trait",
  "axum",
  "carbon_domain",
  "carbon_java_manager",
@@ -564,6 +565,8 @@ dependencies = [
  "chrono",
  "directories",
  "env_logger",
+ "futures",
+ "jsonwebtoken",
  "log",
  "prisma-client-rust",
  "reqwest",

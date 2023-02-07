@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
@@ -82,7 +83,7 @@ impl DeviceCode {
                     let error = response.json::<BadRequestError>().await?;
                     match &error.error as &str {
                         "authorization_pending" => continue,
-                        _ => break Err(DeviceCodePollError::BadRequest(error.error))
+                        _ => break Err(DeviceCodePollError::BadRequest(error.error)),
                     }
                 }
                 StatusCode::OK => {
@@ -101,11 +102,9 @@ impl DeviceCode {
                         id_token: response.id_token,
                         refresh_token: response.refresh_token,
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
-                    })
-                },
-                status => {
-                    break Err(DeviceCodePollError::UnexpectedResponse(status))
+                    });
                 }
+                status => break Err(DeviceCodePollError::UnexpectedResponse(status)),
             }
         }
     }
@@ -245,7 +244,7 @@ impl XboxAuth {
 
                 #[derive(Deserialize)]
                 struct DisplayClaims {
-                    xui: Vec<Xui>
+                    xui: Vec<Xui>,
                 }
 
                 #[derive(Deserialize)]
@@ -256,14 +255,15 @@ impl XboxAuth {
                 let response = response.json::<XstsToken>().await?;
                 Ok(Self {
                     xsts_token: response.token,
-                    userhash: response.display_claims
+                    userhash: response
+                        .display_claims
                         .xui
                         .get(0)
                         .ok_or(XboxAuthError::MissingUserhash)?
                         .uhs
                         .clone(),
                 })
-            },
+            }
             StatusCode::UNAUTHORIZED => {
                 #[derive(Deserialize)]
                 struct XstsError {
@@ -273,7 +273,7 @@ impl XboxAuth {
 
                 let xsts_err = response.json::<XstsError>().await?;
                 Err(XboxAuthError::from_xerr(xsts_err.xerr))
-            },
+            }
             status => Err(XboxAuthError::UnexpectedResponse(status)),
         }
     }
@@ -364,4 +364,110 @@ pub enum McAuthError {
 
     #[error("error getting xbox auth: {0}")]
     Xbox(#[from] XboxAuthError),
+}
+
+pub enum McEntitlements {
+    None,
+    Owned,
+    XboxGamepass,
+}
+
+impl McEntitlements {
+    fn mojang_jwt_key() -> DecodingKey {
+        // The test at the bottom of this file makes sure this unwrap is fine.
+        DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
+    }
+
+    pub async fn check_entitlements(
+        mc_auth: &McAuth,
+        client: &Client,
+    ) -> Result<McEntitlements, McEntitlementCheckError> {
+        #[derive(Deserialize)]
+        struct EntitlementResponse {
+            signature: String,
+        }
+
+        let response = client
+            .get("https://api.minecraftservices.com/entitlements/mcstore")
+            .bearer_auth(&mc_auth.access_token)
+            .send()
+            .await?
+            .error_for_status()?
+            .json::<EntitlementResponse>()
+            .await?;
+
+        println!("Reponse: {}", &response.signature);
+
+        #[derive(Debug, Deserialize)]
+        struct SignedEntitlements {
+            entitlements: Vec<SignedEntitlement>,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct SignedEntitlement {
+            name: String,
+        }
+
+        // The only part of the response we use is the JWT signature part,
+        // as its data is confirmed to be signed by mojang, and contains
+        // everything we actually need to check game ownership.
+        let entitlements = jsonwebtoken::decode::<SignedEntitlements>(
+            &response.signature,
+            &Self::mojang_jwt_key(),
+            &Validation::new(Algorithm::RS256),
+        );
+
+        let entitlements = match entitlements {
+            Ok(jwt) => jwt.claims,
+            Err(e) => {
+                let error = match e.kind() {
+                    ErrorKind::InvalidSignature | ErrorKind::ImmatureSignature => {
+                        McEntitlementCheckError::InvalidSignature
+                    }
+                    ErrorKind::InvalidToken | ErrorKind::MissingRequiredClaim(_) => {
+                        McEntitlementCheckError::InvalidData
+                    }
+                    ErrorKind::MissingAlgorithm => McEntitlementCheckError::Outdated,
+                    _ => McEntitlementCheckError::Jwt(e),
+                };
+
+                return Err(error);
+            }
+        };
+
+        println!("Entitlements: {entitlements:#?}");
+
+        todo!("parse signed entitlements")
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum McEntitlementCheckError {
+    #[error("reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("response data was not valid")]
+    InvalidData,
+
+    #[error("response data could not be verified")]
+    InvalidSignature,
+
+    #[error("GDLauncher account verifcation checks are outdated")]
+    Outdated,
+
+    #[error("JWT error: {0}")]
+    Jwt(jsonwebtoken::errors::Error),
+}
+
+#[cfg(test)]
+mod test {
+    use super::McEntitlements;
+
+    /// Make sure it's possible to get a JWT decoding key from
+    /// the saved public key.
+    #[test]
+    fn valid_mojang_account_sig() {
+        // unwrap performed inside
+        let _ = McEntitlements::mojang_jwt_key();
+    }
 }
