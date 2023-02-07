@@ -144,64 +144,69 @@ function Slider(props: Props) {
   };
 
   return (
-    <div class="relative">
-      <For each={Object.entries(props.marks)}>
-        {([value, label]) => (
-          <>
-            <div
-              class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
-              style={{
-                position: "absolute",
-                left: `${calcOffset(parseInt(value, 10))}%`,
-                "margin-left": -(16 / 2) + "px",
-              }}
-              classList={{
-                "bg-shade-9 border-shade-9":
-                  calcOffset(parseInt(value, 10)) >= calcOffset(currentValue()),
-                "bg-primary border-primary":
-                  calcOffset(parseInt(value, 10)) <= calcOffset(currentValue()),
-              }}
-            />
-            <p
-              class="flex flex-col mt-2 mb-0 text-xs text-shade-5"
-              style={{
-                position: "absolute",
-                left: `${calcOffset(parseInt(value, 10))}%`,
-                top: "10px",
-              }}
-            >
-              <Switch>
-                <Match when={typeof label === "string"}>{label}</Match>
-                <Match when={typeof label === "object"}>{label.label}</Match>
-              </Switch>
-            </p>
-          </>
-        )}
-      </For>
-      <div
-        ref={(el) => {
-          handleRef = el;
-        }}
-        class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
-        style={{
-          position: "absolute",
-          left: `${calcOffset(currentValue())}%`,
-          transform: "translateX(-50%)",
-        }}
-      />
-      <div
-        class=" h-2 bg-primary rounded-full"
-        style={{
-          position: "absolute",
-          width: `${calcOffset(currentValue())}%`,
-        }}
-      />
-      <div
-        ref={(el) => {
-          sliderRef = el;
-        }}
-        class="w-full h-2 bg-shade-9 rounded-full"
-      />
+    <div class="h-10 flex items-center">
+      <div class="relative w-full">
+        <For each={Object.entries(props.marks)}>
+          {([value, label]) => (
+            <>
+              <div
+                class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
+                style={{
+                  position: "absolute",
+                  left: `${calcOffset(parseInt(value, 10))}%`,
+                  "margin-left": -(16 / 2) + "px",
+                }}
+                classList={{
+                  "bg-shade-9 border-shade-9":
+                    calcOffset(parseInt(value, 10)) >=
+                    calcOffset(currentValue()),
+                  "bg-primary border-primary":
+                    calcOffset(parseInt(value, 10)) <=
+                    calcOffset(currentValue()),
+                }}
+              />
+              <p
+                class="flex flex-col mt-2 mb-0 text-xs text-shade-5 w-10"
+                style={{
+                  position: "absolute",
+                  left: `${calcOffset(parseInt(value, 10))}%`,
+                  top: "10px",
+                  "margin-left": -(40 / 2) + "px",
+                }}
+              >
+                <Switch>
+                  <Match when={typeof label === "string"}>{label}</Match>
+                  <Match when={typeof label === "object"}>{label.label}</Match>
+                </Switch>
+              </p>
+            </>
+          )}
+        </For>
+        <div
+          ref={(el) => {
+            handleRef = el;
+          }}
+          class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
+          style={{
+            position: "absolute",
+            left: `${calcOffset(currentValue())}%`,
+            transform: "translateX(-50%)",
+          }}
+        />
+        <div
+          class=" h-2 bg-primary rounded-full"
+          style={{
+            position: "absolute",
+            width: `${calcOffset(currentValue())}%`,
+          }}
+        />
+        <div
+          ref={(el) => {
+            sliderRef = el;
+          }}
+          class="w-full h-2 bg-shade-9 rounded-full"
+        />
+      </div>
     </div>
   );
 }
