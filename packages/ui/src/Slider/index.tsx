@@ -1,38 +1,36 @@
-import { For, createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  For,
+  createEffect,
+  createSignal,
+  mergeProps,
+  onCleanup,
+  onMount,
+} from "solid-js";
 
 interface Marks {
   [mark: number]: string;
 }
 export interface Props {
-  min: number;
   max: number;
+  min: number;
   steps?: number;
   snap?: boolean;
   marks: Marks;
   defaultValue: number;
-  onChange?: (_val: string | undefined) => void;
+  onChange?: (_val: number) => void;
 }
 
 function Slider(props: Props) {
-  const [xElem, setXElem] = createSignal<number>(0);
-  const [xPos, setXPos] = createSignal<number>(0);
-  const [newPos, setNewPos] = createSignal<number>(0);
+  const minValue = () => props.min;
+  const [currentValue, setCurrentValue] = createSignal<number>(minValue() || 0);
+  const [startPosition, setStartPosition] = createSignal<number>(0);
+  const [startValue, setStartValue] = createSignal<number>(0);
   const [dragging, setDragging] = createSignal(false);
 
   let handleRef: HTMLDivElement;
   let sliderRef: HTMLDivElement;
 
-  createEffect(() => {
-    setNewPos(xPos() - xElem());
-  });
-
-  const mousedown = (e: MouseEvent) => {
-    e.preventDefault();
-    setDragging(true);
-    let elementPercentage =
-      (handleRef.offsetLeft * 100) / sliderRef.offsetWidth;
-    setXElem(xPos() - elementPercentage);
-  };
+  const mergedProps = mergeProps({ steps: 1 }, props);
 
   const findClosestNumberAndIndex = (arr: string[], target: number) => {
     let closest = parseInt(arr[0], 10);
@@ -49,34 +47,94 @@ function Slider(props: Props) {
     return { number: closest, index: index };
   };
 
-  const mousemove = (e: MouseEvent) => {
-    const offsetWidth = sliderRef.offsetWidth;
-    let pageXPercentage = (e.pageX / offsetWidth) * 100;
+  const getSliderStart = () => {
+    const rect = sliderRef.getBoundingClientRect();
+    return rect.left;
+  };
 
-    setXPos(pageXPercentage);
-
-    const closest = findClosestNumberAndIndex(
-      Object.keys(props.marks),
-      newPos()
-    );
-
-    if (dragging()) {
-      if (newPos() < 0) {
-        setNewPos(0);
-      }
-
-      if (newPos() > 100) {
-        setNewPos(100);
-      }
-
-      if (!props.snap) {
-        if (newPos() % (props.steps || 1) === 0) {
-          handleRef.style.left = newPos() + "%";
-        }
-      } else {
-        handleRef.style.left = closest.number + "%";
-      }
+  const getSliderLength = () => {
+    if (!sliderRef) {
+      return 0;
     }
+
+    return sliderRef.clientWidth;
+  };
+
+  const calcValue = (offset: number) => {
+    const ratio = Math.abs(offset / getSliderLength());
+    const value = ratio * (props.max - props.min) + props.min;
+    return value;
+  };
+
+  const getPrecision = (step: number) => {
+    const stepString = step.toString();
+    let precision = 0;
+    if (stepString.indexOf(".") >= 0) {
+      precision = stepString.length - stepString.indexOf(".") - 1;
+    }
+    return precision;
+  };
+
+  const trimAlignValue = (v: number) => {
+    let val = v;
+    if (val <= props.min) {
+      val = props.min;
+    }
+    if (val >= props.max) {
+      val = props.max;
+    }
+
+    const points = Object.keys(props.marks).map(parseFloat);
+    if (mergedProps.steps !== null) {
+      const closestStep =
+        Math.round((val - props.min) / mergedProps.steps) * mergedProps.steps +
+        props.min;
+      points.push(closestStep);
+    }
+
+    const diffs = points.map((point) => Math.abs(val - point));
+    const closestPoint = points[diffs.indexOf(Math.min.apply(Math, diffs))];
+
+    return mergedProps.steps !== null
+      ? parseFloat(closestPoint.toFixed(getPrecision(mergedProps.steps)))
+      : closestPoint;
+  };
+
+  const calcValueByPos = (position: number) => {
+    const pixelOffset = position - getSliderStart();
+    const nextValue = trimAlignValue(calcValue(pixelOffset));
+    return nextValue;
+  };
+
+  const mousedown = (e: MouseEvent) => {
+    e.preventDefault();
+
+    const value = calcValueByPos(e.pageX);
+    setDragging(true);
+    setStartPosition(e.pageX);
+    setStartValue(value);
+
+    if (currentValue() !== value) {
+      onChange(value);
+    }
+  };
+
+  const onChange = (val: number) => {
+    setCurrentValue(val);
+    props?.onChange?.(val);
+  };
+
+  const mousemove = (e: MouseEvent) => {
+    if (!dragging()) return;
+    let diffPosition = e.pageX - startPosition();
+    const diffValue =
+      (diffPosition / getSliderLength()) * (props.max - props.min);
+
+    const value = trimAlignValue(startValue() + diffValue);
+    const oldValue = currentValue();
+    if (value === oldValue) return;
+
+    onChange(value);
   };
 
   const mouseup = () => {
@@ -95,6 +153,11 @@ function Slider(props: Props) {
     document.removeEventListener("mouseup", mouseup);
   });
 
+  const calcOffset = (value: number) => {
+    const ratio = (value - props.min) / (props.max - props.min);
+    return ratio * 100;
+  };
+
   return (
     <div class="relative">
       <For each={Object.entries(props.marks)}>
@@ -107,7 +170,7 @@ function Slider(props: Props) {
             }}
           >
             <div class="w-2 h-2 bg-primary rounded-full border-4 border-solid border-primary" />
-            <span class="mt-4">{label}</span>
+            <p class="mt-2 mb-0 text-xs">{label}</p>
           </span>
         )}
       </For>
@@ -118,7 +181,8 @@ function Slider(props: Props) {
         class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move"
         style={{
           position: "absolute",
-          left: `${props.defaultValue}%`,
+          // left: `${props.defaultValue}%`,
+          left: `${calcOffset(currentValue())}%`,
           transform: !props.snap ? `translateX(-50%)` : "",
         }}
       />
