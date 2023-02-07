@@ -6,7 +6,8 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 
 use super::api::{
-    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, McAuth, McAuthError, McAccount, McAccountPopulateError,
+    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, McAccount, McAccountPopulateError,
+    McAuth, McAuthError,
 };
 
 /// Active process of adding an account

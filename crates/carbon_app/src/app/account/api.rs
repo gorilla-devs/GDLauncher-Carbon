@@ -356,7 +356,10 @@ impl McAuth {
         })
     }
 
-    pub async fn get_entitlement(&self, client: &Client) -> Result<McEntitlement, McEntitlementCheckError> {
+    pub async fn get_entitlement(
+        &self,
+        client: &Client,
+    ) -> Result<McEntitlement, McEntitlementCheckError> {
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -411,7 +414,9 @@ impl McAuth {
         println!("Entitlements: {entitlements:#?}");
 
         // likely will not work for gamepass
-        let owns_game = entitlements.entitlements.iter()
+        let owns_game = entitlements
+            .entitlements
+            .iter()
             .any(|SignedEntitlement { name }| name == "product_minecraft");
 
         match owns_game {
@@ -442,7 +447,7 @@ impl McAuth {
                     uuid: response.id,
                     username: response.name,
                 })
-            },
+            }
             status => Err(McProfileRequestError::UnexpectedResponse(status)),
         }
     }
