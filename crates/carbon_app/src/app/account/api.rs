@@ -366,13 +366,13 @@ pub enum McAuthError {
     Xbox(#[from] XboxAuthError),
 }
 
-pub enum McEntitlements {
+pub enum McEntitlement {
     None,
     Owned,
     XboxGamepass,
 }
 
-impl McEntitlements {
+impl McEntitlement {
     fn mojang_jwt_key() -> DecodingKey {
         // The test at the bottom of this file makes sure this unwrap is fine.
         DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
@@ -381,7 +381,7 @@ impl McEntitlements {
     pub async fn check_entitlements(
         mc_auth: &McAuth,
         client: &Client,
-    ) -> Result<McEntitlements, McEntitlementCheckError> {
+    ) -> Result<McEntitlement, McEntitlementCheckError> {
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -395,8 +395,6 @@ impl McEntitlements {
             .error_for_status()?
             .json::<EntitlementResponse>()
             .await?;
-
-        println!("Reponse: {}", &response.signature);
 
         #[derive(Debug, Deserialize)]
         struct SignedEntitlements {
@@ -437,7 +435,14 @@ impl McEntitlements {
 
         println!("Entitlements: {entitlements:#?}");
 
-        todo!("parse signed entitlements")
+        // likely will not work for gamepass
+        let owns_game = entitlements.entitlements.iter()
+            .any(|SignedEntitlement { name }| name == "product_minecraft");
+
+        Ok(match owns_game {
+            true => McEntitlement::Owned,
+            false => McEntitlement::None,
+        })
     }
 }
 
@@ -461,13 +466,13 @@ pub enum McEntitlementCheckError {
 
 #[cfg(test)]
 mod test {
-    use super::McEntitlements;
+    use super::McEntitlement;
 
     /// Make sure it's possible to get a JWT decoding key from
     /// the saved public key.
     #[test]
     fn valid_mojang_account_sig() {
         // unwrap performed inside
-        let _ = McEntitlements::mojang_jwt_key();
+        let _ = McEntitlement::mojang_jwt_key();
     }
 }
