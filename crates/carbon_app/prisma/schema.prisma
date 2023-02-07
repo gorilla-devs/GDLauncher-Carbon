@@ -19,3 +19,20 @@ model AppConfiguration {
 model Accounts {
   id Int @id @unique
 }
+
+model MinecraftManifest {
+  id          String            @id @unique
+  type        String
+  url         String
+  time        String
+  releaseTime String
+  sha1        String
+  version     MinecraftVersion? @relation(fields: [id], references: [id])
+}
+
+model MinecraftVersion {
+  id                String             @id @unique
+  MinecraftManifest MinecraftManifest?
+  // For now let's just store the entire json as bytes
+  json              Bytes
+}

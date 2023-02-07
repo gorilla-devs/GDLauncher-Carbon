@@ -1,19 +1,27 @@
-mod configuration;
-mod persistence;
-
 use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
-use crate::app::configuration::{ConfigurationManager, ConfigurationManagerError};
-use crate::app::persistence::PersistenceManager;
+use crate::managers::persistence::PersistenceManager;
+use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, RwLock, RwLockReadGuard};
 
-pub type GlobalContext = Arc<RwLock<App>>;
+use self::minecraft::MinecraftManager;
+
+mod minecraft;
+mod persistence;
+mod settings;
+
+pub type Managers = Arc<ManagersInner>;
 type AppComponentContainer<M> = Option<RwLock<M>>;
+
+trait Manager {
+    fn create_manager() -> Self;
+    fn init_manager(&self) -> Result<(), AppError>;
+}
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -21,26 +29,32 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
-pub struct App {
+pub struct ManagersInner {
     //instances: Instances,
     configuration_manager: AppComponentContainer<ConfigurationManager>,
     persistence_manager: AppComponentContainer<PersistenceManager>,
+    minecraft_manager: AppComponentContainer<MinecraftManager>,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
 }
 
-impl App {
+impl ManagersInner {
     pub async fn new_with_invalidation_channel(
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
-    ) -> GlobalContext {
-        let app = Arc::new(RwLock::new(App {
+    ) -> Managers {
+        let app = Arc::new(ManagersInner {
             configuration_manager: None,
             persistence_manager: None,
+            minecraft_manager: None,
             invalidation_channel,
-        }));
+        });
+        // DO NOT REFER TO MANAGERS INSIDE make_for_app
         let configuration_manager = ConfigurationManager::make_for_app(&app);
         let persistence_manager = PersistenceManager::make_for_app(&app).await;
-        app.write().await.persistence_manager = Some(RwLock::new(persistence_manager));
-        app.write().await.configuration_manager = Some(RwLock::new(configuration_manager));
+        let minecraft_manager = MinecraftManager::make_for_app(&app).await;
+
+        app.persistence_manager = Some(RwLock::new(persistence_manager));
+        app.configuration_manager = Some(RwLock::new(configuration_manager));
+        app.minecraft_manager = Some(RwLock::new(minecraft_manager));
         app
     }
 
@@ -104,7 +118,7 @@ impl Into<rspc::Error> for ConfigurationManagerError {
     }
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
+pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_THEME[app, _args: ()] {
             let app = app.read().await;

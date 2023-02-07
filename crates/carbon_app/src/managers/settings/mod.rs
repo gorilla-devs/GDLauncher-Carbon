@@ -1,18 +1,18 @@
-use crate::app::configuration::ConfigurationManagerError::{
-    AppConfigurationNotFound, AppNotFoundError, ThemeNotFound,
-};
-use crate::app::persistence::PersistenceManagerError;
-use crate::app::{App, AppError};
 use crate::db;
-use crate::db::app_configuration::SetParam::{SetId, SetTheme};
+use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
+use crate::managers::persistence::PersistenceManagerError;
+use crate::managers::settings::ConfigurationManagerError::{
+    AppConfigurationNotFound, AppNotFoundError,
+};
+use crate::managers::{AppError, ManagersInner};
 use log::trace;
 use prisma_client_rust::QueryError;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tokio::sync::RwLock;
+
+use super::Managers;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
@@ -42,29 +42,26 @@ pub struct AppConfiguration {
 }
 
 pub(crate) struct ConfigurationManager {
-    app: Weak<RwLock<App>>,
+    app: Weak<ManagersInner>,
 }
 
 impl ConfigurationManager {
-    pub fn make_for_app(app: &Arc<RwLock<App>>) -> ConfigurationManager {
+    pub fn make_for_app(app: &Managers) -> ConfigurationManager {
         ConfigurationManager {
             app: Arc::downgrade(app),
         }
     }
 
-    fn get_app(&self) -> Result<Arc<RwLock<App>>, ConfigurationManagerError> {
+    fn get_app(&self) -> Result<Managers, ConfigurationManagerError> {
         self.app.upgrade().ok_or(AppNotFoundError)
     }
 
     pub async fn get_theme(&self) -> Result<String, ConfigurationManagerError> {
         trace!("retrieving current theme from db");
         let app = self.app.upgrade().ok_or(AppNotFoundError)?;
-        let app = app.read().await;
         let persistence_manager = app.get_persistence_manager().await?;
         let app_config = persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .app_configuration()
             .find_unique(db::app_configuration::id::equals(0))
@@ -79,12 +76,9 @@ impl ConfigurationManager {
     pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
         trace!("writing theme in db : {theme}");
         let app = self.app.upgrade().ok_or(AppNotFoundError)?;
-        let app = app.read().await;
         let persistence_manager = app.get_persistence_manager().await?;
         persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .app_configuration()
             .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
