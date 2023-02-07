@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use futures::{future::abortable, stream::AbortHandle};
+use async_trait::async_trait;
+use futures::{future::abortable, stream::AbortHandle, Future};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -12,10 +13,12 @@ pub struct EnrollmentTask {
     abort: AbortHandle,
 }
 
+#[derive(Debug)]
 enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
+    Complete(McAuth),
     Aborted,
     Failed(EnrollmentError),
 }
@@ -25,7 +28,7 @@ impl EnrollmentTask {
     /// whenever the task's status updates.
     pub fn begin(
         client: reqwest::Client,
-        invalidate: impl Fn() + Send + Sync + 'static,
+        invalidate: impl InvalidateCtx + Send + Sync + 'static,
     ) -> Self {
         let status = Arc::new(RwLock::new(EnrollmentStatus::RequestingCode));
         let task_status = status.clone();
@@ -33,7 +36,7 @@ impl EnrollmentTask {
         let task = async move {
             let update_status = |status: EnrollmentStatus| async {
                 *task_status.write().await = status;
-                invalidate();
+                invalidate.invalidate().await;
             };
 
             let task = || async {
@@ -48,7 +51,8 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::McLogin).await;
                 let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
 
-                // TODO
+                // TODO: verify the user actually owns minecraft
+                update_status(EnrollmentStatus::Complete(mc_auth)).await;
 
                 Ok(())
             };
@@ -75,6 +79,11 @@ impl EnrollmentTask {
     }
 }
 
+#[async_trait]
+pub trait InvalidateCtx {
+    async fn invalidate(&self);
+}
+
 #[derive(Error, Debug)]
 pub enum EnrollmentError {
     #[error("error requesting device code: {0}")]
@@ -86,3 +95,49 @@ pub enum EnrollmentError {
     #[error("error getting mc auth: {0}")]
     McAuth(#[from] McAuthError),
 }
+
+/*
+mod test {
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+    use tokio::sync::RwLock;
+
+    use crate::app::account::enroll::InvalidateCtx;
+
+    use super::EnrollmentTask;
+
+    #[tokio::test]
+    async fn test_mc_auth() {
+        let enrollment = Arc::new(RwLock::new(Option::<EnrollmentTask>::None));
+
+        struct Printer {
+            enrollment: Arc<RwLock<Option<EnrollmentTask>>>,
+        }
+
+        #[async_trait]
+        impl InvalidateCtx for Printer {
+            async fn invalidate(&self) {
+                println!(
+                    "Invalidate: {:#?}",
+                    self.enrollment.read()
+                        .await
+                        .as_ref()
+                        .unwrap()
+                        .status
+                        .read()
+                        .await
+                );
+            }
+        }
+
+        *enrollment.write().await = Some(EnrollmentTask::begin(
+            reqwest::Client::new(), Printer {
+                enrollment: enrollment.clone(),
+            },
+        ));
+
+        tokio::time::sleep(std::time::Duration::from_secs(10000)).await
+    }
+}
+*/

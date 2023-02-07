@@ -8,7 +8,7 @@ use thiserror::Error;
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DeviceCode {
     pub user_code: String,
     device_code: String,
@@ -319,6 +319,7 @@ impl XboxAuthError {
     }
 }
 
+#[derive(Debug)]
 pub struct McAuth {
     pub access_token: String,
     pub expires_at: DateTime<Utc>,
