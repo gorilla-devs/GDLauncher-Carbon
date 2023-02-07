@@ -1,5 +1,5 @@
 import Tile from "@/components/Instance/Tile";
-import { Carousel, News, Slider } from "@gd/ui";
+import { Carousel, News } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
 import "./index.css";
@@ -87,18 +87,10 @@ const Home = () => {
   const navigate = useNavigate();
   const [t] = useTransContext();
 
-  const marks = {
-    0: "0°C",
-    10: "10°C",
-    30: "30°C",
-    80: "80°C",
-  };
-
   return (
     <div class="p-6">
       <div>
-        {/* <News slides={newsArticles} /> */}
-        <Slider max={1000} min={0} value={10} marks={marks} defaultValue={15} />
+        <News slides={newsArticles} />
         <div class="mt-4">
           <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>
