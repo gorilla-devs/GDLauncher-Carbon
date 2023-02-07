@@ -42,7 +42,8 @@ impl DeviceCode {
             .header("content-length", "0")
             .send()
             .await?
-            .error_for_status().map_err(|e| e.without_url())?
+            .error_for_status()
+            .map_err(|e| e.without_url())?
             .json::<DeviceCodeResponse>()
             .await?;
 
@@ -126,6 +127,7 @@ pub enum DeviceCodePollError {
     UnexpectedResponse(StatusCode),
 }
 
+#[derive(Debug, Clone)]
 pub struct MsAuth {
     pub access_token: String,
     pub id_token: String,
@@ -470,7 +472,7 @@ pub enum McAuthError {
     Xbox(#[from] XboxAuthError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum McEntitlement {
     Owned,
     XboxGamepass,
@@ -504,7 +506,7 @@ pub enum McEntitlementCheckError {
     NoEntitlement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct McProfile {
     pub uuid: String,
     pub username: String,
@@ -522,7 +524,7 @@ pub enum McProfileRequestError {
     UnexpectedResponse(StatusCode),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct McAccount {
     pub auth: McAuth,
     pub entitlement: McEntitlement,
@@ -536,6 +538,12 @@ pub enum McAccountPopulateError {
 
     #[error("profile retrieval error: {0}")]
     Profile(#[from] McProfileRequestError),
+}
+
+#[derive(Debug, Clone)]
+pub struct FullAccount {
+    pub ms: MsAuth,
+    pub mc: McAccount,
 }
 
 #[cfg(test)]

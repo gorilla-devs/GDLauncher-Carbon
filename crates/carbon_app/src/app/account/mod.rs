@@ -1,12 +1,24 @@
-use crate::{app::App, db};
+use crate::{
+    app::{account::enroll::InvalidateCtx, App},
+    db,
+};
+use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{chrono::DateTime, QueryError};
 use rspc::ErrorCode;
-use std::sync::{Arc, Weak};
+use std::{
+    mem,
+    sync::{Arc, Weak},
+};
 
 use thiserror::Error;
 use tokio::sync::RwLock;
+
+use self::{
+    api::DeviceCode,
+    enroll::{EnrollmentStatus, EnrollmentTask},
+};
 
 use super::AppError;
 
@@ -16,6 +28,7 @@ mod enroll;
 pub(crate) struct AccountManager {
     app: Weak<RwLock<App>>,
     currently_refreshing: RwLock<Vec<String>>,
+    active_enrollment: RwLock<Option<EnrollmentTask>>,
 }
 
 impl AccountManager {
@@ -23,6 +36,7 @@ impl AccountManager {
         Self {
             app: Arc::downgrade(app),
             currently_refreshing: RwLock::new(Vec::new()),
+            active_enrollment: RwLock::new(None),
         }
     }
 
@@ -213,6 +227,89 @@ impl AccountManager {
         // TODO: invalidate get_account_list, get_account_status
         Ok(())
     }
+
+    pub async fn begin_enrollment(&self) -> Result<(), EnrollmentError> {
+        match &*self.active_enrollment.read().await {
+            Some(_) => Err(EnrollmentError::InProgress),
+            None => {
+                let client = self
+                    .app
+                    .upgrade()
+                    .unwrap() // waiting on rwlock/weak removal PR
+                    .read()
+                    .await
+                    .reqwest_client
+                    .clone();
+
+                struct Invalidator(Weak<RwLock<App>>);
+
+                #[async_trait]
+                impl InvalidateCtx for Invalidator {
+                    async fn invalidate(&self) {
+                        // TODO: invalidate status endpoint
+                    }
+                }
+
+                let enrollment = EnrollmentTask::begin(client, Invalidator(self.app.clone()));
+
+                *self.active_enrollment.write().await = Some(enrollment);
+
+                Ok(())
+            }
+        }
+    }
+
+    pub async fn cancel_enrollment(&self) -> Result<(), EnrollmentError> {
+        let enrollment = self.active_enrollment.write().await.take();
+
+        match enrollment {
+            Some(_) => Ok(()),
+            None => Err(EnrollmentError::NotActive),
+        }
+    }
+
+    pub async fn get_enrollment_status(&self) -> Result<FEEnrollmentStatus, EnrollmentError> {
+        match &*self.active_enrollment.read().await {
+            None => Err(EnrollmentError::NotActive),
+            Some(enrollment) => Ok(FEEnrollmentStatus::from_enrollment_status(
+                &*enrollment.status.read().await,
+            )),
+        }
+    }
+
+    pub async fn finalize_enrollment(&self) -> Result<(), EnrollmentError> {
+        let enrollment = self.active_enrollment.write().await.take();
+
+        match enrollment {
+            None => Err(EnrollmentError::NotActive),
+            Some(enrollment) => {
+                let mut status = EnrollmentStatus::RequestingCode;
+                mem::swap(&mut *enrollment.status.write().await, &mut status);
+
+                match status {
+                    EnrollmentStatus::Complete(account) => {
+                        self.add_account(FullAccount {
+                            username: account.mc.profile.username,
+                            uuid: account.mc.profile.uuid.clone(),
+                            type_: FullAccountType::Microsoft {
+                                access_token: account.mc.auth.access_token,
+                                token_expires: DateTime::<FixedOffset>::from(
+                                    account.mc.auth.expires_at,
+                                ),
+                                refresh_token: account.ms.refresh_token,
+                            },
+                        })
+                        .await?;
+
+                        self.set_active_uuid(Some(account.mc.profile.uuid)).await?;
+
+                        Ok(())
+                    }
+                    _ => Err(EnrollmentError::NotComplete),
+                }
+            }
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -251,6 +348,21 @@ impl From<AccountError> for rspc::Error {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum EnrollmentError {
+    #[error("enrollment already in progress")]
+    InProgress,
+
+    #[error("no active enrollment")]
+    NotActive,
+
+    #[error("enrollment not complete")]
+    NotComplete,
+
+    #[error("account error: {0}")]
+    AccountError(#[from] AccountError),
+}
+
 struct FullAccount {
     username: String,
     uuid: String,
@@ -283,6 +395,31 @@ impl From<FullAccount> for db::account::Data {
             access_token,
             ms_refresh_token: refresh_token,
             token_expires,
+        }
+    }
+}
+
+// Temporary until enroll errors are fixed
+pub enum FEEnrollmentStatus {
+    RequestingCode,
+    PollingCode(DeviceCode),
+    QueryAccount,
+    Complete(Account),
+    Failed(String),
+}
+
+impl FEEnrollmentStatus {
+    fn from_enrollment_status(status: &EnrollmentStatus) -> FEEnrollmentStatus {
+        match status {
+            EnrollmentStatus::RequestingCode => Self::RequestingCode,
+            EnrollmentStatus::PollingCode(code) => Self::PollingCode(code.clone()),
+            EnrollmentStatus::McLogin | EnrollmentStatus::PopulateAccount => Self::QueryAccount,
+            EnrollmentStatus::Complete(account) => FEEnrollmentStatus::Complete(Account {
+                username: account.mc.profile.username.clone(),
+                uuid: account.mc.profile.uuid.clone(),
+                type_: AccountType::Microsoft,
+            }),
+            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(format!("{:#?}", err)),
         }
     }
 }

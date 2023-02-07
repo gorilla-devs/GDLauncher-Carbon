@@ -6,24 +6,23 @@ use thiserror::Error;
 use tokio::sync::RwLock;
 
 use super::api::{
-    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, McAccount, McAccountPopulateError,
-    McAuth, McAuthError,
+    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccount,
+    McAccountPopulateError, McAuth, McAuthError,
 };
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
-    status: Arc<RwLock<EnrollmentStatus>>,
+    pub status: Arc<RwLock<EnrollmentStatus>>,
     abort: AbortHandle,
 }
 
 #[derive(Debug)]
-enum EnrollmentStatus {
+pub enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
     PopulateAccount,
-    Complete(McAccount),
-    Aborted,
+    Complete(FullAccount),
     Failed(EnrollmentError),
 }
 
@@ -58,7 +57,11 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::PopulateAccount).await;
                 let populated = mc_auth.populate(&client).await?;
 
-                update_status(EnrollmentStatus::Complete(populated)).await;
+                update_status(EnrollmentStatus::Complete(FullAccount {
+                    ms: ms_auth,
+                    mc: populated,
+                }))
+                .await;
 
                 Ok(())
             };
@@ -77,11 +80,11 @@ impl EnrollmentTask {
             abort: abort_handle,
         }
     }
+}
 
-    /// Abort the enrollment task
-    pub async fn abort(self) {
-        *self.status.write().await = EnrollmentStatus::Aborted;
-        self.abort.abort();
+impl Drop for EnrollmentTask {
+    fn drop(&mut self) {
+        self.abort.abort()
     }
 }
 
