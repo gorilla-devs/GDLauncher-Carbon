@@ -42,7 +42,7 @@ impl DeviceCode {
             .header("content-length", "0")
             .send()
             .await?
-            .error_for_status()?
+            .error_for_status().map_err(|e| e.without_url())?
             .json::<DeviceCodeResponse>()
             .await?;
 
