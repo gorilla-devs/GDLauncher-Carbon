@@ -15,15 +15,16 @@ export interface Props {
   max: number;
   min: number;
   steps?: number | null;
-  snap?: boolean;
   marks: Marks;
-  defaultValue: number;
+  value?: number;
   onChange?: (_val: number) => void;
 }
 
 function Slider(props: Props) {
+  const defaultValue = () => props.value;
+  const min = () => props.min;
   const [currentValue, setCurrentValue] = createSignal<number>(
-    props.defaultValue || 0
+    defaultValue() || min()
   );
   const [startPosition, setStartPosition] = createSignal<number>(0);
   const [startValue, setStartValue] = createSignal<number>(0);
@@ -185,7 +186,7 @@ function Slider(props: Props) {
         style={{
           position: "absolute",
           left: `${calcOffset(currentValue())}%`,
-          transform: !props.snap ? `translateX(-50%)` : "",
+          transform: "translateX(-50%)",
         }}
       />
       <div
