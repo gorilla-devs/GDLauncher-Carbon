@@ -1,8 +1,5 @@
-use crate::db;
 use crate::db::PrismaClient;
-use crate::managers::ManagersInner;
 use log::trace;
-use prisma_client_rust::NewClientError;
 use std::{
     path::Path,
     sync::{Arc, Weak},
@@ -10,7 +7,7 @@ use std::{
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use super::Managers;
+use super::{AppRef, Managers};
 
 mod database;
 
@@ -18,19 +15,23 @@ mod database;
 pub enum PersistenceManagerError {}
 
 pub(crate) struct PersistenceManager {
-    managers: Weak<ManagersInner>,
+    app: AppRef,
     db_client: Arc<PrismaClient>,
 }
 
 impl PersistenceManager {
-    pub async fn make_for_app(app: &Managers) -> PersistenceManager {
+    pub async fn new() -> Self {
         // TODO: don't unwrap. Managers should return a result
         let db_client = database::load_and_migrate().await.unwrap();
 
-        PersistenceManager {
-            managers: Arc::downgrade(app),
+        Self {
+            app: AppRef::uninit(),
             db_client: Arc::new(db_client),
         }
+    }
+
+    pub fn get_appref(&self) -> &AppRef {
+        &self.app
     }
 
     pub async fn get_db_client(&self) -> Arc<PrismaClient> {

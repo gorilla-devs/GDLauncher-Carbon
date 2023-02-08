@@ -2,26 +2,16 @@ use crate::db;
 use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
 use crate::managers::persistence::PersistenceManagerError;
-use crate::managers::settings::ConfigurationManagerError::{
-    AppConfigurationNotFound, AppNotFoundError,
-};
-use crate::managers::{AppError, ManagersInner};
+use crate::managers::settings::ConfigurationManagerError::AppConfigurationNotFound;
 use log::trace;
 use prisma_client_rust::QueryError;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Weak};
 use thiserror::Error;
 
-use super::Managers;
+use super::{AppRef, Managers};
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
-    #[error("app reference not found")]
-    AppNotFoundError,
-
-    #[error("app raised an error : {0}")]
-    AppError(#[from] AppError),
-
     #[error("error raised while executing query : ")]
     ThemeNotFound,
 
@@ -42,25 +32,26 @@ pub struct AppConfiguration {
 }
 
 pub(crate) struct ConfigurationManager {
-    app: Weak<ManagersInner>,
+    app: AppRef,
 }
 
 impl ConfigurationManager {
-    pub fn make_for_app(app: &Managers) -> ConfigurationManager {
-        ConfigurationManager {
-            app: Arc::downgrade(app),
+    pub fn new() -> Self {
+        Self {
+            app: AppRef::uninit(),
         }
     }
 
-    fn get_app(&self) -> Result<Managers, ConfigurationManagerError> {
-        self.app.upgrade().ok_or(AppNotFoundError)
+    pub fn get_appref(&self) -> &AppRef {
+        &self.app
     }
 
     pub async fn get_theme(&self) -> Result<String, ConfigurationManagerError> {
         trace!("retrieving current theme from db");
-        let app = self.app.upgrade().ok_or(AppNotFoundError)?;
-        let persistence_manager = app.get_persistence_manager().await?;
-        let app_config = persistence_manager
+        let app_config = self
+            .app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
             .await
             .app_configuration()
@@ -75,9 +66,9 @@ impl ConfigurationManager {
 
     pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
         trace!("writing theme in db : {theme}");
-        let app = self.app.upgrade().ok_or(AppNotFoundError)?;
-        let persistence_manager = app.get_persistence_manager().await?;
-        persistence_manager
+        self.app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
             .await
             .app_configuration()

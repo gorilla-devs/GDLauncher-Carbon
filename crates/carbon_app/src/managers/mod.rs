@@ -4,10 +4,11 @@ use crate::api::InvalidationEvent;
 use crate::managers::persistence::PersistenceManager;
 use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
-use std::sync::Arc;
+use std::cell::UnsafeCell;
+use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, RwLock, RwLockReadGuard};
+use tokio::sync::{broadcast, RwLock};
 
 use self::minecraft::MinecraftManager;
 
@@ -18,11 +19,6 @@ mod settings;
 pub type Managers = Arc<ManagersInner>;
 type AppComponentContainer<M> = Option<RwLock<M>>;
 
-trait Manager {
-    fn create_manager() -> Self;
-    fn init_manager(&self) -> Result<(), AppError>;
-}
-
 #[derive(Error, Debug)]
 pub enum AppError {
     #[error("manager {0} not found")]
@@ -31,10 +27,42 @@ pub enum AppError {
 
 pub struct ManagersInner {
     //instances: Instances,
-    configuration_manager: AppComponentContainer<ConfigurationManager>,
-    persistence_manager: AppComponentContainer<PersistenceManager>,
-    minecraft_manager: AppComponentContainer<MinecraftManager>,
+    configuration_manager: ConfigurationManager,
+    persistence_manager: PersistenceManager,
+    minecraft_manager: MinecraftManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
+}
+
+pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
+
+unsafe impl Send for AppRef {}
+unsafe impl Sync for AppRef {}
+
+impl AppRef {
+    pub fn uninit() -> Self {
+        Self(UnsafeCell::new(None))
+    }
+
+    /// # Safety
+    /// This function is safe to call only during the manager init.
+    /// No managers may spawn tasks that can depend on the app
+    /// during `new`.
+    pub unsafe fn init(&self, app: Weak<ManagersInner>) {
+        *self.0.get() = Some(app);
+    }
+
+    fn ref_inner(&self) -> &Option<Weak<ManagersInner>> {
+        // Safety is enforced by Self::init's invariants
+        unsafe { &*self.0.get() }
+    }
+
+    pub fn upgrade(&self) -> Managers {
+        self.ref_inner()
+            .as_ref()
+            .expect("App was used before initialization")
+            .upgrade()
+            .expect("App was dropped before its final usage")
+    }
 }
 
 impl ManagersInner {
@@ -42,42 +70,27 @@ impl ManagersInner {
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
     ) -> Managers {
         let app = Arc::new(ManagersInner {
-            configuration_manager: None,
-            persistence_manager: None,
-            minecraft_manager: None,
+            configuration_manager: ConfigurationManager::new(),
+            persistence_manager: PersistenceManager::new().await,
+            minecraft_manager: MinecraftManager::new(),
             invalidation_channel,
         });
-        // DO NOT REFER TO MANAGERS INSIDE make_for_app
-        let configuration_manager = ConfigurationManager::make_for_app(&app);
-        let persistence_manager = PersistenceManager::make_for_app(&app).await;
-        let minecraft_manager = MinecraftManager::make_for_app(&app).await;
 
-        app.persistence_manager = Some(RwLock::new(persistence_manager));
-        app.configuration_manager = Some(RwLock::new(configuration_manager));
-        app.minecraft_manager = Some(RwLock::new(minecraft_manager));
+        let weak = Arc::downgrade(&app);
+
+        // SAFETY: This is safe as long as `get_appref` only returns
+        // the appref, without doing anything else, and `new` does
+        // not spawn tasks that may access `app`.
+        // Before this block, attempting to access the appref will
+        // panic, and after this block it will be safe. The appref
+        // CANNOT be safely accessed inside of this block.
+        unsafe {
+            app.configuration_manager.get_appref().init(weak.clone());
+            app.persistence_manager.get_appref().init(weak.clone());
+            app.minecraft_manager.get_appref().init(weak.clone());
+        }
+
         app
-    }
-
-    pub(crate) async fn get_persistence_manager(
-        &self,
-    ) -> Result<RwLockReadGuard<PersistenceManager>, AppError> {
-        Ok(self
-            .persistence_manager
-            .as_ref()
-            .ok_or_else(|| AppError::ManagerNotFound("".to_string()))?
-            .read()
-            .await)
-    }
-
-    pub(crate) async fn get_configuration_manager(
-        &self,
-    ) -> Result<RwLockReadGuard<ConfigurationManager>, AppError> {
-        Ok(self
-            .configuration_manager
-            .as_ref()
-            .ok_or_else(|| AppError::ManagerNotFound("".to_string()))?
-            .read()
-            .await)
     }
 
     pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
@@ -121,24 +134,14 @@ impl Into<rspc::Error> for ConfigurationManagerError {
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_THEME[app, _args: ()] {
-            let app = app.read().await;
-            let configuration_manager =
-                app.get_configuration_manager().await.map_err(|error| {
-                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                })?;
-            configuration_manager
+            app.configuration_manager
                 .get_theme()
                 .await
                 .map_err(|error| error.into())
         }
 
         mutation SET_THEME[app, new_theme: String] {
-            let app = app.read().await;
-            let configuration_manager =
-                app.get_configuration_manager().await.map_err(|error| {
-                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                })?;
-            configuration_manager
+            app.configuration_manager
                 .set_theme(new_theme.clone())
                 .await
                 .map_err(|error| {

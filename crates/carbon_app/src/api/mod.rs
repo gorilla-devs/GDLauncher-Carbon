@@ -30,10 +30,10 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<Managers> {
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
-            t(move |app_container, _args: ()| {
+            t(move |app, _args: ()| {
                 stream! {
                     loop {
-                        match app_container.read().await.wait_for_invalidation().await {
+                        match app.wait_for_invalidation().await {
                             Ok(event) => {
                                 yield event;
                             }

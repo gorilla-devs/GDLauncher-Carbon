@@ -4,7 +4,7 @@ use carbon_domain::minecraft::MinecraftManifest;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
 
-use super::Managers;
+use super::{AppRef, Managers};
 
 #[derive(Error, Debug)]
 pub enum MinecraftManagerError {
@@ -15,14 +15,18 @@ pub enum MinecraftManagerError {
 }
 
 pub(crate) struct MinecraftManager {
-    managers: Weak<ManagersInner>,
+    app: AppRef,
 }
 
 impl MinecraftManager {
-    pub async fn make_for_app(app: &Managers) -> Self {
-        let managers = Arc::downgrade(app);
+    pub fn new() -> Self {
+        Self {
+            app: AppRef::uninit(),
+        }
+    }
 
-        Self { managers }
+    pub fn get_appref(&self) -> &AppRef {
+        &self.app
     }
 }
 
