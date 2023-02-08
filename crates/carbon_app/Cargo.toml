@@ -25,6 +25,7 @@ async-stream = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
 carbon_macro = { path = "../carbon_macro" }
 carbon_java_manager = { path = "../carbon_java_manager" }
+carbon_domain = { path = "../carbon_domain" }
 prisma-client-rust = { workspace = true, features = [
     "sqlite-create-many",
     "sqlite",

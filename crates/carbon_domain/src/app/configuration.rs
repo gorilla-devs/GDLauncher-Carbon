@@ -1,8 +1,7 @@
+use crate::app::App;
+use serde::{Deserialize, Serialize};
 use std::rc::Weak;
 use std::sync::{Arc, RwLock};
-use serde::{Deserialize, Serialize};
-use crate::app::App;
-
 
 #[derive(Serialize, Deserialize, Ord, PartialOrd, PartialEq, Eq)]
 pub struct AppConfiguration {
@@ -11,7 +10,6 @@ pub struct AppConfiguration {
     pub app_theme: String,
 }
 
-
 pub struct ConfigurationManager {
-    app: RwLock<Arc<Weak<App>>>
+    app: RwLock<Arc<Weak<App>>>,
 }
