@@ -27,12 +27,12 @@ pub enum AppError {
 
 pub struct ManagersInner {
     //instances: Instances,
-    configuration_manager: ConfigurationManager,
-    persistence_manager: PersistenceManager,
-    minecraft_manager: MinecraftManager,
-    account_manager: AccountManager,
+    pub(crate) configuration_manager: ConfigurationManager,
+    pub(crate) persistence_manager: PersistenceManager,
+    pub(crate) minecraft_manager: MinecraftManager,
+    pub(crate) account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
-    reqwest_client: reqwest::Client,
+    pub(crate) reqwest_client: reqwest::Client,
 }
 
 pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
