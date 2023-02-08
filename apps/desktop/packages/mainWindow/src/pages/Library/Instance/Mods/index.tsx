@@ -1,15 +1,14 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
+import { ModloaderType } from "@/utils/sidebar";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
-
-type Modloader = "forge" | "vanilla" | "fabric";
 
 type ModType = {
   title: string;
   enabled: boolean;
-  modloader: Modloader;
+  modloader: ModloaderType;
   mcversion: string;
   modloaderVersion: string;
 };

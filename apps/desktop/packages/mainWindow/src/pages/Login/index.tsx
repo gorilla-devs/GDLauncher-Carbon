@@ -9,7 +9,7 @@ export default function Login() {
   // @ts-ignore
 
   return (
-    <div class="flex justify-center items-center w-full h-full bg-img-loginBG.jpg p-0">
+    <div class="flex justify-center items-center w-full h-screen bg-img-loginBG.jpg p-0">
       <div
         style={{
           "mix-blend-mode": "hard-light",
