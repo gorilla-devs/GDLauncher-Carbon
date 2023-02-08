@@ -17,7 +17,6 @@ mod persistence;
 mod settings;
 
 pub type Managers = Arc<ManagersInner>;
-type AppComponentContainer<M> = Option<RwLock<M>>;
 
 #[derive(Error, Debug)]
 pub enum AppError {
