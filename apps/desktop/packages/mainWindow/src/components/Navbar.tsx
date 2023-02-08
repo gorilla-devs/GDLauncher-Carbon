@@ -71,15 +71,16 @@ const AppNavbar = () => {
                   <Tab ignored>
                     <div class="i-ri:terminal-box-fill text-shade-0 text-2xl cursor-pointer" />
                   </Tab>
-                  <Tab>
-                    <div
-                      class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
-                      classList={{
-                        "bg-primary": !!isSettings() || !!isSettingsNested(),
-                      }}
-                      onClick={() => navigate("/settings")}
-                    />
-                  </Tab>
+                  <Link href="/settings" class="no-underline">
+                    <Tab>
+                      <div
+                        class="i-ri:settings-3-fill text-shade-0 text-2xl cursor-pointer"
+                        classList={{
+                          "bg-primary": !!isSettings() || !!isSettingsNested(),
+                        }}
+                      />
+                    </Tab>
+                  </Link>
                   <div class="i-ri:notification-2-fill text-shade-0 text-2xl cursor-pointer" />
                 </div>
               </TabList>

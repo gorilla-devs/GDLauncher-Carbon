@@ -1,29 +1,16 @@
+import { ModloaderType, getModloaderIcon } from "@/utils/sidebar";
 import { Checkbox, Switch } from "@gd/ui";
-import forgeIcon from "/assets/images/icons/forge.png";
-import vanillaIcon from "/assets/images/icons/vanilla.png";
 
-type Modloader = "forge" | "vanilla" | "fabric";
 type ModType = {
   title: string;
   enabled: boolean;
-  modloader: Modloader;
+  modloader: ModloaderType;
   mcversion: string;
   modloaderVersion: string;
 };
 
 type Props = {
   mod: ModType;
-};
-
-const getIcon = (modloader: Modloader) => {
-  switch (modloader) {
-    case "vanilla":
-      return vanillaIcon;
-    case "forge":
-      return forgeIcon;
-    default:
-      return vanillaIcon;
-  }
 };
 
 const Mod = (props: Props) => {
@@ -37,7 +24,10 @@ const Mod = (props: Props) => {
             <div class="flex flex-col">
               {props.mod.title}
               <div class="flex gap-2">
-                <img class="w-4 h-4" src={getIcon(props.mod.modloader)} />
+                <img
+                  class="w-4 h-4"
+                  src={getModloaderIcon(props.mod.modloader)}
+                />
                 <p class="m-0 text-shade-5 text-sm">
                   {`${props.mod.modloader} ${props.mod.mcversion}`}
                 </p>

@@ -22,6 +22,7 @@ module.exports = {
     "plugin:solid/typescript",
     "plugin:i18next/recommended",
     "prettier",
+    "@unocss",
   ],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"],
 };

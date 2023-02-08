@@ -14,7 +14,7 @@ type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
 
 export interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   children: HTMLElement | string | JSX.Element;
-  class?: string;
+  style?: any;
   textColor?: string;
   variant?: Variant;
   rounded?: boolean;
@@ -178,34 +178,33 @@ function Button(props: Props) {
   );
 
   return (
-    <div class="w-fit h-fit">
-      <button
-        classList={getVariant(
-          props.variant || "primary",
-          mergedProps.rounded,
-          props.size || "medium",
-          !!props.disabled,
-          mergedProps.uppercase,
-          !!props.iconRight,
-          !!props.loading,
-          props.textColor
-        )}
-        {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
-        style={{
-          ...(mergedProps.variant === "transparent" && {
-            background: "rgba(0, 0, 0, 0.4)",
-          }),
-        }}
+    <button
+      classList={getVariant(
+        props.variant || "primary",
+        mergedProps.rounded,
+        props.size || "medium",
+        !!props.disabled,
+        mergedProps.uppercase,
+        !!props.iconRight,
+        !!props.loading,
+        props.textColor
+      )}
+      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+      style={{
+        ...(mergedProps.variant === "transparent" && {
+          background: "rgba(0, 0, 0, 0.4)",
+        }),
+        ...props.style,
+      }}
+    >
+      <Show when={props.icon}>{props.icon}</Show>
+      <Show
+        when={!props.loading}
+        fallback={<Loading percentage={props.percentage}>{c()}</Loading>}
       >
-        <Show when={props.icon}>{props.icon}</Show>
-        <Show
-          when={!props.loading}
-          fallback={<Loading percentage={props.percentage}>{c()}</Loading>}
-        >
-          {c()}
-        </Show>
-      </button>
-    </div>
+        {c()}
+      </Show>
+    </button>
   );
 }
 

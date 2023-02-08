@@ -1,6 +1,6 @@
 use crate::{
-    app::{account::enroll::InvalidateCtx, App},
     db,
+    managers::{account::enroll::InvalidateCtx, ManagersInner},
 };
 use async_trait::async_trait;
 use carbon_domain::account::*;
@@ -20,35 +20,36 @@ use self::{
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::AppError;
+use super::{AppError, AppRef};
 
 mod api;
 mod enroll;
 
 pub(crate) struct AccountManager {
-    app: Weak<RwLock<App>>,
+    app: AppRef,
     currently_refreshing: RwLock<Vec<String>>,
     active_enrollment: RwLock<Option<EnrollmentTask>>,
 }
 
 impl AccountManager {
-    pub fn make_for_app(app: &Arc<RwLock<App>>) -> Self {
+    pub fn new() -> Self {
         Self {
-            app: Arc::downgrade(app),
+            app: AppRef::uninit(),
             currently_refreshing: RwLock::new(Vec::new()),
             active_enrollment: RwLock::new(None),
         }
     }
 
-    pub async fn get_active_uuid(&self) -> Result<Option<String>, AccountError> {
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
+    pub fn get_appref(&self) -> &AppRef {
+        &self.app
+    }
 
-        Ok(persistence_manager
+    pub async fn get_active_uuid(&self) -> Result<Option<String>, AccountError> {
+        Ok(self
+            .app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .app_configuration()
             .find_unique(db::app_configuration::id::equals(0))
@@ -61,14 +62,10 @@ impl AccountManager {
     pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), AccountError> {
         use db::app_configuration::{SetParam::SetActiveAccountUuid, UniqueWhereParam};
 
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
-
-        persistence_manager
+        self.app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .app_configuration()
             .update(
@@ -83,14 +80,11 @@ impl AccountManager {
     }
 
     async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, AccountError> {
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
-
-        Ok(persistence_manager
+        Ok(self
+            .app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .account()
             .find_many(Vec::new())
@@ -124,14 +118,11 @@ impl AccountManager {
     ) -> Result<Option<AccountStatus>, AccountError> {
         use db::account::UniqueWhereParam;
 
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
-
-        let account = persistence_manager
+        let account = self
+            .app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
@@ -176,10 +167,6 @@ impl AccountManager {
     async fn add_account(&self, account: FullAccount) -> Result<(), AccountError> {
         use db::account::SetParam;
 
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
-
         let set_params = match account.type_ {
             FullAccountType::Offline => Vec::new(),
             FullAccountType::Microsoft {
@@ -193,10 +180,10 @@ impl AccountManager {
             ],
         };
 
-        persistence_manager
+        self.app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .account()
             .create(account.uuid, account.username, set_params)
@@ -210,14 +197,10 @@ impl AccountManager {
     pub async fn delete_account(&self, uuid: String) -> Result<(), AccountError> {
         use db::account::UniqueWhereParam;
 
-        let app = self.app.upgrade().ok_or(AccountError::AppNotFound)?;
-        let app = app.read().await;
-        let persistence_manager = app.get_persistence_manager().await?;
-
-        persistence_manager
+        self.app
+            .upgrade()
+            .persistence_manager
             .get_db_client()
-            .await
-            .read()
             .await
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid))
@@ -232,16 +215,9 @@ impl AccountManager {
         match &*self.active_enrollment.read().await {
             Some(_) => Err(EnrollmentError::InProgress),
             None => {
-                let client = self
-                    .app
-                    .upgrade()
-                    .unwrap() // waiting on rwlock/weak removal PR
-                    .read()
-                    .await
-                    .reqwest_client
-                    .clone();
+                let client = self.app.upgrade().reqwest_client.clone();
 
-                struct Invalidator(Weak<RwLock<App>>);
+                struct Invalidator(Weak<ManagersInner>);
 
                 #[async_trait]
                 impl InvalidateCtx for Invalidator {
@@ -250,7 +226,8 @@ impl AccountManager {
                     }
                 }
 
-                let enrollment = EnrollmentTask::begin(client, Invalidator(self.app.clone()));
+                let enrollment =
+                    EnrollmentTask::begin(client, Invalidator(Arc::downgrade(&self.app.upgrade())));
 
                 *self.active_enrollment.write().await = Some(enrollment);
 
@@ -314,9 +291,6 @@ impl AccountManager {
 
 #[derive(Error, Debug)]
 pub enum AccountError {
-    #[error("app reference not found")]
-    AppNotFound,
-
     #[error("app configuration not found")]
     AppConfigurationNotFound,
 

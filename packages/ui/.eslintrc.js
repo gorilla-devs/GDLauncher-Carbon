@@ -13,7 +13,7 @@ module.exports = {
     ],
   },
   parser: "@typescript-eslint/parser",
-  plugins: ["solid", "prettier"],
+  plugins: ["solid", "prettier", "@unocss"],
   extends: ["eslint:recommended", "plugin:solid/typescript", "prettier"],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"],
 };

@@ -4,8 +4,16 @@ import { useNavigate } from "@solidjs/router";
 import { For } from "solid-js";
 import "./index.css";
 import { useTransContext } from "@gd/i18n";
+import { ModloaderType } from "@/utils/sidebar";
 
-const mockCarousel = [
+type MockInstance = {
+  title: string;
+  modloader: ModloaderType;
+  mcVersion: string;
+  id: string;
+};
+
+const mockCarousel: MockInstance[] = [
   {
     title: "Minecraft forge 1",
     modloader: "forge",

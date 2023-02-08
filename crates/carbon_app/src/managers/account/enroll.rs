@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::{future::abortable, stream::AbortHandle, Future};
+use futures::{future::abortable, stream::AbortHandle};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
 use super::api::{
-    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccount,
-    McAccountPopulateError, McAuth, McAuthError,
+    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
+    McAuth, McAuthError,
 };
 
 /// Active process of adding an account
@@ -108,14 +108,13 @@ pub enum EnrollmentError {
     Populate(#[from] McAccountPopulateError),
 }
 
-/*
 mod test {
     use std::sync::Arc;
 
     use async_trait::async_trait;
     use tokio::sync::RwLock;
 
-    use crate::app::account::enroll::InvalidateCtx;
+    use super::InvalidateCtx;
 
     use super::EnrollmentTask;
 
@@ -154,4 +153,3 @@ mod test {
         tokio::time::sleep(std::time::Duration::from_secs(10000)).await
     }
 }
-*/

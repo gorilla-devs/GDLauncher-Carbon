@@ -24,3 +24,28 @@ model Account {
   tokenExpires     DateTime?
   msRefreshToken   String?
 }
+
+model MinecraftManifest {
+  id          String            @unique
+  type        String
+  url         String
+  time        String
+  releaseTime String
+  sha1        String            @unique
+  version     MinecraftVersion? @relation(fields: [sha1], references: [idSha1])
+}
+
+model MinecraftVersion {
+  idSha1            String             @id @unique
+  MinecraftManifest MinecraftManifest?
+  // For now let's just store the entire json as bytes
+  json              Bytes
+  assetsIdSha1      String
+  assets            MinecraftAssets    @relation(fields: [assetsIdSha1], references: [idSha1])
+}
+
+model MinecraftAssets {
+  idSha1           String             @id @unique
+  MinecraftVersion MinecraftVersion[]
+  json             Bytes
+}
