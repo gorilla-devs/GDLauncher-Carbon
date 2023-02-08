@@ -4642,6 +4642,7 @@ name = "specta"
 version = "0.0.6"
 source = "git+https://github.com/oscartbeaumont/rspc?rev=7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46#7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46"
 dependencies = [
+ "chrono",
  "document-features",
  "indoc",
  "once_cell",

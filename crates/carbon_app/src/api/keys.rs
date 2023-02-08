@@ -23,6 +23,18 @@ pub struct Key {
 }
 
 keys! {
+    account {
+        GET_ACTIVE_UUID               = "getActiveUuid";
+        SET_ACTIVE_UUID               = "setActiveUuid";
+        GET_ACCOUNTS                  = "getAccounts";
+        GET_ACCOUNT_STATUS            = "getAccountStatus";
+        DELETE_ACCOUNT                = "deleteAccount";
+        ENROLL_BEGIN                  = "enroll.begin";
+        ENROLL_CANCEL                 = "enroll.cancel";
+        ENROLL_GET_STATUS             = "enroll.getStatus";
+        ENROLL_FINALIZE               = "enroll.finalize";
+    }
+
     java {
         GET_AVAILABLE                 = "getAvailable";
         SET_DEFAULT                   = "setDefault";

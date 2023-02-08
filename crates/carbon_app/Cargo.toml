@@ -19,7 +19,7 @@ directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }
 tower-http = { workspace = true, default-features = false, features = ["cors"] }
-rspc = { workspace = true, features = ["axum"] }
+rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
 async-stream = { workspace = true }

@@ -1,4 +1,5 @@
 use crate::{
+    api::keys::account::*,
     db,
     managers::{account::enroll::InvalidateCtx, ManagersInner},
 };
@@ -22,7 +23,7 @@ use self::{
 
 use super::{AppError, AppRef};
 
-mod api;
+pub mod api;
 mod enroll;
 
 pub(crate) struct AccountManager {
@@ -75,7 +76,7 @@ impl AccountManager {
             .exec()
             .await?;
 
-        // TODO: invalidate get_active_uuid
+        self.app.upgrade().invalidate(GET_ACTIVE_UUID, None);
         Ok(())
     }
 
@@ -190,7 +191,7 @@ impl AccountManager {
             .exec()
             .await?;
 
-        // TODO: invalidate get_account_list
+        self.app.upgrade().invalidate(GET_ACCOUNTS, None);
         Ok(())
     }
 
@@ -203,11 +204,14 @@ impl AccountManager {
             .get_db_client()
             .await
             .account()
-            .delete(UniqueWhereParam::UuidEquals(uuid))
+            .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()
             .await?;
 
-        // TODO: invalidate get_account_list, get_account_status
+        self.app.upgrade().invalidate(GET_ACCOUNTS, None);
+        self.app
+            .upgrade()
+            .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
         Ok(())
     }
 
@@ -217,17 +221,16 @@ impl AccountManager {
             None => {
                 let client = self.app.upgrade().reqwest_client.clone();
 
-                struct Invalidator(Weak<ManagersInner>);
+                struct Invalidator(AppRef);
 
                 #[async_trait]
                 impl InvalidateCtx for Invalidator {
                     async fn invalidate(&self) {
-                        // TODO: invalidate status endpoint
+                        self.0.upgrade().invalidate(ENROLL_GET_STATUS, None);
                     }
                 }
 
-                let enrollment =
-                    EnrollmentTask::begin(client, Invalidator(Arc::downgrade(&self.app.upgrade())));
+                let enrollment = EnrollmentTask::begin(client, Invalidator(self.app.clone()));
 
                 *self.active_enrollment.write().await = Some(enrollment);
 
@@ -294,9 +297,6 @@ pub enum AccountError {
     #[error("app configuration not found")]
     AppConfigurationNotFound,
 
-    #[error("app raised an error : {0}")]
-    AppError(#[from] AppError),
-
     #[error("executed invalid query: {0}")]
     QueryError(#[from] QueryError),
 
@@ -335,6 +335,15 @@ pub enum EnrollmentError {
 
     #[error("account error: {0}")]
     AccountError(#[from] AccountError),
+}
+
+impl From<EnrollmentError> for rspc::Error {
+    fn from(value: EnrollmentError) -> Self {
+        rspc::Error::new(
+            ErrorCode::InternalServerError,
+            format!("Account Query Error: {}", value),
+        )
+    }
 }
 
 struct FullAccount {

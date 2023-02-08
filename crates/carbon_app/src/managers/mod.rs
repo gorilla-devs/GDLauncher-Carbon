@@ -67,6 +67,12 @@ impl AppRef {
     }
 }
 
+impl Clone for AppRef {
+    fn clone(&self) -> Self {
+        Self(UnsafeCell::new(self.ref_inner().clone()))
+    }
+}
+
 impl ManagersInner {
     pub async fn new_with_invalidation_channel(
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
