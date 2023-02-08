@@ -1,4 +1,4 @@
-use crate::db::PrismaClient;
+use crate::db::{minecraft_manifest::SetParam, PrismaClient};
 use crate::managers::ManagersInner;
 use carbon_domain::minecraft::MinecraftManifest;
 use std::sync::{Arc, Weak};
@@ -43,12 +43,12 @@ pub async fn init_manifest_v2(db_client: PrismaClient) -> Result<(), MinecraftMa
         db_client
             .minecraft_manifest()
             .create(
+                version.id,
                 version.type_.into(),
                 version.url,
                 version.time,
                 version.release_time,
-                version.sha1,
-                vec![],
+                vec![SetParam::SetSha1(version.sha1)],
             )
             .exec()
             .await

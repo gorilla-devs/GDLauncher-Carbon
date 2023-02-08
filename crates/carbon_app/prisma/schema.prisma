@@ -21,7 +21,7 @@ model Accounts {
 }
 
 model MinecraftManifest {
-  id          String            @id @unique
+  id          String            @unique
   type        String
   url         String
   time        String
