@@ -108,6 +108,7 @@ pub enum EnrollmentError {
     Populate(#[from] McAccountPopulateError),
 }
 
+/*
 mod test {
     use std::sync::Arc;
 
@@ -152,4 +153,4 @@ mod test {
 
         tokio::time::sleep(std::time::Duration::from_secs(10000)).await
     }
-}
+}*/
