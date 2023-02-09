@@ -110,14 +110,17 @@ jobs:
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
-      - run: |
+
             rustc -Vv
             node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
-      - run: |
-          echo "" > crates/carbon_app/src/db.rs
-          cargo fmt --check
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
+            echo "" > crates/carbon_app/src/db.rs
+            cargo fmt --check
+          shell: bash.exe
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
