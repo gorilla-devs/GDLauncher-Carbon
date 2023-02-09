@@ -1,9 +1,16 @@
+/* eslint-disable @unocss/order */
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
-import { For, createSignal } from "solid-js";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "@solidjs/router";
+import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 type InstancePage = {
@@ -12,7 +19,6 @@ type InstancePage = {
 };
 
 const Instance = () => {
-  const [lastScroll, setLastScroll] = createSignal(0);
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
@@ -74,8 +80,6 @@ const Instance = () => {
           refStickyContainer.classList.add("h-0", "opacity-0");
           refStickyContainer.classList.remove("h-20", "sticky", "top-0");
         }
-
-        setLastScroll(e.target.scrollTop);
       }}
     >
       <div
@@ -129,7 +133,7 @@ const Instance = () => {
                     {/* <img /> */}
                   </div>
                   <div class="flex flex-1 flex-col max-w-185 ">
-                    <h1 class="m-0">{id}</h1>
+                    <h1 class="m-0">{params.id}</h1>
                     <div class="flex flex-col lg:flex-row justify-between">
                       <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                         <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
@@ -201,7 +205,7 @@ const Instance = () => {
             </Button>
           </div>
           <div class="flex flex-1 flex-col max-w-185 ">
-            <h4 class="m-0">{id}</h4>
+            <h4 class="m-0">{params.id}</h4>
             <div class="flex flex-col lg:flex-row justify-between">
               <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                 <div class="text-xs	 p-0 lg:pr-2 border-0 lg:border-r-2 border-shade-5">
