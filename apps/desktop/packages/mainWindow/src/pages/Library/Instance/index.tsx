@@ -3,7 +3,7 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
-import { For } from "solid-js";
+import { For, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
 type InstancePage = {
@@ -12,6 +12,7 @@ type InstancePage = {
 };
 
 const Instance = () => {
+  const [lastScroll, setLastScroll] = createSignal(0);
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -42,9 +43,12 @@ const Instance = () => {
     getRouteIndex(instancePages, location.pathname, true);
 
   let ref: HTMLDivElement;
+  let inlineHeaderContainerRef: HTMLDivElement;
+  let inlineHeaderRef: HTMLDivElement;
+  let instanceInfoHeaderRef: HTMLDivElement;
 
-  let opacityIn = 1;
-  let opacityOut = 0;
+  let opacityIn = 0;
+  let opacityOut = 1;
 
   return (
     <div
@@ -56,24 +60,37 @@ const Instance = () => {
         const containerTop = e.currentTarget.getBoundingClientRect().top;
         const innerContainerTop = ref.getBoundingClientRect().top;
 
-        const header = document.getElementById("inline-header");
-        const headerContainer = document.getElementById(
-          "inline-header-container"
-        );
-
-        if (innerContainerTop - containerTop >= 50) {
-          if (header?.style && headerContainer?.style) {
-            if (opacityOut > 0) opacityOut -= 0.1;
-            headerContainer.style.height = "0";
-            header.style.opacity = opacityOut.toString();
+        if (e.currentTarget.scrollTop < lastScroll()) {
+          if (e.currentTarget.scrollTop > 50) {
+            inlineHeaderRef.style.opacity = (
+              -e.currentTarget.scrollTop / 50
+            ).toString();
+            instanceInfoHeaderRef.style.opacity = (
+              e.currentTarget.scrollTop / 50 +
+              0
+            ).toString();
+            inlineHeaderContainerRef.style.height = "0";
           }
-        } else if (innerContainerTop - containerTop <= 10) {
-          if (header?.style && headerContainer?.style) {
-            if (opacityIn < 1) opacityIn += 0.1;
-            headerContainer.style.height = "80px";
-            header.style.opacity = opacityIn.toString();
+        } else {
+          console.log(
+            "SCROLL UP",
+            e.currentTarget.scrollTop,
+            e.currentTarget.scrollTop / 50
+          );
+
+          if (e.currentTarget.scrollTop < 50) {
+            // console.log("SCROLL UP OFFSET");
+            inlineHeaderRef.style.opacity = (
+              e.currentTarget.scrollTop / 50
+            ).toString();
+            instanceInfoHeaderRef.style.opacity = (
+              -e.currentTarget.scrollTop / 50
+            ).toString();
+            inlineHeaderContainerRef.style.height = "80px";
           }
         }
+
+        setLastScroll(e.target.scrollTop);
       }}
     >
       <div
@@ -100,6 +117,9 @@ const Instance = () => {
           </Button>
         </div>
         <div
+          ref={(el) => {
+            instanceInfoHeaderRef = el;
+          }}
           class="flex justify-center px-6 h-24 absolute bottom-0 right-0 left-0"
           style={{
             background:
@@ -162,24 +182,33 @@ const Instance = () => {
         </div>
       </div>
       <div class="min-h-2xl lg:mt-64 bg-shade-8">
-        <div class="mt-52 lg:mt-64 p-6 flex justify-center">
+        <div
+          class="mt-52 lg:mt-64 p-6 flex justify-center"
+          ref={(el) => {
+            ref = el;
+          }}
+        >
           <div class="max-w-full w-185 bg-shade-8">
             <div
               class="sticky -top-1 z-20 flex flex-col bg-shade-8 mb-4"
-              ref={(el) => {
-                ref = el;
-              }}
+              // ref={(el) => {
+              //   ref = el;
+              // }}
             >
               <div
                 class="flex flex-col lg:flex-row gap-4 justify-end w-full z-10 transition-height duration-200 ease-in-out"
-                id="inline-header-container"
+                ref={(el) => {
+                  inlineHeaderContainerRef = el;
+                }}
                 style={{
                   height: 0,
                 }}
               >
                 <div
                   class="flex items-start w-full transition-opacity duration-300 ease-in-out mt-5"
-                  id="inline-header"
+                  ref={(el) => {
+                    inlineHeaderRef = el;
+                  }}
                   style={{
                     opacity: 0,
                   }}
