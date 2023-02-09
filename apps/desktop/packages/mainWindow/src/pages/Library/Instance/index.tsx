@@ -55,7 +55,6 @@ const Instance = () => {
       }}
       onScroll={(e) => {
         if (e.currentTarget.scrollTop > 50) {
-          console.log("TEST");
           innerContainerRef.style.opacity = "0";
           containerRef.classList.remove("h-52");
           containerRef.classList.add("h-0");
