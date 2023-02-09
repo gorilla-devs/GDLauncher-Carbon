@@ -43,6 +43,8 @@ jobs:
             - run: |
                 node -v
                 cargo --version
+            - run: cargo fmt --check
+            - run: |
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
@@ -66,6 +68,8 @@ jobs:
             - run: |
                 node -v
                 cargo --version
+            - run: cargo fmt --check
+            - run: |
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
@@ -98,15 +102,16 @@ jobs:
           name: "Install Rust"
           shell: powershell.exe
           command: |
-            $ProgressPreference = 'Continue'    
+            $ProgressPreference = 'Continue'
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --no-modify-path --profile minimal
             $env:path += ";$env:userprofile\.cargo\bin"
-
+      - run: |
             rustc -Vv
             node -v
             cargo --version
             rustc --version | Out-File -FilePath "rust-version"
+      - run: cargo fmt --check
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -169,6 +174,7 @@ jobs:
       - run: |
           node -v
           cargo --version
+      - run: cargo fmt --check
       - run: |
           sudo npm i -g pnpm
           pnpm i
@@ -186,6 +192,7 @@ jobs:
       - run: |
           node -v
           cargo --version
+      - run: cargo fmt --check
       - run: |
           sudo npm i -g pnpm
           pnpm i
