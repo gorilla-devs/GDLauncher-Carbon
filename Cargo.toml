@@ -12,6 +12,7 @@ strip = "symbols"
 [workspace.dependencies]
 tokio = "1.25.0"
 axum = "0.6.2"
+backtrace = "0.3.67"
 directories = "4.0.1"
 dotenv = "0.15.0"
 napi = "2.10.4"

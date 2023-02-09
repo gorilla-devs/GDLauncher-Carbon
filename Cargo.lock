@@ -570,6 +570,7 @@ name = "carbon_domain"
 version = "0.0.0"
 dependencies = [
  "async-trait",
+ "backtrace",
  "carbon_net",
  "env_logger",
  "futures",
