@@ -14,33 +14,34 @@ type InstancePage = {
 const Instance = () => {
   const [lastScroll, setLastScroll] = createSignal(0);
   const navigate = useNavigate();
-  const { id } = useParams();
+  const params = useParams();
+  const location = useLocation();
 
-  const instancePages = [
+  const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${id}`,
+      path: `/library/${params.id}`,
     },
     {
       label: "Mods",
-      path: `/library/${id}/mods`,
+      path: `/library/${params.id}/mods`,
     },
     {
       label: "Resource Packs",
-      path: `/library/${id}/resourcepacks`,
+      path: `/library/${params.id}/resourcepacks`,
     },
     {
       label: "Screenshots",
-      path: `/library/${id}/screenshots`,
+      path: `/library/${params.id}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/library/${id}/versions`,
+      path: `/library/${params.id}/versions`,
     },
   ];
 
   const selectedIndex = () =>
-    getRouteIndex(instancePages, location.pathname, true);
+    getRouteIndex(instancePages(), location.pathname, true);
 
   let containerRef: HTMLDivElement;
   let bgRef: HTMLDivElement;
@@ -251,7 +252,7 @@ const Instance = () => {
             <div class="sticky top-20 z-20 flex flex-col bg-shade-8 mb-4">
               <Tabs index={selectedIndex()}>
                 <TabList>
-                  <For each={instancePages}>
+                  <For each={instancePages()}>
                     {(page: InstancePage) => (
                       <Link href={page.path} class="no-underline">
                         <Tab class="bg-transparent">{page.label}</Tab>

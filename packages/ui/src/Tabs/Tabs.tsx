@@ -17,6 +17,7 @@ export interface ITabsContext {
   paddingY?: string;
   variant: string;
   orientation: string;
+  clearTabs: () => void;
   setSelectedIndex: (_: number) => void;
   registerTab: (_obj: TabType, _index?: number) => number;
   registerTabSpacing: (_obj: SpacingTab, _index?: number) => number;
@@ -115,9 +116,14 @@ function Tabs(props: Props) {
     return index === currentIndex();
   };
 
+  const clearTabs = () => {
+    return setTabs([]);
+  };
+
   const context = {
     isSelectedIndex,
     setSelectedIndex,
+    clearTabs,
     registerTab,
     currentIndex,
     getRegisteredTabs,

@@ -1,5 +1,5 @@
-use crate::api::app::GlobalContext;
 use crate::api::keys::mc::*;
+use crate::api::managers::Managers;
 use crate::api::router::router;
 use axum::extract::DefaultBodyLimit;
 use rspc::{Router, RouterBuilderLike, Type};
@@ -41,7 +41,7 @@ struct UpdateInstanceArgs {
     new_name: String,
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<GlobalContext> {
+pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_INSTANCES[_, _args: ()] {
             let instances = vec![

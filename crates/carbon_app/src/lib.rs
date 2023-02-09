@@ -1,11 +1,11 @@
-use crate::app::{App, GlobalContext};
+use crate::managers::{Managers, ManagersInner};
 use rspc::RouterBuilderLike;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
-pub mod app;
 pub(crate) mod db;
+pub mod managers;
 
 pub mod generate_rspc_ts_bindings;
 mod runtime_directory;
@@ -28,7 +28,7 @@ pub fn init() {
 async fn start_router() {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<GlobalContext>> =
+    let router: Arc<rspc::Router<Managers>> =
         crate::api::build_rspc_router().expose().build().arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
@@ -37,7 +37,7 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let app = App::new_with_invalidation_channel(invalidation_sender).await;
+    let app = ManagersInner::new_with_invalidation_channel(invalidation_sender).await;
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
