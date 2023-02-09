@@ -108,7 +108,7 @@ jobs:
           command: |
             $ProgressPreference = 'Continue'
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
-            & C:\rustup-init.exe -y --no-modify-path --profile minimal
+            & C:\rustup-init.exe -y --no-modify-path
             $env:path += ";$env:userprofile\.cargo\bin"
 
             rustc -Vv
