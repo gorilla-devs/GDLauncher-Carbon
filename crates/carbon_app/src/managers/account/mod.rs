@@ -132,7 +132,7 @@ impl AccountManager {
 
         let status = match account {
             Some(account) => Some(match account.ms_refresh_token {
-                None => AccountStatus::Launchable { access_token: None },
+                None => AccountStatus::Ok { access_token: None },
                 Some(_) => {
                     let token_expires = account
                         .token_expires
@@ -151,7 +151,7 @@ impl AccountManager {
                             .access_token
                             .ok_or(AccountError::DbError(AccountDbError::TokenUnset))?;
 
-                        AccountStatus::Launchable {
+                        AccountStatus::Ok {
                             access_token: Some(access_token),
                         }
                     } else {

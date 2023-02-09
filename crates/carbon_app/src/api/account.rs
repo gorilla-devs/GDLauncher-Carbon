@@ -75,7 +75,7 @@ enum AccountType {
 
 #[derive(Type, Serialize)]
 enum AccountStatus {
-    Launchable,
+    Ok,
     Expired,
     Refreshing,
 }
@@ -118,7 +118,7 @@ impl From<domain::AccountType> for AccountType {
 impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
-            domain::AccountStatus::Launchable { .. } => Self::Launchable,
+            domain::AccountStatus::Ok { .. } => Self::Ok,
             domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Refreshing => Self::Refreshing,
         }
