@@ -4,6 +4,7 @@ use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+mod account;
 mod java;
 pub mod keys;
 mod mc;
@@ -24,6 +25,7 @@ impl InvalidationEvent {
 pub fn build_rspc_router() -> impl RouterBuilderLike<Managers> {
     rspc::Router::<Managers>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
+        .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
         .yolo_merge(keys::app::GROUP_PREFIX, managers::mount())

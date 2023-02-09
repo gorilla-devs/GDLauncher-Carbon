@@ -7,11 +7,12 @@ use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::broadcast::{self, error::RecvError};
 
+use self::account::AccountManager;
 use self::minecraft::MinecraftManager;
 
+pub mod account;
 mod minecraft;
 mod persistence;
 mod settings;
@@ -26,10 +27,12 @@ pub enum AppError {
 
 pub struct ManagersInner {
     //instances: Instances,
-    configuration_manager: ConfigurationManager,
-    persistence_manager: PersistenceManager,
-    minecraft_manager: MinecraftManager,
+    pub(crate) configuration_manager: ConfigurationManager,
+    pub(crate) persistence_manager: PersistenceManager,
+    pub(crate) minecraft_manager: MinecraftManager,
+    pub(crate) account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
+    pub(crate) reqwest_client: reqwest::Client,
 }
 
 pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
@@ -64,6 +67,12 @@ impl AppRef {
     }
 }
 
+impl Clone for AppRef {
+    fn clone(&self) -> Self {
+        Self(UnsafeCell::new(self.ref_inner().clone()))
+    }
+}
+
 impl ManagersInner {
     pub async fn new_with_invalidation_channel(
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
@@ -72,7 +81,9 @@ impl ManagersInner {
             configuration_manager: ConfigurationManager::new(),
             persistence_manager: PersistenceManager::new().await,
             minecraft_manager: MinecraftManager::new(),
+            account_manager: AccountManager::new(),
             invalidation_channel,
+            reqwest_client: reqwest::Client::new(),
         });
 
         let weak = Arc::downgrade(&app);
@@ -87,6 +98,7 @@ impl ManagersInner {
             app.configuration_manager.get_appref().init(weak.clone());
             app.persistence_manager.get_appref().init(weak.clone());
             app.minecraft_manager.get_appref().init(weak.clone());
+            app.account_manager.get_appref().init(weak.clone());
         }
 
         app
