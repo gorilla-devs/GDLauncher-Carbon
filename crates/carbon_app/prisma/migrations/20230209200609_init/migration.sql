@@ -4,17 +4,22 @@ CREATE TABLE "AppConfiguration" (
     "theme" TEXT NOT NULL DEFAULT 'main',
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
-    "releaseChannel" TEXT NOT NULL DEFAULT 'stable'
+    "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
+    "activeAccountUuid" TEXT
 );
 
 -- CreateTable
-CREATE TABLE "Accounts" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+CREATE TABLE "Account" (
+    "uuid" TEXT NOT NULL PRIMARY KEY,
+    "username" TEXT NOT NULL,
+    "accessToken" TEXT,
+    "tokenExpires" DATETIME,
+    "msRefreshToken" TEXT
 );
 
 -- CreateTable
 CREATE TABLE "MinecraftManifest" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL,
     "type" TEXT NOT NULL,
     "url" TEXT NOT NULL,
     "time" TEXT NOT NULL,
@@ -36,9 +41,6 @@ CREATE TABLE "MinecraftAssets" (
     "idSha1" TEXT NOT NULL PRIMARY KEY,
     "json" BLOB NOT NULL
 );
-
--- CreateIndex
-CREATE UNIQUE INDEX "Accounts_id_key" ON "Accounts"("id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MinecraftManifest_id_key" ON "MinecraftManifest"("id");
