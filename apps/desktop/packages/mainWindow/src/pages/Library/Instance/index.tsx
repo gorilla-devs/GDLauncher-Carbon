@@ -9,8 +9,9 @@ import {
   useNavigate,
   useParams,
 } from "@solidjs/router";
-import { For, onCleanup, onMount } from "solid-js";
+import { For, createEffect, onCleanup, onMount } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
+import { setRoutesLastTab } from "@/utils/routes";
 
 type InstancePage = {
   label: string;
@@ -25,7 +26,7 @@ const Instance = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${params.id}`,
+      path: `/library/${params.id}/overview`,
     },
     {
       label: "Mods",
@@ -50,6 +51,10 @@ const Instance = () => {
 
   let ref: HTMLDivElement;
   let observer: ResizeObserver;
+
+  createEffect(() => {
+    setRoutesLastTab((prev) => ({ ...prev, [params.id]: selectedIndex() }));
+  });
 
   onMount(() => {
     observer = new IntersectionObserver(

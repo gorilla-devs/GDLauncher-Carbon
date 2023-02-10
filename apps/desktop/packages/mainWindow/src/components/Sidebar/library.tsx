@@ -7,12 +7,14 @@ import Collapsable from "./collapsable";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 import { useLocation, useNavigate } from "@solidjs/router";
+import { getTabIndex, routesLastTab } from "@/utils/routes";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const instanceId = () => location.pathname.match(/\/([^/]*)$/)![1];
+  const instanceTab = () =>
+    location.pathname.match(/^.*\/library\/([^\\/]+)\/([^\\/]+)(?=\/*$)/);
 
   // TODO: adapt to real data
   return (
@@ -50,8 +52,12 @@ const Sidebar = () => {
               variant="sidebar"
             />
             <Tile
-              onClick={() => navigate(`/library/ABDFEAD`)}
-              selected={instanceId() === "ABDFEAD"}
+              onClick={() =>
+                navigate(
+                  `/library/ABDFEAD/${getTabIndex(routesLastTab["ABDFEAD"])}`
+                )
+              }
+              selected={instanceTab()?.[1] === "ABDFEAD"}
               title={"Instance ABDFEAD"}
               modloader={"forge"}
               version={"1.19.2"}
@@ -60,8 +66,12 @@ const Sidebar = () => {
           </Collapsable>
           <Collapsable title="FAVOURITED">
             <Tile
-              onClick={() => navigate(`/library/DDAEDF`)}
-              selected={instanceId() === "DDAEDF"}
+              onClick={() =>
+                navigate(
+                  `/library/DDAEDF/${getTabIndex(routesLastTab["DDAEDF"])}`
+                )
+              }
+              selected={instanceTab()?.[1] === "DDAEDF"}
               title={"Instance DDAEDF"}
               modloader={"forge"}
               version={"1.19.2"}
