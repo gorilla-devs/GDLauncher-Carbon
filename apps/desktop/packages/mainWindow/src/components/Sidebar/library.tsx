@@ -1,39 +1,182 @@
 /* eslint-disable i18next/no-literal-string */
-import { loadLanguageFile, useTransContext, Trans } from "@gd/i18n";
-import { createNotification, Input } from "@gd/ui";
+import { Button, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
+import { Show } from "solid-js";
+import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
+import Collapsable from "./collapsable";
+import Tile from "../Instance/Tile";
+import Style from "./style.module.scss";
+import { useLocation, useNavigate } from "@solidjs/router";
 
 const Sidebar = () => {
-  const [addNotification] = createNotification();
-  const [t, { changeLanguage, addResources }] = useTransContext();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const changeLang = async (lang: string) => {
-    const langFile = await loadLanguageFile(lang);
-    addResources(lang, "common", langFile);
-    await changeLanguage(lang);
-  };
+  const instanceId = () => location.pathname.match(/\/([^/]*)$/)![1];
 
+  // TODO: adapt to real data
   return (
-    <SiderbarWrapper>
-      <Input
-        placeholder="Type Here"
-        icon={<div class="i-ri:search-line" />}
-        class="w-full rounded-full text-shade-0"
-      />
-      {/* {t("hello")} */}
-      <Trans
-        key="hello"
-        options={{
-          defaultValue: "Hello",
-        }}
-      />
-      {t("world")}
-      <button onClick={() => changeLang("it")}>IT</button>
-      <button onClick={() => changeLang("en")}>EN</button>
-      <button onClick={() => changeLang("de")}>DE</button>
-      <button onClick={() => addNotification("Notification Added")}>
-        Add Notification
-      </button>
+    <SiderbarWrapper noPadding>
+      <div class="h-full w-full pt-5 pb-5 box-border">
+        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3 px-3">
+          <Show
+            when={isSidebarOpened()}
+            fallback={
+              <div
+                class="group w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center"
+                onClick={() => {
+                  toggleSidebar();
+                }}
+              >
+                <div class="i-ri:search-line text-shade-5 group-hover:text-shade-0 transition duration-100 ease-in-out" />
+              </div>
+            }
+          >
+            <Input
+              placeholder="Type Here"
+              icon={<div class="i-ri:search-line" />}
+              class="w-full rounded-full"
+            />
+          </Show>
+        </div>
+        <Show when={isSidebarOpened()}>
+          <Collapsable title="VANILLA">
+            <Tile
+              isLoading={true}
+              percentage={50}
+              title={"Instance"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+            <Tile
+              onClick={() => navigate(`/library/ABDFEAD`)}
+              selected={instanceId() === "ABDFEAD"}
+              title={"Instance ABDFEAD"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="FAVOURITED">
+            <Tile
+              onClick={() => navigate(`/library/DDAEDF`)}
+              selected={instanceId() === "DDAEDF"}
+              title={"Instance DDAEDF"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="CURSEFORGE">
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+        </Show>
+        <Show when={!isSidebarOpened()}>
+          <div
+            class={`${Style.scrollbarHide} h-full w-full max-h-[calc(100vh-60px-28px-80px-80px)] overflow-auto flex flex-col gap-4 items-center mt-6`}
+          >
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+          </div>
+        </Show>
+        <div class="absolute left-0 right-0 bottom-0 py-5 w-full flex justify-center bg-shade-8">
+          <Button
+            variant="outline"
+            style={{
+              ...(isSidebarOpened()
+                ? { width: "100%", "max-width": "200px" }
+                : { width: "40px", height: "40px", padding: "16px" }),
+            }}
+          >
+            <Show when={isSidebarOpened()} fallback={"+"}>
+              + Add Instance
+            </Show>
+          </Button>
+        </div>
+      </div>
     </SiderbarWrapper>
   );
 };

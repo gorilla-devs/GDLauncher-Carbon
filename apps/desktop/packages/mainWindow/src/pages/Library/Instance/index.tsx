@@ -2,7 +2,13 @@
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import { Link, Outlet, useNavigate, useParams } from "@solidjs/router";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "@solidjs/router";
 import { For, onCleanup, onMount } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 
@@ -13,33 +19,34 @@ type InstancePage = {
 
 const Instance = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const params = useParams();
+  const location = useLocation();
 
-  const instancePages = [
+  const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${id}`,
+      path: `/library/${params.id}`,
     },
     {
       label: "Mods",
-      path: `/library/${id}/mods`,
+      path: `/library/${params.id}/mods`,
     },
     {
       label: "Resource Packs",
-      path: `/library/${id}/resourcepacks`,
+      path: `/library/${params.id}/resourcepacks`,
     },
     {
       label: "Screenshots",
-      path: `/library/${id}/screenshots`,
+      path: `/library/${params.id}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/library/${id}/versions`,
+      path: `/library/${params.id}/versions`,
     },
   ];
 
   const selectedIndex = () =>
-    getRouteIndex(instancePages, location.pathname, true);
+    getRouteIndex(instancePages(), location.pathname, true);
 
   let ref: HTMLDivElement;
   let observer: ResizeObserver;
@@ -125,7 +132,7 @@ const Instance = () => {
                   {/* <img /> */}
                 </div>
                 <div class="flex flex-1 flex-col max-w-185 ">
-                  <h1 class="m-0">{id}</h1>
+                  <h1 class="m-0">{params.id}</h1>
                   <div class="flex flex-col lg:flex-row justify-between">
                     <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
@@ -200,7 +207,7 @@ const Instance = () => {
                     </Button>
                   </div>
                   <div class="flex flex-1 flex-col max-w-185 ">
-                    <h4 class="m-0">{id}</h4>
+                    <h4 class="m-0">{params.id}</h4>
                     <div class="flex flex-col lg:flex-row justify-between">
                       <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-shade-0">
                         <div class="text-xs	 p-0 lg:pr-2 border-0 lg:border-r-2 border-shade-5">
@@ -247,7 +254,7 @@ const Instance = () => {
               </div>
               <Tabs index={selectedIndex()}>
                 <TabList>
-                  <For each={instancePages}>
+                  <For each={instancePages()}>
                     {(page: InstancePage) => (
                       <Link href={page.path} class="no-underline">
                         <Tab class="bg-transparent">{page.label}</Tab>

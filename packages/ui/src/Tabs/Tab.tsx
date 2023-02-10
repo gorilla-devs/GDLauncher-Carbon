@@ -54,6 +54,7 @@ const Tab = (_props: Props) => {
   });
 
   onCleanup(() => {
+    tabsContext?.clearTabs();
     observer?.disconnect();
   });
 
