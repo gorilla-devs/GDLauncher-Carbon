@@ -1,13 +1,9 @@
 use crate::db::PrismaClient;
 use log::trace;
-use std::{
-    path::Path,
-    sync::{Arc, Weak},
-};
+use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::RwLock;
 
-use super::{AppRef, Managers};
+use super::AppRef;
 
 mod database;
 

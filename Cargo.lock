@@ -607,6 +607,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
+ "rspc",
  "serde",
  "serde_json",
  "sha1",

@@ -3,14 +3,15 @@ use crate::{
     instance::InstanceStatus::NotPersisted,
     minecraft_package::configuration::MinecraftPackageConfigurationFile,
 };
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd, Type)]
 pub enum InstanceStatus {
     NotPersisted,
-    Installing,
+    Installing(PathBuf),
     Ready(PathBuf),
 }
 
@@ -20,7 +21,7 @@ impl Default for InstanceStatus {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Type)]
 pub struct Instance {
     pub name: String,
     pub id: u128,
@@ -39,7 +40,7 @@ impl Instance {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Type)]
 pub struct InstanceConfigurationFile {
     pub instance_name: String,
     pub notes: String,

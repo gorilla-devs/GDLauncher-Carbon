@@ -10,18 +10,17 @@ mod write;
 use crate::managers::instance::delete::InstanceDeleteError;
 use crate::managers::instance::representation::CreateInstanceDto;
 use crate::managers::instance::scan::InstanceScanError;
-use crate::managers::instance::store::InstanceStore;
+use crate::managers::instance::store::{InstanceStore, InstanceStoreError};
 use crate::managers::instance::write::InstanceWriteError;
 
+use crate::api::keys::mc::{DELETE_INSTANCE, SAVE_NEW_INSTANCE, UPDATE_INSTANCE};
 use crate::managers::AppRef;
 use carbon_domain::instance::{Instance, InstanceStatus};
-use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
 use log::trace;
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
 use std::path::Path;
-use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -30,6 +29,8 @@ pub enum InstanceManagerError {
     AppNotFoundError,
     #[error("instance with id {0} not found")]
     InstanceWithGivenIdNotFound(u128),
+    #[error("instance store system error raised : {0}")]
+    InstanceStoreSystemError(#[from] InstanceStoreError),
     #[error("unable to delete instance : {0}")]
     InstanceDeleteError(#[from] InstanceDeleteError),
     #[error("unable to write instance : {0} ")]
@@ -72,29 +73,21 @@ impl InstanceManager {
         &self,
         dto: CreateInstanceDto,
     ) -> Result<Instance, InstanceManagerError> {
-        let instance = Instance {
-            name: dto.name,
-            id: self.instance_store.get_next_available_id().await,
-            played_time: Duration::default(),
-            last_played: None,
-            minecraft_package: MinecraftPackage {
-                version: dto.minecraft_version,
-                mods: Default::default(),
-                description: "".to_string(),
-                mod_loaders: Default::default(),
-                status: MinecraftPackageStatus::NotPersisted,
-            },
-            persistence_status: InstanceStatus::NotPersisted,
-            notes: "".to_string(),
+        let available_id = self.instance_store.get_next_available_id().await;
+        let instance = dto.into_instance_with_id(available_id).await;
+        let instance = self.instance_store.save_instance(instance).await?;
+        let instance = match instance.persistence_status {
+            InstanceStatus::Installing(ref path) | InstanceStatus::Ready(ref path) => {
+                self.write_at(instance.clone(), path).await?
+            }
+            _ => instance,
         };
-        let instance = self.instance_store.save_instance(instance).await;
-        //todo: handle path collision between instances
-        let instance = if let Some(path_to_write_in) = dto.path_to_save_at {
-            self.write_at(instance, &path_to_write_in).await?
-        } else {
-            instance
-        };
-        Ok(self.instance_store.save_instance(instance).await)
+        let saved_instance = self.instance_store.save_instance(instance).await?;
+        self.app.upgrade().invalidate(
+            SAVE_NEW_INSTANCE,
+            Some(serde_json::to_value(saved_instance.clone())?),
+        );
+        Ok(saved_instance)
     }
 
     pub async fn delete_instance_by_id(
@@ -107,6 +100,10 @@ impl InstanceManager {
             .delete_instance_by_id(&id)
             .await
             .ok_or(InstanceManagerError::InstanceWithGivenIdNotFound(id))?;
+        self.app.upgrade().invalidate(
+            DELETE_INSTANCE,
+            Some(serde_json::to_value(deleted_instance.clone())?),
+        );
         Ok(self
             .delete_from_fs(deleted_instance, !remove_from_fs)
             .await?)
@@ -123,7 +120,7 @@ impl InstanceManager {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
         for instance in found_instances.clone() {
-            self.instance_store.save_instance(instance).await;
+            self.instance_store.save_instance(instance).await?;
         }
         Ok(found_instances)
     }
@@ -137,7 +134,13 @@ impl InstanceManager {
         trace!("trying to patch instance with id {id} with new values {new_values:#?}");
         let target_instance = self.get_instance_by_id(id).await?;
         let into_properties = serde_json::to_value(target_instance)?;
-        let forbidden_property_keys = vec!["id"];
+        let forbidden_property_keys = vec![
+            "id",
+            "minecraft_package",
+            "persistence_status",
+            "last_played",
+            "played_time",
+        ];
         for forbidden_property_key in forbidden_property_keys {
             trace!("removing property named {forbidden_property_key} from patch plan cause is forbidden to change with patch");
             new_values.remove(forbidden_property_key);
@@ -149,8 +152,13 @@ impl InstanceManager {
                 None => trace!("set initially value for property with name  {property_key} value : {property_value} for instance with id {id}")
             }
         }
-        let patched_instance: Instance = serde_json::from_value(properties_to_patch.into())?;
-        let new_instance = self.instance_store.save_instance(patched_instance).await;
+        let patched_instance: Instance =
+            serde_json::from_value(Value::Object(properties_to_patch.clone()))?;
+        let new_instance = self.instance_store.save_instance(patched_instance).await?;
+        self.app.upgrade().invalidate(
+            UPDATE_INSTANCE,
+            Some(serde_json::to_value(new_instance.clone())?),
+        );
         Ok(new_instance)
     }
 

@@ -3,11 +3,12 @@ pub(crate) mod configuration;
 use crate::minecraft_mod::MinecraftMod;
 use crate::minecraft_package::configuration::MinecraftPackageConfigurationFile;
 use crate::modloader::ModLoader;
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord, Type)]
 pub enum MinecraftPackageInstallationStage {
     DownloadingAssets,
     DownloadingLibraries,
@@ -16,7 +17,7 @@ pub enum MinecraftPackageInstallationStage {
     InstallingMod,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Type)]
 pub enum MinecraftPackageStatus {
     NotPersisted,
     Queued,
@@ -24,7 +25,7 @@ pub enum MinecraftPackageStatus {
     Ready(PathBuf),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord, Type)]
 pub struct MinecraftPackage {
     pub version: String,
     pub mods: BTreeSet<MinecraftMod>,

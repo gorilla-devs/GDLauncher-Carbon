@@ -17,6 +17,7 @@ sha2 = { workspace = true }
 sha1 = { workspace = true }
 futures = { workspace = true }
 reqwest-middleware = { workspace = true }
+rspc = { workspace = true }
 reqwest-retry = { workspace = true }
 zip = { workspace = true }
 lazy_static = { workspace = true }

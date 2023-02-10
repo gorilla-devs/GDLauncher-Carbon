@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use thiserror::Error;
 
 use crate::db::{self, PrismaClient};

@@ -27,10 +27,10 @@ pub enum AppError {
 }
 
 pub struct ManagersInner {
-    instance_manager: InstanceManager,
-    configuration_manager: ConfigurationManager,
-    persistence_manager: PersistenceManager,
-    minecraft_manager: MinecraftManager,
+    pub(crate) instance_manager: InstanceManager,
+    pub(crate) configuration_manager: ConfigurationManager,
+    pub(crate) persistence_manager: PersistenceManager,
+    pub(crate) minecraft_manager: MinecraftManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
 }
 

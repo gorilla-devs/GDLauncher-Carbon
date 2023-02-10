@@ -1,5 +1,6 @@
 use super::instance::Instance;
 use async_trait::async_trait;
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::{fmt::Debug, sync::Weak};
@@ -19,7 +20,7 @@ enum ModLoaderInstanceStatus {
 
 struct ModLoaderInstance {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd, Type)]
 pub enum ModLoader {
     Vanilla,
     Forge,

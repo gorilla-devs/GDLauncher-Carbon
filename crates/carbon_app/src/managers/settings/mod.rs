@@ -8,7 +8,7 @@ use prisma_client_rust::QueryError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{AppRef, Managers};
+use super::AppRef;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {

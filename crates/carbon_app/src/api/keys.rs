@@ -37,6 +37,7 @@ keys! {
         OPEN_INSTANCE_FOLDER_PATH     = "openInstanceFolderPath";
         START_INSTANCE                = "startInstance";
         STOP_INSTANCE                 = "stopInstance";
+        SAVE_NEW_INSTANCE             = "saveNewInstance";
         DELETE_INSTANCE               = "deleteInstance";
         ENABLE_MOD                    = "enableMod";
         DISABLE_MOD                   = "disableMod";
@@ -45,7 +46,7 @@ keys! {
         SWITCH_MINECRAFT_VERSION      = "switchMinecraftVersion";
         SWITCH_MODLOADER              = "switchModloader";
         SWITCH_MODLOADER_VERSION      = "switchModloaderVersion";
-        UPDATE_INSTANCE_NAME          = "updateInstanceName";
+        UPDATE_INSTANCE               = "updateInstance";
         GET_INSTANCE_MEMORY           = "getInstanceMemory";
         UPDATE_INSTANCE_MEMORY        = "updateInstanceMemory";
         GET_INSTANCE_JAVA_ARGS        = "getInstanceJavaArgs";
