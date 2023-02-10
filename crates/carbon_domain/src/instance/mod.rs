@@ -1,23 +1,17 @@
-pub mod configuration;
-pub mod conversion;
-pub mod delete;
-pub mod scan;
-pub mod write;
-
 use crate::minecraft_package::MinecraftPackage;
 use crate::{
     instance::InstanceStatus::NotPersisted,
     minecraft_package::configuration::MinecraftPackageConfigurationFile,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
-use uuid::Uuid;
+use std::time::Duration;
 
-#[derive(Debug, Serialize, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum InstanceStatus {
-    Persisted(PathBuf),
     NotPersisted,
+    Installing,
+    Ready(PathBuf),
 }
 
 impl Default for InstanceStatus {
@@ -26,23 +20,15 @@ impl Default for InstanceStatus {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Instance {
     pub name: String,
-    pub uuid: String,
+    pub id: u128,
+    pub played_time: Duration,
+    pub last_played: Option<std::time::SystemTime>,
+    pub notes: String,
     pub minecraft_package: MinecraftPackage,
     pub persistence_status: InstanceStatus,
-}
-
-impl Instance {
-    fn new(mc_version: impl Into<String>) -> Self {
-        Instance {
-            name: String::from("Unnamed Instance"),
-            uuid: Uuid::new_v4().to_string(),
-            minecraft_package: MinecraftPackage::new(mc_version),
-            persistence_status: InstanceStatus::default(),
-        }
-    }
 }
 
 impl Instance {
@@ -56,6 +42,9 @@ impl Instance {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InstanceConfigurationFile {
     pub instance_name: String,
+    pub notes: String,
+    pub played_time: Duration,
+    pub last_played: Option<std::time::SystemTime>,
     #[serde(rename = "minecraft_package")]
     pub minecraft_package_configuration: MinecraftPackageConfigurationFile,
 }
@@ -64,31 +53,14 @@ impl From<&Instance> for InstanceConfigurationFile {
     fn from(value: &Instance) -> Self {
         InstanceConfigurationFile {
             instance_name: value.name.clone(),
+            notes: value.notes.clone(),
+            played_time: value.played_time,
+            last_played: value.last_played,
             minecraft_package_configuration: MinecraftPackageConfigurationFile {
                 version: value.minecraft_package.version.clone(),
                 description: value.minecraft_package.description.clone(),
-                modloader: value.minecraft_package.modloader.clone(),
+                modloader: value.minecraft_package.mod_loaders.clone(),
             },
-        }
-    }
-}
-
-pub mod consts {
-    pub(crate) const TEMP_CONFIG_FILE_PREFIX: &str = ".temp";
-    pub(crate) const CONFIGURATION_FILE_RELATIVE_PATH: &str = ".conf.json";
-    pub(crate) const MINECRAFT_PACKAGE_RELATIVE_PATH: &str = "minecraft";
-}
-
-pub struct Instances {
-    pub instances_path: PathBuf,
-    pub instances: HashSet<Instance>,
-}
-
-impl Instances {
-    pub fn new(instances_path: PathBuf) -> Self {
-        Instances {
-            instances_path,
-            instances: HashSet::new(),
         }
     }
 }

@@ -15,6 +15,11 @@ log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 tracing-test = { workspace = true }
+uuid = { workspace = true }
+trash = { workspace = true }
+futures = { workspace = true }
+tokio-stream = { workspace = true }
+open = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tower-http = { workspace = true, default-features = false, features = ["cors"] }

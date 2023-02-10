@@ -1,8 +1,9 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
 use crate::{minecraft_package::MinecraftPackage, modloader::ModLoader};
 use serde::{Deserialize, Serialize};
 
+//fixme: MUST be remodelled, modloader here is not good
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct MinecraftPackageConfigurationFile {
     pub version: String,
@@ -15,7 +16,7 @@ impl From<&MinecraftPackage> for MinecraftPackageConfigurationFile {
         MinecraftPackageConfigurationFile {
             version: value.version.clone(),
             description: "".to_string(),
-            modloader: value.modloader.clone(),
+            modloader: value.mod_loaders.clone(),
         }
     }
 }

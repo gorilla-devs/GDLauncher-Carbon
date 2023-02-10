@@ -1,6 +1,7 @@
 use super::instance::Instance;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::fmt::{Display, Formatter};
 use std::{fmt::Debug, sync::Weak};
 use tokio::sync::{watch::Sender, RwLock};
 
@@ -10,6 +11,14 @@ pub(crate) mod vanilla;
 
 pub trait ModLoaderError: std::error::Error + Send + Sync + 'static {}
 
+enum ModLoaderInstanceStatus {
+    NotPersisted,
+    Queued,
+    Ready,
+}
+
+struct ModLoaderInstance {}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub enum ModLoader {
     Vanilla,
@@ -17,6 +26,25 @@ pub enum ModLoader {
     Fabric,
     LiteLoader,
     Quilt,
+}
+
+impl ModLoader {
+    pub fn get_version(&self) -> String {
+        "".to_string()
+    }
+}
+
+impl Display for ModLoader {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let enum_name = match self {
+            ModLoader::Vanilla => "vanilla",
+            ModLoader::Forge => "forge",
+            ModLoader::Fabric => "fabric",
+            ModLoader::LiteLoader => "lite-loader",
+            ModLoader::Quilt => "quilt",
+        };
+        write!(f, "{}", enum_name)
+    }
 }
 
 impl Default for ModLoader {
@@ -55,6 +83,8 @@ where
     ) -> Result<(), Self::Error>;
 
     fn remove(&self) -> Result<(), Self::Error>;
+
     fn verify(&self) -> Result<(), Self::Error>;
+
     fn get_version(&self) -> ModloaderVersion;
 }

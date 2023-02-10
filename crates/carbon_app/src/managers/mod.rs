@@ -1,17 +1,19 @@
 use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
+use crate::managers::instance::InstanceManager;
 use crate::managers::persistence::PersistenceManager;
 use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
+use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::RecvError;
-use tokio::sync::{broadcast, RwLock};
 
 use self::minecraft::MinecraftManager;
 
+mod instance;
 mod minecraft;
 mod persistence;
 mod settings;
@@ -25,7 +27,7 @@ pub enum AppError {
 }
 
 pub struct ManagersInner {
-    //instances: Instances,
+    instance_manager: InstanceManager,
     configuration_manager: ConfigurationManager,
     persistence_manager: PersistenceManager,
     minecraft_manager: MinecraftManager,
@@ -69,6 +71,7 @@ impl ManagersInner {
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
     ) -> Managers {
         let app = Arc::new(ManagersInner {
+            instance_manager: InstanceManager::new(),
             configuration_manager: ConfigurationManager::new(),
             persistence_manager: PersistenceManager::new().await,
             minecraft_manager: MinecraftManager::new(),
@@ -84,6 +87,7 @@ impl ManagersInner {
         // panic, and after this block it will be safe. The appref
         // CANNOT be safely accessed inside of this block.
         unsafe {
+            app.instance_manager.get_appref().init(weak.clone());
             app.configuration_manager.get_appref().init(weak.clone());
             app.persistence_manager.get_appref().init(weak.clone());
             app.minecraft_manager.get_appref().init(weak.clone());

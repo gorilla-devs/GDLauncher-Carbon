@@ -41,51 +41,17 @@ struct UpdateInstanceArgs {
     new_name: String,
 }
 
+#[derive(Type, Deserialize)]
+struct DeleteInstanceArgs {
+    id: String,
+    move_to_trash_bin: bool,
+}
+
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
-        query GET_INSTANCES[_, _args: ()] {
-            let instances = vec![
-                Instance {
-                    id: "88r39459345939453".to_string(),
-                    name: "My first instance".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Forge".to_string(),
-                },
-                Instance {
-                    id: "88r39459345939456".to_string(),
-                    name: "My second instance".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Fabric".to_string(),
-                },
-                Instance {
-                    id: "88r39459345939451".to_string(),
-                    name: "Instance with a very long name".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Fabric".to_string(),
-                },
-                Instance {
-                    id: "88r39459345336457".to_string(),
-                    name: "Vanilla Minecraft".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Vanilla".to_string(),
-                },
-                Instance {
-                    id: "84439459345336457".to_string(),
-                    name: "Forge Minecraft".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Forge".to_string(),
-                },
-                Instance {
-                    id: "82h39459345336457".to_string(),
-                    name: "All The Mods 6".to_string(),
-                    mc_version: "1.16.5".to_string(),
-                    modloader: "Forge".to_string(),
-                },
-            ];
-
-            let final_instances = Instances(instances);
-
-            Ok(final_instances)
+        query GET_INSTANCES[app, _: ()] {
+            let instances = app.instance_manager.get_all_instances();
+            Ok(instances)
         }
 
         query GET_INSTANCE_DETAILS[_, args: String] {
@@ -131,7 +97,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         mutation OPEN_INSTANCE_FOLDER_PATH[_, args: String] {}
         mutation START_INSTANCE[_, args: String] {}
         mutation STOP_INSTANCE[_, args: String] {}
-        mutation DELETE_INSTANCE[_, args: String] {}
+        mutation DELETE_INSTANCE[_, args: DeleteInstanceArgs] {
+
+        }
         // Actions on mods
         mutation ENABLE_MOD[_, args: String] {}
         mutation DISABLE_MOD[_, args: String] {}

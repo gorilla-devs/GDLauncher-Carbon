@@ -9,6 +9,7 @@ pub mod managers;
 
 pub mod generate_rspc_ts_bindings;
 mod runtime_directory;
+pub(crate) mod try_path_fmt;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
