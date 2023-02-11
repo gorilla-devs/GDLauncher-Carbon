@@ -16,6 +16,7 @@ use self::minecraft::MinecraftManager;
 mod instance;
 mod minecraft;
 mod persistence;
+pub mod representation;
 mod settings;
 
 pub type Managers = Arc<ManagersInner>;

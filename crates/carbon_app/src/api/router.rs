@@ -32,4 +32,30 @@ macro_rules! router {
     }}
 }
 
+/// Macro that perform a generic conversion towards rspc::Error,
+/// error that have to be mapped MUST impl Debug trait
+///
+/// # Examples
+///
+/// ```ignore
+///
+///     fn main(){
+///         let to_parse = "abcd";
+///         let rspc_error = to_parse.parse().map_err(|error| {
+///             rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
+///         }).unwrap_err();
+///
+///         assert_eq!(rspc_error, try_in_router!(to_parse.parse()).unwrap_err())
+///
+///     }
+/// ``
+macro_rules! try_in_router {
+    ($result:expr) => {
+        $result.map_err(|error| {
+            rspc::Error::new(rspc::ErrorCode::InternalServerError, format!("{:?}", error))
+        })
+    };
+}
+
 pub(crate) use router;
+pub(crate) use try_in_router;

@@ -1,17 +1,15 @@
 mod delete;
 mod instance_configuration;
-mod play;
-pub mod representation;
 mod scan;
 mod store;
 mod tests;
 mod write;
 
 use crate::managers::instance::delete::InstanceDeleteError;
-use crate::managers::instance::representation::CreateInstanceDto;
 use crate::managers::instance::scan::InstanceScanError;
 use crate::managers::instance::store::{InstanceStore, InstanceStoreError};
 use crate::managers::instance::write::InstanceWriteError;
+use crate::managers::representation::CreateInstanceDto;
 
 use crate::api::keys::mc::{DELETE_INSTANCE, SAVE_NEW_INSTANCE, UPDATE_INSTANCE};
 use crate::managers::AppRef;

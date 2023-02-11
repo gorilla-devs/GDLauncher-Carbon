@@ -1,9 +1,10 @@
 use crate::api::keys::mc::*;
 use crate::api::managers::Managers;
-use crate::api::router::router;
+use crate::api::router::{router, try_in_router};
+use crate::managers::representation::CreateInstanceDto;
 use axum::extract::DefaultBodyLimit;
-use rspc::{Router, RouterBuilderLike, Type};
-use serde::{Deserialize, Serialize};
+use rspc::{RouterBuilderLike, Type};
+use serde::Deserialize;
 use serde_json::Value;
 
 #[derive(Type, Deserialize)]
@@ -25,27 +26,39 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             Ok(instances)
         }
         query GET_INSTANCE_DETAILS[app, instance_uuid: String] {
-            let instance_uuid = instance_uuid.parse()?;
-            let instance = app.instance_manager.get_instance_by_id(instance_uuid).await?;
+            let instance_uuid = try_in_router!(instance_uuid.parse())?;
+            let instance = try_in_router!(app.instance_manager.get_instance_by_id(instance_uuid).await)?;
             Ok(instance)
         }
         mutation UPDATE_INSTANCE[app, args: UpdateInstanceArgs] {
-            let instance_uuid = args.id.parse()?;
-            app.instance_manager.patch_instance_by_id(instance_uuid, args.new_props).await?;
+            let instance_uuid = try_in_router!(args.id.parse())?;
+            try_in_router!(app.instance_manager.patch_instance_by_id(instance_uuid, args.new_props).await)?;
+            Ok(())
         }
         mutation DELETE_INSTANCE[app, args: DeleteInstanceArgs] {
-            let instance_uuid = args.id.parse()?;
-            let instance = app.instance_manager.delete_instance_by_id(instance_uuid,args.move_to_trash_bin).await?;
+            let instance_uuid = try_in_router!(args.id.parse())?;
+            try_in_router!(app.instance_manager.delete_instance_by_id(instance_uuid,args.move_to_trash_bin).await)?;
+            Ok(())
         }
         mutation OPEN_INSTANCE_FOLDER_PATH[app, instance_uuid: String] {
-            let instance_uuid = instance_uuid.parse()?;
-            let instance = app.instance_manager.get_instance_by_id(instance_uuid).await?;
+            let instance_uuid = try_in_router!(instance_uuid.parse())?;
+            try_in_router!(app.instance_manager.get_instance_by_id(instance_uuid).await)?;
+            Ok(())
         }
         mutation SAVE_NEW_INSTANCE[app, create_instance_dto: CreateInstanceDto] {
-            let instance = app.instance_manager.add_instance(create_instance_dto).await?;
+            try_in_router!(app.instance_manager.add_instance(create_instance_dto).await)?;
+            Ok(())
         }
-        mutation START_INSTANCE[app, args: String] {}
-        mutation STOP_INSTANCE[app, args: String] {}
+        mutation START_INSTANCE[app, instance_uuid: String] {
+            let instance_uuid = try_in_router!(instance_uuid.parse())?;
+            try_in_router!(app.instance_manager.start_instance_by_id(instance_uuid).await)?;
+            Ok(())
+        }
+        mutation STOP_INSTANCE[app, instance_uuid: String] {
+            let instance_uuid = try_in_router!(instance_uuid.parse())?;
+            try_in_router!(app.instance_manager.stop_instance_by_id(instance_uuid).await)?;
+            Ok(())
+        }
         // Actions on mods
         mutation ENABLE_MOD[_, args: String] {}
         mutation DISABLE_MOD[_, args: String] {}
