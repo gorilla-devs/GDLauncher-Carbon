@@ -1,3 +1,4 @@
+pub mod account;
 pub mod instance;
 pub mod minecraft;
 pub mod minecraft_mod;
