@@ -19,12 +19,6 @@ use tokio_stream::StreamExt;
 
 #[derive(Error, Debug)]
 pub enum InstanceScanError {
-    #[error("path `{path}` does not contain any valid instance at ")]
-    NoInstancesInFolder {
-        path: PathBuf,
-        recursive_searched: bool,
-    },
-
     #[error("path `{0}` does not point to a directory ")]
     PathNotIsNotPointingToAFolder(PathBuf),
 
@@ -41,8 +35,8 @@ pub enum InstanceScanError {
     ConfigurationFileParsingError(#[from] ConfigurationFileParsingError),
 }
 
-type InstanceScanResult = Result<Vec<Result<Instance, InstanceScanError>>, InstanceScanError>;
 type InstanceTestResult = Result<(), InstanceScanError>;
+type InstanceScanResult = Result<Vec<Result<Instance, InstanceScanError>>, InstanceScanError>;
 
 impl InstanceManager {
     pub(super) async fn scan_for_instances(
@@ -92,7 +86,7 @@ impl InstanceManager {
         let instance_id = self.instance_store.get_next_available_id().await;
         Ok(Instance {
             name: instance_configuration_file.instance_name,
-            id: instance_id,
+            uuid: instance_id.to_string(),
             played_time: instance_configuration_file.played_time,
             last_played: instance_configuration_file.last_played,
             notes: instance_configuration_file.notes,

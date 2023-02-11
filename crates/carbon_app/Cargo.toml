@@ -17,7 +17,6 @@ serde_json = { workspace = true }
 tracing-test = { workspace = true }
 uuid = { workspace = true }
 trash = { workspace = true }
-futures = { workspace = true }
 tokio-stream = { workspace = true }
 open = { workspace = true }
 directories = { workspace = true }

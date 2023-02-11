@@ -2,6 +2,7 @@ use crate::try_path_fmt::try_path_fmt;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use log::trace;
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::ParseIntError;
 use std::path::PathBuf;
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -21,6 +22,8 @@ pub enum InstanceStoreError {
         candidate: Instance,
         already_indexed: Instance,
     },
+    #[error("unable to convert string {0} to u128")]
+    UuidParseError(#[from] ParseIntError),
 }
 
 impl InstanceStore {
@@ -54,18 +57,15 @@ impl InstanceStore {
             "trying to save instance {} into instances store",
             serde_json::to_string(&instance).unwrap_or("<<unrepresentable instance!>>".to_string())
         );
-        let instance_id = &instance.id;
+        let instance_id = &instance.uuid.parse()?;
         match instance.persistence_status {
             InstanceStatus::Installing(ref path) | InstanceStatus::Ready(ref path) => {
-                match self.instances_by_path.read().await.get(path) {
-                    Some(found_instance) => {
-                        trace!("found instance with same path, path collision not supported!");
-                        return Err(InstanceStoreError::InstanceBreakPathIntegrityRule {
-                            candidate: instance.clone(),
-                            already_indexed: found_instance.clone(),
-                        });
-                    }
-                    _ => (),
+                if let Some(found_instance) = self.instances_by_path.read().await.get(path) {
+                    trace!("found instance with same path, path collision not supported!");
+                    return Err(InstanceStoreError::InstanceBreakPathIntegrityRule {
+                        candidate: instance.clone(),
+                        already_indexed: found_instance.clone(),
+                    });
                 };
                 self.instances_by_path
                     .write()
@@ -76,9 +76,9 @@ impl InstanceStore {
                     try_path_fmt!(path)
                 )
             }
-            _ => trace!(
-                "instance with id {instance_id} not saved in path index since is not persisted"
-            ),
+            _ => {
+                trace!("instance with id {instance_id} not indexed by path since is not persisted")
+            }
         }
         if let true = self.instances_by_id.read().await.contains_key(instance_id) {
             trace!("found instance with id {instance_id}, removing in order to replace with the new one");
@@ -87,11 +87,11 @@ impl InstanceStore {
         self.instances_by_id
             .write()
             .await
-            .insert(instance_id.clone(), instance.clone());
+            .insert(*instance_id, instance.clone());
         match self.instances_pool.write().await.insert(instance.clone()) {
             true => trace!("updated instance with id {instance_id}"),
             false => trace!("saved new instance with id {instance_id}"),
         };
-        return Ok(instance);
+        Ok(instance)
     }
 }

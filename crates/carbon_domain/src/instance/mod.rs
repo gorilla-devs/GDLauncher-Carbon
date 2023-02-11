@@ -24,7 +24,7 @@ impl Default for InstanceStatus {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Ord, PartialOrd, Type)]
 pub struct Instance {
     pub name: String,
-    pub id: u128,
+    pub uuid: String,
     pub played_time: Duration,
     pub last_played: Option<std::time::SystemTime>,
     pub notes: String,

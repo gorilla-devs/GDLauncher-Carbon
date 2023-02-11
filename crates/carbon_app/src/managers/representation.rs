@@ -16,7 +16,7 @@ impl CreateInstanceDto {
     pub async fn into_instance_with_id(self, uuid: u128) -> Instance {
         Instance {
             name: self.name,
-            id: uuid,
+            uuid: uuid.to_string(),
             played_time: Duration::default(),
             last_played: None,
             minecraft_package: MinecraftPackage {

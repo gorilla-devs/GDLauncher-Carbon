@@ -23,8 +23,6 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum InstanceManagerError {
-    #[error("app reference not found")]
-    AppNotFoundError,
     #[error("instance with id {0} not found")]
     InstanceWithGivenIdNotFound(u128),
     #[error("instance store system error raised : {0}")]
@@ -160,11 +158,14 @@ impl InstanceManager {
         Ok(new_instance)
     }
 
-    pub async fn start_instance_by_id(&self, id: String) -> Result<Instance, InstanceManagerError> {
+    pub async fn start_instance_by_id(
+        &self,
+        _id: String,
+    ) -> Result<Instance, InstanceManagerError> {
         unimplemented!()
     }
 
-    pub async fn stop_instance_by_id(&self, id: u128) -> Result<Instance, InstanceManagerError> {
+    pub async fn stop_instance_by_id(&self, _id: u128) -> Result<Instance, InstanceManagerError> {
         unimplemented!()
     }
 }

@@ -60,19 +60,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             Ok(())
         }
         // Actions on mods
-        mutation ENABLE_MOD[_, args: String] {}
-        mutation DISABLE_MOD[_, args: String] {}
-        mutation REMOVE_MOD[_, args: String] {}
-        mutation REMOVE_MODS[_, args: Vec<String>] {}
+        mutation ENABLE_MOD[_, _args: String] {}
+        mutation DISABLE_MOD[_, _args: String] {}
+        mutation REMOVE_MOD[_, _args: String] {}
+        mutation REMOVE_MODS[_, _args: Vec<String>] {}
         // Change versions
-        mutation SWITCH_MINECRAFT_VERSION[_, args: String] {}
-        mutation SWITCH_MODLOADER[_, args: String] {}
-        mutation SWITCH_MODLOADER_VERSION[_, args: String] {}
+        mutation SWITCH_MINECRAFT_VERSION[_, _args: String] {}
+        mutation SWITCH_MODLOADER[_, _args: String] {}
+        mutation SWITCH_MODLOADER_VERSION[_, _args: String] {}
         // Instance settings
-        query GET_INSTANCE_MEMORY[_, args: String] {}
-        mutation UPDATE_INSTANCE_MEMORY[_, args: u8] {}
-        query GET_INSTANCE_JAVA_ARGS[_, args: String] {}
-        mutation UPDATE_INSTANCE_JAVA_ARGS[_, args: String] {}
+        query GET_INSTANCE_MEMORY[_, _args: String] {}
+        mutation UPDATE_INSTANCE_MEMORY[_, _args: u8] {}
+        query GET_INSTANCE_JAVA_ARGS[_, _args: String] {}
+        mutation UPDATE_INSTANCE_JAVA_ARGS[_, _args: String] {}
     }
 }
 

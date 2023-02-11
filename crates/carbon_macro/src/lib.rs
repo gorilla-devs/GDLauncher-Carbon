@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 use syn::__private::bool;
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, ItemFn};
+use syn::{parse_macro_input, Data, DeriveInput, Field};
 
 /// Example of user-defined [derive mode macro][1]
 ///

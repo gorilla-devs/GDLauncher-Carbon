@@ -14,9 +14,6 @@ pub enum InstanceWriteError {
     #[error("error happened while trying to write configuration file for instance : {0}\n")]
     InstanceConfigurationWritingError(#[from] ConfigurationFileParsingError),
 
-    #[error("error happened while trying to write configuration file for instance \n")]
-    PathNotSpecified(),
-
     #[error("minecraft package already exist and is a file \n")]
     MinecraftPackageIsAFile(),
 
