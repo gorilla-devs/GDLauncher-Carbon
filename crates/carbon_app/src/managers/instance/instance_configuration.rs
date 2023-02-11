@@ -85,20 +85,3 @@ impl InstanceManager {
         Ok(instance_configuration_file)
     }
 }
-
-#[cfg(test)]
-mod unit_tests {
-    #[test]
-    fn test_configuration_file_parsing_ok() {
-        /* let res = check_configuration_file_sanity(&PathBuf::from("fixtures").join("instance_example")).await;
-        let affirmative_check = matches!(res, Ok(_));
-        assert!(affirmative_check);*/
-    }
-
-    #[test]
-    fn test_configuration_file_parsing_fail() {
-        /* let res = check_configuration_file_sanity(&PathBuf::from("fixtures").join("malformed_instance_example")).await;
-        let denial_check = matches!(res, Err(_)); // todo : add every error case
-        assert!(denial_check);*/
-    }
-}

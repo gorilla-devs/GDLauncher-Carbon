@@ -18,8 +18,9 @@ use log::trace;
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
+use crate::managers::instance::InstanceManagerError::InstanceWithPathAlreadyExistError;
 
 #[derive(Error, Debug)]
 pub enum InstanceManagerError {
@@ -33,6 +34,10 @@ pub enum InstanceManagerError {
     InstanceWriteError(#[from] InstanceWriteError),
     #[error("error raised in instance patch process : {0} ")]
     InstancePatchError(#[from] serde_json::error::Error),
+    #[error("error raised in instance patch process : {0} ")]
+    InstanceWithPathAlreadyExistError(PathBuf),
+    #[error("io error raised : {0} ")]
+    IoError(#[from] std::io::Error),
     #[error("unable to scan directory for instances : {0} ")]
     InstanceScanError(#[from] InstanceScanError),
 }
@@ -70,13 +75,19 @@ impl InstanceManager {
         dto: CreateInstanceDto,
     ) -> Result<Instance, InstanceManagerError> {
         let available_id = self.instance_store.get_next_available_id().await;
-        let instance = dto.into_instance_with_id(available_id).await;
+        let instance = dto.clone().into_instance_with_id(available_id).await;
         let instance = self.instance_store.save_instance(instance).await?;
-        let instance = match instance.persistence_status {
-            InstanceStatus::Installing(ref path) | InstanceStatus::Ready(ref path) => {
-                self.write_at(instance.clone(), path).await?
+        let instance = match dto.path_to_save_at {
+            Some(path_to_save) if self.instance_store.exist_by_path(&path_to_save).await => {
+                Err(InstanceWithPathAlreadyExistError(path_to_save))?
             }
-            _ => instance,
+            Some(path_to_save) => {
+                if !path_to_save.exists() {
+                    tokio::fs::create_dir(&path_to_save).await?;
+                };
+                self.write_at(instance.clone(), &path_to_save).await?
+            }
+            None => instance
         };
         let saved_instance = self.instance_store.save_instance(instance).await?;
         self.app.upgrade().invalidate(

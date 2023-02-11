@@ -1,3 +1,4 @@
+use crate::api::keys::app::{GET_THEME, SET_THEME};
 use crate::db;
 use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
@@ -20,6 +21,9 @@ pub enum ConfigurationManagerError {
 
     #[error("error : {0}")]
     PersistenceManagerError(#[from] PersistenceManagerError),
+
+    #[error("serde error : {0}")]
+    SerdeError(#[from] serde_json::Error),
 
     #[error("error raised while executing query : {0}")]
     QueryError(#[from] QueryError),
@@ -66,7 +70,8 @@ impl ConfigurationManager {
 
     pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
         trace!("writing theme in db : {theme}");
-        self.app
+        let new_configuration = self
+            .app
             .upgrade()
             .persistence_manager
             .get_db_client()
@@ -75,6 +80,9 @@ impl ConfigurationManager {
             .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
             .exec()
             .await?;
+        self.app
+            .upgrade()
+            .invalidate(SET_THEME, Some(serde_json::to_value(new_configuration)?));
         trace!("wrote theme into db");
         Ok(())
     }

@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod test {
     use crate::managers::instance;
+    use crate::managers::instance::InstanceManager;
+    use crate::managers::representation::CreateInstanceDto;
     use env_logger::Builder;
     use log::{debug, LevelFilter};
     use std::env;
@@ -9,9 +11,21 @@ mod test {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn test_instance_crud() {
-        /*   Builder::new().filter_level(LevelFilter::Trace).init();
+        Builder::new().filter_level(LevelFilter::Trace).init();
 
-        let test_assets_base_dir = std::env::current_dir().unwrap().join("test_assets");
+        let test_assets_base_dir = env::current_dir().unwrap().join("test_instance");
+
+        let instance_manager = InstanceManager::new();
+
+        let create_instance_dto = CreateInstanceDto {
+            name: "test_instance".to_string(),
+            minecraft_version: "1.15.179".to_string(),
+            path_to_save_at: Some(test_assets_base_dir),
+        };
+
+        instance_manager.add_instance(create_instance_dto).await?;
+
+        let test_assets_base_dir = env::current_dir().unwrap().join("test_assets");
 
         let directory_to_scan = &PathBuf::from(&test_assets_base_dir);
         debug!("scanning directory at {}", try_path_fmt!(directory_to_scan));
@@ -91,7 +105,7 @@ mod test {
         debug!(
             "instance  correctly deleted at : {}",
             try_path_fmt!(tmp_directory)
-        );*/
+        );
     }
 
     /* #[tokio::test]

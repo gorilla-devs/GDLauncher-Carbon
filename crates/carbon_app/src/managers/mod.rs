@@ -147,27 +147,7 @@ impl Into<rspc::Error> for ConfigurationManagerError {
     }
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
-    router! {
-        query GET_THEME[app, _args: ()] {
-            app.configuration_manager
-                .get_theme()
-                .await
-                .map_err(|error| error.into())
-        }
 
-        mutation SET_THEME[app, new_theme: String] {
-            app.configuration_manager
-                .set_theme(new_theme.clone())
-                .await
-                .map_err(|error| {
-                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                })?;
-            app.invalidate(GET_THEME, Some(new_theme.into()));
-            Ok(())
-        }
-    }
-}
 
 // mod test {
 //     use crate::app::App;

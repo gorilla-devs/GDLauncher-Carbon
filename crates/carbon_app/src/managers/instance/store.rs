@@ -52,6 +52,10 @@ impl InstanceStore {
         deindexed_instance
     }
 
+    pub async fn exist_by_path(&self, path: &PathBuf) -> bool {
+        self.instances_by_path.read().await.contains_key(path)
+    }
+
     pub async fn save_instance(&self, instance: Instance) -> Result<Instance, InstanceStoreError> {
         trace!(
             "trying to save instance {} into instances store",
