@@ -17,12 +17,16 @@ serde_json = { workspace = true }
 tracing-test = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+futures = { workspace = true }
 tower-http = { workspace = true, default-features = false, features = ["cors"] }
-rspc = { workspace = true, features = ["axum"] }
+rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
 async-stream = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
+jsonwebtoken = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
 carbon_java_manager = { path = "../carbon_java_manager" }
 carbon_domain = { path = "../carbon_domain" }
