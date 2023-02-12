@@ -17,7 +17,7 @@ const Collapsable = (props: Props) => {
       }}
     >
       <div
-        class="max-w-full h-8 px-3 flex gap-2 items-center cursor-pointer"
+        class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         onClick={() => {
           setOpened((prev) => !prev);
         }}
