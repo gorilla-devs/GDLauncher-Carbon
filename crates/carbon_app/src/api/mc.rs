@@ -43,6 +43,12 @@ struct UpdateInstanceArgs {
 
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
+        query GET_MINECRAFT_VERSIONS[app, _args: ()] {
+            let res = app.minecraft_manager.get_minecraft_versions().await;
+
+            res.into_iter().map(|version| version.into()).collect::<Vec<ManifestVersion>>()
+        }
+
         query GET_INSTANCES[_, _args: ()] {
             let instances = vec![
                 Instance {
@@ -159,4 +165,49 @@ pub(super) fn mount_axum_router() -> axum::Router<()> {
             }),
         )
         .layer(DefaultBodyLimit::max(4096)) // this is probably enough for a thumbnail
+}
+
+#[derive(Type, Debug, Serialize, Deserialize, Clone)]
+pub struct ManifestVersion {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_: Type,
+}
+
+impl From<carbon_domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
+    fn from(value: carbon_domain::minecraft::manifest::ManifestVersion) -> Self {
+        ManifestVersion {
+            id: value.id,
+            type_: value.type_.into(),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize, Clone)]
+pub enum Type {
+    #[serde(rename = "old_alpha")]
+    OldAlpha,
+    #[serde(rename = "old_beta")]
+    OldBeta,
+    #[serde(rename = "release")]
+    Release,
+    #[serde(rename = "snapshot")]
+    Snapshot,
+}
+
+impl From<carbon_domain::minecraft::manifest::Type> for Type {
+    fn from(value: carbon_domain::minecraft::manifest::Type) -> Self {
+        value.into()
+    }
+}
+
+impl From<Type> for String {
+    fn from(type_: Type) -> Self {
+        match type_ {
+            Type::OldAlpha => "old_alpha".to_string(),
+            Type::OldBeta => "old_beta".to_string(),
+            Type::Release => "release".to_string(),
+            Type::Snapshot => "snapshot".to_string(),
+        }
+    }
 }

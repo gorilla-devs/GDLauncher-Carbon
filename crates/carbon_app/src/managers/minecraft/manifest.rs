@@ -1,21 +1,31 @@
 use std::sync::Arc;
 
-use carbon_domain::minecraft::manifest::MinecraftManifest;
+use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 use prisma_client_rust::QueryError;
+use rspc::ErrorCode;
 use thiserror::Error;
 
 use crate::db::{minecraft_manifest::SetParam, PrismaClient};
 
 #[derive(Error, Debug)]
-enum ManifestError {
+pub enum ManifestError {
     #[error("Could not fetch manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
     DBQueryError(#[from] QueryError),
 }
 
+impl From<ManifestError> for rspc::Error {
+    fn from(value: ManifestError) -> Self {
+        rspc::Error::new(
+            ErrorCode::InternalServerError,
+            format!("Manifest Error: {value}"),
+        )
+    }
+}
+
 // get should abstract the complexity of fetching it from either the network or the db
-async fn get(db: Arc<PrismaClient>) -> Result<MinecraftManifest, ManifestError> {
+pub async fn get(db: Arc<PrismaClient>) -> Result<Vec<ManifestVersion>, ManifestError> {
     let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
     let new_manifest = reqwest::get(server_url)
         .await?
@@ -37,5 +47,5 @@ async fn get(db: Arc<PrismaClient>) -> Result<MinecraftManifest, ManifestError> 
             .await?;
     }
 
-    Ok(new_manifest)
+    Ok(new_manifest.versions)
 }
