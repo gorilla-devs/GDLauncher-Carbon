@@ -46,7 +46,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager.get_minecraft_versions().await;
 
-            res.into_iter().map(|version| version.into()).collect::<Vec<ManifestVersion>>()
+            res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>()
         }
 
         query GET_INSTANCES[_, _args: ()] {
