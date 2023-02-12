@@ -561,6 +561,7 @@ dependencies = [
  "carbon_domain",
  "carbon_java_manager",
  "carbon_macro",
+ "carbon_net",
  "directories",
  "env_logger",
  "log",

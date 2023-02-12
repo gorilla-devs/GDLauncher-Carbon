@@ -1,17 +1,6 @@
+use carbon_net::IntoVecDownloadable;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
-use thiserror::Error;
-use tracing::trace;
-
-#[derive(Error, Debug)]
-pub enum AssetsError {
-    #[error("failed to download asset index")]
-    DownloadError(#[from] reqwest::Error),
-    #[error("failed to parse asset index")]
-    ParseError(#[from] serde_json::Error),
-    #[error("failed to write asset index")]
-    WriteError(#[from] std::io::Error),
-}
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AssetIndex {
@@ -24,29 +13,8 @@ pub struct Object {
     pub size: i64,
 }
 
-impl From<Object> for carbon_net::Downloadable {
-    fn from(object: Object) -> Self {
-        carbon_net::Downloadable::new(
-            format!(
-                "https://resources.download.minecraft.net/{}/{}",
-                &object.hash[0..2],
-                &object.hash
-            ),
-            PathBuf::from(&object.hash),
-        )
-        .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash)))
-        .with_size(object.size as u64)
-    }
-}
-
-impl AssetIndex {
-    #[tracing::instrument]
-    pub async fn get_asset_files_downloadable(
-        &self,
-        base_path: &PathBuf,
-    ) -> Result<Vec<carbon_net::Downloadable>, AssetsError> {
-        trace!("Downloading assets");
-
+impl IntoVecDownloadable for AssetIndex {
+    fn into_vec_downloadable(self, base_path: &Path) -> Vec<carbon_net::Downloadable> {
         let mut files: Vec<carbon_net::Downloadable> = vec![];
 
         for (_, object) in self.objects.iter() {
@@ -71,6 +39,6 @@ impl AssetIndex {
             );
         }
 
-        Ok(files)
+        files
     }
 }

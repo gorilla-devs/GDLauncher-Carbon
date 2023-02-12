@@ -1,12 +1,14 @@
-use carbon_net::Downloadable;
+use std::path::PathBuf;
+
+use carbon_net::IntoVecDownloadable;
 use serde::{Deserialize, Serialize};
-use std::{
-    error::Error,
-    path::{Path, PathBuf},
-};
-use thiserror::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::trace;
+
+// Need custom type to impl external traits for Vec<Library>
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Libraries {
+    #[serde(flatten)]
+    inner: Vec<Library>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,7 +16,7 @@ pub struct Version {
     pub inherits_from: Option<String>,
     pub arguments: Option<Arguments>,
     #[serde(rename = "assetIndex")]
-    pub asset_index: Option<AssetIndex>,
+    pub asset_index: Option<VersionAssetIndex>,
     pub assets: Option<String>,
     #[serde(rename = "complianceLevel")]
     pub compliance_level: Option<i64>,
@@ -22,7 +24,7 @@ pub struct Version {
     pub id: Option<String>,
     #[serde(rename = "javaVersion")]
     pub java_version: Option<JavaVersion>,
-    pub libraries: Option<Vec<Library>>,
+    pub libraries: Option<Libraries>,
     pub logging: Option<Logging>,
     #[serde(rename = "mainClass")]
     pub main_class: Option<String>,
@@ -79,7 +81,7 @@ pub struct JvmOs {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AssetIndex {
+pub struct VersionAssetIndex {
     pub id: String,
     pub sha1: String,
     pub size: i64,
@@ -120,6 +122,32 @@ pub struct Library {
     pub rules: Option<Vec<LibraryRule>>,
     pub natives: Option<Natives>,
     pub extract: Option<Extract>,
+}
+
+impl IntoVecDownloadable for Libraries {
+    fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
+        let mut files = vec![];
+
+        for library in self.inner {
+            let Some(artifact) = library.downloads.artifact else {
+                continue;
+            };
+
+            let Some(path) = artifact.path else {
+                continue;
+            };
+            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
+
+            files.push(carbon_net::Downloadable {
+                url: artifact.url,
+                path: PathBuf::from(path),
+                checksum,
+                size: Some(artifact.size),
+            })
+        }
+
+        files
+    }
 }
 
 impl Library {
@@ -164,31 +192,6 @@ impl Library {
     }
 }
 
-impl TryFrom<&Library> for carbon_net::Downloadable {
-    type Error = impl Error;
-
-    fn try_from(value: &Library) -> Result<Self, Self::Error> {
-        let artifact = value
-            .downloads
-            .artifact
-            .clone()
-            .ok_or_else(|| VersionError::NoArtifactFoundInLib(value.name.clone()))?;
-        let path = PathBuf::new().join(
-            artifact
-                .path
-                .ok_or_else(|| VersionError::NoPathFoundInLib(value.name.clone()))?,
-        );
-        let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-        Ok(carbon_net::Downloadable {
-            url: artifact.url,
-            path,
-            checksum,
-            size: Some(artifact.size),
-        })
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LibraryDownloads {
     pub artifact: Option<MappingsClass>,
@@ -208,79 +211,6 @@ pub struct Classifiers {
     #[serde(rename = "natives-osx")]
     pub natives_osx: Option<MappingsClass>,
 }
-
-impl TryFrom<&Classifiers> for carbon_net::Downloadable {
-    type Error = VersionError;
-
-    fn try_from(value: &Classifiers) -> Result<Self, Self::Error> {
-        let classifier = value.clone();
-        let download = match std::env::consts::OS {
-            "windows" => {
-                if let Some(windows) = classifier.natives_windows {
-                    let path =
-                        PathBuf::from(windows.path.ok_or(VersionError::NoPathFoundInClassifier)?);
-                    let checksum = Some(carbon_net::Checksum::Sha1(windows.sha1));
-
-                    carbon_net::Downloadable {
-                        url: windows.url,
-                        path,
-                        checksum,
-                        size: Some(windows.size),
-                    }
-                } else {
-                    return Err(VersionError::NoWindowNativesFoundInClassifier);
-                }
-            }
-            "macos" => {
-                if let Some(macos) = classifier.natives_macos {
-                    let path = macos.path.ok_or(VersionError::NoPathFoundInClassifier)?;
-
-                    let checksum = Some(carbon_net::Checksum::Sha1(macos.sha1));
-
-                    carbon_net::Downloadable {
-                        url: macos.url,
-                        path: PathBuf::from(path),
-                        checksum,
-                        size: Some(macos.size),
-                    }
-                } else if let Some(osx) = classifier.natives_osx {
-                    let path =
-                        PathBuf::from(osx.path.ok_or(VersionError::NoPathFoundInClassifier)?);
-                    let checksum = Some(carbon_net::Checksum::Sha1(osx.sha1));
-
-                    carbon_net::Downloadable {
-                        url: osx.url,
-                        path,
-                        checksum,
-                        size: Some(osx.size),
-                    }
-                } else {
-                    return Err(VersionError::NoMacOSNativesFoundInClassifier);
-                }
-            }
-            "linux" => {
-                if let Some(linux) = classifier.natives_linux {
-                    let path =
-                        PathBuf::from(linux.path.ok_or(VersionError::NoPathFoundInClassifier)?);
-                    let checksum = Some(carbon_net::Checksum::Sha1(linux.sha1));
-
-                    carbon_net::Downloadable {
-                        url: linux.url,
-                        path,
-                        checksum,
-                        size: Some(linux.size),
-                    }
-                } else {
-                    return Err(VersionError::NoLinuxNativesFoundInClassifier);
-                }
-            }
-            _ => panic!("Unsupported OS"),
-        };
-
-        Ok(download)
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Extract {
     pub exclude: Vec<String>,
@@ -312,7 +242,7 @@ pub struct Logging {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoggingClient {
     pub argument: String,
-    pub file: AssetIndex,
+    pub file: VersionAssetIndex,
     #[serde(rename = "type")]
     pub client_type: String,
 }
