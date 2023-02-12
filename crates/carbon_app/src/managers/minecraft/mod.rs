@@ -1,10 +1,12 @@
+use super::{AppRef, Managers};
 use crate::db::{minecraft_manifest::SetParam, PrismaClient};
 use crate::managers::ManagersInner;
-use carbon_domain::minecraft::MinecraftManifest;
+use carbon_domain::minecraft::manifest::MinecraftManifest;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
 
-use super::{AppRef, Managers};
+mod assets;
+mod libraries;
 
 #[derive(Error, Debug)]
 pub enum MinecraftManagerError {
