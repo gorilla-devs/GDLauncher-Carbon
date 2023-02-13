@@ -12,7 +12,6 @@ import {
 } from "@solidjs/router";
 import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
-import { setRoutesLastTab } from "@/utils/routes";
 
 type InstancePage = {
   label: string;
@@ -27,7 +26,7 @@ const Instance = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${params.id}/overview`,
+      path: `/library/${params.id}`,
     },
     {
       label: "Mods",

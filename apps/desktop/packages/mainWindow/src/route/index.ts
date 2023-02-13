@@ -35,7 +35,7 @@ export const routes: RouteDefinition[] = [
             },
             children: [
               {
-                path: "/overview",
+                path: "/",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Overview")
                 ),
