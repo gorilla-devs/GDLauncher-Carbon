@@ -46,6 +46,7 @@ const Java = () => {
               }}
             />
           </h5>
+          <button onClick={() => navigate("?m=javasetup")}>addjava</button>
           <Button
             rounded={false}
             variant="secondary"

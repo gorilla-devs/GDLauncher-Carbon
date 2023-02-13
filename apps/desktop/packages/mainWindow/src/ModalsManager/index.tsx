@@ -35,7 +35,11 @@ const Modals: Component = () => {
       title: "Terms and Conditions",
     },
     addjava: {
-      component: lazy(() => import("./modals/AddJava")),
+      component: lazy(() => import("./modals/Java/AddJava")),
+      title: "Add java version",
+    },
+    javasetup: {
+      component: lazy(() => import("./modals/Java/JavaSetup")),
       title: "Add java version",
     },
     acceptableUsePolicy: {
@@ -77,7 +81,7 @@ const Modals: Component = () => {
 
   return (
     <div
-      class="absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
+      class="absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen h-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
       classList={{
         "opacity-100": !!opacity(),
         "scale-100": !!opacity(),
