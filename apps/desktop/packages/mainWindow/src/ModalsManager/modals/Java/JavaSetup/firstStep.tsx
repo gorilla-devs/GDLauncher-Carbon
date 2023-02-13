@@ -6,7 +6,7 @@ import { Button } from "@gd/ui";
 
 const firstStep = (props: StepsProps) => {
   return (
-    <div class="flex flex-col w-full h-full">
+    <div class="flex flex-col justify-between w-full h-full">
       <div class="flex flex-col items-center">
         <img src={JavaLogo} class="h-16 w-16" />
         <h3>Java 8 missing</h3>
@@ -20,15 +20,13 @@ const firstStep = (props: StepsProps) => {
           }}
         />
       </p>
-      <button
-        onClick={() => {
-          props?.nextStep?.();
-        }}
-      >
-        NEXT
-      </button>
-      <div class="w-full flex">
-        <Button rounded variant="secondary" size="large">
+      <div class="w-full flex justify-between gap-4">
+        <Button
+          rounded
+          variant="secondary"
+          size="large"
+          style={{ width: "100%", "max-width": "100%" }}
+        >
           <Trans
             key="manual_setup"
             options={{
@@ -36,7 +34,11 @@ const firstStep = (props: StepsProps) => {
             }}
           />
         </Button>
-        <Button rounded size="large">
+        <Button
+          rounded
+          size="large"
+          style={{ width: "100%", "max-width": "100%" }}
+        >
           <Trans
             key="automatic_setup"
             options={{

@@ -11,7 +11,6 @@ const JavaSetup = () => {
   const [currentStep, setCurrentStep] = createSignal<number>(0);
 
   const nextStep = () => {
-    console.log("NEXT", currentStep(), currentStep() < 1);
     if (currentStep() < 1) {
       setCurrentStep((prev) => prev + 1);
     }
@@ -24,7 +23,7 @@ const JavaSetup = () => {
   };
 
   return (
-    <div>
+    <div class="w-110 h-80">
       <Switch>
         <Match when={currentStep() === 0}>
           <FirstStep nextStep={nextStep} previusStep={previusStep} />
