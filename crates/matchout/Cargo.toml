@@ -1,0 +1,13 @@
+[package]
+name = "matchout"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "^1", features = ["full", "extra-traits"] }
+quote = "^1"
+proc-macro2 = "^1"
+itertools = "^0.10"
