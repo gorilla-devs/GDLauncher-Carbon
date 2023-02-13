@@ -10,7 +10,7 @@ const Collapsable = (props: Props) => {
 
   return (
     <div
-      class="w-full py-2 box-border overflow-hidden flex flex-col"
+      class="w-full box-border flex flex-col py-2 overflow-hidden"
       classList={{
         "h-auto": opened(),
         "h-8": !opened(),
@@ -23,7 +23,7 @@ const Collapsable = (props: Props) => {
         }}
       >
         <div
-          class="i-ri:arrow-down-s-line text-shade-1 text-2xl transition ease-in-out"
+          class="text-2xl transition ease-in-out i-ri:arrow-down-s-line text-shade-1"
           classList={{
             "-rotate-180": !opened(),
           }}

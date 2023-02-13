@@ -2,7 +2,7 @@
 import { getModloaderIcon } from "@/utils/sidebar";
 import SiderbarWrapper from "./wrapper";
 import { Checkbox } from "@gd/ui";
-import Collapsable from "./collapsable";
+import Collapsable from "./Collapsable";
 
 const Sidebar = () => {
   return (

@@ -3,7 +3,7 @@ import { Button, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
-import Collapsable from "./collapsable";
+import Collapsable from "./Collapsable";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 import { useLocation, useNavigate } from "@solidjs/router";
