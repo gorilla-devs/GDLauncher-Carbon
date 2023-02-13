@@ -2,12 +2,12 @@ use carbon_net::IntoVecDownloadable;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AssetIndex {
     pub objects: HashMap<String, Object>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Object {
     pub hash: String,
     pub size: i64,

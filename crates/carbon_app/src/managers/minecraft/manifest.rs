@@ -34,6 +34,7 @@ pub async fn get(db: Arc<PrismaClient>) -> Result<Vec<ManifestVersion>, Manifest
     // TODO ^^ should not throw but try to fetch from DB first
 
     for version in &new_manifest.versions {
+        // TODO: should check if it's there already
         db.minecraft_manifest()
             .create(
                 version.id.clone(),
