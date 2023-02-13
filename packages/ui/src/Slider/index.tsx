@@ -171,7 +171,6 @@ function Slider(props: Props) {
                   position: "absolute",
                   left: `${calcOffset(parseInt(value, 10))}%`,
                   top: "10px",
-                  "margin-left": -(40 / 2) + "px",
                 }}
               >
                 <Switch>
