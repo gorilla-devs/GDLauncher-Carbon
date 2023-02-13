@@ -1,35 +1,30 @@
 import { createSignal, Match, Switch } from "solid-js";
 import FirstStep from "./firstStep";
-import SecondStep from "./secondStep";
+import Automatic from "./automaticStep";
+import ManualStep from "./manualStep";
 
 export type StepsProps = {
-  nextStep?: () => void;
-  previusStep?: () => void;
+  nextStep?: (_step: string) => void;
 };
 
 const JavaSetup = () => {
-  const [currentStep, setCurrentStep] = createSignal<number>(0);
+  const [currentStep, setCurrentStep] = createSignal<string>("intro");
 
-  const nextStep = () => {
-    if (currentStep() < 1) {
-      setCurrentStep((prev) => prev + 1);
-    }
-  };
-
-  const previusStep = () => {
-    if (currentStep() > 0) {
-      setCurrentStep((prev) => prev - 1);
-    }
+  const nextStep = (step: string) => {
+    setCurrentStep(step);
   };
 
   return (
-    <div class="w-110 h-80">
+    <div>
       <Switch>
-        <Match when={currentStep() === 0}>
-          <FirstStep nextStep={nextStep} previusStep={previusStep} />
+        <Match when={currentStep() === "intro"}>
+          <FirstStep nextStep={nextStep} />
         </Match>
-        <Match when={currentStep() === 1}>
-          <SecondStep nextStep={nextStep} previusStep={previusStep} />
+        <Match when={currentStep() === "automatic"}>
+          <Automatic nextStep={nextStep} />
+        </Match>
+        <Match when={currentStep() === "manual"}>
+          <ManualStep nextStep={nextStep} />
         </Match>
       </Switch>
     </div>
