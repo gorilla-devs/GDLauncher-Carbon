@@ -40,7 +40,7 @@ const Modals: Component = () => {
     },
     javasetup: {
       component: lazy(() => import("./modals/Java/JavaSetup")),
-      title: "Add java version",
+      title: "Java Setupß",
     },
     acceptableUsePolicy: {
       component: lazy(() => import("./modals/AcceptableUsePolicy")),
