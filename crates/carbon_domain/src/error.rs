@@ -1,4 +1,8 @@
-use std::{error::Error as StdError, result::Result as StdResult, fmt::{Debug, Display}};
+use std::{
+    error::Error as StdError,
+    fmt::{Debug, Display},
+    result::Result as StdResult,
+};
 
 use backtrace::Backtrace;
 
@@ -73,9 +77,7 @@ impl<E: Debug> TracedError<E> {
 
 impl<E: Debug> Debug for TracedError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("TracedError")
-            .field(&self.error)
-            .finish()
+        f.debug_tuple("TracedError").field(&self.error).finish()
     }
 }
 
@@ -92,7 +94,7 @@ impl<E: Debug + Display> Display for TracedError<E> {
 
 #[cfg(test)]
 mod test {
-    use std::{fmt::Display, error::Error};
+    use std::{error::Error, fmt::Display};
 
     use crate::error::UnhandledError;
 
@@ -123,6 +125,9 @@ mod test {
             Ok(())
         }
 
-        println!("Debug: {0:?}\nDebug Expanded: {0:#?}\nDisplay:\n{0}", UnhandledError::new(Box::new(UnknownErr)));
+        println!(
+            "Debug: {0:?}\nDebug Expanded: {0:#?}\nDisplay:\n{0}",
+            UnhandledError::new(Box::new(UnknownErr))
+        );
     }
 }
