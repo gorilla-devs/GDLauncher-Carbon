@@ -20,8 +20,8 @@ const ModalLayout = (props: Props) => {
       <Show when={!props.noHeader}>
         <div class="bg-shade-8 flex justify-between items-center h-12 px-5 box-border rounded-t-2xl">
           <h3>{props.title}</h3>
-          <span
-            class="i-gdl:close cursor-pointer"
+          <div
+            class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
             onClick={() => props.onClose()}
           />
         </div>

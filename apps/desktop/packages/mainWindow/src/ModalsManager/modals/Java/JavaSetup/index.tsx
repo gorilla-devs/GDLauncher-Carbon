@@ -21,7 +21,7 @@ const JavaSetup = () => {
           <FirstStep nextStep={nextStep} />
         </Match>
         <Match when={currentStep() === "automatic"}>
-          <Automatic nextStep={nextStep} />
+          <Automatic />
         </Match>
         <Match when={currentStep() === "manual"}>
           <ManualStep nextStep={nextStep} />
