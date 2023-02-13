@@ -28,7 +28,8 @@ impl AssetIndex {
     #[tracing::instrument]
     pub async fn get_asset_files_downloadable(
         &self,
-        base_path: &PathBuf) -> Result<Vec<carbon_net::Downloadable>, AssetsError> {
+        base_path: &PathBuf,
+    ) -> Result<Vec<carbon_net::Downloadable>, AssetsError> {
         trace!("Downloading assets");
 
         let mut files: Vec<carbon_net::Downloadable> = vec![];
