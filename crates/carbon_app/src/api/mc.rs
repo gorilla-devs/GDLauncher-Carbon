@@ -3,6 +3,8 @@ use crate::api::managers::Managers;
 use crate::api::router::{router, try_in_router};
 use crate::managers::representation::CreateInstanceDto;
 use axum::extract::DefaultBodyLimit;
+use carbon_domain::instance::InstanceStatus;
+use log::warn;
 use rspc::{RouterBuilderLike, Type};
 use serde::Deserialize;
 use serde_json::Value;
@@ -42,7 +44,21 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         }
         mutation OPEN_INSTANCE_FOLDER_PATH[app, instance_uuid: String] {
             let instance_uuid = try_in_router!(instance_uuid.parse())?;
-            try_in_router!(app.instance_manager.get_instance_by_id(instance_uuid).await)?;
+            let instance = try_in_router!(app.instance_manager.get_instance_by_id(instance_uuid).await)?;
+            let opened = match instance.persistence_status {
+                InstanceStatus::Installing(path) | InstanceStatus::Ready(path) => {
+                    try_in_router!(open::that(path))?;
+                    true
+                }
+                InstanceStatus::NotPersisted =>{
+                    warn!("cannot open instance with id {instance_uuid} folder in system file manager since is not persisted");
+                    false
+                }
+            };
+            app.invalidate(
+                OPEN_INSTANCE_FOLDER_PATH,
+                Some(opened.into()),
+            );
             Ok(())
         }
         mutation SAVE_NEW_INSTANCE[app, create_instance_dto: CreateInstanceDto] {

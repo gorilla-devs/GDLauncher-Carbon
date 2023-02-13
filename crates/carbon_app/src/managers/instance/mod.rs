@@ -11,16 +11,23 @@ use crate::managers::instance::store::{InstanceStore, InstanceStoreError};
 use crate::managers::instance::write::InstanceWriteError;
 use crate::managers::representation::CreateInstanceDto;
 
-use crate::api::keys::mc::{DELETE_INSTANCE, SAVE_NEW_INSTANCE, UPDATE_INSTANCE};
+use crate::api::keys::mc::{
+    DELETE_INSTANCE, OPEN_INSTANCE_FOLDER_PATH, SAVE_NEW_INSTANCE, UPDATE_INSTANCE,
+};
+use crate::managers::instance::InstanceManagerError::{
+    InconvertibleValueToPath, InstanceMoveError, InstanceStatusPatchingNotAllowed,
+    InstanceWithPathAlreadyExistError,
+};
 use crate::managers::AppRef;
+use crate::try_path_fmt::try_path_fmt;
 use carbon_domain::instance::{Instance, InstanceStatus};
-use log::trace;
+use futures::future::err;
+use log::{trace, warn};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::default::Default;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-use crate::managers::instance::InstanceManagerError::InstanceWithPathAlreadyExistError;
 
 #[derive(Error, Debug)]
 pub enum InstanceManagerError {
@@ -34,6 +41,16 @@ pub enum InstanceManagerError {
     InstanceWriteError(#[from] InstanceWriteError),
     #[error("error raised in instance patch process : {0} ")]
     InstancePatchError(#[from] serde_json::error::Error),
+    #[error("unable to change instance status to {0:?} via patch")]
+    InstanceStatusPatchingNotAllowed(InstanceStatus),
+    #[error("error raised in instance copy process, cause : {0} ")]
+    InstanceCopyError(String),
+    #[error("error raised in instance move process, cause : {0} ")]
+    InstanceMoveError(String),
+    #[error("error raised in instance saving process, cause : {0} ")]
+    InstanceSaveError(String),
+    #[error("value {0} is not convertable in fs path")]
+    InconvertibleValueToPath(Value),
     #[error("error raised in instance patch process : {0} ")]
     InstanceWithPathAlreadyExistError(PathBuf),
     #[error("io error raised : {0} ")]
@@ -78,16 +95,8 @@ impl InstanceManager {
         let instance = dto.clone().into_instance_with_id(available_id).await;
         let instance = self.instance_store.save_instance(instance).await?;
         let instance = match dto.path_to_save_at {
-            Some(path_to_save) if self.instance_store.exist_by_path(&path_to_save).await => {
-                Err(InstanceWithPathAlreadyExistError(path_to_save))?
-            }
-            Some(path_to_save) => {
-                if !path_to_save.exists() {
-                    tokio::fs::create_dir(&path_to_save).await?;
-                };
-                self.write_at(instance.clone(), &path_to_save).await?
-            }
-            None => instance
+            Some(path_to_save) => self.write_at(instance.clone(), &path_to_save).await?,
+            None => instance,
         };
         let saved_instance = self.instance_store.save_instance(instance).await?;
         self.app.upgrade().invalidate(
@@ -102,6 +111,23 @@ impl InstanceManager {
         id: u128,
         remove_from_fs: bool,
     ) -> Result<Instance, InstanceManagerError> {
+        let instance_to_delete = self.get_instance_by_id(id).await?;
+
+        let erase_instance_result = self
+            .delete_from_fs(instance_to_delete.clone(), !remove_from_fs)
+            .await;
+        let in_memory_instance = match erase_instance_result {
+            Ok(instance) => {
+                trace!("removed persisted instance from fs {instance_to_delete:?}");
+                self.instance_store.save_instance(instance).await?
+            }
+            Err(InstanceDeleteError::InstanceNotPersisted) => {
+                trace!("unable to delete non persisted entity with id {id}");
+                instance_to_delete.clone()
+            }
+            error => error?,
+        };
+
         let deleted_instance = self
             .instance_store
             .delete_instance_by_id(&id)
@@ -109,7 +135,7 @@ impl InstanceManager {
             .ok_or(InstanceManagerError::InstanceWithGivenIdNotFound(id))?;
         self.app.upgrade().invalidate(
             DELETE_INSTANCE,
-            Some(serde_json::to_value(deleted_instance.clone())?),
+            Some(serde_json::to_value(instance_to_delete.clone())?),
         );
         Ok(self
             .delete_from_fs(deleted_instance, !remove_from_fs)
@@ -137,7 +163,7 @@ impl InstanceManager {
         id: u128,
         new_values: BTreeMap<String, Value>,
     ) -> Result<Instance, InstanceManagerError> {
-        let mut new_values = new_values;
+        let mut new_values_cloned = new_values.clone();
         trace!("trying to patch instance with id {id} with new values {new_values:#?}");
         let target_instance = self.get_instance_by_id(id).await?;
         let into_properties = serde_json::to_value(target_instance)?;
@@ -150,10 +176,10 @@ impl InstanceManager {
         ];
         for forbidden_property_key in forbidden_property_keys {
             trace!("removing property named {forbidden_property_key} from patch plan cause is forbidden to change with patch");
-            new_values.remove(forbidden_property_key);
+            new_values_cloned.remove(forbidden_property_key);
         }
         let mut properties_to_patch = into_properties.as_object().map_or(Map::new(), Clone::clone);
-        for (property_key, property_value) in new_values {
+        for (property_key, property_value) in new_values_cloned {
             match properties_to_patch.insert(property_key.clone(), property_value.clone()){
                 Some(old_value) => trace!("changed property with name  {property_key}  old : {old_value} new : {property_value} for instance with id {id}"),
                 None => trace!("set initially value for property with name  {property_key} value : {property_value} for instance with id {id}")
@@ -161,12 +187,35 @@ impl InstanceManager {
         }
         let patched_instance: Instance =
             serde_json::from_value(Value::Object(properties_to_patch.clone()))?;
-        let new_instance = self.instance_store.save_instance(patched_instance).await?;
+        let saved_instance = match new_values.get("persistence_status") {
+            Some(new_persistence_status) => {
+                self.change_instance_persistence_status(
+                    patched_instance,
+                    new_persistence_status.clone(),
+                )
+                .await?
+            }
+            _ => self.instance_store.save_instance(patched_instance).await?,
+        };
         self.app.upgrade().invalidate(
             UPDATE_INSTANCE,
-            Some(serde_json::to_value(new_instance.clone())?),
+            Some(serde_json::to_value(saved_instance.clone())?),
         );
-        Ok(new_instance)
+        Ok(saved_instance)
+    }
+
+    async fn change_instance_persistence_status(
+        &self,
+        instance: Instance,
+        new_persistence_value: Value,
+    ) -> Result<Instance, InstanceManagerError> {
+        let new_persistence_status: InstanceStatus = serde_json::from_value(new_persistence_value)?;
+        let written_instance = match new_persistence_status {
+            InstanceStatus::Ready(new_path) => self.write_at(instance, &new_path).await?,
+            new_status => Err(InstanceStatusPatchingNotAllowed(new_status))?,
+        };
+        let saved_instance = self.instance_store.save_instance(written_instance).await?;
+        Ok(saved_instance)
     }
 
     pub async fn start_instance_by_id(

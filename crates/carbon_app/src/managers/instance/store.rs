@@ -1,3 +1,4 @@
+use crate::db::minecraft_assets::minecraft_version::some;
 use crate::try_path_fmt::try_path_fmt;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use log::trace;
@@ -38,12 +39,21 @@ impl InstanceStore {
 
     pub async fn get_instance_by_id(&self, id: u128) -> Option<Instance> {
         trace!("trying to retrieve instance with id {id} from instances store");
-        self.instances_by_id.read().await.get(&id).map(Clone::clone)
+        match self.instances_by_id.read().await.get(&id).map(Clone::clone) {
+            Some(found_instance) => {
+                trace!("instance with id {id} correctly retrieved from store, instance is {found_instance:?}");
+                Some(found_instance)
+            }
+            None => {
+                trace!("instance with id {id} not exist in store");
+                None
+            }
+        }
     }
 
     pub async fn delete_instance_by_id(&self, id: &u128) -> Option<Instance> {
         trace!("trying to remove instance with id {id} from instances store");
-        let deindexed_instance = self.instances_by_id.write().await.remove(id);
+        let deindexed_instance = self.instances_by_id.write().await.remove(id); // deadlock
         match &deindexed_instance {
             Some(instance) => self.instances_pool.write().await.remove(instance),
             None => false,
@@ -92,10 +102,8 @@ impl InstanceStore {
             .write()
             .await
             .insert(*instance_id, instance.clone());
-        match self.instances_pool.write().await.insert(instance.clone()) {
-            true => trace!("updated instance with id {instance_id}"),
-            false => trace!("saved new instance with id {instance_id}"),
-        };
+        self.instances_pool.write().await.insert(instance.clone());
+        trace!("instance {instance:?} correctly added to store");
         Ok(instance)
     }
 }

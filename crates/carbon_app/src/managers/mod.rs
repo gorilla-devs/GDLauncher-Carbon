@@ -147,8 +147,6 @@ impl Into<rspc::Error> for ConfigurationManagerError {
     }
 }
 
-
-
 // mod test {
 //     use crate::app::App;
 //     use env_logger::Builder;

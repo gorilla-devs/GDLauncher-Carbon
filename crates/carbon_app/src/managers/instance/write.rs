@@ -2,10 +2,14 @@ use crate::managers::instance::instance_configuration::consts::{
     CONFIGURATION_FILE_RELATIVE_PATH, MINECRAFT_PACKAGE_RELATIVE_PATH,
 };
 use crate::managers::instance::instance_configuration::ConfigurationFileParsingError;
+use crate::managers::instance::write::InstanceWriteError::{
+    InstanceAlreadyPresent, InstanceIsInstalling,
+};
 use crate::managers::instance::InstanceManager;
 use crate::try_path_fmt::try_path_fmt;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use log::trace;
+use std::future::Future;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -14,13 +18,19 @@ pub enum InstanceWriteError {
     #[error("error happened while trying to write configuration file for instance : {0}\n")]
     InstanceConfigurationWritingError(#[from] ConfigurationFileParsingError),
 
-    #[error("minecraft package already exist and is a file \n")]
-    MinecraftPackageIsAFile(),
+    #[error("instance already exist at : {0}")]
+    InstanceAlreadyPresent(PathBuf),
 
-    #[error("minecraft package already exist \n")]
-    MinecraftPackageAlreadyExist(),
+    #[error("instance is installing so we cannot write now : {0:?}")]
+    InstanceIsInstalling(Instance),
 
-    #[error("io error raised while writing instance : {0}\n")]
+    #[error("minecraft package already exist and is a file at {0}")]
+    MinecraftPackageIsAFile(PathBuf),
+
+    #[error("minecraft package already exist")]
+    MinecraftPackageAlreadyExist(PathBuf),
+
+    #[error("io error raised while writing instance : {0}")]
     IoError(#[from] std::io::Error),
 }
 
@@ -34,6 +44,18 @@ impl InstanceManager {
     ) -> InstanceWriteResult {
         let base_path = path.as_ref();
         trace!("writing instance at {}", try_path_fmt!(base_path));
+
+        if (self.check_instance_directory_sanity(&base_path).await).is_ok() {
+            Err(InstanceAlreadyPresent(base_path.to_path_buf()))?
+        };
+
+        if !base_path.exists() {
+            trace!(
+                "folder {} does not exist, making ",
+                try_path_fmt!(base_path)
+            );
+            tokio::fs::create_dir_all(base_path).await?
+        }
 
         let minecraft_package_folder =
             &PathBuf::from(base_path).join(MINECRAFT_PACKAGE_RELATIVE_PATH);
@@ -64,12 +86,23 @@ impl InstanceManager {
                     try_path_fmt!(old_instance_minecraft_package_dir),
                     try_path_fmt!(minecraft_package_folder)
                 );
-                tokio::fs::copy(old_instance_minecraft_package_dir, minecraft_package_folder)
-                    .await?;
+                tokio::fs::copy(
+                    old_instance_minecraft_package_dir.clone(),
+                    minecraft_package_folder,
+                )
+                .await?;
+                tokio::fs::remove_dir_all(old_instance_minecraft_package_dir).await?;
             }
             (_, false, false) => make_minecraft_package_folder_at(minecraft_package_folder).await?,
-            (_, true, false) => Err(InstanceWriteError::MinecraftPackageIsAFile())?,
-            (_, true, true) => Err(InstanceWriteError::MinecraftPackageAlreadyExist())?,
+            (InstanceStatus::Installing(instance_path), _, _) => {
+                Err(InstanceIsInstalling(instance.clone()))?
+            }
+            (_, true, false) => Err(InstanceWriteError::MinecraftPackageIsAFile(
+                minecraft_package_folder.clone(),
+            ))?,
+            (_, true, true) => Err(InstanceWriteError::MinecraftPackageAlreadyExist(
+                minecraft_package_folder.clone(),
+            ))?,
             _ => (),
         }
 
