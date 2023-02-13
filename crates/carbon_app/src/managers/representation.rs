@@ -2,11 +2,11 @@ use carbon_domain::instance::InstanceStatus::NotPersisted;
 use carbon_domain::instance::{Instance, InstanceStatus};
 use carbon_domain::minecraft_package::{MinecraftPackage, MinecraftPackageStatus};
 use rspc::Type;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Type, Deserialize, Clone)]
+#[derive(Type, Deserialize, Serialize, Clone)]
 pub struct CreateInstanceDto {
     pub name: String,
     pub minecraft_version: String,
@@ -27,7 +27,7 @@ impl CreateInstanceDto {
                 mod_loaders: Default::default(),
                 status: MinecraftPackageStatus::NotPersisted,
             },
-            persistence_status: NotPersisted,
+            status: NotPersisted,
             notes: "".to_string(),
         }
     }

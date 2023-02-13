@@ -72,7 +72,7 @@ impl InstanceManager {
         let minecraft_package_folder_is_dir = minecraft_package_folder.is_dir();
 
         match (
-            &instance.persistence_status,
+            &instance.status,
             minecraft_package_folder_exist,
             minecraft_package_folder_is_dir,
         ) {

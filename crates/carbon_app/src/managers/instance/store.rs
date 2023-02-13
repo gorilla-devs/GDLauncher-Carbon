@@ -1,7 +1,7 @@
-use crate::db::minecraft_assets::minecraft_version::some;
 use crate::try_path_fmt::try_path_fmt;
+use carbon_domain::instance::InstanceStatus::*;
 use carbon_domain::instance::{Instance, InstanceStatus};
-use log::trace;
+use log::{error, trace};
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::ParseIntError;
 use std::path::PathBuf;
@@ -58,12 +58,21 @@ impl InstanceStore {
             Some(instance) => self.instances_pool.write().await.remove(instance),
             None => false,
         };
+        match &deindexed_instance {
+            Some(Instance {
+                status: Ready(path),
+                ..
+            })
+            | Some(Instance {
+                status: Installing(path),
+                ..
+            }) => {
+                self.instances_by_path.write().await.remove(path);
+            }
+            _ => (),
+        }
         trace!("instance with id {id} correctly removed from instances store");
         deindexed_instance
-    }
-
-    pub async fn exist_by_path(&self, path: &PathBuf) -> bool {
-        self.instances_by_path.read().await.contains_key(path)
     }
 
     pub async fn save_instance(&self, instance: Instance) -> Result<Instance, InstanceStoreError> {
@@ -72,38 +81,67 @@ impl InstanceStore {
             serde_json::to_string(&instance).unwrap_or("<<unrepresentable instance!>>".to_string())
         );
         let instance_id = &instance.uuid.parse()?;
-        match instance.persistence_status {
-            InstanceStatus::Installing(ref path) | InstanceStatus::Ready(ref path) => {
-                if let Some(found_instance) = self.instances_by_path.read().await.get(path) {
-                    trace!("found instance with same path, path collision not supported!");
-                    return Err(InstanceStoreError::InstanceBreakPathIntegrityRule {
-                        candidate: instance.clone(),
-                        already_indexed: found_instance.clone(),
-                    });
-                };
+        match (
+            self.instances_by_id.read().await.get(instance_id).cloned(),
+            instance.status.clone(),
+        ) {
+            (
+                Some(Instance {
+                    status: Ready(ref old_path) | Installing(ref old_path),
+                    ..
+                }),
+                Ready(ref new_path) | Installing(ref new_path),
+            ) => {
+                trace!("found instance with same id, going to merge them");
+                self.instances_by_path.write().await.remove(old_path);
                 self.instances_by_path
                     .write()
                     .await
-                    .insert(path.to_path_buf(), instance.clone());
+                    .insert(new_path.to_path_buf(), instance.clone());
                 trace!(
-                    "added instance with id {instance_id} to path index with path {}",
-                    try_path_fmt!(path)
+                    "change path in index for instance with id {instance_id} from {} to {}",
+                    try_path_fmt!(old_path),
+                    try_path_fmt!(new_path)
                 )
             }
-            _ => {
-                trace!("instance with id {instance_id} not indexed by path since is not persisted")
+            (
+                Some(Instance {
+                    status: Ready(ref old_path) | Installing(ref old_path),
+                    ..
+                }),
+                NotPersisted,
+            ) => {
+                self.instances_by_path.write().await.remove(old_path);
+                trace!("removed path {} from index since instance with id {instance_id} is not persisted anymore", try_path_fmt!(old_path))
             }
+            (None, Ready(ref new_path) | Installing(ref new_path))
+                if self.instances_by_path.read().await.contains_key(new_path) =>
+            {
+                let found_instance = self.instances_by_path.read().await.get(new_path).cloned();
+                error!("found instance with same path, path collision not supported!");
+                Err(InstanceStoreError::InstanceBreakPathIntegrityRule {
+                    candidate: instance.clone(),
+                    already_indexed: found_instance
+                        .expect("expected instance in instance by path index !!!"),
+                })?
+            }
+            (_, _) => (),
         }
-        if let true = self.instances_by_id.read().await.contains_key(instance_id) {
-            trace!("found instance with id {instance_id}, removing in order to replace with the new one");
-            self.delete_instance_by_id(instance_id).await;
-        };
-        self.instances_by_id
+
+        match self
+            .instances_by_id
             .write()
             .await
-            .insert(*instance_id, instance.clone());
+            .insert(*instance_id, instance.clone())
+        {
+            Some(old_instance) => {
+                trace!("replacing old instance {old_instance:?} with new {instance:?}");
+                self.instances_pool.write().await.remove(&instance);
+            }
+            None => trace!("adding brand new instance {instance:?}"),
+        }
         self.instances_pool.write().await.insert(instance.clone());
-        trace!("instance {instance:?} correctly added to store");
+        trace!("instance correctly added to store : {instance:?}");
         Ok(instance)
     }
 }

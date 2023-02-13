@@ -27,7 +27,7 @@ mod test {
         let instance_manager = &app.instance_manager;
 
         let create_instance_dto = CreateInstanceDto {
-            name: "test_instance".to_string(),
+            name: "test_written_instance".to_string(),
             minecraft_version: "1.15.179".to_string(),
             path_to_save_at: Some(test_assets_base_dir.clone()),
         };
@@ -38,7 +38,7 @@ mod test {
             .unwrap();
 
         let create_instance_dto = CreateInstanceDto {
-            name: "test_instance".to_string(),
+            name: "test_in_memory_instance".to_string(),
             minecraft_version: "1.15.179".to_string(),
             path_to_save_at: None,
         };
@@ -58,22 +58,12 @@ mod test {
             .expect("unable to parse id to u128");
 
         let read_written_instance = instance_manager
-            .get_instance_by_id(
-                added_in_memory_instance
-                    .uuid
-                    .parse()
-                    .expect("unable to parse id to u128"),
-            )
+            .get_instance_by_id(written_instance_id)
             .await
             .unwrap();
 
         let read_in_memory_instance = instance_manager
-            .get_instance_by_id(
-                added_in_memory_instance
-                    .uuid
-                    .parse()
-                    .expect("unable to parse id to u128"),
-            )
+            .get_instance_by_id(in_memory_instance_id)
             .await
             .unwrap();
 
@@ -82,30 +72,59 @@ mod test {
 
         let notes = "i'm a in-memory instance".to_string();
         let mut new_props = BTreeMap::new();
-        new_props.insert("notes".to_string(), notes.into());
+        new_props.insert("notes".to_string(), notes.clone().into());
 
         let patched_in_memory_instance = instance_manager
             .patch_instance_by_id(in_memory_instance_id, new_props)
             .await
             .unwrap();
 
+        let in_memory_instance = instance_manager
+            .get_instance_by_id(in_memory_instance_id)
+            .await
+            .unwrap();
+        assert_eq!(in_memory_instance, patched_in_memory_instance);
+        assert_eq!(in_memory_instance.notes, notes.clone());
+
         let notes = "i'm a written instance".to_string();
         let mut new_props = BTreeMap::new();
-        new_props.insert("notes".to_string(), serde_json::to_value(notes).unwrap());
+        new_props.insert("notes".to_string(), notes.clone().into());
 
         let patched_written_instance = instance_manager
             .patch_instance_by_id(written_instance_id, new_props)
             .await
             .unwrap();
 
-        // instance_manager
-        //     .delete_instance_by_id(written_instance_id, true)
-        //     .await
-        //     .unwrap();
-        //
-        // instance_manager
-        //     .delete_instance_by_id(in_memory_instance_id, true)
-        //     .await
-        //     .unwrap();
+        let written_instance = instance_manager
+            .get_instance_by_id(written_instance_id)
+            .await
+            .unwrap();
+        assert_eq!(written_instance, patched_written_instance);
+        assert_eq!(written_instance.notes, notes.clone());
+
+        instance_manager
+            .delete_instance_by_id(written_instance_id, true)
+            .await
+            .unwrap();
+
+        instance_manager
+            .get_instance_by_id(written_instance_id)
+            .await
+            .unwrap_err();
+
+        instance_manager
+            .delete_instance_by_id(in_memory_instance_id, true)
+            .await
+            .unwrap();
+
+        instance_manager
+            .get_instance_by_id(written_instance_id)
+            .await
+            .expect_err("expected to not find written_instance after delete!");
+
+        instance_manager
+            .get_instance_by_id(in_memory_instance_id)
+            .await
+            .expect_err("expected to not find in_memory_instance after delete!");
     }
 }

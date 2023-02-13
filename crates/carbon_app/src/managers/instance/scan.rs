@@ -3,7 +3,7 @@ use crate::managers::instance::instance_configuration::consts::{
 };
 use crate::managers::instance::instance_configuration::ConfigurationFileParsingError;
 use crate::managers::instance::scan::InstanceScanError::{
-    FileStructureDoesNotMatch, FolderStructureDoesNotMatch, PathNotIsNotPointingToAFolder,
+    FileStructureDoesNotMatch, FolderStructureDoesNotMatch, PathIsNotPointingToAFolder,
 };
 use crate::managers::instance::InstanceManager;
 use crate::try_path_fmt::try_path_fmt;
@@ -20,7 +20,7 @@ use tokio_stream::StreamExt;
 #[derive(Error, Debug)]
 pub enum InstanceScanError {
     #[error("path `{0}` does not point to a directory ")]
-    PathNotIsNotPointingToAFolder(PathBuf),
+    PathIsNotPointingToAFolder(PathBuf),
 
     #[error("io error: {0} !\n")]
     IoError(#[from] io::Error),
@@ -61,9 +61,7 @@ impl InstanceManager {
                     "path {} is not pointing to a directory! aborting instance scan process ...",
                     try_path_fmt!(path_to_search_in)
                 );
-                Err(PathNotIsNotPointingToAFolder(
-                    path_to_search_in.to_path_buf(),
-                ))
+                Err(PathIsNotPointingToAFolder(path_to_search_in.to_path_buf()))
             }
         }
     }
@@ -99,7 +97,7 @@ impl InstanceManager {
                 mod_loaders: Default::default(),
                 status: MinecraftPackageStatus::NotPersisted, // todo add probing method for the mc pakcage in relative manager
             },
-            persistence_status: InstanceStatus::Ready(directory_path.clone()),
+            status: InstanceStatus::Ready(directory_path.clone()),
         })
     }
 

@@ -31,7 +31,7 @@ impl InstanceManager {
         instance: Instance,
         put_in_trash_bin: bool,
     ) -> InstanceDeleterResult {
-        match &instance.persistence_status {
+        match &instance.status {
             InstanceStatus::Ready(instance_path) if put_in_trash_bin => {
                 trace!(
                     "checking instance directory structure at {}",

@@ -45,7 +45,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         mutation OPEN_INSTANCE_FOLDER_PATH[app, instance_uuid: String] {
             let instance_uuid = try_in_router!(instance_uuid.parse())?;
             let instance = try_in_router!(app.instance_manager.get_instance_by_id(instance_uuid).await)?;
-            let opened = match instance.persistence_status {
+            let opened = match instance.status {
                 InstanceStatus::Installing(path) | InstanceStatus::Ready(path) => {
                     try_in_router!(open::that(path))?;
                     true

@@ -29,13 +29,13 @@ pub struct Instance {
     pub last_played: Option<std::time::SystemTime>,
     pub notes: String,
     pub minecraft_package: MinecraftPackage,
-    pub persistence_status: InstanceStatus,
+    pub status: InstanceStatus,
 }
 
 impl Instance {
     pub fn mutate_persistence_status(self, new_persistence_status: InstanceStatus) -> Instance {
         let mut new_instance = self;
-        new_instance.persistence_status = new_persistence_status;
+        new_instance.status = new_persistence_status;
         new_instance
     }
 }
