@@ -1,8 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import SiderbarWrapper from "./wrapper";
-import { Checkbox } from "@gd/ui";
-import Collapsable from "./Collapsable";
+import { Checkbox, Collapsable } from "@gd/ui";
 
 const Sidebar = () => {
   return (

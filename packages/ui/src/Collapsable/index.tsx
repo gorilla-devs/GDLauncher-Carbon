@@ -9,13 +9,7 @@ const Collapsable = (props: Props) => {
   const [opened, setOpened] = createSignal(true);
 
   return (
-    <div
-      class="w-full box-border flex flex-col py-2 overflow-hidden"
-      classList={{
-        "h-auto": opened(),
-        "h-8": !opened(),
-      }}
-    >
+    <div class="w-full box-border flex flex-col py-2 overflow-hidden">
       <div
         class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         onClick={() => {
@@ -30,9 +24,17 @@ const Collapsable = (props: Props) => {
         />
         <p class="m-0 text-shade-1 flex items-center">{props.title}</p>
       </div>
-      {props.children}
+      <div
+        class="overflow-hidden"
+        classList={{
+          "h-auto": opened(),
+          "h-0": !opened(),
+        }}
+      >
+        {props.children}
+      </div>
     </div>
   );
 };
 
-export default Collapsable;
+export { Collapsable };
