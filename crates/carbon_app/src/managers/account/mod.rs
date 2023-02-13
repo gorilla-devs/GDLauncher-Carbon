@@ -216,11 +216,9 @@ impl AccountManager {
     }
 
     pub async fn begin_enrollment(&self) -> Result<(), EnrollmentError> {
-        let reader = self.active_enrollment.read().await;
-
-        let active_enrollment = match &*self.active_enrollment.read().await {
+        match &mut *self.active_enrollment.write().await {
             Some(_) => Err(EnrollmentError::InProgress),
-            None => {
+            enrollment @ None => {
                 let client = self.app.upgrade().reqwest_client.clone();
 
                 struct Invalidator(AppRef);
@@ -232,14 +230,13 @@ impl AccountManager {
                     }
                 }
 
-                Ok(EnrollmentTask::begin(client, Invalidator(self.app.clone())))
+                let active_enrollment =
+                    EnrollmentTask::begin(client, Invalidator(self.app.clone()));
+
+                *enrollment = Some(active_enrollment);
+                Ok(())
             }
-        };
-
-        drop(reader);
-        *self.active_enrollment.write().await = Some(active_enrollment?);
-
-        Ok(())
+        }
     }
 
     pub async fn cancel_enrollment(&self) -> Result<(), EnrollmentError> {
