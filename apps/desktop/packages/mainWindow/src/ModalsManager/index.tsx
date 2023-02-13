@@ -1,3 +1,4 @@
+/* eslint-disable @unocss/order */
 import { useLocation, useNavigate } from "@solidjs/router";
 import {
   Component,
@@ -81,7 +82,7 @@ const Modals: Component = () => {
 
   return (
     <div
-      class="absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen h-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
+      class="h-screen absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
       classList={{
         "opacity-100": !!opacity(),
         "scale-100": !!opacity(),

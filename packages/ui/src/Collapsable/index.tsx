@@ -9,30 +9,32 @@ const Collapsable = (props: Props) => {
   const [opened, setOpened] = createSignal(true);
 
   return (
-    <div
-      class="w-full py-2 box-border overflow-hidden flex flex-col"
-      classList={{
-        "h-auto": opened(),
-        "h-8": !opened(),
-      }}
-    >
+    <div class="w-full box-border flex flex-col py-2 overflow-hidden">
       <div
-        class="max-w-full h-8 px-3 flex gap-2 items-center cursor-pointer"
+        class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         onClick={() => {
           setOpened((prev) => !prev);
         }}
       >
         <div
-          class="i-ri:arrow-down-s-line text-shade-1 text-2xl transition ease-in-out"
+          class="text-2xl transition ease-in-out i-ri:arrow-down-s-line text-shade-1"
           classList={{
             "-rotate-180": !opened(),
           }}
         />
         <p class="m-0 text-shade-1 flex items-center">{props.title}</p>
       </div>
-      {props.children}
+      <div
+        class="overflow-hidden"
+        classList={{
+          "h-auto": opened(),
+          "h-0": !opened(),
+        }}
+      >
+        {props.children}
+      </div>
     </div>
   );
 };
 
-export default Collapsable;
+export { Collapsable };
