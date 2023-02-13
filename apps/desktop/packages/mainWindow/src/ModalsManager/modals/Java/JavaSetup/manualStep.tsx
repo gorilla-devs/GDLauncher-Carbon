@@ -1,12 +1,27 @@
+/* eslint-disable i18next/no-literal-string */
 import { Button } from "@gd/ui";
 import { StepsProps } from ".";
 import { Trans } from "@gd/i18n";
 
 const ManualStep = (props: StepsProps) => {
   return (
-    <div class="w-110 h-75">
+    <div class="w-110 h-65">
       <div class="flex flex-col justify-between w-full h-full">
-        <div class="border-dashed border-2 border-primary">AAA</div>
+        <div class="border-dashed border-2 border-primary py-4 h-13 flex flex-col justify-center items-center">
+          <div class="flex flex-col gap-2 justify-center items-center">
+            <div class="i-ri:folder-open-fill text-shade-5 text-xl w-6" />
+            <p class="m-0 text-shade-5">Select java 8 zip</p>
+          </div>
+        </div>
+        <p class="text-shade-5 text-center">
+          <Trans
+            key="select_required_java_text"
+            options={{
+              defaultValue:
+                "Select the required paths to java. Java 8 udes for all the versions < 1.17",
+            }}
+          />
+        </p>
         <div class="w-full flex justify-between gap-4">
           <Button
             rounded
