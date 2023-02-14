@@ -77,7 +77,10 @@ impl<E: Debug> TracedError<E> {
 
 impl<E: Debug> Debug for TracedError<E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("TracedError").field(&self.error).finish()
+        f.debug_struct("TracedError")
+            .field("error", &self.error)
+            .field("trace", &format_args!("Backtrace {{\n{:?}}}", &self.trace))
+            .finish()
     }
 }
 
