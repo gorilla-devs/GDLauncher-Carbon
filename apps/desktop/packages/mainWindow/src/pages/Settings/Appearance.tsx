@@ -18,7 +18,7 @@ const Appearance = () => {
 
   return (
     <LoadingError routeData={routeData}>
-      <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
+      <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
         <h2 class="m-0 mb-7 text-4">
           <Trans
             key="appearance"
@@ -27,9 +27,9 @@ const Appearance = () => {
             }}
           />
         </h2>
-        <div class="flex justify-between border-box w-full max-w-[35rem]">
+        <div class="flex justify-between w-full border-box max-w-[35rem]">
           <div
-            class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
+            class="flex flex-col flex justify-center items-center cursor-pointer w-42 p-1 bg-[#15181E]"
             onClick={() => {
               mutation.mutate("default");
             }}
@@ -39,7 +39,7 @@ const Appearance = () => {
               shade2="fill-[#272B35]"
               shade3="fill-[#333947]"
             />
-            <div class="flex justify-start gap-2 items-center w-full py-1 px-2 box-border">
+            <div class="flex justify-start gap-2 items-center w-full box-border py-1 px-2">
               <Show when={themeName() === "default"}>
                 <div class="i-ri:check-fill text-shade-0" />
               </Show>

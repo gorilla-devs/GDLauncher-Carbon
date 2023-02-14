@@ -27,7 +27,7 @@ const Java = () => {
   });
 
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
+    <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="java"

@@ -20,7 +20,7 @@ const Mod = (props: Props) => {
         <div class="flex gap-4 justify-between items-center">
           <Checkbox checked={true} disabled={false} />
           <div class="flex items-center gap-2">
-            <div class="bg-green-500 h-10 w-10 rounded-xl" />
+            <div class="h-10 w-10 rounded-xl bg-green-500" />
             <div class="flex flex-col">
               {props.mod.title}
               <div class="flex gap-2">

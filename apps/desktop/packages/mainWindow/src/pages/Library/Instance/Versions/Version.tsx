@@ -30,14 +30,14 @@ const getColor = (stable: string) => {
 
 const Active = () => {
   return (
-    <div class="text-green flex items-center gap-2 cursor-pointer">
+    <div class="flex items-center gap-2 cursor-pointer text-green">
       <Trans
         key="active_version"
         options={{
           defaultValue: "Active",
         }}
       />
-      <div class="i-ri:check-fill text-green text-2xl" />
+      <div class="text-green text-2xl i-ri:check-fill" />
     </div>
   );
 };
@@ -67,14 +67,14 @@ const Version = (props: Props) => {
           </div>
         </div>
         <Show when={!props.version.isActive} fallback={<Active />}>
-          <div class="group text-shade-3 hover:text-shade-1 transition ease-in-out flex items-center gap-2 cursor-pointer">
+          <div class="group text-shade-3 transition ease-in-out flex items-center gap-2 cursor-pointer hover:text-shade-1">
             <Trans
               key="switch_version"
               options={{
                 defaultValue: "Switch Version",
               }}
             />
-            <div class="i-ri:download-2-line text-shade-3 group-hover:text-shade-1 text-2xl" />
+            <div class="text-shade-3 text-2xl i-ri:download-2-line group-hover:text-shade-1" />
           </div>
         </Show>
       </div>

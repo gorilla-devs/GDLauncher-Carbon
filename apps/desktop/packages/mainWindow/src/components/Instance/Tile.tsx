@@ -27,7 +27,7 @@ const Tile = (props: Props) => {
           class="flex flex-col justify-center items-start cursor-pointer snap-start"
           onClick={(e) => props?.onClick?.(e)}
         >
-          <div class="h-38 w-38 bg-green-600 rounded-2xl" />
+          <div class="rounded-2xl h-38 w-38 bg-green-600" />
           <h4 class="my-2">{props.title}</h4>
           <div class="flex justify-between text-shade-0">
             <p class="m-0">{props.modloader}</p>
@@ -37,26 +37,26 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="group relative h-14 w-full flex items-center gap-4 px-3 box-border cursor pointer"
+          class="group relative w-full flex items-center gap-4 px-3 box-border h-14 cursor pointer"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="bg-primary opacity-10 transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0" />
+            <div class="transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0 bg-primary opacity-10" />
             <div class="w-1 absolute right-0 top-0 bottom-0 bg-primary" />
           </Show>
 
-          <div class="absolute right-5 gap-2 hidden group-hover:flex transition-all duration-100 ease-in-out">
-            <div class="h-7 w-7 bg-shade-5 rounded-full flex justify-center items-center cursor-pointer">
+          <div class="absolute gap-2 hidden transition-all duration-100 ease-in-out right-5 group-hover:flex">
+            <div class="h-7 rounded-full flex justify-center items-center cursor-pointer w-7 bg-shade-5">
               <div class="i-ri:more-2-fill text-white text-lg" />
             </div>
             <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center cursor-pointer">
-              <div class="i-ri:play-fill text-white text-lg" />
+              <div class="text-white text-lg i-ri:play-fill" />
             </div>
           </div>
 
           <Show when={props.isLoading && props.percentage !== undefined}>
             <div
-              class="absolute left-0 top-0 bottom-0 bg-white opacity-10"
+              class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
               style={{
                 width: `${props.percentage}%`,
               }}
