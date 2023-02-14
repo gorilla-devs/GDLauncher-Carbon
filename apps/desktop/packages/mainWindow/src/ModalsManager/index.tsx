@@ -1,5 +1,5 @@
 /* eslint-disable @unocss/order */
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 import {
   Component,
   createEffect,
@@ -7,8 +7,10 @@ import {
   JSX,
   lazy,
   Show,
+  Suspense,
 } from "solid-js";
 import { createStore } from "solid-js/store";
+import { Dynamic } from "solid-js/web";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
@@ -18,11 +20,16 @@ import { createStore } from "solid-js/store";
 export type ModalProps = {
   title?: string;
   noHeader?: boolean;
+  isVisible: boolean;
+  opacity: number;
 };
 
 type Hash = {
   [name: string]: {
-    component: (_props?: ModalProps) => JSX.Element;
+    component: ((_props: ModalProps) => JSX.Element) & {
+      preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
+    };
+
     title: string;
     noHeader?: boolean;
   };
@@ -31,7 +38,6 @@ type Hash = {
 const Modals: Component = () => {
   const location = useLocation();
 
-  const navigate = useNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const [opacity, setOpacity] = createSignal<0 | 1>(0);
   const [modals] = createStore<Hash>({
@@ -49,7 +55,6 @@ const Modals: Component = () => {
     },
     javasetup: {
       component: lazy(() => import("./modals/Java/JavaSetup")),
-      noHeader: true,
       title: "Java Setup",
     },
     acceptableUsePolicy: {
@@ -62,13 +67,10 @@ const Modals: Component = () => {
   const mParam = () => new URLSearchParams(queryParams()).get("m");
   const isModal = () => mParam() !== null;
 
-  const getModal = (type: string) => {
-    const noHeader = () => modals[type]?.noHeader || false;
-    const Component: any = () => modals[type]?.component;
-    const title = () => modals[type]?.title;
-
-    return <Component noHeader={noHeader()} title={title()} />;
-  };
+  const type = () => mParam() || "";
+  const noHeader = () => modals[type()]?.noHeader || false;
+  const ModalComponent: any = () => modals[type()]?.component;
+  const title = () => modals[type()]?.title;
 
   createEffect(() => {
     const visibility = isModal();
@@ -87,26 +89,15 @@ const Modals: Component = () => {
   });
 
   return (
-    <div
-      class="h-screen absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
-      classList={{
-        "opacity-100": !!opacity(),
-        "scale-100": !!opacity(),
-      }}
-      onClick={() => {
-        navigate(location.pathname);
-      }}
-    >
-      <Show when={isVisible()}>
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          {getModal(mParam() || "")}
-        </div>
-      </Show>
-    </div>
+    <Show when={isVisible()}>
+      <Suspense fallback={<p>Loading...</p>}>
+        <Dynamic
+          component={ModalComponent({ noHeader, title })}
+          noHeader={noHeader()}
+          title={title()}
+        />
+      </Suspense>
+    </Show>
   );
 };
 

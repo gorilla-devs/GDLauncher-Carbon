@@ -17,7 +17,13 @@ const JavaSetup = (props: ModalProps) => {
   };
 
   return (
-    <ModalLayout noHeader={props?.noHeader} title={props?.title}>
+    <ModalLayout
+      noHeader={currentStep() === "automatic"}
+      title={props?.title}
+      preventClose={currentStep() === "automatic"}
+      opacity={props.opacity}
+      isVisible={props.isVisible}
+    >
       <div>
         <Switch>
           <Match when={currentStep() === "intro"}>
