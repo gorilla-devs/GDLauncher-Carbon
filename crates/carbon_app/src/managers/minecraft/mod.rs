@@ -9,13 +9,11 @@ mod assets;
 mod manifest;
 mod version;
 
-// #[derive(Error, Debug)]
-// pub enum MinecraftManagerError {
-//     #[error("Cannot fetch manifest from HTTP: {0}")]
-//     ManifestFetchError(reqwest::Error),
-//     #[error("Manifest does not meet expected JSON structure: {0}")]
-//     ManifestParseError(reqwest::Error),
-// }
+#[derive(Error, Debug)]
+pub enum MinecraftError {
+    #[error("Assets error")]
+    AssetsError(assets::AssetsError),
+}
 
 pub(crate) struct MinecraftManager {
     app: AppRef,
@@ -33,10 +31,29 @@ impl MinecraftManager {
     }
 
     pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        let versions = manifest::get(self.app.upgrade().persistence_manager.get_db_client().await)
+        manifest::get_meta(self.app.upgrade().persistence_manager.get_db_client().await)
+            .await
+            .unwrap()
+    }
+
+    pub async fn gather_download_files_list(
+        &self,
+        mc_version: String,
+    ) -> Result<(), MinecraftError> {
+        let db_client = self.app.upgrade().persistence_manager.get_db_client().await;
+
+        let manifest = manifest::get_meta(db_client.clone()).await.unwrap();
+
+        let manifest_version = manifest.iter().find(|v| v.id == mc_version).unwrap();
+
+        let version = version::get_meta(db_client.clone(), manifest_version.clone())
             .await
             .unwrap();
 
-        versions
+        let assets = assets::get_meta(db_client.clone(), version.asset_index.unwrap())
+            .await
+            .unwrap();
+
+        todo!()
     }
 }

@@ -25,7 +25,7 @@ impl From<ManifestError> for rspc::Error {
 }
 
 // get should abstract the complexity of fetching it from either the network or the db
-pub async fn get(db: Arc<PrismaClient>) -> Result<Vec<ManifestVersion>, ManifestError> {
+pub async fn get_meta(db: Arc<PrismaClient>) -> Result<Vec<ManifestVersion>, ManifestError> {
     let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
     let new_manifest = reqwest::get(server_url)
         .await?

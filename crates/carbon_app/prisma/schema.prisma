@@ -32,11 +32,11 @@ model MinecraftManifest {
   time        String
   releaseTime String
   sha1        String            @unique
-  version     MinecraftVersion? @relation(fields: [sha1], references: [idSha1])
+  version     MinecraftVersion? @relation(fields: [id], references: [id])
 }
 
 model MinecraftVersion {
-  idSha1            String             @id @unique
+  id                String             @unique
   MinecraftManifest MinecraftManifest?
   // For now let's just store the entire json as bytes
   json              Bytes
@@ -45,7 +45,7 @@ model MinecraftVersion {
 }
 
 model MinecraftAssets {
-  idSha1           String             @id @unique
+  idSha1           String             @unique
   MinecraftVersion MinecraftVersion[]
   json             Bytes
 }

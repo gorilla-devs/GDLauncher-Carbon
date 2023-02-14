@@ -21,7 +21,7 @@ pub struct Version {
     #[serde(rename = "complianceLevel")]
     pub compliance_level: Option<i64>,
     pub downloads: Option<VersionInfoDownloads>,
-    pub id: Option<String>,
+    pub id: String,
     #[serde(rename = "javaVersion")]
     pub java_version: Option<JavaVersion>,
     pub libraries: Option<Libraries>,
