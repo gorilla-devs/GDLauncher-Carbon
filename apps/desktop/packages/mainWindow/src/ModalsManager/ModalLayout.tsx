@@ -1,3 +1,4 @@
+import { useLocation, useNavigate } from "@solidjs/router";
 import { Show, children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 
@@ -6,11 +7,13 @@ interface Props {
   class?: string;
   title?: string;
   noHeader?: boolean;
-  onClose: () => void;
 }
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children);
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <div
       class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl ${
@@ -22,7 +25,9 @@ const ModalLayout = (props: Props) => {
           <h3>{props.title}</h3>
           <div
             class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
-            onClick={() => props.onClose()}
+            onClick={() => {
+              navigate(location.pathname);
+            }}
           />
         </div>
       </Show>

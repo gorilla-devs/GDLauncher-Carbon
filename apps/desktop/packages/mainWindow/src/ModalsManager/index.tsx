@@ -9,16 +9,24 @@ import {
   Show,
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import ModalLayout from "./ModalLayout";
 
 /**
  * It renders a modal when the URL contains a query parameter called `m`
  * @returns A component that renders a modal.
  */
 
-interface Hash {
-  [name: string]: { component: JSX.Element; title: string };
-}
+export type ModalProps = {
+  title?: string;
+  noHeader?: boolean;
+};
+
+type Hash = {
+  [name: string]: {
+    component: (_props?: ModalProps) => JSX.Element;
+    title: string;
+    noHeader?: boolean;
+  };
+};
 
 const Modals: Component = () => {
   const location = useLocation();
@@ -41,6 +49,7 @@ const Modals: Component = () => {
     },
     javasetup: {
       component: lazy(() => import("./modals/Java/JavaSetup")),
+      noHeader: true,
       title: "Java Setup",
     },
     acceptableUsePolicy: {
@@ -54,14 +63,11 @@ const Modals: Component = () => {
   const isModal = () => mParam() !== null;
 
   const getModal = (type: string) => {
-    const Component = () => modals[type]?.component;
+    const noHeader = () => modals[type]?.noHeader || false;
+    const Component: any = () => modals[type]?.component;
     const title = () => modals[type]?.title;
 
-    return (
-      <ModalLayout onClose={() => navigate(location.pathname)} title={title()}>
-        <Component />
-      </ModalLayout>
-    );
+    return <Component noHeader={noHeader()} title={title()} />;
   };
 
   createEffect(() => {
