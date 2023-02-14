@@ -2,12 +2,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
+use matchout::Extract;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
+use crate::error::RequestError;
+
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
-    McAuth, McAuthError,
+    McAuth, McAuthError, McEntitlementError, McProfileError, XboxError,
 };
 
 /// Active process of adding an account
@@ -93,19 +96,24 @@ pub trait InvalidateCtx {
     async fn invalidate(&self);
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Extract)]
 pub enum EnrollmentError {
-    #[error("error requesting device code: {0}")]
-    DeviceCodeRequest(#[from] DeviceCodeRequestError),
+    #[error("request error: {0}")]
+    #[extract(DeviceCodeRequestError(self.0))]
+    #[extract(DeviceCodePollError(self.0))]
+    #[extract(McAuthError::Request(self.0))]
+    #[extract(McAccountPopulateError::Request(self.0))]
+    Request(RequestError),
 
-    #[error("error polling device code: {0}")]
-    DeviceCodePoll(#[from] DeviceCodePollError),
+    #[error("error getting xbox auth: {0}")]
+    XboxAuth(#[extract(McAuthError::Xbox)] XboxError),
 
-    #[error("error getting mc auth: {0}")]
-    McAuth(#[from] McAuthError),
+    #[error("error checking entitlements: {0}")]
+    EntitlementCheckError(#[extract(McAccountPopulateError::Entitlement)] McEntitlementError),
 
-    #[error("error populating account details: {0}")]
-    Populate(#[from] McAccountPopulateError),
+    #[error("no profile attached to account")]
+    #[extract(McAccountPopulateError::Profile(McProfileError::NoProfile))]
+    NoProfile,
 }
 
 /*
