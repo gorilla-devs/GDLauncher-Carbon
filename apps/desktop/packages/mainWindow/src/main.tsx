@@ -24,10 +24,6 @@ const instance = i18n.createInstance({
 });
 instance.use(icu);
 
-onMount(() => {
-  InitNews();
-});
-
 loadLanguageFile(DEFAULT_LANG).then((langFile) => {
   instance.addResourceBundle(DEFAULT_LANG, "common", langFile);
 });
