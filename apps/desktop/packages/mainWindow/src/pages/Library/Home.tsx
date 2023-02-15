@@ -1,10 +1,11 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useNavigate } from "@solidjs/router";
-import { For } from "solid-js";
+import { createEffect, For } from "solid-js";
 import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
+import { rspc } from "@/utils/rspcClient";
 
 type MockInstance = {
   title: string;
@@ -94,6 +95,12 @@ const newsArticles = [
 const Home = () => {
   const navigate = useNavigate();
   const [t] = useTransContext();
+
+  const query = rspc.createQuery(() => ["mc.TEMP_TEST", null]);
+
+  createEffect(() => {
+    console.log(query.data);
+  });
 
   return (
     <div class="p-6">

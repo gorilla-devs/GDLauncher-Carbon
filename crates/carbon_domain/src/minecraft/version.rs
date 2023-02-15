@@ -24,6 +24,7 @@ pub struct Version {
     pub id: String,
     #[serde(rename = "javaVersion")]
     pub java_version: Option<JavaVersion>,
+    #[serde(flatten)]
     pub libraries: Option<Libraries>,
     pub logging: Option<Logging>,
     #[serde(rename = "mainClass")]

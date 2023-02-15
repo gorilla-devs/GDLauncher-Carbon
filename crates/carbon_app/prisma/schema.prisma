@@ -26,26 +26,20 @@ model Account {
 }
 
 model MinecraftManifest {
-  id          String            @unique
+  id          String @unique
   type        String
   url         String
   time        String
   releaseTime String
-  sha1        String            @unique
-  version     MinecraftVersion? @relation(fields: [id], references: [id])
+  sha1        String @unique
 }
 
 model MinecraftVersion {
-  id                String             @unique
-  MinecraftManifest MinecraftManifest?
-  // For now let's just store the entire json as bytes
-  json              Bytes
-  assetsIdSha1      String
-  assets            MinecraftAssets?   @relation(fields: [assetsIdSha1], references: [idSha1])
+  id   String @unique
+  json Bytes
 }
 
 model MinecraftAssets {
-  idSha1           String             @unique
-  MinecraftVersion MinecraftVersion[]
-  json             Bytes
+  assetsIdSha1 String @unique
+  json         Bytes
 }

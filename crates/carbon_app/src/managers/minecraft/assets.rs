@@ -28,7 +28,7 @@ pub async fn get_meta(
 
     db.minecraft_assets()
         .upsert(
-            crate::db::minecraft_assets::id_sha_1::equals(version_asset_index.sha1.clone()),
+            crate::db::minecraft_assets::assets_id_sha_1::equals(version_asset_index.sha1.clone()),
             crate::db::minecraft_assets::create(
                 version_asset_index.sha1.clone(),
                 bytes.clone(),

@@ -11,7 +11,7 @@ use crate::db::PrismaClient;
 
 #[derive(Debug, Error)]
 pub enum VersionError {
-    #[error("Could not fetch manifest from launchermeta: {0}")]
+    #[error("Could not fetch version meta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Could not execute db query: {0}")]
     QueryError(#[from] QueryError),

@@ -34,15 +34,26 @@ pub async fn get_meta(db: Arc<PrismaClient>) -> Result<Vec<ManifestVersion>, Man
     // TODO ^^ should not throw but try to fetch from DB first
 
     for version in &new_manifest.versions {
-        // TODO: should check if it's there already
         db.minecraft_manifest()
-            .create(
-                version.id.clone(),
-                version.type_.clone().into(),
-                version.url.clone(),
-                version.time.clone(),
-                version.release_time.clone(),
-                vec![SetParam::SetSha1(version.sha1.clone())],
+            .upsert(
+                crate::db::minecraft_manifest::id::equals(version.id.clone()),
+                crate::db::minecraft_manifest::create(
+                    version.id.clone(),
+                    version.type_.clone().into(),
+                    version.url.clone(),
+                    version.time.clone(),
+                    version.release_time.clone(),
+                    version.sha1.clone(),
+                    vec![],
+                ),
+                vec![
+                    crate::db::minecraft_manifest::id::set(version.id.clone()),
+                    crate::db::minecraft_manifest::r#type::set(version.type_.clone().into()),
+                    crate::db::minecraft_manifest::url::set(version.url.clone()),
+                    crate::db::minecraft_manifest::time::set(version.time.clone()),
+                    crate::db::minecraft_manifest::release_time::set(version.release_time.clone()),
+                    crate::db::minecraft_manifest::sha_1::set(version.sha1.clone()),
+                ],
             )
             .exec()
             .await?;

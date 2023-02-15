@@ -46,6 +46,7 @@ keys! {
     mc {
         GET_INSTANCES                 = "getInstances";
         GET_MINECRAFT_VERSIONS        = "getMinecraftVersions";
+        TEMP_TEST        = "TEMP_TEST";
         GET_INSTANCE_DETAILS          = "getInstanceDetails";
         OPEN_INSTANCE_FOLDER_PATH     = "openInstanceFolderPath";
         START_INSTANCE                = "startInstance";
