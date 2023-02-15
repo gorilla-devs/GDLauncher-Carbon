@@ -12,7 +12,7 @@ type NewsItem = {
   guid: string;
 };
 
-export const InitNews = async () => {
+export const initNews = async () => {
   try {
     const { data: newsXml } = await axios.get(NEWS_URL);
 

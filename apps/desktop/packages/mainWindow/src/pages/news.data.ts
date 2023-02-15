@@ -1,7 +1,7 @@
-import { InitNews } from "@/utils/news";
+import { initNews } from "@/utils/news";
 
 const fetchData = () => {
-  const news = InitNews();
+  const news = initNews();
   return news;
 };
 
