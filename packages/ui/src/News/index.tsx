@@ -63,7 +63,7 @@ const News = (props: CarouselProps) => {
               />
               <div class="absolute bottom-10 left-5 flex flex-col">
                 <h2 class="mb-0">{slide.title}</h2>
-                <p class="mt-2">{slide.description}</p>
+                <p class="mt-2 text-shade-0">{slide.description}</p>
               </div>
             </div>
           )}
