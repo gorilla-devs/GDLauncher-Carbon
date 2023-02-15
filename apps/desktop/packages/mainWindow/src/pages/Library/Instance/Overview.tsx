@@ -13,7 +13,7 @@ const Overview = () => {
         <Card title="Minecraft version" text="1.19.2" icon="clock" />
         <Card title="Minecraft version" text="1.19.2" icon="sign" />
       </div>
-      <div class="flex flex-col items-start justify-between gap-2 p-5 w-59 bg-shade-7 rounded-xl box-border w-full">
+      <div class="flex flex-col items-start justify-between gap-2 p-5 bg-shade-7 rounded-xl box-border w-full w-59">
         <div class="text-shade-0 uppercase">
           <Trans
             key="notes"

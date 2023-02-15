@@ -3,7 +3,6 @@ import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import NewsData from "@/pages/news.data";
 import SettingsAppearanceData from "@/pages/Settings/settings.appearance.data";
-import { InitNews } from "@/utils/news";
 
 /* Defining the routes for the application. */
 export const routes: RouteDefinition[] = [

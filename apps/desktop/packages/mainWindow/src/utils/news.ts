@@ -1,4 +1,3 @@
-import { createSignal } from "solid-js";
 import { XMLParser } from "fast-xml-parser";
 import axios from "axios";
 import { NEWS_URL } from "@/constants";

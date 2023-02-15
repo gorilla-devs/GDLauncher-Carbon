@@ -9,8 +9,6 @@ import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
-import { InitNews } from "./utils/news";
-import { onMount } from "solid-js";
 
 queueMicrotask(() => {
   initAnalytics();

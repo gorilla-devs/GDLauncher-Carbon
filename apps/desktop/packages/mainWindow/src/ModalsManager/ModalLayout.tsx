@@ -23,7 +23,7 @@ const ModalLayout = (props: Props) => {
           onClick={() => props.onClose()}
         />
       </div>
-      <div class="p-5 h-full box-border">{c()}</div>
+      <div class="box-border p-5 h-full">{c()}</div>
     </div>
   );
 };
