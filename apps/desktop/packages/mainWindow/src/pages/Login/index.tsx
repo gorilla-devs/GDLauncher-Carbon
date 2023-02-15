@@ -33,7 +33,7 @@ export default function Login() {
         />
       </div>
       <div
-        class="h-100 rounded-2xl relative flex flex-col justify-end items-center text-white w-120"
+        class="rounded-2xl relative flex flex-col justify-end items-center text-white h-100 w-120"
         style={{
           background: "rgba(29, 32, 40, 0.8)",
           "justify-content": step() === 0 ? "flex-end" : "center",

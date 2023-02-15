@@ -151,7 +151,7 @@ const NoResourcePacks = () => {
 const ResourcePacks = () => {
   return (
     <div>
-      <div class="flex flex-col sticky bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out top-30">
+      <div class="flex flex-col bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"

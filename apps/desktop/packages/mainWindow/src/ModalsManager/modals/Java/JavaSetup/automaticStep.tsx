@@ -6,7 +6,7 @@ const percentage = 40;
 
 const AutomaticStep = () => {
   return (
-    <div class="w-110 flex flex-col items-center h-50 justify-around">
+    <div class="flex flex-col items-center w-110 h-50 justify-around">
       <div class="flex flex-col items-center">
         <img src={JavaLogo} class="h-16 w-16" />
         <h3>

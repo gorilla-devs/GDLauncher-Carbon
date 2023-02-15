@@ -11,7 +11,7 @@ const ListItem = (props: Props) => {
 
   return (
     <div
-      class="w-full py-2 cursor-pointer hover:bg-shade-6 pl-2"
+      class="w-full cursor-pointer py-2 hover:bg-shade-6 pl-2"
       classList={{
         "bg-shade-6": !!match(),
       }}

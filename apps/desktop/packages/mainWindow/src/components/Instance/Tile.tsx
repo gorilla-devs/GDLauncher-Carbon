@@ -24,7 +24,7 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="flex flex-col justify-center items-start cursor-pointer snap-start"
+          class="flex flex-col justify-center cursor-pointer items-start snap-start"
           onClick={(e) => props?.onClick?.(e)}
         >
           <div class="rounded-2xl h-38 w-38 bg-green-600" />
@@ -37,17 +37,17 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="group relative w-full flex items-center gap-4 px-3 box-border h-14 cursor pointer"
+          class="relative w-full flex items-center gap-4 box-border group px-3 h-14 cursor pointer"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="transition duration-100 ease-in-out absolute top-0 left-0 right-0 bottom-0 bg-primary opacity-10" />
-            <div class="w-1 absolute right-0 top-0 bottom-0 bg-primary" />
+            <div class="absolute right-0 transition duration-100 ease-in-out top-0 left-0 bottom-0 bg-primary opacity-10" />
+            <div class="absolute right-0 top-0 bottom-0 bg-primary w-1" />
           </Show>
 
-          <div class="absolute gap-2 hidden transition-all duration-100 ease-in-out right-5 group-hover:flex">
-            <div class="h-7 rounded-full flex justify-center items-center cursor-pointer w-7 bg-shade-5">
-              <div class="i-ri:more-2-fill text-white text-lg" />
+          <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
+            <div class="flex justify-center items-center cursor-pointer h-7 rounded-full w-7 bg-shade-5">
+              <div class="text-white i-ri:more-2-fill text-lg" />
             </div>
             <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center cursor-pointer">
               <div class="text-white text-lg i-ri:play-fill" />
@@ -63,7 +63,7 @@ const Tile = (props: Props) => {
             />
           </Show>
           <div
-            class="h-10 w-10 bg-green-600 rounded-lg"
+            class="h-10 bg-green-600 rounded-lg w-10"
             classList={{
               grayscale: props.isLoading,
             }}

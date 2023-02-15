@@ -43,7 +43,7 @@ const ModalLayout = (props: Props) => {
               />
             </div>
           </Show>
-          <div class="h-full box-border p-5">{c()}</div>
+          <div class="box-border h-full p-5">{c()}</div>
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Button, Input } from "@gd/ui";
 const AddJava = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="flex flex-col justify-center items-center h-full">
+      <div class="flex items-center h-full flex-col justify-center">
         <div class="flex flex-col max-w-90 gap-8">
           <div class="flex flex-col gap-4">
             <div class="flex justify-between items-center gap-4">
@@ -32,7 +32,7 @@ const AddJava = (props: ModalProps) => {
               <Input value={"adoptOpenJDK"} />
             </div>
           </div>
-          <div class="w-full flex justify-end">
+          <div class="flex w-full justify-end">
             <Button rounded={false} loading={true} percentage={0}>
               <Trans
                 key="install_java"

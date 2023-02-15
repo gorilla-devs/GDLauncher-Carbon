@@ -6,9 +6,9 @@ const ManualStep = (props: StepsProps) => {
   return (
     <div class="w-110 h-65">
       <div class="flex flex-col justify-between w-full h-full">
-        <div class="border-dashed border-2 border-primary py-4 h-13 flex flex-col justify-center items-center">
-          <div class="flex flex-col gap-2 justify-center items-center">
-            <div class="i-ri:folder-open-fill text-shade-5 text-xl w-6" />
+        <div class="flex flex-col justify-center items-center border-dashed border-2 border-primary py-4 h-13">
+          <div class="flex flex-col justify-center items-center gap-2">
+            <div class="text-shade-5 i-ri:folder-open-fill text-xl w-6" />
             <p class="m-0 text-shade-5">
               <Trans
                 key="select_java_zip"
