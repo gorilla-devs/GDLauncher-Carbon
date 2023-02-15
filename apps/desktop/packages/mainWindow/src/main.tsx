@@ -9,6 +9,8 @@ import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
+import { InitNews } from "./utils/news";
+import { onMount } from "solid-js";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -21,6 +23,10 @@ const instance = i18n.createInstance({
   fallbackLng: DEFAULT_LANG,
 });
 instance.use(icu);
+
+onMount(() => {
+  InitNews();
+});
 
 loadLanguageFile(DEFAULT_LANG).then((langFile) => {
   instance.addResourceBundle(DEFAULT_LANG, "common", langFile);

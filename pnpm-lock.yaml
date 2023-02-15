@@ -39,6 +39,7 @@ importers:
       eslint-plugin-prettier: ^4.2.1
       eslint-plugin-solid: ^0.9.1
       event-lite: ^0.1.2
+      fast-xml-parser: ^4.1.2
       jsdom: ^20.0.3
       playwright: ^1.29.1
       posthog-js: ^1.39.1
@@ -74,6 +75,7 @@ importers:
       eslint-plugin-prettier: 4.2.1_32m5uc2milwdw3tnkcq5del26y
       eslint-plugin-solid: 0.9.1_iukboom6ndih5an6iafl45j2fe
       event-lite: 0.1.2
+      fast-xml-parser: 4.1.2
       jsdom: 20.0.3
       playwright: 1.29.1
       posthog-js: 1.39.1
@@ -11441,6 +11443,13 @@ packages:
 
   /fast-xml-parser/4.0.11:
     resolution: {integrity: sha512-4aUg3aNRR/WjQAcpceODG1C3x3lFANXRo8+1biqfieHmg9pyMt7qB4lQV/Ta6sJCTbA5vfD8fnA8S54JATiFUA==}
+    hasBin: true
+    dependencies:
+      strnum: 1.0.5
+    dev: true
+
+  /fast-xml-parser/4.1.2:
+    resolution: {integrity: sha512-CDYeykkle1LiA/uqQyNwYpFbyF6Axec6YapmpUP+/RHWIoR1zKjocdvNaTsxCxZzQ6v9MLXaSYm9Qq0thv0DHg==}
     hasBin: true
     dependencies:
       strnum: 1.0.5

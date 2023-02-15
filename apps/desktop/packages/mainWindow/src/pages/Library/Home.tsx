@@ -5,6 +5,7 @@ import { For } from "solid-js";
 import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
+import { news } from "@/utils/news";
 
 type MockInstance = {
   title: string;
@@ -64,33 +65,6 @@ const mockCarousel: MockInstance[] = [
   },
 ];
 
-const newsArticles = [
-  {
-    title: "title",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title1",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title2",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title3",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-];
-
 const Home = () => {
   const navigate = useNavigate();
   const [t] = useTransContext();
@@ -98,7 +72,7 @@ const Home = () => {
   return (
     <div class="p-6">
       <div>
-        <News slides={newsArticles} />
+        <News slides={news()} />
         <div class="mt-4">
           <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>
