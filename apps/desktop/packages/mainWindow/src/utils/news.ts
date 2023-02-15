@@ -19,10 +19,10 @@ export interface Channel {
   "atom:link": string;
   language: string;
   pubDate: string;
-  item: Item[];
+  item: NewsItem[];
 }
 
-export interface Item {
+export interface NewsItem {
   title: string;
   link: string;
   description: string;
@@ -42,7 +42,7 @@ export const InitNews = async () => {
       const parser = new XMLParser();
       let parsedNews = parser.parse(newsXml);
       const newsArr =
-        parsedNews?.rss?.channel?.item?.map((newsEntry: Item) => ({
+        parsedNews?.rss?.channel?.item?.map((newsEntry: NewsItem) => ({
           title: newsEntry.title,
           description: newsEntry.description,
           image: `https://minecraft.net${newsEntry.imageURL}`,

@@ -72,7 +72,12 @@ const Home = () => {
   return (
     <div class="p-6">
       <div>
-        <News slides={news()} />
+        <News
+          slides={news()}
+          onClick={(news) => {
+            window.openExternalLink(news.url || "");
+          }}
+        />
         <div class="mt-4">
           <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>
