@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Trans } from "@gd/i18n";
 import { StepsProps } from ".";
 import JavaLogo from "/assets/images/icons/java-logo.svg";
@@ -10,7 +9,15 @@ const FirstStep = (props: StepsProps) => {
       <div class="flex flex-col justify-between w-full h-full">
         <div class="flex flex-col items-center">
           <img src={JavaLogo} class="h-16 w-16" />
-          <h3 class="mb-0">Java 8 missing</h3>
+          <h3 class="mb-0">
+            <Trans
+              key="java_missing"
+              options={{
+                defaultValue: "Java {{version}} missing",
+                version: 8,
+              }}
+            />
+          </h3>
         </div>
         <p class="text-center text-shade-3 m-0">
           <Trans

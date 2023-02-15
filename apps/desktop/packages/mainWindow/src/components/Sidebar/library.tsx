@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";

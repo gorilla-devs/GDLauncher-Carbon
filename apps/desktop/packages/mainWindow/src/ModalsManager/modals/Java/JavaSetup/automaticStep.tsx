@@ -1,6 +1,6 @@
-/* eslint-disable i18next/no-literal-string */
 import { Progressbar } from "@gd/ui";
 import JavaLogo from "/assets/images/icons/java-logo.svg";
+import { Trans } from "@gd/i18n";
 
 const percentage = 40;
 
@@ -9,10 +9,26 @@ const AutomaticStep = () => {
     <div class="w-110 flex flex-col items-center h-50 justify-around">
       <div class="flex flex-col items-center">
         <img src={JavaLogo} class="h-16 w-16" />
-        <h3>Java 8 missing</h3>
+        <h3>
+          <Trans
+            key="java_missing"
+            options={{
+              defaultValue: "Java {{version}} missing",
+              version: 8,
+            }}
+          />
+        </h3>
       </div>
       <Progressbar percentage={percentage} />
-      <p class="mb-0">{percentage}% Downloaded</p>
+      <p class="mb-0">
+        {`${percentage}%`}
+        <Trans
+          key="automatic_download_progress"
+          options={{
+            defaultValue: "Downloaded",
+          }}
+        />
+      </p>
     </div>
   );
 };

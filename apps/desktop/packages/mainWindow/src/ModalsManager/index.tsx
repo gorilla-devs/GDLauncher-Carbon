@@ -1,4 +1,3 @@
-/* eslint-disable @unocss/order */
 import { useLocation } from "@solidjs/router";
 import {
   Component,
@@ -39,7 +38,6 @@ const Modals: Component = () => {
   const location = useLocation();
 
   const [isVisible, setIsVisible] = createSignal(false);
-  const [opacity, setOpacity] = createSignal<0 | 1>(0);
   const [modals] = createStore<Hash>({
     privacyPolicy: {
       component: lazy(() => import("./modals/Privacypolicy")),
@@ -77,11 +75,7 @@ const Modals: Component = () => {
     // When the URL changes, update the visibility of the modal after a timeout
     if (visibility) {
       setIsVisible(visibility);
-      setTimeout(() => {
-        setOpacity(1);
-      }, 20);
     } else {
-      setOpacity(0);
       setTimeout(() => {
         setIsVisible(visibility);
       }, 150);

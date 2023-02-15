@@ -1,9 +1,8 @@
-// import { Trans } from "@gd/i18n";
+import { Trans } from "@gd/i18n";
 import { ModalProps } from "@/ModalsManager";
 import ModalLayout from "@/ModalsManager/ModalLayout";
 import { Button, Input } from "@gd/ui";
 
-/* eslint-disable i18next/no-literal-string */
 const AddJava = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
@@ -12,32 +11,35 @@ const AddJava = (props: ModalProps) => {
           <div class="flex flex-col gap-4">
             <div class="flex justify-between items-center gap-4">
               <h5 class="m-0">
-                {/* <Trans
-            key="java_major"
-            options={{
-              defaultValue: "Java Major",
-            }}
-          /> */}
-                Java Major
+                <Trans
+                  key="java_major"
+                  options={{
+                    defaultValue: "Java Major",
+                  }}
+                />
               </h5>
               <Input value={16} />
             </div>
             <div class="flex justify-between items-center gap-4">
               <h5 class="m-0">
-                {/* <Trans
-            key="java_distribution"
-            options={{
-              defaultValue: "Distribution",
-            }}
-          /> */}
-                Distribution
+                <Trans
+                  key="java_distribution"
+                  options={{
+                    defaultValue: "Distribution",
+                  }}
+                />
               </h5>
               <Input value={"adoptOpenJDK"} />
             </div>
           </div>
           <div class="w-full flex justify-end">
             <Button rounded={false} loading={true} percentage={0}>
-              Install
+              <Trans
+                key="install_java"
+                options={{
+                  defaultValue: "Install",
+                }}
+              />
             </Button>
           </div>
         </div>

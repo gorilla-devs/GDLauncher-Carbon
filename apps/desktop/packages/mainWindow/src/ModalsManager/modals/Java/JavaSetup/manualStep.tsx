@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button } from "@gd/ui";
 import { StepsProps } from ".";
 import { Trans } from "@gd/i18n";
@@ -10,7 +9,15 @@ const ManualStep = (props: StepsProps) => {
         <div class="border-dashed border-2 border-primary py-4 h-13 flex flex-col justify-center items-center">
           <div class="flex flex-col gap-2 justify-center items-center">
             <div class="i-ri:folder-open-fill text-shade-5 text-xl w-6" />
-            <p class="m-0 text-shade-5">Select java 8 zip</p>
+            <p class="m-0 text-shade-5">
+              <Trans
+                key="select_java_zip"
+                options={{
+                  defaultValue: "Select java {{version}} zip",
+                  version: 8,
+                }}
+              />
+            </p>
           </div>
         </div>
         <p class="text-shade-5 text-center">
