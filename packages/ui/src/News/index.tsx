@@ -8,20 +8,21 @@ import {
   Show,
 } from "solid-js";
 
-interface SlideProps {
+type SlideProps = {
   image: string;
   title: string;
   description: string;
   url?: string;
-}
+};
 
-interface SliderProps {
+type SliderProps = {
   currentImageIndex: number;
   slides: SlideProps[];
   disableRedirect?: boolean;
   alignment?: string;
   onClick?: any;
-}
+  onSlideClick?: (_news: SlideProps) => void;
+};
 
 export interface CarouselProps {
   slides: SlideProps[];
@@ -31,6 +32,7 @@ export interface CarouselProps {
   showArrows?: boolean;
   showIndicators?: boolean;
   disableRedirect?: boolean;
+  onClick?: (_news: SlideProps) => void;
 }
 
 const News = (props: CarouselProps) => {
@@ -49,11 +51,22 @@ const News = (props: CarouselProps) => {
         <For each={props.slides}>
           {(slide) => (
             <div
-              class={`absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border bg-[url("${slide.image}")]`}
+              class="absolute inset-0 transition-all transform min-h-80 w-full flex justify-center items-center hidden box-border bg-no-repeat	bg-center bg-cover cursor-pointer"
+              style={{
+                "background-image": `url('${slide.image}')`,
+              }}
+              onClick={() => props.onSlideClick?.(slide)}
             >
+              <div
+                class="absolute bottom-0 left-0 right-0 top-0"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
+                }}
+              />
               <div class="absolute bottom-10 left-5 flex flex-col">
                 <h2 class="mb-0">{slide.title}</h2>
-                <p class="mt-2">{slide.description}</p>
+                <p class="mt-2 text-shade-0">{slide.description}</p>
               </div>
             </div>
           )}
@@ -84,7 +97,9 @@ const News = (props: CarouselProps) => {
 
   createEffect(() => {
     interval = setInterval(() => {
-      changeSlide(mergedProps.rtl ? "right" : "left");
+      if (!props.disableAutoRotation) {
+        changeSlide(mergedProps.rtl ? "right" : "left");
+      }
     }, props.speed || 5000);
   });
 
@@ -184,7 +199,11 @@ const News = (props: CarouselProps) => {
         </div>
       </Show>
       <Show when={props.slides}>
-        <Slider currentImageIndex={currentImageIndex()} slides={props.slides} />
+        <Slider
+          currentImageIndex={currentImageIndex()}
+          slides={props.slides}
+          onSlideClick={(news) => props?.onClick?.(news)}
+        />
       </Show>
     </div>
   );

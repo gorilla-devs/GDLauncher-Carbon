@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
@@ -152,10 +151,7 @@ const NoResourcePacks = () => {
 const ResourcePacks = () => {
   return (
     <div>
-      <div
-        id="inline-inner-container"
-        class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-10 transition-all duration-100 ease-in-out"
-      >
+      <div class="flex flex-col bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
@@ -229,7 +225,15 @@ const ResourcePacks = () => {
               />
             </div>
           </div>
-          <div>{resourcePacks.length} Resource packs</div>
+          <div>
+            {resourcePacks.length}
+            <Trans
+              key="resource_packs"
+              options={{
+                defaultValue: "Resource packs",
+              }}
+            />
+          </div>
         </div>
       </div>
       <div class="h-full overflow-y-hidden">

@@ -1,29 +1,51 @@
-import { children } from "solid-js";
+import { useLocation, useNavigate } from "@solidjs/router";
+import { Show, children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 
 interface Props {
   children: JSX.Element | Element;
   class?: string;
   title?: string;
-  onClose: () => void;
+  noHeader?: boolean;
+  preventClose?: boolean;
 }
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children);
+  const navigate = useNavigate();
+  const location = useLocation();
+
   return (
     <div
-      class={`flex flex-col h-130 w-190 bg-shade-7 rounded-t-2xl ${
-        props.class ?? ""
-      }`}
+      class="h-screen absolute opacity-100 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999 scale-100"
+      onClick={() => {
+        if (!props.preventClose) navigate(location.pathname);
+      }}
     >
-      <div class="h-12 w-full px-5 box-border bg-shade-8 rounded-t-2xl flex justify-between items-center">
-        <h3>{props.title}</h3>
-        <span
-          class="i-gdl:close cursor-pointer"
-          onClick={() => props.onClose()}
-        />
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <div
+          class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl ${
+            props.class ?? ""
+          }`}
+        >
+          <Show when={!props.noHeader}>
+            <div class="bg-shade-8 flex justify-between items-center h-12 px-5 box-border rounded-t-2xl">
+              <h3>{props.title}</h3>
+              <div
+                class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
+                onClick={() => {
+                  if (!props.preventClose) navigate(location.pathname);
+                }}
+              />
+            </div>
+          </Show>
+          <div class="box-border h-full p-5">{c()}</div>
+        </div>
       </div>
-      <div class="p-5 h-full box-border">{c()}</div>
     </div>
   );
 };

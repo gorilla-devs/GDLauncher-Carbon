@@ -123,7 +123,7 @@ const mods: ModType[] = [
 
 const NoMods = () => {
   return (
-    <div class="h-full min-h-90 w-full flex justify-center items-center">
+    <div class="h-full w-full flex justify-center items-center min-h-90">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-shade-0 max-w-100">
@@ -151,10 +151,7 @@ const NoMods = () => {
 const Mods = () => {
   return (
     <div>
-      <div
-        id="inline-inner-container"
-        class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-10 transition-all duration-100 ease-in-out"
-      >
+      <div class="flex flex-col bg-shade-8 z-10 transition-all duration-100 ease-in-out pt-10">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
@@ -189,7 +186,7 @@ const Mods = () => {
             />
           </Button>
         </div>
-        <div class="flex justify-between text-shade-0 mb-6 z-10">
+        <div class="flex justify-between text-shade-0 z-10 mb-6">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
@@ -200,8 +197,8 @@ const Mods = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
-              <span class="i-ri:folder-open-fill text-2xl" />
+            <div class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white">
+              <span class="text-2xl i-ri:folder-open-fill" />
               <Trans
                 key="open_folder"
                 options={{
@@ -210,7 +207,7 @@ const Mods = () => {
               />
             </div>
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
-              <span class="i-ri:forbid-line text-2xl" />
+              <span class="text-2xl i-ri:forbid-line" />
               <Trans
                 key="disable"
                 options={{
@@ -219,7 +216,7 @@ const Mods = () => {
               />
             </div>
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
-              <span class="i-ri:delete-bin-2-fill text-2xl" />
+              <span class="text-2xl i-ri:delete-bin-2-fill" />
               <Trans
                 key="delete"
                 options={{

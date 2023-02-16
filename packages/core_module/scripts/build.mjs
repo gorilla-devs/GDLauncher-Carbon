@@ -1,4 +1,5 @@
 import { spawnSync } from "child_process";
+import path from "path";
 
 const target = process.argv[2];
 
@@ -8,7 +9,7 @@ if (target) {
   args.push("--target", target);
 }
 
-spawnSync("./node_modules/.bin/napi", args, {
+spawnSync(path.join(process.cwd(), "node_modules", ".bin", "napi"), args, {
   stdio: "inherit",
   shell: true,
 });

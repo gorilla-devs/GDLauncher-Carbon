@@ -116,11 +116,8 @@ const Screenshots = () => {
 
   return (
     <div>
-      <div
-        id="inline-inner-container"
-        class="flex flex-col sticky top-30 bg-shade-8 z-20 pt-2 transition-all duration-100 ease-in-out"
-      >
-        <div class="flex justify-between text-shade-0 mb-5 z-10">
+      <div class="flex flex-col sticky top-30 bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out">
+        <div class="flex justify-between text-shade-0 z-10 mb-5">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
