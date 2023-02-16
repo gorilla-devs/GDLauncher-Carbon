@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show } from "solid-js";
@@ -6,6 +5,7 @@ import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 import { useLocation, useNavigate } from "@solidjs/router";
+import { Trans } from "@gd/i18n";
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -171,7 +171,12 @@ const Sidebar = () => {
             }}
           >
             <Show when={isSidebarOpened()} fallback={"+"}>
-              + Add Instance
+              <Trans
+                key="add_instance"
+                options={{
+                  defaultValue: "+ Add Instance",
+                }}
+              />
             </Show>
           </Button>
         </div>

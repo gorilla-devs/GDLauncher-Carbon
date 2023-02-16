@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
@@ -226,7 +225,15 @@ const ResourcePacks = () => {
               />
             </div>
           </div>
-          <div>{resourcePacks.length} Resource packs</div>
+          <div>
+            {resourcePacks.length}
+            <Trans
+              key="resource_packs"
+              options={{
+                defaultValue: "Resource packs",
+              }}
+            />
+          </div>
         </div>
       </div>
       <div class="h-full overflow-y-hidden">
