@@ -11,6 +11,7 @@ export { News } from "./News";
 export { Tabs, TabList, TabPanel, Tab, Spacing } from "./Tabs";
 export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
+export { Collapsable } from "./Collapsable";
 export {
   NotificationsProvider,
   createNotification,
