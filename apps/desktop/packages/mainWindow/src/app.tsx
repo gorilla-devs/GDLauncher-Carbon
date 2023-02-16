@@ -14,9 +14,9 @@ const App: Component = () => {
   initThemes();
 
   return (
-    <div class="relative w-screen">
+    <div class="w-screen relative">
       <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute bottom-10 right-0 h-10 p-2 gap-4 z-50 bg-light-600 flex justify-center items-center cursor-pointer">
+        <div class="absolute gap-4 flex justify-center items-center cursor-pointer bottom-10 right-0 h-10 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
               navigate("/library");

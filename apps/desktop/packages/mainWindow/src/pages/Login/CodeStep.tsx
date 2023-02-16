@@ -84,7 +84,7 @@ const CodeStep = (props: Props) => {
   const [addNotification] = createNotification();
 
   return (
-    <div class="flex flex-col justify-between items-center gap-5 p-10 text-center">
+    <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
       <img src={DoorImage} />
       <div>
         <div class="flex flex-col justify-center items-center">
@@ -97,7 +97,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="text-[#E54B4B] mb-0 mt-2">
+            <p class="mt-2 text-[#E54B4B] mb-0">
               <Trans
                 key="code_expired_message"
                 options={{

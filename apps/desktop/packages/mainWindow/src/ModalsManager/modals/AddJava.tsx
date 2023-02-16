@@ -4,7 +4,7 @@ import { Button, Input } from "@gd/ui";
 /* eslint-disable i18next/no-literal-string */
 const AddJava = () => {
   return (
-    <div class="flex flex-col justify-center items-center h-full">
+    <div class="flex items-center h-full flex-col justify-center">
       <div class="flex flex-col max-w-90 gap-8">
         <div class="flex flex-col gap-4">
           <div class="flex justify-between items-center gap-4">

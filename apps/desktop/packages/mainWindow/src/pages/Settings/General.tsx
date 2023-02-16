@@ -5,7 +5,7 @@ import { Trans } from "@gd/i18n";
 
 const General = () => {
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
+    <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="general"
@@ -24,7 +24,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-shade-3 m-0 max-w-96">
             <Trans
               key="choose_a_language"
               options={{
@@ -144,11 +144,11 @@ const General = () => {
           }}
         />
       </Button>
-      <div class="mt-16 flex gap-24 mb-6">
+      <div class="flex mb-6 mt-16 gap-24">
         <div class="flex gap-5">
           <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
           <div class="flex flex-col">
-            <img src={GDLauncherText} class="h-5 cursor-pointer" />
+            <img src={GDLauncherText} class="cursor-pointer h-5" />
             <p class="mb-0 mt-2">v.1.1.26</p>
           </div>
         </div>
