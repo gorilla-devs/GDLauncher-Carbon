@@ -26,8 +26,9 @@ impl Parse for ExtractEnum {
 
             for attr in &variant.attrs {
                 if attr.path.is_ident("extract") {
-                    let pattern = attr
-                        .parse_args_with(|input: ParseStream| ExtractPattern::parse(input, None))?;
+                    let pattern = attr.parse_args_with(|input: ParseStream| {
+                        ExtractPattern::parse(input, None, false)
+                    })?;
 
                     let arm = pattern.create_arm(variant.ident.clone(), &variant.fields);
                     let arms = matches.entry(pattern.target).or_insert(Vec::new());
@@ -54,37 +55,63 @@ impl Parse for ExtractEnum {
                     }) = iter.next()
                     {
                         for attr in attrs {
-                            if attr.path.is_ident("extract") {
-                                if attr.tokens.is_empty() {
-                                    // shorthand for a direct From
-                                    if let Type::Path(TypePath { qself: None, path }) = ty {
-                                        inline_extract = Some((
-                                            ExtractPattern {
-                                                target: path.clone(),
-                                                pattern: Pat::Path(PatPath {
-                                                    attrs: Vec::new(),
-                                                    qself: None,
-                                                    path: Path::from(Ident::new("_0", attr.span())),
-                                                }),
-                                            },
-                                            attr,
-                                        ));
+                            let Some(attrtype) = attr.path.get_ident() else { continue };
+
+                            match &attrtype.to_string() as &str {
+                                "extract" => {
+                                    if attr.tokens.is_empty() {
+                                        if let Type::Path(TypePath { qself: None, path }) = ty {
+                                            inline_extract = Some((
+                                                ExtractPattern {
+                                                    target: path.clone(),
+                                                    pattern: Pat::Path(PatPath {
+                                                        attrs: Vec::new(),
+                                                        qself: None,
+                                                        path: Path::from(Ident::new(
+                                                            "_0",
+                                                            attr.span(),
+                                                        )),
+                                                    }),
+                                                    into: false,
+                                                },
+                                                attr,
+                                            ));
+                                        } else {
+                                            return Err(syn::Error::new_spanned(attr, "#[extract] with no args can only be applied to simple paths"));
+                                        }
                                     } else {
-                                        return Err(syn::Error::new_spanned(attr, "#[extract] with no args can only be applied to simple paths"));
+                                        let pattern =
+                                            attr.parse_args_with(|input: ParseStream| {
+                                                println!("{}", attr.tokens.to_string());
+                                                ExtractPattern::parse(
+                                                    input,
+                                                    Some(&match field_ident {
+                                                        Some(ident) => ident.to_string(),
+                                                        None => String::from("_0"),
+                                                    }),
+                                                    false,
+                                                )
+                                            })?;
+                                        inline_extract = Some((pattern, attr));
                                     }
-                                } else {
-                                    let pattern = attr.parse_args_with(|input: ParseStream| {
-                                        println!("{}", attr.tokens.to_string());
-                                        ExtractPattern::parse(
-                                            input,
-                                            Some(&match field_ident {
-                                                Some(ident) => ident.to_string(),
-                                                None => String::from("_0"),
-                                            }),
-                                        )
-                                    })?;
-                                    inline_extract = Some((pattern, attr));
                                 }
+                                "into" => {
+                                    let into_path = attr.parse_args::<Path>()?;
+
+                                    inline_extract = Some((
+                                        ExtractPattern {
+                                            target: into_path,
+                                            pattern: Pat::Path(PatPath {
+                                                attrs: Vec::new(),
+                                                qself: None,
+                                                path: Path::from(Ident::new("_0", attr.span())),
+                                            }),
+                                            into: true,
+                                        },
+                                        attr,
+                                    ));
+                                }
+                                _ => {}
                             }
                         }
                     }

@@ -5,7 +5,7 @@ use syn::{parse_macro_input, Arm, ItemEnum, Path};
 
 mod parse;
 
-#[proc_macro_derive(Extract, attributes(extract))]
+#[proc_macro_derive(Extract, attributes(extract, into))]
 pub fn extract(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(item as ExtractEnum);
 

@@ -13,6 +13,8 @@ use syn::{
 pub struct ExtractPattern {
     pub target: Path,
     pub pattern: Pat,
+    // coerce the matched pattern using Into::into
+    pub into: bool,
 }
 
 impl ExtractPattern {
@@ -33,6 +35,33 @@ impl ExtractPattern {
             },
         };
 
+        let call_into = |path| {
+            Expr::Call(ExprCall {
+                attrs: Vec::new(),
+                func: Box::new(Expr::Path(ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: Path {
+                        leading_colon: Some(Default::default()),
+                        segments: {
+                            let segments = ["core", "convert", "Into", "into"];
+
+                            segments
+                                .map(|s| PathSegment::from(Ident::new(s, Span::call_site())))
+                                .into_iter()
+                                .collect()
+                        },
+                    },
+                })),
+                paren_token: Default::default(),
+                args: {
+                    let args = [Expr::Path(path)];
+
+                    args.into_iter().collect()
+                },
+            })
+        };
+
         Arm {
             attrs: Vec::new(),
             pat: self.pattern.clone(),
@@ -47,11 +76,18 @@ impl ExtractPattern {
                     paren_token: Default::default(),
                     args: {
                         let fields = (0..unnamed.len()).map(|i| {
-                            Expr::Path(ExprPath {
+                            let path = ExprPath {
                                 attrs: Vec::new(),
                                 qself: None,
                                 path: Path::from(Ident::new(&format!("_{i}"), Span::call_site())),
-                            })
+                            };
+
+                            // currently `into` can only be true for single arguments,
+                            // so types without `Into` impls are not an issue.
+                            match self.into {
+                                false => Expr::Path(path),
+                                true => call_into(path),
+                            }
                         });
 
                         fields.collect()
@@ -67,15 +103,20 @@ impl ExtractPattern {
                         let fields = named.iter().map(|Field { ident, .. }| {
                             let ident = ident.clone().unwrap(); // definitely named
 
+                            let path = ExprPath {
+                                attrs: Vec::new(),
+                                qself: None,
+                                path: Path::from(ident.clone()),
+                            };
+
                             FieldValue {
                                 attrs: Vec::new(),
                                 member: Member::Named(ident.clone()),
                                 colon_token: None,
-                                expr: Expr::Path(ExprPath {
-                                    attrs: Vec::new(),
-                                    qself: None,
-                                    path: Path::from(ident),
-                                }),
+                                expr: match self.into {
+                                    false => Expr::Path(path),
+                                    true => call_into(path),
+                                },
                             }
                         });
 
@@ -86,7 +127,7 @@ impl ExtractPattern {
         }
     }
 
-    pub fn parse(input: ParseStream, field: Option<&str>) -> syn::Result<Self> {
+    pub fn parse(input: ParseStream, field: Option<&str>, into: bool) -> syn::Result<Self> {
         let reparsed = reparse_tokens(input.parse::<TokenStream>()?, field);
         let mut pat = syn::parse2::<Pat>(reparsed)?;
 
@@ -115,6 +156,7 @@ impl ExtractPattern {
 
         Ok(Self {
             target,
+            into,
             pattern: pat,
         })
     }
