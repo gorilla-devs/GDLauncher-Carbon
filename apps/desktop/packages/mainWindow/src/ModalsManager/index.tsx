@@ -50,9 +50,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const noHeader = () => modals[modalType()]?.noHeader || false;
   const ModalComponent: any = () => modals[modalType()]?.component;
-  const title = () => modals[modalType()]?.title;
 
-  const [modals] = createStore<Hash>({
+  const defaultModals = {
     privacyPolicy: {
       component: lazy(() => import("./modals/Privacypolicy")),
       title: "Privacy Policy",
@@ -73,13 +72,26 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       component: lazy(() => import("./modals/AcceptableUsePolicy")),
       title: "Acceptable Use Policy",
     },
-  });
+  };
+
+  const title = () => modals[modalType()]?.title;
+
+  const [modals] = createStore<Hash>(defaultModals);
+
+  type modalskeys = keyof typeof defaultModals;
 
   const manager = {
-    openModal: (modal: string) => {
-      const mParam = () => new URLSearchParams(modal).get("m");
-      const isPath = () => mParam() !== null;
-      if (isPath()) {
+    openModal: (modal: modalskeys | string) => {
+      const urlPathRegex =
+        /^\/[a-zA-Z0-9-_]+(?:\/[a-zA-Z0-9-_]+)*(?:\?[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+(?:&[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+)*)?$/;
+
+      const modalParamRegex = /m=([^&]+)/;
+
+      const isPath = () => urlPathRegex.test(modal);
+      const mParam = () => modal.match(modalParamRegex)?.[1];
+      const isModal = () => mParam() !== null;
+
+      if (isPath() && isModal()) {
         setIsRoute(true);
         navigate(modal);
       } else {

@@ -3,6 +3,7 @@ import { createSignal, Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
 import { useModal } from "@/ModalsManager";
+import { useNavigate } from "@solidjs/router";
 interface Props {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
@@ -59,7 +60,7 @@ const Auth = (_props: Props) => {
           <li
             class="cursor-pointer"
             onClick={() => {
-              modalsContext?.openModal("?m=termsAndConditions");
+              modalsContext?.openModal("/library/DDAEDF?m=termsAndConditions");
             }}
           >
             {t("terms_and_conditions")}
