@@ -20,7 +20,6 @@ export type ModalProps = {
   title?: string;
   noHeader?: boolean;
   isVisible: boolean;
-  opacity: number;
 };
 
 type Hash = {
@@ -47,11 +46,11 @@ const Modals: Component = () => {
       component: lazy(() => import("./modals/TermsAndConditions")),
       title: "Terms and Conditions",
     },
-    addjava: {
+    addJava: {
       component: lazy(() => import("./modals/Java/AddJava")),
       title: "Add java version",
     },
-    javasetup: {
+    javaSetup: {
       component: lazy(() => import("./modals/Java/JavaSetup")),
       title: "Java Setup",
     },
