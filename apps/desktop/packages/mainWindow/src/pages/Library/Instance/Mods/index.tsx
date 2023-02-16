@@ -152,7 +152,7 @@ const Mods = () => {
   return (
     <div>
       <div class="flex flex-col bg-shade-8 z-10 transition-all duration-100 ease-in-out pt-10">
-        <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
+        <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
@@ -198,7 +198,7 @@ const Mods = () => {
               />
             </div>
             <div class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white">
-              <span class="i-ri:folder-open-fill text-2xl" />
+              <span class="text-2xl i-ri:folder-open-fill" />
               <Trans
                 key="open_folder"
                 options={{

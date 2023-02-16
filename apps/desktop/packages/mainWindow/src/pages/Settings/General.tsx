@@ -148,7 +148,7 @@ const General = () => {
         <div class="flex gap-5">
           <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
           <div class="flex flex-col">
-            <img src={GDLauncherText} class="h-5 cursor-pointer" />
+            <img src={GDLauncherText} class="cursor-pointer h-5" />
             <p class="mb-0 mt-2">v.1.1.26</p>
           </div>
         </div>
