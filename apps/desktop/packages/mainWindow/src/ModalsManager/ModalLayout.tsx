@@ -1,12 +1,11 @@
 import { useLocation, useNavigate } from "@solidjs/router";
 import { Show, children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
+import { ModalProps, useModal } from ".";
 
-interface Props {
+interface Props extends ModalProps {
   children: JSX.Element | Element;
   class?: string;
-  title?: string;
-  noHeader?: boolean;
   preventClose?: boolean;
 }
 
@@ -14,12 +13,16 @@ const ModalLayout = (props: Props) => {
   const c = children(() => props.children);
   const navigate = useNavigate();
   const location = useLocation();
+  const modalsContext = useModal();
 
   return (
     <div
       class="h-screen absolute opacity-100 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999 scale-100"
       onClick={() => {
-        if (!props.preventClose) navigate(location.pathname);
+        if (!props.preventClose) {
+          navigate(location.pathname);
+          modalsContext?.closeModal();
+        }
       }}
     >
       <div
@@ -38,7 +41,10 @@ const ModalLayout = (props: Props) => {
               <div
                 class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
                 onClick={() => {
-                  if (!props.preventClose) navigate(location.pathname);
+                  if (!props.preventClose) {
+                    navigate(location.pathname);
+                    modalsContext?.closeModal();
+                  }
                 }}
               />
             </div>
