@@ -1,6 +1,5 @@
 pub mod account;
 pub mod app;
-pub mod error;
 pub mod instance;
 pub mod minecraft;
 mod minecraft_mod;

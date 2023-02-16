@@ -1,10 +1,10 @@
-//! Shared error types
-
 use std::fmt::{self, Display, Formatter};
 
-use carbon_domain::error::UnhandledError;
 use reqwest::{Response, StatusCode, Url};
+use std::error::Error as StdError;
 use thiserror::Error;
+
+use super::{HandlingActions, UError, UnexpectedError};
 
 #[derive(Error, Debug, Clone)]
 #[error("request error for {context}: {error}")]
@@ -35,10 +35,6 @@ pub enum RequestErrorDetails {
 
     #[error("malformed response")]
     MalformedResponse, // TODO: get body
-
-    // Unexpected errors are converted to strings so RequestError can be Clone.
-    #[error("unexpected error returned from reqwest: {0}")]
-    Unexpected(UnhandledError),
 }
 
 impl Display for RequestContext {
@@ -73,8 +69,8 @@ impl RequestContext {
 }
 
 impl RequestErrorDetails {
-    pub fn from_error(error: reqwest::Error) -> Self {
-        if error.is_status() {
+    pub fn from_error(error: reqwest::Error) -> UError<Self> {
+        let error = if error.is_status() {
             RequestErrorDetails::UnexpectedStatus {
                 status: error.status().unwrap(),
                 details: None,
@@ -86,8 +82,10 @@ impl RequestErrorDetails {
         } else if error.is_decode() {
             RequestErrorDetails::MalformedResponse
         } else {
-            RequestErrorDetails::Unexpected(UnhandledError::new(error))
-        }
+            return UError::Unexpected(UnexpectedError::new(error, HandlingActions::None));
+        };
+
+        UError::Expected(error)
     }
 
     pub fn from_status(response: &Response) -> Self {
@@ -98,20 +96,37 @@ impl RequestErrorDetails {
     }
 }
 
-impl From<reqwest::Error> for RequestError {
-    fn from(value: reqwest::Error) -> Self {
-        Self {
-            context: RequestContext::from_error(&value),
-            error: RequestErrorDetails::from_error(value),
-        }
-    }
-}
-
 impl RequestError {
     pub fn from_status(response: &Response) -> Self {
         Self {
-            context: RequestContext::from_response(response),
+            context: RequestContext::from_response(&response),
             error: RequestErrorDetails::from_status(response),
         }
+    }
+
+    pub fn from_reqwest(value: reqwest::Error) -> UError<Self> {
+        let context = RequestContext::from_error(&value);
+
+        match RequestErrorDetails::from_error(value) {
+            UError::Unexpected(e) => UError::Unexpected(e),
+            UError::Expected(e) => UError::Expected(RequestError { context, error: e }),
+        }
+    }
+
+    /// Convenience function for mapping a [reqwest::Error] to any error
+    /// that implements From<RequestError>.
+    pub fn map<E: StdError + From<Self>>(value: reqwest::Error) -> UError<E> {
+        UError::map(Self::from_reqwest(value))
+    }
+
+    /// Same as [map], but strips the URL from the error
+    pub fn map_sensitive<E: StdError + From<Self>>(value: reqwest::Error) -> UError<E> {
+        Self::map(value.without_url())
+    }
+}
+
+impl<E: StdError + From<RequestError>> From<reqwest::Error> for UError<E> {
+    fn from(value: reqwest::Error) -> Self {
+        RequestError::map(value)
     }
 }

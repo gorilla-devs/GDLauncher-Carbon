@@ -7,7 +7,6 @@ edition = "2021"
 crate-type = ["lib"]
 
 [dependencies]
-backtrace = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true, features = ["fs"] }

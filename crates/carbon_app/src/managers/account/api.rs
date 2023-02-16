@@ -8,7 +8,10 @@ use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
 
-use crate::error::{RequestContext, RequestError, RequestErrorDetails};
+use crate::error::{
+    request::{RequestContext, RequestError, RequestErrorDetails},
+    UError, UResult,
+};
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
@@ -22,7 +25,7 @@ pub struct DeviceCode {
 }
 
 impl DeviceCode {
-    pub async fn request_code(client: &Client) -> Result<Self, DeviceCodeRequestError> {
+    pub async fn request_code(client: &Client) -> UResult<Self, DeviceCodeRequestError> {
         #[derive(Deserialize)]
         struct DeviceCodeResponse {
             user_code: String,
@@ -45,15 +48,12 @@ impl DeviceCode {
             .header("content-length", "0")
             .send()
             .await
-            .map_err(|e| e.without_url())
-            .map_err(RequestError::from)?
+            .map_err(RequestError::map_sensitive)?
             .error_for_status()
-            .map_err(|e| e.without_url())
-            .map_err(RequestError::from)?
+            .map_err(RequestError::map_sensitive)?
             .json::<DeviceCodeResponse>()
             .await
-            .map_err(|e| e.without_url())
-            .map_err(RequestError::from)?;
+            .map_err(RequestError::map_sensitive)?;
 
         Ok(Self {
             user_code: response.user_code,
@@ -64,7 +64,7 @@ impl DeviceCode {
         })
     }
 
-    pub async fn poll_ms_auth(&self, client: &Client) -> Result<MsAuth, DeviceCodePollError> {
+    pub async fn poll_ms_auth(&self, client: &Client) -> UResult<MsAuth, DeviceCodePollError> {
         loop {
             tokio::time::sleep(self.polling_interval).await;
 
@@ -80,8 +80,7 @@ impl DeviceCode {
                     ("device_code", &self.device_code),
                 ])
                 .send()
-                .await
-                .map_err(RequestError::from)?;
+                .await?;
 
             match response.status() {
                 StatusCode::BAD_REQUEST => {
@@ -93,17 +92,15 @@ impl DeviceCode {
                     match response.json::<BadRequestError>().await {
                         Ok(BadRequestError { error }) => match &error as &str {
                             "authorization_pending" => continue,
-                            _ => {
-                                break Err(DeviceCodePollError(RequestError {
-                                    context: RequestContext::none(),
-                                    error: RequestErrorDetails::UnexpectedStatus {
-                                        status: StatusCode::BAD_REQUEST,
-                                        details: Some(error),
-                                    },
-                                }))
-                            }
+                            _ => Err(DeviceCodePollError(RequestError {
+                                context: RequestContext::none(),
+                                error: RequestErrorDetails::UnexpectedStatus {
+                                    status: StatusCode::BAD_REQUEST,
+                                    details: Some(error),
+                                },
+                            }))?,
                         },
-                        Err(e) => break Err(DeviceCodePollError(RequestError::from(e))),
+                        Err(e) => Err(RequestError::map::<DeviceCodePollError>(e))?,
                     }
                 }
                 StatusCode::OK => {
@@ -115,10 +112,7 @@ impl DeviceCode {
                         expires_in: i64,
                     }
 
-                    let response = response
-                        .json::<MsAuthResponse>()
-                        .await
-                        .map_err(RequestError::from)?;
+                    let response = response.json::<MsAuthResponse>().await?;
 
                     break Ok(MsAuth {
                         access_token: response.access_token,
@@ -127,7 +121,7 @@ impl DeviceCode {
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     });
                 }
-                _ => break Err(DeviceCodePollError(RequestError::from_status(&response))),
+                _ => Err(DeviceCodePollError(RequestError::from_status(&response)))?,
             }
         }
     }
@@ -152,7 +146,7 @@ pub struct MsAuth {
 impl MsAuth {
     /// Refresh the auth token, returning a new token if the current one
     /// has expired.
-    pub async fn refresh(&mut self, client: &Client) -> Result<bool, MsAuthRefreshError> {
+    pub async fn refresh(&mut self, client: &Client) -> UResult<bool, MsAuthRefreshError> {
         if self.expires_at > Utc::now() {
             #[derive(Deserialize)]
             struct RefreshResponse {
@@ -173,16 +167,10 @@ impl MsAuth {
                     ),
                 ])
                 .send()
-                .await
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?
-                .error_for_status()
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?
+                .await?
+                .error_for_status()?
                 .json::<RefreshResponse>()
-                .await
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?;
+                .await?;
 
             self.access_token = response.access_token;
             self.refresh_token = response.refresh_token;
@@ -205,7 +193,7 @@ struct XboxAuth {
 
 impl XboxAuth {
     /// Obtain an Xbox account from a MS account (without refreshing it)
-    pub async fn from_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, XboxAuthError> {
+    pub async fn from_ms(ms_auth: &MsAuth, client: &Client) -> UResult<Self, XboxAuthError> {
         let xbl_token = {
             #[derive(Deserialize)]
             struct XblToken {
@@ -228,16 +216,10 @@ impl XboxAuth {
                 .header("Accept", "application/json")
                 .json(&json)
                 .send()
-                .await
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?
-                .error_for_status()
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?
+                .await?
+                .error_for_status()?
                 .json::<XblToken>()
-                .await
-                .map_err(|e| e.without_url())
-                .map_err(RequestError::from)?;
+                .await?;
 
             response.token
         };
@@ -258,9 +240,7 @@ impl XboxAuth {
             .header("Content-Type", "application/json")
             .json(&json)
             .send()
-            .await
-            .map_err(|e| e.without_url())
-            .map_err(RequestError::from)?;
+            .await?;
 
         match response.status() {
             StatusCode::OK => {
@@ -282,11 +262,7 @@ impl XboxAuth {
                     uhs: String,
                 }
 
-                let response = response
-                    .json::<XstsToken>()
-                    .await
-                    .map_err(|e| e.without_url())
-                    .map_err(RequestError::from)?;
+                let response = response.json::<XstsToken>().await?;
                 Ok(Self {
                     xsts_token: response.token,
                     userhash: response
@@ -308,14 +284,10 @@ impl XboxAuth {
                     xerr: u64,
                 }
 
-                let xsts_err = response
-                    .json::<XstsError>()
-                    .await
-                    .map_err(|e| e.without_url())
-                    .map_err(RequestError::from)?;
-                Err(XboxAuthError::Xbox(XboxError::from_xerr(xsts_err.xerr)))
+                let xsts_err = response.json::<XstsError>().await?;
+                Err(XboxAuthError::Xbox(XboxError::from_xerr(xsts_err.xerr)))?
             }
-            _ => Err(XboxAuthError::Request(RequestError::from_status(&response))),
+            _ => Err(XboxAuthError::Request(RequestError::from_status(&response)))?,
         }
     }
 }
@@ -368,8 +340,10 @@ pub struct McAuth {
 
 impl McAuth {
     /// Authenticate with a MS account (without refreshing it)
-    pub async fn auth_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, McAuthError> {
-        let xbox_auth = XboxAuth::from_ms(ms_auth, client).await?;
+    pub async fn auth_ms(ms_auth: &MsAuth, client: &Client) -> UResult<Self, McAuthError> {
+        let xbox_auth = XboxAuth::from_ms(ms_auth, client)
+            .await
+            .map_err(UError::map)?;
 
         let json = json!({
             "identityToken": format!("XBL3.0 x={};{}", xbox_auth.userhash, xbox_auth.xsts_token)
@@ -386,13 +360,10 @@ impl McAuth {
             .header("Accept", "application/json")
             .json(&json)
             .send()
-            .await
-            .map_err(RequestError::from)?
-            .error_for_status()
-            .map_err(RequestError::from)?
+            .await?
+            .error_for_status()?
             .json::<McAuthResponse>()
-            .await
-            .map_err(RequestError::from)?;
+            .await?;
 
         Ok(Self {
             access_token: response.access_token,
@@ -403,7 +374,7 @@ impl McAuth {
     pub async fn get_entitlement(
         &self,
         client: &Client,
-    ) -> Result<McEntitlement, McEntitlementCheckError> {
+    ) -> UResult<McEntitlement, McEntitlementCheckError> {
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -413,13 +384,10 @@ impl McAuth {
             .get("https://api.minecraftservices.com/entitlements/mcstore")
             .bearer_auth(&self.access_token)
             .send()
-            .await
-            .map_err(RequestError::from)?
-            .error_for_status()
-            .map_err(RequestError::from)?
+            .await?
+            .error_for_status()?
             .json::<EntitlementResponse>()
-            .await
-            .map_err(RequestError::from)?;
+            .await?;
 
         #[derive(Debug, Deserialize)]
         struct SignedEntitlements {
@@ -456,7 +424,9 @@ impl McAuth {
                     _ => McEntitlementCheckError::Entitlement(McEntitlementError::Jwt(e)),
                 };
 
-                return Err(error);
+                // `?` on an Err variant is still marked as a control flow split
+                // instead of a termination. The `return` here is never called.
+                return Err(error)?;
             }
         };
 
@@ -472,20 +442,21 @@ impl McAuth {
             true => Ok(McEntitlement::Owned),
             false => Err(McEntitlementCheckError::Entitlement(
                 McEntitlementError::NoEntitlement,
-            )),
+            ))?,
         }
     }
 
-    pub async fn get_profile(&self, client: &Client) -> Result<McProfile, McProfileRequestError> {
+    pub async fn get_profile(&self, client: &Client) -> UResult<McProfile, McProfileRequestError> {
         let response = client
             .get("https://api.minecraftservices.com/minecraft/profile")
             .bearer_auth(&self.access_token)
             .send()
-            .await
-            .map_err(RequestError::from)?;
+            .await?;
 
         match response.status() {
-            StatusCode::NOT_FOUND => Err(McProfileRequestError::Profile(McProfileError::NoProfile)),
+            StatusCode::NOT_FOUND => {
+                Err(McProfileRequestError::Profile(McProfileError::NoProfile))?
+            }
             StatusCode::OK => {
                 #[derive(Debug, Deserialize)]
                 struct McProfileResponse {
@@ -493,10 +464,7 @@ impl McAuth {
                     name: String,
                 }
 
-                let response = response
-                    .json::<McProfileResponse>()
-                    .await
-                    .map_err(RequestError::from)?;
+                let response = response.json::<McProfileResponse>().await?;
 
                 Ok(McProfile {
                     uuid: response.id,
@@ -505,15 +473,15 @@ impl McAuth {
             }
             _ => Err(McProfileRequestError::Request(RequestError::from_status(
                 &response,
-            ))),
+            )))?,
         }
     }
 
-    pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
+    pub async fn populate(&self, client: &Client) -> UResult<McAccount, McAccountPopulateError> {
         Ok(McAccount {
             auth: self.clone(),
-            entitlement: self.get_entitlement(&client).await?,
-            profile: self.get_profile(&client).await?,
+            entitlement: self.get_entitlement(&client).await.map_err(UError::map)?,
+            profile: self.get_profile(&client).await.map_err(UError::map)?,
         })
     }
 }

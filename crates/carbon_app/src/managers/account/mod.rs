@@ -1,17 +1,10 @@
-use crate::{
-    api::keys::account::*,
-    db,
-    managers::{account::enroll::InvalidateCtx, ManagersInner},
-};
+use crate::{api::keys::account::*, db, managers::account::enroll::InvalidateCtx};
 use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{chrono::DateTime, QueryError};
 use rspc::ErrorCode;
-use std::{
-    mem,
-    sync::{Arc, Weak},
-};
+use std::mem;
 
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -21,7 +14,7 @@ use self::{
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{AppError, AppRef};
+use super::AppRef;
 
 pub mod api;
 mod enroll;

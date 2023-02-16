@@ -6,7 +6,7 @@ use matchout::Extract;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use crate::error::RequestError;
+use crate::error::{request::RequestError, UError};
 
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
@@ -26,7 +26,7 @@ pub enum EnrollmentStatus {
     McLogin,
     PopulateAccount,
     Complete(FullAccount),
-    Failed(EnrollmentError),
+    Failed(UError<EnrollmentError>),
 }
 
 impl EnrollmentTask {
@@ -47,18 +47,25 @@ impl EnrollmentTask {
 
             let task = || async {
                 // request device code
-                let device_code = DeviceCode::request_code(&client).await?;
+                let device_code = DeviceCode::request_code(&client)
+                    .await
+                    .map_err(UError::map)?;
 
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
-                let ms_auth = device_code.poll_ms_auth(&client).await?;
+                let ms_auth = device_code
+                    .poll_ms_auth(&client)
+                    .await
+                    .map_err(UError::map)?;
 
                 // authenticate with MC
                 update_status(EnrollmentStatus::McLogin).await;
-                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
+                let mc_auth = McAuth::auth_ms(&ms_auth, &client)
+                    .await
+                    .map_err(UError::map)?;
 
                 update_status(EnrollmentStatus::PopulateAccount).await;
-                let populated = mc_auth.populate(&client).await?;
+                let populated = mc_auth.populate(&client).await.map_err(UError::map)?;
 
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
@@ -123,6 +130,8 @@ mod test {
     use async_trait::async_trait;
     use tokio::sync::RwLock;
 
+    use crate::managers::account::enroll::EnrollmentStatus;
+
     use super::InvalidateCtx;
 
     use super::EnrollmentTask;
@@ -138,17 +147,12 @@ mod test {
         #[async_trait]
         impl InvalidateCtx for Printer {
             async fn invalidate(&self) {
-                println!(
-                    "Invalidate: {:#?}",
-                    self.enrollment
-                        .read()
-                        .await
-                        .as_ref()
-                        .unwrap()
-                        .status
-                        .read()
-                        .await
-                );
+                let enrollment1 = self.enrollment.read().await;
+                let enrollment = enrollment1.as_ref().unwrap().status.read().await;
+                if let EnrollmentStatus::Failed(e) = &*enrollment {
+                    println!("{e}");
+                }
+                println!("Invalidate: {enrollment:#?}",);
             }
         }
 
