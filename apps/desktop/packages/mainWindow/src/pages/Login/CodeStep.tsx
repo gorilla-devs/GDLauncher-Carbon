@@ -97,7 +97,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="mb-0 mt-2 text-[#E54B4B]">
+            <p class="mt-2 text-[#E54B4B] mb-0">
               <Trans
                 key="code_expired_message"
                 options={{

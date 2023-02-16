@@ -51,7 +51,7 @@ const Version = (props: Props) => {
             <div class="flex flex-col">
               <p class="mt-0 mb-2">{props.version.title}</p>
               <div class="flex gap-2">
-                <div class="m-0 text-shade-3 text-sm flex items-center gap-2">
+                <div class="m-0 text-sm flex items-center gap-2 text-shade-3">
                   {props.version.modloader} {props.version.mcversion}
                   <div class="h-2 w-px bg-shade-3" />
                   <p class="m-0 text-shade-3 text-md">
