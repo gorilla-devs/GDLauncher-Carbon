@@ -1,29 +1,8 @@
-use crate::db;
-use crate::db::app_configuration::SetParam::SetTheme;
-use crate::db::app_configuration::UniqueWhereParam;
-use crate::managers::persistence::PersistenceManagerError;
-use crate::managers::settings::ConfigurationManagerError::AppConfigurationNotFound;
+use crate::error::UnexpectedError;
 use log::trace;
-use prisma_client_rust::QueryError;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-use super::{AppRef, Managers};
-
-#[derive(Error, Debug)]
-pub enum ConfigurationManagerError {
-    #[error("error raised while executing query : ")]
-    ThemeNotFound,
-
-    #[error("error raised while executing query ")]
-    AppConfigurationNotFound,
-
-    #[error("error : {0}")]
-    PersistenceManagerError(#[from] PersistenceManagerError),
-
-    #[error("error raised while executing query : {0}")]
-    QueryError(#[from] QueryError),
-}
+use super::AppRef;
 
 #[derive(Serialize, Deserialize, Ord, PartialOrd, PartialEq, Eq)]
 pub struct AppConfiguration {
@@ -46,36 +25,31 @@ impl ConfigurationManager {
         &self.app
     }
 
-    pub async fn get_theme(&self) -> Result<String, ConfigurationManagerError> {
+    pub async fn get_theme(&self) -> Result<String, UnexpectedError> {
         trace!("retrieving current theme from db");
-        let app_config = self
+
+        Ok(self
             .app
             .upgrade()
             .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
+            .configuration()
+            .get()
             .await?
-            .ok_or(AppConfigurationNotFound)?;
-        let theme = app_config.theme;
-        trace!("retrieved current theme from db : {theme}");
-        Ok(theme)
+            .theme)
     }
 
-    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
-        trace!("writing theme in db : {theme}");
+    pub async fn set_theme(&self, theme: String) -> Result<(), UnexpectedError> {
+        use crate::db::app_configuration::SetParam::SetTheme;
+
+        trace!("writing theme in db: {theme}");
+
         self.app
             .upgrade()
             .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
-            .exec()
+            .configuration()
+            .set(SetTheme(theme))
             .await?;
-        trace!("wrote theme into db");
+
         Ok(())
     }
 }

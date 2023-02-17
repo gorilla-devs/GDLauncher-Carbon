@@ -1,8 +1,13 @@
-use crate::{api::keys::account::*, db, managers::account::enroll::InvalidateCtx};
+use crate::{
+    api::keys::account::*,
+    db,
+    error::{HandlingActions, UError, UResult, UnexpectedError},
+    managers::account::enroll::InvalidateCtx,
+};
 use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
-use prisma_client_rust::{chrono::DateTime, QueryError};
+use prisma_client_rust::{chrono::DateTime, prisma_errors::query_engine::RecordNotFound};
 use rspc::ErrorCode;
 use std::mem;
 
@@ -38,42 +43,32 @@ impl AccountManager {
         &self.app
     }
 
-    pub async fn get_active_uuid(&self) -> Result<Option<String>, AccountError> {
+    pub async fn get_active_uuid(&self) -> Result<Option<String>, UnexpectedError> {
         Ok(self
             .app
             .upgrade()
             .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
+            .configuration()
+            .get()
             .await?
-            .ok_or(AccountError::AppConfigurationNotFound)?
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), AccountError> {
-        use db::app_configuration::{SetParam::SetActiveAccountUuid, UniqueWhereParam};
+    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), UnexpectedError> {
+        use db::app_configuration::SetParam::SetActiveAccountUuid;
 
         self.app
             .upgrade()
             .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .update(
-                UniqueWhereParam::IdEquals(0),
-                vec![SetActiveAccountUuid(uuid)],
-            )
-            .exec()
+            .configuration()
+            .set(SetActiveAccountUuid(uuid))
             .await?;
 
         self.app.upgrade().invalidate(GET_ACTIVE_UUID, None);
         Ok(())
     }
 
-    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, AccountError> {
+    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, UnexpectedError> {
         Ok(self
             .app
             .upgrade()
@@ -83,13 +78,14 @@ impl AccountManager {
             .account()
             .find_many(Vec::new())
             .exec()
-            .await?)
+            .await
+            .map_err(UnexpectedError::map(HandlingActions::None))?)
     }
 
-    pub async fn get_account_list(&self) -> Result<Vec<Account>, AccountError> {
+    pub async fn get_account_list(&self) -> Result<Vec<Account>, UnexpectedError> {
         let accounts = self.get_account_entries().await?;
 
-        accounts
+        Ok(accounts
             .into_iter()
             .map(|account| {
                 let type_ = match &account.ms_refresh_token {
@@ -97,19 +93,19 @@ impl AccountManager {
                     Some(_) => AccountType::Microsoft,
                 };
 
-                Ok(Account {
+                Account {
                     username: account.username,
                     uuid: account.uuid,
                     type_,
-                })
+                }
             })
-            .collect::<Result<_, _>>()
+            .collect())
     }
 
     pub async fn get_account_status(
         &self,
         uuid: String,
-    ) -> Result<Option<AccountStatus>, AccountError> {
+    ) -> Result<Option<AccountStatus>, UnexpectedError> {
         use db::account::UniqueWhereParam;
 
         let account = self
@@ -121,15 +117,16 @@ impl AccountManager {
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
             .exec()
-            .await?;
+            .await
+            .map_err(UnexpectedError::map(HandlingActions::None))?;
 
         let status = match account {
             Some(account) => Some(match account.ms_refresh_token {
                 None => AccountStatus::Ok { access_token: None },
                 Some(_) => {
-                    let token_expires = account
-                        .token_expires
-                        .ok_or(AccountError::DbError(AccountDbError::ExpiryUnset))?;
+                    let token_expires = account.token_expires.ok_or_else(|| {
+                        UnexpectedError::direct("account token expiry unset", HandlingActions::None)
+                    })?;
 
                     let refreshing = self
                         .currently_refreshing
@@ -140,9 +137,12 @@ impl AccountManager {
                     if refreshing {
                         AccountStatus::Refreshing
                     } else if token_expires < Utc::now() {
-                        let access_token = account
-                            .access_token
-                            .ok_or(AccountError::DbError(AccountDbError::TokenUnset))?;
+                        let access_token = account.access_token.ok_or_else(|| {
+                            UnexpectedError::direct(
+                                "account access token unset",
+                                HandlingActions::None,
+                            )
+                        })?;
 
                         AccountStatus::Ok {
                             access_token: Some(access_token),
@@ -158,7 +158,7 @@ impl AccountManager {
         Ok(status)
     }
 
-    async fn add_account(&self, account: FullAccount) -> Result<(), AccountError> {
+    async fn add_account(&self, account: FullAccount) -> Result<(), UnexpectedError> {
         use db::account::SetParam;
 
         let set_params = match account.type_ {
@@ -182,16 +182,18 @@ impl AccountManager {
             .account()
             .create(account.uuid, account.username, set_params)
             .exec()
-            .await?;
+            .await
+            .map_err(UnexpectedError::map(HandlingActions::None))?;
 
         self.app.upgrade().invalidate(GET_ACCOUNTS, None);
         Ok(())
     }
 
-    pub async fn delete_account(&self, uuid: String) -> Result<(), AccountError> {
+    pub async fn delete_account(&self, uuid: String) -> Result<bool, UnexpectedError> {
         use db::account::UniqueWhereParam;
 
-        self.app
+        let result = self
+            .app
             .upgrade()
             .persistence_manager
             .get_db_client()
@@ -199,13 +201,25 @@ impl AccountManager {
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()
-            .await?;
+            .await;
 
-        self.app.upgrade().invalidate(GET_ACCOUNTS, None);
-        self.app
-            .upgrade()
-            .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
-        Ok(())
+        match result {
+            Ok(_) => {
+                self.app.upgrade().invalidate(GET_ACCOUNTS, None);
+                self.app
+                    .upgrade()
+                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+
+                Ok(true)
+            }
+            Err(e) => {
+                if e.is_prisma_error::<RecordNotFound>() {
+                    Ok(false)
+                } else {
+                    Err(UnexpectedError::new(e, HandlingActions::None))
+                }
+            }
+        }
     }
 
     pub async fn begin_enrollment(&self) -> Result<(), EnrollmentError> {
@@ -250,11 +264,11 @@ impl AccountManager {
         }
     }
 
-    pub async fn finalize_enrollment(&self) -> Result<(), EnrollmentError> {
+    pub async fn finalize_enrollment(&self) -> UResult<(), EnrollmentError> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
-            None => Err(EnrollmentError::NotActive),
+            None => Err(EnrollmentError::NotActive)?,
             Some(enrollment) => {
                 let mut status = EnrollmentStatus::RequestingCode;
                 mem::swap(&mut *enrollment.status.write().await, &mut status);
@@ -272,46 +286,19 @@ impl AccountManager {
                                 refresh_token: account.ms.refresh_token,
                             },
                         })
-                        .await?;
+                        .await
+                        .map_err(UError::Unexpected)?;
 
-                        self.set_active_uuid(Some(account.mc.profile.uuid)).await?;
+                        self.set_active_uuid(Some(account.mc.profile.uuid))
+                            .await
+                            .map_err(UError::Unexpected)?;
 
                         Ok(())
                     }
-                    _ => Err(EnrollmentError::NotComplete),
+                    _ => Err(EnrollmentError::NotComplete)?,
                 }
             }
         }
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum AccountError {
-    #[error("app configuration not found")]
-    AppConfigurationNotFound,
-
-    #[error("executed invalid query: {0}")]
-    QueryError(#[from] QueryError),
-
-    #[error("database error: {0}")]
-    DbError(#[from] AccountDbError),
-}
-
-#[derive(Error, Debug)]
-pub enum AccountDbError {
-    #[error("ms account access token unset")]
-    TokenUnset,
-
-    #[error("ms account access token exiry date unset")]
-    ExpiryUnset,
-}
-
-impl From<AccountError> for rspc::Error {
-    fn from(value: AccountError) -> Self {
-        rspc::Error::new(
-            ErrorCode::InternalServerError,
-            format!("Account Query Error: {}", value),
-        )
     }
 }
 
@@ -325,9 +312,6 @@ pub enum EnrollmentError {
 
     #[error("enrollment not complete")]
     NotComplete,
-
-    #[error("account error: {0}")]
-    AccountError(#[from] AccountError),
 }
 
 impl From<EnrollmentError> for rspc::Error {

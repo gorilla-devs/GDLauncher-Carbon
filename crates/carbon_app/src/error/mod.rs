@@ -43,15 +43,11 @@ impl<E: StdError> UError<E> {
     }
 }
 
-pub trait Unexpected<T, E: StdError> {
-    fn unexpected(self, actions: HandlingActions) -> UResult<T, E>;
-}
-
-impl<T, E: StdError> Unexpected<T, E> for StdResult<T, E> {
-    fn unexpected(self, actions: HandlingActions) -> UResult<T, E> {
-        match self {
-            Ok(x) => Ok(x),
-            Err(e) => Err(UError::Unexpected(UnexpectedError::new(e, actions))),
+impl<E: StdError + Into<rspc::Error>> From<UError<E>> for rspc::Error {
+    fn from(value: UError<E>) -> Self {
+        match value {
+            UError::Expected(e) => e.into(),
+            UError::Unexpected(e) => e.into(),
         }
     }
 }
@@ -79,6 +75,22 @@ impl UnexpectedError {
             actions,
         }
     }
+
+    /// Create an UnexpectedError directly from a string. If using this function
+    /// in a chain, make sure you use the closure variant (e.g. `ok_or_else` vs `ok_or`)
+    /// as this type is expensive to create.
+    pub fn direct<S: AsRef<str>>(error: S, actions: HandlingActions) -> Self {
+        Self {
+            debug: format!("UnexpectedError::Unwrap({})", error.as_ref()),
+            display: String::from(error.as_ref()),
+            trace: format!("{:?}", Backtrace::new()),
+            actions,
+        }
+    }
+
+    pub fn map<E: StdError>(actions: HandlingActions) -> impl Fn(E) -> UnexpectedError {
+        move |e| Self::new(e, actions)
+    }
 }
 
 impl Debug for UnexpectedError {
@@ -95,6 +107,15 @@ impl Debug for UnexpectedError {
 impl Display for UnexpectedError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.display)
+    }
+}
+
+impl From<UnexpectedError> for rspc::Error {
+    fn from(value: UnexpectedError) -> Self {
+        Self::new(
+            rspc::ErrorCode::InternalServerError,
+            serde_json::to_string(&value).expect("UnexpectedError failed to serialize"),
+        )
     }
 }
 

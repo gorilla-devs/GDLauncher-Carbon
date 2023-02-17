@@ -1,13 +1,12 @@
-use crate::db::PrismaClient;
-use log::trace;
-use std::{
-    path::Path,
-    sync::{Arc, Weak},
+use crate::{
+    db::{app_configuration, PrismaClient},
+    error::{HandlingActions, UnexpectedError},
 };
+use log::trace;
+use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::RwLock;
 
-use super::{AppRef, Managers};
+use super::AppRef;
 
 mod database;
 
@@ -37,5 +36,48 @@ impl PersistenceManager {
     pub async fn get_db_client(&self) -> Arc<PrismaClient> {
         trace!("retrieving db client");
         self.db_client.clone()
+    }
+
+    pub fn configuration(&self) -> Configuration {
+        Configuration {
+            persistance_manager: self,
+        }
+    }
+}
+
+pub struct Configuration<'a> {
+    persistance_manager: &'a PersistenceManager,
+}
+
+impl Configuration<'_> {
+    pub async fn get(self) -> Result<app_configuration::Data, UnexpectedError> {
+        Ok(self
+            .persistance_manager
+            .get_db_client()
+            .await
+            .app_configuration()
+            .find_unique(app_configuration::id::equals(0))
+            .exec()
+            .await
+            .map_err(UnexpectedError::map(HandlingActions::None))?
+            .ok_or_else(|| {
+                UnexpectedError::direct("config entry missing in database", HandlingActions::None)
+            })?)
+    }
+
+    pub async fn set(self, value: app_configuration::SetParam) -> Result<(), UnexpectedError> {
+        self.persistance_manager
+            .get_db_client()
+            .await
+            .app_configuration()
+            .update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![value],
+            )
+            .exec()
+            .await
+            .map_err(UnexpectedError::map(HandlingActions::None))?;
+
+        Ok(())
     }
 }

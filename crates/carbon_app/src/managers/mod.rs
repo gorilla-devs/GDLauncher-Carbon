@@ -2,7 +2,7 @@ use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::managers::persistence::PersistenceManager;
-use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
+use crate::managers::settings::ConfigurationManager;
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
 use std::sync::{Arc, Weak};
@@ -118,27 +118,6 @@ impl ManagersInner {
 
     pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
         self.invalidation_channel.subscribe().recv().await
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum ApiError {
-    #[error("configuration error raised : ${0}")]
-    ConfigurationManagerError(#[from] ConfigurationManagerError),
-
-    #[error("app not found in ctx")]
-    AppNotFound(),
-}
-
-impl Into<rspc::Error> for ApiError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
-    }
-}
-
-impl Into<rspc::Error> for ConfigurationManagerError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
     }
 }
 
