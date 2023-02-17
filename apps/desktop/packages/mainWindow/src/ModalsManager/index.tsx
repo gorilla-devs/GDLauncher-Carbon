@@ -21,11 +21,11 @@ const defaultModals = {
     component: lazy(() => import("./modals/TermsAndConditions")),
     title: "Terms and Conditions",
   },
-  addjava: {
+  addJava: {
     component: lazy(() => import("./modals/Java/AddJava")),
     title: "Add java version",
   },
-  javasetup: {
+  javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: "Java Setup",
   },
@@ -39,7 +39,6 @@ export type ModalProps = {
   title: string;
   noHeader?: boolean;
   isVisible?: boolean;
-  opacity?: number;
 };
 
 type Hash = {
@@ -92,17 +91,13 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const manager = {
     openModal: (modal: OpenModalPath | OpenModalName) => {
-      const urlPathRegex =
-        /^\/[a-zA-Z0-9-_]+(?:\/[a-zA-Z0-9-_]+)*(?:\?[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+(?:&[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+)*)?$/;
-
       const modalParamRegex = /m=([^&]+)/;
 
       if (isPath(modal)) {
-        const isActualPath = () => urlPathRegex.test(modal.url);
         const mParam = () => modal.url.match(modalParamRegex)?.[1];
         const isModal = () => mParam() !== null;
 
-        if (isActualPath() && isModal()) {
+        if (isModal()) {
           setIsRoute(true);
           navigate(modal.url);
         }
@@ -121,7 +116,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   createEffect(() => {
     if (mParam() && mParam() !== modalType() && isRoute()) {
-      setModalType(mParam() || "");
+      setModalType(mParam() as string);
     }
   });
 
