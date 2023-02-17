@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
-use carbon_net::IntoVecDownloadable;
+use carbon_net::{IntoDownloadable, IntoVecDownloadable};
 use serde::{Deserialize, Serialize};
 
 // Need custom type to impl external traits for Vec<Library>
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Libraries {
-    #[serde(flatten)]
-    inner: Vec<Library>,
+    pub libraries: Vec<Library>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -107,6 +106,18 @@ pub struct MappingsClass {
     pub path: Option<String>,
 }
 
+impl IntoDownloadable for MappingsClass {
+    fn into_downloadable(self, base_path: &std::path::Path) -> carbon_net::Downloadable {
+        let jar_path = base_path
+            .join("clients")
+            .join(format!("{}.jar", &self.sha1));
+
+        carbon_net::Downloadable::new(self.url, jar_path)
+            .with_checksum(Some(carbon_net::Checksum::Sha1(self.sha1)))
+            .with_size(self.size)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JavaVersion {
     pub component: String,
@@ -114,7 +125,7 @@ pub struct JavaVersion {
     pub major_version: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Library {
     pub downloads: LibraryDownloads,
     /// Url only appears in some forge libraries apparently
@@ -129,7 +140,11 @@ impl IntoVecDownloadable for Libraries {
     fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
         let mut files = vec![];
 
-        for library in self.inner {
+        for library in self.libraries {
+            if !library.is_allowed() {
+                continue;
+            }
+
             let Some(artifact) = library.downloads.artifact else {
                 continue;
             };
@@ -141,7 +156,7 @@ impl IntoVecDownloadable for Libraries {
 
             files.push(carbon_net::Downloadable {
                 url: artifact.url,
-                path: PathBuf::from(path),
+                path: PathBuf::from(base_path).join(path),
                 checksum,
                 size: Some(artifact.size),
             })
@@ -212,25 +227,25 @@ pub struct Classifiers {
     #[serde(rename = "natives-osx")]
     pub natives_osx: Option<MappingsClass>,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Extract {
     pub exclude: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Natives {
     pub osx: Option<String>,
     pub linux: Option<String>,
     pub windows: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LibraryRule {
     pub action: Action,
     pub os: Option<LibOs>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LibOs {
     pub name: Name,
 }
@@ -269,7 +284,7 @@ pub enum JvmElement {
     String(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Action {
     #[serde(rename = "allow")]
     Allow,
@@ -277,7 +292,7 @@ pub enum Action {
     Disallow,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Name {
     #[serde(rename = "osx")]
     Osx,

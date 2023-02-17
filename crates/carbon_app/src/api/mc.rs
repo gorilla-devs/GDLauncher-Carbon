@@ -50,7 +50,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         }
 
         query TEMP_TEST[app, _args: ()] {
-            Ok(app.minecraft_manager.gather_game_download_files_list("1.16.5".to_string()).await?)
+            Ok(app.minecraft_manager.get_game_download_files_list("1.16.5".to_string()).await?)
         }
 
         query GET_INSTANCES[_, _args: ()] {
