@@ -82,7 +82,6 @@ impl Parse for ExtractEnum {
                                     } else {
                                         let pattern =
                                             attr.parse_args_with(|input: ParseStream| {
-                                                println!("{}", attr.tokens.to_string());
                                                 ExtractPattern::parse(
                                                     input,
                                                     Some(&match field_ident {
