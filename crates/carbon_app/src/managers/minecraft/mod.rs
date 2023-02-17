@@ -1,12 +1,7 @@
-use super::{AppRef, Managers};
-use crate::db::{minecraft_manifest::SetParam, PrismaClient};
-use crate::managers::ManagersInner;
-use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
-use carbon_domain::minecraft::version::Library;
-use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
+use super::AppRef;
+use carbon_domain::minecraft::manifest::ManifestVersion;
+use carbon_net::{IntoDownloadable, IntoVecDownloadable};
 use rspc::ErrorCode;
-use std::path::PathBuf;
-use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 mod assets;

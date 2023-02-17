@@ -5,7 +5,7 @@ use prisma_client_rust::QueryError;
 use rspc::ErrorCode;
 use thiserror::Error;
 
-use crate::db::{minecraft_manifest::SetParam, PrismaClient};
+use crate::db::PrismaClient;
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
