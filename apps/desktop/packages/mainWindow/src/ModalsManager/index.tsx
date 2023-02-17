@@ -12,6 +12,29 @@ import {
 import { createStore } from "solid-js/store";
 import { Dynamic, Portal } from "solid-js/web";
 
+const defaultModals = {
+  privacyPolicy: {
+    component: lazy(() => import("./modals/Privacypolicy")),
+    title: "Privacy Policy",
+  },
+  termsAndConditions: {
+    component: lazy(() => import("./modals/TermsAndConditions")),
+    title: "Terms and Conditions",
+  },
+  addjava: {
+    component: lazy(() => import("./modals/Java/AddJava")),
+    title: "Add java version",
+  },
+  javasetup: {
+    component: lazy(() => import("./modals/Java/JavaSetup")),
+    title: "Java Setup",
+  },
+  acceptableUsePolicy: {
+    component: lazy(() => import("./modals/AcceptableUsePolicy")),
+    title: "Acceptable Use Policy",
+  },
+};
+
 export type ModalProps = {
   title: string;
   noHeader?: boolean;
@@ -30,8 +53,13 @@ type Hash = {
   };
 };
 
+type Modalskeys = keyof typeof defaultModals;
+
+type OpenModalPath = { url: string };
+type OpenModalName = { name: Modalskeys };
+
 type Context = {
-  openModal: (_modal: string) => void;
+  openModal: (_modal: OpenModalPath | OpenModalName) => void;
   closeModal: () => void;
 };
 
@@ -51,52 +79,36 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const noHeader = () => modals[modalType()]?.noHeader || false;
   const ModalComponent: any = () => modals[modalType()]?.component;
 
-  const defaultModals = {
-    privacyPolicy: {
-      component: lazy(() => import("./modals/Privacypolicy")),
-      title: "Privacy Policy",
-    },
-    termsAndConditions: {
-      component: lazy(() => import("./modals/TermsAndConditions")),
-      title: "Terms and Conditions",
-    },
-    addjava: {
-      component: lazy(() => import("./modals/Java/AddJava")),
-      title: "Add java version",
-    },
-    javasetup: {
-      component: lazy(() => import("./modals/Java/JavaSetup")),
-      title: "Java Setup",
-    },
-    acceptableUsePolicy: {
-      component: lazy(() => import("./modals/AcceptableUsePolicy")),
-      title: "Acceptable Use Policy",
-    },
-  };
-
   const title = () => modals[modalType()]?.title;
 
   const [modals] = createStore<Hash>(defaultModals);
 
-  type modalskeys = keyof typeof defaultModals;
+  function isPath(data: OpenModalPath | OpenModalName): data is OpenModalPath {
+    if ((data as OpenModalPath).url) {
+      return true;
+    }
+    return false;
+  }
 
   const manager = {
-    openModal: (modal: modalskeys | string) => {
+    openModal: (modal: OpenModalPath | OpenModalName) => {
       const urlPathRegex =
         /^\/[a-zA-Z0-9-_]+(?:\/[a-zA-Z0-9-_]+)*(?:\?[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+(?:&[a-zA-Z0-9-_]+=[a-zA-Z0-9-_]+)*)?$/;
 
       const modalParamRegex = /m=([^&]+)/;
 
-      const isPath = () => urlPathRegex.test(modal);
-      const mParam = () => modal.match(modalParamRegex)?.[1];
-      const isModal = () => mParam() !== null;
+      if (isPath(modal)) {
+        const isActualPath = () => urlPathRegex.test(modal.url);
+        const mParam = () => modal.url.match(modalParamRegex)?.[1];
+        const isModal = () => mParam() !== null;
 
-      if (isPath() && isModal()) {
-        setIsRoute(true);
-        navigate(modal);
+        if (isActualPath() && isModal()) {
+          setIsRoute(true);
+          navigate(modal.url);
+        }
       } else {
         setIsRoute(false);
-        setModalType(modal);
+        setModalType(modal.name);
         setIsVisible(true);
       }
     },

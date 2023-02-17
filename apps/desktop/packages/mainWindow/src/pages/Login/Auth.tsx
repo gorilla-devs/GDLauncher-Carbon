@@ -52,7 +52,7 @@ const Auth = (_props: Props) => {
           <li
             class="cursor-pointer"
             onClick={() => {
-              modalsContext?.openModal("privacyPolicy");
+              modalsContext?.openModal({ name: "privacyPolicy" });
             }}
           >
             {t("privacy_policy")}
@@ -60,14 +60,16 @@ const Auth = (_props: Props) => {
           <li
             class="cursor-pointer"
             onClick={() => {
-              modalsContext?.openModal("/library/DDAEDF?m=termsAndConditions");
+              modalsContext?.openModal({
+                url: "/library/DDAEDF?m=termsAndConditions",
+              });
             }}
           >
             {t("terms_and_conditions")}
           </li>
           <li
             class="cursor-pointer"
-            onClick={() => modalsContext?.openModal("privacyPolicy")}
+            onClick={() => modalsContext?.openModal({ name: "privacyPolicy" })}
           >
             {t("acceptable_use_policy")}
           </li>

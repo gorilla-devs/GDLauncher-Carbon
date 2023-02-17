@@ -9,7 +9,7 @@ const TermsAndConditions = (props: ModalProps) => {
       <div class="h-130 w-190">
         <button
           onClick={() => {
-            modalsManager?.openModal("privacyPolicy");
+            modalsManager?.openModal({ name: "privacyPolicy" });
           }}
         >
           OPEN
