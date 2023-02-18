@@ -92,7 +92,8 @@ impl DeviceCode {
                     match response.json::<BadRequestError>().await {
                         Ok(BadRequestError { error }) => match &error as &str {
                             "authorization_pending" => continue,
-                            _ => Err(DeviceCodePollError(RequestError {
+                            "expired_token" => Err(DeviceCodePollError::CodeExpired)?,
+                            _ => Err(DeviceCodePollError::RequestError(RequestError {
                                 context: RequestContext::none(),
                                 error: RequestErrorDetails::UnexpectedStatus {
                                     status: StatusCode::BAD_REQUEST,
@@ -121,7 +122,7 @@ impl DeviceCode {
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     });
                 }
-                _ => Err(DeviceCodePollError(RequestError::from_status(&response)))?,
+                _ => Err(DeviceCodePollError::RequestError(RequestError::from_status(&response)))?,
             }
         }
     }
@@ -132,8 +133,12 @@ impl DeviceCode {
 pub struct DeviceCodeRequestError(#[from] pub RequestError);
 
 #[derive(Error, Debug, Clone)]
-#[error("request error: {0}")]
-pub struct DeviceCodePollError(#[from] pub RequestError);
+pub enum DeviceCodePollError {
+    #[error("request error: {0}")]
+    RequestError(#[from] RequestError),
+    #[error("device code expired")]
+    CodeExpired,
+}
 
 #[derive(Debug, Clone)]
 pub struct MsAuth {

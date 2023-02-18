@@ -107,10 +107,14 @@ pub trait InvalidateCtx {
 pub enum EnrollmentError {
     #[error("request error: {0}")]
     #[extract(DeviceCodeRequestError(self.0))]
-    #[extract(DeviceCodePollError(self.0))]
+    #[extract(DeviceCodePollError::RequestError(self.0))]
     #[extract(McAuthError::Request(self.0))]
     #[extract(McAccountPopulateError::Request(self.0))]
     Request(RequestError),
+
+    #[error("device code expired")]
+    #[extract(DeviceCodePollError::CodeExpired)]
+    CodeExpired,
 
     #[error("error getting xbox auth: {0}")]
     XboxAuth(#[extract(McAuthError::Xbox)] XboxError),
