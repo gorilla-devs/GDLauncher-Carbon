@@ -2,7 +2,7 @@ use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
+use crate::managers::configuration::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
 use std::sync::{Arc, Weak};
@@ -13,9 +13,9 @@ use self::account::AccountManager;
 use self::minecraft::MinecraftManager;
 
 pub mod account;
+mod configuration;
 mod minecraft;
 mod prisma_client;
-mod settings;
 
 pub type Managers = Arc<ManagersInner>;
 
