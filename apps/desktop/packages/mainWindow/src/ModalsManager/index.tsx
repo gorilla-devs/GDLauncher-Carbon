@@ -70,9 +70,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const [isRoute, setIsRoute] = createSignal(false);
 
   const location = useLocation();
-  const queryParams = () => location.search;
+  const queryParams = () => location.search as Modalskeys;
   const mParam = () => new URLSearchParams(queryParams()).get("m");
-  const [modalType, setModalType] = createSignal(mParam() || "");
+  const [modalType, setModalType] = createSignal<Modalskeys>(
+    mParam() as Modalskeys
+  );
   const isModal = () => mParam() !== null;
 
   const noHeader = () => modals[modalType()]?.noHeader || false;
@@ -94,7 +96,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       const modalParamRegex = /m=([^&]+)/;
 
       if (isPath(modal)) {
-        const mParam = () => modal.url.match(modalParamRegex)?.[1];
+        const mParam = () =>
+          modal.url.match(modalParamRegex)?.[1] as Modalskeys;
         const isModal = () => mParam() !== null;
 
         if (isModal()) {
@@ -109,14 +112,13 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     },
     closeModal: () => {
       setIsRoute(false);
-      setModalType("");
       setIsVisible(false);
     },
   };
 
   createEffect(() => {
     if (mParam() && mParam() !== modalType() && isRoute()) {
-      setModalType(mParam() as string);
+      setModalType(mParam() as Modalskeys);
     }
   });
 

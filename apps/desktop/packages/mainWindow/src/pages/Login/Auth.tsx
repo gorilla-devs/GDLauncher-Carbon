@@ -68,7 +68,9 @@ const Auth = (_props: Props) => {
           </li>
           <li
             class="cursor-pointer"
-            onClick={() => modalsContext?.openModal({ name: "privacyPolicy" })}
+            onClick={() =>
+              modalsContext?.openModal({ name: "acceptableUsePolicy" })
+            }
           >
             {t("acceptable_use_policy")}
           </li>
