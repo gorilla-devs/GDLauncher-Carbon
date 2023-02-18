@@ -54,11 +54,10 @@ type Hash = {
 
 type Modalskeys = keyof typeof defaultModals;
 
-type OpenModalPath = { url: string };
-type OpenModalName = { name: Modalskeys };
+type OpenModal = { name: Modalskeys; url?: string };
 
 type Context = {
-  openModal: (_modal: OpenModalPath | OpenModalName) => void;
+  openModal: (_modal: OpenModal) => void;
   closeModal: () => void;
 };
 
@@ -84,31 +83,23 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const [modals] = createStore<Hash>(defaultModals);
 
-  function isPath(data: OpenModalPath | OpenModalName): data is OpenModalPath {
-    if ((data as OpenModalPath).url) {
-      return true;
-    }
-    return false;
-  }
-
   const manager = {
-    openModal: (modal: OpenModalPath | OpenModalName) => {
+    openModal: (modal: OpenModal) => {
       const modalParamRegex = /m=([^&]+)/;
 
-      if (isPath(modal)) {
-        const mParam = () =>
-          modal.url.match(modalParamRegex)?.[1] as Modalskeys;
-        const isModal = () => mParam() !== null;
+      if (modal.url) {
+        const mParam = modal.url.match(modalParamRegex)?.[1] as Modalskeys;
+        const isModal = mParam !== null;
 
-        if (isModal()) {
+        if (isModal) {
           setIsRoute(true);
           navigate(modal.url);
         }
-      } else {
-        setIsRoute(false);
-        setModalType(modal.name);
-        setIsVisible(true);
       }
+
+      setIsRoute(false);
+      setModalType(modal.name);
+      setIsVisible(true);
     },
     closeModal: () => {
       setIsRoute(false);

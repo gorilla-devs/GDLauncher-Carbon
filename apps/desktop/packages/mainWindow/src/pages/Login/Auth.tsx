@@ -60,7 +60,8 @@ const Auth = (_props: Props) => {
             class="cursor-pointer"
             onClick={() => {
               modalsContext?.openModal({
-                url: "/library/DDAEDF?m=termsAndConditions",
+                name: "termsAndConditions",
+                url: "/library/DDAEDF",
               });
             }}
           >
