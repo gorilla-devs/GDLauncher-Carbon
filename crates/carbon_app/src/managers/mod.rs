@@ -1,7 +1,7 @@
 use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
-use crate::managers::persistence::PersistenceManager;
+use crate::db::PrismaClient;
 use crate::managers::settings::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
@@ -14,7 +14,7 @@ use self::minecraft::MinecraftManager;
 
 pub mod account;
 mod minecraft;
-mod persistence;
+mod prisma_client;
 mod settings;
 
 pub type Managers = Arc<ManagersInner>;
@@ -28,11 +28,11 @@ pub enum AppError {
 pub struct ManagersInner {
     //instances: Instances,
     pub(crate) configuration_manager: ConfigurationManager,
-    pub(crate) persistence_manager: PersistenceManager,
     pub(crate) minecraft_manager: MinecraftManager,
     pub(crate) account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
     pub(crate) reqwest_client: reqwest::Client,
+    pub(crate) prisma_client: Arc<PrismaClient>,
 }
 
 pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
@@ -77,13 +77,15 @@ impl ManagersInner {
     pub async fn new_with_invalidation_channel(
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
     ) -> Managers {
+        let db_client = prisma_client::load_and_migrate().await.unwrap();
+
         let app = Arc::new(ManagersInner {
             configuration_manager: ConfigurationManager::new(),
-            persistence_manager: PersistenceManager::new().await,
             minecraft_manager: MinecraftManager::new(),
             account_manager: AccountManager::new(),
             invalidation_channel,
             reqwest_client: reqwest::Client::new(),
+            prisma_client: Arc::new(db_client),
         });
 
         let weak = Arc::downgrade(&app);
@@ -96,9 +98,8 @@ impl ManagersInner {
         // CANNOT be safely accessed inside of this block.
         unsafe {
             app.configuration_manager.get_appref().init(weak.clone());
-            app.persistence_manager.get_appref().init(weak.clone());
             app.minecraft_manager.get_appref().init(weak.clone());
-            app.account_manager.get_appref().init(weak.clone());
+            app.account_manager.get_appref().init(weak);
         }
 
         app

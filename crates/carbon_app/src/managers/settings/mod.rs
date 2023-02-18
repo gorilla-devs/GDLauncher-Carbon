@@ -1,14 +1,13 @@
 use crate::db;
 use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
-use crate::managers::persistence::PersistenceManagerError;
 use crate::managers::settings::ConfigurationManagerError::AppConfigurationNotFound;
 use log::trace;
 use prisma_client_rust::QueryError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{AppRef, Managers};
+use super::AppRef;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
@@ -17,9 +16,6 @@ pub enum ConfigurationManagerError {
 
     #[error("error raised while executing query ")]
     AppConfigurationNotFound,
-
-    #[error("error : {0}")]
-    PersistenceManagerError(#[from] PersistenceManagerError),
 
     #[error("error raised while executing query : {0}")]
     QueryError(#[from] QueryError),
@@ -51,9 +47,7 @@ impl ConfigurationManager {
         let app_config = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .find_unique(db::app_configuration::id::equals(0))
             .exec()
@@ -68,9 +62,7 @@ impl ConfigurationManager {
         trace!("writing theme in db : {theme}");
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
             .exec()
