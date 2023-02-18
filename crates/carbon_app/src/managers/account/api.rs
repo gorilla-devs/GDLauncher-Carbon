@@ -122,7 +122,9 @@ impl DeviceCode {
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     });
                 }
-                _ => Err(DeviceCodePollError::RequestError(RequestError::from_status(&response)))?,
+                _ => Err(DeviceCodePollError::RequestError(
+                    RequestError::from_status(&response),
+                ))?,
             }
         }
     }
