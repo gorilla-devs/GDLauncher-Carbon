@@ -123,6 +123,9 @@ mod tests {
         let coordinates = "com.example:example:1.0.0".to_string();
         let parsed_coordinates = MavenCoordinates::try_from(coordinates).unwrap();
         let path = parsed_coordinates.into_pathbuf();
-        assert_eq!(path, PathBuf::from("com.example/example/1.0.0"));
+        assert_eq!(
+            path,
+            PathBuf::from("com.example").join("example").join("1.0.0")
+        );
     }
 }
