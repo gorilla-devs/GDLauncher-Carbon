@@ -31,5 +31,4 @@ regex = { workspace = true }
 [dev-dependencies]
 mockall = { workspace = true }
 env_logger = { workspace = true }
-temp-dir = { workspace = true }
 tracing-test = { workspace = true }
