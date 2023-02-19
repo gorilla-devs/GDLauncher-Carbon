@@ -1,6 +1,7 @@
 pub mod account;
 pub mod app;
 pub mod instance;
+pub mod maven;
 pub mod minecraft;
 mod minecraft_mod;
 mod minecraft_package;

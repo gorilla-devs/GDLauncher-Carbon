@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+use super::AppRef;
 use crate::db;
 use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
@@ -5,7 +8,7 @@ use log::trace;
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 
-use super::AppRef;
+pub mod runtime_path;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
@@ -19,12 +22,14 @@ pub enum ConfigurationManagerError {
 
 pub(crate) struct ConfigurationManager {
     app: AppRef,
+    runtime_path: runtime_path::RuntimePath,
 }
 
 impl ConfigurationManager {
-    pub fn new() -> Self {
+    pub fn new(runtime_path: PathBuf) -> Self {
         Self {
             app: AppRef::uninit(),
+            runtime_path: runtime_path::RuntimePath::new(runtime_path),
         }
     }
 

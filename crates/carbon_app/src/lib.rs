@@ -8,18 +8,16 @@ pub(crate) mod db;
 pub mod managers;
 
 pub mod generate_rspc_ts_bindings;
-mod runtime_directory;
+mod runtime_path_override;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
 pub fn init() {
-    use runtime_directory::set_runtime_directory_override;
     std::thread::spawn(|| {
         let runtime = tokio::runtime::Runtime::new();
         runtime
             .unwrap() /* This should never fail */
             .block_on(async {
-                set_runtime_directory_override().await;
                 start_router().await;
             })
     });
@@ -37,7 +35,9 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let app = ManagersInner::new_with_invalidation_channel(invalidation_sender).await;
+    let runtime_path = runtime_path_override::get_runtime_path_override().await;
+
+    let app = ManagersInner::new(invalidation_sender, runtime_path).await;
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())

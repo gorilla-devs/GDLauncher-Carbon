@@ -428,6 +428,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mockall",
+ "regex",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",

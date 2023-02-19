@@ -5,6 +5,7 @@ use crate::db::PrismaClient;
 use crate::managers::configuration::{ConfigurationManager, ConfigurationManagerError};
 use rspc::{ErrorCode, RouterBuilderLike};
 use std::cell::UnsafeCell;
+use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tokio::sync::broadcast::{self, error::RecvError};
@@ -74,13 +75,14 @@ impl Clone for AppRef {
 }
 
 impl ManagersInner {
-    pub async fn new_with_invalidation_channel(
+    pub async fn new(
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        runtime_path: PathBuf,
     ) -> Managers {
         let db_client = prisma_client::load_and_migrate().await.unwrap();
 
         let app = Arc::new(ManagersInner {
-            configuration_manager: ConfigurationManager::new(),
+            configuration_manager: ConfigurationManager::new(runtime_path),
             minecraft_manager: MinecraftManager::new(),
             account_manager: AccountManager::new(),
             invalidation_channel,
