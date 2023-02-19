@@ -14,7 +14,6 @@ impl RootPath {
 
 pub struct LibrariesPath(PathBuf);
 
-// TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
     pub fn get_library_pathbuf(&self, maven_coordinate: MavenCoordinates) -> PathBuf {
         self.0.join(maven_coordinate.into_pathbuf())
