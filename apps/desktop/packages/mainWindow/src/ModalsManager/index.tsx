@@ -1,7 +1,6 @@
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import {
   createContext,
-  createEffect,
   createSignal,
   JSX,
   lazy,
@@ -68,12 +67,12 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;
-  const mParam = () => new URLSearchParams(queryParams()).get("m");
-  const [modalType, setModalType] = createSignal<Modalskeys | null>(
-    mParam() as Modalskeys
-  );
+  const urlSearchParans = () => new URLSearchParams(queryParams());
+  const mParam = () => urlSearchParans().get("m");
 
-  const modalTypeIndex = () => modalType() || "";
+  const [_searchParams, setSearchParams] = useSearchParams();
+
+  const modalTypeIndex = () => mParam() || "";
   const noHeader = () => modals[modalTypeIndex()]?.noHeader || false;
   const ModalComponent: any = () => modals[modalTypeIndex()]?.component;
 
@@ -83,35 +82,27 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const manager = {
     openModal: (modal: OpenModal) => {
-      const modalParamRegex = /m=([^&]+)/;
-
       if (modal.url) {
-        const mParam = modal.url.match(modalParamRegex)?.[1] as Modalskeys;
-        const isModal = mParam !== null;
+        const url = new URLSearchParams(modal.url);
+        url.append("m", modal.name);
 
-        if (isModal) {
-          navigate(modal.url);
-        }
+        const decodedParamString = decodeURIComponent(url.toString());
+
+        navigate(decodedParamString.replace("=&", "?"));
+      } else {
+        setSearchParams({ m: modal.name });
       }
-
-      setModalType(modal.name);
     },
     closeModal: () => {
-      setModalType(null);
+      urlSearchParans()?.delete("m");
     },
   };
-
-  createEffect(() => {
-    if (mParam() && mParam() !== modalType()) {
-      setModalType(mParam() as Modalskeys);
-    }
-  });
 
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <Show when={modalType()}>
+        <Show when={mParam()}>
           <Suspense fallback={<p>Loading...</p>}>
             <Dynamic
               component={ModalComponent({ noHeader, title })}
