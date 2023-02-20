@@ -35,10 +35,21 @@ impl<E: StdError> From<E> for UError<E> {
 }
 
 impl<E: StdError> UError<E> {
+    /// Map a UError to a different UError type using the expected error
+    /// type's From impl.
     pub fn map<F: StdError + Into<E>>(value: UError<F>) -> Self {
         match value {
-            UError::Expected(x) => UError::Expected(x.into()),
-            UError::Unexpected(x) => UError::Unexpected(x),
+            UError::Expected(x) => Self::Expected(x.into()),
+            UError::Unexpected(x) => Self::Unexpected(x),
+        }
+    }
+
+    /// Convert a UError into an UnexpectedError by considering the Expected
+    /// type to be unexpected.
+    pub fn map_unexpected(actions: HandlingActions) -> impl Fn(Self) -> UnexpectedError {
+        move |error| match error {
+            Self::Expected(e) => UnexpectedError::new(e, actions),
+            Self::Unexpected(e) => e,
         }
     }
 }
@@ -88,6 +99,7 @@ impl UnexpectedError {
         }
     }
 
+    /// Convert a normal error to an UnexpectedError
     pub fn map<E: StdError>(actions: HandlingActions) -> impl Fn(E) -> UnexpectedError {
         move |e| Self::new(e, actions)
     }

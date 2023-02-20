@@ -1,6 +1,6 @@
 use crate::{
     api::keys::account::*,
-    db,
+    db::{self, read_filters::StringFilter},
     error::{HandlingActions, UError, UResult, UnexpectedError},
     managers::account::enroll::InvalidateCtx,
 };
@@ -54,15 +54,37 @@ impl AccountManager {
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), UnexpectedError> {
+    pub async fn set_active_uuid(&self, uuid: Option<String>) -> UResult<(), SetAccountError> {
+        use db::account::WhereParam::Uuid;
         use db::app_configuration::SetParam::SetActiveAccountUuid;
+
+        if let Some(uuid) = uuid.clone() {
+            let account_entry = self
+                .app
+                .upgrade()
+                .persistence_manager
+                .get_db_client()
+                .await
+                .account()
+                .find_first(vec![Uuid(StringFilter::Equals(uuid))])
+                .exec()
+                .await
+                .map_err(UnexpectedError::map(HandlingActions::None))
+                .map_err(UError::Unexpected)?;
+
+            // Setting the active account to one not in the DB does not make sense.
+            if account_entry.is_none() {
+                return Err(UError::Expected(SetAccountError::NoAccount));
+            }
+        }
 
         self.app
             .upgrade()
             .persistence_manager
             .configuration()
             .set(SetActiveAccountUuid(uuid))
-            .await?;
+            .await
+            .map_err(UError::Unexpected)?;
 
         self.app.upgrade().invalidate(GET_ACTIVE_UUID, None);
         Ok(())
@@ -294,6 +316,9 @@ impl AccountManager {
 
                         self.set_active_uuid(Some(account.mc.profile.uuid))
                             .await
+                            // it makes no sense for the active account to be missing from the account list
+                            // immediately after adding it.
+                            .map_err(UError::map_unexpected(HandlingActions::None))
                             .map_err(UError::Unexpected)?;
 
                         Ok(())
@@ -323,6 +348,12 @@ pub enum DeleteAccountError {
     NoAccount,
 }
 
+#[derive(Error, Debug)]
+pub enum SetAccountError {
+    #[error("account does not exist and cannot be set as the active account")]
+    NoAccount,
+}
+
 impl From<EnrollmentError> for rspc::Error {
     fn from(value: EnrollmentError) -> Self {
         rspc::Error::new(
@@ -337,6 +368,15 @@ impl From<DeleteAccountError> for rspc::Error {
         rspc::Error::new(
             ErrorCode::InternalServerError,
             format!("Account Delete Error: {}", value),
+        )
+    }
+}
+
+impl From<SetAccountError> for rspc::Error {
+    fn from(value: SetAccountError) -> Self {
+        rspc::Error::new(
+            ErrorCode::InternalServerError,
+            format!("Account Set Error: {}", value),
         )
     }
 }
