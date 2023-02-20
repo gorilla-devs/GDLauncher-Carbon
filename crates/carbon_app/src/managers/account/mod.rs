@@ -189,7 +189,7 @@ impl AccountManager {
         Ok(())
     }
 
-    pub async fn delete_account(&self, uuid: String) -> Result<bool, UnexpectedError> {
+    pub async fn delete_account(&self, uuid: String) -> UResult<(), DeleteAccountError> {
         use db::account::UniqueWhereParam;
 
         let result = self
@@ -210,13 +210,13 @@ impl AccountManager {
                     .upgrade()
                     .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
-                Ok(true)
+                Ok(())
             }
             Err(e) => {
                 if e.is_prisma_error::<RecordNotFound>() {
-                    Ok(false)
+                    Err(UError::Expected(DeleteAccountError::NoAccount))
                 } else {
-                    Err(UnexpectedError::new(e, HandlingActions::None))
+                    Err(UError::Unexpected(UnexpectedError::new(e, HandlingActions::None)))
                 }
             }
         }
@@ -312,6 +312,12 @@ pub enum EnrollmentError {
 
     #[error("enrollment not complete")]
     NotComplete,
+}
+
+#[derive(Error, Debug)]
+pub enum DeleteAccountError {
+    #[error("account does not exist and cannot be deleted")]
+    NoAccount,
 }
 
 impl From<EnrollmentError> for rspc::Error {
