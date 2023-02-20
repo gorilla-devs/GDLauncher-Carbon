@@ -24,7 +24,7 @@ const Auth = (props: Props) => {
     },
   });
 
-  // let cancelMutation = rspc.createMutation(["account.enroll.finalize"], {});
+  // let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {});
 
   const handleClick = async () => {
     mutation.mutate(null);
@@ -49,7 +49,7 @@ const Auth = (props: Props) => {
         const error = data.Failed;
         setError(error);
       } else if ("Complete" in data) {
-        // navigate("/library");
+        navigate("/library");
       }
     }
   });

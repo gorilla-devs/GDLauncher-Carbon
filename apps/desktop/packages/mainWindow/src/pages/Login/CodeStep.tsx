@@ -64,7 +64,7 @@ const CodeStep = (props: Props) => {
       if (typeof data === "string") return;
       if ("Complete" in data) {
         // FINALIZE
-        // navigate("/library");
+        navigate("/library");
       } else if ("Faile" in data) {
         // DO SOMETHING
       }
