@@ -64,22 +64,20 @@ type Context = {
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const [isVisible, setIsVisible] = createSignal(false);
   const navigate = useNavigate();
-  const [isRoute, setIsRoute] = createSignal(false);
 
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;
   const mParam = () => new URLSearchParams(queryParams()).get("m");
-  const [modalType, setModalType] = createSignal<Modalskeys>(
+  const [modalType, setModalType] = createSignal<Modalskeys | null>(
     mParam() as Modalskeys
   );
-  const isModal = () => mParam() !== null;
 
-  const noHeader = () => modals[modalType()]?.noHeader || false;
-  const ModalComponent: any = () => modals[modalType()]?.component;
+  const modalTypeIndex = () => modalType() || "";
+  const noHeader = () => modals[modalTypeIndex()]?.noHeader || false;
+  const ModalComponent: any = () => modals[modalTypeIndex()]?.component;
 
-  const title = () => modals[modalType()]?.title;
+  const title = () => modals[modalTypeIndex()]?.title;
 
   const [modals] = createStore<Hash>(defaultModals);
 
@@ -92,36 +90,20 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         const isModal = mParam !== null;
 
         if (isModal) {
-          setIsRoute(true);
           navigate(modal.url);
         }
       }
 
-      setIsRoute(false);
       setModalType(modal.name);
-      setIsVisible(true);
     },
     closeModal: () => {
-      setIsRoute(false);
-      setIsVisible(false);
+      setModalType(null);
     },
   };
 
   createEffect(() => {
-    if (mParam() && mParam() !== modalType() && isRoute()) {
+    if (mParam() && mParam() !== modalType()) {
       setModalType(mParam() as Modalskeys);
-    }
-  });
-
-  createEffect(() => {
-    const visibility = isModal();
-    // When the URL changes, update the visibility of the modal after a timeout
-    if (visibility) {
-      setIsVisible(visibility);
-    } else {
-      setTimeout(() => {
-        setIsVisible(visibility);
-      }, 150);
     }
   });
 
@@ -129,7 +111,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <Show when={isVisible()}>
+        <Show when={modalType()}>
           <Suspense fallback={<p>Loading...</p>}>
             <Dynamic
               component={ModalComponent({ noHeader, title })}
