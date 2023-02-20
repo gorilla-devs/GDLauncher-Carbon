@@ -332,6 +332,15 @@ impl From<EnrollmentError> for rspc::Error {
     }
 }
 
+impl From<DeleteAccountError> for rspc::Error {
+    fn from(value: DeleteAccountError) -> Self {
+        rspc::Error::new(
+            ErrorCode::InternalServerError,
+            format!("Account Delete Error: {}", value),
+        )
+    }
+}
+
 struct FullAccount {
     username: String,
     uuid: String,
