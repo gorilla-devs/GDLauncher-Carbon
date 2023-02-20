@@ -53,7 +53,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             ))
         }
 
-        query ENROLL_FINALIZE[app, _: ()] {
+        mutation ENROLL_FINALIZE[app, _: ()] {
             app.account_manager.finalize_enrollment().await?;
             Ok(())
         }
