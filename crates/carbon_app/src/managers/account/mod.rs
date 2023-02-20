@@ -216,7 +216,10 @@ impl AccountManager {
                 if e.is_prisma_error::<RecordNotFound>() {
                     Err(UError::Expected(DeleteAccountError::NoAccount))
                 } else {
-                    Err(UError::Unexpected(UnexpectedError::new(e, HandlingActions::None)))
+                    Err(UError::Unexpected(UnexpectedError::new(
+                        e,
+                        HandlingActions::None,
+                    )))
                 }
             }
         }
