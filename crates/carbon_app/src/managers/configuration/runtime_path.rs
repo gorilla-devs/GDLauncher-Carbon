@@ -14,6 +14,7 @@ impl RootPath {
 
 pub struct LibrariesPath(PathBuf);
 
+// TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
     pub fn get_library_pathbuf(&self, maven_coordinate: MavenCoordinates) -> PathBuf {
         self.0.join(maven_coordinate.into_pathbuf())
@@ -23,8 +24,7 @@ impl LibrariesPath {
 pub struct AssetsPath(PathBuf);
 
 impl AssetsPath {
-    pub fn get_asset_pathbuf(&self, asset_hash: impl Into<String>) -> PathBuf {
-        let asset_hash = asset_hash.into();
+    pub fn get_asset_pathbuf(&self, asset_hash: &str) -> PathBuf {
         self.0.join(&asset_hash[..2]).join(asset_hash)
     }
 }
@@ -32,18 +32,12 @@ impl AssetsPath {
 pub struct VersionsPath(PathBuf);
 
 impl VersionsPath {
-    pub fn get_client_version_pathbuf(&self, version: impl Into<String>) -> PathBuf {
-        self.0
-            .join("client")
-            .join(version.into())
-            .with_extension("jar")
+    pub fn get_client_version_pathbuf(&self, version: &str) -> PathBuf {
+        self.0.join("client").join(version).with_extension("jar")
     }
 
-    pub fn get_server_version_pathbuf(&self, version: impl Into<String>) -> PathBuf {
-        self.0
-            .join("server")
-            .join(version.into())
-            .with_extension("jar")
+    pub fn get_server_version_pathbuf(&self, version: &str) -> PathBuf {
+        self.0.join("server").join(version).with_extension("jar")
     }
 }
 
