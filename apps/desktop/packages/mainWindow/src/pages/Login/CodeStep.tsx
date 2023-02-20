@@ -1,15 +1,14 @@
 import { Button } from "@gd/ui";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-// import { accounts, login } from "@/modules/components/accounts";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
+import fetchData from "./auth.login.data";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -55,23 +54,21 @@ const CodeStep = (props: Props) => {
     }
   };
 
-  let mutation = rspc.createQuery(() => ["account.enroll.finalize", null]);
-
-  // eslint-disable-next-line no-undef
-  let interval: NodeJS.Timer;
+  let interval: ReturnType<typeof setTimeout>;
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  // let finalize = rspc.createQuery(() => ["account.enroll.finalize", null]);
 
   createEffect(() => {
-    console.log(
-      "EXPIRES",
-      expiresAt(),
-      "EXPIRES FORAT",
-      new Date(expiresAt()).getTime(),
-      mutation.data
-    );
-    // if (accounts.selectedAccountId) {
-    // TODO: save in a store the default / last page
-    // navigate("/library");
-    // }
+    if (routeData.isSuccess) {
+      const data = routeData.data;
+      if (typeof data === "string") return;
+      if ("Complete" in data) {
+        // FINALIZE
+        // navigate("/library");
+      } else if ("Faile" in data) {
+        // DO SOMETHING
+      }
+    }
   });
 
   createEffect(() => {

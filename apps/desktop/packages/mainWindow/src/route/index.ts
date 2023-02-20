@@ -3,12 +3,14 @@ import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import NewsData from "@/pages/news.data";
 import SettingsAppearanceData from "@/pages/Settings/settings.appearance.data";
+import LoginData from "@/pages/Login/auth.login.data";
 
 /* Defining the routes for the application. */
 export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/Login")),
+    data: LoginData,
   },
   {
     path: "/",

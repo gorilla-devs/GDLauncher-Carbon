@@ -1,53 +1,43 @@
 /* eslint-disable i18next/no-literal-string */
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useRouteData } from "@solidjs/router";
 import { createEffect, createSignal, Setter, Show } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
-import { useModal } from "@/ModalsManager";
 import { Button } from "@gd/ui";
+import fetchData from "./auth.login.data";
 
 type Props = {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
 };
 
-type LoginRes = {
-  PollingCode: PollingCode;
-};
-
-type PollingCode = {
-  user_code: string;
-  verification_uri: string;
-  expires_at: Date;
-};
-
 const Auth = (props: Props) => {
   const [t] = useTransContext();
-  const [loading, setLoading] = createSignal(false);
-  const [error, setError] = createSignal(false);
-  const modalsContext = useModal();
+  const [error, setError] = createSignal("");
+  const navigate = useNavigate();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   let mutation = rspc.createMutation(["account.enroll.begin"], {
-    onError() {
-      setError(true);
+    onError(error) {
+      setError(error.message);
     },
   });
 
-  let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {});
-
-  let status = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+  // let cancelMutation = rspc.createMutation(["account.enroll.finalize"], {});
 
   const handleClick = async () => {
     mutation.mutate(null);
+  };
 
-    if (status.isSuccess) {
-      const data = status.data;
-      if ((data as any).PollingCode) {
-        const info = (data as any).PollingCode;
+  createEffect(() => {
+    if (routeData.isSuccess) {
+      const data = routeData.data;
+      if (typeof data === "string") return;
+      if ("PollingCode" in data) {
+        const info = data.PollingCode;
 
         if (info) {
-          console.log("YESY", data, info);
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
@@ -55,14 +45,14 @@ const Auth = (props: Props) => {
           });
           props.setStep(1);
         }
-      } else if ((data as any).Failed) {
-        cancelMutation.mutate(null);
+      } else if ("Failed" in data) {
+        const error = data.Failed;
+        setError(error);
+      } else if ("Complete" in data) {
+        // navigate("/library");
       }
-
-      // console.log("Loading");
-      setLoading(true);
     }
-  };
+  });
 
   console.log(__APP_VERSION__);
 
@@ -75,7 +65,7 @@ const Auth = (props: Props) => {
       <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={loading()}
+          loading={routeData.isLoading}
           size="large"
           onClick={() => handleClick()}
         >
@@ -85,7 +75,7 @@ const Auth = (props: Props) => {
           {t("sign_in_with_microsoft_text")}
         </p>
         <Show when={error()}>
-          <p class="text-red">Error</p>
+          <p class="text-red m-0">{error()} Error</p>
         </Show>
         <ul class="flex text-sm gap-3 list-none p-0 mb-8 underline">
           <li
