@@ -8,6 +8,8 @@ import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
+import { format } from "date-fns";
+import { rspc } from "@/utils/rspcClient";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -29,8 +31,9 @@ const CodeStep = (props: Props) => {
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
-  const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
-  const expiresAtMs = () => expiresAt() - Date.now();
+  const expiresAt = () => props.deviceCodeObject?.expiresAt;
+  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
@@ -52,13 +55,22 @@ const CodeStep = (props: Props) => {
     }
   };
 
+  let mutation = rspc.createQuery(() => ["account.enroll.finalize", null]);
+
   // eslint-disable-next-line no-undef
   let interval: NodeJS.Timer;
 
   createEffect(() => {
+    console.log(
+      "EXPIRES",
+      expiresAt(),
+      "EXPIRES FORAT",
+      new Date(expiresAt()).getTime(),
+      mutation.data
+    );
     // if (accounts.selectedAccountId) {
     // TODO: save in a store the default / last page
-    navigate("/library");
+    // navigate("/library");
     // }
   });
 
