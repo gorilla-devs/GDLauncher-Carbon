@@ -9,6 +9,7 @@ import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "./auth.login.data";
+import { handleStatus } from "@/utils/login";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -60,14 +61,12 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (routeData.isSuccess) {
-      const data = routeData.data;
-      if (typeof data === "string") return;
-      if ("Complete" in data) {
-        // FINALIZE
-        navigate("/library");
-      } else if ("Faile" in data) {
-        // DO SOMETHING
-      }
+      handleStatus(routeData, {
+        onComplete(_accountEntry) {
+          // FINALIZE
+          navigate("/library");
+        },
+      });
     }
   });
 

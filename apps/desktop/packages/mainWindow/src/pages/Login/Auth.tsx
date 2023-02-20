@@ -6,6 +6,7 @@ import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
+import { handleStatus } from "@/utils/login";
 
 type Props = {
   setStep: Setter<number>;
@@ -32,25 +33,22 @@ const Auth = (props: Props) => {
 
   createEffect(() => {
     if (routeData.isSuccess) {
-      const data = routeData.data;
-      if (typeof data === "string") return;
-      if ("PollingCode" in data) {
-        const info = data.PollingCode;
-
-        if (info) {
+      handleStatus(routeData, {
+        onPolling: (info) => {
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
             expiresAt: info.expires_at,
           });
           props.setStep(1);
-        }
-      } else if ("Failed" in data) {
-        const error = data.Failed;
-        setError(error);
-      } else if ("Complete" in data) {
-        navigate("/library");
-      }
+        },
+        onFail(error) {
+          setError(error);
+        },
+        onComplete() {
+          navigate("/library");
+        },
+      });
     }
   });
 
