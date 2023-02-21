@@ -1,24 +1,17 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
-use super::AppRef;
-use crate::db;
-use crate::db::app_configuration::SetParam::SetTheme;
-use crate::db::app_configuration::UniqueWhereParam;
 use log::trace;
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 
-pub mod runtime_path;
+use crate::{
+    api::keys::app::*,
+    db::{app_configuration, PrismaClient},
+};
 
-#[derive(Error, Debug)]
-pub enum ConfigurationManagerError {
-    #[error("error raised while executing query: ")]
-    ThemeNotFound,
-    #[error("error raised while executing query: {0}")]
-    QueryError(#[from] QueryError),
-    #[error("App configuration does not exist on DB")]
-    AppConfigurationNotFound,
-}
+use super::AppRef;
+
+pub mod runtime_path;
 
 pub(crate) struct ConfigurationManager {
     app: AppRef,
@@ -37,33 +30,65 @@ impl ConfigurationManager {
         &self.app
     }
 
-    pub async fn get_theme(&self) -> Result<String, ConfigurationManagerError> {
+    pub async fn get_theme(&self) -> Result<String, ConfigurationError> {
         trace!("retrieving current theme from db");
-        let app_config = self
-            .app
-            .upgrade()
-            .prisma_client
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
-            .await?
-            .ok_or(ConfigurationManagerError::AppConfigurationNotFound)?;
 
-        let theme = app_config.theme;
-        trace!("retrieved current theme from db : {theme}");
-        Ok(theme)
+        Ok(self.configuration().get().await?.theme)
     }
 
-    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationManagerError> {
-        trace!("writing theme in db : {theme}");
-        self.app
-            .upgrade()
-            .prisma_client
-            .app_configuration()
-            .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
-            .exec()
-            .await?;
-        trace!("wrote theme into db");
+    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationError> {
+        use crate::db::app_configuration::SetParam::SetTheme;
+
+        trace!("writing theme in db: {theme}");
+
+        self.configuration().set(SetTheme(theme.clone())).await?;
+
+        self.app.upgrade().invalidate(GET_THEME, Some(theme.into()));
+
         Ok(())
     }
+
+    pub fn configuration(&self) -> Configuration {
+        Configuration {
+            client: self.app.upgrade().prisma_client.clone(),
+        }
+    }
+}
+
+pub struct Configuration {
+    client: Arc<PrismaClient>,
+}
+
+impl Configuration {
+    pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
+        Ok(self
+            .client
+            .app_configuration()
+            .find_unique(app_configuration::id::equals(0))
+            .exec()
+            .await?
+            .ok_or(ConfigurationError::Missing)?)
+    }
+
+    pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {
+        self.client
+            .app_configuration()
+            .update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![value],
+            )
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ConfigurationError {
+    #[error("configuration row missing from DB")]
+    Missing,
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
 }

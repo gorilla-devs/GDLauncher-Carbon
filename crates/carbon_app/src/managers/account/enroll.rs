@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use futures::{future::abortable, stream::AbortHandle};
-use thiserror::Error;
-use tokio::sync::RwLock;
-
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
     McAuth, McAuthError,
 };
+use async_trait::async_trait;
+use futures::{future::abortable, stream::AbortHandle};
+use thiserror::Error;
+use tokio::sync::RwLock;
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
@@ -16,7 +15,7 @@ pub struct EnrollmentTask {
     abort: AbortHandle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
@@ -93,19 +92,19 @@ pub trait InvalidateCtx {
     async fn invalidate(&self);
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum EnrollmentError {
-    #[error("error requesting device code: {0}")]
+    #[error("device code request: {0}")]
     DeviceCodeRequest(#[from] DeviceCodeRequestError),
 
-    #[error("error polling device code: {0}")]
+    #[error("device code poll: {0}")]
     DeviceCodePoll(#[from] DeviceCodePollError),
 
-    #[error("error getting mc auth: {0}")]
+    #[error("mc auth: {0}")]
     McAuth(#[from] McAuthError),
 
-    #[error("error populating account details: {0}")]
-    Populate(#[from] McAccountPopulateError),
+    #[error("account populate: {0}")]
+    AccountPopulate(#[from] McAccountPopulateError),
 }
 
 /*
@@ -114,6 +113,8 @@ mod test {
 
     use async_trait::async_trait;
     use tokio::sync::RwLock;
+
+    use crate::managers::account::enroll::EnrollmentStatus;
 
     use super::InvalidateCtx;
 
@@ -130,17 +131,12 @@ mod test {
         #[async_trait]
         impl InvalidateCtx for Printer {
             async fn invalidate(&self) {
-                println!(
-                    "Invalidate: {:#?}",
-                    self.enrollment
-                        .read()
-                        .await
-                        .as_ref()
-                        .unwrap()
-                        .status
-                        .read()
-                        .await
-                );
+                let enrollment1 = self.enrollment.read().await;
+                let enrollment = enrollment1.as_ref().unwrap().status.read().await;
+                if let EnrollmentStatus::Failed(e) = &*enrollment {
+                    println!("{e}");
+                }
+                println!("Invalidate: {enrollment:#?}",);
             }
         }
 
