@@ -1,10 +1,10 @@
 /* @refresh reload */
-import { Portal, render } from "solid-js/web";
+import { render } from "solid-js/web";
 import { Router, hashIntegration } from "@solidjs/router";
 import { client, queryClient, rspc } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
-import Modals from "@/ModalsManager";
+import { ModalProvider } from "@/ModalsManager";
 import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
@@ -41,10 +41,9 @@ render(() => {
       <Router source={hashIntegration()}>
         <TransProvider instance={instance}>
           <NotificationsProvider>
-            <App />
-            <Portal mount={document.getElementById("overlay") as HTMLElement}>
-              <Modals />
-            </Portal>
+            <ModalProvider>
+              <App />
+            </ModalProvider>
           </NotificationsProvider>
         </TransProvider>
       </Router>
