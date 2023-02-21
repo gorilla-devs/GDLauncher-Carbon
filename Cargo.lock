@@ -393,7 +393,6 @@ dependencies = [
  "futures",
  "jsonwebtoken",
  "log",
- "matchout",
  "prisma-client-rust",
  "reqwest",
  "rspc",
@@ -1794,16 +1793,6 @@ name = "matchit"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b87248edafb776e59e6ee64a79086f65890d3510f2c656c000bf2a7e8a0aea40"
-
-[[package]]
-name = "matchout"
-version = "0.0.0"
-dependencies = [
- "itertools",
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "memchr"

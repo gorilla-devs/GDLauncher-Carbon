@@ -2,16 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
-use matchout::Extract;
 use thiserror::Error;
 use tokio::sync::RwLock;
-
-use crate::error::request::RequestError;
-
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
-    McAuth, McAuthError, McEntitlementCheckError, McEntitlementError, McProfileError,
-    McProfileRequestError, XboxAuthError, XboxError,
+    McAuth, McAuthError,
 };
 
 /// Active process of adding an account
