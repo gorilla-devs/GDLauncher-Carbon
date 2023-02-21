@@ -1,5 +1,6 @@
 import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import {
+  Accessor,
   createContext,
   createSignal,
   JSX,
@@ -37,7 +38,6 @@ const defaultModals = {
 export type ModalProps = {
   title: string;
   noHeader?: boolean;
-  isVisible?: boolean;
 };
 
 type Hash = {
@@ -58,13 +58,14 @@ type OpenModal = { name: Modalskeys; url?: string };
 type Context = {
   openModal: (_modal: OpenModal) => void;
   closeModal: () => void;
+  isVisible: Accessor<boolean>;
 };
 
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
-
+  const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;
   const urlSearchParans = () => new URLSearchParams(queryParams());
@@ -82,6 +83,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const manager = {
     openModal: (modal: OpenModal) => {
+      const overlay = document.getElementById("overlay") as HTMLElement;
+      overlay.style.display = "flex";
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
         url.append("m", modal.name);
@@ -89,13 +92,25 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         const decodedParamString = decodeURIComponent(url.toString());
 
         navigate(decodedParamString.replace("=&", "?"));
+        setTimeout(() => {
+          setIsVisible(true);
+        }, 100);
       } else {
         setSearchParams({ m: modal.name });
+        setTimeout(() => {
+          setIsVisible(true);
+        }, 100);
       }
     },
     closeModal: () => {
-      urlSearchParans()?.delete("m");
+      setIsVisible(false);
+      setTimeout(() => {
+        urlSearchParans()?.delete("m");
+        const overlay = document.getElementById("overlay") as HTMLElement;
+        overlay.style.display = "none";
+      }, 100);
     },
+    isVisible,
   };
 
   return (
@@ -104,11 +119,16 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
         <Show when={mParam()}>
           <Suspense fallback={<p>Loading...</p>}>
-            <Dynamic
-              component={ModalComponent({ noHeader, title })}
-              noHeader={noHeader()}
-              title={title()}
-            />
+            <div class="h-screen w-screen">
+              <Dynamic
+                component={ModalComponent({
+                  noHeader,
+                  title,
+                })}
+                noHeader={noHeader()}
+                title={title()}
+              />
+            </div>
           </Suspense>
         </Show>
       </Portal>
