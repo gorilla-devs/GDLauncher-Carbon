@@ -16,16 +16,39 @@ interface Props {
 }
 
 const CodeStep = (props: Props) => {
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
   const navigate = useNavigate();
+  const [error, setError] = createSignal("");
+
+  let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {
+    onError(error) {
+      setError(error.message);
+    },
+  });
+
+  let mutation = rspc.createMutation(["account.enroll.begin"], {
+    onError(error) {
+      setError(error.message);
+    },
+  });
 
   const handleRefersh = async () => {
-    // await login(({ userCode, link, expiresAt }) => {
-    props.setDeviceCodeObject({
-      userCode: "AXDLE",
-      link: "",
-      expiresAt: 548559,
-    });
-    // });
+    cancelMutation.mutate(null);
+    mutation.mutate(null);
+    if (routeData.isSuccess) {
+      handleStatus(routeData, {
+        onPolling: (info) => {
+          props.setDeviceCodeObject({
+            userCode: info.user_code,
+            link: info.verification_uri,
+            expiresAt: info.expires_at,
+          });
+        },
+        onFail(error) {
+          setError(error);
+        },
+      });
+    }
   };
 
   const userCode = () => props.deviceCodeObject?.userCode;
@@ -56,7 +79,6 @@ const CodeStep = (props: Props) => {
   };
 
   let interval: ReturnType<typeof setTimeout>;
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
   // let finalize = rspc.createQuery(() => ["account.enroll.finalize", null]);
 
   createEffect(() => {
@@ -105,7 +127,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="mt-2 text-[#E54B4B] mb-0">
+            <p class="mt-2 mb-0 text-[#E54B4B]">
               <Trans
                 key="code_expired_message"
                 options={{
@@ -116,8 +138,8 @@ const CodeStep = (props: Props) => {
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="mb-0 mt-2 text-shade-0">
-            <span class="text-white">{countDown()}</span>
+          <p class="mb-0 text-shade-0 mt-4">
+            <span class="text-white mr-2">{countDown()}</span>
             <Trans
               key="before_expiring"
               options={{
@@ -125,7 +147,7 @@ const CodeStep = (props: Props) => {
               }}
             />
           </p>
-          <p class="text-shade-0">
+          <p class="text-shade-0 mb-0">
             <Trans
               key="enter_code_in_browser"
               options={{
@@ -136,6 +158,9 @@ const CodeStep = (props: Props) => {
           </p>
         </Show>
       </div>
+      <Show when={error()}>
+        <p class="text-red m-0">{error()}</p>
+      </Show>
       <Show when={!expired()}>
         <Button
           class="normal-case"
@@ -158,7 +183,6 @@ const CodeStep = (props: Props) => {
         >
           <span class="i-ri:refresh-line" />
           <h3 class="m-0">
-            {" "}
             <Trans
               key="refresh"
               options={{

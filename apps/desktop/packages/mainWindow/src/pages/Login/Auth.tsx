@@ -1,9 +1,8 @@
-/* eslint-disable i18next/no-literal-string */
 import { useNavigate, useRouteData } from "@solidjs/router";
 import { createEffect, createSignal, Setter, Show } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
@@ -16,6 +15,7 @@ type Props = {
 const Auth = (props: Props) => {
   const [t] = useTransContext();
   const [error, setError] = createSignal("");
+  const [clicked, setClicked] = createSignal(false);
   const navigate = useNavigate();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -28,6 +28,7 @@ const Auth = (props: Props) => {
   // let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {});
 
   const handleClick = async () => {
+    setClicked(true);
     mutation.mutate(null);
   };
 
@@ -63,7 +64,7 @@ const Auth = (props: Props) => {
       <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={routeData.isLoading}
+          loading={routeData.isLoading && clicked()}
           size="large"
           onClick={() => handleClick()}
         >
@@ -73,7 +74,7 @@ const Auth = (props: Props) => {
           {t("sign_in_with_microsoft_text")}
         </p>
         <Show when={error()}>
-          <p class="text-red m-0">{error()} Error</p>
+          <p class="m-0 text-red">{error()}</p>
         </Show>
         <ul class="flex text-sm gap-3 list-none p-0 mb-8 underline">
           <li

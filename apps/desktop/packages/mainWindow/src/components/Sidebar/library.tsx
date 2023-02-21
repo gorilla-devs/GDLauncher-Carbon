@@ -22,12 +22,12 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="group w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center"
+                class="flex justify-center items-center group w-10 h-10 bg-shade-7 rounded-full"
                 onClick={() => {
                   toggleSidebar();
                 }}
               >
-                <div class="transition duration-100 ease-in-out i-ri:search-line text-shade-5 group-hover:text-shade-0" />
+                <div class="transition duration-100 ease-in-out text-shade-5 i-ri:search-line group-hover:text-shade-0" />
               </div>
             }
           >
