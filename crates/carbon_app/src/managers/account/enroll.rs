@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use futures::{future::abortable, stream::AbortHandle};
-use thiserror::Error;
-use tokio::sync::RwLock;
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
     McAuth, McAuthError,
 };
+use async_trait::async_trait;
+use futures::{future::abortable, stream::AbortHandle};
+use thiserror::Error;
+use tokio::sync::RwLock;
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
