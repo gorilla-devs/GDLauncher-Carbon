@@ -10,10 +10,30 @@ const LogViewer = (props: ModalProps) => {
         <div class="bg-shade-8">
           <Tabs variant="traditional">
             <TabList>
-              <Tab>TEST</Tab>
-              <Tab>TEST</Tab>
-              <Tab>TEST</Tab>
-              <Tab>TEST</Tab>
+              <Tab>
+                <div class="w-full flex gap-3 items-center justify-start">
+                  <div class="w-10 h-10 rounded-xl bg-green" />
+                  <p>Valhelsia</p>
+                </div>
+              </Tab>
+              <Tab>
+                <div class="w-full flex gap-3 items-center justify-start">
+                  <div class="w-10 h-10 rounded-xl bg-green" />
+                  <p>Valhelsia</p>
+                </div>
+              </Tab>
+              <Tab>
+                <div class="w-full flex gap-3 items-center justify-start">
+                  <div class="w-10 h-10 rounded-xl bg-green" />
+                  <p>Valhelsia</p>
+                </div>
+              </Tab>
+              <Tab>
+                <div class="w-full flex gap-3 items-center justify-start">
+                  <div class="w-10 h-10 rounded-xl bg-green" />
+                  <p>Valhelsia</p>
+                </div>
+              </Tab>
             </TabList>
             <div class="bg-shade-7">
               <TabPanel>1</TabPanel>
