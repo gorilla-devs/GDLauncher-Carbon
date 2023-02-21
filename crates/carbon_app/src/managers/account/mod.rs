@@ -1,17 +1,10 @@
-use crate::{
-    api::keys::account::*,
-    db,
-    managers::{account::enroll::InvalidateCtx, ManagersInner},
-};
+use crate::{api::keys::account::*, db, managers::account::enroll::InvalidateCtx};
 use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{chrono::DateTime, QueryError};
 use rspc::ErrorCode;
-use std::{
-    mem,
-    sync::{Arc, Weak},
-};
+use std::mem;
 
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -21,7 +14,7 @@ use self::{
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{AppError, AppRef};
+use super::AppRef;
 
 pub mod api;
 mod enroll;
@@ -49,9 +42,7 @@ impl AccountManager {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .find_unique(db::app_configuration::id::equals(0))
             .exec()
@@ -65,9 +56,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .update(
                 UniqueWhereParam::IdEquals(0),
@@ -84,9 +73,7 @@ impl AccountManager {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_many(Vec::new())
             .exec()
@@ -122,9 +109,7 @@ impl AccountManager {
         let account = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
             .exec()
@@ -183,9 +168,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .create(account.uuid, account.username, set_params)
             .exec()
@@ -200,9 +183,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()
