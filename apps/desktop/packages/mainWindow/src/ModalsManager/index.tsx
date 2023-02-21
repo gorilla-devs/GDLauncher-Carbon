@@ -58,6 +58,10 @@ const Modals: Component = () => {
       component: lazy(() => import("./modals/AcceptableUsePolicy")),
       title: "Acceptable Use Policy",
     },
+    logViewer: {
+      component: lazy(() => import("./modals/LogViewer")),
+      title: "Logs",
+    },
   });
 
   const queryParams = () => location.search;

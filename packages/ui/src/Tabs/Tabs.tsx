@@ -32,7 +32,7 @@ export interface Props {
   defaultIndex?: number;
   index?: number;
   onChange?: (_: number) => void;
-  variant?: "underline" | "block";
+  variant?: "underline" | "block" | "traditional";
   orientation?: "horizontal" | "vertical";
   gap?: number;
   paddingX?: string;

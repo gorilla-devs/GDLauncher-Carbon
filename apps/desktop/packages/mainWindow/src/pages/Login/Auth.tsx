@@ -60,10 +60,7 @@ const Auth = (_props: Props) => {
           >
             {t("terms_and_conditions")}
           </li>
-          <li
-            class="cursor-pointer"
-            onClick={() => navigate("?m=acceptableUsePolicy")}
-          >
+          <li class="cursor-pointer" onClick={() => navigate("?m=logViewer")}>
             {t("acceptable_use_policy")}
           </li>
         </ul>
