@@ -1,6 +1,7 @@
 use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
+use crate::error;
 use crate::managers::persistence::PersistenceManager;
 use crate::managers::settings::ConfigurationManager;
 use rspc::{ErrorCode, RouterBuilderLike};
@@ -127,17 +128,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             app.configuration_manager
                 .get_theme()
                 .await
-                .map_err(|error| error.into())
+                .map_err(error::into_rspc)
         }
 
         mutation SET_THEME[app, new_theme: String] {
             app.configuration_manager
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(|error| {
-                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                })?;
-            app.invalidate(GET_THEME, Some(new_theme.into()));
+                .map_err(error::into_rspc);
             Ok(())
         }
     }

@@ -1,8 +1,6 @@
-use crate::{
-    db::{app_configuration, PrismaClient},
-    error::{HandlingActions, UnexpectedError},
-};
+use crate::db::{app_configuration, PrismaClient};
 use log::trace;
+use prisma_client_rust::QueryError;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -50,7 +48,7 @@ pub struct Configuration<'a> {
 }
 
 impl Configuration<'_> {
-    pub async fn get(self) -> Result<app_configuration::Data, UnexpectedError> {
+    pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
         Ok(self
             .persistance_manager
             .get_db_client()
@@ -58,14 +56,11 @@ impl Configuration<'_> {
             .app_configuration()
             .find_unique(app_configuration::id::equals(0))
             .exec()
-            .await
-            .map_err(UnexpectedError::map(HandlingActions::None))?
-            .ok_or_else(|| {
-                UnexpectedError::direct("config entry missing in database", HandlingActions::None)
-            })?)
+            .await?
+            .ok_or(ConfigurationError::Missing)?)
     }
 
-    pub async fn set(self, value: app_configuration::SetParam) -> Result<(), UnexpectedError> {
+    pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {
         self.persistance_manager
             .get_db_client()
             .await
@@ -75,9 +70,17 @@ impl Configuration<'_> {
                 vec![value],
             )
             .exec()
-            .await
-            .map_err(UnexpectedError::map(HandlingActions::None))?;
+            .await?;
 
         Ok(())
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ConfigurationError {
+    #[error("configuration row missing from DB")]
+    Missing,
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
 }

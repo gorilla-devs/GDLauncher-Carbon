@@ -6,11 +6,12 @@ use matchout::Extract;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use crate::error::{request::RequestError, UError};
+use crate::error::request::RequestError;
 
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
-    McAuth, McAuthError, McEntitlementError, McProfileError, XboxError,
+    McAuth, McAuthError, McEntitlementCheckError, McEntitlementError, McProfileError,
+    McProfileRequestError, XboxAuthError, XboxError,
 };
 
 /// Active process of adding an account
@@ -19,14 +20,14 @@ pub struct EnrollmentTask {
     abort: AbortHandle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
     PopulateAccount,
     Complete(FullAccount),
-    Failed(UError<EnrollmentError>),
+    Failed(EnrollmentError),
 }
 
 impl EnrollmentTask {
@@ -47,25 +48,18 @@ impl EnrollmentTask {
 
             let task = || async {
                 // request device code
-                let device_code = DeviceCode::request_code(&client)
-                    .await
-                    .map_err(UError::map)?;
+                let device_code = DeviceCode::request_code(&client).await?;
 
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
-                let ms_auth = device_code
-                    .poll_ms_auth(&client)
-                    .await
-                    .map_err(UError::map)?;
+                let ms_auth = device_code.poll_ms_auth(&client).await?;
 
                 // authenticate with MC
                 update_status(EnrollmentStatus::McLogin).await;
-                let mc_auth = McAuth::auth_ms(&ms_auth, &client)
-                    .await
-                    .map_err(UError::map)?;
+                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
 
                 update_status(EnrollmentStatus::PopulateAccount).await;
-                let populated = mc_auth.populate(&client).await.map_err(UError::map)?;
+                let populated = mc_auth.populate(&client).await?;
 
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
@@ -103,28 +97,19 @@ pub trait InvalidateCtx {
     async fn invalidate(&self);
 }
 
-#[derive(Error, Debug, Extract)]
+#[derive(Error, Debug, Clone)]
 pub enum EnrollmentError {
-    #[error("request error: {0}")]
-    #[extract(DeviceCodeRequestError(self.0))]
-    #[extract(DeviceCodePollError::RequestError(self.0))]
-    #[extract(McAuthError::Request(self.0))]
-    #[extract(McAccountPopulateError::Request(self.0))]
-    Request(RequestError),
+    #[error("device code request: {0}")]
+    DeviceCodeRequest(#[from] DeviceCodeRequestError),
 
-    #[error("device code expired")]
-    #[extract(DeviceCodePollError::CodeExpired)]
-    CodeExpired,
+    #[error("device code poll: {0}")]
+    DeviceCodePoll(#[from] DeviceCodePollError),
 
-    #[error("error getting xbox auth: {0}")]
-    XboxAuth(#[extract(McAuthError::Xbox)] XboxError),
+    #[error("mc auth: {0}")]
+    McAuth(#[from] McAuthError),
 
-    #[error("error checking entitlements: {0}")]
-    EntitlementCheckError(#[extract(McAccountPopulateError::Entitlement)] McEntitlementError),
-
-    #[error("no profile attached to account")]
-    #[extract(McAccountPopulateError::Profile(McProfileError::NoProfile))]
-    NoProfile,
+    #[error("account populate: {0}")]
+    AccountPopulate(#[from] McAccountPopulateError),
 }
 
 /*

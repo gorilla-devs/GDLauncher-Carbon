@@ -1,8 +1,9 @@
-use crate::error::UnexpectedError;
 use log::trace;
 use serde::{Deserialize, Serialize};
 
-use super::AppRef;
+use crate::api::keys::app::*;
+
+use super::{persistence::ConfigurationError, AppRef};
 
 #[derive(Serialize, Deserialize, Ord, PartialOrd, PartialEq, Eq)]
 pub struct AppConfiguration {
@@ -25,7 +26,7 @@ impl ConfigurationManager {
         &self.app
     }
 
-    pub async fn get_theme(&self) -> Result<String, UnexpectedError> {
+    pub async fn get_theme(&self) -> Result<String, ConfigurationError> {
         trace!("retrieving current theme from db");
 
         Ok(self
@@ -38,7 +39,7 @@ impl ConfigurationManager {
             .theme)
     }
 
-    pub async fn set_theme(&self, theme: String) -> Result<(), UnexpectedError> {
+    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationError> {
         use crate::db::app_configuration::SetParam::SetTheme;
 
         trace!("writing theme in db: {theme}");
@@ -47,8 +48,10 @@ impl ConfigurationManager {
             .upgrade()
             .persistence_manager
             .configuration()
-            .set(SetTheme(theme))
+            .set(SetTheme(theme.clone()))
             .await?;
+
+        self.app.upgrade().invalidate(GET_THEME, Some(theme.into()));
 
         Ok(())
     }
