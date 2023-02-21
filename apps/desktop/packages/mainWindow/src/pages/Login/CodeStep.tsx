@@ -62,7 +62,8 @@ const CodeStep = (props: Props) => {
             link: info.verification_uri,
             expiresAt: info.expires_at,
           });
-          setExpired(true);
+          setExpired(false);
+          setError("");
         },
         onFail(error) {
           setError(error);
