@@ -140,7 +140,6 @@ const TabList = (props: Props) => {
           <div
             class="flex items-center rounded-xl box-border overflow-auto w-full"
             classList={{
-              "gap-6": tabsContext?.orientation !== undefined,
               "flex-row": tabsContext?.orientation === "horizontal",
               "flex-col": tabsContext?.orientation === "vertical",
               "justify-between": props.aligment === "between",

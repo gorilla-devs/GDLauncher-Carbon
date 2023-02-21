@@ -39,6 +39,7 @@ const LogViewer = (props: ModalProps) => {
               <TabPanel>1</TabPanel>
               <TabPanel>2</TabPanel>
               <TabPanel>3</TabPanel>
+              <TabPanel>4</TabPanel>
             </div>
           </Tabs>
         </div>
