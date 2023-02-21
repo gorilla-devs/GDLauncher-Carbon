@@ -1,44 +1,35 @@
+use std::path::PathBuf;
+
+use super::AppRef;
 use crate::db;
 use crate::db::app_configuration::SetParam::SetTheme;
 use crate::db::app_configuration::UniqueWhereParam;
-use crate::managers::persistence::PersistenceManagerError;
-use crate::managers::settings::ConfigurationManagerError::AppConfigurationNotFound;
 use log::trace;
 use prisma_client_rust::QueryError;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::{AppRef, Managers};
+pub mod runtime_path;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationManagerError {
-    #[error("error raised while executing query : ")]
+    #[error("error raised while executing query: ")]
     ThemeNotFound,
-
-    #[error("error raised while executing query ")]
-    AppConfigurationNotFound,
-
-    #[error("error : {0}")]
-    PersistenceManagerError(#[from] PersistenceManagerError),
-
-    #[error("error raised while executing query : {0}")]
+    #[error("error raised while executing query: {0}")]
     QueryError(#[from] QueryError),
-}
-
-#[derive(Serialize, Deserialize, Ord, PartialOrd, PartialEq, Eq)]
-pub struct AppConfiguration {
-    pub default_db_url: String,
-    pub app_theme: String,
+    #[error("App configuration does not exist on DB")]
+    AppConfigurationNotFound,
 }
 
 pub(crate) struct ConfigurationManager {
     app: AppRef,
+    runtime_path: runtime_path::RuntimePath,
 }
 
 impl ConfigurationManager {
-    pub fn new() -> Self {
+    pub fn new(runtime_path: PathBuf) -> Self {
         Self {
             app: AppRef::uninit(),
+            runtime_path: runtime_path::RuntimePath::new(runtime_path),
         }
     }
 
@@ -51,14 +42,13 @@ impl ConfigurationManager {
         let app_config = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .find_unique(db::app_configuration::id::equals(0))
             .exec()
             .await?
-            .ok_or(AppConfigurationNotFound)?;
+            .ok_or(ConfigurationManagerError::AppConfigurationNotFound)?;
+
         let theme = app_config.theme;
         trace!("retrieved current theme from db : {theme}");
         Ok(theme)
@@ -68,9 +58,7 @@ impl ConfigurationManager {
         trace!("writing theme in db : {theme}");
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .app_configuration()
             .update(UniqueWhereParam::IdEquals(0), vec![SetTheme(theme)])
             .exec()

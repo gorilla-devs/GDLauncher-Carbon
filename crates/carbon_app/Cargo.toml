@@ -35,3 +35,6 @@ prisma-client-rust = { workspace = true, features = [
     "sqlite",
     "migrations",
 ], default_features = false }
+
+[dev-dependencies]
+tempdir = { workspace = true }
