@@ -68,8 +68,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;
-  const urlSearchParans = () => new URLSearchParams(queryParams());
-  const mParam = () => urlSearchParans().get("m");
+  const urlSearchParams = () => new URLSearchParams(queryParams());
+  const mParam = () => urlSearchParams().get("m");
 
   const [_searchParams, setSearchParams] = useSearchParams();
 
@@ -105,7 +105,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     closeModal: () => {
       setIsVisible(false);
       setTimeout(() => {
-        urlSearchParans()?.delete("m");
+        urlSearchParams()?.delete("m");
         const overlay = document.getElementById("overlay") as HTMLElement;
         overlay.style.display = "none";
       }, 100);
