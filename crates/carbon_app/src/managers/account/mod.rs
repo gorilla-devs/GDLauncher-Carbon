@@ -20,7 +20,7 @@ use self::{
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{persistence::ConfigurationError, AppRef};
+use super::{configuration::ConfigurationError, AppRef};
 
 pub mod api;
 mod enroll;
@@ -48,7 +48,7 @@ impl AccountManager {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
+            .configuration_manager
             .configuration()
             .get()
             .await?
@@ -63,9 +63,7 @@ impl AccountManager {
             let account_entry = self
                 .app
                 .upgrade()
-                .persistence_manager
-                .get_db_client()
-                .await
+                .prisma_client
                 .account()
                 .find_first(vec![Uuid(StringFilter::Equals(uuid))])
                 .exec()
@@ -79,7 +77,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
+            .configuration_manager
             .configuration()
             .set(SetActiveAccountUuid(uuid))
             .await?;
@@ -92,9 +90,7 @@ impl AccountManager {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_many(Vec::new())
             .exec()
@@ -130,9 +126,7 @@ impl AccountManager {
         let account = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
             .exec()
@@ -191,9 +185,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .create(account.uuid, account.username, set_params)
             .exec()
@@ -209,9 +201,7 @@ impl AccountManager {
         let result = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()

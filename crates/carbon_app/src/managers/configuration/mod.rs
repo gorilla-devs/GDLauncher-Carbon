@@ -1,29 +1,28 @@
-use crate::db::{app_configuration, PrismaClient};
+use std::{path::PathBuf, sync::Arc};
+
 use log::trace;
 use prisma_client_rust::QueryError;
-use std::sync::Arc;
 use thiserror::Error;
+
+use crate::{
+    api::keys::app::*,
+    db::{app_configuration, PrismaClient},
+};
 
 use super::AppRef;
 
-mod database;
+pub mod runtime_path;
 
-#[derive(Error, Debug)]
-pub enum PersistenceManagerError {}
-
-pub(crate) struct PersistenceManager {
+pub(crate) struct ConfigurationManager {
     app: AppRef,
-    db_client: Arc<PrismaClient>,
+    runtime_path: runtime_path::RuntimePath,
 }
 
-impl PersistenceManager {
-    pub async fn new() -> Self {
-        // TODO: don't unwrap. Managers should return a result
-        let db_client = database::load_and_migrate().await.unwrap();
-
+impl ConfigurationManager {
+    pub fn new(runtime_path: PathBuf) -> Self {
         Self {
             app: AppRef::uninit(),
-            db_client: Arc::new(db_client),
+            runtime_path: runtime_path::RuntimePath::new(runtime_path),
         }
     }
 
@@ -31,28 +30,39 @@ impl PersistenceManager {
         &self.app
     }
 
-    pub async fn get_db_client(&self) -> Arc<PrismaClient> {
-        trace!("retrieving db client");
-        self.db_client.clone()
+    pub async fn get_theme(&self) -> Result<String, ConfigurationError> {
+        trace!("retrieving current theme from db");
+
+        Ok(self.configuration().get().await?.theme)
+    }
+
+    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationError> {
+        use crate::db::app_configuration::SetParam::SetTheme;
+
+        trace!("writing theme in db: {theme}");
+
+        self.configuration().set(SetTheme(theme.clone())).await?;
+
+        self.app.upgrade().invalidate(GET_THEME, Some(theme.into()));
+
+        Ok(())
     }
 
     pub fn configuration(&self) -> Configuration {
         Configuration {
-            persistance_manager: self,
+            client: self.app.upgrade().prisma_client.clone(),
         }
     }
 }
 
-pub struct Configuration<'a> {
-    persistance_manager: &'a PersistenceManager,
+pub struct Configuration {
+    client: Arc<PrismaClient>,
 }
 
-impl Configuration<'_> {
+impl Configuration {
     pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
         Ok(self
-            .persistance_manager
-            .get_db_client()
-            .await
+            .client
             .app_configuration()
             .find_unique(app_configuration::id::equals(0))
             .exec()
@@ -61,9 +71,7 @@ impl Configuration<'_> {
     }
 
     pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {
-        self.persistance_manager
-            .get_db_client()
-            .await
+        self.client
             .app_configuration()
             .update(
                 app_configuration::UniqueWhereParam::IdEquals(0),
