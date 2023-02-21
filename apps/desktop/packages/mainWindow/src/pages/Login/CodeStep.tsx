@@ -32,25 +32,6 @@ const CodeStep = (props: Props) => {
     },
   });
 
-  const handleRefersh = async () => {
-    cancelMutation.mutate(null);
-    mutation.mutate(null);
-    if (routeData.isSuccess) {
-      handleStatus(routeData, {
-        onPolling: (info) => {
-          props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
-          });
-        },
-        onFail(error) {
-          setError(error);
-        },
-      });
-    }
-  };
-
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
@@ -68,6 +49,26 @@ const CodeStep = (props: Props) => {
   const resetCountDown = () => {
     setExpired(false);
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+  };
+
+  const handleRefersh = async () => {
+    cancelMutation.mutate(null);
+    mutation.mutate(null);
+    if (routeData.isSuccess) {
+      handleStatus(routeData, {
+        onPolling: (info) => {
+          props.setDeviceCodeObject({
+            userCode: info.user_code,
+            link: info.verification_uri,
+            expiresAt: info.expires_at,
+          });
+          setExpired(true);
+        },
+        onFail(error) {
+          setError(error);
+        },
+      });
+    }
   };
 
   const updateExpireTime = () => {
