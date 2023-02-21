@@ -88,7 +88,7 @@ impl AccountManager {
         Ok(())
     }
 
-    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, GetAccountEntriesError> {
+    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, QueryError> {
         Ok(self
             .app
             .upgrade()
@@ -318,15 +318,7 @@ impl AccountManager {
 define_single_error!(GetActiveUuidError::Query(ConfigurationError));
 define_single_error!(GetAccountEntriesError::Query(QueryError));
 define_single_error!(AddAccountError::Query(QueryError));
-
-#[derive(Error, Debug)]
-pub enum GetAccountListError {
-    #[error("get account entries: {0}")]
-    GetAccountEntries(#[from] GetAccountEntriesError),
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
-}
+define_single_error!(GetAccountListError::Query(QueryError));
 
 #[derive(Error, Debug)]
 pub enum GetAccountStatusError {
