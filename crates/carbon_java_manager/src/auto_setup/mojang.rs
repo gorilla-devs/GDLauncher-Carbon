@@ -174,7 +174,7 @@ impl JavaAuto for MojangRuntime {
 
         for (name, asset) in runtime_meta.files {
             let path_buf = PathBuf::from(Into::<String>::into(self.version.clone()));
-            let path = runtime_path.join("mojang").join(path_buf).join(&name);
+            let path = runtime_path.join("mojang").join(path_buf).join(name);
             let downloadable = asset
                 .downloads
                 .and_then(|d| d.raw)
@@ -220,7 +220,7 @@ impl JavaAuto for MojangRuntime {
     }
 
     async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError> {
-        let mojang_assets = self.get_runtime_assets(&runtime_path).await?;
+        let mojang_assets = self.get_runtime_assets(runtime_path).await?;
 
         let updated_at = mojang_assets.last_updated.timestamp();
 

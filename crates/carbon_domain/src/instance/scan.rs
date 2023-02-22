@@ -69,10 +69,8 @@ impl Instances {
         };
 
         if let Ok(instances) = res {
-            for instance in instances.into_iter() {
-                if let Ok(instance) = instance {
-                    self.instances.insert(instance);
-                }
+            for instance in instances.into_iter().flatten() {
+                self.instances.insert(instance);
             }
         }
 

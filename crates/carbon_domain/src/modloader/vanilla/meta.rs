@@ -8,11 +8,11 @@ use tracing::trace;
 #[derive(Error, Debug)]
 pub enum MetaError {
     #[error("failed to download meta")]
-    DownloadError(#[from] reqwest::Error),
+    Download(#[from] reqwest::Error),
     #[error("failed to parse meta")]
-    ParseError(#[from] serde_json::Error),
+    Parse(#[from] serde_json::Error),
     #[error("failed to write meta")]
-    WriteError(#[from] std::io::Error),
+    Write(#[from] std::io::Error),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

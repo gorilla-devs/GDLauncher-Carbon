@@ -45,7 +45,7 @@ impl Display for RequestContext {
             self.url
                 .as_ref()
                 .map(|u| u.to_string())
-                .unwrap_or(String::from("<no url>"))
+                .unwrap_or_else(|| String::from("<no url>"))
         )
     }
 }
@@ -101,7 +101,7 @@ impl RequestErrorDetails {
 impl RequestError {
     pub fn from_status(response: &Response) -> Self {
         Self {
-            context: RequestContext::from_response(&response),
+            context: RequestContext::from_response(response),
             error: RequestErrorDetails::from_status(response),
         }
     }

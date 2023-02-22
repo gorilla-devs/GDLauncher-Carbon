@@ -294,10 +294,12 @@ impl XboxAuth {
                         .display_claims
                         .xui
                         .get(0)
-                        .ok_or(XboxAuthError::Request(RequestError {
-                            context: RequestContext::none(),
-                            error: RequestErrorDetails::MalformedResponse,
-                        }))?
+                        .ok_or_else(|| {
+                            XboxAuthError::Request(RequestError {
+                                context: RequestContext::none(),
+                                error: RequestErrorDetails::MalformedResponse,
+                            })
+                        })?
                         .uhs
                         .clone(),
                 })
@@ -515,8 +517,8 @@ impl McAuth {
     pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
         Ok(McAccount {
             auth: self.clone(),
-            entitlement: self.get_entitlement(&client).await?,
-            profile: self.get_profile(&client).await?,
+            entitlement: self.get_entitlement(client).await?,
+            profile: self.get_profile(client).await?,
         })
     }
 }
