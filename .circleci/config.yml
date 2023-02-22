@@ -51,6 +51,7 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm codegen
+            - run: cargo clippy # runs cargo check internally
             - run: pnpm build:mac-x64
             - run: pnpm lint
             - run: pnpm test
@@ -78,6 +79,7 @@ jobs:
                 pnpm i
                 chmod -R a+x node_modules
             - run: pnpm codegen
+            - run: cargo clippy # runs cargo check internally
             - run: pnpm build:mac-arm64
             - run: pnpm lint
             - run: pnpm test
@@ -140,6 +142,13 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
+            cargo clippy # runs cargo check internally
+          shell: bash.exe
+          environment:
+            CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      - run:
+          command: |
+            export PATH="$HOME/.cargo/bin:$PATH"
             pnpm build:win-x64
           shell: bash.exe
           environment:
@@ -191,6 +200,7 @@ jobs:
           pnpm i
           chmod -R a+x node_modules
       - run: pnpm codegen
+      - run: cargo clippy # runs cargo check internally
       - run: IS_DOCKER_TEST=true pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
@@ -211,6 +221,7 @@ jobs:
           pnpm i
           chmod -R a+x node_modules
       - run: pnpm codegen
+      - run: cargo clippy # runs cargo check internally
       - run: pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
