@@ -2,8 +2,9 @@ use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::managers::configuration::{ConfigurationManager, ConfigurationManagerError};
-use rspc::{ErrorCode, RouterBuilderLike};
+use crate::error;
+use crate::managers::configuration::ConfigurationManager;
+use rspc::RouterBuilderLike;
 use std::cell::UnsafeCell;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -124,44 +125,20 @@ impl ManagersInner {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum ApiError {
-    #[error("configuration error raised : ${0}")]
-    ConfigurationManagerError(#[from] ConfigurationManagerError),
-
-    #[error("app not found in ctx")]
-    AppNotFound(),
-}
-
-impl Into<rspc::Error> for ApiError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
-    }
-}
-
-impl Into<rspc::Error> for ConfigurationManagerError {
-    fn into(self) -> rspc::Error {
-        rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", self))
-    }
-}
-
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_THEME[app, _args: ()] {
             app.configuration_manager
                 .get_theme()
                 .await
-                .map_err(|error| error.into())
+                .map_err(error::into_rspc)
         }
 
         mutation SET_THEME[app, new_theme: String] {
             app.configuration_manager
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(|error| {
-                    rspc::Error::new(ErrorCode::InternalServerError, format!("{:?}", error))
-                })?;
-            app.invalidate(GET_THEME, Some(new_theme.into()));
+                .map_err(error::into_rspc);
             Ok(())
         }
     }

@@ -7,6 +7,7 @@ pub mod api;
 pub(crate) mod db;
 pub mod managers;
 
+mod error;
 pub mod generate_rspc_ts_bindings;
 mod runtime_path_override;
 

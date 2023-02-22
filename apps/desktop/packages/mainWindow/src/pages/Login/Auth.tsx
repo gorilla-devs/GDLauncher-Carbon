@@ -79,19 +79,28 @@ const Auth = (props: Props) => {
         <ul class="flex text-sm gap-3 list-none p-0 mb-8 underline">
           <li
             class="cursor-pointer"
-            onClick={() => navigate("?m=privacyPolicy")}
+            onClick={() => {
+              modalsContext?.openModal({ name: "privacyPolicy" });
+            }}
           >
             {t("privacy_policy")}
           </li>
           <li
             class="cursor-pointer"
-            onClick={() => navigate("?m=termsAndConditions")}
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "termsAndConditions",
+                url: "/library/DDAEDF",
+              });
+            }}
           >
             {t("terms_and_conditions")}
           </li>
           <li
             class="cursor-pointer"
-            onClick={() => navigate("?m=acceptableUsePolicy")}
+            onClick={() =>
+              modalsContext?.openModal({ name: "acceptableUsePolicy" })
+            }
           >
             {t("acceptable_use_policy")}
           </li>
