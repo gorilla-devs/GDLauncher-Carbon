@@ -50,8 +50,10 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm codegen
-            - run: cargo clippy # runs cargo check internally
+            - run:
+                command: pnpm codegen
+                environment:
+                  RUSTFLAGS: -D warnings
             - run: pnpm build:mac-x64
             - run: pnpm lint
             - run: pnpm test
@@ -78,8 +80,10 @@ jobs:
                 sudo npm i -g pnpm
                 pnpm i
                 chmod -R a+x node_modules
-            - run: pnpm codegen
-            - run: cargo clippy # runs cargo check internally
+            - run:
+                command: pnpm codegen
+                environment:
+                  RUSTFLAGS: -D warnings
             - run: pnpm build:mac-arm64
             - run: pnpm lint
             - run: pnpm test
@@ -139,13 +143,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-      - run:
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            cargo clippy # runs cargo check internally
-          shell: bash.exe
-          environment:
-            CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+            RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -199,8 +197,10 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm codegen
-      - run: cargo clippy # runs cargo check internally
+      - run:
+          command: pnpm codegen
+          environment:
+            RUSTFLAGS: -D warnings
       - run: IS_DOCKER_TEST=true pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
@@ -220,8 +220,10 @@ jobs:
           sudo npm i -g pnpm
           pnpm i
           chmod -R a+x node_modules
-      - run: pnpm codegen
-      - run: cargo clippy # runs cargo check internally
+      - run:
+          command: pnpm codegen
+          environment:
+            RUSTFLAGS: -D warnings
       - run: pnpm build:linux-x64
       - run: pnpm lint
       - run: pnpm test
