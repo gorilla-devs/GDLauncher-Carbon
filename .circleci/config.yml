@@ -54,9 +54,18 @@ jobs:
                 command: pnpm codegen
                 environment:
                   RUSTFLAGS: -D warnings
-            - run: pnpm build:mac-x64
-            - run: pnpm lint
-            - run: pnpm test
+            - run:
+                command: pnpm build:mac-x64
+                environment:
+                  RUSTFLAGS: -D warnings
+            - run:
+                command: pnpm lint
+                environment:
+                  RUSTFLAGS: -D warnings
+            - run:
+                command: pnpm test
+                environment:
+                  RUSTFLAGS: -D warnings
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -84,9 +93,18 @@ jobs:
                 command: pnpm codegen
                 environment:
                   RUSTFLAGS: -D warnings
-            - run: pnpm build:mac-arm64
-            - run: pnpm lint
-            - run: pnpm test
+            - run:
+                command: pnpm build:mac-arm64
+                environment:
+                  RUSTFLAGS: -D warnings
+            - run:
+                command: pnpm lint
+                environment:
+                  RUSTFLAGS: -D warnings
+            - run:
+                command: pnpm test
+                environment:
+                  RUSTFLAGS: -D warnings
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -151,6 +169,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+            RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -158,6 +177,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+            RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -165,6 +185,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+            RUSTFLAGS: -D warnings
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -201,10 +222,22 @@ jobs:
           command: pnpm codegen
           environment:
             RUSTFLAGS: -D warnings
-      - run: IS_DOCKER_TEST=true pnpm build:linux-x64
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm check-bundle
+      - run:
+          command: IS_DOCKER_TEST=true pnpm build:linux-x64
+          environment:
+            RUSTFLAGS: -D warnings
+      - run:
+          command: pnpm lint
+          environment:
+            RUSTFLAGS: -D warnings
+      - run:
+          command: pnpm test
+          environment:
+            RUSTFLAGS: -D warnings
+      - run:
+          command: pnpm check-bundle
+          environment:
+            RUSTFLAGS: -D warnings
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -224,9 +257,18 @@ jobs:
           command: pnpm codegen
           environment:
             RUSTFLAGS: -D warnings
-      - run: pnpm build:linux-x64
-      - run: pnpm lint
-      - run: pnpm test
+      - run:
+          command: pnpm build:linux-x64
+          environment:
+            RUSTFLAGS: -D warnings
+      - run:
+          command: pnpm lint
+          environment:
+            RUSTFLAGS: -D warnings
+      - run:
+          command: pnpm test
+          environment:
+            RUSTFLAGS: -D warnings
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
