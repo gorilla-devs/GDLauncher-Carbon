@@ -9,32 +9,38 @@ const LogViewer = (props: ModalProps) => {
       <div class="h-130 w-190">
         <div class="bg-shade-8">
           <Tabs variant="traditional">
-            <TabList>
-              <Tab>
-                <div class="w-full flex gap-3 items-center justify-start">
-                  <div class="w-10 h-10 rounded-xl bg-green" />
-                  <p>Valhelsia</p>
-                </div>
-              </Tab>
-              <Tab>
-                <div class="w-full flex gap-3 items-center justify-start">
-                  <div class="w-10 h-10 rounded-xl bg-green" />
-                  <p>Valhelsia</p>
-                </div>
-              </Tab>
-              <Tab>
-                <div class="w-full flex gap-3 items-center justify-start">
-                  <div class="w-10 h-10 rounded-xl bg-green" />
-                  <p>Valhelsia</p>
-                </div>
-              </Tab>
-              <Tab>
-                <div class="w-full flex gap-3 items-center justify-start">
-                  <div class="w-10 h-10 rounded-xl bg-green" />
-                  <p>Valhelsia</p>
-                </div>
-              </Tab>
-            </TabList>
+            <div class="flex items-center">
+              <TabList>
+                <Tab>
+                  <div class="w-full flex gap-3 items-center justify-start">
+                    <div class="w-10 h-10 rounded-xl bg-green" />
+                    <p>Valhelsia</p>
+                  </div>
+                </Tab>
+                <Tab>
+                  <div class="w-full flex gap-3 items-center justify-start">
+                    <div class="w-10 h-10 rounded-xl bg-green" />
+                    <p>Valhelsia</p>
+                  </div>
+                </Tab>
+                <Tab>
+                  <div class="w-full flex gap-3 items-center justify-start">
+                    <div class="w-10 h-10 rounded-xl bg-green" />
+                    <p>Valhelsia</p>
+                  </div>
+                </Tab>
+                <Tab>
+                  <div class="w-full flex gap-3 items-center justify-start">
+                    <div class="w-10 h-10 rounded-xl bg-green" />
+                    <p>Valhelsia</p>
+                  </div>
+                </Tab>
+              </TabList>
+              <div class="flex gap-4 px-5">
+                <div class="i-ri:upload-2-line text-shade-0 cursor-pointer" />
+                <div class="i-ri:file-copy-fill text-shade-0 cursor-pointer" />
+              </div>
+            </div>
             <div class="bg-shade-7">
               <TabPanel>1</TabPanel>
               <TabPanel>2</TabPanel>

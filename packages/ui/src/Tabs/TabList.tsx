@@ -138,7 +138,7 @@ const TabList = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "traditional"}>
           <div
-            class="flex items-center rounded-xl box-border overflow-auto w-full"
+            class="flex items-center box-border overflow-auto w-full"
             classList={{
               "flex-row": tabsContext?.orientation === "horizontal",
               "flex-col": tabsContext?.orientation === "vertical",

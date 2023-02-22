@@ -59,7 +59,14 @@ const ModalLayout = (props: Props) => {
                 />
               </div>
             </Show>
-            <div class="box-border h-full p-5">{c()}</div>
+            <div
+              class="box-border h-full"
+              classList={{
+                "p-5": !props.noPadding,
+              }}
+            >
+              {c()}
+            </div>
           </div>
         </div>
       </div>
