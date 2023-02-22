@@ -37,7 +37,7 @@ const ModalLayout = (props: Props) => {
           }}
         >
           <div
-            class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl transition-scale ease-in-out origin-center duration-100 ${
+            class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl transition-scale ease-in-out origin-center duration-100 overflow-hidden ${
               props.class ?? ""
             }`}
             classList={{
@@ -60,7 +60,7 @@ const ModalLayout = (props: Props) => {
               </div>
             </Show>
             <div
-              class="box-border h-full"
+              class="box-border h-full overflow-hidden"
               classList={{
                 "p-5": !props.noPadding,
               }}
