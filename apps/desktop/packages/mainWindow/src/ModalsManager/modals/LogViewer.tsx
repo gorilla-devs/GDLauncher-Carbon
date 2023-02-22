@@ -2,11 +2,48 @@
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
+import { For, Show } from "solid-js";
+
+const logs = [
+  {
+    type: "",
+    data: ` 
+        <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
+            <log4j:Message>
+                <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
+            <log4j:Message>
+            <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
+        </log4j:Event>
+    `,
+  },
+  {
+    type: "",
+    data: `
+          <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
+              <log4j:Message>
+                  <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
+              <log4j:Message>
+              <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
+          </log4j:Event>
+      `,
+  },
+  {
+    type: "",
+    data: `
+          <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
+              <log4j:Message>
+                  <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
+              <log4j:Message>
+              <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
+          </log4j:Event>
+      `,
+  },
+];
 
 const LogViewer = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190">
+      <div class="h-130 w-190 overflow-y-auto">
         <div class="bg-shade-8">
           <Tabs variant="traditional">
             <div class="flex items-center">
@@ -42,7 +79,19 @@ const LogViewer = (props: ModalProps) => {
               </div>
             </div>
             <div class="bg-shade-7">
-              <TabPanel>1</TabPanel>
+              <TabPanel>
+                <div class="divide-y divide-shade-5">
+                  <For each={logs}>
+                    {(log) => (
+                      <div class="flex flex-col justify-center items-center">
+                        <pre class="leading-8 whitespace-pre-wrap m-0 pl-4">
+                          {log.data}
+                        </pre>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </TabPanel>
               <TabPanel>2</TabPanel>
               <TabPanel>3</TabPanel>
               <TabPanel>4</TabPanel>

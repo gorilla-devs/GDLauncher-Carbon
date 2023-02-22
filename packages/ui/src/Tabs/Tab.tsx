@@ -125,7 +125,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{
