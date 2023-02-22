@@ -1,32 +1,32 @@
 use crate::managers::{Managers, ManagersInner};
 use rspc::RouterBuilderLike;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
 pub(crate) mod db;
 pub mod managers;
 
+mod error;
 pub mod generate_rspc_ts_bindings;
 pub mod queue;
-mod runtime_directory;
+mod runtime_path_override;
 
 // Since it's module_init, make sure it's not running during tests
 #[cfg(not(test))]
 pub fn init() {
-    use runtime_directory::set_runtime_directory_override;
     std::thread::spawn(|| {
         let runtime = tokio::runtime::Runtime::new();
         runtime
             .unwrap() /* This should never fail */
             .block_on(async {
-                set_runtime_directory_override().await;
-                start_router().await;
+                let runtime_path = runtime_path_override::get_runtime_path_override().await;
+                start_router(runtime_path).await;
             })
     });
 }
 
-async fn start_router() {
+async fn start_router(runtime_path: PathBuf) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<Managers>> =
@@ -38,7 +38,7 @@ async fn start_router() {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let app = ManagersInner::new_with_invalidation_channel(invalidation_sender).await;
+    let app = ManagersInner::new(invalidation_sender, runtime_path).await;
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
@@ -53,11 +53,19 @@ async fn start_router() {
 }
 
 #[cfg(test)]
+async fn setup_managers_for_test() -> Managers {
+    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
+    ManagersInner::new(invalidation_sender, temp_dir.into_path()).await
+}
+
+#[cfg(test)]
 mod test {
     #[tokio::test]
     async fn test_router() {
+        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
         let server = tokio::spawn(async {
-            super::start_router().await;
+            super::start_router(temp_dir.into_path()).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
