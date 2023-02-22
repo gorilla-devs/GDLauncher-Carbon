@@ -8,6 +8,7 @@ pub(crate) mod db;
 pub mod managers;
 
 pub mod generate_rspc_ts_bindings;
+pub mod queue;
 mod runtime_directory;
 
 // Since it's module_init, make sure it's not running during tests
