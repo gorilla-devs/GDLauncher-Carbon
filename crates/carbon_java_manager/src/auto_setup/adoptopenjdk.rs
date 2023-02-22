@@ -30,7 +30,7 @@ impl JavaAuto for AdoptOpenJDK {
         &mut self,
         base_path: &Path,
         // TODO: implement progress reporting
-        progress_report: Sender<JavaProgress>,
+        _progress_report: Sender<JavaProgress>,
     ) -> Result<(), JavaError> {
         let runtime = base_path.join(JAVA_RUNTIMES_FOLDER).join("openjdk");
         let meta = self.get_runtime_assets(&runtime).await?;

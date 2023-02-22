@@ -1,4 +1,3 @@
-use crate::instance::consts::{CONFIGURATION_FILE_RELATIVE_PATH, MINECRAFT_PACKAGE_RELATIVE_PATH};
 use crate::instance::delete::InstanceDeleteError::InstanceNotPersisted;
 use crate::instance::scan::{check_instance_directory_sanity, InstanceScanError};
 use crate::instance::{Instance, InstanceStatus};

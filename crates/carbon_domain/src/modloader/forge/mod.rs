@@ -37,7 +37,7 @@ impl ModLoaderHandler for ForgeModloader {
     }
     async fn install(
         &self,
-        progress_send: Sender<InstallProgress<InstallStages>>,
+        _progress_send: Sender<InstallProgress<InstallStages>>,
     ) -> Result<(), ForgeError> {
         Ok(())
     }

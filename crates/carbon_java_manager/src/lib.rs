@@ -1,3 +1,6 @@
+// allow dead code during development to keep warning outputs meaningful
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 use error::JavaError;
