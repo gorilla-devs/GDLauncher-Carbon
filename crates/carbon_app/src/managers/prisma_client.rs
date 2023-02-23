@@ -1,8 +1,5 @@
-use std::path::Path;
-
-use thiserror::Error;
-
 use crate::db::{self, PrismaClient};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum DatabaseError {

@@ -27,7 +27,7 @@ const Java = () => {
   });
 
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col py-5	px-6 box-border">
+    <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="java"
@@ -50,10 +50,10 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate("?m=addjava");
+              navigate("?m=addJava");
             }}
           >
-            <div class="i-ri:add-fill text-shade-5 text-xl" />
+            <div class="text-shade-5 text-xl i-ri:add-fill" />
           </Button>
         </div>
         <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
@@ -74,7 +74,7 @@ const Java = () => {
                           />
                           {j?.version}
                         </p>
-                        <p class="m-0 text-ellipsis max-w-[245px] overflow-hidden">
+                        <p class="m-0 overflow-hidden text-ellipsis max-w-[245px]">
                           {j?.path}
                         </p>
                         <p class="m-0">{j?.type}</p>
@@ -91,10 +91,10 @@ const Java = () => {
                           <Show
                             when={defaultJavasIds().includes(j?.id)}
                             fallback={
-                              <div class="i-ri:star-line text-shade-5 text-xl" />
+                              <div class="text-shade-5 text-xl i-ri:star-line" />
                             }
                           >
-                            <div class="i-ri:star-fill text-yellow text-xl" />
+                            <div class="text-xl i-ri:star-fill text-yellow" />
                           </Show>
                         </div>
                       </div>

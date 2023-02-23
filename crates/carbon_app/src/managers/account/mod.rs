@@ -1,17 +1,16 @@
 use crate::{
     api::keys::account::*,
-    db,
-    managers::{account::enroll::InvalidateCtx, ManagersInner},
+    db::{self, read_filters::StringFilter},
+    error::define_single_error,
+    managers::account::enroll::InvalidateCtx,
 };
 use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
-use prisma_client_rust::{chrono::DateTime, QueryError};
-use rspc::ErrorCode;
-use std::{
-    mem,
-    sync::{Arc, Weak},
+use prisma_client_rust::{
+    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, QueryError,
 };
+use std::mem;
 
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -21,7 +20,7 @@ use self::{
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{AppError, AppRef};
+use super::{configuration::ConfigurationError, AppRef};
 
 pub mod api;
 mod enroll;
@@ -45,58 +44,63 @@ impl AccountManager {
         &self.app
     }
 
-    pub async fn get_active_uuid(&self) -> Result<Option<String>, AccountError> {
+    pub async fn get_active_uuid(&self) -> Result<Option<String>, GetActiveUuidError> {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .find_unique(db::app_configuration::id::equals(0))
-            .exec()
+            .configuration_manager
+            .configuration()
+            .get()
             .await?
-            .ok_or(AccountError::AppConfigurationNotFound)?
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), AccountError> {
-        use db::app_configuration::{SetParam::SetActiveAccountUuid, UniqueWhereParam};
+    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), SetAccountError> {
+        use db::account::WhereParam::Uuid;
+        use db::app_configuration::SetParam::SetActiveAccountUuid;
+
+        if let Some(uuid) = uuid.clone() {
+            let account_entry = self
+                .app
+                .upgrade()
+                .prisma_client
+                .account()
+                .find_first(vec![Uuid(StringFilter::Equals(uuid))])
+                .exec()
+                .await?;
+
+            // Setting the active account to one not in the DB does not make sense.
+            if account_entry.is_none() {
+                return Err(SetAccountError::NoAccount);
+            }
+        }
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
-            .app_configuration()
-            .update(
-                UniqueWhereParam::IdEquals(0),
-                vec![SetActiveAccountUuid(uuid)],
-            )
-            .exec()
+            .configuration_manager
+            .configuration()
+            .set(SetActiveAccountUuid(uuid))
             .await?;
 
         self.app.upgrade().invalidate(GET_ACTIVE_UUID, None);
         Ok(())
     }
 
-    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, AccountError> {
+    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, QueryError> {
         Ok(self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_many(Vec::new())
             .exec()
             .await?)
     }
 
-    pub async fn get_account_list(&self) -> Result<Vec<Account>, AccountError> {
+    pub async fn get_account_list(&self) -> Result<Vec<Account>, GetAccountListError> {
         let accounts = self.get_account_entries().await?;
 
-        accounts
+        Ok(accounts
             .into_iter()
             .map(|account| {
                 let type_ = match &account.ms_refresh_token {
@@ -104,27 +108,25 @@ impl AccountManager {
                     Some(_) => AccountType::Microsoft,
                 };
 
-                Ok(Account {
+                Account {
                     username: account.username,
                     uuid: account.uuid,
                     type_,
-                })
+                }
             })
-            .collect::<Result<_, _>>()
+            .collect())
     }
 
     pub async fn get_account_status(
         &self,
         uuid: String,
-    ) -> Result<Option<AccountStatus>, AccountError> {
+    ) -> Result<Option<AccountStatus>, GetAccountStatusError> {
         use db::account::UniqueWhereParam;
 
         let account = self
             .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
             .exec()
@@ -136,7 +138,7 @@ impl AccountManager {
                 Some(_) => {
                     let token_expires = account
                         .token_expires
-                        .ok_or(AccountError::DbError(AccountDbError::ExpiryUnset))?;
+                        .ok_or(GetAccountStatusError::TokenExpiryUnset)?;
 
                     let refreshing = self
                         .currently_refreshing
@@ -149,7 +151,7 @@ impl AccountManager {
                     } else if token_expires < Utc::now() {
                         let access_token = account
                             .access_token
-                            .ok_or(AccountError::DbError(AccountDbError::TokenUnset))?;
+                            .ok_or(GetAccountStatusError::TokenUnset)?;
 
                         AccountStatus::Ok {
                             access_token: Some(access_token),
@@ -165,7 +167,7 @@ impl AccountManager {
         Ok(status)
     }
 
-    async fn add_account(&self, account: FullAccount) -> Result<(), AccountError> {
+    async fn add_account(&self, account: FullAccount) -> Result<(), AddAccountError> {
         use db::account::SetParam;
 
         let set_params = match account.type_ {
@@ -183,9 +185,7 @@ impl AccountManager {
 
         self.app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .create(account.uuid, account.username, set_params)
             .exec()
@@ -195,29 +195,40 @@ impl AccountManager {
         Ok(())
     }
 
-    pub async fn delete_account(&self, uuid: String) -> Result<(), AccountError> {
+    pub async fn delete_account(&self, uuid: String) -> Result<(), DeleteAccountError> {
         use db::account::UniqueWhereParam;
 
-        self.app
+        let result = self
+            .app
             .upgrade()
-            .persistence_manager
-            .get_db_client()
-            .await
+            .prisma_client
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()
-            .await?;
+            .await;
 
-        self.app.upgrade().invalidate(GET_ACCOUNTS, None);
-        self.app
-            .upgrade()
-            .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
-        Ok(())
+        match result {
+            Ok(_) => {
+                self.app.upgrade().invalidate(GET_ACCOUNTS, None);
+                self.app
+                    .upgrade()
+                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+
+                Ok(())
+            }
+            Err(e) => {
+                if e.is_prisma_error::<RecordNotFound>() {
+                    Err(DeleteAccountError::NoAccount)
+                } else {
+                    Err(DeleteAccountError::Query(e))
+                }
+            }
+        }
     }
 
-    pub async fn begin_enrollment(&self) -> Result<(), EnrollmentError> {
+    pub async fn begin_enrollment(&self) -> Result<(), BeginEnrollmentStatusError> {
         match &mut *self.active_enrollment.write().await {
-            Some(_) => Err(EnrollmentError::InProgress),
+            Some(_) => Err(BeginEnrollmentStatusError::InProgress),
             enrollment @ None => {
                 let client = self.app.upgrade().reqwest_client.clone();
 
@@ -239,29 +250,31 @@ impl AccountManager {
         }
     }
 
-    pub async fn cancel_enrollment(&self) -> Result<(), EnrollmentError> {
+    pub async fn cancel_enrollment(&self) -> Result<(), CancelEnrollmentStatusError> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
             Some(_) => Ok(()),
-            None => Err(EnrollmentError::NotActive),
+            None => Err(CancelEnrollmentStatusError::NotActive),
         }
     }
 
-    pub async fn get_enrollment_status(&self) -> Result<FEEnrollmentStatus, EnrollmentError> {
+    pub async fn get_enrollment_status(
+        &self,
+    ) -> Result<FEEnrollmentStatus, GetEnrollmentStatusError> {
         match &*self.active_enrollment.read().await {
-            None => Err(EnrollmentError::NotActive),
+            None => Err(GetEnrollmentStatusError::NotActive),
             Some(enrollment) => Ok(FEEnrollmentStatus::from_enrollment_status(
                 &*enrollment.status.read().await,
             )),
         }
     }
 
-    pub async fn finalize_enrollment(&self) -> Result<(), EnrollmentError> {
+    pub async fn finalize_enrollment(&self) -> Result<(), FinalizeEnrollmentError> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
-            None => Err(EnrollmentError::NotActive),
+            None => Err(FinalizeEnrollmentError::NotActive),
             Some(enrollment) => {
                 let mut status = EnrollmentStatus::RequestingCode;
                 mem::swap(&mut *enrollment.status.write().await, &mut status);
@@ -285,65 +298,82 @@ impl AccountManager {
 
                         Ok(())
                     }
-                    _ => Err(EnrollmentError::NotComplete),
+                    _ => Err(FinalizeEnrollmentError::NotComplete),
                 }
             }
         }
     }
 }
 
-#[derive(Error, Debug)]
-pub enum AccountError {
-    #[error("app configuration not found")]
-    AppConfigurationNotFound,
-
-    #[error("executed invalid query: {0}")]
-    QueryError(#[from] QueryError),
-
-    #[error("database error: {0}")]
-    DbError(#[from] AccountDbError),
-}
+define_single_error!(GetActiveUuidError::Query(ConfigurationError));
+define_single_error!(GetAccountEntriesError::Query(QueryError));
+define_single_error!(AddAccountError::Query(QueryError));
+define_single_error!(GetAccountListError::Query(QueryError));
 
 #[derive(Error, Debug)]
-pub enum AccountDbError {
-    #[error("ms account access token unset")]
+pub enum GetAccountStatusError {
+    #[error("account token expiry unset")]
+    TokenExpiryUnset,
+
+    #[error("account token unset")]
     TokenUnset,
 
-    #[error("ms account access token exiry date unset")]
-    ExpiryUnset,
-}
-
-impl From<AccountError> for rspc::Error {
-    fn from(value: AccountError) -> Self {
-        rspc::Error::new(
-            ErrorCode::InternalServerError,
-            format!("Account Query Error: {}", value),
-        )
-    }
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
 }
 
 #[derive(Error, Debug)]
-pub enum EnrollmentError {
-    #[error("enrollment already in progress")]
+pub enum BeginEnrollmentStatusError {
+    #[error("enrollment already active")]
     InProgress,
+}
 
+#[derive(Error, Debug)]
+pub enum CancelEnrollmentStatusError {
+    #[error("no active enrollment")]
+    NotActive,
+}
+
+#[derive(Error, Debug)]
+pub enum GetEnrollmentStatusError {
+    #[error("no active enrollment")]
+    NotActive,
+}
+
+#[derive(Error, Debug)]
+pub enum FinalizeEnrollmentError {
     #[error("no active enrollment")]
     NotActive,
 
-    #[error("enrollment not complete")]
+    #[error("enrollment is not complete")]
     NotComplete,
 
-    #[error("account error: {0}")]
-    AccountError(#[from] AccountError),
+    #[error("account add error: {0}")]
+    AddAccount(#[from] AddAccountError),
+
+    #[error("set account error: {0}")]
+    SetAccount(#[from] SetAccountError),
 }
 
-impl From<EnrollmentError> for rspc::Error {
-    fn from(value: EnrollmentError) -> Self {
-        rspc::Error::new(
-            ErrorCode::InternalServerError,
-            format!("Account Query Error: {}", value),
-        )
-    }
+#[derive(Error, Debug)]
+pub enum DeleteAccountError {
+    #[error("account does not exist and cannot be deleted")]
+    NoAccount,
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+}
+
+#[derive(Error, Debug)]
+pub enum SetAccountError {
+    #[error("config error: {0}")]
+    Configuration(#[from] ConfigurationError),
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("account does not exist and cannot be set as the active account")]
+    NoAccount,
 }
 
 struct FullAccount {

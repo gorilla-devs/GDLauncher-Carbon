@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { Show, createEffect } from "solid-js";
@@ -7,6 +6,7 @@ import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { setLastInstanceOpened } from "@/utils/routes";
+import { Trans } from "@gd/i18n";
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -21,8 +21,8 @@ const Sidebar = () => {
   // TODO: adapt to real data
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full pt-5 pb-5 box-border">
-        <div class="max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3 px-3">
+      <div class="h-full w-full box-border pt-5 pb-5">
+        <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}
             fallback={
@@ -32,7 +32,7 @@ const Sidebar = () => {
                   toggleSidebar();
                 }}
               >
-                <div class="i-ri:search-line text-shade-5 group-hover:text-shade-0 transition duration-100 ease-in-out" />
+                <div class="transition duration-100 ease-in-out text-shade-5 i-ri:search-line group-hover:text-shade-0" />
               </div>
             }
           >
@@ -166,7 +166,7 @@ const Sidebar = () => {
             />
           </div>
         </Show>
-        <div class="absolute left-0 right-0 bottom-0 py-5 w-full flex justify-center bg-shade-8">
+        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-shade-8 py-5">
           <Button
             variant="outline"
             style={{
@@ -176,7 +176,12 @@ const Sidebar = () => {
             }}
           >
             <Show when={isSidebarOpened()} fallback={"+"}>
-              + Add Instance
+              <Trans
+                key="add_instance"
+                options={{
+                  defaultValue: "+ Add Instance",
+                }}
+              />
             </Show>
           </Button>
         </div>

@@ -9,14 +9,14 @@ export default function Login() {
   // @ts-ignore
 
   return (
-    <div class="flex justify-center items-center w-full h-screen bg-img-loginBG.jpg p-0">
+    <div class="flex justify-center items-center w-full h-screen p-0 bg-img-loginBG.jpg">
       <div
         style={{
           "mix-blend-mode": "hard-light",
         }}
         class="absolute top-0 left-0 right-0 bottom-0 bg-shade-8 opacity-80"
       />
-      <div class="absolute top-0 left-1/2 -translate-x-1/2 top-5 z-10">
+      <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
         <Dropdown
           options={[
             { label: "english", key: "en" },
@@ -33,7 +33,7 @@ export default function Login() {
         />
       </div>
       <div
-        class="w-120 h-100 rounded-2xl relative flex flex-col justify-end items-center text-white"
+        class="rounded-2xl relative flex flex-col justify-end items-center text-white w-120 h-100"
         style={{
           background: "rgba(29, 32, 40, 0.8)",
           "justify-content": step() === 0 ? "flex-end" : "center",

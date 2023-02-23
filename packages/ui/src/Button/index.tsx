@@ -86,10 +86,10 @@ const getVariant = (
       ...commonStyle,
       "border-1": true,
       "hover:border-white": !isDisabled,
-      "border-shade-7": !isDisabled,
-      "bg-shade-8": !isDisabled,
-      "bg-shade-5": isDisabled,
+      "border-shade-5": !isDisabled,
+      "bg-shade-7": true,
       "text-shade-5": isDisabled,
+      "cursor-not-allowed": isDisabled,
     },
     outline: {
       ...commonStyle,

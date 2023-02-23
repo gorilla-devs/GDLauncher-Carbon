@@ -1,10 +1,11 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
-import { useNavigate } from "@solidjs/router";
-import { For } from "solid-js";
+import { useNavigate, useRouteData } from "@solidjs/router";
+import { For, Show, createEffect } from "solid-js";
 import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
+import { createStore } from "solid-js/store";
 
 type MockInstance = {
   title: string;
@@ -64,41 +65,29 @@ const mockCarousel: MockInstance[] = [
   },
 ];
 
-const newsArticles = [
-  {
-    title: "title",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title1",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title2",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-  {
-    title: "title3",
-    description: "this is a nice and fair description",
-    image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-    url: "https://randomurl.com",
-  },
-];
-
 const Home = () => {
   const navigate = useNavigate();
   const [t] = useTransContext();
+  const [news, setNews] = createStore([]);
+  const routeDataNews: Promise<any> = useRouteData();
+
+  createEffect(() => {
+    routeDataNews.then((newss) => {
+      setNews(newss);
+    });
+  });
 
   return (
     <div class="p-6">
       <div>
-        <News slides={newsArticles} />
+        <Show when={news.length > 0}>
+          <News
+            slides={news}
+            onClick={(news) => {
+              window.openExternalLink(news.url || "");
+            }}
+          />
+        </Show>
         <div class="mt-4">
           <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>

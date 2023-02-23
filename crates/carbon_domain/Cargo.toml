@@ -26,9 +26,9 @@ thiserror = { workspace = true }
 log = { workspace = true }
 trash = { workspace = true }
 carbon_net = { path = "../carbon_net" }
+regex = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }
 env_logger = { workspace = true }
-temp-dir = { workspace = true }
 tracing-test = { workspace = true }
