@@ -34,8 +34,8 @@ const defaultModals = {
     title: "Acceptable Use Policy",
   },
   logViewer: {
-      component: lazy(() => import("./modals/LogViewer")),
-      title: "Logs",
+    component: lazy(() => import("./modals/LogViewer")),
+    title: "Logs",
   },
 };
 
