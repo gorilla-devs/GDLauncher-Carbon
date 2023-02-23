@@ -14,14 +14,30 @@ impl TaskHandle {
     }
 }
 
-pub enum TaskProgress {
-    Known(f32),
-    Indeterminate,
+pub struct TaskStatus {
+    /// additional status details
+    subtext: Option<String>,
+    /// current task progress where None means indeterminate
+    progress: Option<TaskProgress>,
+}
+
+pub struct TaskProgress {
+    /// current progress in `unit`s
+    current: u64,
+    /// total progress in `unit`s. None if unknown.
+    total: Option<u64>,
+    unit: ProgressUnit,
+}
+
+pub enum ProgressUnit {
+    SizeBytes,
+    Count,
 }
 
 pub struct QueuedTask {
     handle: TaskHandle,
-    start: Box<dyn FnOnce()>,
+    name: String,
+    start: Box<dyn FnOnce(TaskHandle) + Send + Sync>,
     // this can be changed if and when we need any resource type other than
     // a download slot.
     requires_download_slot: bool,
@@ -32,8 +48,9 @@ pub struct QueuedTask {
 
 pub struct ActiveTask {
     handle: TaskHandle,
+    name: String,
     requires_download_slot: bool,
-    progress: TaskProgress,
+    status: TaskStatus,
 }
 
 pub struct TaskQueue {
@@ -89,10 +106,12 @@ impl TaskQueue {
 
         self.active.push_back(ActiveTask {
             handle: task.handle,
+            name: task.name,
             requires_download_slot: task.requires_download_slot,
-            progress: TaskProgress::Indeterminate,
+            status: TaskStatus { subtext: None, progress: None },
         });
-        (task.start)();
+
+        (task.start)(task.handle);
     }
 
     /// Start all tasks that can be started
@@ -127,11 +146,11 @@ impl TaskQueue {
         self.start_tasks();
     }
 
-    pub fn update(&mut self, task: TaskHandle, progress: TaskProgress) {
+    pub fn update(&mut self, task: TaskHandle, status: TaskStatus) {
         let Some(idx) = self.get_active_index(task) else { return };
         let Some(task) = self.active.get_mut(idx) else { return };
 
-        task.progress = progress;
+        task.status = status;
     }
 }
 
@@ -151,7 +170,7 @@ mod test {
 
             let task = QueuedTask {
                 handle: TaskHandle::new(),
-                start: Box::new(move || *trigger.lock().unwrap() = true),
+                start: Box::new(move |_| *trigger.lock().unwrap() = true),
                 requires_download_slot: true,
                 prerequisites: Vec::new(),
             };
@@ -184,7 +203,7 @@ mod test {
 
         let a_task = QueuedTask {
             handle: a_handle,
-            start: Box::new(|| {}),
+            start: Box::new(|_| {}),
             requires_download_slot: false,
             prerequisites: Vec::new(),
         };
@@ -194,7 +213,7 @@ mod test {
             start: Box::new({
                 let trigger = b_trigger.clone();
 
-                move || *trigger.lock().unwrap() = true
+                move |_| *trigger.lock().unwrap() = true
             }),
             requires_download_slot: false,
             prerequisites: vec![a_handle],
