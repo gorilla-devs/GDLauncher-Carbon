@@ -15,6 +15,7 @@ use std::mem;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
+pub use self::enroll::EnrollmentError;
 use self::{
     api::DeviceCode,
     enroll::{EnrollmentStatus, EnrollmentTask},
@@ -417,7 +418,7 @@ pub enum FEEnrollmentStatus {
     PollingCode(DeviceCode),
     QueryAccount,
     Complete(Account),
-    Failed(String),
+    Failed(EnrollmentError),
 }
 
 impl FEEnrollmentStatus {
@@ -431,7 +432,7 @@ impl FEEnrollmentStatus {
                 uuid: account.mc.profile.uuid.clone(),
                 type_: AccountType::Microsoft,
             }),
-            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(format!("{:#?}", err)),
+            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(err.clone()),
         }
     }
 }

@@ -3,7 +3,8 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::{Client, StatusCode};
-use serde::Deserialize;
+use rspc::Type;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
@@ -323,7 +324,7 @@ impl XboxAuth {
     }
 }
 
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone, Copy, Type, Serialize)]
 pub enum XboxError {
     #[error("no xbox account is associated with this microsoft account")]
     NoAccount,
