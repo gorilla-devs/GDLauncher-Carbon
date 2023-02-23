@@ -62,8 +62,9 @@ const Tab = (_props: Props) => {
     <div
       class="cursor-pointer"
       classList={{
-        "w-full": tabsContext?.variant === "block",
-        "w-full": tabsContext?.variant === "traditional",
+        "w-full":
+          tabsContext?.variant === "block" ||
+          tabsContext?.variant === "traditional",
       }}
       ref={(el) => {
         ref = el;
