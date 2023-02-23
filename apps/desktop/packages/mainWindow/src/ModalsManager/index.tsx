@@ -1,103 +1,141 @@
-/* eslint-disable @unocss/order */
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
 import {
-  Component,
-  createEffect,
+  Accessor,
+  createContext,
   createSignal,
   JSX,
   lazy,
   Show,
+  Suspense,
+  useContext,
 } from "solid-js";
 import { createStore } from "solid-js/store";
-import ModalLayout from "./ModalLayout";
+import { Dynamic, Portal } from "solid-js/web";
 
-/**
- * It renders a modal when the URL contains a query parameter called `m`
- * @returns A component that renders a modal.
- */
+const defaultModals = {
+  privacyPolicy: {
+    component: lazy(() => import("./modals/Privacypolicy")),
+    title: "Privacy Policy",
+  },
+  termsAndConditions: {
+    component: lazy(() => import("./modals/TermsAndConditions")),
+    title: "Terms and Conditions",
+  },
+  addJava: {
+    component: lazy(() => import("./modals/Java/AddJava")),
+    title: "Add java version",
+  },
+  javaSetup: {
+    component: lazy(() => import("./modals/Java/JavaSetup")),
+    title: "Java Setup",
+  },
+  acceptableUsePolicy: {
+    component: lazy(() => import("./modals/AcceptableUsePolicy")),
+    title: "Acceptable Use Policy",
+  },
+};
 
-interface Hash {
-  [name: string]: { component: JSX.Element; title: string };
-}
+export type ModalProps = {
+  title: string;
+  noHeader?: boolean;
+};
 
-const Modals: Component = () => {
-  const location = useLocation();
+type Hash = {
+  [name: string]: {
+    component: ((_props: ModalProps) => JSX.Element) & {
+      preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
+    };
 
+    title: string;
+    noHeader?: boolean;
+  };
+};
+
+type Modalskeys = keyof typeof defaultModals;
+
+type OpenModal = { name: Modalskeys; url?: string };
+
+type Context = {
+  openModal: (_modal: OpenModal) => void;
+  closeModal: () => void;
+  isVisible: Accessor<boolean>;
+};
+
+const ModalsContext = createContext<Context>();
+
+export const ModalProvider = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
-  const [opacity, setOpacity] = createSignal<0 | 1>(0);
-  const [modals] = createStore<Hash>({
-    privacyPolicy: {
-      component: lazy(() => import("./modals/Privacypolicy")),
-      title: "Privacy Policy",
-    },
-    termsAndConditions: {
-      component: lazy(() => import("./modals/TermsAndConditions")),
-      title: "Terms and Conditions",
-    },
-    addjava: {
-      component: lazy(() => import("./modals/AddJava")),
-      title: "Add java version",
-    },
-    acceptableUsePolicy: {
-      component: lazy(() => import("./modals/AcceptableUsePolicy")),
-      title: "Acceptable Use Policy",
-    },
-  });
+  const location = useLocation();
+  const queryParams = () => location.search as Modalskeys;
+  const urlSearchParams = () => new URLSearchParams(queryParams());
+  const mParam = () => urlSearchParams().get("m");
 
-  const queryParams = () => location.search;
-  const mParam = () => new URLSearchParams(queryParams()).get("m");
-  const isModal = () => mParam() !== null;
+  const [_searchParams, setSearchParams] = useSearchParams();
 
-  const getModal = (type: string) => {
-    const Component = () => modals[type]?.component;
-    const title = () => modals[type]?.title;
+  const modalTypeIndex = () => mParam() || "";
+  const noHeader = () => modals[modalTypeIndex()]?.noHeader || false;
+  const ModalComponent: any = () => modals[modalTypeIndex()]?.component;
 
-    return (
-      <ModalLayout onClose={() => navigate(location.pathname)} title={title()}>
-        <Component />
-      </ModalLayout>
-    );
+  const title = () => modals[modalTypeIndex()]?.title;
+
+  const [modals] = createStore<Hash>(defaultModals);
+
+  const manager = {
+    openModal: (modal: OpenModal) => {
+      const overlay = document.getElementById("overlay") as HTMLElement;
+      overlay.style.display = "flex";
+      if (modal.url) {
+        const url = new URLSearchParams(modal.url);
+        url.append("m", modal.name);
+
+        const decodedParamString = decodeURIComponent(url.toString());
+
+        navigate(decodedParamString.replace("=&", "?"));
+        setTimeout(() => {
+          setIsVisible(true);
+        }, 100);
+      } else {
+        setSearchParams({ m: modal.name });
+        setTimeout(() => {
+          setIsVisible(true);
+        }, 100);
+      }
+    },
+    closeModal: () => {
+      setIsVisible(false);
+      setTimeout(() => {
+        urlSearchParams()?.delete("m");
+        const overlay = document.getElementById("overlay") as HTMLElement;
+        overlay.style.display = "none";
+      }, 100);
+    },
+    isVisible,
   };
 
-  createEffect(() => {
-    const visibility = isModal();
-    // When the URL changes, update the visibility of the modal after a timeout
-    if (visibility) {
-      setIsVisible(visibility);
-      setTimeout(() => {
-        setOpacity(1);
-      }, 20);
-    } else {
-      setOpacity(0);
-      setTimeout(() => {
-        setIsVisible(visibility);
-      }, 150);
-    }
-  });
-
   return (
-    <div
-      class="h-screen absolute opacity-0 scale-0 will-change-auto transition-opacity w-screen backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999"
-      classList={{
-        "opacity-100": !!opacity(),
-        "scale-100": !!opacity(),
-      }}
-      onClick={() => {
-        navigate(location.pathname);
-      }}
-    >
-      <Show when={isVisible()}>
-        <div
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-        >
-          {getModal(mParam() || "")}
-        </div>
-      </Show>
-    </div>
+    <ModalsContext.Provider value={manager}>
+      {props.children}
+      <Portal mount={document.getElementById("overlay") as HTMLElement}>
+        <Show when={mParam()}>
+          <Suspense fallback={<p>Loading...</p>}>
+            <div class="h-screen w-screen">
+              <Dynamic
+                component={ModalComponent({
+                  noHeader,
+                  title,
+                })}
+                noHeader={noHeader()}
+                title={title()}
+              />
+            </div>
+          </Suspense>
+        </Show>
+      </Portal>
+    </ModalsContext.Provider>
   );
 };
 
-export default Modals;
+export const useModal = () => {
+  return useContext(ModalsContext);
+};

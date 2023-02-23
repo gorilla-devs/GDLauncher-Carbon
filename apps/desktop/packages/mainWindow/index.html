@@ -13,7 +13,7 @@
         script-src 'self' 'unsafe-inline';
         img-src 'self' data: https:;
         default-src 'unsafe-inline' 'self';
-        connect-src 'self' ws://localhost:4000
+        connect-src 'self' ws://localhost:4000 https://www.minecraft.net
       "
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -93,7 +93,20 @@
     </script>
   </head>
   <body style="margin: 0; padding: 0">
-    <div id="overlay" style="position: absolute; z-index: 100; top: 0"></div>
+    <div
+      id="overlay"
+      style="
+        height: 100vh;
+        width: 100vw;
+        position: absolute;
+        z-index: 100;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: none;
+      "
+    ></div>
     <div id="root"></div>
     <div id="appLoadingState">Loading...</div>
     <script type="module" src="/src/main.tsx"></script>
