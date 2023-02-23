@@ -139,7 +139,7 @@ impl TaskQueue {
 mod test {
     use std::sync::{Arc, Mutex};
 
-    use super::{TaskQueue, QueuedTask, TaskHandle, ActiveTask, TaskProgress};
+    use super::{ActiveTask, QueuedTask, TaskHandle, TaskProgress, TaskQueue};
 
     #[test]
     fn download_concurrency() {
@@ -184,7 +184,7 @@ mod test {
 
         let a_task = QueuedTask {
             handle: a_handle,
-            start: Box::new(||{}),
+            start: Box::new(|| {}),
             requires_download_slot: false,
             prerequisites: Vec::new(),
         };
