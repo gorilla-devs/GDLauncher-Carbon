@@ -21,7 +21,7 @@ pub enum TaskProgress {
 
 pub struct QueuedTask {
     handle: TaskHandle,
-    start: Box<dyn FnOnce() -> ActiveTask>,
+    start: Box<dyn FnOnce()>,
     // this can be changed if and when we need any resource type other than
     // a download slot.
     requires_download_slot: bool,
@@ -33,7 +33,6 @@ pub struct QueuedTask {
 pub struct ActiveTask {
     handle: TaskHandle,
     requires_download_slot: bool,
-    pause_fn: Option<Box<dyn FnOnce() -> QueuedTask>>,
     progress: TaskProgress,
 }
 
@@ -47,13 +46,13 @@ pub struct TaskQueue {
 }
 
 impl TaskQueue {
-    pub fn new() -> Self {
+    pub fn new(download_slots: usize) -> Self {
         Self {
             queue: VecDeque::new(),
             active: VecDeque::new(),
             paused: VecDeque::new(),
             used_download_slots: 0,
-            total_download_slots: 0,
+            total_download_slots: download_slots,
         }
     }
 
@@ -88,7 +87,12 @@ impl TaskQueue {
             self.used_download_slots += 1;
         }
 
-        self.active.push_back((task.start)());
+        self.active.push_back(ActiveTask {
+            handle: task.handle,
+            requires_download_slot: task.requires_download_slot,
+            progress: TaskProgress::Indeterminate,
+        });
+        (task.start)();
     }
 
     /// Start all tasks that can be started
@@ -128,5 +132,78 @@ impl TaskQueue {
         let Some(task) = self.active.get_mut(idx) else { return };
 
         task.progress = progress;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::{Arc, Mutex};
+
+    use super::{TaskQueue, QueuedTask, TaskHandle, ActiveTask, TaskProgress};
+
+    #[test]
+    fn download_concurrency() {
+        let mut queue = TaskQueue::new(2);
+
+        let task = || {
+            let trigger = Arc::new(Mutex::new(false));
+            let trigger2 = trigger.clone();
+
+            let task = QueuedTask {
+                handle: TaskHandle::new(),
+                start: Box::new(move || *trigger.lock().unwrap() = true),
+                requires_download_slot: true,
+                prerequisites: Vec::new(),
+            };
+
+            (task.handle, task, trigger2)
+        };
+
+        let (a_handle, a_task, a_trigger) = task();
+        let (_, b_task, b_trigger) = task();
+        let (_, c_task, c_trigger) = task();
+
+        queue.queue(a_task);
+        assert_eq!(*a_trigger.lock().unwrap(), true);
+        queue.queue(b_task);
+        assert_eq!(*b_trigger.lock().unwrap(), true);
+        queue.queue(c_task);
+        assert_eq!(*c_trigger.lock().unwrap(), false);
+        queue.complete(a_handle);
+        assert_eq!(*c_trigger.lock().unwrap(), true);
+    }
+
+    #[test]
+    fn task_dependence() {
+        let mut queue = TaskQueue::new(0);
+
+        let a_handle = TaskHandle::new();
+        let b_handle = TaskHandle::new();
+
+        let b_trigger = Arc::new(Mutex::new(false));
+
+        let a_task = QueuedTask {
+            handle: a_handle,
+            start: Box::new(||{}),
+            requires_download_slot: false,
+            prerequisites: Vec::new(),
+        };
+
+        let b_task = QueuedTask {
+            handle: b_handle,
+            start: Box::new({
+                let trigger = b_trigger.clone();
+
+                move || *trigger.lock().unwrap() = true
+            }),
+            requires_download_slot: false,
+            prerequisites: vec![a_handle],
+        };
+
+        queue.queue(a_task);
+        queue.queue(b_task);
+        assert_eq!(*b_trigger.lock().unwrap(), false);
+        queue.complete(a_handle);
+        assert_eq!(*b_trigger.lock().unwrap(), true);
     }
 }
