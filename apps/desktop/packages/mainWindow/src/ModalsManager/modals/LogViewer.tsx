@@ -49,27 +49,27 @@ const LogViewer = (props: ModalProps) => {
             <div class="flex items-center max-h-full">
               <TabList>
                 <Tab>
-                  <div class="w-full flex gap-3 items-center justify-start">
-                    <div class="w-10 h-10 rounded-xl bg-green" />
-                    <p>Valhelsia</p>
+                  <div class="w-full h-10 flex gap-2 items-center justify-start">
+                    <div class="w-6 h-6 rounded-md bg-green" />
+                    <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>
                 <Tab>
-                  <div class="w-full flex gap-3 items-center justify-start">
-                    <div class="w-10 h-10 rounded-xl bg-green" />
-                    <p>Valhelsia</p>
+                  <div class="w-full h-10 flex gap-2 items-center justify-start">
+                    <div class="w-6 h-6 rounded-md bg-green" />
+                    <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>
                 <Tab>
-                  <div class="w-full flex gap-3 items-center justify-start">
-                    <div class="w-10 h-10 rounded-xl bg-green" />
-                    <p>Valhelsia</p>
+                  <div class="w-full h-10 flex gap-2 items-center justify-start">
+                    <div class="w-6 h-6 rounded-md bg-green" />
+                    <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>
                 <Tab>
-                  <div class="w-full flex gap-3 items-center justify-start">
-                    <div class="w-10 h-10 rounded-xl bg-green" />
-                    <p>Valhelsia</p>
+                  <div class="w-full h-10 flex gap-2 items-center justify-start">
+                    <div class="w-6 h-6 rounded-md bg-green" />
+                    <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>
               </TabList>
