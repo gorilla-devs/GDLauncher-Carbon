@@ -6,7 +6,42 @@ use serde::{Deserialize, Serialize};
 // Need custom type to impl external traits for Vec<Library>
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Libraries {
-    pub libraries: Vec<Library>,
+    libraries: Vec<Library>,
+}
+impl Libraries {
+    pub fn get_libraries(&self) -> &Vec<Library> {
+        &self.libraries
+    }
+}
+
+impl IntoVecDownloadable for Libraries {
+    fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
+        let mut files = vec![];
+
+        for library in self.libraries {
+            if !library.is_allowed() {
+                continue;
+            }
+
+            let Some(artifact) = library.downloads.artifact else {
+                continue;
+            };
+
+            let Some(path) = artifact.path else {
+                continue;
+            };
+            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
+
+            files.push(carbon_net::Downloadable {
+                url: artifact.url,
+                path: PathBuf::from(base_path).join(path),
+                checksum,
+                size: Some(artifact.size),
+            })
+        }
+
+        files
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -134,36 +169,6 @@ pub struct Library {
     pub rules: Option<Vec<LibraryRule>>,
     pub natives: Option<Natives>,
     pub extract: Option<Extract>,
-}
-
-impl IntoVecDownloadable for Libraries {
-    fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
-        let mut files = vec![];
-
-        for library in self.libraries {
-            if !library.is_allowed() {
-                continue;
-            }
-
-            let Some(artifact) = library.downloads.artifact else {
-                continue;
-            };
-
-            let Some(path) = artifact.path else {
-                continue;
-            };
-            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-            files.push(carbon_net::Downloadable {
-                url: artifact.url,
-                path: PathBuf::from(base_path).join(path),
-                checksum,
-                size: Some(artifact.size),
-            })
-        }
-
-        files
-    }
 }
 
 impl Library {

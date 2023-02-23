@@ -47,7 +47,7 @@ impl MinecraftManager {
     }
 
     pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        manifest::get_meta(self.app.upgrade().persistence_manager.get_db_client().await)
+        manifest::get_meta(self.app.upgrade().prisma_client.clone())
             .await
             .unwrap()
     }
@@ -56,7 +56,7 @@ impl MinecraftManager {
         &self,
         mc_version: String,
     ) -> Result<Vec<String>, MinecraftError> {
-        let db_client = self.app.upgrade().persistence_manager.get_db_client().await;
+        let db_client = self.app.upgrade().prisma_client.clone();
 
         let manifest = manifest::get_meta(db_client.clone()).await?;
 

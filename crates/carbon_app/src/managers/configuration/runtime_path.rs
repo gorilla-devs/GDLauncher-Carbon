@@ -41,12 +41,11 @@ impl VersionsPath {
     }
 }
 
-// TODO: WIP
 pub struct NativesPath(PathBuf);
 
 impl NativesPath {
-    pub fn to_pathbuf(&self) -> PathBuf {
-        self.0.clone()
+    pub fn get_versioned(&self, version: &str) -> PathBuf {
+        self.0.clone().join(version)
     }
 }
 

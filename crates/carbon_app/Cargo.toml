@@ -36,6 +36,9 @@ prisma-client-rust = { workspace = true, features = [
     "sqlite",
     "migrations",
 ], default_features = false }
+strum_macros = { workspace = true }
+strum = { workspace = true }
+regex = { workspace = true }
 
 [dev-dependencies]
 tempdir = { workspace = true }
