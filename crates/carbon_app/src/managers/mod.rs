@@ -19,7 +19,7 @@ pub mod account;
 mod configuration;
 mod minecraft;
 mod prisma_client;
-mod queue;
+pub mod queue;
 
 pub type Managers = Arc<ManagersInner>;
 

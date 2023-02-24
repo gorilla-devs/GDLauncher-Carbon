@@ -64,6 +64,11 @@ keys! {
         UPDATE_INSTANCE_JAVA_ARGS     = "updateInstanceJavaArgs";
     }
 
+    queue {
+        GET_TASKS                     = "getTasks";
+        GET_TASK_STATUS               = "getTaskStatus";
+    }
+
     app {
         GET_THEME                     = "getTheme";
         SET_THEME                     = "setTheme";

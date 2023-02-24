@@ -3,9 +3,11 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use rspc::Type;
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct TaskHandle(usize);
 
 impl TaskHandle {
@@ -16,6 +18,7 @@ impl TaskHandle {
     }
 }
 
+#[derive(Type, Serialize, Clone)]
 pub struct TaskStatus {
     /// additional status details
     subtext: Option<String>,
@@ -23,6 +26,7 @@ pub struct TaskStatus {
     progress: Option<TaskProgress>,
 }
 
+#[derive(Type, Serialize, Clone)]
 pub struct TaskProgress {
     /// current progress in `unit`s
     current: u64,
@@ -31,6 +35,7 @@ pub struct TaskProgress {
     unit: ProgressUnit,
 }
 
+#[derive(Type, Serialize, Clone)]
 pub enum ProgressUnit {
     SizeBytes,
     Count,
@@ -58,7 +63,6 @@ pub struct ActiveTask {
 pub struct TaskQueue {
     queue: RwLock<VecDeque<QueuedTask>>,
     active: RwLock<VecDeque<ActiveTask>>,
-    paused: RwLock<VecDeque<QueuedTask>>,
     download_slots: RwLock<DownloadSlots>,
 }
 
@@ -68,12 +72,24 @@ struct DownloadSlots {
     total: usize,
 }
 
+#[derive(Type, Serialize)]
+pub struct TaskListEntry {
+    handle: TaskHandle,
+    name: String,
+    state: TaskEntryState,
+}
+
+#[derive(Type, Serialize)]
+pub enum TaskEntryState {
+    Active,
+    Queued,
+}
+
 impl TaskQueue {
     pub fn new(download_slots: usize) -> Self {
         Self {
             queue: RwLock::new(VecDeque::new()),
             active: RwLock::new(VecDeque::new()),
-            paused: RwLock::new(VecDeque::new()),
             download_slots: RwLock::new(DownloadSlots {
                 used: 0,
                 total: download_slots,
@@ -88,11 +104,9 @@ impl TaskQueue {
         } {
             let queue = self.queue.read().await;
             let active = self.active.read().await;
-            let paused = self.paused.read().await;
             for &prereqisite in &task.prerequisites {
                 if queue.iter().any(|task| task.handle == prereqisite)
                     || active.iter().any(|task| task.handle == prereqisite)
-                    || paused.iter().any(|task| task.handle == prereqisite)
                 {
                     return false;
                 }
@@ -177,6 +191,34 @@ impl TaskQueue {
 
         task.status = status;
     }
+
+    pub async fn get_tasks(&self) -> Vec<TaskListEntry> {
+        let mut entries = Vec::<TaskListEntry>::new();
+
+        entries.extend(self.active.read().await.iter().map(|task| TaskListEntry {
+            handle: task.handle,
+            name: task.name.clone(),
+            state: TaskEntryState::Active,
+        }));
+
+        entries.extend(self.queue.read().await.iter().map(|task| TaskListEntry {
+            handle: task.handle,
+            name: task.name.clone(),
+            state: TaskEntryState::Queued,
+        }));
+
+        entries
+    }
+
+    pub async fn get_task_status(&self, task: TaskHandle) -> Option<TaskStatus> {
+        // only active tasks can have a status
+        self.active
+            .read()
+            .await
+            .iter()
+            .find(|active| active.handle == task)
+            .map(|task| task.status.clone())
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +237,7 @@ mod test {
 
             let task = QueuedTask {
                 handle: TaskHandle::new(),
+                name: String::new(),
                 start: Box::new(move |_| *trigger.lock().unwrap() = true),
                 requires_download_slot: true,
                 prerequisites: Vec::new(),
@@ -228,6 +271,7 @@ mod test {
 
         let a_task = QueuedTask {
             handle: a_handle,
+            name: String::new(),
             start: Box::new(|_| {}),
             requires_download_slot: false,
             prerequisites: Vec::new(),
@@ -235,6 +279,7 @@ mod test {
 
         let b_task = QueuedTask {
             handle: b_handle,
+            name: String::new(),
             start: Box::new({
                 let trigger = b_trigger.clone();
 
