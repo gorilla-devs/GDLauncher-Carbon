@@ -33,6 +33,10 @@ const defaultModals = {
     component: lazy(() => import("./modals/AcceptableUsePolicy")),
     title: "Acceptable Use Policy",
   },
+  logViewer: {
+    component: lazy(() => import("./modals/LogViewer")),
+    title: "Logs",
+  },
 };
 
 export type ModalProps = {
