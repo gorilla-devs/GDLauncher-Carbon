@@ -17,10 +17,10 @@ use self::queue::TaskQueue;
 
 pub mod account;
 mod configuration;
+pub mod download;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
-pub mod download;
 
 pub type Managers = Arc<ManagersInner>;
 
