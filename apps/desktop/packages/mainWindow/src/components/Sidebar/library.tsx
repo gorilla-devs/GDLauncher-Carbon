@@ -12,10 +12,11 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const instanceId = () => location.pathname.match(/\/library\/(\w+)/)![1];
+  const instaceUrlRegex = () => location.pathname.match(/\/library\/(\w+)/);
+  const instanceId = () => instaceUrlRegex()?.[1];
 
   createEffect(() => {
-    setLastInstanceOpened(instanceId());
+    setLastInstanceOpened(instanceId() || "");
   });
 
   // TODO: adapt to real data
