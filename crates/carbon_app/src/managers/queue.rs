@@ -1,6 +1,6 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
-    sync::atomic::{AtomicUsize, Ordering},
+    collections::VecDeque,
+    sync::atomic::{Ordering, AtomicU32},
 };
 
 use rspc::Type;
@@ -8,11 +8,11 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 #[derive(Copy, Clone, PartialEq, Serialize, Deserialize, Type)]
-pub struct TaskHandle(usize);
+pub struct TaskHandle(u32);
 
 impl TaskHandle {
     pub fn new() -> Self {
-        static TASK_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+        static TASK_ID_COUNTER: AtomicU32 = AtomicU32::new(0);
 
         Self(TASK_ID_COUNTER.fetch_add(1, Ordering::Relaxed))
     }
@@ -121,7 +121,7 @@ impl TaskQueue {
     /// Queue a task or run it immediately if possible
     pub async fn queue(&mut self, task: QueuedTask) {
         if self.can_start_task(&task).await {
-            self.start_task(task);
+            self.start_task(task).await;
         } else {
             self.queue.write().await.push_back(task);
         }
@@ -227,7 +227,7 @@ mod test {
 
     use super::{ActiveTask, QueuedTask, TaskHandle, TaskProgress, TaskQueue};
 
-    #[test]
+    #[tokio::test]
     fn download_concurrency() {
         let mut queue = TaskQueue::new(2);
 
