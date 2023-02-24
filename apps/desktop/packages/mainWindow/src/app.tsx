@@ -5,6 +5,7 @@ import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
+import { handleRouteChange } from "./utils/routes";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
@@ -12,11 +13,12 @@ const App: Component = () => {
 
   createInvalidateQuery();
   initThemes();
+  handleRouteChange();
 
   return (
     <div class="w-screen relative">
       <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute gap-4 flex justify-center items-center cursor-pointer bottom-10 right-0 h-10 p-2 z-50 bg-light-600">
+        <div class="absolute flex justify-center items-center cursor-pointer right-0 h-10 gap-4 bottom-10 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
               navigate("/library");

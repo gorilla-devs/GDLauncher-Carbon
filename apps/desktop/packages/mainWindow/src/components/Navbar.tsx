@@ -4,7 +4,7 @@ import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
-import { lastInstanceOpened } from "@/utils/routes";
+import { composePathUrl } from "@/utils/routes";
 
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -31,19 +31,9 @@ const AppNavbar = () => {
       ? 4
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
-  const composePathUrl = (route: { label: string; path: string }) => {
-    switch (route.label) {
-      case "library": {
-        return `${route.path}/${lastInstanceOpened()}`;
-      }
-      default:
-        return route.path;
-    }
-  };
-
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-shade-8 text-white flex items-center px-5 h-15">
+      <nav class="bg-shade-8 flex items-center text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -52,7 +42,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex m-0 text-white w-full items-between gap-6 list-none pl-10">
+          <ul class="flex text-white w-full m-0 items-between gap-6 list-none pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -80,7 +70,7 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div class="text-shade-0 text-2xl cursor-pointer i-ri:terminal-box-fill" />
+                    <div class="cursor-pointer text-shade-0 text-2xl i-ri:terminal-box-fill" />
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>

@@ -5,14 +5,14 @@ import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
 import { useLocation, useNavigate } from "@solidjs/router";
-import { setLastInstanceOpened } from "@/utils/routes";
+import { libraryUrlRegex, setLastInstanceOpened } from "@/utils/routes";
 import { Trans } from "@gd/i18n";
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const instaceUrlRegex = () => location.pathname.match(/\/library\/(\w+)/);
+  const instaceUrlRegex = () => location.pathname.match(libraryUrlRegex);
   const instanceId = () => instaceUrlRegex()?.[1];
 
   createEffect(() => {
