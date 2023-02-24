@@ -9,7 +9,6 @@ pub mod managers;
 
 mod error;
 pub mod generate_rspc_ts_bindings;
-pub mod queue;
 mod runtime_path_override;
 
 // Since it's module_init, make sure it's not running during tests

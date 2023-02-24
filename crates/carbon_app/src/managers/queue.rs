@@ -3,6 +3,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+use tokio::sync::RwLock;
+
 #[derive(Copy, Clone, PartialEq)]
 pub struct TaskHandle(usize);
 
@@ -54,31 +56,43 @@ pub struct ActiveTask {
 }
 
 pub struct TaskQueue {
-    queue: VecDeque<QueuedTask>,
-    active: VecDeque<ActiveTask>,
-    paused: VecDeque<QueuedTask>,
+    queue: RwLock<VecDeque<QueuedTask>>,
+    active: RwLock<VecDeque<ActiveTask>>,
+    paused: RwLock<VecDeque<QueuedTask>>,
+    download_slots: RwLock<DownloadSlots>,
+}
+
+struct DownloadSlots {
+    used: usize,
     // this allows changing download slot count at runtime
-    used_download_slots: usize,
-    total_download_slots: usize,
+    total: usize,
 }
 
 impl TaskQueue {
     pub fn new(download_slots: usize) -> Self {
         Self {
-            queue: VecDeque::new(),
-            active: VecDeque::new(),
-            paused: VecDeque::new(),
-            used_download_slots: 0,
-            total_download_slots: download_slots,
+            queue: RwLock::new(VecDeque::new()),
+            active: RwLock::new(VecDeque::new()),
+            paused: RwLock::new(VecDeque::new()),
+            download_slots: RwLock::new(DownloadSlots {
+                used: 0,
+                total: download_slots,
+            }),
         }
     }
 
-    fn can_start_task(&self, task: &QueuedTask) -> bool {
-        if !task.requires_download_slot || self.used_download_slots < self.total_download_slots {
+    async fn can_start_task(&self, task: &QueuedTask) -> bool {
+        if !task.requires_download_slot || {
+            let slots = self.download_slots.read().await;
+            slots.used < slots.total
+        } {
+            let queue = self.queue.read().await;
+            let active = self.active.read().await;
+            let paused = self.paused.read().await;
             for &prereqisite in &task.prerequisites {
-                if self.queue.iter().any(|task| task.handle == prereqisite)
-                    || self.active.iter().any(|task| task.handle == prereqisite)
-                    || self.paused.iter().any(|task| task.handle == prereqisite)
+                if queue.iter().any(|task| task.handle == prereqisite)
+                    || active.iter().any(|task| task.handle == prereqisite)
+                    || paused.iter().any(|task| task.handle == prereqisite)
                 {
                     return false;
                 }
@@ -91,64 +105,75 @@ impl TaskQueue {
     }
 
     /// Queue a task or run it immediately if possible
-    pub fn queue(&mut self, task: QueuedTask) {
-        if self.can_start_task(&task) {
+    pub async fn queue(&mut self, task: QueuedTask) {
+        if self.can_start_task(&task).await {
             self.start_task(task);
         } else {
-            self.queue.push_back(task);
+            self.queue.write().await.push_back(task);
         }
     }
 
-    fn start_task(&mut self, task: QueuedTask) {
+    async fn start_task(&self, task: QueuedTask) {
         if task.requires_download_slot {
-            self.used_download_slots += 1;
+            self.download_slots.write().await.used += 1;
         }
 
-        self.active.push_back(ActiveTask {
+        self.active.write().await.push_back(ActiveTask {
             handle: task.handle,
             name: task.name,
             requires_download_slot: task.requires_download_slot,
-            status: TaskStatus { subtext: None, progress: None },
+            status: TaskStatus {
+                subtext: None,
+                progress: None,
+            },
         });
 
         (task.start)(task.handle);
     }
 
     /// Start all tasks that can be started
-    fn start_tasks(&mut self) {
+    async fn start_tasks(&self) {
+        let mut queue = self.queue.write().await;
         let mut i = 0;
-        while let Some(queued) = self.queue.get(i) {
-            if self.can_start_task(queued) {
-                let task = self.queue.remove(i).unwrap();
-                self.start_task(task);
+        while let Some(queued) = queue.get(i) {
+            if self.can_start_task(queued).await {
+                let task = queue.remove(i).unwrap();
+                // not a deadlock, start_task uses self.active
+                self.start_task(task).await;
             } else {
                 i += 1;
             }
         }
     }
 
-    fn get_active_index(&self, task: TaskHandle) -> Option<usize> {
-        self.active
+    fn get_active_index(active: &VecDeque<ActiveTask>, task: TaskHandle) -> Option<usize> {
+        active
             .iter()
             .enumerate()
             .find(|(_, t)| t.handle == task)
             .map(|(i, _)| i)
     }
 
-    pub fn complete(&mut self, task: TaskHandle) {
-        let Some(idx) = self.get_active_index(task) else { return };
-        let Some(task) = self.active.remove(idx) else { return };
+    pub async fn complete(&self, task: TaskHandle) {
+        let task = {
+            let mut active = self.active.write().await;
+            let Some(idx) = Self::get_active_index(&*active, task) else { return };
+            let Some(task) = active.remove(idx) else { return };
+
+            task
+        };
 
         if task.requires_download_slot {
-            self.used_download_slots -= 1;
+            self.download_slots.write().await.used -= 1;
         }
 
-        self.start_tasks();
+        self.start_tasks().await;
     }
 
-    pub fn update(&mut self, task: TaskHandle, status: TaskStatus) {
-        let Some(idx) = self.get_active_index(task) else { return };
-        let Some(task) = self.active.get_mut(idx) else { return };
+    pub async fn update(&self, task: TaskHandle, status: TaskStatus) {
+        let mut active = self.active.write().await;
+        let Some(idx) = Self::get_active_index(&*active, task) else { return };
+        let Some(task) = active.get_mut(idx) else { return };
 
         task.status = status;
     }

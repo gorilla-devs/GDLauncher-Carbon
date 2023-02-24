@@ -13,11 +13,13 @@ use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
 use self::minecraft::MinecraftManager;
+use self::queue::TaskQueue;
 
 pub mod account;
 mod configuration;
 mod minecraft;
 mod prisma_client;
+mod queue;
 
 pub type Managers = Arc<ManagersInner>;
 
@@ -35,6 +37,7 @@ pub struct ManagersInner {
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
     pub(crate) reqwest_client: reqwest::Client,
     pub(crate) prisma_client: Arc<PrismaClient>,
+    pub(crate) task_queue: TaskQueue,
 }
 
 pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
@@ -89,6 +92,7 @@ impl ManagersInner {
             invalidation_channel,
             reqwest_client: reqwest::Client::new(),
             prisma_client: Arc::new(db_client),
+            task_queue: TaskQueue::new(2 /* todo: download slots */),
         });
 
         let weak = Arc::downgrade(&app);
