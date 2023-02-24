@@ -92,9 +92,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             Ok(Javas(javas))
         }
 
-        mutation SET_DEFAULT[_, args: SetDefaultArgs] {}
+        mutation SET_DEFAULT[_, _args: SetDefaultArgs] {}
 
-        mutation SETUP_CONTROLLED[_, args: SetupArgs] {
+        mutation SETUP_CONTROLLED[_, _args: SetupArgs] {
             // invalidate_query!("java.autoSetupjavaProgress");
         }
 
@@ -102,6 +102,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             Ok(0) // progress
         }
 
-        mutation DELETE_CONTROLLED[_, major_version: u8] {}
+        mutation DELETE_CONTROLLED[_, _major_version: u8] {}
     }
 }
