@@ -26,6 +26,10 @@ impl ConfigurationManager {
         }
     }
 
+    pub fn get_runtime_path(&self) -> &runtime_path::RuntimePath {
+        &self.runtime_path
+    }
+
     pub fn get_appref(&self) -> &AppRef {
         &self.app
     }

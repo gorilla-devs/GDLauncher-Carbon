@@ -8,14 +8,17 @@ use carbon_domain::{
     },
 };
 use prisma_client_rust::QueryError;
-use regex::Regex;
+use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use thiserror::Error;
 
 use crate::{
     db::PrismaClient,
-    managers::configuration::runtime_path::{NativesPath, RuntimePath},
+    managers::{
+        configuration::runtime_path::{NativesPath, RuntimePath},
+        AppRef, Managers, ManagersInner,
+    },
 };
 
 #[derive(Debug, Error)]
@@ -65,7 +68,23 @@ enum ArgPlaceholder {
 }
 
 impl ArgPlaceholder {
-    // fn get_matching_enum
+    fn from_str(s: &str) -> Option<ArgPlaceholder> {
+        match s {
+            "auth_player_name" => Some(ArgPlaceholder::AuthPlayerName),
+            "version_name" => Some(ArgPlaceholder::VersionName),
+            "game_directory" => Some(ArgPlaceholder::GameDirectory),
+            "assets_root" => Some(ArgPlaceholder::AssetsRoot),
+            "game_assets" => Some(ArgPlaceholder::GameAssets),
+            "assets_index_name" => Some(ArgPlaceholder::AssetsIndexName),
+            "auth_uuid" => Some(ArgPlaceholder::AuthUuid),
+            "auth_access_token" => Some(ArgPlaceholder::AuthAccessToken),
+            "auth_session" => Some(ArgPlaceholder::AuthSession),
+            "user_type" => Some(ArgPlaceholder::UserType),
+            "version_type" => Some(ArgPlaceholder::VersionType),
+            "user_properties" => Some(ArgPlaceholder::UserProperties),
+            _ => None,
+        }
+    }
 
     fn get_argument(&self) -> String {
         match self {
@@ -86,18 +105,18 @@ impl ArgPlaceholder {
 
     fn get_placeholder(&self) -> String {
         match self {
-            ArgPlaceholder::AuthPlayerName => "${auth_player_name}".to_owned(),
-            ArgPlaceholder::VersionName => "${version_name}".to_owned(),
-            ArgPlaceholder::GameDirectory => "${game_directory}".to_owned(),
-            ArgPlaceholder::AssetsRoot => "${assets_root}".to_owned(),
-            ArgPlaceholder::GameAssets => "${game_assets}".to_owned(),
-            ArgPlaceholder::AssetsIndexName => "${assets_index_name}".to_owned(),
-            ArgPlaceholder::AuthUuid => "${auth_uuid}".to_owned(),
-            ArgPlaceholder::AuthAccessToken => "${auth_access_token}".to_owned(),
-            ArgPlaceholder::AuthSession => "${auth_session}".to_owned(),
-            ArgPlaceholder::UserType => "${user_type}".to_owned(),
-            ArgPlaceholder::VersionType => "${version_type}".to_owned(),
-            ArgPlaceholder::UserProperties => "${user_properties}".to_owned(),
+            ArgPlaceholder::AuthPlayerName => "auth_player_name".to_owned(),
+            ArgPlaceholder::VersionName => "version_name".to_owned(),
+            ArgPlaceholder::GameDirectory => "game_directory".to_owned(),
+            ArgPlaceholder::AssetsRoot => "assets_root".to_owned(),
+            ArgPlaceholder::GameAssets => "game_assets".to_owned(),
+            ArgPlaceholder::AssetsIndexName => "assets_index_name".to_owned(),
+            ArgPlaceholder::AuthUuid => "auth_uuid".to_owned(),
+            ArgPlaceholder::AuthAccessToken => "auth_access_token".to_owned(),
+            ArgPlaceholder::AuthSession => "auth_session".to_owned(),
+            ArgPlaceholder::UserType => "user_type".to_owned(),
+            ArgPlaceholder::VersionType => "version_type".to_owned(),
+            ArgPlaceholder::UserProperties => "user_properties".to_owned(),
         }
     }
 }
@@ -112,28 +131,72 @@ fn get_default_placeholder(version: &Version) -> String {
     args
 }
 
-fn replace_placeholders(command: String) -> String {
-    let matches =
-        Regex::new(r"--(?P<name>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
-            .unwrap();
+fn replace_placeholder(app: Arc<ManagersInner>, placeholder: &str, version: &Version) -> String {
+    // let player_name = app.account_manager.get_player_name();
+    let version_name = version.id.clone();
+    let game_directory = app
+        .configuration_manager
+        .get_runtime_path()
+        .get_instances()
+        .get_instance_path("something".to_owned());
+    let assets_root = app
+        .configuration_manager
+        .get_runtime_path()
+        .get_assets()
+        .to_path();
+    let game_assets = app
+        .configuration_manager
+        .get_runtime_path()
+        .get_assets()
+        .get_legacy_path();
+    let assets_index_name = version.assets.clone();
 
-    for cap in matches.captures_iter(&command) {
-        if let Some(name) = cap.name("name") {
-            println!("Name: {}", name.as_str());
-        }
-        if let Some(value) = cap.name("value") {
-            println!("Value: {}", value.as_str());
-        }
-        if let Some(standalone) = cap.name("standalone") {
-            println!("Standalone: {}", standalone.as_str());
-        }
+    match placeholder {
+        "auth_player_name" => unimplemented!(),
+        "version_name" => unimplemented!(),
+        "game_directory" => unimplemented!(),
+        "assets_root" => unimplemented!(),
+        "game_assets" => unimplemented!(),
+        "assets_index_name" => unimplemented!(),
+        "auth_uuid" => unimplemented!(),
+        "auth_access_token" => unimplemented!(),
+        "auth_session" => unimplemented!(),
+        "user_type" => unimplemented!(),
+        "version_type" => unimplemented!(),
+        "user_properties" => unimplemented!(),
+        _ => todo!(),
     }
-
-    todo!()
 }
 
-pub fn generate_startup_command(version: Version, runtime_path: RuntimePath) -> String {
-    let libraries = version.libraries.unwrap();
+fn replace_placeholders(app: Arc<ManagersInner>, command: String, version: &Version) -> String {
+    let matches =
+        Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
+            .unwrap();
+
+    let new_command = matches.replace_all(&command, |caps: &Captures| {
+        if let Some(value) = caps.name("value") {
+            let value = replace_placeholder(app.clone(), value.as_str(), version);
+            return format!("{} {}", caps.name("arg").unwrap().as_str(), value);
+        } else if let Some(standalone) = caps.name("standalone") {
+            let value = replace_placeholder(app.clone(), standalone.as_str(), version);
+            return value;
+        }
+        if let Some(arg) = caps.name("arg") {
+            return arg.as_str().to_string();
+        } else {
+            unreachable!("No capturing group matched")
+        }
+    });
+
+    new_command.to_string()
+}
+
+pub fn generate_startup_command(
+    app: Arc<ManagersInner>,
+    version: Version,
+    runtime_path: RuntimePath,
+) -> String {
+    let libraries = version.libraries.as_ref().unwrap();
 
     let mut command = Vec::with_capacity(libraries.get_libraries().len() * 2);
     command.push("java".to_owned());
@@ -148,12 +211,18 @@ pub fn generate_startup_command(version: Version, runtime_path: RuntimePath) -> 
     command.push(natives_path);
     command.push("-cp".to_owned());
 
+    let classpath_separator = if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    };
+
     for library in libraries.get_libraries() {
         let path = runtime_path
             .get_libraries()
-            .get_library_pathbuf(MavenCoordinates::try_from(library.name.clone()).unwrap());
+            .get_library_path(MavenCoordinates::try_from(library.name.clone()).unwrap());
 
-        command.push(format!("{};", path.display()));
+        command.push(format!("{}{}", path.display(), classpath_separator));
     }
 
     command.push("-Xmx4096m".to_string());
@@ -161,7 +230,7 @@ pub fn generate_startup_command(version: Version, runtime_path: RuntimePath) -> 
 
     command.push(format!(
         "-Dminecraft.applet.TargetDirectory={}",
-        runtime_path.get_root().to_pathbuf().display()
+        runtime_path.get_root().to_path().display()
     ));
 
     // command.push("-Dlog4j.configurationFile=C:\Users\david\AppData\Roaming\gdlauncher_next\datastore\assets\objects\bd\client-1.12.xml".to_owned());
@@ -169,24 +238,51 @@ pub fn generate_startup_command(version: Version, runtime_path: RuntimePath) -> 
     command.push("-Dfml.ignorePatchDiscrepancies=true".to_owned());
     command.push("-Dfml.ignoreInvalidMinecraftCertificates=true".to_owned());
 
-    command.push("net.minecraft.client.main.Main".to_owned());
+    command.push(version.main_class.clone());
 
     // check if arguments.jvm is there, otherwise inject defaults
 
-    match version.arguments {
+    match &version.arguments {
         Some(arguments) => {
-            if let Some(jvm) = arguments.jvm {
+            if let Some(jvm) = &arguments.jvm {
                 command.push("".to_string());
             } else {
-                get_default_placeholder();
+                get_default_placeholder(&version);
             }
         }
         None => {
-            get_default_placeholder();
+            get_default_placeholder(&version);
         }
     }
 
     // command.push("--username killpowa --version 1.19.3 --gameDir ..\..\instances\Minecraft vanilla --assetsDir ..\..\datastore\assets --assetIndex 2 --uuid 3b40f99969e64dbcabd01f87cddcb1fd --accessToken __HIDDEN_TOKEN__ --clientId ${clientid} --xuid ${auth_xuid} --userType mojang --versionType release --width=854 --height=480".to_owned());
 
     command.join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use crate::setup_managers_for_test;
+
+    use super::*;
+
+    // #[tokio::test]
+    // async fn test_replace_placeholder() {
+    //     let app = setup_managers_for_test().await;
+    //     let version = Version::default();
+    //     let placeholder = "auth_player_name";
+    //     let result = replace_placeholder(app, placeholder, &version);
+    //     assert_eq!(result, "killpowa");
+    // }
+
+    // #[tokio::test]
+    // async fn test_replace_placeholders() {
+    //     let app = setup_managers_for_test().await;
+    //     let version = Version::default();
+    //     let command = "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --clientId ${clientid} --xuid ${auth_xuid} --userType ${user_type} --versionType ${version_type} --width=854 --height=480".to_owned();
+    //     let result = replace_placeholders(app, command, &version);
+    //     assert_eq!(result, "--username killpowa --version 1.19.3 --gameDir ..\\..\\instances\\Minecraft vanilla --assetsDir ..\\..\\datastore\\assets --assetIndex 2 --uuid 3b40f99969e64dbcabd01f87cddcb1fd --accessToken __HIDDEN_TOKEN__ --clientId ${clientid} --xuid ${auth_xuid} --userType mojang --versionType release --width=854 --height=480".to_owned());
+    // }
 }

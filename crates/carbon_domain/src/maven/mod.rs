@@ -20,7 +20,7 @@ impl MavenCoordinates {
         parse_maven_coordinates(coordinates)
     }
 
-    pub fn into_pathbuf(self) -> PathBuf {
+    pub fn into_path(self) -> PathBuf {
         PathBuf::new()
             .join(self.group_id)
             .join(self.artifact_id)
@@ -122,7 +122,7 @@ mod tests {
     fn test_into_pathbuf() {
         let coordinates = "com.example:example:1.0.0".to_string();
         let parsed_coordinates = MavenCoordinates::try_from(coordinates).unwrap();
-        let path = parsed_coordinates.into_pathbuf();
+        let path = parsed_coordinates.into_path();
         assert_eq!(
             path,
             PathBuf::from("com.example").join("example").join("1.0.0")

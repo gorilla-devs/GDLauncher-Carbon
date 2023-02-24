@@ -80,7 +80,7 @@ impl MinecraftManager {
             .client
             .into_downloadable(&std::env::current_dir().unwrap());
 
-        let assets = assets::get_meta(db_client.clone(), version.asset_index.unwrap())
+        let assets = assets::get_meta(db_client.clone(), version.asset_index)
             .await?
             .into_vec_downloadable(&std::env::current_dir().unwrap());
 

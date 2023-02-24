@@ -50,7 +50,7 @@ pub struct Version {
     pub inherits_from: Option<String>,
     pub arguments: Option<Arguments>,
     #[serde(rename = "assetIndex")]
-    pub asset_index: Option<VersionAssetIndex>,
+    pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
     #[serde(rename = "complianceLevel")]
     pub compliance_level: Option<i64>,
@@ -62,7 +62,7 @@ pub struct Version {
     pub libraries: Option<Libraries>,
     pub logging: Option<Logging>,
     #[serde(rename = "mainClass")]
-    pub main_class: Option<String>,
+    pub main_class: String,
     #[serde(rename = "minimumLauncherVersion")]
     pub minimum_launcher_version: Option<i64>,
     #[serde(rename = "releaseTime")]
@@ -70,6 +70,24 @@ pub struct Version {
     pub time: Option<String>,
     #[serde(rename = "type")]
     pub version_info_type: Option<String>,
+}
+
+impl Version {
+    pub fn is_older_than(&self, other: &Version) -> bool {
+        if let Some(release_time) = &self.release_time {
+            if let Some(other_release_time) = &other.release_time {
+                return release_time < other_release_time;
+            }
+        }
+
+        if let Some(time) = &self.time {
+            if let Some(other_time) = &other.time {
+                return time < other_time;
+            }
+        }
+
+        false
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
