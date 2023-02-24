@@ -6,6 +6,7 @@ import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
+import { useModal } from "@/ModalsManager";
 
 type Props = {
   setStep: Setter<number>;
@@ -18,6 +19,8 @@ const Auth = (props: Props) => {
   const [clicked, setClicked] = createSignal(false);
   const navigate = useNavigate();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const modalsContext = useModal();
 
   let mutation = rspc.createMutation(["account.enroll.begin"], {
     onError(error) {
@@ -57,7 +60,7 @@ const Auth = (props: Props) => {
 
   return (
     <div>
-      <div class="absolute left-0 right-0 flex flex-col justify-center items-center m-auto -top-15">
+      <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
         <img class="w-40" src={Logo} />
         <p class="text-shade-0">{__APP_VERSION__}</p>
       </div>
@@ -76,7 +79,7 @@ const Auth = (props: Props) => {
         <Show when={error()}>
           <p class="m-0 text-red">{error()}</p>
         </Show>
-        <ul class="flex text-sm gap-3 list-none p-0 mb-8 underline">
+        <ul class="flex text-sm list-none gap-3 p-0 mb-8 underline">
           <li
             class="cursor-pointer"
             onClick={() => {
