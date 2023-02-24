@@ -1,5 +1,3 @@
-use std::backtrace::Backtrace;
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]

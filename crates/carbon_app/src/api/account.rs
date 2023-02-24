@@ -5,6 +5,12 @@ use serde::Serialize;
 use crate::api::keys::account::*;
 use crate::api::router::router;
 use crate::error::into_rspc;
+use crate::error::request::FERequestError;
+use crate::managers::account::api::{
+    DeviceCodePollError, DeviceCodeRequestError, McAccountPopulateError, McAuthError,
+    McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
+    XboxAuthError, XboxError,
+};
 use crate::managers::{account, Managers};
 use carbon_domain::account as domain;
 
@@ -91,7 +97,7 @@ enum EnrollmentStatus {
     PollingCode(DeviceCode),
     QueryingAccount,
     Complete(AccountEntry),
-    Failed(String),
+    Failed(EnrollmentError),
 }
 
 #[derive(Type, Serialize)]
@@ -99,6 +105,21 @@ struct DeviceCode {
     user_code: String,
     verification_uri: String,
     expires_at: DateTime<Utc>,
+}
+
+#[derive(Type, Serialize)]
+enum EnrollmentError {
+    /// web request related error
+    Request(FERequestError),
+    DeviceCodeExpired,
+    /// signing in with xbox has returned an error
+    XboxAccount(XboxError),
+    /// the account details response from the mojang server has likely been tampered with
+    AccountSigningError,
+    /// the user does not own the game OR is using xbox gamepass (this is not checked yet)
+    NoGameOwnership,
+    /// the user needs to log in once on the offical mc launcher
+    NoGameProfile,
 }
 
 impl From<domain::Account> for AccountEntry {
@@ -139,7 +160,7 @@ impl From<account::FEEnrollmentStatus> for EnrollmentStatus {
             Status::PollingCode(code) => Self::PollingCode(code.into()),
             Status::QueryAccount => Self::QueryingAccount,
             Status::Complete(account) => Self::Complete(account.into()),
-            Status::Failed(msg) => Self::Failed(msg),
+            Status::Failed(msg) => Self::Failed(msg.into()),
         }
     }
 }
@@ -150,6 +171,41 @@ impl From<account::api::DeviceCode> for DeviceCode {
             user_code: value.user_code,
             verification_uri: value.verification_uri,
             expires_at: value.expires_at,
+        }
+    }
+}
+
+impl From<account::EnrollmentError> for EnrollmentError {
+    fn from(value: account::EnrollmentError) -> Self {
+        use account::EnrollmentError as BE;
+
+        match value {
+            BE::DeviceCodeRequest(DeviceCodeRequestError::Request(x))
+            | BE::DeviceCodePoll(DeviceCodePollError::Request(x))
+            | BE::McAuth(McAuthError::Request(x))
+            | BE::McAuth(McAuthError::Xbox(XboxAuthError::Request(x)))
+            | BE::AccountPopulate(McAccountPopulateError::Entitlement(
+                McEntitlementCheckError::Request(x),
+            ))
+            | BE::AccountPopulate(McAccountPopulateError::Profile(
+                McProfileRequestError::Request(x),
+            )) => Self::Request(x.into()),
+
+            BE::DeviceCodePoll(DeviceCodePollError::CodeExpired) => Self::DeviceCodeExpired,
+
+            BE::McAuth(McAuthError::Xbox(XboxAuthError::Xbox(x))) => Self::XboxAccount(x),
+
+            BE::AccountPopulate(McAccountPopulateError::Entitlement(
+                McEntitlementCheckError::Entitlement(McEntitlementError::NoEntitlement),
+            )) => Self::NoGameOwnership,
+
+            BE::AccountPopulate(McAccountPopulateError::Entitlement(
+                McEntitlementCheckError::Entitlement(_),
+            )) => Self::AccountSigningError,
+
+            BE::AccountPopulate(McAccountPopulateError::Profile(
+                McProfileRequestError::Profile(McProfileError::NoProfile),
+            )) => Self::NoGameProfile,
         }
     }
 }

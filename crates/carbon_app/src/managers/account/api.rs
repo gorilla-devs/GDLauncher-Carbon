@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use axum::extract::FromRef;
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::{Client, StatusCode};
-use serde::Deserialize;
+use rspc::Type;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
@@ -295,10 +295,12 @@ impl XboxAuth {
                         .display_claims
                         .xui
                         .get(0)
-                        .ok_or(XboxAuthError::Request(RequestError {
-                            context: RequestContext::none(),
-                            error: RequestErrorDetails::MalformedResponse,
-                        }))?
+                        .ok_or_else(|| {
+                            XboxAuthError::Request(RequestError {
+                                context: RequestContext::none(),
+                                error: RequestErrorDetails::MalformedResponse,
+                            })
+                        })?
                         .uhs
                         .clone(),
                 })
@@ -322,7 +324,7 @@ impl XboxAuth {
     }
 }
 
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone, Copy, Type, Serialize)]
 pub enum XboxError {
     #[error("no xbox account is associated with this microsoft account")]
     NoAccount,
@@ -516,8 +518,8 @@ impl McAuth {
     pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
         Ok(McAccount {
             auth: self.clone(),
-            entitlement: self.get_entitlement(&client).await?,
-            profile: self.get_profile(&client).await?,
+            entitlement: self.get_entitlement(client).await?,
+            profile: self.get_profile(client).await?,
         })
     }
 }

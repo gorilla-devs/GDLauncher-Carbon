@@ -142,7 +142,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             app.configuration_manager
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(error::into_rspc);
+                .map_err(error::into_rspc)?;
             Ok(())
         }
     }

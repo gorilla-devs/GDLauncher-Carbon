@@ -86,13 +86,13 @@ pub async fn download_file(
         progress.send(Progress {
             current_count: 0,
             current_size: buf.len() as u64,
-        });
+        })?;
     }
 
     progress.send(Progress {
         current_count: 0,
         current_size: 0,
-    });
+    })?;
 
     Ok(())
 }
