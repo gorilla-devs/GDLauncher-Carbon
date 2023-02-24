@@ -86,6 +86,36 @@ impl AccountManager {
         Ok(())
     }
 
+    /// Get the active account's details.
+    ///
+    /// Not exposed to the frontend on purpose. Will NOT be invalidated.
+    pub async fn get_active_account(&self) -> Result<Option<Account>, GetActiveAccountError> {
+        use db::account::WhereParam::Uuid;
+
+        let Some(uuid) = self.get_active_uuid().await? else { return Ok(None) };
+
+        let account = self
+            .app
+            .upgrade()
+            .prisma_client
+            .account()
+            .find_first(vec![Uuid(StringFilter::Equals(uuid))])
+            .exec()
+            .await?
+            .ok_or(GetActiveAccountError::AccountNotPresent)?;
+
+        let type_ = match &account.ms_refresh_token {
+            None => AccountType::Offline,
+            Some(_) => AccountType::Microsoft,
+        };
+
+        Ok(Some(Account {
+            username: account.username,
+            uuid: account.uuid,
+            type_,
+        }))
+    }
+
     async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, QueryError> {
         Ok(self
             .app
@@ -309,6 +339,18 @@ define_single_error!(GetActiveUuidError::Query(ConfigurationError));
 define_single_error!(GetAccountEntriesError::Query(QueryError));
 define_single_error!(AddAccountError::Query(QueryError));
 define_single_error!(GetAccountListError::Query(QueryError));
+
+#[derive(Error, Debug)]
+pub enum GetActiveAccountError {
+    #[error("get active uuid error: {0}")]
+    GetActiveUuid(#[from] GetActiveUuidError),
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("account selected but not present")]
+    AccountNotPresent,
+}
 
 #[derive(Error, Debug)]
 pub enum GetAccountStatusError {
