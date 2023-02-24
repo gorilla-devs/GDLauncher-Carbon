@@ -15,7 +15,7 @@ pub mod runtime_path;
 
 pub(crate) struct ConfigurationManager {
     app: AppRef,
-    runtime_path: runtime_path::RuntimePath,
+    pub runtime_path: runtime_path::RuntimePath,
 }
 
 impl ConfigurationManager {

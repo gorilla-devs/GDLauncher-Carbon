@@ -234,7 +234,7 @@ impl TaskQueue {
 mod test {
     use std::sync::{Arc, Mutex};
 
-    use super::{ActiveTask, QueuedTask, TaskHandle, TaskProgress, TaskQueue};
+    use super::{QueuedTask, TaskHandle, TaskQueue};
 
     #[tokio::test]
     async fn download_concurrency() {
