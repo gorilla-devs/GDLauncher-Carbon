@@ -97,13 +97,11 @@ impl TaskQueue {
         }
     }
 
-    async fn can_start_task(&self, task: &QueuedTask) -> bool {
+    async fn can_start_task(&self, task: &QueuedTask, queue: &VecDeque<QueuedTask>, active: &VecDeque<ActiveTask>) -> bool {
         if !task.requires_download_slot || {
             let slots = self.download_slots.read().await;
             slots.used < slots.total
         } {
-            let queue = self.queue.read().await;
-            let active = self.active.read().await;
             for &prereqisite in &task.prerequisites {
                 if queue.iter().any(|task| task.handle == prereqisite)
                     || active.iter().any(|task| task.handle == prereqisite)
@@ -120,7 +118,7 @@ impl TaskQueue {
 
     /// Queue a task or run it immediately if possible
     pub async fn queue(&mut self, task: QueuedTask) {
-        if self.can_start_task(&task).await {
+        if self.can_start_task(&task, &*self.queue.read().await, &*self.active.read().await).await {
             self.start_task(task).await;
         } else {
             self.queue.write().await.push_back(task);
@@ -150,7 +148,7 @@ impl TaskQueue {
         let mut queue = self.queue.write().await;
         let mut i = 0;
         while let Some(queued) = queue.get(i) {
-            if self.can_start_task(queued).await {
+            if self.can_start_task(queued, &*queue, &*self.active.read().await).await {
                 let task = queue.remove(i).unwrap();
                 // not a deadlock, start_task uses self.active
                 self.start_task(task).await;
@@ -228,7 +226,7 @@ mod test {
     use super::{ActiveTask, QueuedTask, TaskHandle, TaskProgress, TaskQueue};
 
     #[tokio::test]
-    fn download_concurrency() {
+    async fn download_concurrency() {
         let mut queue = TaskQueue::new(2);
 
         let task = || {
@@ -250,18 +248,18 @@ mod test {
         let (_, b_task, b_trigger) = task();
         let (_, c_task, c_trigger) = task();
 
-        queue.queue(a_task);
+        queue.queue(a_task).await;
         assert_eq!(*a_trigger.lock().unwrap(), true);
-        queue.queue(b_task);
+        queue.queue(b_task).await;
         assert_eq!(*b_trigger.lock().unwrap(), true);
-        queue.queue(c_task);
+        queue.queue(c_task).await;
         assert_eq!(*c_trigger.lock().unwrap(), false);
-        queue.complete(a_handle);
+        queue.complete(a_handle).await;
         assert_eq!(*c_trigger.lock().unwrap(), true);
     }
 
-    #[test]
-    fn task_dependence() {
+    #[tokio::test]
+    async fn task_dependence() {
         let mut queue = TaskQueue::new(0);
 
         let a_handle = TaskHandle::new();
@@ -289,10 +287,10 @@ mod test {
             prerequisites: vec![a_handle],
         };
 
-        queue.queue(a_task);
-        queue.queue(b_task);
+        queue.queue(a_task).await;
+        queue.queue(b_task).await;
         assert_eq!(*b_trigger.lock().unwrap(), false);
-        queue.complete(a_handle);
+        queue.complete(a_handle).await;
         assert_eq!(*b_trigger.lock().unwrap(), true);
     }
 }
