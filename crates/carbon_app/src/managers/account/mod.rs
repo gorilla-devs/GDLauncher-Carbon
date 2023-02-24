@@ -413,9 +413,9 @@ pub enum SetAccountError {
 }
 
 pub struct FullAccount {
-    username: String,
-    uuid: String,
-    type_: FullAccountType,
+    pub username: String,
+    pub uuid: String,
+    pub type_: FullAccountType,
 }
 
 pub enum FullAccountType {
