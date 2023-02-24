@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    sync::atomic::{Ordering, AtomicU32},
+    sync::atomic::{AtomicU32, Ordering},
 };
 
 use rspc::Type;
@@ -97,7 +97,12 @@ impl TaskQueue {
         }
     }
 
-    async fn can_start_task(&self, task: &QueuedTask, queue: &VecDeque<QueuedTask>, active: &VecDeque<ActiveTask>) -> bool {
+    async fn can_start_task(
+        &self,
+        task: &QueuedTask,
+        queue: &VecDeque<QueuedTask>,
+        active: &VecDeque<ActiveTask>,
+    ) -> bool {
         if !task.requires_download_slot || {
             let slots = self.download_slots.read().await;
             slots.used < slots.total
@@ -118,7 +123,10 @@ impl TaskQueue {
 
     /// Queue a task or run it immediately if possible
     pub async fn queue(&mut self, task: QueuedTask) {
-        if self.can_start_task(&task, &*self.queue.read().await, &*self.active.read().await).await {
+        if self
+            .can_start_task(&task, &*self.queue.read().await, &*self.active.read().await)
+            .await
+        {
             self.start_task(task).await;
         } else {
             self.queue.write().await.push_back(task);
@@ -148,7 +156,10 @@ impl TaskQueue {
         let mut queue = self.queue.write().await;
         let mut i = 0;
         while let Some(queued) = queue.get(i) {
-            if self.can_start_task(queued, &*queue, &*self.active.read().await).await {
+            if self
+                .can_start_task(queued, &*queue, &*self.active.read().await)
+                .await
+            {
                 let task = queue.remove(i).unwrap();
                 // not a deadlock, start_task uses self.active
                 self.start_task(task).await;
