@@ -3,12 +3,17 @@ import { createSignal } from "solid-js";
 
 export const [lastInstanceOpened, setLastInstanceOpened] = createSignal("");
 
-export const libraryUrlRegex = /\/library\/(\w+)/;
+export const libraryPathRegex = /\/library\/(\w+)/;
+
+export const getInstanceIdFromPath = (path: string) => {
+  const instaceUrlRegex = path.match(libraryPathRegex);
+  const instanceId = instaceUrlRegex?.[1];
+  return instanceId;
+};
 
 export const handleRouteChange = () => {
   useBeforeLeave((e: BeforeLeaveEventArgs) => {
-    const instaceUrlRegex = e.to.toString().match(libraryUrlRegex);
-    const instanceId = instaceUrlRegex?.[1];
+    const instanceId = getInstanceIdFromPath(e.to.toString());
 
     if (instanceId) setLastInstanceOpened(instanceId);
   });
