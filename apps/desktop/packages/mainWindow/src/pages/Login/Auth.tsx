@@ -36,9 +36,10 @@ const Auth = (props: Props) => {
   };
 
   createEffect(() => {
-    if (routeData.isSuccess) {
+    if (routeData.isSuccess && clicked()) {
       handleStatus(routeData, {
         onPolling: (info) => {
+          setError("");
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
@@ -50,14 +51,13 @@ const Auth = (props: Props) => {
           setError("error");
         },
         onComplete() {
+          setError("");
           finalizeMutation.mutate(null);
           navigate("/library");
         },
       });
     }
   });
-
-  console.log(__APP_VERSION__);
 
   return (
     <div>

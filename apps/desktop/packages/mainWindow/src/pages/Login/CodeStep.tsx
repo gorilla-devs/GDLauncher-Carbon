@@ -177,6 +177,7 @@ const CodeStep = (props: Props) => {
               defaultValue: "Insert Code",
             }}
           />
+          <div class="i-ri:link text-md" />
         </Button>
       </Show>
       <Show when={expired()}>
