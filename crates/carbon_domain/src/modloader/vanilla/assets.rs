@@ -6,11 +6,11 @@ use tracing::trace;
 #[derive(Error, Debug)]
 pub enum AssetsError {
     #[error("failed to download asset index")]
-    DownloadError(#[from] reqwest::Error),
+    Download(#[from] reqwest::Error),
     #[error("failed to parse asset index")]
-    ParseError(#[from] serde_json::Error),
+    Parse(#[from] serde_json::Error),
     #[error("failed to write asset index")]
-    WriteError(#[from] std::io::Error),
+    Write(#[from] std::io::Error),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

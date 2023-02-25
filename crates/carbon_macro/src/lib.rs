@@ -1,11 +1,13 @@
+// allow dead code during development to keep warning outputs meaningful
+#![allow(dead_code)]
+
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use std::fs;
 
 use quote::quote;
 use syn::__private::bool;
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, ItemFn};
+use syn::{parse_macro_input, Data, DeriveInput, Field};
 
 /// Example of user-defined [derive mode macro][1]
 ///
@@ -14,7 +16,7 @@ use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, ItemFn};
 pub fn app_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    fn is_manager_field(field: &&Field) -> bool {
+    fn _is_manager_field(_field: &&Field) -> bool {
         true
     }
 
@@ -22,7 +24,7 @@ pub fn app_derive(input: TokenStream) -> TokenStream {
         struct Hello;
     };
 
-    if let Data::Struct(app_struct) = input.data {
+    if let Data::Struct(_app_struct) = input.data {
         /*app_struct.fields.iter()
         .filter(is_manager_field)
         .map(|field| {
@@ -39,7 +41,7 @@ pub fn app_derive(input: TokenStream) -> TokenStream {
 pub fn manager_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    fn is_manager_field(field: &&Field) -> bool {
+    fn _is_manager_field(_field: &&Field) -> bool {
         true
     }
 
@@ -47,7 +49,7 @@ pub fn manager_derive(input: TokenStream) -> TokenStream {
         struct Hello;
     };
 
-    if let Data::Struct(app_struct) = input.data {
+    if let Data::Struct(_app_struct) = input.data {
         /*app_struct.fields.iter()
         .filter(is_manager_field)
         .map(|field| {

@@ -88,14 +88,13 @@ impl AccountManager {
     }
 
     async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, QueryError> {
-        Ok(self
-            .app
+        self.app
             .upgrade()
             .prisma_client
             .account()
             .find_many(Vec::new())
             .exec()
-            .await?)
+            .await
     }
 
     pub async fn get_account_list(&self) -> Result<Vec<Account>, GetAccountListError> {

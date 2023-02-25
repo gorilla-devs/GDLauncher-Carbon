@@ -61,7 +61,7 @@ impl ModLoaderHandler for VanillaModLoader {
     }
     async fn install(
         &self,
-        progress_send: Sender<InstallProgress<InstallStages>>,
+        _progress_send: Sender<InstallProgress<InstallStages>>,
     ) -> Result<(), VanillaError> {
         let mc_version = &self.mc_version;
         // TODO: GET BASE_DIR FROM SOMEWHERE

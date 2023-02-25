@@ -16,7 +16,7 @@ const App: Component = () => {
   return (
     <div class="w-screen relative">
       <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute gap-4 flex justify-center items-center cursor-pointer bottom-10 right-0 h-10 p-2 z-50 bg-light-600">
+        <div class="absolute gap-4 flex justify-center items-center cursor-pointer h-10 bottom-10 right-0 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
               navigate("/library");
@@ -45,7 +45,7 @@ const App: Component = () => {
       </Show>
       <AppNavbar />
       <div class="flex w-screen h-auto z-10">
-        <main class="relative flex-1 overflow-hidden">
+        <main class="relative overflow-hidden flex-1">
           <Suspense fallback={<></>}>
             <Route />
           </Suspense>

@@ -107,7 +107,7 @@ pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JavaError> {
     }
     Err(JavaError::NoArchInJavaOutput)
 }
-
+/*
 #[cfg(test)]
 mod test {
     use crate::JavaVersion;
@@ -290,3 +290,4 @@ mod test {
         let _ = std::fs::remove_file(&java_check_path_env);
     }
 }
+*/

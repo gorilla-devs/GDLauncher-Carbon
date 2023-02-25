@@ -61,13 +61,12 @@ pub struct Configuration {
 
 impl Configuration {
     pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
-        Ok(self
-            .client
+        self.client
             .app_configuration()
             .find_unique(app_configuration::id::equals(0))
             .exec()
             .await?
-            .ok_or(ConfigurationError::Missing)?)
+            .ok_or(ConfigurationError::Missing)
     }
 
     pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {

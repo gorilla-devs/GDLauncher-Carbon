@@ -15,5 +15,5 @@ struct App {
 }
 
 impl App {
-    fn start_instance_by_name(instance_name: String) {}
+    fn start_instance_by_name(_instance_name: String) {}
 }
