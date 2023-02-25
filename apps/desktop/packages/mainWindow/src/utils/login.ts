@@ -1,12 +1,22 @@
-import { AccountEntry, DeviceCode } from "@gd/core_module/bindings";
+import {
+  AccountEntry,
+  DeviceCode,
+  EnrollmentError,
+} from "@gd/core_module/bindings";
 
 type RouteData = {
   data:
     | "RequestingCode"
-    | { PollingCode: DeviceCode }
+    | {
+        PollingCode: DeviceCode;
+      }
     | "QueryingAccount"
-    | { Complete: AccountEntry }
-    | { Failed: string };
+    | {
+        Complete: AccountEntry;
+      }
+    | {
+        Failed: EnrollmentError;
+      };
 };
 
 type EventsCallbacks = {

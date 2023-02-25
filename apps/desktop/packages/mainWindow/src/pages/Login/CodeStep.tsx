@@ -51,6 +51,8 @@ const CodeStep = (props: Props) => {
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
 
+  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
+
   const handleRefersh = async () => {
     cancelMutation.mutate(null);
     mutation.mutate(null);
@@ -81,13 +83,12 @@ const CodeStep = (props: Props) => {
   };
 
   let interval: ReturnType<typeof setTimeout>;
-  // let finalize = rspc.createQuery(() => ["account.enroll.finalize", null]);
 
   createEffect(() => {
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onComplete(_accountEntry) {
-          // FINALIZE
+          finalizeMutation.mutate(null);
           navigate("/library");
         },
       });

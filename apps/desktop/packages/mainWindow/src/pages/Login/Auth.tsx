@@ -22,13 +22,13 @@ const Auth = (props: Props) => {
 
   const modalsContext = useModal();
 
-  let mutation = rspc.createMutation(["account.enroll.begin"], {
+  const mutation = rspc.createMutation(["account.enroll.begin"], {
     onError(error) {
       setError(error.message);
     },
   });
 
-  // let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {});
+  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
   const handleClick = async () => {
     setClicked(true);
@@ -50,6 +50,7 @@ const Auth = (props: Props) => {
           setError(error);
         },
         onComplete() {
+          finalizeMutation.mutate(null);
           navigate("/library");
         },
       });

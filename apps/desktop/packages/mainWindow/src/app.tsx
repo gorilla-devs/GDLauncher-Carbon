@@ -9,6 +9,7 @@ import initThemes from "./utils/theme";
 const App: Component = () => {
   const Route = useRoutes(routes);
   const navigate = useNavigate();
+  // const deleteMutation = rspc.createMutation(["account.deleteAccount"]);
 
   createInvalidateQuery();
   initThemes();
@@ -31,6 +32,7 @@ const App: Component = () => {
           </div>
           <div
             onClick={() => {
+              // deleteMutation.mutate();
               navigate("/");
             }}
           >
