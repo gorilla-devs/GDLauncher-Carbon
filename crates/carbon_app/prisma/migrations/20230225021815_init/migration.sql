@@ -42,6 +42,12 @@ CREATE TABLE "MinecraftAssets" (
     "json" BLOB NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "ActiveDownloads" (
+    "url" TEXT NOT NULL PRIMARY KEY,
+    "file_id" TEXT NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "MinecraftManifest_id_key" ON "MinecraftManifest"("id");
 
@@ -53,3 +59,6 @@ CREATE UNIQUE INDEX "MinecraftVersion_idSha1_key" ON "MinecraftVersion"("idSha1"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "MinecraftAssets_idSha1_key" ON "MinecraftAssets"("idSha1");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");

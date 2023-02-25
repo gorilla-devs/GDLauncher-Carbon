@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use crate::{error::request::RequestError, managers::AppRef};
 
-struct DownloadManager {
+pub struct DownloadManager {
     app: AppRef,
 }
 
@@ -227,4 +227,56 @@ pub enum DownloadCompleteError {
 
     #[error("error renaming file: {0}")]
     RenameError(io::Error),
+}
+
+#[cfg(test)]
+mod test {
+    use super::DownloadStatus;
+
+    #[tokio::test]
+    async fn attempt_download() {
+        let app = crate::setup_managers_for_test().await;
+
+        let mut handle = app
+            .download_manager
+            .start_download(String::from("https://gdlauncher.com/"))
+            .await
+            .unwrap();
+
+        while let Some(msg) = handle.status_channel.recv().await {
+            match msg {
+                DownloadStatus::FailedToStart(e) => Err(e).unwrap(),
+                DownloadStatus::FailedInProgress(e) => Err(e).unwrap(),
+                DownloadStatus::Complete => {
+                    let tmpfolder = app
+                        .configuration_manager
+                        .runtime_path
+                        .get_temp()
+                        .to_pathbuf();
+
+                    tokio::fs::create_dir(tmpfolder).await.unwrap();
+
+                    app.download_manager
+                        .complete_download(
+                            handle,
+                            &app.configuration_manager
+                                .runtime_path
+                                .get_temp()
+                                .to_pathbuf()
+                                .join("gdl.html"),
+                        )
+                        .await
+                        .unwrap();
+
+                    return;
+                }
+                DownloadStatus::Status { downloaded, total } => {
+                    println!("downloaded: {downloaded}/{total:?}");
+                }
+            }
+        }
+        dbg!();
+
+        panic!("channel dropped before completion");
+    }
 }

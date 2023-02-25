@@ -12,6 +12,7 @@ use thiserror::Error;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
+use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
 use self::queue::TaskQueue;
 
@@ -37,6 +38,7 @@ pub struct ManagersInner {
     pub(crate) account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
     pub(crate) reqwest_client: reqwest::Client,
+    pub(crate) download_manager: DownloadManager,
     pub(crate) prisma_client: Arc<PrismaClient>,
     pub(crate) task_queue: TaskQueue,
 }
@@ -90,6 +92,7 @@ impl ManagersInner {
             configuration_manager: ConfigurationManager::new(runtime_path),
             minecraft_manager: MinecraftManager::new(),
             account_manager: AccountManager::new(),
+            download_manager: DownloadManager::new(),
             invalidation_channel,
             reqwest_client: reqwest::Client::new(),
             prisma_client: Arc::new(db_client),
@@ -107,7 +110,8 @@ impl ManagersInner {
         unsafe {
             app.configuration_manager.get_appref().init(weak.clone());
             app.minecraft_manager.get_appref().init(weak.clone());
-            app.account_manager.get_appref().init(weak);
+            app.account_manager.get_appref().init(weak.clone());
+            app.download_manager.get_appref().init(weak.clone());
         }
 
         app
