@@ -1,5 +1,6 @@
-use std::io;
+use std::{io, path::Path};
 
+use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::{
     fs::File,
@@ -25,8 +26,55 @@ impl DownloadManager {
         &self.app
     }
 
-    pub async fn start_download(&self, url: String) -> DownloadHandle {
+    pub async fn complete_download(
+        &self,
+        mut handle: DownloadHandle,
+        target: &Path,
+    ) -> Result<(), DownloadCompleteError> {
+        use crate::db::active_downloads::UniqueWhereParam;
+
+        if let Err(_) = handle.complete_channel.try_recv() {
+            // no completion flag
+            return Err(DownloadCompleteError::DownloadIncomplete);
+        }
+
+        let path = self
+            .app
+            .upgrade()
+            .configuration_manager
+            .runtime_path
+            .get_download()
+            .to_pathbuf()
+            .join(handle.id.to_string());
+
+        tokio::fs::rename(path, target)
+            .await
+            // explicit map_err because this is specifically a rename error,
+            // not just an IO error
+            .map_err(DownloadCompleteError::RenameError)?;
+
+        self.app
+            .upgrade()
+            .prisma_client
+            .active_downloads()
+            .delete(UniqueWhereParam::FileIdEquals(handle.id.to_string()))
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn start_download(&self, url: String) -> Result<DownloadHandle, QueryError> {
         let id = Uuid::new_v4();
+
+        self.app
+            .upgrade()
+            .prisma_client
+            .active_downloads()
+            .create(url.clone(), id.to_string(), Vec::new())
+            .exec()
+            .await?;
+
         let path = self
             .app
             .upgrade()
@@ -37,12 +85,14 @@ impl DownloadManager {
             .join(id.to_string());
 
         let (status_send, status_recv) = mpsc::unbounded_channel::<DownloadStatus>();
-        let (cancel_send, mut cancel_recv) = mpsc::channel(1);
+        let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
+        let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
         let app = self.app.clone();
         let task = async move {
             let task = || async {
                 let client = app.upgrade().reqwest_client.clone();
+                let mut send_complete = true;
 
                 let mut response = client
                     .get(url)
@@ -95,6 +145,7 @@ impl DownloadManager {
                         .map_err(DownloadStatus::FailedInProgress)?;
 
                     if let Ok(()) = cancel_recv.try_recv() {
+                        send_complete = false;
                         break; // break instead of return to flush writebuf
                     }
 
@@ -111,6 +162,12 @@ impl DownloadManager {
                     .map_err(DownloadError::IoError)
                     .map_err(DownloadStatus::FailedInProgress)?;
 
+                if send_complete {
+                    // the complete flag is set first to avoid a possible race condition
+                    let _ = complete_send.send(()).await;
+                    let _ = status_send.send(DownloadStatus::Complete);
+                }
+
                 Ok(())
             };
 
@@ -124,11 +181,12 @@ impl DownloadManager {
 
         tokio::spawn(task);
 
-        DownloadHandle {
+        Ok(DownloadHandle {
             id,
             status_channel: status_recv,
             cancel_channel: cancel_send,
-        }
+            complete_channel: complete_recv,
+        })
     }
 }
 
@@ -136,6 +194,8 @@ pub struct DownloadHandle {
     id: Uuid,
     pub status_channel: mpsc::UnboundedReceiver<DownloadStatus>,
     pub cancel_channel: mpsc::Sender<()>,
+    // used to make sure a download was actually completed
+    complete_channel: mpsc::Receiver<()>,
 }
 
 pub enum DownloadStatus {
@@ -155,4 +215,16 @@ pub enum DownloadError {
 
     #[error("io error: {0}")]
     IoError(#[from] io::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum DownloadCompleteError {
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("download was not completed")]
+    DownloadIncomplete,
+
+    #[error("error renaming file: {0}")]
+    RenameError(io::Error),
 }
