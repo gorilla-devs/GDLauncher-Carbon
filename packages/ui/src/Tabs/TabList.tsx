@@ -136,6 +136,21 @@ const TabList = (props: Props) => {
             {props.children}
           </div>
         </Match>
+        <Match when={tabsContext?.variant === "traditional"}>
+          <div
+            class="flex items-center box-border overflow-auto w-full"
+            classList={{
+              "flex-row": tabsContext?.orientation === "horizontal",
+              "flex-col": tabsContext?.orientation === "vertical",
+              "justify-between": props.aligment === "between",
+            }}
+            style={{
+              gap: tabsContext?.gap?.toString(),
+            }}
+          >
+            {props.children}
+          </div>
+        </Match>
       </Switch>
     </div>
   );

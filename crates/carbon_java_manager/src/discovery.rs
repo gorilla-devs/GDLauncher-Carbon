@@ -275,7 +275,7 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     while let Ok(child) = entries.next_entry().await {
         match child {
             Some(child) => {
-                let path = PathBuf::from(child.path());
+                let path = child.path();
                 result.push(path.join("jre/bin/java"));
                 result.push(path.join("bin/java"));
             }

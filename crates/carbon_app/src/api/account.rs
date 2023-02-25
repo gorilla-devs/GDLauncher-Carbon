@@ -5,7 +5,7 @@ use serde::Serialize;
 use crate::api::keys::account::*;
 use crate::api::router::router;
 use crate::error::into_rspc;
-use crate::error::request::{FERequestError, RequestError};
+use crate::error::request::FERequestError;
 use crate::managers::account::api::{
     DeviceCodePollError, DeviceCodeRequestError, McAccountPopulateError, McAuthError,
     McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
