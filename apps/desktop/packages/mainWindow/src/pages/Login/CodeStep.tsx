@@ -67,8 +67,8 @@ const CodeStep = (props: Props) => {
           setExpired(false);
           setError("");
         },
-        onFail(error) {
-          setError(error);
+        onFail() {
+          setError("error");
         },
       });
     }

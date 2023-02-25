@@ -21,7 +21,8 @@ type RouteData = {
 
 type EventsCallbacks = {
   onPolling?: (_info: DeviceCode) => void;
-  onFail?: (_error: string) => void;
+  // TODO: handle errors
+  onFail?: (_error: EnrollmentError) => void;
   onComplete?: (_accountEntry: AccountEntry) => void;
 };
 

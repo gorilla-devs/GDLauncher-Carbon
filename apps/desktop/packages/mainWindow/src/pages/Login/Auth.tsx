@@ -46,8 +46,8 @@ const Auth = (props: Props) => {
           });
           props.setStep(1);
         },
-        onFail(error) {
-          setError(error);
+        onFail() {
+          setError("error");
         },
         onComplete() {
           finalizeMutation.mutate(null);
