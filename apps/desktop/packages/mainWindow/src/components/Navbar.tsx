@@ -1,10 +1,10 @@
-import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
+import { Link, useLocation, useMatch } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
-import { composePathUrl } from "@/utils/routes";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -20,7 +20,7 @@ import { composePathUrl } from "@/utils/routes";
 
 const AppNavbar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -39,7 +39,7 @@ const AppNavbar = () => {
             <img
               src={GDLauncherWideLogo}
               class="cursor-pointer h-9"
-              onClick={() => navigate("/library")}
+              onClick={() => navigate?.navigate("/library")}
             />
           </div>
           <ul class="flex text-white w-full m-0 items-between gap-6 list-none pl-10">
@@ -51,8 +51,8 @@ const AppNavbar = () => {
                       const isMatch = useMatch(() => route.path);
 
                       return (
-                        <Link
-                          href={composePathUrl(route)}
+                        <div
+                          onClick={() => navigate?.navigate(route.path)}
                           class="no-underline"
                           classList={{
                             "text-white": !!isMatch(),
@@ -62,7 +62,7 @@ const AppNavbar = () => {
                           <Tab>
                             <li class="no-underline">{route.label}</li>
                           </Tab>
-                        </Link>
+                        </div>
                       );
                     }}
                   </For>

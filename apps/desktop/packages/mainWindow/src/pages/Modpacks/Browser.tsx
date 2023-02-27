@@ -1,12 +1,12 @@
-import { useNavigate } from "@solidjs/router";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 export default function About() {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
 
   return (
     <div>
       <div>
-        <button onClick={() => navigate("/modpacks/DDLTR")}>
+        <button onClick={() => navigate?.navigate("/modpacks/DDLTR")}>
           {/* Modpack DDLTR */}
         </button>
       </div>

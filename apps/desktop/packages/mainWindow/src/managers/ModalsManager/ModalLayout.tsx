@@ -1,7 +1,8 @@
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 import { Show, children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 import { ModalProps, useModal } from ".";
+import { useGdNavigation } from "../NavigationManager";
 
 interface Props extends ModalProps {
   children: JSX.Element | Element;
@@ -12,7 +13,7 @@ interface Props extends ModalProps {
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children);
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   const location = useLocation();
   const modalsContext = useModal();
 
@@ -26,7 +27,7 @@ const ModalLayout = (props: Props) => {
         }}
         onClick={() => {
           if (!props.preventClose) {
-            navigate(location.pathname);
+            navigate.navigate(location.pathname);
             modalsContext?.closeModal();
           }
         }}
@@ -52,7 +53,7 @@ const ModalLayout = (props: Props) => {
                   class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
                   onClick={() => {
                     if (!props.preventClose) {
-                      navigate(location.pathname);
+                      navigate.navigate(location.pathname);
                       modalsContext?.closeModal();
                     }
                   }}

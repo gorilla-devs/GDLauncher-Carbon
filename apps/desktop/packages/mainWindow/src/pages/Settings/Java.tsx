@@ -1,16 +1,17 @@
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
-import { useNavigate, useRouteData } from "@solidjs/router";
+import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
   const javas = () => javasData()?.data || [];
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
 
   let mutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -50,7 +51,7 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate("?m=addJava");
+              navigate?.navigate("?m=addJava");
             }}
           >
             <div class="text-shade-5 text-xl i-ri:add-fill" />

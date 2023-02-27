@@ -2,15 +2,10 @@
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import {
-  Link,
-  Outlet,
-  useLocation,
-  useNavigate,
-  useParams,
-} from "@solidjs/router";
+import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
 import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 type InstancePage = {
   label: string;
@@ -18,7 +13,7 @@ type InstancePage = {
 };
 
 const Instance = () => {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   const params = useParams();
   const location = useLocation();
 
@@ -105,7 +100,7 @@ const Instance = () => {
         >
           <div class="sticky z-10 top-5 left-5 w-fit">
             <Button
-              onClick={() => navigate("/library")}
+              onClick={() => navigate?.navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
               size="small"
               variant="transparent"
@@ -190,7 +185,7 @@ const Instance = () => {
         <div class="flex items-start w-full transition-opacity ease-in-out duration-300">
           <div class="w-fit justify-center items-center transition duration-100 ease-in-out h-fit mr-4">
             <Button
-              onClick={() => navigate("/library")}
+              onClick={() => navigate?.navigate("/library")}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
               size="small"
               variant="transparent"

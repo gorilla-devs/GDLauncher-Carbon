@@ -1,12 +1,13 @@
-import { useMatch, useNavigate } from "@solidjs/router";
+import { useMatch } from "@solidjs/router";
 import { settingsItem } from ".";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 interface Props {
   item: settingsItem;
 }
 
 const ListItem = (props: Props) => {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   const match = useMatch(() => props.item.path);
 
   return (
@@ -16,7 +17,7 @@ const ListItem = (props: Props) => {
         "bg-shade-6": !!match(),
       }}
       onClick={() => {
-        navigate(props.item.path);
+        navigate?.navigate(props.item.path);
       }}
     >
       {props.item.name}

@@ -1,19 +1,18 @@
 import { Component, Show, Suspense } from "solid-js";
-import { useRoutes, useNavigate } from "@solidjs/router";
+import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
-import { handleRouteChange } from "./utils/routes";
+import { useGdNavigation } from "./managers/NavigationManager";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
 
   createInvalidateQuery();
   initThemes();
-  handleRouteChange();
 
   return (
     <div class="w-screen relative">
@@ -21,7 +20,7 @@ const App: Component = () => {
         <div class="absolute gap-4 flex justify-center items-center cursor-pointer h-10 bottom-10 right-0 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
-              navigate("/library");
+              navigate?.navigate("/library");
             }}
           >
             <Trans
@@ -33,7 +32,7 @@ const App: Component = () => {
           </div>
           <div
             onClick={() => {
-              navigate("/");
+              navigate?.navigate("/");
             }}
           >
             <Trans

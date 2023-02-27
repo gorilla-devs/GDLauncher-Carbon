@@ -1,15 +1,15 @@
 import ContentWrapper from "@/components/ContentWrapper";
+import { useGdNavigation } from "@/managers/NavigationManager";
 import { Trans } from "@gd/i18n";
-import { useNavigate } from "@solidjs/router";
 
 const Modpack = () => {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   // const params = useParams();
 
   return (
     <ContentWrapper>
       {/* <div>Modpack {params.id}</div> */}
-      <button onClick={() => navigate("/modpacks")}>
+      <button onClick={() => navigate?.navigate("/modpacks")}>
         <Trans
           key="back"
           options={{

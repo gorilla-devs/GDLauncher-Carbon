@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
+import { useLocation, useSearchParams } from "@solidjs/router";
 import {
   Accessor,
   createContext,
@@ -11,6 +11,7 @@ import {
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Dynamic, Portal } from "solid-js/web";
+import { useGdNavigation } from "../NavigationManager";
 
 const defaultModals = {
   privacyPolicy: {
@@ -68,7 +69,7 @@ type Context = {
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;
@@ -95,7 +96,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
         const decodedParamString = decodeURIComponent(url.toString());
 
-        navigate(decodedParamString.replace("=&", "?"));
+        navigate?.navigate(decodedParamString.replace("=&", "?"));
         setTimeout(() => {
           setIsVisible(true);
         }, 100);

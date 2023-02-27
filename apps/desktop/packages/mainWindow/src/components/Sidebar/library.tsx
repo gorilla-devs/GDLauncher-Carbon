@@ -4,12 +4,13 @@ import { Show, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans } from "@gd/i18n";
+import { useGdNavigation } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
-  const navigate = useNavigate();
+  const navigate = useGdNavigation();
   const location = useLocation();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
@@ -54,7 +55,7 @@ const Sidebar = () => {
               variant="sidebar"
             />
             <Tile
-              onClick={() => navigate(`/library/ABDFEAD`)}
+              onClick={() => navigate?.navigate(`/library/ABDFEAD`)}
               selected={instanceId() === "ABDFEAD"}
               title={"Instance ABDFEAD"}
               modloader={"forge"}
@@ -64,7 +65,7 @@ const Sidebar = () => {
           </Collapsable>
           <Collapsable title="FAVOURITED">
             <Tile
-              onClick={() => navigate(`/library/DDAEDF`)}
+              onClick={() => navigate?.navigate(`/library/DDAEDF`)}
               selected={instanceId() === "DDAEDF"}
               title={"Instance DDAEDF"}
               modloader={"forge"}
