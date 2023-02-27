@@ -12,7 +12,7 @@ type NavigateOptions = {
 };
 
 type Context = {
-  navigate: (_path: string, options?: NavigateOptions) => void;
+  navigate: (_path: string, _options?: NavigateOptions) => void;
 };
 const NavigationContext = createContext<Context>();
 

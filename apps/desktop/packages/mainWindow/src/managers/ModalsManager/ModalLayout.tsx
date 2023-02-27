@@ -18,9 +18,9 @@ const ModalLayout = (props: Props) => {
   const modalsContext = useModal();
 
   return (
-    <div class="h-screen w-screen">
+    <div class="w-screen h-screen">
       <div
-        class="h-screen w-screen absolute will-change-auto transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center text-white z-999 transition-opacity ease-in-out origin-center duration-100"
+        class="h-screen w-screen absolute text-white ease-in-out duration-100 will-change-auto transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center"
         classList={{
           "opacity-100": modalsContext?.isVisible(),
           "opacity-0": !modalsContext?.isVisible(),
@@ -47,7 +47,7 @@ const ModalLayout = (props: Props) => {
             }}
           >
             <Show when={!props.noHeader}>
-              <div class="bg-shade-8 flex justify-between items-center h-12 px-5 box-border rounded-t-2xl">
+              <div class="bg-shade-8 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">
                 <h3>{props.title}</h3>
                 <div
                   class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"

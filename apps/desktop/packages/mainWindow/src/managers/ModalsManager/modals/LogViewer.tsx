@@ -50,7 +50,7 @@ const LogViewer = (props: ModalProps) => {
               <TabList>
                 <Tab>
                   <div class="w-full flex gap-2 items-center h-10 justify-start">
-                    <div class="w-6 h-6 rounded-md bg-green" />
+                    <div class="w-6 rounded-md h-6 bg-green" />
                     <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>
@@ -74,7 +74,7 @@ const LogViewer = (props: ModalProps) => {
                 </Tab>
               </TabList>
               <div class="flex gap-4 px-5">
-                <div class="cursor-pointer i-ri:upload-2-line text-shade-0" />
+                <div class="cursor-pointer text-shade-0 i-ri:upload-2-line" />
                 <div class="text-shade-0 cursor-pointer i-ri:file-copy-fill" />
               </div>
             </div>
