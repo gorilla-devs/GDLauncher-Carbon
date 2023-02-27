@@ -52,7 +52,11 @@ const AppNavbar = () => {
 
                       return (
                         <div
-                          onClick={() => navigate?.navigate(route.path)}
+                          onClick={() =>
+                            navigate?.navigate(route.path, {
+                              getLastInstance: true,
+                            })
+                          }
                           class="no-underline"
                           classList={{
                             "text-white": !!isMatch(),
