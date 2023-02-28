@@ -1,4 +1,5 @@
 import { Button } from "@gd/ui";
+import { useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { parseTwoDigitNumber } from "@/utils/helpers";
@@ -6,6 +7,9 @@ import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
+import { rspc } from "@/utils/rspcClient";
+import fetchData from "./auth.login.data";
+import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
 interface Props {
   deviceCodeObject: any | null;
@@ -13,23 +17,34 @@ interface Props {
 }
 
 const CodeStep = (props: Props) => {
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
   const navigate = useGDNavigate();
+  const [error, setError] = createSignal<null | string>(null);
 
-  const handleRefersh = async () => {
-    // await login(({ userCode, link, expiresAt }) => {
-    props.setDeviceCodeObject({
-      userCode: "AXDLE",
-      link: "",
-      expiresAt: 548559,
-    });
-    // });
-  };
+  const accountEnrollCancelMutation = rspc.createMutation(
+    ["account.enroll.cancel"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
+
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
 
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
-  const expiresAt = () => props.deviceCodeObject?.expiresAt || 0;
-  const expiresAtMs = () => expiresAt() - Date.now();
+  const expiresAt = () => props.deviceCodeObject?.expiresAt;
+  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
@@ -43,6 +58,29 @@ const CodeStep = (props: Props) => {
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
 
+  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
+
+  const handleRefersh = async () => {
+    accountEnrollCancelMutation.mutate(null);
+    accountEnrollBeginMutation.mutate(null);
+    if (routeData.isSuccess) {
+      handleStatus(routeData, {
+        onPolling: (info) => {
+          props.setDeviceCodeObject({
+            userCode: info.user_code,
+            link: info.verification_uri,
+            expiresAt: info.expires_at,
+          });
+          setExpired(false);
+          setError(null);
+        },
+        onFail() {
+          setError("something went wrong while logging in");
+        },
+      });
+    }
+  };
+
   const updateExpireTime = () => {
     if (minutes() <= 0 && seconds() <= 0) {
       setExpired(true);
@@ -51,14 +89,17 @@ const CodeStep = (props: Props) => {
     }
   };
 
-  // eslint-disable-next-line no-undef
-  let interval: NodeJS.Timer;
+  let interval: ReturnType<typeof setTimeout>;
 
   createEffect(() => {
-    // if (accounts.selectedAccountId) {
-    // TODO: save in a store the default / last page
-    navigate("/library");
-    // }
+    if (routeData.isSuccess) {
+      handleStatus(routeData, {
+        onComplete(_accountEntry) {
+          finalizeMutation.mutate(null);
+          navigate("/library");
+        },
+      });
+    }
   });
 
   createEffect(() => {
@@ -107,8 +148,8 @@ const CodeStep = (props: Props) => {
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="mb-0 mt-2 text-shade-0">
-            <span class="text-white">{countDown()}</span>
+          <p class="mb-0 text-shade-0 mt-4">
+            <span class="text-white mr-2">{countDown()}</span>
             <Trans
               key="before_expiring"
               options={{
@@ -116,7 +157,7 @@ const CodeStep = (props: Props) => {
               }}
             />
           </p>
-          <p class="text-shade-0">
+          <p class="text-shade-0 mb-0">
             <Trans
               key="enter_code_in_browser"
               options={{
@@ -127,6 +168,9 @@ const CodeStep = (props: Props) => {
           </p>
         </Show>
       </div>
+      <Show when={error()}>
+        <p class="text-red m-0">{error()}</p>
+      </Show>
       <Show when={!expired()}>
         <Button
           class="normal-case"
@@ -140,6 +184,7 @@ const CodeStep = (props: Props) => {
               defaultValue: "Insert Code",
             }}
           />
+          <div class="i-ri:link text-md" />
         </Button>
       </Show>
       <Show when={expired()}>
@@ -149,7 +194,6 @@ const CodeStep = (props: Props) => {
         >
           <span class="i-ri:refresh-line" />
           <h3 class="m-0">
-            {" "}
             <Trans
               key="refresh"
               options={{

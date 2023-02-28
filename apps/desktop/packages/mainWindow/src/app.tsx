@@ -32,6 +32,7 @@ const App: Component = () => {
           </div>
           <div
             onClick={() => {
+              // deleteMutation.mutate();
               navigate("/");
             }}
           >

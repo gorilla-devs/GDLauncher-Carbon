@@ -28,7 +28,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="group w-10 h-10 bg-shade-7 rounded-full flex justify-center items-center"
+                class="flex justify-center items-center group w-10 h-10 bg-shade-7 rounded-full"
                 onClick={() => {
                   toggleSidebar();
                 }}

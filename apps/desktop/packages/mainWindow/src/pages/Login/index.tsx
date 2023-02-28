@@ -6,7 +6,6 @@ import CodeStep from "./CodeStep";
 export default function Login() {
   const [step, setStep] = createSignal(0);
   const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
-  // @ts-ignore
 
   return (
     <div class="flex justify-center items-center w-full h-screen p-0 bg-img-loginBG.jpg">
@@ -14,7 +13,7 @@ export default function Login() {
         style={{
           "mix-blend-mode": "hard-light",
         }}
-        class="absolute top-0 left-0 right-0 bottom-0 bg-shade-8 opacity-80"
+        class="absolute left-0 right-0 bg-shade-8 top-0 bottom-0 opacity-80"
       />
       <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
         <Dropdown
@@ -33,7 +32,7 @@ export default function Login() {
         />
       </div>
       <div
-        class="rounded-2xl relative flex flex-col justify-end items-center text-white w-120 h-100"
+        class="flex flex-col items-center text-white rounded-2xl relative justify-end w-120 h-100"
         style={{
           background: "rgba(29, 32, 40, 0.8)",
           "justify-content": step() === 0 ? "flex-end" : "center",
