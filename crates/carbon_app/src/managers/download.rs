@@ -43,10 +43,7 @@ impl DownloadManager {
             let status = handle.status_channel.borrow().clone();
             match status {
                 None => {}
-                Some(DownloadStatus::FailedToStart(e))
-                | Some(DownloadStatus::FailedInProgress(e)) => {
-                    return Err(DownloadError::Active(e))
-                }
+                Some(DownloadStatus::Failed(e)) => return Err(DownloadError::Active(e)),
                 Some(DownloadStatus::Status { downloaded, total }) => updater(downloaded, total),
                 Some(DownloadStatus::Complete) => {
                     self.complete_download(handle, path).await?;
@@ -146,53 +143,35 @@ impl DownloadManager {
                     let mut send_complete = true;
 
                     tokio::fs::create_dir_all(
-                        path.parent()
-                            .ok_or(ActiveDownloadError::MalformedPath)
-                            .map_err(DownloadStatus::FailedToStart)?,
+                        path.parent().ok_or(ActiveDownloadError::MalformedPath)?,
                     )
-                    .await
-                    .map_err(ActiveDownloadError::IoError)
-                    .map_err(DownloadStatus::FailedToStart)?;
+                    .await?;
 
                     let file = OpenOptions::new()
                         .create(true)
                         .append(true)
                         .read(true)
                         .open(&path)
-                        .await
-                        .map_err(ActiveDownloadError::IoError)
-                        .map_err(DownloadStatus::FailedToStart)?;
+                        .await?;
 
-                    let mut start_loc = file
-                        .metadata()
-                        .await
-                        .map_err(ActiveDownloadError::IoError)
-                        .map_err(DownloadStatus::FailedToStart)?
-                        .len();
+                    let mut start_loc = file.metadata().await?.len();
 
                     async fn init_request(
                         client: &Client,
                         url: &str,
                         start_loc: u64,
-                    ) -> Result<Response, DownloadStatus> {
+                    ) -> Result<Response, ActiveDownloadError> {
                         let mut builder = client.get(url);
 
                         if start_loc != 0 {
                             builder = builder.header("Range", format!("bytes={start_loc}-"));
                         }
 
-                        let response = builder
-                            .send()
-                            .await
-                            .map_err(RequestError::from_error)
-                            .map_err(ActiveDownloadError::Request)
-                            .map_err(DownloadStatus::FailedToStart)?;
+                        let response = builder.send().await.map_err(RequestError::from_error)?;
 
                         let _ = response
                             .error_for_status_ref()
-                            .map_err(RequestError::from_error)
-                            .map_err(ActiveDownloadError::Request)
-                            .map_err(DownloadStatus::FailedToStart)?;
+                            .map_err(RequestError::from_error)?;
 
                         Ok(response)
                     }
@@ -222,37 +201,26 @@ impl DownloadManager {
                                         // server gave a resume point later than we have, assuming it will do that
                                         // again if we re-request with our starting point, so start from 0.
                                         start_loc = 0;
-                                        file.set_len(0)
-                                            .await
-                                            .map_err(ActiveDownloadError::IoError)
-                                            .map_err(DownloadStatus::FailedToStart)?;
+                                        file.set_len(0).await?;
                                         response = init_request(&client, &url, 0).await?;
                                     } else if start < start_loc {
                                         // server gave a resume point earlier than we have, truncate the file to the
                                         // server's position.
                                         start_loc = start;
-                                        file.set_len(start)
-                                            .await
-                                            .map_err(ActiveDownloadError::IoError)
-                                            .map_err(DownloadStatus::FailedToStart)?;
+                                        file.set_len(start).await?;
                                     }
                                 }
                                 Err(()) => {
-                                    return Err(DownloadStatus::FailedToStart(
-                                        ActiveDownloadError::Request(RequestError {
-                                            context: RequestContext::from_response(&response),
-                                            error: RequestErrorDetails::MalformedResponse,
-                                        }),
-                                    ))
+                                    return Err(ActiveDownloadError::Request(RequestError {
+                                        context: RequestContext::from_response(&response),
+                                        error: RequestErrorDetails::MalformedResponse,
+                                    }))
                                 }
                             }
                         }
                         None => {
                             start_loc = 0;
-                            file.set_len(0)
-                                .await
-                                .map_err(ActiveDownloadError::IoError)
-                                .map_err(DownloadStatus::FailedToStart)?;
+                            file.set_len(0).await?;
                         }
                     }
 
@@ -267,18 +235,10 @@ impl DownloadManager {
                         total: length,
                     }));
 
-                    while let Some(chunk) = response
-                        .chunk()
-                        .await
-                        .map_err(RequestError::from_error)
-                        .map_err(ActiveDownloadError::Request)
-                        .map_err(DownloadStatus::FailedInProgress)?
+                    while let Some(chunk) =
+                        response.chunk().await.map_err(RequestError::from_error)?
                     {
-                        writebuf
-                            .write(&chunk)
-                            .await
-                            .map_err(ActiveDownloadError::IoError)
-                            .map_err(DownloadStatus::FailedInProgress)?;
+                        writebuf.write(&chunk).await?;
 
                         if let Ok(()) = cancel_recv.try_recv() {
                             send_complete = false;
@@ -293,11 +253,7 @@ impl DownloadManager {
                     }
 
                     // will NOT be flushed on drop, so it is done manually
-                    writebuf
-                        .flush()
-                        .await
-                        .map_err(ActiveDownloadError::IoError)
-                        .map_err(DownloadStatus::FailedInProgress)?;
+                    writebuf.flush().await?;
 
                     if send_complete {
                         // the complete flag is set first to avoid a possible race condition
@@ -312,7 +268,7 @@ impl DownloadManager {
             match task().await {
                 Ok(()) => {}
                 Err(e) => {
-                    let _ = status_send.send(Some(e));
+                    let _ = status_send.send(Some(DownloadStatus::Failed(e)));
                 }
             }
         };
@@ -338,8 +294,7 @@ pub struct DownloadHandle {
 
 #[derive(Clone)]
 pub enum DownloadStatus {
-    FailedToStart(ActiveDownloadError),
-    FailedInProgress(ActiveDownloadError),
+    Failed(ActiveDownloadError),
     Status { downloaded: u64, total: Option<u64> },
     Complete,
 }
