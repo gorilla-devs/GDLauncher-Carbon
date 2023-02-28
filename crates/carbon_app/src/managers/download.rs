@@ -6,7 +6,7 @@ use thiserror::Error;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncWriteExt, BufWriter},
-    sync::mpsc,
+    sync::{mpsc, watch},
 };
 use uuid::Uuid;
 
@@ -29,6 +29,33 @@ impl DownloadManager {
 
     pub fn get_appref(&self) -> &AppRef {
         &self.app
+    }
+
+    pub async fn download(
+        &self,
+        url: String,
+        path: &Path,
+        updater: &mut dyn FnMut(u64, Option<u64>),
+    ) -> Result<(), DownloadError> {
+        let mut handle = self.start_download(url).await?;
+
+        while handle.status_channel.changed().await.is_ok() {
+            let status = handle.status_channel.borrow().clone();
+            match status {
+                None => {}
+                Some(DownloadStatus::FailedToStart(e))
+                | Some(DownloadStatus::FailedInProgress(e)) => {
+                    return Err(DownloadError::Active(e))
+                }
+                Some(DownloadStatus::Status { downloaded, total }) => updater(downloaded, total),
+                Some(DownloadStatus::Complete) => {
+                    self.complete_download(handle, path).await?;
+                    return Ok(());
+                }
+            }
+        }
+
+        return Err(DownloadError::Dropped);
     }
 
     pub async fn complete_download(
@@ -107,7 +134,7 @@ impl DownloadManager {
             .to_pathbuf()
             .join(&id);
 
-        let (status_send, status_recv) = mpsc::unbounded_channel::<DownloadStatus>();
+        let (status_send, status_recv) = watch::channel::<Option<DownloadStatus>>(None);
         let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
@@ -120,11 +147,11 @@ impl DownloadManager {
 
                     tokio::fs::create_dir_all(
                         path.parent()
-                            .ok_or(DownloadError::MalformedPath)
+                            .ok_or(ActiveDownloadError::MalformedPath)
                             .map_err(DownloadStatus::FailedToStart)?,
                     )
                     .await
-                    .map_err(DownloadError::IoError)
+                    .map_err(ActiveDownloadError::IoError)
                     .map_err(DownloadStatus::FailedToStart)?;
 
                     let file = OpenOptions::new()
@@ -133,13 +160,13 @@ impl DownloadManager {
                         .read(true)
                         .open(&path)
                         .await
-                        .map_err(DownloadError::IoError)
+                        .map_err(ActiveDownloadError::IoError)
                         .map_err(DownloadStatus::FailedToStart)?;
 
                     let mut start_loc = file
                         .metadata()
                         .await
-                        .map_err(DownloadError::IoError)
+                        .map_err(ActiveDownloadError::IoError)
                         .map_err(DownloadStatus::FailedToStart)?
                         .len();
 
@@ -158,13 +185,13 @@ impl DownloadManager {
                             .send()
                             .await
                             .map_err(RequestError::from_error)
-                            .map_err(DownloadError::Request)
+                            .map_err(ActiveDownloadError::Request)
                             .map_err(DownloadStatus::FailedToStart)?;
 
                         let _ = response
                             .error_for_status_ref()
                             .map_err(RequestError::from_error)
-                            .map_err(DownloadError::Request)
+                            .map_err(ActiveDownloadError::Request)
                             .map_err(DownloadStatus::FailedToStart)?;
 
                         Ok(response)
@@ -197,7 +224,7 @@ impl DownloadManager {
                                         start_loc = 0;
                                         file.set_len(0)
                                             .await
-                                            .map_err(DownloadError::IoError)
+                                            .map_err(ActiveDownloadError::IoError)
                                             .map_err(DownloadStatus::FailedToStart)?;
                                         response = init_request(&client, &url, 0).await?;
                                     } else if start < start_loc {
@@ -206,13 +233,13 @@ impl DownloadManager {
                                         start_loc = start;
                                         file.set_len(start)
                                             .await
-                                            .map_err(DownloadError::IoError)
+                                            .map_err(ActiveDownloadError::IoError)
                                             .map_err(DownloadStatus::FailedToStart)?;
                                     }
                                 }
                                 Err(()) => {
                                     return Err(DownloadStatus::FailedToStart(
-                                        DownloadError::Request(RequestError {
+                                        ActiveDownloadError::Request(RequestError {
                                             context: RequestContext::from_response(&response),
                                             error: RequestErrorDetails::MalformedResponse,
                                         }),
@@ -224,7 +251,7 @@ impl DownloadManager {
                             start_loc = 0;
                             file.set_len(0)
                                 .await
-                                .map_err(DownloadError::IoError)
+                                .map_err(ActiveDownloadError::IoError)
                                 .map_err(DownloadStatus::FailedToStart)?;
                         }
                     }
@@ -235,22 +262,22 @@ impl DownloadManager {
 
                     let mut downloaded = start_loc;
 
-                    let _ = status_send.send(DownloadStatus::Status {
+                    let _ = status_send.send(Some(DownloadStatus::Status {
                         downloaded,
                         total: length,
-                    });
+                    }));
 
                     while let Some(chunk) = response
                         .chunk()
                         .await
                         .map_err(RequestError::from_error)
-                        .map_err(DownloadError::Request)
+                        .map_err(ActiveDownloadError::Request)
                         .map_err(DownloadStatus::FailedInProgress)?
                     {
                         writebuf
                             .write(&chunk)
                             .await
-                            .map_err(DownloadError::IoError)
+                            .map_err(ActiveDownloadError::IoError)
                             .map_err(DownloadStatus::FailedInProgress)?;
 
                         if let Ok(()) = cancel_recv.try_recv() {
@@ -259,23 +286,23 @@ impl DownloadManager {
                         }
 
                         downloaded += chunk.len() as u64;
-                        let _ = status_send.send(DownloadStatus::Status {
+                        let _ = status_send.send(Some(DownloadStatus::Status {
                             downloaded,
                             total: length,
-                        });
+                        }));
                     }
 
                     // will NOT be flushed on drop, so it is done manually
                     writebuf
                         .flush()
                         .await
-                        .map_err(DownloadError::IoError)
+                        .map_err(ActiveDownloadError::IoError)
                         .map_err(DownloadStatus::FailedInProgress)?;
 
                     if send_complete {
                         // the complete flag is set first to avoid a possible race condition
                         let _ = complete_send.send(()).await;
-                        let _ = status_send.send(DownloadStatus::Complete);
+                        let _ = status_send.send(Some(DownloadStatus::Complete));
                     }
 
                     Ok(())
@@ -285,7 +312,7 @@ impl DownloadManager {
             match task().await {
                 Ok(()) => {}
                 Err(e) => {
-                    let _ = status_send.send(e);
+                    let _ = status_send.send(Some(e));
                 }
             }
         };
@@ -303,21 +330,22 @@ impl DownloadManager {
 
 pub struct DownloadHandle {
     id: String,
-    pub status_channel: mpsc::UnboundedReceiver<DownloadStatus>,
+    pub status_channel: watch::Receiver<Option<DownloadStatus>>,
     pub cancel_channel: mpsc::Sender<()>,
     // used to make sure a download was actually completed
     complete_channel: mpsc::Receiver<()>,
 }
 
+#[derive(Clone)]
 pub enum DownloadStatus {
-    FailedToStart(DownloadError),
-    FailedInProgress(DownloadError),
+    FailedToStart(ActiveDownloadError),
+    FailedInProgress(ActiveDownloadError),
     Status { downloaded: u64, total: Option<u64> },
     Complete,
 }
 
 #[derive(Error, Debug)]
-pub enum DownloadError {
+pub enum ActiveDownloadError {
     #[error("request error: {0}")]
     Request(#[from] RequestError),
 
@@ -326,6 +354,17 @@ pub enum DownloadError {
 
     #[error("io error: {0}")]
     IoError(#[from] io::Error),
+}
+
+impl Clone for ActiveDownloadError {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Request(e) => Self::Request(e.clone()),
+            Self::MalformedPath => Self::MalformedPath,
+            // this looses information, but is needed to be Clone
+            Self::IoError(e) => Self::IoError(io::Error::from(e.kind())),
+        }
+    }
 }
 
 #[derive(Error, Debug)]
@@ -340,54 +379,47 @@ pub enum DownloadCompleteError {
     RenameError(io::Error),
 }
 
+#[derive(Error, Debug)]
+pub enum DownloadError {
+    #[error("while downloading: {0}")]
+    Active(#[from] ActiveDownloadError),
+
+    #[error("on completion: {0}")]
+    Complete(#[from] DownloadCompleteError),
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("channel was dropped")]
+    Dropped,
+}
+
 #[cfg(test)]
 mod test {
-    use super::DownloadStatus;
+    use crate::managers::download::DownloadError;
 
     #[tokio::test]
-    async fn attempt_download() {
+    async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
-        let mut handle = app
-            .download_manager
-            .start_download(String::from("https://gdlauncher.com/"))
+        let tmpfolder = app
+            .configuration_manager
+            .runtime_path
+            .get_temp()
+            .to_pathbuf();
+
+        tokio::fs::create_dir_all(tmpfolder).await.unwrap();
+
+        app.download_manager
+            .download(
+                String::from("https://gdlauncher.com"),
+                &app.configuration_manager
+                    .runtime_path
+                    .get_temp()
+                    .to_pathbuf()
+                    .join("gdl.html"),
+                &mut |downloaded, total| println!("Downloaded {downloaded}/{total:?}"),
+            )
             .await
-            .unwrap();
-
-        while let Some(msg) = handle.status_channel.recv().await {
-            match msg {
-                DownloadStatus::FailedToStart(e) => Err(e).unwrap(),
-                DownloadStatus::FailedInProgress(e) => Err(e).unwrap(),
-                DownloadStatus::Complete => {
-                    let tmpfolder = app
-                        .configuration_manager
-                        .runtime_path
-                        .get_temp()
-                        .to_pathbuf();
-
-                    tokio::fs::create_dir_all(tmpfolder).await.unwrap();
-
-                    app.download_manager
-                        .complete_download(
-                            handle,
-                            &app.configuration_manager
-                                .runtime_path
-                                .get_temp()
-                                .to_pathbuf()
-                                .join("gdl.html"),
-                        )
-                        .await
-                        .unwrap();
-
-                    return;
-                }
-                DownloadStatus::Status { downloaded, total } => {
-                    println!("downloaded: {downloaded}/{total:?}");
-                }
-            }
-        }
-        dbg!();
-
-        panic!("channel dropped before completion");
     }
 }
