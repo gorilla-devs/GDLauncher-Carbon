@@ -7,10 +7,10 @@ import Style from "./style.module.scss";
 import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans } from "@gd/i18n";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   const location = useLocation();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);

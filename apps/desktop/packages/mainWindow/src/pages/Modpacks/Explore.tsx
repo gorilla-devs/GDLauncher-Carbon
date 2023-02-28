@@ -1,9 +1,9 @@
 import ContentWrapper from "@/components/ContentWrapper";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 import { Trans } from "@gd/i18n";
 
 const Modpack = () => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   // const params = useParams();
 
   return (

@@ -4,7 +4,7 @@ import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -20,7 +20,7 @@ import { useGdNavigation } from "@/managers/NavigationManager";
 
 const AppNavbar = () => {
   const location = useLocation();
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");

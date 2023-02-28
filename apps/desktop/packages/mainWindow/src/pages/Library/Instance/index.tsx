@@ -5,7 +5,7 @@ import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
 import { For } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 type InstancePage = {
   label: string;
@@ -13,7 +13,7 @@ type InstancePage = {
 };
 
 const Instance = () => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   const params = useParams();
   const location = useLocation();
 

@@ -6,7 +6,7 @@ import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 type MockInstance = {
   title: string;
@@ -67,7 +67,7 @@ const mockCarousel: MockInstance[] = [
 ];
 
 const Home = () => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
   const routeDataNews: Promise<any> = useRouteData();

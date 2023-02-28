@@ -4,14 +4,14 @@ import { Button } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
   const javas = () => javasData()?.data || [];
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
 
   let mutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {

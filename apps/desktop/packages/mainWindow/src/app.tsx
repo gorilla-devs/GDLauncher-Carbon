@@ -5,11 +5,11 @@ import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
-import { useGdNavigation } from "./managers/NavigationManager";
+import { useGDNavigate } from "./managers/NavigationManager";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
 
   createInvalidateQuery();
   initThemes();

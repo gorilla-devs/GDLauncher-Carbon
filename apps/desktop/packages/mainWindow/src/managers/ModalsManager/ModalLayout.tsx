@@ -2,7 +2,7 @@ import { useLocation } from "@solidjs/router";
 import { Show, children } from "solid-js";
 import { JSX } from "solid-js/jsx-runtime";
 import { ModalProps, useModal } from ".";
-import { useGdNavigation } from "../NavigationManager";
+import { useGDNavigate } from "../NavigationManager";
 
 interface Props extends ModalProps {
   children: JSX.Element | Element;
@@ -13,7 +13,7 @@ interface Props extends ModalProps {
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children);
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   const location = useLocation();
   const modalsContext = useModal();
 

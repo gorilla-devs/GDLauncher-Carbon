@@ -6,14 +6,14 @@ import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
 }
 
 const CodeStep = (props: Props) => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
 
   const handleRefersh = async () => {
     // await login(({ userCode, link, expiresAt }) => {

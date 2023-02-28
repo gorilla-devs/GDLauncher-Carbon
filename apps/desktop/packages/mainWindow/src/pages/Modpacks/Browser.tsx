@@ -1,7 +1,7 @@
-import { useGdNavigation } from "@/managers/NavigationManager";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 export default function About() {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
 
   return (
     <div>

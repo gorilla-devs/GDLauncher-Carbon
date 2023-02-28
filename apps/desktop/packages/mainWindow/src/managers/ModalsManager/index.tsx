@@ -11,7 +11,7 @@ import {
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Dynamic, Portal } from "solid-js/web";
-import { useGdNavigation } from "../NavigationManager";
+import { useGDNavigate } from "../NavigationManager";
 
 const defaultModals = {
   privacyPolicy: {
@@ -69,7 +69,7 @@ type Context = {
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const navigate = useGdNavigation();
+  const navigate = useGDNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;

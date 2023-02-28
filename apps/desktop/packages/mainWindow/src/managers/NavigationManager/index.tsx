@@ -34,6 +34,6 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   );
 };
 
-export const useGdNavigation = (): Context => {
+export const useGDNavigate = (): Context => {
   return useContext(NavigationContext) as Context;
 };
