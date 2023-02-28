@@ -6,7 +6,7 @@ import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
-import { useModal } from "@/ModalsManager";
+import { useModal } from "@/managers/ModalsManager";
 
 type Props = {
   setStep: Setter<number>;
