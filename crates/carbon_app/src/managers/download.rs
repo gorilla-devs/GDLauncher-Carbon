@@ -1,15 +1,20 @@
-use std::{io, path::Path};
+use std::{io, path::Path, str::FromStr};
 
 use prisma_client_rust::QueryError;
+use reqwest::{Client, Response};
 use thiserror::Error;
 use tokio::{
-    fs::File,
+    fs::OpenOptions,
     io::{AsyncWriteExt, BufWriter},
     sync::mpsc,
 };
 use uuid::Uuid;
 
-use crate::{error::request::RequestError, managers::AppRef};
+use crate::{
+    db::read_filters::StringFilter,
+    error::request::{RequestContext, RequestError, RequestErrorDetails},
+    managers::AppRef,
+};
 
 pub struct DownloadManager {
     app: AppRef,
@@ -65,15 +70,33 @@ impl DownloadManager {
     }
 
     pub async fn start_download(&self, url: String) -> Result<DownloadHandle, QueryError> {
-        let id = Uuid::new_v4();
+        use crate::db::active_downloads::WhereParam;
 
-        self.app
+        let active_download = self
+            .app
             .upgrade()
             .prisma_client
             .active_downloads()
-            .create(url.clone(), id.to_string(), Vec::new())
+            .find_first(vec![WhereParam::Url(StringFilter::Equals(url.clone()))])
             .exec()
             .await?;
+
+        let id = match active_download {
+            Some(download) => download.file_id,
+            None => {
+                let id = Uuid::new_v4().to_string();
+
+                self.app
+                    .upgrade()
+                    .prisma_client
+                    .active_downloads()
+                    .create(url.clone(), id.clone(), Vec::new())
+                    .exec()
+                    .await?;
+
+                id
+            }
+        };
 
         let path = self
             .app
@@ -82,93 +105,181 @@ impl DownloadManager {
             .runtime_path
             .get_download()
             .to_pathbuf()
-            .join(id.to_string());
+            .join(&id);
 
         let (status_send, status_recv) = mpsc::unbounded_channel::<DownloadStatus>();
         let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
-        let app = self.app.clone();
+        let client = self.app.upgrade().reqwest_client.clone();
         let task = async move {
-            let task = || async {
-                let client = app.upgrade().reqwest_client.clone();
-                let mut send_complete = true;
+            let task = || {
+                let status_send = &status_send;
+                async move {
+                    let mut send_complete = true;
 
-                let mut response = client
-                    .get(url)
-                    .send()
-                    .await
-                    .map_err(RequestError::from_error)
-                    .map_err(DownloadError::Request)
-                    .map_err(DownloadStatus::FailedToStart)?;
-
-                let _ = response
-                    .error_for_status_ref()
-                    .map_err(RequestError::from_error)
-                    .map_err(DownloadError::Request)
-                    .map_err(DownloadStatus::FailedToStart)?;
-
-                let length = response.content_length().map(|x| x as u64);
-
-                tokio::fs::create_dir_all(
-                    path.parent()
-                        .ok_or(DownloadError::MalformedPath)
-                        .map_err(DownloadStatus::FailedToStart)?,
-                )
-                .await
-                .map_err(DownloadError::IoError)
-                .map_err(DownloadStatus::FailedToStart)?;
-
-                let file = File::create(path)
+                    tokio::fs::create_dir_all(
+                        path.parent()
+                            .ok_or(DownloadError::MalformedPath)
+                            .map_err(DownloadStatus::FailedToStart)?,
+                    )
                     .await
                     .map_err(DownloadError::IoError)
                     .map_err(DownloadStatus::FailedToStart)?;
 
-                let mut writebuf = BufWriter::new(file);
+                    let file = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .read(true)
+                        .open(&path)
+                        .await
+                        .map_err(DownloadError::IoError)
+                        .map_err(DownloadStatus::FailedToStart)?;
 
-                let _ = status_send.send(DownloadStatus::Status {
-                    downloaded: 0,
-                    total: length,
-                });
+                    let mut start_loc = file
+                        .metadata()
+                        .await
+                        .map_err(DownloadError::IoError)
+                        .map_err(DownloadStatus::FailedToStart)?
+                        .len();
 
-                while let Some(chunk) = response
-                    .chunk()
-                    .await
-                    .map_err(RequestError::from_error)
-                    .map_err(DownloadError::Request)
-                    .map_err(DownloadStatus::FailedInProgress)?
-                {
+                    async fn init_request(
+                        client: &Client,
+                        url: &str,
+                        start_loc: u64,
+                    ) -> Result<Response, DownloadStatus> {
+                        let mut builder = client.get(url);
+
+                        if start_loc != 0 {
+                            builder = builder.header("Range", format!("bytes={start_loc}-"));
+                        }
+
+                        let response = builder
+                            .send()
+                            .await
+                            .map_err(RequestError::from_error)
+                            .map_err(DownloadError::Request)
+                            .map_err(DownloadStatus::FailedToStart)?;
+
+                        let _ = response
+                            .error_for_status_ref()
+                            .map_err(RequestError::from_error)
+                            .map_err(DownloadError::Request)
+                            .map_err(DownloadStatus::FailedToStart)?;
+
+                        Ok(response)
+                    }
+
+                    let mut response = init_request(&client, &url, start_loc).await?;
+
+                    match response.headers().get("content-range") {
+                        Some(range_header) => {
+                            let parse_start = || {
+                                let mut header_str = range_header.to_str().map_err(|_| ())?;
+
+                                match header_str.get(0..6) {
+                                    Some("bytes ") => header_str = &header_str[6..],
+                                    _ => return Err(()),
+                                }
+
+                                let Some((range, _)) = header_str.split_once('/') else { return Err(()) };
+                                let Some((start, _)) = range.split_once('-') else { return Err(()) };
+                                let Ok(start) = u64::from_str(start) else { return Err(()) };
+
+                                Ok(start)
+                            };
+
+                            match parse_start() {
+                                Ok(start) => {
+                                    if start > start_loc {
+                                        // server gave a resume point later than we have, assuming it will do that
+                                        // again if we re-request with our starting point, so start from 0.
+                                        start_loc = 0;
+                                        file.set_len(0)
+                                            .await
+                                            .map_err(DownloadError::IoError)
+                                            .map_err(DownloadStatus::FailedToStart)?;
+                                        response = init_request(&client, &url, 0).await?;
+                                    } else if start < start_loc {
+                                        // server gave a resume point earlier than we have, truncate the file to the
+                                        // server's position.
+                                        start_loc = start;
+                                        file.set_len(start)
+                                            .await
+                                            .map_err(DownloadError::IoError)
+                                            .map_err(DownloadStatus::FailedToStart)?;
+                                    }
+                                }
+                                Err(()) => {
+                                    return Err(DownloadStatus::FailedToStart(
+                                        DownloadError::Request(RequestError {
+                                            context: RequestContext::from_response(&response),
+                                            error: RequestErrorDetails::MalformedResponse,
+                                        }),
+                                    ))
+                                }
+                            }
+                        }
+                        None => {
+                            start_loc = 0;
+                            file.set_len(0)
+                                .await
+                                .map_err(DownloadError::IoError)
+                                .map_err(DownloadStatus::FailedToStart)?;
+                        }
+                    }
+
+                    let mut writebuf = BufWriter::new(file);
+
+                    let length = response.content_length().map(|x| x as u64 + start_loc);
+
+                    let mut downloaded = start_loc;
+
+                    let _ = status_send.send(DownloadStatus::Status {
+                        downloaded,
+                        total: length,
+                    });
+
+                    while let Some(chunk) = response
+                        .chunk()
+                        .await
+                        .map_err(RequestError::from_error)
+                        .map_err(DownloadError::Request)
+                        .map_err(DownloadStatus::FailedInProgress)?
+                    {
+                        writebuf
+                            .write(&chunk)
+                            .await
+                            .map_err(DownloadError::IoError)
+                            .map_err(DownloadStatus::FailedInProgress)?;
+
+                        if let Ok(()) = cancel_recv.try_recv() {
+                            send_complete = false;
+                            break; // break instead of return to flush writebuf
+                        }
+
+                        downloaded += chunk.len() as u64;
+                        let _ = status_send.send(DownloadStatus::Status {
+                            downloaded,
+                            total: length,
+                        });
+                    }
+
+                    // will NOT be flushed on drop, so it is done manually
                     writebuf
-                        .write(&chunk)
+                        .flush()
                         .await
                         .map_err(DownloadError::IoError)
                         .map_err(DownloadStatus::FailedInProgress)?;
 
-                    if let Ok(()) = cancel_recv.try_recv() {
-                        send_complete = false;
-                        break; // break instead of return to flush writebuf
+                    if send_complete {
+                        // the complete flag is set first to avoid a possible race condition
+                        let _ = complete_send.send(()).await;
+                        let _ = status_send.send(DownloadStatus::Complete);
                     }
 
-                    let _ = status_send.send(DownloadStatus::Status {
-                        downloaded: chunk.len() as u64,
-                        total: length,
-                    });
+                    Ok(())
                 }
-
-                // will NOT be flushed on drop, so it is done manually
-                writebuf
-                    .flush()
-                    .await
-                    .map_err(DownloadError::IoError)
-                    .map_err(DownloadStatus::FailedInProgress)?;
-
-                if send_complete {
-                    // the complete flag is set first to avoid a possible race condition
-                    let _ = complete_send.send(()).await;
-                    let _ = status_send.send(DownloadStatus::Complete);
-                }
-
-                Ok(())
             };
 
             match task().await {
@@ -191,7 +302,7 @@ impl DownloadManager {
 }
 
 pub struct DownloadHandle {
-    id: Uuid,
+    id: String,
     pub status_channel: mpsc::UnboundedReceiver<DownloadStatus>,
     pub cancel_channel: mpsc::Sender<()>,
     // used to make sure a download was actually completed
@@ -254,7 +365,7 @@ mod test {
                         .get_temp()
                         .to_pathbuf();
 
-                    tokio::fs::create_dir(tmpfolder).await.unwrap();
+                    tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
                     app.download_manager
                         .complete_download(
