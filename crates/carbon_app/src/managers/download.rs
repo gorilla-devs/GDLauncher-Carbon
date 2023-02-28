@@ -341,9 +341,12 @@ pub enum DownloadError {
 
 #[cfg(test)]
 mod test {
+    use ntest::timeout;
+
     use crate::managers::download::DownloadError;
 
     #[tokio::test]
+    #[timeout(1000)]
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 

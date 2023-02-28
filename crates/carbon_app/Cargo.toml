@@ -39,3 +39,4 @@ prisma-client-rust = { workspace = true, features = [
 
 [dev-dependencies]
 tempdir = { workspace = true }
+ntest = { workspace = true }

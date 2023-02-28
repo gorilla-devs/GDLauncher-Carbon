@@ -234,9 +234,12 @@ impl TaskQueue {
 mod test {
     use std::sync::{Arc, Mutex};
 
+    use ntest::timeout;
+
     use super::{QueuedTask, TaskHandle, TaskQueue};
 
     #[tokio::test]
+    #[timeout(1)]
     async fn download_concurrency() {
         let mut queue = TaskQueue::new(2);
 
@@ -270,6 +273,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[timeout(1)]
     async fn task_dependence() {
         let mut queue = TaskQueue::new(0);
 
