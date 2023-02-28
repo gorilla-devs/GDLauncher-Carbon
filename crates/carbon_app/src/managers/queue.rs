@@ -107,9 +107,9 @@ impl TaskQueue {
             let slots = self.download_slots.read().await;
             slots.used < slots.total
         } {
-            for &prereqisite in &task.prerequisites {
-                if queue.iter().any(|task| task.handle == prereqisite)
-                    || active.iter().any(|task| task.handle == prereqisite)
+            for &prerequisite in &task.prerequisites {
+                if queue.iter().any(|task| task.handle == prerequisite)
+                    || active.iter().any(|task| task.handle == prerequisite)
                 {
                     return false;
                 }
