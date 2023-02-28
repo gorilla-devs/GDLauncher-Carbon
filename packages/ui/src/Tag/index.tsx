@@ -1,4 +1,4 @@
-import { mergeProps } from "solid-js";
+import { Show, mergeProps } from "solid-js";
 
 type Props = {
   name: string;
@@ -7,8 +7,8 @@ type Props = {
   onClose?: () => void;
 };
 
-const Tag = (props: Props) => {
-  const mergedProps = mergeProps(props, { type: "default" });
+export const Tag = (props: Props) => {
+  const mergedProps = mergeProps({ type: "default" }, props);
 
   return (
     <div
@@ -19,13 +19,13 @@ const Tag = (props: Props) => {
       }}
     >
       <img class="w-4 h-4" src={props.img} alt={`icon_${props.name}`} />
-      <p class="m-0">{props.name}</p>
-      <div
-        class="i-ri:close-fill text-lg text-shade-2 cursor-pointer"
-        onClick={() => props.onClose?.()}
-      />
+      <p class="m-0 text-shade-1">{props.name}</p>
+      <Show when={mergedProps.type === "default"}>
+        <div
+          class="i-ri:close-fill text-lg text-shade-2 cursor-pointer"
+          onClick={() => props.onClose?.()}
+        />
+      </Show>
     </div>
   );
 };
-
-export default Tag;
