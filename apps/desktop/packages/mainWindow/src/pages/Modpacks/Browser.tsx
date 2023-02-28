@@ -96,7 +96,7 @@ const NoModpacks = () => {
 
 export default function Browser() {
   return (
-    <div class="relative h-full w-full box-border">
+    <div class="relative w-full box-border">
       <div class="sticky top-0 left-0 right-0 flex flex-col bg-shade-8 z-10 px-5 pt-5">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
@@ -143,7 +143,7 @@ export default function Browser() {
           <Tags />
         </div>
       </div>
-      <div class="h-full overflow-y-hidden px-5 flex flex-col gap-2">
+      <div class="overflow-y-hidden px-5 pb-5 flex flex-col gap-2">
         <Show when={modpacks.length > 0} fallback={<NoModpacks />}>
           <For each={modpacks}>{(props) => <Modpack modpack={props} />}</For>
         </Show>
