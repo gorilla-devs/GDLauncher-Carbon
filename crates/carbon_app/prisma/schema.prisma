@@ -51,6 +51,6 @@ model MinecraftAssets {
 }
 
 model ActiveDownloads {
-  url      String @id
-  file_id  String @unique
+  url     String @id
+  file_id String @unique
 }
