@@ -1,5 +1,5 @@
 import { Component, Show, Suspense } from "solid-js";
-import { useNavigate, useRoutes } from "@solidjs/router";
+import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
