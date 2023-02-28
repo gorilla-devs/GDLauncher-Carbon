@@ -1,5 +1,5 @@
 import { Component, Show, Suspense } from "solid-js";
-import { useRoutes } from "@solidjs/router";
+import { useNavigate, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
@@ -20,7 +20,7 @@ const App: Component = () => {
         <div class="absolute gap-4 flex justify-center items-center cursor-pointer h-10 bottom-10 right-0 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
-              navigate?.navigate("/library");
+              navigate("/library");
             }}
           >
             <Trans
@@ -32,7 +32,7 @@ const App: Component = () => {
           </div>
           <div
             onClick={() => {
-              navigate?.navigate("/");
+              navigate("/");
             }}
           >
             <Trans

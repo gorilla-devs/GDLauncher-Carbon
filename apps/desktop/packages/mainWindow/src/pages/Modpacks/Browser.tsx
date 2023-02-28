@@ -6,7 +6,7 @@ export default function About() {
   return (
     <div>
       <div>
-        <button onClick={() => navigate?.navigate("/modpacks/DDLTR")}>
+        <button onClick={() => navigate("/modpacks/DDLTR")}>
           {/* Modpack DDLTR */}
         </button>
       </div>

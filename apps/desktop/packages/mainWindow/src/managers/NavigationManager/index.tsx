@@ -11,23 +11,20 @@ type NavigateOptions = {
   getLastInstance?: boolean;
 };
 
-type Context = {
-  navigate: (_path: string, _options?: NavigateOptions) => void;
-};
+type Context = (_path: string, _options?: NavigateOptions) => void;
+
 const NavigationContext = createContext<Context>();
 
 export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
-  const manager = {
-    navigate: (path: string, options?: NavigateOptions) => {
-      if (isLibraryPath(path) && options?.getLastInstance) {
-        const parameters = path.split("?")[1];
-        const instanceId = getInstanceIdFromPath(path);
-        if (instanceId) setLastInstanceOpened(instanceId);
+  const manager = (path: string, options?: NavigateOptions) => {
+    if (isLibraryPath(path) && options?.getLastInstance) {
+      const parameters = path.split("?")[1];
+      const instanceId = getInstanceIdFromPath(path);
+      if (instanceId) setLastInstanceOpened(instanceId);
 
-        navigate(`/library/${lastInstanceOpened()}/${parameters || ""}`);
-      } else navigate(path);
-    },
+      navigate(`/library/${lastInstanceOpened()}/${parameters || ""}`);
+    } else navigate(path);
   };
 
   return (
@@ -37,6 +34,6 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   );
 };
 
-export const useGdNavigation = () => {
-  return useContext(NavigationContext);
+export const useGdNavigation = (): Context => {
+  return useContext(NavigationContext) as Context;
 };

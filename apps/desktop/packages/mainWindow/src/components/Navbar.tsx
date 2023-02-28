@@ -39,7 +39,7 @@ const AppNavbar = () => {
             <img
               src={GDLauncherWideLogo}
               class="cursor-pointer h-9"
-              onClick={() => navigate?.navigate("/library")}
+              onClick={() => navigate("/library")}
             />
           </div>
           <ul class="flex text-white w-full m-0 items-between gap-6 list-none pl-10">
@@ -53,7 +53,7 @@ const AppNavbar = () => {
                       return (
                         <div
                           onClick={() =>
-                            navigate?.navigate(route.path, {
+                            navigate(route.path, {
                               getLastInstance: true,
                             })
                           }

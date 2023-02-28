@@ -96,7 +96,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
         const decodedParamString = decodeURIComponent(url.toString());
 
-        navigate?.navigate(decodedParamString.replace("=&", "?"));
+        navigate(decodedParamString.replace("=&", "?"));
         setTimeout(() => {
           setIsVisible(true);
         }, 100);

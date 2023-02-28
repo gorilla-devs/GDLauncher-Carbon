@@ -9,7 +9,7 @@ const Modpack = () => {
   return (
     <ContentWrapper>
       {/* <div>Modpack {params.id}</div> */}
-      <button onClick={() => navigate?.navigate("/modpacks")}>
+      <button onClick={() => navigate("/modpacks")}>
         <Trans
           key="back"
           options={{

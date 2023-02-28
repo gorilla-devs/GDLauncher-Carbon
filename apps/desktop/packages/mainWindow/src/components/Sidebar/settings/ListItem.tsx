@@ -17,7 +17,7 @@ const ListItem = (props: Props) => {
         "bg-shade-6": !!match(),
       }}
       onClick={() => {
-        navigate?.navigate(props.item.path);
+        navigate(props.item.path);
       }}
     >
       {props.item.name}

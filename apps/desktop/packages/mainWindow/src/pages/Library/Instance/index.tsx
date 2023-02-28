@@ -100,7 +100,7 @@ const Instance = () => {
         >
           <div class="sticky z-10 top-5 left-5 w-fit">
             <Button
-              onClick={() => navigate?.navigate("/library")}
+              onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
               size="small"
               variant="transparent"
@@ -185,7 +185,7 @@ const Instance = () => {
         <div class="flex items-start w-full transition-opacity ease-in-out duration-300">
           <div class="w-fit justify-center items-center transition duration-100 ease-in-out h-fit mr-4">
             <Button
-              onClick={() => navigate?.navigate("/library")}
+              onClick={() => navigate("/library")}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
               size="small"
               variant="transparent"

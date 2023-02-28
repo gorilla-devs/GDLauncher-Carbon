@@ -55,7 +55,7 @@ const Sidebar = () => {
               variant="sidebar"
             />
             <Tile
-              onClick={() => navigate?.navigate(`/library/ABDFEAD`)}
+              onClick={() => navigate(`/library/ABDFEAD`)}
               selected={instanceId() === "ABDFEAD"}
               title={"Instance ABDFEAD"}
               modloader={"forge"}
@@ -65,7 +65,7 @@ const Sidebar = () => {
           </Collapsable>
           <Collapsable title="FAVOURITED">
             <Tile
-              onClick={() => navigate?.navigate(`/library/DDAEDF`)}
+              onClick={() => navigate(`/library/DDAEDF`)}
               selected={instanceId() === "DDAEDF"}
               title={"Instance DDAEDF"}
               modloader={"forge"}

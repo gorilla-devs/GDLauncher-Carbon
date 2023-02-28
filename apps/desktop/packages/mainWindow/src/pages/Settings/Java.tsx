@@ -51,7 +51,7 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate?.navigate("?m=addJava");
+              navigate("?m=addJava");
             }}
           >
             <div class="text-shade-5 text-xl i-ri:add-fill" />

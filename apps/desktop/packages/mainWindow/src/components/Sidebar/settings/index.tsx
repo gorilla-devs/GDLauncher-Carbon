@@ -43,7 +43,7 @@ const Sidebar = () => {
             {(item) => (
               <Tab
                 onClick={() => {
-                  navigate?.navigate(item.path);
+                  navigate(item.path);
                 }}
               >
                 {item.name}

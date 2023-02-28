@@ -95,9 +95,7 @@ const Home = () => {
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
-                    onClick={() =>
-                      navigate?.navigate(`/library/${instance.id}`)
-                    }
+                    onClick={() => navigate(`/library/${instance.id}`)}
                     title={instance.title}
                     modloader={instance.modloader}
                     version={instance.mcVersion}
@@ -113,9 +111,7 @@ const Home = () => {
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
-                    onClick={() =>
-                      navigate?.navigate(`/library/${instance.id}`)
-                    }
+                    onClick={() => navigate(`/library/${instance.id}`)}
                     title={instance.title}
                     modloader={instance.modloader}
                     version={instance.mcVersion}
@@ -131,9 +127,7 @@ const Home = () => {
               {(instance) => (
                 <div id={instance.id}>
                   <Tile
-                    onClick={() =>
-                      navigate?.navigate(`/library/${instance.id}`)
-                    }
+                    onClick={() => navigate(`/library/${instance.id}`)}
                     title={instance.title}
                     modloader={instance.modloader}
                     version={instance.mcVersion}

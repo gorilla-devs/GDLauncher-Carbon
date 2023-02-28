@@ -27,7 +27,7 @@ const ModalLayout = (props: Props) => {
         }}
         onClick={() => {
           if (!props.preventClose) {
-            navigate?.navigate(location.pathname);
+            navigate(location.pathname);
             modalsContext?.closeModal();
           }
         }}
@@ -53,7 +53,7 @@ const ModalLayout = (props: Props) => {
                   class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
                   onClick={() => {
                     if (!props.preventClose) {
-                      navigate?.navigate(location.pathname);
+                      navigate(location.pathname);
                       modalsContext?.closeModal();
                     }
                   }}
