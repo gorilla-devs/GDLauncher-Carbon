@@ -1,9 +1,10 @@
-import { Link, useLocation, useMatch, useNavigate } from "@solidjs/router";
+import { Link, useLocation, useMatch } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -19,7 +20,7 @@ import getRouteIndex from "@/route/getRouteIndex";
 
 const AppNavbar = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -32,7 +33,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-shade-8 text-white flex items-center px-5 h-15">
+      <nav class="bg-shade-8 flex items-center text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -41,7 +42,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex m-0 text-white w-full items-between gap-6 list-none pl-10">
+          <ul class="flex text-white w-full m-0 items-between gap-6 list-none pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -50,8 +51,12 @@ const AppNavbar = () => {
                       const isMatch = useMatch(() => route.path);
 
                       return (
-                        <Link
-                          href={route.path}
+                        <div
+                          onClick={() =>
+                            navigate(route.path, {
+                              getLastInstance: true,
+                            })
+                          }
                           class="no-underline"
                           classList={{
                             "text-white": !!isMatch(),
@@ -61,7 +66,7 @@ const AppNavbar = () => {
                           <Tab>
                             <li class="no-underline">{route.label}</li>
                           </Tab>
-                        </Link>
+                        </div>
                       );
                     }}
                   </For>
@@ -69,7 +74,7 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div class="text-shade-0 text-2xl cursor-pointer i-ri:terminal-box-fill" />
+                    <div class="cursor-pointer text-shade-0 text-2xl i-ri:terminal-box-fill" />
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>

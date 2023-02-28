@@ -1,5 +1,5 @@
 import { Button } from "@gd/ui";
-import { useNavigate, useRouteData } from "@solidjs/router";
+import { useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { parseTwoDigitNumber } from "@/utils/helpers";
@@ -10,6 +10,7 @@ import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
+import { useGDNavigate } from "@/managers/NavigationManager";
 interface Props {
   deviceCodeObject: any | null;
   setDeviceCodeObject: Setter<any>;
@@ -17,7 +18,7 @@ interface Props {
 
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   const [error, setError] = createSignal<null | string>(null);
 
   const accountEnrollCancelMutation = rspc.createMutation(

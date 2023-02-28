@@ -17,17 +17,17 @@ use carbon_domain::account as domain;
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_ACTIVE_UUID[app, _: ()] {
-            app.account_manager.get_active_uuid().await
+            app.account_manager().get_active_uuid().await
                .map_err(into_rspc)
         }
 
         mutation SET_ACTIVE_UUID[app, uuid: Option<String>] {
-            app.account_manager.set_active_uuid(uuid).await
+            app.account_manager().set_active_uuid(uuid).await
                 .map_err(into_rspc)
         }
 
         query GET_ACCOUNTS[app, _: ()] {
-            Ok(app.account_manager
+            Ok(app.account_manager()
                .get_account_list()
                .await
                .map_err(into_rspc)?
@@ -37,35 +37,35 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
         }
 
         query GET_ACCOUNT_STATUS[app, uuid: String] {
-            Ok(app.account_manager.get_account_status(uuid).await
+            Ok(app.account_manager().get_account_status(uuid).await
                 .map_err(into_rspc)?
                 .map(AccountStatus::from))
         }
 
         mutation DELETE_ACCOUNT[app, uuid: String] {
-            app.account_manager.delete_account(uuid).await
+            app.account_manager().delete_account(uuid).await
                 .map_err(into_rspc)
         }
 
         mutation ENROLL_BEGIN[app, _: ()] {
-            app.account_manager.begin_enrollment().await
+            app.account_manager().begin_enrollment().await
                 .map_err(into_rspc)
         }
 
         mutation ENROLL_CANCEL[app, _: ()] {
-            app.account_manager.cancel_enrollment().await
+            app.account_manager().cancel_enrollment().await
                 .map_err(into_rspc)
         }
 
         query ENROLL_GET_STATUS[app, _: ()] {
             Ok(EnrollmentStatus::from(
-                app.account_manager.get_enrollment_status().await
+                app.account_manager().get_enrollment_status().await
                     .map_err(into_rspc)?
             ))
         }
 
         mutation ENROLL_FINALIZE[app, _: ()] {
-            app.account_manager.finalize_enrollment().await
+            app.account_manager().finalize_enrollment().await
                 .map_err(into_rspc)
         }
     }

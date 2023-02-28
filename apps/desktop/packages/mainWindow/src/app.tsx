@@ -1,15 +1,15 @@
 import { Component, Show, Suspense } from "solid-js";
-import { useRoutes, useNavigate } from "@solidjs/router";
+import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { createInvalidateQuery } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
+import { useGDNavigate } from "./managers/NavigationManager";
 
 const App: Component = () => {
   const Route = useRoutes(routes);
-  const navigate = useNavigate();
-  // const deleteMutation = rspc.createMutation(["account.deleteAccount"]);
+  const navigate = useGDNavigate();
 
   createInvalidateQuery();
   initThemes();

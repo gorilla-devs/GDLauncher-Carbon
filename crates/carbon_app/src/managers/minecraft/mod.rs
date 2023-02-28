@@ -2,8 +2,6 @@ use crate::db::{minecraft_manifest::SetParam, PrismaClient};
 use carbon_domain::minecraft::MinecraftManifest;
 use thiserror::Error;
 
-use super::AppRef;
-
 #[derive(Error, Debug)]
 pub enum MinecraftManagerError {
     #[error("Cannot fetch manifest from HTTP: {0}")]
@@ -12,19 +10,11 @@ pub enum MinecraftManagerError {
     ManifestParseError(reqwest::Error),
 }
 
-pub(crate) struct MinecraftManager {
-    app: AppRef,
-}
+pub(crate) struct MinecraftManager {}
 
 impl MinecraftManager {
     pub fn new() -> Self {
-        Self {
-            app: AppRef::uninit(),
-        }
-    }
-
-    pub fn get_appref(&self) -> &AppRef {
-        &self.app
+        Self {}
     }
 }
 
