@@ -13,24 +13,19 @@ use uuid::Uuid;
 use crate::{
     db::read_filters::StringFilter,
     error::request::{RequestContext, RequestError, RequestErrorDetails},
-    managers::AppRef,
 };
 
-pub struct DownloadManager {
-    app: AppRef,
-}
+use super::ManagerRef;
+
+pub struct DownloadManager {}
 
 impl DownloadManager {
     pub fn new() -> Self {
-        Self {
-            app: AppRef::uninit(),
-        }
+        Self {}
     }
+}
 
-    pub fn get_appref(&self) -> &AppRef {
-        &self.app
-    }
-
+impl ManagerRef<'_, DownloadManager> {
     pub async fn download(
         &self,
         url: String,
@@ -56,7 +51,7 @@ impl DownloadManager {
     }
 
     pub async fn complete_download(
-        &self,
+        self,
         mut handle: DownloadHandle,
         target: &Path,
     ) -> Result<(), DownloadCompleteError> {
@@ -69,7 +64,6 @@ impl DownloadManager {
 
         let path = self
             .app
-            .upgrade()
             .configuration_manager
             .runtime_path
             .get_download()
@@ -83,7 +77,6 @@ impl DownloadManager {
             .map_err(DownloadCompleteError::RenameError)?;
 
         self.app
-            .upgrade()
             .prisma_client
             .active_downloads()
             .delete(UniqueWhereParam::FileIdEquals(handle.id.to_string()))
@@ -93,12 +86,11 @@ impl DownloadManager {
         Ok(())
     }
 
-    pub async fn start_download(&self, url: String) -> Result<DownloadHandle, QueryError> {
+    pub async fn start_download(self, url: String) -> Result<DownloadHandle, QueryError> {
         use crate::db::active_downloads::WhereParam;
 
         let active_download = self
             .app
-            .upgrade()
             .prisma_client
             .active_downloads()
             .find_first(vec![WhereParam::Url(StringFilter::Equals(url.clone()))])
@@ -111,7 +103,6 @@ impl DownloadManager {
                 let id = Uuid::new_v4().to_string();
 
                 self.app
-                    .upgrade()
                     .prisma_client
                     .active_downloads()
                     .create(url.clone(), id.clone(), Vec::new())
@@ -124,7 +115,6 @@ impl DownloadManager {
 
         let path = self
             .app
-            .upgrade()
             .configuration_manager
             .runtime_path
             .get_download()
@@ -135,7 +125,7 @@ impl DownloadManager {
         let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
-        let client = self.app.upgrade().reqwest_client.clone();
+        let client = self.app.reqwest_client.clone();
         let task = async move {
             let task = || {
                 let status_send = &status_send;
@@ -365,7 +355,7 @@ mod test {
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
-        app.download_manager
+        app.download_manager()
             .download(
                 String::from("https://gdlauncher.com"),
                 &app.configuration_manager
