@@ -18,7 +18,7 @@ interface Props {
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const navigate = useNavigate();
-  const [error, setError] = createSignal("");
+  const [error, setError] = createSignal<null | string>(null);
 
   let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {
     onError(error) {
@@ -65,10 +65,10 @@ const CodeStep = (props: Props) => {
             expiresAt: info.expires_at,
           });
           setExpired(false);
-          setError("");
+          setError(null);
         },
         onFail() {
-          setError("error");
+          setError("something went wrong while logging in");
         },
       });
     }

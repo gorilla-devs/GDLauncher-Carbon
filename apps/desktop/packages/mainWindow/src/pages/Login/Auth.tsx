@@ -15,7 +15,7 @@ type Props = {
 
 const Auth = (props: Props) => {
   const [t] = useTransContext();
-  const [error, setError] = createSignal("");
+  const [error, setError] = createSignal<null | string>(null);
   const [clicked, setClicked] = createSignal(false);
   const navigate = useNavigate();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -39,7 +39,7 @@ const Auth = (props: Props) => {
     if (routeData.isSuccess && clicked()) {
       handleStatus(routeData, {
         onPolling: (info) => {
-          setError("");
+          setError(null);
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
@@ -48,10 +48,10 @@ const Auth = (props: Props) => {
           props.setStep(1);
         },
         onFail() {
-          setError("error");
+          setError("something went wrong while logging in");
         },
         onComplete() {
-          setError("");
+          setError(null);
           finalizeMutation.mutate(null);
           navigate("/library");
         },
