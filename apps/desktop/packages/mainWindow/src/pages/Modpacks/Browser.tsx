@@ -1,7 +1,7 @@
-import { useNavigate } from "@solidjs/router";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 export default function About() {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
 
   return (
     <div>

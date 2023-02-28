@@ -24,12 +24,12 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="flex flex-col justify-center cursor-pointer items-start snap-start"
+          class="flex justify-center cursor-pointer flex-col items-start snap-start"
           onClick={(e) => props?.onClick?.(e)}
         >
           <div class="rounded-2xl h-38 w-38 bg-green-600" />
           <h4 class="my-2">{props.title}</h4>
-          <div class="flex justify-between text-shade-0">
+          <div class="flex text-shade-0 justify-between">
             <p class="m-0">{props.modloader}</p>
             <p class="m-0">{props.version}</p>
           </div>

@@ -2,7 +2,7 @@ import { Button } from "@gd/ui";
 import { createSignal, Setter } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
-import { useModal } from "@/ModalsManager";
+import { useModal } from "@/managers/ModalsManager";
 interface Props {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;

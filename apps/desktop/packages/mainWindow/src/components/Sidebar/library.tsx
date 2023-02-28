@@ -1,17 +1,23 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { Show } from "solid-js";
+import { Show, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import Style from "./style.module.scss";
-import { useLocation, useNavigate } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
+import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans } from "@gd/i18n";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   const location = useLocation();
 
-  const instanceId = () => location.pathname.match(/\/([^/]*)$/)![1];
+  const instanceId = () => getInstanceIdFromPath(location.pathname);
+
+  createEffect(() => {
+    setLastInstanceOpened(instanceId() || "");
+  });
 
   // TODO: adapt to real data
   return (

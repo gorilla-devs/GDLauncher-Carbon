@@ -1,6 +1,6 @@
 import { Trans } from "@gd/i18n";
-import { ModalProps } from "@/ModalsManager";
-import ModalLayout from "@/ModalsManager/ModalLayout";
+import { ModalProps } from "@/managers/ModalsManager";
+import ModalLayout from "@/managers/ModalsManager/ModalLayout";
 import { Button, Input } from "@gd/ui";
 
 const AddJava = (props: ModalProps) => {

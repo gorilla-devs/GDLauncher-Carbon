@@ -1,11 +1,12 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
-import { useNavigate, useRouteData } from "@solidjs/router";
+import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect } from "solid-js";
 import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 type MockInstance = {
   title: string;
@@ -66,7 +67,7 @@ const mockCarousel: MockInstance[] = [
 ];
 
 const Home = () => {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
   const routeDataNews: Promise<any> = useRouteData();
