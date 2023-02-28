@@ -22,17 +22,22 @@ const Auth = (props: Props) => {
 
   const modalsContext = useModal();
 
-  const mutation = rspc.createMutation(["account.enroll.begin"], {
-    onError(error) {
-      setError(error.message);
-    },
-  });
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
 
-  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
+  const accountEnrollFinalizeMutation = rspc.createMutation([
+    "account.enroll.finalize",
+  ]);
 
   const handleClick = async () => {
     setClicked(true);
-    mutation.mutate(null);
+    accountEnrollBeginMutation.mutate(null);
   };
 
   createEffect(() => {
@@ -52,7 +57,7 @@ const Auth = (props: Props) => {
         },
         onComplete() {
           setError(null);
-          finalizeMutation.mutate(null);
+          accountEnrollFinalizeMutation.mutate(null);
           navigate("/library");
         },
       });

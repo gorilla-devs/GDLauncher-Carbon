@@ -20,17 +20,23 @@ const CodeStep = (props: Props) => {
   const navigate = useNavigate();
   const [error, setError] = createSignal<null | string>(null);
 
-  let cancelMutation = rspc.createMutation(["account.enroll.cancel"], {
-    onError(error) {
-      setError(error.message);
-    },
-  });
+  const accountEnrollCancelMutation = rspc.createMutation(
+    ["account.enroll.cancel"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
 
-  let mutation = rspc.createMutation(["account.enroll.begin"], {
-    onError(error) {
-      setError(error.message);
-    },
-  });
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
 
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
@@ -54,8 +60,8 @@ const CodeStep = (props: Props) => {
   const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
   const handleRefersh = async () => {
-    cancelMutation.mutate(null);
-    mutation.mutate(null);
+    accountEnrollCancelMutation.mutate(null);
+    accountEnrollBeginMutation.mutate(null);
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onPolling: (info) => {
