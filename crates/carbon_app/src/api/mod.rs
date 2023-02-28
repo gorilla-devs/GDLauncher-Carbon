@@ -8,6 +8,7 @@ mod account;
 mod java;
 pub mod keys;
 mod mc;
+mod queue;
 pub mod router;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
@@ -28,6 +29,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<Managers> {
         .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
+        .yolo_merge(keys::queue::GROUP_PREFIX, queue::mount())
         .yolo_merge(keys::app::GROUP_PREFIX, managers::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168

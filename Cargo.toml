@@ -28,6 +28,7 @@ log = "0.4.17"
 mockall = "0.11.3"
 napi = "2.10.4"
 napi-derive = "2.9.3"
+ntest = "0.9.0"
 prisma-client-rust = {git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = [
   "sqlite-create-many",
   "sqlite",
