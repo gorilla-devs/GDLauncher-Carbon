@@ -18,6 +18,7 @@ export type Props = {
   id?: string;
   bg?: string;
   btnDropdown?: boolean;
+  icon?: JSX.Element;
 };
 export interface DropDownButtonProps extends Props {
   children: JSX.Element;
@@ -75,6 +76,7 @@ const Dropdown = (props: Props) => {
         }}
       >
         <Show when={!props.btnDropdown}>
+          <span class="mr-2">{props.icon}</span>
           <span
             classList={{
               "text-white": props.error,
@@ -92,7 +94,7 @@ const Dropdown = (props: Props) => {
           }`}
           classList={{
             "text-shade-0 group-hover:text-white":
-              !props.disabled && !props.error,
+              !props.disabled && !props.error && !props.btnDropdown,
             "text-white": props.error || props.btnDropdown,
             "text-shade-5": props.disabled,
           }}
@@ -144,7 +146,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
     <div class="flex">
       <Button class="rounded-r-0 pr-0 flex gap-1">
         <span>{props.children}</span>
-        <span class="text-white font-light text-sm">{selectedValue()}</span>
+        <span class="text-white font-light text-xs">{selectedValue()}</span>
       </Button>
       <Dropdown
         btnDropdown

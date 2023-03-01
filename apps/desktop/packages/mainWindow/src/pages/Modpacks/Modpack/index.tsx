@@ -62,6 +62,7 @@ const Modpack = (props: Props) => {
               { label: "1.16.3", key: "1.16.3" },
               { label: "1.16.2", key: "1.16.2" },
             ]}
+            icon={<div class="i-ri:price-tag-3-fill" />}
             rounded
             bg="bg-shade-4"
             value="1.16.2"

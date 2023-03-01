@@ -14,7 +14,7 @@ const tags = [
 
 const Tags = () => {
   return (
-    <div class="flex gap-2 max-w-full">
+    <div class="flex gap-2 max-w-full items-center">
       <div class="flex flex-1 gap-2 max-w-full overflow-x-auto">
         <For each={tags}>{(tag) => <Tag name={tag.name} img={tag.img} />}</For>
       </div>
