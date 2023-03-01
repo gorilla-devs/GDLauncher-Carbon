@@ -12,12 +12,16 @@ use thiserror::Error;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
+use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
+use self::queue::TaskQueue;
 
 pub mod account;
 mod configuration;
+pub mod download;
 mod minecraft;
 mod prisma_client;
+pub mod queue;
 
 pub type Managers = Arc<ManagersInner>;
 
@@ -33,8 +37,10 @@ pub struct ManagersInner {
     minecraft_manager: MinecraftManager,
     account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
+    download_manager: DownloadManager,
     pub(crate) reqwest_client: reqwest::Client,
     pub(crate) prisma_client: Arc<PrismaClient>,
+    pub(crate) task_queue: TaskQueue,
 }
 
 pub struct ManagerRef<'a, T> {
@@ -89,9 +95,11 @@ impl ManagersInner {
             configuration_manager: ConfigurationManager::new(runtime_path),
             minecraft_manager: MinecraftManager::new(),
             account_manager: AccountManager::new(),
+            download_manager: DownloadManager::new(),
             invalidation_channel,
             reqwest_client: reqwest::Client::new(),
             prisma_client: Arc::new(db_client),
+            task_queue: TaskQueue::new(2 /* todo: download slots */),
         });
 
         app
@@ -100,6 +108,7 @@ impl ManagersInner {
     manager_getter!(configuration_manager: ConfigurationManager);
     manager_getter!(minecraft_manager: MinecraftManager);
     manager_getter!(account_manager: AccountManager);
+    manager_getter!(download_manager: DownloadManager);
 
     pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
         match self

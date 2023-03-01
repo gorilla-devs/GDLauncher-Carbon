@@ -14,7 +14,7 @@ use super::ManagerRef;
 pub mod runtime_path;
 
 pub(crate) struct ConfigurationManager {
-    runtime_path: runtime_path::RuntimePath,
+    pub runtime_path: runtime_path::RuntimePath,
 }
 
 impl ConfigurationManager {
