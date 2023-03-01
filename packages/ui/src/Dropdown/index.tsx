@@ -149,7 +149,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
     <div class="flex">
       <Button class="rounded-r-0 pr-0 flex gap-1">
         <span>{props.children}</span>
-        <span class="text-white font-light">{selectedValue()}</span>
+        <span class="text-white font-light text-sm">{selectedValue()}</span>
       </Button>
       <Dropdown
         btnDropdown
