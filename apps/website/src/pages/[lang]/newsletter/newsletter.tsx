@@ -7,9 +7,9 @@ import { createSignal, Show } from "solid-js";
 
 const WaitList = ({ pathname }: { pathname: string }) => {
   const [email, setEmail] = createSignal("");
-  const [error, setError] = createSignal("");
+  const [error, setError] = createSignal<null | string>(null);
   const [loading, setLoading] = createSignal(false);
-  const [success, setSuccess] = createSignal("");
+  const [success, setSuccess] = createSignal<null | string>(null);
   const t = useTranslations(pathname);
 
   const addUser = async (body: any) => {
@@ -26,8 +26,8 @@ const WaitList = ({ pathname }: { pathname: string }) => {
   const handleSubmit = async (event: Event) => {
     event.preventDefault();
     const obj: any = {};
-    setError("");
-    setSuccess("");
+    setError(null);
+    setSuccess(null);
     setLoading(true);
 
     const emailRegex = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,4}$/i;

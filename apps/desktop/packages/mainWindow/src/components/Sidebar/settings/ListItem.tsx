@@ -1,12 +1,13 @@
-import { useMatch, useNavigate } from "@solidjs/router";
+import { useMatch } from "@solidjs/router";
 import { settingsItem } from ".";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 interface Props {
   item: settingsItem;
 }
 
 const ListItem = (props: Props) => {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   const match = useMatch(() => props.item.path);
 
   return (
