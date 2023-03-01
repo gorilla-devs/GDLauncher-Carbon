@@ -1,11 +1,12 @@
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Show, JSX } from "solid-js";
+import { Button } from "../Button";
 
-export interface Option {
+export type Option = {
   label: string;
   key: string;
-}
+};
 
-export interface Props {
+export type Props = {
   options: Option[];
   value: string;
   error?: boolean;
@@ -13,9 +14,17 @@ export interface Props {
   rounded?: boolean;
   label?: string;
   onChange?: (_option: Option) => void;
+  class?: string;
+  id?: string;
+  bg?: string;
+  btnDropdown?: boolean;
+  icon?: JSX.Element;
+};
+export interface DropDownButtonProps extends Props {
+  children: JSX.Element;
 }
 
-function Dropdown(props: Props) {
+const Dropdown = (props: Props) => {
   const defaultValue = () =>
     props.options.find((option) => option.key === props.value)?.label ||
     props.options[0]?.label;
@@ -33,7 +42,7 @@ function Dropdown(props: Props) {
   };
 
   return (
-    <div class="inline-block relative">
+    <div class="inline-block relative" id={props.id}>
       <Show when={!props.rounded && props.label}>
         <p
           class="mt-0 mb-2 font-bold"
@@ -46,7 +55,7 @@ function Dropdown(props: Props) {
         </p>
       </Show>
       <button
-        class="group flex justify-between bg-shade-7 font-semibold py-2 px-4 inline-flex items-center min-w-45 min-h-10 box-border"
+        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bg}`}
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -63,39 +72,48 @@ function Dropdown(props: Props) {
           "text-shade-5": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
+          "bg-shade-7": !props.bg,
         }}
       >
-        <span
-          classList={{
-            "text-white": props.error,
-            "text-shade-0 hover:text-white group-hover:text-white":
-              !props.disabled && !props.error,
-            "text-shade-5": props.disabled,
-          }}
-        >
-          {selectedValue()}
-        </span>
+        <Show when={!props.btnDropdown}>
+          <span class="mr-2">{props.icon}</span>
+          <span
+            classList={{
+              "text-white": props.error,
+              "text-shade-0 hover:text-white group-hover:text-white":
+                !props.disabled && !props.error,
+              "text-shade-5": props.disabled,
+            }}
+          >
+            {selectedValue()}
+          </span>
+        </Show>
         <span
           class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
             "text-shade-0 group-hover:text-white":
-              !props.disabled && !props.error,
-            "text-white": props.error,
+              !props.disabled && !props.error && !props.btnDropdown,
+            "text-white": props.error || props.btnDropdown,
             "text-shade-5": props.disabled,
           }}
         />
       </button>
+
       <ul
-        class={`absolute text-shade-0 pt-1 z-20 ${
-          menuOpened() ? "block" : "hidden"
-        } list-none m-0 p-0 w-45 z-20`}
+        class={`absolute text-shade-0 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20`}
         onMouseOut={() => {
           setFocusIn(false);
         }}
         onMouseOver={() => {
           setFocusIn(true);
+        }}
+        classList={{
+          block: menuOpened(),
+          hidden: !menuOpened(),
+          "-left-10": props.btnDropdown,
+          "min-w-20": props.btnDropdown,
         }}
       >
         <For each={props.options}>
@@ -115,6 +133,34 @@ function Dropdown(props: Props) {
       </ul>
     </div>
   );
-}
+};
+
+const DropDownButton = (props: DropDownButtonProps) => {
+  const [selectedValue, setSelectedValue] = createSignal("");
+
+  const handleChange = (option: Option) => {
+    setSelectedValue(option.label);
+  };
+
+  return (
+    <div class="flex">
+      <Button class="rounded-r-0 pr-0 flex gap-1">
+        <span>{props.children}</span>
+        <span class="text-white font-light text-xs">{selectedValue()}</span>
+      </Button>
+      <Dropdown
+        btnDropdown
+        class="rounded-l-0 h-11 pl-0"
+        options={props.options}
+        rounded
+        bg="bg-primary"
+        value={props.value}
+        onChange={(option) => handleChange(option)}
+      />
+    </div>
+  );
+};
+
+Dropdown.button = DropDownButton;
 
 export { Dropdown };
