@@ -12,7 +12,7 @@ export const Tag = (props: Props) => {
 
   return (
     <div
-      class="flex gap-2 items-center px-3 py-2 bg-shade-7 rounded-md max-h-8"
+      class="flex gap-2 items-center px-3 py-2 bg-shade-7 rounded-md max-h-8 box-border"
       classList={{
         "bg-shade-7": mergedProps.type === "default",
         "bg-shade-9": mergedProps.type === "fixed",

@@ -46,7 +46,7 @@ const Modpack = (props: Props) => {
           <p class="m-0 text-shade-0 text-sm">{props.modpack.description}</p>
         </div>
       </div>
-      <div class="flex justify-between gap-3">
+      <div class="flex justify-between items-center gap-3">
         <div class="flex gap-2">
           <For each={props.modpack.tags}>
             {(tag) => (

@@ -134,14 +134,9 @@ const Dropdown = (props: Props) => {
 };
 
 const DropDownButton = (props: DropDownButtonProps) => {
-  const defaultValue = () =>
-    props.options.find((option) => option.key === props.value)?.label ||
-    props.options[0]?.label;
-
   const [selectedValue, setSelectedValue] = createSignal("");
 
   const handleChange = (option: Option) => {
-    console.log("CHANGE", option);
     setSelectedValue(option.label);
   };
 
