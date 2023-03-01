@@ -3,7 +3,7 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
-import { For } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
@@ -16,6 +16,7 @@ const Instance = () => {
   const navigate = useGDNavigate();
   const params = useParams();
   const location = useLocation();
+  const [editableName, setEditableName] = createSignal(false);
 
   const instancePages = () => [
     {
@@ -25,6 +26,10 @@ const Instance = () => {
     {
       label: "Mods",
       path: `/library/${params.id}/mods`,
+    },
+    {
+      label: "Settings",
+      path: `/library/${params.id}/settings`,
     },
     {
       label: "Resource Packs",
@@ -127,8 +132,38 @@ const Instance = () => {
                     {/* <img /> */}
                   </div>
                   <div class="flex flex-1 flex-col max-w-185">
-                    <h1 class="m-0">{params.id}</h1>
-                    <div class="flex flex-col lg:flex-row justify-between">
+                    <div class="flex gap-4 items-center">
+                      <h1
+                        class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
+                        contentEditable
+                        onInput={() => {
+                          console.log("AAA");
+                        }}
+                        onChange={() => {
+                          console.log("CHANGE");
+                          setEditableName((prev) => !prev);
+                        }}
+                        onFocusIn={() => {
+                          setEditableName(true);
+                        }}
+                        onFocusOut={() => {
+                          setEditableName(false);
+                        }}
+                      >
+                        {params.id}
+                      </h1>
+                      <div class="flex gap-2">
+                        <Show when={editableName()}>
+                          <div
+                            class="i-ri:delete-bin-7-fill text-2xl cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-red"
+                            onClick={() => {
+                              setEditableName(false);
+                            }}
+                          />
+                        </Show>
+                      </div>
+                    </div>
+                    <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex items-start flex-col gap-1 lg:flex-row text-shade-0 lg:items-center lg:gap-0">
                         <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
                           Forge 1.19.2

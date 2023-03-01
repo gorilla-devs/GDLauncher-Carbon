@@ -144,7 +144,7 @@ function Slider(props: Props) {
   };
 
   return (
-    <div class="h-10 flex items-center">
+    <div class="h-10 flex items-center w-full max-w-full box-border px-4 mb-10">
       <div class="relative w-full">
         <For each={Object.entries(props.marks)}>
           {([value, label]) => (
