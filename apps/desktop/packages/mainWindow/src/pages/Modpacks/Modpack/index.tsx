@@ -1,5 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
-import { Tag } from "@gd/ui";
+import { Trans } from "@gd/i18n";
+import { Dropdown, Tag } from "@gd/ui";
 import { For } from "solid-js";
 
 type TagType = {
@@ -45,10 +46,44 @@ const Modpack = (props: Props) => {
           <p class="m-0 text-shade-0 text-sm">{props.modpack.description}</p>
         </div>
       </div>
-      <div class="flex gap-2">
-        <For each={props.modpack.tags}>
-          {(tag) => <Tag name={EventTarget.name} img={tag.img} type="fixed" />}
-        </For>
+      <div class="flex justify-between">
+        <div class="flex gap-2">
+          <For each={props.modpack.tags}>
+            {(tag) => (
+              <Tag name={EventTarget.name} img={tag.img} type="fixed" />
+            )}
+          </For>
+        </div>
+        <div class="flex gap-3">
+          <Dropdown
+            options={[
+              { label: "1.16.5", key: "1.16.5" },
+              { label: "1.16.4", key: "1.16.4" },
+              { label: "1.16.3", key: "1.16.3" },
+              { label: "1.16.2", key: "1.16.2" },
+            ]}
+            rounded
+            bg="bg-shade-4"
+            value="1.16.2"
+          />
+          <Dropdown.button
+            options={[
+              { label: "1.16.5", key: "1.16.5" },
+              { label: "1.16.4", key: "1.16.4" },
+              { label: "1.16.3", key: "1.16.3" },
+              { label: "1.16.2", key: "1.16.2" },
+            ]}
+            rounded
+            value="1.16.2"
+          >
+            <Trans
+              key="download"
+              options={{
+                defaultValue: "Download",
+              }}
+            />
+          </Dropdown.button>
+        </div>
       </div>
     </div>
   );
