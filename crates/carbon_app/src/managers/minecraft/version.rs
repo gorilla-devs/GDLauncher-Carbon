@@ -191,7 +191,7 @@ fn replace_placeholders(
     let new_command = matches.replace_all(&command, |caps: &Captures| {
         if let Some(value) = caps.name("value") {
             let value = replace_placeholder(&replacer_args, value.as_str().into(), version);
-            return format!("{} {}", caps.name("arg").unwrap().as_str(), value);
+            return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
         } else if let Some(standalone) = caps.name("standalone") {
             let value = replace_placeholder(&replacer_args, standalone.as_str().into(), version);
             return value;
@@ -266,8 +266,8 @@ pub async fn generate_startup_command(
     let mut mc_command = Vec::new();
 
     if let Some(arguments) = &version.arguments {
-        if let Some(jvm) = &arguments.game {
-            for arg in jvm {
+        if let Some(game) = &arguments.game {
+            for arg in game {
                 if let GameElement::String(s) = arg {
                     mc_command.push(s.clone());
                 }
@@ -301,6 +301,7 @@ mod tests {
         }
     }
 
+    // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
         let app = setup_managers_for_test().await;
@@ -317,11 +318,15 @@ mod tests {
             .unwrap();
 
         let full_account = get_account().await;
-        let runtime_path = &app.configuration_manager().runtime_path;
 
-        let command = generate_startup_command(full_account, runtime_path, version).await;
+        // Mock RuntimePath to have a stable path
+        let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
 
-        println!("{}", command);
+        let command = generate_startup_command(full_account, &runtime_path, version).await;
+
+        let fixture = "java -XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump -Dos.name=Windows 10 -Dos.version=10.0 -Djava.library.path=stable_path/natives/1.16.5 -cp stable_path/libraries/com.mojang/patchy/1.3.9:stable_path/libraries/oshi-project/oshi-core/1.1:stable_path/libraries/net.java.dev.jna/jna/4.4.0:stable_path/libraries/net.java.dev.jna/platform/3.4.0:stable_path/libraries/com.ibm.icu/icu4j/66.1:stable_path/libraries/com.mojang/javabridge/1.0.22:stable_path/libraries/net.sf.jopt-simple/jopt-simple/5.0.3:stable_path/libraries/io.netty/netty-all/4.1.25.Final:stable_path/libraries/com.google.guava/guava/21.0:stable_path/libraries/org.apache.commons/commons-lang3/3.5:stable_path/libraries/commons-io/commons-io/2.5:stable_path/libraries/commons-codec/commons-codec/1.10:stable_path/libraries/net.java.jinput/jinput/2.0.5:stable_path/libraries/net.java.jutils/jutils/1.0.0:stable_path/libraries/com.mojang/brigadier/1.0.17:stable_path/libraries/com.mojang/datafixerupper/4.0.26:stable_path/libraries/com.google.code.gson/gson/2.8.0:stable_path/libraries/com.mojang/authlib/2.1.28:stable_path/libraries/org.apache.commons/commons-compress/1.8.1:stable_path/libraries/org.apache.httpcomponents/httpclient/4.3.3:stable_path/libraries/commons-logging/commons-logging/1.1.3:stable_path/libraries/org.apache.httpcomponents/httpcore/4.3.2:stable_path/libraries/it.unimi.dsi/fastutil/8.2.1:stable_path/libraries/org.apache.logging.log4j/log4j-api/2.8.1:stable_path/libraries/org.apache.logging.log4j/log4j-core/2.8.1:stable_path/libraries/org.lwjgl/lwjgl/3.2.1:stable_path/libraries/org.lwjgl/lwjgl/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-jemalloc/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-jemalloc/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-openal/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-openal/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-opengl/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-opengl/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-glfw/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-glfw/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-stb/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-stb/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-tinyfd/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-tinyfd/3.2.2:stable_path/libraries/org.lwjgl/lwjgl/3.2.1:stable_path/libraries/org.lwjgl/lwjgl/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-jemalloc/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-jemalloc/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-openal/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-openal/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-opengl/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-opengl/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-glfw/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-glfw/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-stb/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-tinyfd/3.2.2:stable_path/libraries/org.lwjgl/lwjgl-tinyfd/3.2.1:stable_path/libraries/org.lwjgl/lwjgl-stb/3.2.2:stable_path/libraries/com.mojang/text2speech/1.11.3:stable_path/libraries/com.mojang/text2speech/1.11.3:stable_path/libraries/ca.weblite/java-objc-bridge/1.0.0:stable_path/libraries/ca.weblite/java-objc-bridge/1.0.0: -Xmx4096m -Xms4096m -Dminecraft.applet.TargetDirectory=stable_path -Dfml.ignorePatchDiscrepancies=true -Dfml.ignoreInvalidMinecraftCertificates=true net.minecraft.client.main.Main --username test --version 1.16.5 --gameDir stable_path/instances/something --assetsDir stable_path/assets --assetIndex 1.16 --uuid test --accessToken offline --userType mojang --versionType release";
+
+        assert_eq!(command, fixture);
     }
 
     // #[tokio::test]
