@@ -17,11 +17,12 @@ const Settings = () => {
           </h5>
           <Switch checked={true} />
         </div>
-        <div class="flex justify-center">
+        <div class="flex justify-center px-2">
           <Slider
             min={0}
             max={16384}
             steps={1}
+            value={4096}
             marks={{
               1024: "1024 MB",
               2048: "2048 MB",
