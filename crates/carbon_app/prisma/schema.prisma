@@ -48,3 +48,8 @@ model ActiveDownloads {
   url     String @id
   file_id String @unique
 }
+
+model ActiveDownloads {
+  url     String @id
+  file_id String @unique
+}
