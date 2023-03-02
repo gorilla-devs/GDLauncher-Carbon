@@ -141,7 +141,7 @@ const General = () => {
           <Switch checked={false} />
         </div>
       </div>
-      <div class="mb-6 max">
+      <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
             key="settings_potatp_mode_title"

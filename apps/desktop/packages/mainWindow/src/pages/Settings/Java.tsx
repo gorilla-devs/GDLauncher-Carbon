@@ -1,6 +1,6 @@
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Button, Slider } from "@gd/ui";
+import { Button, Input, Slider } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
@@ -37,15 +37,8 @@ const Java = () => {
           }}
         />
       </h2>
-      <div>
-        <h2 class="m-0 mb-7 text-4">
-          <Trans
-            key="instance_settings_title"
-            options={{
-              defaultValue: "Settings",
-            }}
-          />
-        </h2>
+
+      <div class="mb-6">
         <h5 class="m-0 mb-4">
           <Trans
             key="java_memory_title"
@@ -67,6 +60,27 @@ const Java = () => {
               16384: "16384 MB",
             }}
           />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="m-0 mb-4">
+          <Trans
+            key="java_arguments_title"
+            options={{
+              defaultValue: "Java Arguments",
+            }}
+          />
+        </h5>
+        <div class="flex w-full gap-4 items-center">
+          <Input class="w-full" />
+          <Button rounded={false} variant="secondary" class="h-10">
+            <Trans
+              key="reset_java_args"
+              options={{
+                defaultValue: "Reset",
+              }}
+            />
+          </Button>
         </div>
       </div>
       <div class="flex flex-col">

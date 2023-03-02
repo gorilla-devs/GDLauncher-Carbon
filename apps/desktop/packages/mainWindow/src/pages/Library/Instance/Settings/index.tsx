@@ -1,27 +1,22 @@
 /* eslint-disable i18next/no-literal-string */
 import { Trans } from "@gd/i18n";
-import { Dropdown, Input, Slider } from "@gd/ui";
+import { Button, Dropdown, Input, Slider, Switch } from "@gd/ui";
 
 const Settings = () => {
   return (
     <div class="pt-10">
-      <h2 class="m-0 mb-7 text-4">
-        <Trans
-          key="instance_settings_title"
-          options={{
-            defaultValue: "Settings",
-          }}
-        />
-      </h2>
       <div class="mb-6">
-        <h5 class="m-0 mb-4">
-          <Trans
-            key="java_memory_title"
-            options={{
-              defaultValue: "Java Memory",
-            }}
-          />
-        </h5>
+        <div class="w-full flex justify-between items-center mb-4">
+          <h5 class="m-0">
+            <Trans
+              key="java_memory_title"
+              options={{
+                defaultValue: "Java Memory",
+              }}
+            />
+          </h5>
+          <Switch checked={true} />
+        </div>
         <div class="flex justify-center">
           <Slider
             min={0}
@@ -39,14 +34,17 @@ const Settings = () => {
       </div>
 
       <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="game_resolution"
-            options={{
-              defaultValue: "Game Resolution",
-            }}
-          />
-        </h5>
+        <div class="w-full flex justify-between items-center mb-4">
+          <h5 class="m-0">
+            <Trans
+              key="game_resolution"
+              options={{
+                defaultValue: "Game Resolution",
+              }}
+            />
+          </h5>
+          <Switch checked={true} />
+        </div>
         <div class="flex w-full justify-between">
           <div class="flex gap-4 items-center">
             <Input class="w-20" placeholder="width" value={"1024"} />
@@ -62,6 +60,30 @@ const Settings = () => {
               { label: "1920x1080", key: "1920x1080" },
             ]}
           />
+        </div>
+      </div>
+      <div class="mb-6">
+        <div class="w-full flex justify-between items-center mb-4">
+          <h5 class="m-0">
+            <Trans
+              key="java_arguments_title"
+              options={{
+                defaultValue: "Java Arguments",
+              }}
+            />
+          </h5>
+          <Switch checked={true} />
+        </div>
+        <div class="flex w-full gap-4 items-center">
+          <Input class="w-full" />
+          <Button rounded={false} variant="secondary" class="h-10">
+            <Trans
+              key="reset_java_args"
+              options={{
+                defaultValue: "Reset",
+              }}
+            />
+          </Button>
         </div>
       </div>
     </div>
