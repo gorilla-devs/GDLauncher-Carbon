@@ -147,14 +147,6 @@ impl DownloadPath {
     }
 }
 
-pub struct DownloadPath(PathBuf);
-
-impl DownloadPath {
-    pub fn to_pathbuf(&self) -> PathBuf {
-        self.0.clone()
-    }
-}
-
 impl RuntimePath {
     pub fn new(path: PathBuf) -> Self {
         Self(path)
