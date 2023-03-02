@@ -232,13 +232,20 @@ pub async fn generate_startup_command(
         ":"
     };
 
-    for library in libraries.get_libraries() {
-        let path = runtime_path
-            .get_libraries()
-            .get_library_path(MavenCoordinates::try_from(library.name.clone()).unwrap());
+    let libraries = libraries
+        .get_libraries()
+        .iter()
+        .map(|library| {
+            let path = runtime_path
+                .get_libraries()
+                .get_library_path(MavenCoordinates::try_from(library.name.clone()).unwrap());
 
-        command.push(format!("{}{}", path.display(), classpath_separator));
-    }
+            format!("{}{}", path.display(), classpath_separator)
+        })
+        .reduce(|a, b| format!("{a}{b}"))
+        .unwrap();
+
+    command.push(libraries);
 
     command.push("-Xmx4096m".to_string());
     command.push("-Xms4096m".to_string());
