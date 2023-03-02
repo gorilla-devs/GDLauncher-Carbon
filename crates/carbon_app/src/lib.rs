@@ -1,3 +1,6 @@
+// allow dead code during development to keep warning outputs meaningful
+#![allow(dead_code)]
+
 use crate::managers::{Managers, ManagersInner};
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
@@ -54,8 +57,10 @@ async fn start_router(runtime_path: PathBuf) {
 #[cfg(test)]
 async fn setup_managers_for_test() -> Managers {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_path = temp_dir.into_path();
+    println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
-    ManagersInner::new(invalidation_sender, temp_dir.into_path()).await
+    ManagersInner::new(invalidation_sender, temp_path).await
 }
 
 #[cfg(test)]

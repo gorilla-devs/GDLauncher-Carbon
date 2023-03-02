@@ -5,19 +5,23 @@ use crate::db::PrismaClient;
 use crate::error;
 use crate::managers::configuration::ConfigurationManager;
 use rspc::RouterBuilderLike;
-use std::cell::UnsafeCell;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
+use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
+use self::queue::TaskQueue;
 
 pub mod account;
 mod configuration;
+pub mod download;
 mod minecraft;
 mod prisma_client;
+pub mod queue;
 
 pub type Managers = Arc<ManagersInner>;
 
@@ -29,50 +33,55 @@ pub enum AppError {
 
 pub struct ManagersInner {
     //instances: Instances,
-    pub(crate) configuration_manager: ConfigurationManager,
-    pub(crate) minecraft_manager: MinecraftManager,
-    pub(crate) account_manager: AccountManager,
+    configuration_manager: ConfigurationManager,
+    minecraft_manager: MinecraftManager,
+    account_manager: AccountManager,
     invalidation_channel: broadcast::Sender<InvalidationEvent>,
+    download_manager: DownloadManager,
     pub(crate) reqwest_client: reqwest::Client,
     pub(crate) prisma_client: Arc<PrismaClient>,
+    pub(crate) task_queue: TaskQueue,
 }
 
-pub struct AppRef(UnsafeCell<Option<Weak<ManagersInner>>>);
+pub struct ManagerRef<'a, T> {
+    manager: &'a T,
+    pub app: &'a Arc<ManagersInner>,
+}
 
-unsafe impl Send for AppRef {}
-unsafe impl Sync for AppRef {}
+impl<T> Copy for ManagerRef<'_, T> {}
+impl<T> Clone for ManagerRef<'_, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Deref for ManagerRef<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.manager
+    }
+}
+
+pub struct AppRef(pub Weak<ManagersInner>);
 
 impl AppRef {
-    pub fn uninit() -> Self {
-        Self(UnsafeCell::new(None))
-    }
-
-    /// # Safety
-    /// This function is safe to call only during the manager init.
-    /// No managers may spawn tasks that can depend on the app
-    /// during `new`.
-    pub unsafe fn init(&self, app: Weak<ManagersInner>) {
-        *self.0.get() = Some(app);
-    }
-
-    fn ref_inner(&self) -> &Option<Weak<ManagersInner>> {
-        // Safety is enforced by Self::init's invariants
-        unsafe { &*self.0.get() }
-    }
-
     pub fn upgrade(&self) -> Managers {
-        self.ref_inner()
-            .as_ref()
-            .expect("App was used before initialization")
+        self.0
             .upgrade()
             .expect("App was dropped before its final usage")
     }
 }
 
-impl Clone for AppRef {
-    fn clone(&self) -> Self {
-        Self(UnsafeCell::new(self.ref_inner().clone()))
-    }
+macro_rules! manager_getter {
+    ($manager:ident: $type:path) => {
+        pub(crate) fn $manager<'a>(self: &'a Arc<Self>) -> ManagerRef<'a, $type> {
+            ManagerRef {
+                manager: &self.$manager,
+                app: &self,
+            }
+        }
+    };
 }
 
 impl ManagersInner {
@@ -86,27 +95,20 @@ impl ManagersInner {
             configuration_manager: ConfigurationManager::new(runtime_path),
             minecraft_manager: MinecraftManager::new(),
             account_manager: AccountManager::new(),
+            download_manager: DownloadManager::new(),
             invalidation_channel,
             reqwest_client: reqwest::Client::new(),
             prisma_client: Arc::new(db_client),
+            task_queue: TaskQueue::new(2 /* todo: download slots */),
         });
-
-        let weak = Arc::downgrade(&app);
-
-        // SAFETY: This is safe as long as `get_appref` only returns
-        // the appref, without doing anything else, and `new` does
-        // not spawn tasks that may access `app`.
-        // Before this block, attempting to access the appref will
-        // panic, and after this block it will be safe. The appref
-        // CANNOT be safely accessed inside of this block.
-        unsafe {
-            app.configuration_manager.get_appref().init(weak.clone());
-            app.minecraft_manager.get_appref().init(weak.clone());
-            app.account_manager.get_appref().init(weak);
-        }
 
         app
     }
+
+    manager_getter!(configuration_manager: ConfigurationManager);
+    manager_getter!(minecraft_manager: MinecraftManager);
+    manager_getter!(account_manager: AccountManager);
+    manager_getter!(download_manager: DownloadManager);
 
     pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
         match self
@@ -128,17 +130,17 @@ impl ManagersInner {
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_THEME[app, _args: ()] {
-            app.configuration_manager
+            app.configuration_manager()
                 .get_theme()
                 .await
                 .map_err(error::into_rspc)
         }
 
         mutation SET_THEME[app, new_theme: String] {
-            app.configuration_manager
+            app.configuration_manager()
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(error::into_rspc);
+                .map_err(error::into_rspc)?;
             Ok(())
         }
     }

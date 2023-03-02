@@ -139,6 +139,14 @@ impl TempPath {
     }
 }
 
+pub struct DownloadPath(PathBuf);
+
+impl DownloadPath {
+    pub fn to_pathbuf(&self) -> PathBuf {
+        self.0.clone()
+    }
+}
+
 impl RuntimePath {
     pub fn new(path: PathBuf) -> Self {
         Self(path)
@@ -174,6 +182,10 @@ impl RuntimePath {
 
     pub fn get_temp(&self) -> TempPath {
         TempPath(self.0.join("temp"))
+    }
+
+    pub fn get_download(&self) -> DownloadPath {
+        DownloadPath(self.0.join("download"))
     }
 }
 

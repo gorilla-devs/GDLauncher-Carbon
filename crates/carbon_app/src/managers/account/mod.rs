@@ -15,18 +15,20 @@ use std::mem;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
+pub use self::enroll::EnrollmentError;
 use self::{
     api::DeviceCode,
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{configuration::ConfigurationError, AppRef};
+use super::{configuration::ConfigurationError, AppRef, ManagerRef};
+
+use std::sync::Arc;
 
 pub mod api;
 mod enroll;
 
 pub(crate) struct AccountManager {
-    app: AppRef,
     currently_refreshing: RwLock<Vec<String>>,
     active_enrollment: RwLock<Option<EnrollmentTask>>,
 }
@@ -34,35 +36,30 @@ pub(crate) struct AccountManager {
 impl AccountManager {
     pub fn new() -> Self {
         Self {
-            app: AppRef::uninit(),
             currently_refreshing: RwLock::new(Vec::new()),
             active_enrollment: RwLock::new(None),
         }
     }
+}
 
-    pub fn get_appref(&self) -> &AppRef {
-        &self.app
-    }
-
-    pub async fn get_active_uuid(&self) -> Result<Option<String>, GetActiveUuidError> {
+impl ManagerRef<'_, AccountManager> {
+    pub async fn get_active_uuid(self) -> Result<Option<String>, GetActiveUuidError> {
         Ok(self
             .app
-            .upgrade()
-            .configuration_manager
+            .configuration_manager()
             .configuration()
             .get()
             .await?
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(&self, uuid: Option<String>) -> Result<(), SetAccountError> {
+    pub async fn set_active_uuid(self, uuid: Option<String>) -> Result<(), SetAccountError> {
         use db::account::WhereParam::Uuid;
         use db::app_configuration::SetParam::SetActiveAccountUuid;
 
         if let Some(uuid) = uuid.clone() {
             let account_entry = self
                 .app
-                .upgrade()
                 .prisma_client
                 .account()
                 .find_first(vec![Uuid(StringFilter::Equals(uuid))])
@@ -76,13 +73,12 @@ impl AccountManager {
         }
 
         self.app
-            .upgrade()
-            .configuration_manager
+            .configuration_manager()
             .configuration()
             .set(SetActiveAccountUuid(uuid))
             .await?;
 
-        self.app.upgrade().invalidate(GET_ACTIVE_UUID, None);
+        self.app.invalidate(GET_ACTIVE_UUID, None);
         Ok(())
     }
 
@@ -96,7 +92,6 @@ impl AccountManager {
 
         let account = self
             .app
-            .upgrade()
             .prisma_client
             .account()
             .find_first(vec![Uuid(StringFilter::Equals(uuid))])
@@ -107,18 +102,16 @@ impl AccountManager {
         Ok(Some(account.try_into()?))
     }
 
-    async fn get_account_entries(&self) -> Result<Vec<db::account::Data>, QueryError> {
-        Ok(self
-            .app
-            .upgrade()
+    async fn get_account_entries(self) -> Result<Vec<db::account::Data>, QueryError> {
+        self.app
             .prisma_client
             .account()
             .find_many(Vec::new())
             .exec()
-            .await?)
+            .await
     }
 
-    pub async fn get_account_list(&self) -> Result<Vec<Account>, GetAccountListError> {
+    pub async fn get_account_list(self) -> Result<Vec<Account>, GetAccountListError> {
         let accounts = self.get_account_entries().await?;
 
         Ok(accounts
@@ -139,14 +132,13 @@ impl AccountManager {
     }
 
     pub async fn get_account_status(
-        &self,
+        self,
         uuid: String,
     ) -> Result<Option<AccountStatus>, GetAccountStatusError> {
         use db::account::UniqueWhereParam;
 
         let account = self
             .app
-            .upgrade()
             .prisma_client
             .account()
             .find_unique(UniqueWhereParam::UuidEquals(uuid))
@@ -188,7 +180,7 @@ impl AccountManager {
         Ok(status)
     }
 
-    async fn add_account(&self, account: FullAccount) -> Result<(), AddAccountError> {
+    async fn add_account(self, account: FullAccount) -> Result<(), AddAccountError> {
         use db::account::SetParam;
 
         let set_params = match account.type_ {
@@ -205,23 +197,21 @@ impl AccountManager {
         };
 
         self.app
-            .upgrade()
             .prisma_client
             .account()
             .create(account.uuid, account.username, set_params)
             .exec()
             .await?;
 
-        self.app.upgrade().invalidate(GET_ACCOUNTS, None);
+        self.app.invalidate(GET_ACCOUNTS, None);
         Ok(())
     }
 
-    pub async fn delete_account(&self, uuid: String) -> Result<(), DeleteAccountError> {
+    pub async fn delete_account(self, uuid: String) -> Result<(), DeleteAccountError> {
         use db::account::UniqueWhereParam;
 
         let result = self
             .app
-            .upgrade()
             .prisma_client
             .account()
             .delete(UniqueWhereParam::UuidEquals(uuid.clone()))
@@ -230,10 +220,8 @@ impl AccountManager {
 
         match result {
             Ok(_) => {
-                self.app.upgrade().invalidate(GET_ACCOUNTS, None);
-                self.app
-                    .upgrade()
-                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+                self.app.invalidate(GET_ACCOUNTS, None);
+                self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
                 Ok(())
             }
@@ -247,11 +235,11 @@ impl AccountManager {
         }
     }
 
-    pub async fn begin_enrollment(&self) -> Result<(), BeginEnrollmentStatusError> {
+    pub async fn begin_enrollment(self) -> Result<(), BeginEnrollmentStatusError> {
         match &mut *self.active_enrollment.write().await {
             Some(_) => Err(BeginEnrollmentStatusError::InProgress),
             enrollment @ None => {
-                let client = self.app.upgrade().reqwest_client.clone();
+                let client = self.app.reqwest_client.clone();
 
                 struct Invalidator(AppRef);
 
@@ -263,7 +251,7 @@ impl AccountManager {
                 }
 
                 let active_enrollment =
-                    EnrollmentTask::begin(client, Invalidator(self.app.clone()));
+                    EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
 
                 *enrollment = Some(active_enrollment);
                 Ok(())
@@ -271,7 +259,7 @@ impl AccountManager {
         }
     }
 
-    pub async fn cancel_enrollment(&self) -> Result<(), CancelEnrollmentStatusError> {
+    pub async fn cancel_enrollment(self) -> Result<(), CancelEnrollmentStatusError> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
@@ -281,7 +269,7 @@ impl AccountManager {
     }
 
     pub async fn get_enrollment_status(
-        &self,
+        self,
     ) -> Result<FEEnrollmentStatus, GetEnrollmentStatusError> {
         match &*self.active_enrollment.read().await {
             None => Err(GetEnrollmentStatusError::NotActive),
@@ -291,7 +279,7 @@ impl AccountManager {
         }
     }
 
-    pub async fn finalize_enrollment(&self) -> Result<(), FinalizeEnrollmentError> {
+    pub async fn finalize_enrollment(self) -> Result<(), FinalizeEnrollmentError> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
@@ -486,7 +474,7 @@ pub enum FEEnrollmentStatus {
     PollingCode(DeviceCode),
     QueryAccount,
     Complete(Account),
-    Failed(String),
+    Failed(EnrollmentError),
 }
 
 impl FEEnrollmentStatus {
@@ -500,7 +488,7 @@ impl FEEnrollmentStatus {
                 uuid: account.mc.profile.uuid.clone(),
                 type_: AccountType::Microsoft,
             }),
-            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(format!("{:#?}", err)),
+            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(err.clone()),
         }
     }
 }

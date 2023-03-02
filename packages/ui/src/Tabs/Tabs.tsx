@@ -32,7 +32,7 @@ export interface Props {
   defaultIndex?: number;
   index?: number;
   onChange?: (_: number) => void;
-  variant?: "underline" | "block";
+  variant?: "underline" | "block" | "traditional";
   orientation?: "horizontal" | "vertical";
   gap?: number;
   paddingX?: string;
@@ -139,7 +139,7 @@ function Tabs(props: Props) {
   return (
     <TabsContext.Provider value={context}>
       <div
-        class="flex transition-all duration-100 ease-in-out w-full"
+        class="flex transition-all duration-100 ease-in-out w-full max-h-full"
         classList={{
           "flex-row": orientation() === "vertical",
           "flex-col": orientation() === "horizontal",

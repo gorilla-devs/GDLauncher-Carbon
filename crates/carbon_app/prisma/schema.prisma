@@ -43,3 +43,8 @@ model MinecraftAssets {
   assetsIdSha1 String @unique
   json         Bytes
 }
+
+model ActiveDownloads {
+  url     String @id
+  file_id String @unique
+}

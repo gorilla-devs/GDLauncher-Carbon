@@ -9,52 +9,44 @@ use crate::{
     db::{app_configuration, PrismaClient},
 };
 
-use super::AppRef;
+use super::ManagerRef;
 
 pub mod runtime_path;
 
 pub(crate) struct ConfigurationManager {
-    app: AppRef,
-    runtime_path: runtime_path::RuntimePath,
+    pub runtime_path: runtime_path::RuntimePath,
 }
 
 impl ConfigurationManager {
     pub fn new(runtime_path: PathBuf) -> Self {
         Self {
-            app: AppRef::uninit(),
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
         }
     }
+}
 
-    pub fn get_runtime_path(&self) -> &runtime_path::RuntimePath {
-        &self.runtime_path
-    }
-
-    pub fn get_appref(&self) -> &AppRef {
-        &self.app
-    }
-
-    pub async fn get_theme(&self) -> Result<String, ConfigurationError> {
+impl ManagerRef<'_, ConfigurationManager> {
+    pub async fn get_theme(self) -> Result<String, ConfigurationError> {
         trace!("retrieving current theme from db");
 
         Ok(self.configuration().get().await?.theme)
     }
 
-    pub async fn set_theme(&self, theme: String) -> Result<(), ConfigurationError> {
+    pub async fn set_theme(self, theme: String) -> Result<(), ConfigurationError> {
         use crate::db::app_configuration::SetParam::SetTheme;
 
         trace!("writing theme in db: {theme}");
 
         self.configuration().set(SetTheme(theme.clone())).await?;
 
-        self.app.upgrade().invalidate(GET_THEME, Some(theme.into()));
+        self.app.invalidate(GET_THEME, Some(theme.into()));
 
         Ok(())
     }
 
-    pub fn configuration(&self) -> Configuration {
+    pub fn configuration(self) -> Configuration {
         Configuration {
-            client: self.app.upgrade().prisma_client.clone(),
+            client: self.app.prisma_client.clone(),
         }
     }
 }
@@ -65,13 +57,12 @@ pub struct Configuration {
 
 impl Configuration {
     pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
-        Ok(self
-            .client
+        self.client
             .app_configuration()
             .find_unique(app_configuration::id::equals(0))
             .exec()
             .await?
-            .ok_or(ConfigurationError::Missing)?)
+            .ok_or(ConfigurationError::Missing)
     }
 
     pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {

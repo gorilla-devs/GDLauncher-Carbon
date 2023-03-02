@@ -2,7 +2,7 @@ use crate::api::keys::mc::*;
 use crate::api::managers::Managers;
 use crate::api::router::router;
 use axum::extract::DefaultBodyLimit;
-use rspc::{Router, RouterBuilderLike, Type};
+use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 #[derive(Type, Serialize)]
@@ -44,13 +44,13 @@ struct UpdateInstanceArgs {
 pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
     router! {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
-            let res = app.minecraft_manager.get_minecraft_versions().await;
+            let res = app.minecraft_manager().get_minecraft_versions().await;
 
             res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>()
         }
 
         query TEMP_TEST[app, _args: ()] {
-            Ok(app.minecraft_manager.get_game_download_files_list("1.16.5".to_string()).await?)
+            Ok(app.minecraft_manager().get_game_download_files_list("1.16.5".to_string()).await?)
         }
 
         query GET_INSTANCES[_, _args: ()] {
@@ -98,7 +98,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             Ok(final_instances)
         }
 
-        query GET_INSTANCE_DETAILS[_, args: String] {
+        query GET_INSTANCE_DETAILS[_, _args: String] {
             let instance = InstanceDetails {
                 id: "88r39459345939453".to_string(),
                 name: "My first instance".to_string(),
@@ -138,25 +138,25 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
 
             Ok(instance)
         }
-        mutation OPEN_INSTANCE_FOLDER_PATH[_, args: String] {}
-        mutation START_INSTANCE[_, args: String] {}
-        mutation STOP_INSTANCE[_, args: String] {}
-        mutation DELETE_INSTANCE[_, args: String] {}
+        mutation OPEN_INSTANCE_FOLDER_PATH[_, _args: String] {}
+        mutation START_INSTANCE[_, _args: String] {}
+        mutation STOP_INSTANCE[_, _args: String] {}
+        mutation DELETE_INSTANCE[_, _args: String] {}
         // Actions on mods
-        mutation ENABLE_MOD[_, args: String] {}
-        mutation DISABLE_MOD[_, args: String] {}
-        mutation REMOVE_MOD[_, args: String] {}
-        mutation REMOVE_MODS[_, args: Vec<String>] {}
+        mutation ENABLE_MOD[_, _args: String] {}
+        mutation DISABLE_MOD[_, _args: String] {}
+        mutation REMOVE_MOD[_, _args: String] {}
+        mutation REMOVE_MODS[_, _args: Vec<String>] {}
         // Change versions
-        mutation SWITCH_MINECRAFT_VERSION[_, args: String] {}
-        mutation SWITCH_MODLOADER[_, args: String] {}
-        mutation SWITCH_MODLOADER_VERSION[_, args: String] {}
+        mutation SWITCH_MINECRAFT_VERSION[_, _args: String] {}
+        mutation SWITCH_MODLOADER[_, _args: String] {}
+        mutation SWITCH_MODLOADER_VERSION[_, _args: String] {}
         // Instance settings
-        mutation UPDATE_INSTANCE_NAME[_, args: UpdateInstanceArgs] {}
-        query GET_INSTANCE_MEMORY[_, args: String] {}
-        mutation UPDATE_INSTANCE_MEMORY[_, args: u8] {}
-        query GET_INSTANCE_JAVA_ARGS[_, args: String] {}
-        mutation UPDATE_INSTANCE_JAVA_ARGS[_, args: String] {}
+        mutation UPDATE_INSTANCE_NAME[_, _args: UpdateInstanceArgs] {}
+        query GET_INSTANCE_MEMORY[_, _args: String] {}
+        mutation UPDATE_INSTANCE_MEMORY[_, _args: u8] {}
+        query GET_INSTANCE_JAVA_ARGS[_, _args: String] {}
+        mutation UPDATE_INSTANCE_JAVA_ARGS[_, _args: String] {}
     }
 }
 

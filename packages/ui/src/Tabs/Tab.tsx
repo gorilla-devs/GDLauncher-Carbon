@@ -62,7 +62,9 @@ const Tab = (_props: Props) => {
     <div
       class="cursor-pointer"
       classList={{
-        "w-full": tabsContext?.variant === "block",
+        "w-full":
+          tabsContext?.variant === "block" ||
+          tabsContext?.variant === "traditional",
       }}
       ref={(el) => {
         ref = el;
@@ -117,6 +119,21 @@ const Tab = (_props: Props) => {
                 !tabsContext?.paddingY,
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-shade-0": !tabsContext?.isSelectedIndex(index()),
+            }}
+          >
+            {props.children}
+          </div>
+        </Match>
+        <Match when={tabsContext?.variant === "traditional"}>
+          <div
+            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
+              tabsContext?.paddingX || ""
+            } ${tabsContext?.paddingY || ""}`}
+            classList={{
+              "px-2": !tabsContext?.paddingX,
+              "text-white": tabsContext?.isSelectedIndex(index()),
+              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
+              "bg-shade-7": tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}

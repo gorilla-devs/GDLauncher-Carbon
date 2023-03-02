@@ -16,6 +16,6 @@ pub(crate) use define_single_error;
 pub fn into_rspc<E: Error>(err: E) -> rspc::Error {
     rspc::Error::new(
         rspc::ErrorCode::InternalServerError,
-        String::from("backend error: {e:#?}"),
+        format!("backend error: {err:#?}"),
     )
 }

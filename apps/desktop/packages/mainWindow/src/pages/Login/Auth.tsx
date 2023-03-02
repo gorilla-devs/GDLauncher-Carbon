@@ -1,53 +1,91 @@
-import { Button } from "@gd/ui";
-import { createSignal, Setter } from "solid-js";
+import { useNavigate, useRouteData } from "@solidjs/router";
+import { createEffect, createSignal, Setter, Show } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
-import { useModal } from "@/ModalsManager";
-interface Props {
+import { rspc } from "@/utils/rspcClient";
+import { Button } from "@gd/ui";
+import fetchData from "./auth.login.data";
+import { handleStatus } from "@/utils/login";
+import { useModal } from "@/managers/ModalsManager";
+
+type Props = {
   setStep: Setter<number>;
   setDeviceCodeObject: Setter<any>;
-}
+};
 
-const Auth = (_props: Props) => {
+const Auth = (props: Props) => {
   const [t] = useTransContext();
-  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal<null | string>(null);
+  const [clicked, setClicked] = createSignal(false);
+  const navigate = useNavigate();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
   const modalsContext = useModal();
 
-  const handleClick = async () => {
-    // await login(({ userCode, link, expiresAt }) => {
-    // props.setDeviceCodeObject({
-    //   userCode: "AXDLE",
-    //   link: "",
-    //   expiresAt: 548559,
-    // });
-    // props.setStep(1);
-    // });
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError(error) {
+        setError(error.message);
+      },
+    }
+  );
 
-    console.log("Loading");
-    setLoading(true);
+  const accountEnrollFinalizeMutation = rspc.createMutation([
+    "account.enroll.finalize",
+  ]);
+
+  const handleClick = async () => {
+    setClicked(true);
+    accountEnrollBeginMutation.mutate(null);
   };
 
-  console.log(__APP_VERSION__);
+  createEffect(() => {
+    if (routeData.isSuccess && clicked()) {
+      handleStatus(routeData, {
+        onPolling: (info) => {
+          setError(null);
+          props.setDeviceCodeObject({
+            userCode: info.user_code,
+            link: info.verification_uri,
+            expiresAt: info.expires_at,
+          });
+          props.setStep(1);
+        },
+        onFail() {
+          setError("something went wrong while logging in");
+        },
+        onComplete() {
+          setError(null);
+          accountEnrollFinalizeMutation.mutate(null);
+          navigate("/library");
+        },
+      });
+    }
+  });
 
   return (
     <div>
-      <div class="absolute left-0 right-0 flex flex-col justify-center items-center m-auto -top-15">
+      <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
         <img class="w-40" src={Logo} />
         <p class="text-shade-0">{__APP_VERSION__}</p>
       </div>
-      <div class="text-center flex flex-col justify-center items-center">
+      <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={loading()}
+          loading={routeData.isLoading && clicked()}
           size="large"
           onClick={() => handleClick()}
         >
           {t("sign_in_with_microsoft") || ""}
         </Button>
-        <p class="max-w-90 text-sm text-shade-0">
+        <p class="text-shade-0 max-w-90 text-sm">
           {t("sign_in_with_microsoft_text")}
         </p>
-        <ul class="flex gap-3 list-none p-0 text-sm mb-8 underline">
+        <Show when={error()}>
+          <p class="m-0 text-red">{error()}</p>
+        </Show>
+        <ul class="flex text-sm list-none gap-3 p-0 mb-8 underline">
           <li
             class="cursor-pointer"
             onClick={() => {

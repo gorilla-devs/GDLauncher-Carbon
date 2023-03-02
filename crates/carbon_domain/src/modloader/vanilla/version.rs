@@ -264,7 +264,7 @@ impl Version {
                 let native: Result<Downloadable, VersionError> = natives.try_into();
                 if let Ok(native) = native {
                     let native_lib_path = base_path.join("libraries").join(native.path);
-                    let extract_dir = base_path.join("natives").join(&mc_version);
+                    let extract_dir = base_path.join("natives").join(mc_version);
                     if !extract_dir.exists() {
                         tokio::fs::create_dir_all(&extract_dir).await?;
                     }
@@ -295,10 +295,9 @@ impl Version {
                             }
 
                             if (file.name()).ends_with('/') {
-                                std::fs::create_dir_all(&extract_dir.join(outpath))?;
+                                std::fs::create_dir_all(extract_dir.join(outpath))?;
                             } else {
-                                let mut outfile =
-                                    std::fs::File::create(&extract_dir.join(outpath))?;
+                                let mut outfile = std::fs::File::create(extract_dir.join(outpath))?;
                                 std::io::copy(&mut file, &mut outfile)?;
                             }
                         }

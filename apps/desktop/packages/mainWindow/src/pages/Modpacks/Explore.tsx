@@ -1,9 +1,9 @@
 import ContentWrapper from "@/components/ContentWrapper";
+import { useGDNavigate } from "@/managers/NavigationManager";
 import { Trans } from "@gd/i18n";
-import { useNavigate } from "@solidjs/router";
 
 const Modpack = () => {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   // const params = useParams();
 
   return (

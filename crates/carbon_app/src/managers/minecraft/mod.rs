@@ -1,8 +1,9 @@
-use super::AppRef;
 use carbon_domain::minecraft::manifest::ManifestVersion;
 use carbon_net::{IntoDownloadable, IntoVecDownloadable};
 use rspc::ErrorCode;
 use thiserror::Error;
+
+use super::ManagerRef;
 
 mod assets;
 mod manifest;
@@ -31,23 +32,17 @@ impl From<MinecraftError> for rspc::Error {
     }
 }
 
-pub(crate) struct MinecraftManager {
-    app: AppRef,
-}
+pub(crate) struct MinecraftManager {}
 
 impl MinecraftManager {
     pub fn new() -> Self {
-        Self {
-            app: AppRef::uninit(),
-        }
+        Self {}
     }
+}
 
-    pub fn get_appref(&self) -> &AppRef {
-        &self.app
-    }
-
+impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        manifest::get_meta(self.app.upgrade().prisma_client.clone())
+        manifest::get_meta(self.app.prisma_client.clone())
             .await
             .unwrap()
     }
@@ -56,7 +51,7 @@ impl MinecraftManager {
         &self,
         mc_version: String,
     ) -> Result<Vec<String>, MinecraftError> {
-        let db_client = self.app.upgrade().prisma_client.clone();
+        let db_client = self.app.prisma_client.clone();
 
         let manifest = manifest::get_meta(db_client.clone()).await?;
 

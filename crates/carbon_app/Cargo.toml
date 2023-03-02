@@ -31,6 +31,7 @@ carbon_macro = { path = "../carbon_macro" }
 carbon_java_manager = { path = "../carbon_java_manager" }
 carbon_domain = { path = "../carbon_domain" }
 carbon_net = { path = "../carbon_net" }
+uuid = { workspace = true }
 prisma-client-rust = { workspace = true, features = [
     "sqlite-create-many",
     "sqlite",
@@ -42,3 +43,4 @@ regex = { workspace = true }
 
 [dev-dependencies]
 tempdir = { workspace = true }
+ntest = { workspace = true }

@@ -2,8 +2,8 @@ import { createSignal, Match, Switch } from "solid-js";
 import FirstStep from "./firstStep";
 import Automatic from "./automaticStep";
 import ManualStep from "./manualStep";
-import ModalLayout from "@/ModalsManager/ModalLayout";
-import { ModalProps } from "@/ModalsManager";
+import ModalLayout from "@/managers/ModalsManager/ModalLayout";
+import { ModalProps } from "@/managers/ModalsManager";
 
 export type StepsProps = {
   nextStep?: (_step: string) => void;

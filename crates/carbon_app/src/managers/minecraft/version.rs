@@ -211,12 +211,12 @@ fn replace_placeholders(
 pub async fn generate_startup_command(app: Arc<ManagersInner>, version: Version) -> String {
     let libraries = version.libraries.as_ref().unwrap();
     let full_account = app
-        .account_manager
+        .account_manager()
         .get_active_account()
         .await
         .unwrap()
         .unwrap();
-    let runtime_path = app.configuration_manager.get_runtime_path();
+    let runtime_path = &app.configuration_manager().runtime_path;
 
     let mut command = Vec::with_capacity(libraries.get_libraries().len() * 2);
     command.push("java".to_owned());
@@ -279,7 +279,7 @@ pub async fn generate_startup_command(app: Arc<ManagersInner>, version: Version)
     // command.push("--username killpowa --version 1.19.3 --gameDir ..\..\instances\Minecraft vanilla --assetsDir ..\..\datastore\assets --assetIndex 2 --uuid 3b40f99969e64dbcabd01f87cddcb1fd --accessToken __HIDDEN_TOKEN__ --clientId ${clientid} --xuid ${auth_xuid} --userType mojang --versionType release --width=854 --height=480".to_owned());
     let command_string = command.join(" ");
 
-    replace_placeholders(full_account, runtime_path, command_string, &version)
+    replace_placeholders(full_account, &runtime_path, command_string, &version)
 }
 
 #[cfg(test)]

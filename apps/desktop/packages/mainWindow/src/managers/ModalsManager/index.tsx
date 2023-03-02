@@ -1,4 +1,4 @@
-import { useLocation, useNavigate, useSearchParams } from "@solidjs/router";
+import { useLocation, useSearchParams } from "@solidjs/router";
 import {
   Accessor,
   createContext,
@@ -11,6 +11,7 @@ import {
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Dynamic, Portal } from "solid-js/web";
+import { useGDNavigate } from "../NavigationManager";
 
 const defaultModals = {
   privacyPolicy: {
@@ -32,6 +33,10 @@ const defaultModals = {
   acceptableUsePolicy: {
     component: lazy(() => import("./modals/AcceptableUsePolicy")),
     title: "Acceptable Use Policy",
+  },
+  logViewer: {
+    component: lazy(() => import("./modals/LogViewer")),
+    title: "Logs",
   },
 };
 
@@ -64,7 +69,7 @@ type Context = {
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const navigate = useNavigate();
+  const navigate = useGDNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as Modalskeys;

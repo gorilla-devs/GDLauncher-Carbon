@@ -1,6 +1,8 @@
 use std::fmt::{self, Display, Formatter};
 
 use reqwest::{Response, StatusCode, Url};
+use rspc::Type;
+use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]
@@ -45,7 +47,7 @@ impl Display for RequestContext {
             self.url
                 .as_ref()
                 .map(|u| u.to_string())
-                .unwrap_or(String::from("<no url>"))
+                .unwrap_or_else(|| String::from("<no url>"))
         )
     }
 }
@@ -101,7 +103,7 @@ impl RequestErrorDetails {
 impl RequestError {
     pub fn from_status(response: &Response) -> Self {
         Self {
-            context: RequestContext::from_response(&response),
+            context: RequestContext::from_response(response),
             error: RequestErrorDetails::from_status(response),
         }
     }
@@ -117,6 +119,45 @@ impl RequestError {
         Self {
             context: RequestContext::from_error(&value),
             error: RequestErrorDetails::from_error_censored(value),
+        }
+    }
+}
+
+#[derive(Type, Serialize)]
+pub struct FERequestError {
+    url: Option<String>,
+    type_: FERequestErrorType,
+}
+
+#[derive(Type, Serialize)]
+pub enum FERequestErrorType {
+    UnexpectedStatus {
+        status: u16,
+        details: Option<String>,
+    },
+
+    Timeout,
+    ConnectionFailed,
+    MalformedResponse,
+    Unknown(String),
+}
+
+impl From<RequestError> for FERequestError {
+    fn from(value: RequestError) -> Self {
+        Self {
+            url: value.context.url.as_ref().map(ToString::to_string),
+            type_: match value.error {
+                RequestErrorDetails::UnexpectedStatus { status, details } => {
+                    FERequestErrorType::UnexpectedStatus {
+                        status: status.as_u16(),
+                        details,
+                    }
+                }
+                RequestErrorDetails::Timeout => FERequestErrorType::Timeout,
+                RequestErrorDetails::ConnectionFailed => FERequestErrorType::ConnectionFailed,
+                RequestErrorDetails::MalformedResponse => FERequestErrorType::MalformedResponse,
+                RequestErrorDetails::Unknown(x) => FERequestErrorType::Unknown(x),
+            },
         }
     }
 }
