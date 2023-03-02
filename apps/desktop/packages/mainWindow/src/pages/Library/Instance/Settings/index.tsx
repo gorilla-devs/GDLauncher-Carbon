@@ -3,7 +3,7 @@ import { Slider } from "@gd/ui";
 
 const Settings = () => {
   return (
-    <div>
+    <div class="pt-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="instance_settings_title"
