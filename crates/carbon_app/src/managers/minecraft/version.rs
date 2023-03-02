@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use carbon_domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
-        version::{Libraries, Version},
+        version::{GameElement, Libraries, Version},
     },
 };
 use prisma_client_rust::QueryError;
@@ -16,7 +16,8 @@ use thiserror::Error;
 use crate::{
     db::PrismaClient,
     managers::{
-        configuration::runtime_path::{NativesPath, RuntimePath},
+        account::{FullAccount, FullAccountType},
+        configuration::runtime_path::{InstancePath, NativesPath, RuntimePath},
         AppRef, Managers, ManagersInner,
     },
 };
@@ -67,118 +68,134 @@ enum ArgPlaceholder {
     UserProperties,
 }
 
-impl ArgPlaceholder {
-    fn from_str(s: &str) -> Option<ArgPlaceholder> {
-        match s {
-            "auth_player_name" => Some(ArgPlaceholder::AuthPlayerName),
-            "version_name" => Some(ArgPlaceholder::VersionName),
-            "game_directory" => Some(ArgPlaceholder::GameDirectory),
-            "assets_root" => Some(ArgPlaceholder::AssetsRoot),
-            "game_assets" => Some(ArgPlaceholder::GameAssets),
-            "assets_index_name" => Some(ArgPlaceholder::AssetsIndexName),
-            "auth_uuid" => Some(ArgPlaceholder::AuthUuid),
-            "auth_access_token" => Some(ArgPlaceholder::AuthAccessToken),
-            "auth_session" => Some(ArgPlaceholder::AuthSession),
-            "user_type" => Some(ArgPlaceholder::UserType),
-            "version_type" => Some(ArgPlaceholder::VersionType),
-            "user_properties" => Some(ArgPlaceholder::UserProperties),
-            _ => None,
-        }
-    }
-
-    fn get_argument(&self) -> String {
-        match self {
-            ArgPlaceholder::AuthPlayerName => "--username".to_owned(),
-            ArgPlaceholder::VersionName => "--version".to_owned(),
-            ArgPlaceholder::GameDirectory => "--gameDir".to_owned(),
-            ArgPlaceholder::AssetsRoot => "--assetsDir".to_owned(),
-            ArgPlaceholder::GameAssets => "--gameAssets".to_owned(),
-            ArgPlaceholder::AssetsIndexName => "--assetIndex".to_owned(),
-            ArgPlaceholder::AuthUuid => "--uuid".to_owned(),
-            ArgPlaceholder::AuthAccessToken => "--accessToken".to_owned(),
-            ArgPlaceholder::AuthSession => "--userProperties".to_owned(),
-            ArgPlaceholder::UserType => "--userType".to_owned(),
-            ArgPlaceholder::VersionType => "--versionType".to_owned(),
-            ArgPlaceholder::UserProperties => "--userProperties".to_owned(),
-        }
-    }
-
-    fn get_placeholder(&self) -> String {
-        match self {
-            ArgPlaceholder::AuthPlayerName => "auth_player_name".to_owned(),
-            ArgPlaceholder::VersionName => "version_name".to_owned(),
-            ArgPlaceholder::GameDirectory => "game_directory".to_owned(),
-            ArgPlaceholder::AssetsRoot => "assets_root".to_owned(),
-            ArgPlaceholder::GameAssets => "game_assets".to_owned(),
-            ArgPlaceholder::AssetsIndexName => "assets_index_name".to_owned(),
-            ArgPlaceholder::AuthUuid => "auth_uuid".to_owned(),
-            ArgPlaceholder::AuthAccessToken => "auth_access_token".to_owned(),
-            ArgPlaceholder::AuthSession => "auth_session".to_owned(),
-            ArgPlaceholder::UserType => "user_type".to_owned(),
-            ArgPlaceholder::VersionType => "version_type".to_owned(),
-            ArgPlaceholder::UserProperties => "user_properties".to_owned(),
+impl From<&str> for ArgPlaceholder {
+    fn from(arg: &str) -> Self {
+        match arg {
+            "auth_player_name" => ArgPlaceholder::AuthPlayerName,
+            "version_name" => ArgPlaceholder::VersionName,
+            "game_directory" => ArgPlaceholder::GameDirectory,
+            "assets_root" => ArgPlaceholder::AssetsRoot,
+            "game_assets" => ArgPlaceholder::GameAssets,
+            "assets_index_name" => ArgPlaceholder::AssetsIndexName,
+            "auth_uuid" => ArgPlaceholder::AuthUuid,
+            "auth_access_token" => ArgPlaceholder::AuthAccessToken,
+            "auth_session" => ArgPlaceholder::AuthSession,
+            "user_type" => ArgPlaceholder::UserType,
+            "version_type" => ArgPlaceholder::VersionType,
+            "user_properties" => ArgPlaceholder::UserProperties,
+            _ => panic!("Unknown argument placeholder: {}", arg),
         }
     }
 }
 
-fn get_default_placeholder(version: &Version) -> String {
-    // TODO: Do more logic to only add required arguments for the version
-    let mut args = String::new();
-    for arg in ArgPlaceholder::iter() {
-        args.push_str(&format!("{} {}", arg.get_argument(), arg.get_placeholder()));
+impl From<ArgPlaceholder> for &str {
+    fn from(arg: ArgPlaceholder) -> Self {
+        match arg {
+            ArgPlaceholder::AuthPlayerName => "auth_player_name",
+            ArgPlaceholder::VersionName => "version_name",
+            ArgPlaceholder::GameDirectory => "game_directory",
+            ArgPlaceholder::AssetsRoot => "assets_root",
+            ArgPlaceholder::GameAssets => "game_assets",
+            ArgPlaceholder::AssetsIndexName => "assets_index_name",
+            ArgPlaceholder::AuthUuid => "auth_uuid",
+            ArgPlaceholder::AuthAccessToken => "auth_access_token",
+            ArgPlaceholder::AuthSession => "auth_session",
+            ArgPlaceholder::UserType => "user_type",
+            ArgPlaceholder::VersionType => "version_type",
+            ArgPlaceholder::UserProperties => "user_properties",
+        }
     }
-
-    args
 }
 
-fn replace_placeholder(app: Arc<ManagersInner>, placeholder: &str, version: &Version) -> String {
-    // let player_name = app.account_manager.get_player_name();
-    let version_name = version.id.clone();
-    let game_directory = app
-        .configuration_manager
-        .get_runtime_path()
-        .get_instances()
-        .get_instance_path("something".to_owned());
-    let assets_root = app
-        .configuration_manager
-        .get_runtime_path()
-        .get_assets()
-        .to_path();
-    let game_assets = app
-        .configuration_manager
-        .get_runtime_path()
-        .get_assets()
-        .get_legacy_path();
-    let assets_index_name = version.assets.clone();
+struct ReplacerArgs {
+    player_name: String,
+    player_token: String,
+    version_name: String,
+    game_directory: InstancePath,
+    game_assets: PathBuf,
+    assets_root: PathBuf,
+    assets_index_name: String,
+    auth_uuid: String,
+    auth_access_token: String,
+    auth_session: String,
+    user_type: String,
+    version_type: String,
+    user_properties: String,
+}
 
+fn replace_placeholder(
+    replacer_args: &ReplacerArgs,
+    placeholder: ArgPlaceholder,
+    version: &Version,
+) -> String {
     match placeholder {
-        "auth_player_name" => unimplemented!(),
-        "version_name" => unimplemented!(),
-        "game_directory" => unimplemented!(),
-        "assets_root" => unimplemented!(),
-        "game_assets" => unimplemented!(),
-        "assets_index_name" => unimplemented!(),
-        "auth_uuid" => unimplemented!(),
-        "auth_access_token" => unimplemented!(),
-        "auth_session" => unimplemented!(),
-        "user_type" => unimplemented!(),
-        "version_type" => unimplemented!(),
-        "user_properties" => unimplemented!(),
-        _ => todo!(),
+        ArgPlaceholder::AuthPlayerName => replacer_args.player_name.clone(),
+        ArgPlaceholder::VersionName => replacer_args.version_name.clone(),
+        ArgPlaceholder::GameDirectory => replacer_args
+            .game_directory
+            .get_root()
+            .display()
+            .to_string(),
+        ArgPlaceholder::AssetsRoot => replacer_args.assets_root.display().to_string(),
+        ArgPlaceholder::GameAssets => replacer_args.game_assets.display().to_string(),
+        ArgPlaceholder::AssetsIndexName => replacer_args.assets_index_name.clone(),
+        ArgPlaceholder::AuthUuid => replacer_args.auth_uuid.clone(),
+        ArgPlaceholder::AuthAccessToken => replacer_args.auth_access_token.clone(),
+        ArgPlaceholder::AuthSession => replacer_args.auth_session.clone(),
+        ArgPlaceholder::UserType => replacer_args.user_type.clone(), // Hardcoded to mojang apparently ?????
+        ArgPlaceholder::VersionType => replacer_args.version_type.clone(),
+        ArgPlaceholder::UserProperties => replacer_args.user_properties.clone(), // Not sure what this is,
+        _ => panic!("Unknown argument placeholder: {:?}", placeholder),
     }
 }
 
-fn replace_placeholders(app: Arc<ManagersInner>, command: String, version: &Version) -> String {
+fn replace_placeholders(
+    full_account: FullAccount,
+    runtime_path: &RuntimePath,
+    command: String,
+    version: &Version,
+) -> String {
     let matches =
         Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
             .unwrap();
 
+    let player_name = full_account.username;
+    let player_uuid = full_account.uuid;
+    let player_token = match full_account.type_ {
+        FullAccountType::Offline => "offline".to_owned(),
+        FullAccountType::Microsoft { access_token, .. } => access_token,
+    };
+
+    let version_name = version.id.clone();
+    let game_directory = runtime_path
+        .get_instances()
+        .get_instance_path("something".to_owned());
+    let assets_root = runtime_path.get_assets().to_path();
+    let game_assets = runtime_path.get_assets().to_path();
+    let assets_index_name = version.assets.clone().unwrap();
+
+    let replacer_args = ReplacerArgs {
+        player_name,
+        player_token: player_token.clone(),
+        version_name,
+        game_directory,
+        game_assets,
+        assets_root,
+        assets_index_name,
+        auth_uuid: player_uuid,
+        auth_access_token: player_token.clone(),
+        auth_session: player_token,
+        user_type: "mojang".to_owned(),
+        version_type: version.type_.as_ref().unwrap().to_owned(),
+        user_properties: "{}".to_owned(),
+    };
+
     let new_command = matches.replace_all(&command, |caps: &Captures| {
         if let Some(value) = caps.name("value") {
-            let value = replace_placeholder(app.clone(), value.as_str(), version);
+            let value = replace_placeholder(&replacer_args, value.as_str().into(), version);
             return format!("{} {}", caps.name("arg").unwrap().as_str(), value);
         } else if let Some(standalone) = caps.name("standalone") {
-            let value = replace_placeholder(app.clone(), standalone.as_str(), version);
+            let value = replace_placeholder(&replacer_args, standalone.as_str().into(), version);
             return value;
         }
         if let Some(arg) = caps.name("arg") {
@@ -191,12 +208,15 @@ fn replace_placeholders(app: Arc<ManagersInner>, command: String, version: &Vers
     new_command.to_string()
 }
 
-pub fn generate_startup_command(
-    app: Arc<ManagersInner>,
-    version: Version,
-    runtime_path: RuntimePath,
-) -> String {
+pub async fn generate_startup_command(app: Arc<ManagersInner>, version: Version) -> String {
     let libraries = version.libraries.as_ref().unwrap();
+    let full_account = app
+        .account_manager
+        .get_active_account()
+        .await
+        .unwrap()
+        .unwrap();
+    let runtime_path = app.configuration_manager.get_runtime_path();
 
     let mut command = Vec::with_capacity(libraries.get_libraries().len() * 2);
     command.push("java".to_owned());
@@ -241,32 +261,63 @@ pub fn generate_startup_command(
     command.push(version.main_class.clone());
 
     // check if arguments.jvm is there, otherwise inject defaults
+    let mut mc_command = Vec::new();
 
-    match &version.arguments {
-        Some(arguments) => {
-            if let Some(jvm) = &arguments.jvm {
-                command.push("".to_string());
-            } else {
-                get_default_placeholder(&version);
+    if let Some(arguments) = &version.arguments {
+        if let Some(jvm) = &arguments.game {
+            for arg in jvm {
+                if let GameElement::String(s) = arg {
+                    mc_command.push(s.clone());
+                }
             }
         }
-        None => {
-            get_default_placeholder(&version);
-        }
+    } else if let Some(arguments) = &version.minecraft_arguments {
+        mc_command.push(arguments.clone());
     }
 
+    command.extend(mc_command);
     // command.push("--username killpowa --version 1.19.3 --gameDir ..\..\instances\Minecraft vanilla --assetsDir ..\..\datastore\assets --assetIndex 2 --uuid 3b40f99969e64dbcabd01f87cddcb1fd --accessToken __HIDDEN_TOKEN__ --clientId ${clientid} --xuid ${auth_xuid} --userType mojang --versionType release --width=854 --height=480".to_owned());
+    let command_string = command.join(" ");
 
-    command.join(" ")
+    replace_placeholders(full_account, runtime_path, command_string, &version)
 }
 
 #[cfg(test)]
 mod tests {
+    use carbon_domain::minecraft::manifest::MinecraftManifest;
     use serde_json::json;
 
     use crate::setup_managers_for_test;
 
     use super::*;
+
+    async fn setup_account() -> FullAccount {
+        FullAccount {
+            username: "test".to_owned(),
+            uuid: "test".to_owned(),
+            type_: FullAccountType::Offline,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_generate_startup_command() {
+        let app = setup_managers_for_test().await;
+
+        let manifest = MinecraftManifest::fetch().await.unwrap();
+
+        let version = manifest
+            .versions
+            .into_iter()
+            .find(|v| v.id == "1.16.5")
+            .unwrap()
+            .fetch()
+            .await
+            .unwrap();
+
+        let command = generate_startup_command(app, version).await;
+
+        println!("{}", command);
+    }
 
     // #[tokio::test]
     // async fn test_replace_placeholder() {

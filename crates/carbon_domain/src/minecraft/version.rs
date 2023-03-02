@@ -49,27 +49,22 @@ impl IntoVecDownloadable for Libraries {
 pub struct Version {
     pub inherits_from: Option<String>,
     pub arguments: Option<Arguments>,
-    #[serde(rename = "assetIndex")]
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
-    #[serde(rename = "complianceLevel")]
     pub compliance_level: Option<i64>,
     pub downloads: Option<VersionInfoDownloads>,
     pub id: String,
-    #[serde(rename = "javaVersion")]
     pub java_version: Option<JavaVersion>,
     #[serde(flatten)]
     pub libraries: Option<Libraries>,
     pub logging: Option<Logging>,
-    #[serde(rename = "mainClass")]
     pub main_class: String,
-    #[serde(rename = "minimumLauncherVersion")]
     pub minimum_launcher_version: Option<i64>,
-    #[serde(rename = "releaseTime")]
     pub release_time: Option<String>,
     pub time: Option<String>,
+    pub minecraft_arguments: Option<String>,
     #[serde(rename = "type")]
-    pub version_info_type: Option<String>,
+    pub type_: Option<String>,
 }
 
 impl Version {
