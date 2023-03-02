@@ -49,10 +49,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>()
         }
 
-        query TEMP_TEST[app, _args: ()] {
-            Ok(app.minecraft_manager().get_game_download_files_list("1.16.5".to_string()).await?)
-        }
-
         query GET_INSTANCES[_, _args: ()] {
             let instances = vec![
                 Instance {
