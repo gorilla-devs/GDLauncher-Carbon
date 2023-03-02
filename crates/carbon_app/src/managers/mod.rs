@@ -23,7 +23,7 @@ mod minecraft;
 mod prisma_client;
 pub mod queue;
 
-pub type Managers = Arc<ManagersInner>;
+pub type App = Arc<AppInner>;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -31,21 +31,82 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
-pub struct ManagersInner {
-    //instances: Instances,
-    configuration_manager: ConfigurationManager,
-    minecraft_manager: MinecraftManager,
-    account_manager: AccountManager,
-    invalidation_channel: broadcast::Sender<InvalidationEvent>,
-    download_manager: DownloadManager,
-    pub(crate) reqwest_client: reqwest::Client,
-    pub(crate) prisma_client: Arc<PrismaClient>,
-    pub(crate) task_queue: TaskQueue,
+mod app {
+    use super::*;
+
+    pub struct AppInner {
+        //instances: Instances,
+        configuration_manager: ConfigurationManager,
+        minecraft_manager: MinecraftManager,
+        account_manager: AccountManager,
+        invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        download_manager: DownloadManager,
+        pub(crate) reqwest_client: reqwest::Client,
+        pub(crate) prisma_client: Arc<PrismaClient>,
+        pub(crate) task_queue: TaskQueue,
+    }
+
+    macro_rules! manager_getter {
+        ($manager:ident: $type:path) => {
+            pub(crate) fn $manager<'a>(self: &'a Arc<Self>) -> ManagerRef<'a, $type> {
+                ManagerRef {
+                    manager: &self.$manager,
+                    app: &self,
+                }
+            }
+        };
+    }
+
+    impl AppInner {
+        pub async fn new(
+            invalidation_channel: broadcast::Sender<InvalidationEvent>,
+            runtime_path: PathBuf,
+        ) -> App {
+            let db_client = prisma_client::load_and_migrate().await.unwrap();
+
+            let app = Arc::new(AppInner {
+                configuration_manager: ConfigurationManager::new(runtime_path),
+                minecraft_manager: MinecraftManager::new(),
+                account_manager: AccountManager::new(),
+                download_manager: DownloadManager::new(),
+                invalidation_channel,
+                reqwest_client: reqwest::Client::new(),
+                prisma_client: Arc::new(db_client),
+                task_queue: TaskQueue::new(2 /* todo: download slots */),
+            });
+
+            app
+        }
+
+        manager_getter!(configuration_manager: ConfigurationManager);
+        manager_getter!(minecraft_manager: MinecraftManager);
+        manager_getter!(account_manager: AccountManager);
+        manager_getter!(download_manager: DownloadManager);
+
+        pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
+            match self
+                .invalidation_channel
+                .send(InvalidationEvent::new(key.full, args))
+            {
+                Ok(_) => (),
+                Err(e) => {
+                    println!("Error sending invalidation request: {}", e);
+                }
+            }
+        }
+
+        pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
+            self.invalidation_channel.subscribe().recv().await
+        }
+    }
 }
+
+pub use app::AppInner;
+
 
 pub struct ManagerRef<'a, T> {
     manager: &'a T,
-    pub app: &'a Arc<ManagersInner>,
+    pub app: &'a Arc<AppInner>,
 }
 
 impl<T> Copy for ManagerRef<'_, T> {}
@@ -63,71 +124,17 @@ impl<T> Deref for ManagerRef<'_, T> {
     }
 }
 
-pub struct AppRef(pub Weak<ManagersInner>);
+pub struct AppRef(pub Weak<AppInner>);
 
 impl AppRef {
-    pub fn upgrade(&self) -> Managers {
+    pub fn upgrade(&self) -> App {
         self.0
             .upgrade()
             .expect("App was dropped before its final usage")
     }
 }
 
-macro_rules! manager_getter {
-    ($manager:ident: $type:path) => {
-        pub(crate) fn $manager<'a>(self: &'a Arc<Self>) -> ManagerRef<'a, $type> {
-            ManagerRef {
-                manager: &self.$manager,
-                app: &self,
-            }
-        }
-    };
-}
-
-impl ManagersInner {
-    pub async fn new(
-        invalidation_channel: broadcast::Sender<InvalidationEvent>,
-        runtime_path: PathBuf,
-    ) -> Managers {
-        let db_client = prisma_client::load_and_migrate().await.unwrap();
-
-        let app = Arc::new(ManagersInner {
-            configuration_manager: ConfigurationManager::new(runtime_path),
-            minecraft_manager: MinecraftManager::new(),
-            account_manager: AccountManager::new(),
-            download_manager: DownloadManager::new(),
-            invalidation_channel,
-            reqwest_client: reqwest::Client::new(),
-            prisma_client: Arc::new(db_client),
-            task_queue: TaskQueue::new(2 /* todo: download slots */),
-        });
-
-        app
-    }
-
-    manager_getter!(configuration_manager: ConfigurationManager);
-    manager_getter!(minecraft_manager: MinecraftManager);
-    manager_getter!(account_manager: AccountManager);
-    manager_getter!(download_manager: DownloadManager);
-
-    pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
-        match self
-            .invalidation_channel
-            .send(InvalidationEvent::new(key.full, args))
-        {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Error sending invalidation request: {}", e);
-            }
-        }
-    }
-
-    pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
-        self.invalidation_channel.subscribe().recv().await
-    }
-}
-
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_THEME[app, _args: ()] {
             app.configuration_manager()

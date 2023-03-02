@@ -64,7 +64,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager
+            .configuration_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
@@ -115,7 +115,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager
+            .configuration_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()

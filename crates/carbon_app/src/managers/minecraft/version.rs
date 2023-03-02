@@ -4,12 +4,11 @@ use carbon_domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
-        version::{GameElement, Libraries, Version},
+        version::{GameElement, Version},
     },
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
-use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use thiserror::Error;
 
@@ -18,7 +17,6 @@ use crate::{
     managers::{
         account::{FullAccount, FullAccountType},
         configuration::runtime_path::{InstancePath, NativesPath, RuntimePath},
-        AppRef, Managers, ManagersInner,
     },
 };
 

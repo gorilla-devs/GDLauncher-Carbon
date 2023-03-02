@@ -1,7 +1,7 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-use crate::managers::{Managers, ManagersInner};
+use crate::managers::{App, AppInner};
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
@@ -31,7 +31,7 @@ pub fn init() {
 async fn start_router(runtime_path: PathBuf) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<Managers>> =
+    let router: Arc<rspc::Router<App>> =
         crate::api::build_rspc_router().expose().build().arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
@@ -40,7 +40,7 @@ async fn start_router(runtime_path: PathBuf) {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let app = ManagersInner::new(invalidation_sender, runtime_path).await;
+    let app = AppInner::new(invalidation_sender, runtime_path).await;
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
@@ -55,12 +55,12 @@ async fn start_router(runtime_path: PathBuf) {
 }
 
 #[cfg(test)]
-async fn setup_managers_for_test() -> Managers {
+async fn setup_managers_for_test() -> App {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
-    ManagersInner::new(invalidation_sender, temp_path).await
+    AppInner::new(invalidation_sender, temp_path).await
 }
 
 #[cfg(test)]

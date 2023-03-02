@@ -1,5 +1,5 @@
 use crate::managers;
-use crate::managers::Managers;
+use crate::managers::App;
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -23,8 +23,8 @@ impl InvalidationEvent {
     }
 }
 
-pub fn build_rspc_router() -> impl RouterBuilderLike<Managers> {
-    rspc::Router::<Managers>::new()
+pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
+    rspc::Router::<App>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())

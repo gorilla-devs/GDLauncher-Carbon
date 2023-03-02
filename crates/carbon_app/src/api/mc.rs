@@ -1,5 +1,5 @@
 use crate::api::keys::mc::*;
-use crate::api::managers::Managers;
+use crate::api::managers::App;
 use crate::api::router::router;
 use axum::extract::DefaultBodyLimit;
 use rspc::{RouterBuilderLike, Type};
@@ -41,7 +41,7 @@ struct UpdateInstanceArgs {
     new_name: String,
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager().get_minecraft_versions().await;
