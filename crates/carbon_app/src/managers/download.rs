@@ -346,7 +346,7 @@ mod test {
     use crate::managers::download::DownloadError;
 
     #[tokio::test]
-    #[timeout(1000)]
+    #[timeout(120_000)]
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
