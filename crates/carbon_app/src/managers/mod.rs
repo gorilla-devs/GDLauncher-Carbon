@@ -90,7 +90,7 @@ mod app {
             {
                 Ok(_) => (),
                 Err(e) => {
-                    println!("Error sending invalidation request: {}", e);
+                    println!("Error sending invalidation request: {e}");
                 }
             }
         }

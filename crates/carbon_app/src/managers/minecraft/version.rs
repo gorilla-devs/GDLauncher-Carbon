@@ -16,7 +16,7 @@ use crate::{
     db::PrismaClient,
     managers::{
         account::{FullAccount, FullAccountType},
-        configuration::runtime_path::{InstancePath, NativesPath, RuntimePath},
+        configuration::runtime_path::{InstancePath, RuntimePath},
     },
 };
 
@@ -81,7 +81,7 @@ impl From<&str> for ArgPlaceholder {
             "user_type" => ArgPlaceholder::UserType,
             "version_type" => ArgPlaceholder::VersionType,
             "user_properties" => ArgPlaceholder::UserProperties,
-            _ => panic!("Unknown argument placeholder: {}", arg),
+            _ => panic!("Unknown argument placeholder: {arg}"),
         }
     }
 }
@@ -121,11 +121,7 @@ struct ReplacerArgs {
     user_properties: String,
 }
 
-fn replace_placeholder(
-    replacer_args: &ReplacerArgs,
-    placeholder: ArgPlaceholder,
-    version: &Version,
-) -> String {
+fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder) -> String {
     match placeholder {
         ArgPlaceholder::AuthPlayerName => replacer_args.player_name.clone(),
         ArgPlaceholder::VersionName => replacer_args.version_name.clone(),
@@ -189,10 +185,10 @@ fn replace_placeholders(
 
     let new_command = matches.replace_all(&command, |caps: &Captures| {
         if let Some(value) = caps.name("value") {
-            let value = replace_placeholder(&replacer_args, value.as_str().into(), version);
+            let value = replace_placeholder(&replacer_args, value.as_str().into());
             return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
         } else if let Some(standalone) = caps.name("standalone") {
-            let value = replace_placeholder(&replacer_args, standalone.as_str().into(), version);
+            let value = replace_placeholder(&replacer_args, standalone.as_str().into());
             return value;
         }
         if let Some(arg) = caps.name("arg") {
@@ -285,17 +281,13 @@ pub async fn generate_startup_command(
 
 #[cfg(test)]
 mod tests {
-    use carbon_domain::minecraft::manifest::MinecraftManifest;
-    use serde_json::json;
-
-    use crate::setup_managers_for_test;
-
     use super::*;
+    use carbon_domain::minecraft::manifest::MinecraftManifest;
 
     async fn get_account() -> FullAccount {
         FullAccount {
             username: "test".to_owned(),
-            uuid: "test".to_owned(),
+            uuid: "test-uuid".to_owned(),
             type_: FullAccountType::Offline,
         }
     }
@@ -303,8 +295,6 @@ mod tests {
     // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
-        let app = setup_managers_for_test().await;
-
         let manifest = MinecraftManifest::fetch().await.unwrap();
 
         let version = manifest

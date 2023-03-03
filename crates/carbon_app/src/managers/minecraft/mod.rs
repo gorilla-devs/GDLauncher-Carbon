@@ -27,7 +27,7 @@ impl From<MinecraftError> for rspc::Error {
     fn from(value: MinecraftError) -> Self {
         rspc::Error::new(
             ErrorCode::InternalServerError,
-            format!("Minecraft Error: {}", value),
+            format!("Minecraft Error: {value}"),
         )
     }
 }
