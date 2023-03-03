@@ -224,6 +224,9 @@ impl Library {
 
         true
     }
+    pub fn is_native_artifact(&self) -> bool {
+        self.natives.is_some()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
