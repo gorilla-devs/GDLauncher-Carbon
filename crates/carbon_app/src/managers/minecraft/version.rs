@@ -143,7 +143,6 @@ fn replace_placeholder(
         ArgPlaceholder::UserType => replacer_args.user_type.clone(), // Hardcoded to mojang apparently ?????
         ArgPlaceholder::VersionType => replacer_args.version_type.clone(),
         ArgPlaceholder::UserProperties => replacer_args.user_properties.clone(), // Not sure what this is,
-        _ => panic!("Unknown argument placeholder: {:?}", placeholder),
     }
 }
 
