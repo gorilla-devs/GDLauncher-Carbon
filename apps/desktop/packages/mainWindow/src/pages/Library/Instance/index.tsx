@@ -3,7 +3,7 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
-import { For, Show, createSignal } from "solid-js";
+import { For, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
@@ -136,13 +136,6 @@ const Instance = () => {
                       <h1
                         class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
                         contentEditable
-                        onInput={() => {
-                          console.log("AAA");
-                        }}
-                        onChange={() => {
-                          console.log("CHANGE");
-                          setEditableName((prev) => !prev);
-                        }}
                         onFocusIn={() => {
                           setEditableName(true);
                         }}
@@ -153,14 +146,21 @@ const Instance = () => {
                         {params.id}
                       </h1>
                       <div class="flex gap-2">
-                        <Show when={editableName()}>
-                          <div
-                            class="i-ri:delete-bin-7-fill text-2xl cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-red"
-                            onClick={() => {
-                              setEditableName(false);
-                            }}
-                          />
-                        </Show>
+                        <div
+                          class="i-ri:delete-bin-7-fill text-2xl cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-red"
+                          classList={{
+                            hidden: !editableName(),
+                          }}
+                          onClick={() => {
+                            setEditableName(false);
+                          }}
+                        />
+                        <div
+                          class="i-ri:check-fill cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-green text-3xl"
+                          classList={{
+                            hidden: !editableName(),
+                          }}
+                        />
                       </div>
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
