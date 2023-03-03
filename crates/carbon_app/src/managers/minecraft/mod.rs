@@ -48,7 +48,7 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 
     pub async fn get_game_download_files_list(
-        &self,
+        self,
         mc_version: String,
     ) -> Result<Vec<String>, MinecraftError> {
         let db_client = self.app.prisma_client.clone();
