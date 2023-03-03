@@ -103,7 +103,6 @@ mod app {
 
 pub use app::AppInner;
 
-
 pub struct ManagerRef<'a, T> {
     manager: &'a T,
     pub app: &'a Arc<AppInner>,
