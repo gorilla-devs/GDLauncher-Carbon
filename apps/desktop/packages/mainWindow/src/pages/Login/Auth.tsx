@@ -3,7 +3,7 @@ import { createEffect, createSignal, Setter, Show } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Button, LoadingBar } from "@gd/ui";
+import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useModal } from "@/managers/ModalsManager";

@@ -67,7 +67,7 @@ const CodeStep = (props: Props) => {
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onPolling: (info) => {
-          setLoading(false);
+          setLoading(true);
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
@@ -86,6 +86,7 @@ const CodeStep = (props: Props) => {
 
   const updateExpireTime = () => {
     if (minutes() <= 0 && seconds() <= 0) {
+      setLoading(false);
       setExpired(true);
     } else {
       resetCountDown();
@@ -177,7 +178,7 @@ const CodeStep = (props: Props) => {
         <p class="text-red m-0">{error()}</p>
       </Show>
       <Show when={loading()}>
-        <span class="mb-4 text-xs text-shade-1 absolute bottom-1">
+        <span class="mb-4 text-xs absolute text-shade-1 bottom-1">
           <Trans
             key="waiting_login_code_msg"
             options={{
@@ -203,7 +204,7 @@ const CodeStep = (props: Props) => {
               defaultValue: "Open in browser",
             }}
           />
-          <div class="i-ri:link text-md" />
+          <div class="text-md i-ri:link" />
         </Button>
       </Show>
       <Show when={expired()}>
