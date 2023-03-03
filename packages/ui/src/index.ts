@@ -13,6 +13,7 @@ export { Progressbar } from "./Progressbar";
 export { Spinner } from "./Spinner";
 export { Collapsable } from "./Collapsable";
 export { Tag } from "./Tag";
+export { LoadingBar } from "./Loadingbar";
 export {
   NotificationsProvider,
   createNotification,

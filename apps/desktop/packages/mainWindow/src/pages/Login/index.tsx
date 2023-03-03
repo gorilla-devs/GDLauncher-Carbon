@@ -32,10 +32,13 @@ export default function Login() {
         />
       </div>
       <div
-        class="flex flex-col items-center text-white rounded-2xl relative justify-end w-120 h-100"
+        class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
         style={{
           background: "rgba(29, 32, 40, 0.8)",
           "justify-content": step() === 0 ? "flex-end" : "center",
+        }}
+        classList={{
+          "overflow-hidden": step() === 1,
         }}
       >
         <Switch
