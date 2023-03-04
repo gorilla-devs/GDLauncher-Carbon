@@ -2,11 +2,11 @@ use rspc::RouterBuilderLike;
 
 use crate::api::keys::queue::*;
 use crate::managers::queue::TaskHandle;
-use crate::managers::Managers;
+use crate::managers::App;
 
 use super::router::router;
 
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_TASKS[app, _: ()] {
             app.task_queue.get_tasks().await

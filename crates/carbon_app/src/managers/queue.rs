@@ -239,7 +239,7 @@ mod test {
     use super::{QueuedTask, TaskHandle, TaskQueue};
 
     #[tokio::test]
-    #[timeout(1)]
+    #[timeout(100)]
     async fn download_concurrency() {
         let mut queue = TaskQueue::new(2);
 
@@ -273,7 +273,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[timeout(1)]
+    #[timeout(100)]
     async fn task_dependence() {
         let mut queue = TaskQueue::new(0);
 

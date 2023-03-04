@@ -1,5 +1,5 @@
 use crate::api::keys::java::*;
-use crate::api::managers::Managers;
+use crate::api::managers::App;
 use crate::api::router::router;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -48,7 +48,7 @@ struct SetDefaultArgs {
     id: String,
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_AVAILABLE[_, _args: ()] {
             let mut javas = HashMap::new();

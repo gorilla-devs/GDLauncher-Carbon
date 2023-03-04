@@ -1,4 +1,10 @@
-use std::{io, path::Path, str::FromStr};
+use std::{
+    collections::HashSet,
+    io, mem,
+    ops::{Deref, DerefMut},
+    path::Path,
+    str::FromStr,
+};
 
 use prisma_client_rust::QueryError;
 use reqwest::{Client, Response};
@@ -6,7 +12,7 @@ use thiserror::Error;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncWriteExt, BufWriter},
-    sync::{mpsc, watch},
+    sync::{mpsc, watch, Mutex},
 };
 use uuid::Uuid;
 
@@ -17,11 +23,15 @@ use crate::{
 
 use super::ManagerRef;
 
-pub struct DownloadManager {}
+pub struct DownloadManager {
+    active_downloads: Mutex<HashSet<String>>,
+}
 
 impl DownloadManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            active_downloads: Mutex::new(HashSet::new()),
+        }
     }
 }
 
@@ -50,12 +60,47 @@ impl ManagerRef<'_, DownloadManager> {
         return Err(DownloadError::Dropped);
     }
 
+    /// Cancel a download, deleting the file.
+    ///
+    /// If the download has already finished the files will be deleted anyway.
+    pub async fn cancel_download(self, handle: DownloadHandle) -> Result<(), DownloadCancelError> {
+        use crate::db::active_downloads::UniqueWhereParam;
+
+        // stop the handle's drop() from being called
+        let mut handle = handle.into_inner();
+
+        // cancel active download and wait for comfirmation.
+        let _ = handle.cancel_channel.send(()).await;
+        let _ = handle.cancel_complete_channel.recv().await;
+
+        let path = self
+            .app
+            .configuration_manager()
+            .runtime_path
+            .get_download()
+            .to_pathbuf()
+            .join(&handle.id);
+
+        tokio::fs::remove_file(path).await?;
+
+        self.app
+            .prisma_client
+            .active_downloads()
+            .delete(UniqueWhereParam::FileIdEquals(handle.id))
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn complete_download(
         self,
-        mut handle: DownloadHandle,
+        handle: DownloadHandle,
         target: &Path,
     ) -> Result<(), DownloadCompleteError> {
         use crate::db::active_downloads::UniqueWhereParam;
+
+        let mut handle = handle.into_inner();
 
         if let Err(_) = handle.complete_channel.try_recv() {
             // no completion flag
@@ -64,11 +109,11 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager
+            .configuration_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
-            .join(handle.id.to_string());
+            .join(&handle.id);
 
         tokio::fs::rename(path, target)
             .await
@@ -79,15 +124,25 @@ impl ManagerRef<'_, DownloadManager> {
         self.app
             .prisma_client
             .active_downloads()
-            .delete(UniqueWhereParam::FileIdEquals(handle.id.to_string()))
+            .delete(UniqueWhereParam::FileIdEquals(handle.id))
             .exec()
             .await?;
 
         Ok(())
     }
 
-    pub async fn start_download(self, url: String) -> Result<DownloadHandle, QueryError> {
+    pub async fn start_download(self, url: String) -> Result<DownloadHandle, DownloadStartError> {
         use crate::db::active_downloads::WhereParam;
+
+        // Lock active_downloads. Any future downloads will have to wait here.
+        // active_downloads is locked to prevent two downloads attempting to start
+        // for the same file. Whichever download gets here later must wait for the
+        // first attempt to fail or add itself to the map.
+        let mut active_downloads = self.active_downloads.lock().await;
+
+        if active_downloads.contains(&url) {
+            return Err(DownloadStartError::AlreadyActive);
+        }
 
         let active_download = self
             .app
@@ -115,7 +170,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager
+            .configuration_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
@@ -123,15 +178,23 @@ impl ManagerRef<'_, DownloadManager> {
 
         let (status_send, status_recv) = watch::channel::<Option<DownloadStatus>>(None);
         let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
+        let (cancel_complete_send, cancel_complete_recv) = mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
-        let client = self.app.reqwest_client.clone();
+        active_downloads.insert(url.clone());
+        // All failable operations have finished. If the task itself fails than
+        // active_downloads will be updated accordingly.
+        drop(active_downloads);
+
+        let app = self.app.clone();
         let task = async move {
+            let mut canceled = false;
+            let canceled_ref = &mut canceled;
             let task = || {
                 let status_send = &status_send;
+                let url = &url;
+                let app = &app;
                 async move {
-                    let mut send_complete = true;
-
                     tokio::fs::create_dir_all(
                         path.parent().ok_or(ActiveDownloadError::MalformedPath)?,
                     )
@@ -166,7 +229,7 @@ impl ManagerRef<'_, DownloadManager> {
                         Ok(response)
                     }
 
-                    let mut response = init_request(&client, &url, start_loc).await?;
+                    let mut response = init_request(&app.reqwest_client, &url, start_loc).await?;
 
                     match response.headers().get("content-range") {
                         Some(range_header) => {
@@ -192,7 +255,8 @@ impl ManagerRef<'_, DownloadManager> {
                                         // again if we re-request with our starting point, so start from 0.
                                         start_loc = 0;
                                         file.set_len(0).await?;
-                                        response = init_request(&client, &url, 0).await?;
+                                        response =
+                                            init_request(&app.reqwest_client, &url, 0).await?;
                                     } else if start < start_loc {
                                         // server gave a resume point earlier than we have, truncate the file to the
                                         // server's position.
@@ -228,12 +292,12 @@ impl ManagerRef<'_, DownloadManager> {
                     while let Some(chunk) =
                         response.chunk().await.map_err(RequestError::from_error)?
                     {
-                        writebuf.write(&chunk).await?;
-
                         if let Ok(()) = cancel_recv.try_recv() {
-                            send_complete = false;
+                            *canceled_ref = true;
                             break; // break instead of return to flush writebuf
                         }
+
+                        writebuf.write_all(&chunk).await?;
 
                         downloaded += chunk.len() as u64;
                         let _ = status_send.send(Some(DownloadStatus::Status {
@@ -245,7 +309,7 @@ impl ManagerRef<'_, DownloadManager> {
                     // will NOT be flushed on drop, so it is done manually
                     writebuf.flush().await?;
 
-                    if send_complete {
+                    if !*canceled_ref {
                         // the complete flag is set first to avoid a possible race condition
                         let _ = complete_send.send(()).await;
                         let _ = status_send.send(Some(DownloadStatus::Complete));
@@ -255,7 +319,22 @@ impl ManagerRef<'_, DownloadManager> {
                 }
             };
 
-            match task().await {
+            let r = task().await;
+
+            // Remove this download from active downloads *before* cancelation is confirmed.
+            // This means after canceling a download it is always valid to restart it.
+            app.download_manager()
+                .active_downloads
+                .lock()
+                .await
+                .remove(&url);
+
+            if canceled {
+                // cancel confirmation is sent to avoid file deletion race
+                let _ = cancel_complete_send.send(()).await;
+            }
+
+            match r {
                 Ok(()) => {}
                 Err(e) => {
                     let _ = status_send.send(Some(DownloadStatus::Failed(e)));
@@ -265,21 +344,75 @@ impl ManagerRef<'_, DownloadManager> {
 
         tokio::spawn(task);
 
-        Ok(DownloadHandle {
+        Ok(DownloadHandle(DownloadHandleInner {
             id,
             status_channel: status_recv,
             cancel_channel: cancel_send,
+            cancel_complete_channel: cancel_complete_recv,
             complete_channel: complete_recv,
-        })
+        }))
     }
 }
 
-pub struct DownloadHandle {
+pub struct DownloadHandleInner {
     id: String,
     pub status_channel: watch::Receiver<Option<DownloadStatus>>,
-    pub cancel_channel: mpsc::Sender<()>,
+    cancel_channel: mpsc::Sender<()>,
+    cancel_complete_channel: mpsc::Receiver<()>,
     // used to make sure a download was actually completed
     complete_channel: mpsc::Receiver<()>,
+}
+
+pub struct DownloadHandle(DownloadHandleInner);
+
+impl DownloadHandle {
+    /// Convert to inner data without dropping
+    fn into_inner(self) -> DownloadHandleInner {
+        // SAFETY: a reference cast to a pointer and immediately used is
+        // always valid.
+        unsafe {
+            // copy the contained download handle by value
+            let inner = (&self.0 as *const DownloadHandleInner).read();
+            mem::forget(self);
+            // As self is forgotten, it is no longer possible to violate any
+            // invariants for inner's fields.
+            inner
+        }
+    }
+
+    /// Cancel this download without deleting files.
+    pub async fn cancel(self) {
+        let mut handle = self.into_inner();
+        let _ = handle.cancel_channel.send(()).await;
+        let _ = handle.cancel_complete_channel.recv().await;
+    }
+}
+
+impl Deref for DownloadHandle {
+    type Target = DownloadHandleInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for DownloadHandle {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Drop for DownloadHandle {
+    fn drop(&mut self) {
+        // Canceling a download by dropping its handle will keep the file
+        // in the download cache folder.
+        // As the download handle is not Clone, and cancel_channel is private,
+        // this will never block.
+        let channel = self.cancel_channel.clone();
+        tokio::task::spawn_blocking(move || {
+            let _ = channel.blocking_send(());
+        });
+    }
 }
 
 #[derive(Clone)]
@@ -287,6 +420,27 @@ pub enum DownloadStatus {
     Failed(ActiveDownloadError),
     Status { downloaded: u64, total: Option<u64> },
     Complete,
+}
+
+#[derive(Error, Debug)]
+pub enum DownloadCancelError {
+    #[error("not started")]
+    NotStarted,
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("io error: {0}")]
+    Io(#[from] io::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum DownloadStartError {
+    #[error("download already active")]
+    AlreadyActive,
+
+    #[error("query error")]
+    Query(#[from] QueryError),
 }
 
 #[derive(Error, Debug)]
@@ -326,14 +480,14 @@ pub enum DownloadCompleteError {
 
 #[derive(Error, Debug)]
 pub enum DownloadError {
+    #[error("while starting: {0}")]
+    Start(#[from] DownloadStartError),
+
     #[error("while downloading: {0}")]
     Active(#[from] ActiveDownloadError),
 
     #[error("on completion: {0}")]
     Complete(#[from] DownloadCompleteError),
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
 
     #[error("channel was dropped")]
     Dropped,
@@ -343,31 +497,108 @@ pub enum DownloadError {
 mod test {
     use ntest::timeout;
 
-    use crate::managers::download::DownloadError;
+    use crate::managers::download::{DownloadError, DownloadStartError};
 
     #[tokio::test]
-    #[timeout(1000)]
+    #[timeout(120_000)]
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
         let tmpfolder = app
-            .configuration_manager
+            .configuration_manager()
             .runtime_path
             .get_temp()
-            .to_pathbuf();
+            .to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
         app.download_manager()
             .download(
                 String::from("https://gdlauncher.com"),
-                &app.configuration_manager
+                &app.configuration_manager()
                     .runtime_path
                     .get_temp()
-                    .to_pathbuf()
+                    .to_path()
                     .join("gdl.html"),
                 &mut |downloaded, total| println!("Downloaded {downloaded}/{total:?}"),
             )
             .await
+    }
+
+    #[tokio::test]
+    #[should_panic]
+    #[timeout(120_000)]
+    async fn attempt_download_twice() {
+        let app = crate::setup_managers_for_test().await;
+
+        let tmpfolder = app
+            .configuration_manager()
+            .runtime_path
+            .get_temp()
+            .to_path();
+
+        tokio::fs::create_dir_all(tmpfolder).await.unwrap();
+
+        // this file should not instantly download.
+        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+
+        app.download_manager()
+            .start_download(url.clone())
+            .await
+            .unwrap();
+        app.download_manager()
+            .start_download(url.clone())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    #[timeout(120_000)]
+    async fn attempt_download_after_cancel() -> Result<(), DownloadStartError> {
+        let app = crate::setup_managers_for_test().await;
+
+        let tmpfolder = app
+            .configuration_manager()
+            .runtime_path
+            .get_temp()
+            .to_path();
+
+        tokio::fs::create_dir_all(tmpfolder).await.unwrap();
+
+        // this file should not instantly download.
+        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+
+        let handle = app.download_manager().start_download(url.clone()).await?;
+        handle.cancel().await;
+        app.download_manager().start_download(url.clone()).await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[timeout(120_000)]
+    async fn attempt_cancel_download() {
+        let app = crate::setup_managers_for_test().await;
+
+        let tmpfolder = app
+            .configuration_manager()
+            .runtime_path
+            .get_temp()
+            .to_path();
+
+        tokio::fs::create_dir_all(tmpfolder).await.unwrap();
+
+        // this file should not instantly download.
+        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+
+        let handle = app
+            .download_manager()
+            .start_download(url.clone())
+            .await
+            .unwrap();
+        app.download_manager()
+            .cancel_download(handle)
+            .await
+            .unwrap();
     }
 }

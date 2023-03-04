@@ -82,6 +82,26 @@ impl ManagerRef<'_, AccountManager> {
         Ok(())
     }
 
+    /// Get the active account's details.
+    ///
+    /// Not exposed to the frontend on purpose. Will NOT be invalidated.
+    pub async fn get_active_account(&self) -> Result<Option<FullAccount>, GetActiveAccountError> {
+        use db::account::WhereParam::Uuid;
+
+        let Some(uuid) = self.get_active_uuid().await? else { return Ok(None) };
+
+        let account = self
+            .app
+            .prisma_client
+            .account()
+            .find_first(vec![Uuid(StringFilter::Equals(uuid))])
+            .exec()
+            .await?
+            .ok_or(GetActiveAccountError::AccountNotPresent)?;
+
+        Ok(Some(account.try_into()?))
+    }
+
     async fn get_account_entries(self) -> Result<Vec<db::account::Data>, QueryError> {
         self.app
             .prisma_client
@@ -300,6 +320,21 @@ define_single_error!(AddAccountError::Query(QueryError));
 define_single_error!(GetAccountListError::Query(QueryError));
 
 #[derive(Error, Debug)]
+pub enum GetActiveAccountError {
+    #[error("get active uuid error: {0}")]
+    GetActiveUuid(#[from] GetActiveUuidError),
+
+    #[error("query error: {0}")]
+    Query(#[from] QueryError),
+
+    #[error("account selected but not present")]
+    AccountNotPresent,
+
+    #[error("could not parse account from db: {0}")]
+    Parse(#[from] FullAccountLoadError),
+}
+
+#[derive(Error, Debug)]
 pub enum GetAccountStatusError {
     #[error("account token expiry unset")]
     TokenExpiryUnset,
@@ -365,13 +400,13 @@ pub enum SetAccountError {
     NoAccount,
 }
 
-struct FullAccount {
-    username: String,
-    uuid: String,
-    type_: FullAccountType,
+pub struct FullAccount {
+    pub username: String,
+    pub uuid: String,
+    pub type_: FullAccountType,
 }
 
-enum FullAccountType {
+pub enum FullAccountType {
     Offline,
     Microsoft {
         access_token: String,
@@ -399,6 +434,38 @@ impl From<FullAccount> for db::account::Data {
             token_expires,
         }
     }
+}
+
+impl TryFrom<db::account::Data> for FullAccount {
+    type Error = FullAccountLoadError;
+
+    fn try_from(value: db::account::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
+            uuid: value.uuid,
+            username: value.username,
+            type_: match value.access_token {
+                Some(access_token) => FullAccountType::Microsoft {
+                    access_token,
+                    refresh_token: value
+                        .ms_refresh_token
+                        .ok_or(FullAccountLoadError::MissingRefreshToken)?,
+                    token_expires: value
+                        .token_expires
+                        .ok_or(FullAccountLoadError::MissingExpiration)?,
+                },
+                None => FullAccountType::Offline,
+            },
+        })
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum FullAccountLoadError {
+    #[error("missing refesh token")]
+    MissingRefreshToken,
+
+    #[error("missing account expiration")]
+    MissingExpiration,
 }
 
 // Temporary until enroll errors are fixed

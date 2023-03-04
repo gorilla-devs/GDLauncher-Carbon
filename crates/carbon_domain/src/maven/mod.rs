@@ -9,6 +9,25 @@ pub struct MavenCoordinates {
     version: String,
 }
 
+impl MavenCoordinates {
+    /// Needs to be in the format of `group:artifact:version`
+    pub fn try_from(coordinates: String) -> Result<Self, MavenError> {
+        let coordinates = coordinates.trim();
+        if coordinates.is_empty() || !is_maven_coordinates(coordinates) {
+            return Err(MavenError::InvalidCoordinates);
+        }
+
+        parse_maven_coordinates(coordinates)
+    }
+
+    pub fn into_path(self) -> PathBuf {
+        PathBuf::new()
+            .join(self.group_id)
+            .join(self.artifact_id)
+            .join(self.version)
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum MavenError {
     #[error("invalid maven coordinates")]
@@ -34,25 +53,6 @@ fn parse_maven_coordinates(maven_coordinates: &str) -> Result<MavenCoordinates, 
         artifact_id: artifact_id.to_string(),
         version: version.to_string(),
     })
-}
-
-impl MavenCoordinates {
-    /// Needs to be in the format of `group:artifact:version`
-    pub fn try_from(coordinates: String) -> Result<Self, MavenError> {
-        let coordinates = coordinates.trim();
-        if coordinates.is_empty() || !is_maven_coordinates(coordinates) {
-            return Err(MavenError::InvalidCoordinates);
-        }
-
-        parse_maven_coordinates(coordinates)
-    }
-
-    pub fn into_pathbuf(self) -> PathBuf {
-        PathBuf::new()
-            .join(self.group_id)
-            .join(self.artifact_id)
-            .join(self.version)
-    }
 }
 
 #[cfg(test)]
@@ -122,7 +122,7 @@ mod tests {
     fn test_into_pathbuf() {
         let coordinates = "com.example:example:1.0.0".to_string();
         let parsed_coordinates = MavenCoordinates::try_from(coordinates).unwrap();
-        let path = parsed_coordinates.into_pathbuf();
+        let path = parsed_coordinates.into_path();
         assert_eq!(
             path,
             PathBuf::from("com.example").join("example").join("1.0.0")
