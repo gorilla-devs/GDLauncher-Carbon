@@ -1,8 +1,10 @@
 import { Link, useLocation, useMatch } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
+import ProfileImg from "/assets/images/profile-img.png";
+import ProfileImg2 from "/assets/images/profile-img2.png";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Dropdown } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
@@ -17,6 +19,11 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 //     if (match) return match;
 //   }
 // };
+
+const accounts = [
+  { name: "Ladvace", icon: ProfileImg },
+  { name: "Ladvace2", icon: ProfileImg2 },
+];
 
 const AppNavbar = () => {
   const location = useLocation();
@@ -34,7 +41,7 @@ const AppNavbar = () => {
   return (
     <Show when={!isLogin()}>
       <nav class="bg-shade-8 flex items-center text-white px-5 h-15">
-        <div class="flex w-full">
+        <div class="flex w-full items-center">
           <div class="flex items-center w-36">
             <img
               src={GDLauncherWideLogo}
@@ -91,6 +98,27 @@ const AppNavbar = () => {
               </TabList>
             </Tabs>
           </ul>
+          <div class="ml-4">
+            <Dropdown
+              options={accounts.map((account) => ({
+                label: {
+                  name: account.name,
+                  icon: account.icon,
+                },
+                key: account.name,
+              }))}
+              // options={accounts.map((account) => ({
+              //   label: (
+              //     <div class="flex justify-between items-center">
+              //       <div class="w-5 h-5 bg-green rounded-md" />
+              //       {account.name}
+              //     </div>
+              //   ),
+              //   key: "test",
+              // }))}
+              value="test"
+            />
+          </div>
         </div>
       </nav>
     </Show>

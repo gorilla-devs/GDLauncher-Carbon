@@ -1,7 +1,17 @@
-import { createSignal, For, Show, JSX } from "solid-js";
+import { createSignal, For, Show, JSX, Switch, Match } from "solid-js";
 import { Button } from "../Button";
 
+export type Label = {
+  name: string;
+  icon: string;
+};
+
 export type Option = {
+  label: string | Label;
+  key: string;
+};
+
+export type OptionDropDown = {
   label: string;
   key: string;
 };
@@ -76,8 +86,17 @@ const Dropdown = (props: Props) => {
         }}
       >
         <Show when={!props.btnDropdown}>
-          <span class="mr-2">{props.icon}</span>
+          <Show when={props.icon}>
+            <span class="mr-2">{props.icon}</span>
+          </Show>
+          <Show when={(selectedValue() as Label).icon}>
+            <img
+              src={(selectedValue() as Label).icon}
+              class="w-5 h-5 rounded-md mr-2"
+            />
+          </Show>
           <span
+            class="w-full"
             classList={{
               "text-white": props.error,
               "text-shade-0 hover:text-white group-hover:text-white":
@@ -85,7 +104,14 @@ const Dropdown = (props: Props) => {
               "text-shade-5": props.disabled,
             }}
           >
-            {selectedValue()}
+            <Switch>
+              <Match when={typeof selectedValue() === "string"}>
+                {selectedValue() as string}
+              </Match>
+              <Match when={typeof selectedValue() === "object"}>
+                {(selectedValue() as Label).name}
+              </Match>
+            </Switch>
           </span>
         </Show>
         <span
@@ -126,7 +152,18 @@ const Dropdown = (props: Props) => {
                 toggleMenu();
               }}
             >
-              {option.label}
+              <Switch>
+                <Match when={typeof option.label === "string"}>
+                  {option.label as string}
+                </Match>
+                <Match when={typeof option.label === "object"}>
+                  <img
+                    src={(option.label as Label).icon}
+                    class="w-5 h-5 rounded-md mr-2"
+                  />
+                  {(option.label as Label).name}
+                </Match>
+              </Switch>
             </li>
           )}
         </For>
@@ -136,9 +173,9 @@ const Dropdown = (props: Props) => {
 };
 
 const DropDownButton = (props: DropDownButtonProps) => {
-  const [selectedValue, setSelectedValue] = createSignal("");
+  const [selectedValue, setSelectedValue] = createSignal<string>("");
 
-  const handleChange = (option: Option) => {
+  const handleChange = (option: OptionDropDown) => {
     setSelectedValue(option.label);
   };
 
@@ -155,7 +192,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
         rounded
         bg="bg-primary"
         value={props.value}
-        onChange={(option) => handleChange(option)}
+        onChange={(option) => handleChange(option as OptionDropDown)}
       />
     </div>
   );
