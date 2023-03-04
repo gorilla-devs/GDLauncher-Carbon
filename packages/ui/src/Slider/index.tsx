@@ -144,7 +144,7 @@ function Slider(props: Props) {
   };
 
   return (
-    <div class="h-10 flex items-center">
+    <div class="h-10 flex items-center w-full max-w-full box-border mb-10">
       <div class="relative w-full">
         <For each={Object.entries(props.marks)}>
           {([value, label]) => (
@@ -166,7 +166,7 @@ function Slider(props: Props) {
                 }}
               />
               <p
-                class="flex flex-col mt-2 mb-0 text-xs text-shade-5 w-10"
+                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-shade-5 w-10"
                 style={{
                   position: "absolute",
                   left: `${calcOffset(parseInt(value, 10))}%`,
