@@ -109,7 +109,7 @@ impl DeviceCode {
                     #[derive(Deserialize)]
                     struct MsAuthResponse {
                         access_token: String,
-                        id_token: String,
+                        //id_token: String,
                         refresh_token: String,
                         expires_in: i64,
                     }
@@ -121,7 +121,7 @@ impl DeviceCode {
 
                     break Ok(MsAuth {
                         access_token: response.access_token,
-                        id_token: response.id_token,
+                        //id_token: response.id_token,
                         refresh_token: response.refresh_token,
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     });
@@ -151,7 +151,7 @@ pub enum DeviceCodePollError {
 #[derive(Debug, Clone)]
 pub struct MsAuth {
     pub access_token: String,
-    pub id_token: String,
+    //pub id_token: String,
     pub refresh_token: String,
     pub expires_at: DateTime<Utc>,
 }
@@ -159,42 +159,40 @@ pub struct MsAuth {
 impl MsAuth {
     /// Refresh the auth token, returning a new token if the current one
     /// has expired.
-    pub async fn refresh(&mut self, client: &Client) -> Result<bool, MsAuthRefreshError> {
-        if self.expires_at > Utc::now() {
-            #[derive(Deserialize)]
-            struct RefreshResponse {
-                access_token: String,
-                refresh_token: String,
-                expires_in: i64,
-            }
-
-            let response = client
-                .post("https://login.live.com/oauth20_token.srf")
-                .form(&[
-                    ("client_id", MS_KEY),
-                    ("refresh_token", &self.refresh_token),
-                    ("grant_type", "refresh_token"),
-                    (
-                        "redirect_uri",
-                        "https://login.microsoftonline.com/common/oauth2/nativeclient",
-                    ),
-                ])
-                .send()
-                .await
-                .map_err(RequestError::from_error)?
-                .error_for_status()
-                .map_err(RequestError::from_error)?
-                .json::<RefreshResponse>()
-                .await
-                .map_err(RequestError::from_error)?;
-
-            self.access_token = response.access_token;
-            self.refresh_token = response.refresh_token;
-            self.expires_at = Utc::now() + chrono::Duration::seconds(response.expires_in);
-            Ok(true)
-        } else {
-            Ok(false)
+    pub async fn refresh(client: &Client, refresh_token: &str) -> Result<Self, MsAuthRefreshError> {
+        #[derive(Deserialize)]
+        struct RefreshResponse {
+            access_token: String,
+            refresh_token: String,
+            expires_in: i64,
         }
+
+        let response = client
+            .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+            //.post("https://login.live.com/oauth20_token.srf")
+            .form(&[
+                ("client_id", MS_KEY),
+                ("refresh_token", refresh_token),
+                ("grant_type", "refresh_token"),
+                (
+                    "redirect_uri",
+                    "https://login.microsoftonline.com/common/oauth2/nativeclient",
+                ),
+            ])
+            .send()
+            .await
+            .map_err(RequestError::from_error)?
+            .error_for_status()
+            .map_err(RequestError::from_error)?
+            .json::<RefreshResponse>()
+            .await
+            .map_err(RequestError::from_error)?;
+
+        Ok(Self {
+            access_token: response.access_token,
+            refresh_token: response.refresh_token,
+            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+        })
     }
 }
 

@@ -68,6 +68,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
             app.account_manager().finalize_enrollment().await
                 .map_err(into_rspc)
         }
+
+        mutation REFRESH_ACCOUNT[app, uuid: String] {
+            app.account_manager().refresh_account(uuid).await
+                .map_err(into_rspc)
+        }
     }
 }
 
@@ -89,6 +94,7 @@ enum AccountStatus {
     Ok,
     Expired,
     Refreshing,
+    Invalid,
 }
 
 #[derive(Type, Serialize)]
@@ -145,8 +151,9 @@ impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
             domain::AccountStatus::Ok { .. } => Self::Ok,
-            domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Refreshing => Self::Refreshing,
+            domain::AccountStatus::Expired => Self::Expired,
+            domain::AccountStatus::Invalid => Self::Invalid,
         }
     }
 }
@@ -192,6 +199,9 @@ impl From<account::EnrollmentError> for EnrollmentError {
             )) => Self::Request(x.into()),
 
             BE::DeviceCodePoll(DeviceCodePollError::CodeExpired) => Self::DeviceCodeExpired,
+
+            // this is a bit nonsensical, but the FE should never get this error
+            BE::MsRefresh(_) => Self::DeviceCodeExpired,
 
             BE::McAuth(McAuthError::Xbox(XboxAuthError::Xbox(x))) => Self::XboxAccount(x),
 
