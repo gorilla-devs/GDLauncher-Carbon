@@ -56,7 +56,7 @@ pub struct Version {
     pub id: String,
     pub java_version: Option<JavaVersion>,
     #[serde(flatten)]
-    pub libraries: Option<Libraries>,
+    pub libraries: Libraries,
     pub logging: Option<Logging>,
     pub main_class: String,
     pub minimum_launcher_version: Option<i64>,
@@ -85,47 +85,110 @@ impl Version {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum Argument {
+    Complex(ArgumentEntry),
+    String(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Arguments {
-    pub game: Option<Vec<GameElement>>,
-    pub jvm: Option<Vec<JvmElement>>,
+    pub game: Vec<Argument>,
+    pub jvm: Vec<Argument>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GameClass {
-    pub rules: Vec<GameRule>,
-    pub value: Value,
+impl Default for Arguments {
+    fn default() -> Self {
+        Self {
+            game: vec![
+                Argument::String("-Xms${ram}M".to_string()),
+                Argument::String("-Xmx${ram}M".to_string()),
+                Argument::String("-XX:+UnlockExperimentalVMOptions".to_string()),
+                Argument::String("-XX:+UseG1GC".to_string()),
+                Argument::String("-XX:G1NewSizePercent=20".to_string()),
+                Argument::String("-XX:G1ReservePercent=20".to_string()),
+                Argument::String("-XX:MaxGCPauseMillis=50".to_string()),
+                Argument::String("-XX:G1HeapRegionSize=32M".to_string()),
+                Argument::String("-Dlog4j2.formatMsgNoLookups=true".to_string()),
+            ],
+            jvm: vec![
+                Argument::Complex(ArgumentEntry {
+                    rules: vec![Rule {
+                        action: Action::Allow,
+                        os: Some(OsRule {
+                            name: Some(OsName::Osx),
+                            version: None,
+                            arch: None,
+                        }),
+                        features: None,
+                    }],
+                    value: Value::String("-XstartOnFirstThread".to_string()),
+                }),
+                Argument::Complex(ArgumentEntry {
+                    rules: vec![Rule {
+                        action: Action::Allow,
+                        os: Some(OsRule {
+                            name: Some(OsName::Windows),
+                            version: None,
+                            arch: None,
+                        }),
+                        features: None,
+                    }],
+                    value: Value::String("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".to_string()),
+                }),
+                Argument::Complex(ArgumentEntry {
+                    rules: vec![Rule {
+                        action: Action::Allow,
+                        os: Some(OsRule {
+                            name: Some(OsName::Windows),
+                            version: Some(r#"^10\\."#.to_string()),
+                            arch: None,
+                        }),
+                        features: None,
+                    }],
+                    value: Value::StringArray(vec![
+                        "-Dos.name=Windows 10".to_string(),
+                        "-Dos.version=10.0".to_string(),
+                    ]),
+                }),
+                Argument::Complex(ArgumentEntry {
+                    rules: vec![Rule {
+                        action: Action::Allow,
+                        os: Some(OsRule {
+                            name: None,
+                            version: None,
+                            arch: Some("x86".to_string()),
+                        }),
+                        features: None,
+                    }],
+                    value: Value::String("-Xss1M".to_string()),
+                }),
+                Argument::String("-Djava.library.path=${natives_directory}".to_string()),
+                Argument::String("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
+                Argument::String("-Dminecraft.launcher.version=${launcher_version}".to_string()),
+
+                // Apparently this "hack" is only needed for launcherVersion < 18
+                Argument::String(
+                    "-Dminecraft.applet.TargetDirectory=${game_directory}".to_string(),
+                ),
+                Argument::String("-cp".to_string()),
+                Argument::String("${classpath}".to_string()),
+            ],
+        }
+    }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GameRule {
-    pub action: Action,
-    pub features: Features,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Features {
     pub is_demo_user: Option<bool>,
     pub has_custom_resolution: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JvmClass {
-    pub rules: Vec<JvmRule>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ArgumentEntry {
+    pub rules: Vec<Rule>,
     pub value: Value,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JvmRule {
-    pub action: Action,
-    pub os: JvmOs,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct JvmOs {
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub arch: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -179,7 +242,7 @@ pub struct Library {
     /// Url only appears in some forge libraries apparently
     pub url: Option<String>,
     pub name: String,
-    pub rules: Option<Vec<LibraryRule>>,
+    pub rules: Option<Vec<Rule>>,
     pub natives: Option<Natives>,
     pub extract: Option<Extract>,
 }
@@ -192,38 +255,14 @@ impl Library {
         };
 
         for rule in rules {
-            match rule.action {
-                Action::Allow => {
-                    if let Some(os) = &rule.os {
-                        if match os.name {
-                            Name::Linux => cfg!(target_os = "linux"),
-                            Name::Osx => cfg!(target_os = "macos"),
-                            Name::Windows => cfg!(target_os = "windows"),
-                        } {
-                            continue;
-                        }
-                        return false;
-                    }
-                    continue;
-                }
-                Action::Disallow => {
-                    if let Some(os) = &rule.os {
-                        if match os.name {
-                            Name::Linux => cfg!(target_os = "linux"),
-                            Name::Osx => cfg!(target_os = "macos"),
-                            Name::Windows => cfg!(target_os = "windows"),
-                        } {
-                            return false;
-                        }
-                        continue;
-                    }
-                    return false;
-                }
+            if !rule.is_allowed() {
+                return false;
             }
         }
 
         true
     }
+
     pub fn is_native_artifact(&self) -> bool {
         self.natives.is_some()
     }
@@ -261,14 +300,77 @@ pub struct Natives {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LibraryRule {
+pub struct Rule {
     pub action: Action,
-    pub os: Option<LibOs>,
+    pub os: Option<OsRule>,
+    pub features: Option<Features>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LibOs {
-    pub name: Name,
+pub enum Action {
+    #[serde(rename = "allow")]
+    Allow,
+    #[serde(rename = "disallow")]
+    Disallow,
+}
+
+impl Rule {
+    pub fn is_allowed(&self) -> bool {
+        let current_arch = std::env::consts::ARCH;
+
+        let os = self.os.as_ref().unwrap_or(&OsRule {
+            name: None,
+            version: None,
+            arch: None,
+        });
+
+        let is_os_allowed = os.name.clone().unwrap_or_default() == OsName::get_os_name();
+        let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
+        let is_feature_allowed = self.features.is_none();
+        // TODO: Check version
+
+        match self.action {
+            Action::Allow => is_os_allowed && is_arch_allowed && is_feature_allowed,
+            Action::Disallow => !(is_os_allowed && is_arch_allowed && is_feature_allowed),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OsRule {
+    pub name: Option<OsName>,
+    pub version: Option<String>,
+    pub arch: Option<String>, // TODO: Make enum?
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum OsName {
+    #[serde(rename = "linux")]
+    Linux,
+    #[serde(rename = "windows")]
+    Windows,
+    #[serde(rename = "osx")]
+    Osx,
+}
+
+impl OsName {
+    pub fn get_os_name() -> OsName {
+        if cfg!(target_os = "linux") {
+            OsName::Linux
+        } else if cfg!(target_os = "macos") {
+            OsName::Osx
+        } else if cfg!(target_os = "windows") {
+            OsName::Windows
+        } else {
+            panic!("Unknown OS");
+        }
+    }
+}
+
+impl Default for OsName {
+    fn default() -> Self {
+        Self::get_os_name()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -284,41 +386,9 @@ pub struct LoggingClient {
     pub client_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum GameElement {
-    GameClass(GameClass),
-    String(String),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Value {
     String(String),
     StringArray(Vec<String>),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum JvmElement {
-    JvmClass(JvmClass),
-    String(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Action {
-    #[serde(rename = "allow")]
-    Allow,
-    #[serde(rename = "disallow")]
-    Disallow,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Name {
-    #[serde(rename = "osx")]
-    Osx,
-    #[serde(rename = "linux")]
-    Linux,
-    #[serde(rename = "windows")]
-    Windows,
 }

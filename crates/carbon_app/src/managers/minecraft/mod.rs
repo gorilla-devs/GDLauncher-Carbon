@@ -66,7 +66,6 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let libraries = version
             .libraries
-            .ok_or(MinecraftError::LibrariesNotFound)?
             .into_vec_downloadable(&std::env::current_dir().unwrap());
 
         let client_main_jar = version

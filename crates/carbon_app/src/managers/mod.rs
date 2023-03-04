@@ -62,9 +62,11 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate().await.unwrap();
+            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
+                .await
+                .unwrap();
 
-            let app = Arc::new(AppInner {
+            Arc::new(AppInner {
                 configuration_manager: ConfigurationManager::new(runtime_path),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
@@ -73,9 +75,7 @@ mod app {
                 reqwest_client: reqwest::Client::new(),
                 prisma_client: Arc::new(db_client),
                 task_queue: TaskQueue::new(2 /* todo: download slots */),
-            });
-
-            app
+            })
         }
 
         manager_getter!(configuration_manager: ConfigurationManager);
