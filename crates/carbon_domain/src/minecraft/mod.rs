@@ -1,48 +1,29 @@
-use serde::{Deserialize, Serialize};
+pub mod assets;
+pub mod manifest;
+pub mod version;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MinecraftManifest {
-    pub latest: Latest,
-    pub versions: Vec<ManifestVersion>,
-}
+#[cfg(test)]
+mod test {
+    use crate::minecraft::manifest::MinecraftManifest;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Latest {
-    pub release: String,
-    pub snapshot: String,
-}
+    #[tokio::test]
+    async fn test_live_manifest_versions_format() {
+        // Test latest and download assets
+        let meta = MinecraftManifest::fetch().await.unwrap();
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ManifestVersion {
-    pub id: String,
-    #[serde(rename = "type")]
-    pub type_: Type,
-    pub url: String,
-    pub time: String,
-    #[serde(rename = "releaseTime")]
-    pub release_time: String,
-    pub sha1: String,
-}
+        // Test all versions meta
+        let tasks: Vec<_> = meta
+            .versions
+            .into_iter()
+            .map(|version| {
+                tokio::spawn(async move {
+                    version.fetch().await.unwrap();
+                })
+            })
+            .collect();
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Type {
-    #[serde(rename = "old_alpha")]
-    OldAlpha,
-    #[serde(rename = "old_beta")]
-    OldBeta,
-    #[serde(rename = "release")]
-    Release,
-    #[serde(rename = "snapshot")]
-    Snapshot,
-}
-
-impl From<Type> for String {
-    fn from(type_: Type) -> Self {
-        match type_ {
-            Type::OldAlpha => "old_alpha".to_string(),
-            Type::OldBeta => "old_beta".to_string(),
-            Type::Release => "release".to_string(),
-            Type::Snapshot => "snapshot".to_string(),
+        for task in tasks {
+            task.await.unwrap();
         }
     }
 }

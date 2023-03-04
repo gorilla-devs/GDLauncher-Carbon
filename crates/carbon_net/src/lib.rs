@@ -24,6 +24,14 @@ pub enum Checksum {
     Sha256(String),
 }
 
+pub trait IntoVecDownloadable {
+    fn into_vec_downloadable(self, base_path: &Path) -> Vec<Downloadable>;
+}
+
+pub trait IntoDownloadable {
+    fn into_downloadable(self, base_path: &Path) -> Downloadable;
+}
+
 #[derive(Debug)]
 pub struct Downloadable {
     pub url: String,

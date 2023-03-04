@@ -11,10 +11,10 @@ use crate::managers::account::api::{
     McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
     XboxAuthError, XboxError,
 };
-use crate::managers::{account, Managers};
+use crate::managers::{account, App};
 use carbon_domain::account as domain;
 
-pub(super) fn mount() -> impl RouterBuilderLike<Managers> {
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_ACTIVE_UUID[app, _: ()] {
             app.account_manager().get_active_uuid().await

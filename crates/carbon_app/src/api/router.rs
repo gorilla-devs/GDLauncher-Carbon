@@ -22,10 +22,10 @@
 /// ```
 macro_rules! router {
     {$($type:ident $endpoint:path [$app:tt, $args:tt: $args_ty:ty] $block:block)*} => {{
-        let mut router = ::rspc::Router::<$crate::managers::Managers>::new();
+        let mut router = ::rspc::Router::<$crate::managers::App>::new();
         $(
             router = router.$type($endpoint.local, |t| {
-                t(|$app: $crate::managers::Managers, $args: $args_ty| async move { $block })
+                t(|$app: $crate::managers::App, $args: $args_ty| async move { $block })
             });
         )*
         router

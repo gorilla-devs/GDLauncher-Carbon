@@ -24,21 +24,18 @@ CREATE TABLE "MinecraftManifest" (
     "url" TEXT NOT NULL,
     "time" TEXT NOT NULL,
     "releaseTime" TEXT NOT NULL,
-    "sha1" TEXT NOT NULL,
-    CONSTRAINT "MinecraftManifest_sha1_fkey" FOREIGN KEY ("sha1") REFERENCES "MinecraftVersion" ("idSha1") ON DELETE RESTRICT ON UPDATE CASCADE
+    "sha1" TEXT NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "MinecraftVersion" (
-    "idSha1" TEXT NOT NULL PRIMARY KEY,
-    "json" BLOB NOT NULL,
-    "assetsIdSha1" TEXT NOT NULL,
-    CONSTRAINT "MinecraftVersion_assetsIdSha1_fkey" FOREIGN KEY ("assetsIdSha1") REFERENCES "MinecraftAssets" ("idSha1") ON DELETE RESTRICT ON UPDATE CASCADE
+    "id" TEXT NOT NULL,
+    "json" BLOB NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "MinecraftAssets" (
-    "idSha1" TEXT NOT NULL PRIMARY KEY,
+    "assetsIdSha1" TEXT NOT NULL,
     "json" BLOB NOT NULL
 );
 
@@ -55,10 +52,10 @@ CREATE UNIQUE INDEX "MinecraftManifest_id_key" ON "MinecraftManifest"("id");
 CREATE UNIQUE INDEX "MinecraftManifest_sha1_key" ON "MinecraftManifest"("sha1");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "MinecraftVersion_idSha1_key" ON "MinecraftVersion"("idSha1");
+CREATE UNIQUE INDEX "MinecraftVersion_id_key" ON "MinecraftVersion"("id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "MinecraftAssets_idSha1_key" ON "MinecraftAssets"("idSha1");
+CREATE UNIQUE INDEX "MinecraftAssets_assetsIdSha1_key" ON "MinecraftAssets"("assetsIdSha1");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");

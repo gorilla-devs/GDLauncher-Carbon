@@ -17,7 +17,7 @@ function debounce(func, timeout) {
 
 let debouncedFn = debounce(() => {
   console.log("Rebuilding native core");
-  spawnSync(
+  const spawnHandler = spawnSync(
     path.join(process.cwd(), "node_modules", ".bin", "napi"),
     ["build"],
     {
@@ -25,7 +25,11 @@ let debouncedFn = debounce(() => {
       shell: true,
     }
   );
-  console.log("Rebuilding native core done");
+  if (spawnHandler && spawnHandler.status !== 0) {
+    console.log("Native core build failed!");
+  } else {
+    console.log("Rebuilding native core done");
+  }
 }, 1000);
 
 //! IMPORTANT !//
