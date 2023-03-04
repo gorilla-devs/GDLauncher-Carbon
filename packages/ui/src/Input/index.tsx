@@ -13,13 +13,14 @@ export interface Props {
 
 function Input(props: Props) {
   return (
-    <div class="h-10">
+    <>
       <div
-        class={`bg-shade-5 flex items-center gap-2 max-w-max h-full box-border transition-all duration-100 ease-in-out ${
+        class={`h-10 bg-shade-6  gap-2 box-border transition-all duration-100 ease-in-out ${
           props.class || ""
         }`}
         classList={{
-          "bg-shade-7 rounded-full px-4": props.icon,
+          "bg-shade-7 rounded-full px-4 flex items-center max-w-max":
+            props.icon,
           "rounded-md": !props.icon,
         }}
       >
@@ -27,7 +28,7 @@ function Input(props: Props) {
           <span class="text-shade-5">{props.icon}</span>
         </Show>
         <input
-          class={`bg-shade-5 border-1 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-shade-5 ${
+          class={`bg-shade-6 border-1 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-shade-5 ${
             props.inputClass || ""
           }
            outline-transparent
@@ -50,7 +51,7 @@ function Input(props: Props) {
       <Show when={props.error}>
         <div class="text-status-red text-left">{props.error}</div>
       </Show>
-    </div>
+    </>
   );
 }
 
