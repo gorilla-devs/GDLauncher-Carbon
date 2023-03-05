@@ -39,6 +39,15 @@ const theme = {
     "yellow-hover": "var(--yellow-hover)",
     // TODO: Move satisfies to the entire theme when possible
   } satisfies Theme,
+  animation: {
+    keyframes: {
+      loadingbar:
+        "{ 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }",
+    },
+    duration: { loadingbar: "1s" },
+    timingFns: { loadingbar: "linear" },
+    counts: { loadingbar: "infinite" },
+  },
 };
 
 export { theme };

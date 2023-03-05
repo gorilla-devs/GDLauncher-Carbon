@@ -129,7 +129,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="i-ri:download-2-fill text-lg" />}
+            icon={<div class="text-lg i-ri:download-2-fill" />}
           >
             <Trans
               key="import"
@@ -139,7 +139,7 @@ export default function Browser() {
             />
           </Button>
         </div>
-        <div class="max-w-150 flex justify-between text-shade-0 z-10 mb-6">
+        <div class="flex justify-between text-shade-0 z-10 mb-6 max-w-150">
           <Tags />
         </div>
       </div>
