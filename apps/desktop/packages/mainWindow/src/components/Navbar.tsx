@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, onMount } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
 // import ProfileImg2 from "/assets/images/profile-img2.png";
@@ -8,21 +8,22 @@ import { Tab, TabList, Tabs, Spacing, Dropdown } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
-// import { accounts } from "@/pages/app.data";
+import { rspc } from "@/utils/rspcClient";
+import { createStore } from "solid-js/store";
+import { AccountsDropdown } from "./AccountsDropdown";
+import { AccountType } from "@gd/core_module/bindings";
 
-// import { createMatcher, expandOptionals } from "@solidjs/router";
-
-// const isLocationMatch = (path: string) => {
-//   const location = useLocation();
-//   const matchers = expandOptionals(path).map((path) => createMatcher(path));
-
-//   for (const matcher of matchers) {
-//     const match = matcher(location.pathname);
-//     if (match) return match;
-//   }
-// };
+export interface AccountsStatus {
+  [details: string]: {
+    username: string;
+    uuid: string;
+    type_: AccountType;
+    status: "Ok" | "Expired" | "Refreshing" | null | undefined;
+  };
+}
 
 const AppNavbar = () => {
+  const [accountsStatus, setAccountsStatus] = createStore<AccountsStatus>({});
   const location = useLocation();
   const navigate = useGDNavigate();
 
@@ -38,7 +39,28 @@ const AppNavbar = () => {
   const accounts = useRouteData<typeof fetchData>();
 
   createEffect(() => {
-    console.log("AAAA", accounts.data);
+    if (accounts.data) {
+      console.log("accounts.data", accounts);
+      for (let index = 0; index < accounts.data.length; index++) {
+        const element = accounts.data[index];
+
+        let accountStatus = rspc.createQuery(() => [
+          "account.getAccountStatus",
+          element.uuid,
+        ]);
+
+        setAccountsStatus((prev) => ({
+          ...prev,
+          [element.uuid]: {
+            ...element,
+            status: accountStatus.data,
+          },
+        }));
+      }
+    }
+  });
+  createEffect(() => {
+    console.log("TEST", accountsStatus);
   });
 
   return (
@@ -103,13 +125,16 @@ const AppNavbar = () => {
           </ul>
           <div class="ml-4">
             <Show when={accounts.data && accounts?.data?.length > 0}>
-              <Dropdown
+              <AccountsDropdown
                 options={(accounts.data || []).map((account) => ({
                   label: {
                     name: account?.username,
                     icon: ProfileImg,
+                    uuid: account.uuid,
+                    status: accountsStatus[account.uuid]?.status,
+                    type: account.type_,
                   },
-                  key: account?.username,
+                  key: account?.uuid,
                 }))}
                 value="ladvace"
               />
