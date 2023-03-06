@@ -95,7 +95,7 @@ impl ManagerRef<'_, AccountManager> {
         Ok(accounts
             .into_iter()
             .map(|account| {
-                let type_ = match &account.ms_refresh_token {
+                let type_ = match &account.access_token {
                     None => AccountType::Offline,
                     Some(_) => AccountType::Microsoft,
                 };
