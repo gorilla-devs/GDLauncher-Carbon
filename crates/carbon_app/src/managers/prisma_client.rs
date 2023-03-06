@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::db::{self, PrismaClient};
 use thiserror::Error;
 
@@ -9,14 +11,10 @@ pub enum DatabaseError {
     MigrationError(#[from] prisma_client_rust::migrations::MigrateDeployError),
 }
 
-pub(super) async fn load_and_migrate() -> Result<PrismaClient, DatabaseError> {
+pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
     let db_client = db::new_client_with_url(&format!(
         "file:{}",
-        std::env::current_dir()
-            .unwrap()
-            .join("gdl_conf.db")
-            .to_str()
-            .unwrap()
+        runtime_path.join("gdl_conf.db").to_str().unwrap()
     ))
     .await
     .map_err(DatabaseError::ClientError)?;

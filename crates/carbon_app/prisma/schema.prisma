@@ -9,11 +9,11 @@ generator client {
 }
 
 model AppConfiguration {
-  id                 Int      @id @default(0)
-  theme              String   @default("main")
-  reducedMotion      Boolean  @default(false)
-  discordIntegration Boolean  @default(true)
-  releaseChannel     String   @default("stable")
+  id                 Int     @id @default(0)
+  theme              String  @default("main")
+  reducedMotion      Boolean @default(false)
+  discordIntegration Boolean @default(true)
+  releaseChannel     String  @default("stable")
   activeAccountUuid  String?
 }
 
@@ -27,28 +27,22 @@ model Account {
 }
 
 model MinecraftManifest {
-  id          String            @unique
+  id          String @unique
   type        String
   url         String
   time        String
   releaseTime String
-  sha1        String            @unique
-  version     MinecraftVersion? @relation(fields: [sha1], references: [idSha1])
+  sha1        String @unique
 }
 
 model MinecraftVersion {
-  idSha1            String             @id @unique
-  MinecraftManifest MinecraftManifest?
-  // For now let's just store the entire json as bytes
-  json              Bytes
-  assetsIdSha1      String
-  assets            MinecraftAssets    @relation(fields: [assetsIdSha1], references: [idSha1])
+  id   String @unique
+  json Bytes
 }
 
 model MinecraftAssets {
-  idSha1           String             @id @unique
-  MinecraftVersion MinecraftVersion[]
-  json             Bytes
+  assetsIdSha1 String @unique
+  json         Bytes
 }
 
 model ActiveDownloads {
