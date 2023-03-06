@@ -1,15 +1,12 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, onMount } from "solid-js";
+import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
-// import ProfileImg2 from "/assets/images/profile-img2.png";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing, Dropdown } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
-import { rspc } from "@/utils/rspcClient";
-import { createStore } from "solid-js/store";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType } from "@gd/core_module/bindings";
 
@@ -23,7 +20,6 @@ export interface AccountsStatus {
 }
 
 const AppNavbar = () => {
-  const [accountsStatus, setAccountsStatus] = createStore<AccountsStatus>({});
   const location = useLocation();
   const navigate = useGDNavigate();
 
@@ -37,31 +33,6 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const accounts = useRouteData<typeof fetchData>();
-
-  createEffect(() => {
-    if (accounts.data) {
-      console.log("accounts.data", accounts);
-      for (let index = 0; index < accounts.data.length; index++) {
-        const element = accounts.data[index];
-
-        let accountStatus = rspc.createQuery(() => [
-          "account.getAccountStatus",
-          element.uuid,
-        ]);
-
-        setAccountsStatus((prev) => ({
-          ...prev,
-          [element.uuid]: {
-            ...element,
-            status: accountStatus.data,
-          },
-        }));
-      }
-    }
-  });
-  createEffect(() => {
-    console.log("TEST", accountsStatus);
-  });
 
   return (
     <Show when={!isLogin()}>
@@ -131,7 +102,6 @@ const AppNavbar = () => {
                     name: account?.username,
                     icon: ProfileImg,
                     uuid: account.uuid,
-                    status: accountsStatus[account.uuid]?.status,
                     type: account.type_,
                   },
                   key: account?.uuid,

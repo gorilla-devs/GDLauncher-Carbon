@@ -1,3 +1,4 @@
+import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { createSignal, For, Show, JSX, Switch, Match } from "solid-js";
 
@@ -9,7 +10,7 @@ export type Label = {
 };
 
 export type Option = {
-  label: string | Label;
+  label: Label;
   key: string;
 };
 
@@ -34,6 +35,60 @@ export type Props = {
 export interface DropDownButtonProps extends Props {
   children: JSX.Element;
 }
+
+const parseStatus = (
+  status: "Ok" | "Expired" | "Refreshing" | null | undefined
+) => {
+  return (
+    <Switch
+      fallback={
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 bg-green rounded-full" />
+          <Trans
+            key="account_online"
+            options={{
+              defaultValue: "online",
+            }}
+          />
+        </div>
+      }
+    >
+      <Match when={status === "Ok"}>
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 bg-green rounded-full" />
+          <Trans
+            key="account_online"
+            options={{
+              defaultValue: "online",
+            }}
+          />
+        </div>
+      </Match>
+      <Match when={status === "Expired"}>
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 bg-red rounded-full" />
+          <Trans
+            key="account_expired"
+            options={{
+              defaultValue: "Expired",
+            }}
+          />
+        </div>
+      </Match>
+      <Match when={status === "Refreshing"}>
+        <div class="flex flex gap-2 items-center">
+          <div class="i-ri:refresh-line" />
+          <Trans
+            key="account_refreshing"
+            options={{
+              defaultValue: "Refresh",
+            }}
+          />
+        </div>
+      </Match>
+    </Switch>
+  );
+};
 
 export const AccountsDropdown = (props: Props) => {
   const defaultValue = () =>
@@ -104,14 +159,7 @@ export const AccountsDropdown = (props: Props) => {
             "text-shade-5": props.disabled,
           }}
         >
-          <Switch>
-            <Match when={typeof selectedValue() === "string"}>
-              {selectedValue() as string}
-            </Match>
-            <Match when={typeof selectedValue() === "object"}>
-              {(selectedValue() as Label).name}
-            </Match>
-          </Switch>
+          {(selectedValue() as Label).name}
         </span>
 
         <span
@@ -127,7 +175,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="absolute flex-col text-shade-0 bg-shade-9 z-20 py-2 px-4 right-0 rounded-md mt-1 w-auto"
+        class="absolute flex-col text-shade-0 bg-shade-9 py-2 px-4 right-0 rounded-md mt-1 w-auto z-40 min-w-80"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -160,44 +208,67 @@ export const AccountsDropdown = (props: Props) => {
           </h5>
           <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
         </div>
-        <hr class="w-full border-shade-0 opacity-20" />
+        <hr class="w-full border-shade-0 opacity-20 mb-0" />
         <ul class="text-shade-0 shadow-md shadow-shade-9 list-none m-0 p-0 w-full">
-          <For each={props.options}>
-            {(option) => (
-              <li
-                class="first:rounded-t last:rounded-b bg-shade-7 hover:bg-[#343946] block whitespace-no-wrap text-shade-0 no-underline"
-                onClick={() => {
-                  setSelectedValue(option.label);
-                  props.onChange?.(option);
-                  toggleMenu();
-                }}
-              >
-                <Switch>
-                  <Match when={typeof option.label === "string"}>
-                    {option.label as string}
-                  </Match>
-                  <Match when={typeof option.label === "object"}>
+          <For
+            each={props.options}
+            // each={props.options.filter(
+            //   (option) => option.key !== (selectedValue() as Label).uuid
+            // )}
+          >
+            {(option) => {
+              let accountStatusQuery = rspc.createQuery(() => [
+                "account.getAccountStatus",
+                (selectedValue() as Label).uuid,
+              ]);
+
+              return (
+                <li
+                  class="first:rounded-t last:rounded-b block whitespace-no-wrap text-shade-0 no-underline min-h-10 my-2 flex items-center justify-between hover:bg-shade-8 pr-2"
+                  onClick={() => {
+                    setSelectedValue(option.label);
+                    props.onChange?.(option);
+                    toggleMenu();
+                  }}
+                >
+                  <div class="flex gap-2">
                     <img
                       src={(option.label as Label).icon}
-                      class="w-5 h-5 rounded-md mr-2"
+                      class="w-10 h-10 rounded-md mr-2"
                     />
-                    {(option.label as Label).name}
-                  </Match>
-                </Switch>
-              </li>
-            )}
+                    <div class="flex flex-col">
+                      <h5 class="m-0 text-white">
+                        {(option.label as Label).name}
+                      </h5>
+                      <p class="m-0">{parseStatus(accountStatusQuery.data)}</p>
+                    </div>
+                  </div>
+
+                  <p class="m-0 hover:text-blue">
+                    <Trans
+                      key="switch_account"
+                      options={{
+                        defaultValue: "Switch",
+                      }}
+                    />
+                  </p>
+                </li>
+              );
+            }}
           </For>
         </ul>
-        <hr class="w-full border-shade-0 opacity-20" />
+        <hr class="w-full border-shade-0 opacity-20 mt-0" />
         <div class="flex flex-col">
-          <div class="flex gap-3 py-2 items-center cursor-pointer">
-            <div class="i-ri:add-circle-fill h-4 w-4" />
-            <Trans
-              key="add_account"
-              options={{
-                defaultValue: "Add Account",
-              }}
-            />
+          <div class="group flex gap-3 py-2 items-center cursor-pointer">
+            <div class="i-ri:add-circle-fill h-4 w-4 text-shade-0 group-hover:text-white transition ease-in-out" />
+            <span class="text-shade-0 group-hover:text-white transition ease-in-out">
+              <Trans
+                key="add_account"
+                options={{
+                  defaultValue: "Add Account",
+                }}
+              />
+            </span>
           </div>
           <div class="flex gap-3 py-2 items-center color-red cursor-pointer">
             <div class="h-4 w-4 i-ri:logout-box-fill" />
