@@ -22,15 +22,10 @@ export type OptionDropDown = {
 export type Props = {
   options: Option[];
   value: string;
-  error?: boolean;
   disabled?: boolean;
-  rounded?: boolean;
   label?: string;
   onChange?: (_option: Option) => void;
-  class?: string;
   id?: string;
-  bg?: string;
-  icon?: JSX.Element;
 };
 export interface DropDownButtonProps extends Props {
   children: JSX.Element;
@@ -130,19 +125,17 @@ export const AccountsDropdown = (props: Props) => {
 
   return (
     <div class="relative inline-block" id={props.id}>
-      <Show when={!props.rounded && props.label}>
-        <p
-          class="mt-0 mb-2 font-bold"
-          classList={{
-            "text-white": !props.disabled,
-            "text-shade-0": props.disabled,
-          }}
-        >
-          {props.label}
-        </p>
-      </Show>
+      <p
+        class="mt-0 mb-2 font-bold"
+        classList={{
+          "text-white": !props.disabled,
+          "text-shade-0": props.disabled,
+        }}
+      >
+        {props.label}
+      </p>
       <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bg}`}
+        class="group flex justify-between py-2 px-4 items-center min-h-10 box-border font-semibold inline-flex rounded-lg"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -153,18 +146,12 @@ export const AccountsDropdown = (props: Props) => {
           }
         }}
         classList={{
-          "border-0": !props.error,
-          "border-1 border-status-red": props.error,
-          "text-shade-0 hover:text-white": !props.disabled && !props.error,
-          "text-shade-5": props.error,
-          "rounded-full": props.rounded,
-          rounded: !props.rounded,
-          "bg-shade-7": !props.bg,
+          "border-0": true,
+          "text-shade-0 hover:text-white": !props.disabled,
+          rounded: true,
+          "bg-shade-7": true,
         }}
       >
-        <Show when={props.icon}>
-          <span class="mr-2">{props.icon}</span>
-        </Show>
         <Show when={(selectedValue() as Label).icon}>
           <img
             src={(selectedValue() as Label).icon}
@@ -174,9 +161,8 @@ export const AccountsDropdown = (props: Props) => {
         <span
           class="w-full"
           classList={{
-            "text-white": props.error,
             "text-shade-0 hover:text-white group-hover:text-white":
-              !props.disabled && !props.error,
+              !props.disabled,
             "text-shade-5": props.disabled,
           }}
         >
@@ -188,9 +174,7 @@ export const AccountsDropdown = (props: Props) => {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-shade-0 group-hover:text-white":
-              !props.disabled && !props.error,
-            "text-white": props.error,
+            "text-shade-0 group-hover:text-white": !props.disabled,
             "text-shade-5": props.disabled,
           }}
         />
