@@ -1,4 +1,4 @@
-import { Button, LoadingBar } from "@gd/ui";
+import { Button } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
@@ -57,7 +57,6 @@ const CodeStep = (props: Props) => {
     setExpired(false);
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
-  const [loading, setLoading] = createSignal(false);
 
   const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
@@ -67,7 +66,6 @@ const CodeStep = (props: Props) => {
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onPolling: (info) => {
-          setLoading(true);
           props.setDeviceCodeObject({
             userCode: info.user_code,
             link: info.verification_uri,
@@ -77,7 +75,6 @@ const CodeStep = (props: Props) => {
           setError(null);
         },
         onFail() {
-          setLoading(false);
           setError("something went wrong while logging in");
         },
       });
@@ -86,7 +83,6 @@ const CodeStep = (props: Props) => {
 
   const updateExpireTime = () => {
     if (minutes() <= 0 && seconds() <= 0) {
-      setLoading(false);
       setExpired(true);
     } else {
       resetCountDown();
@@ -99,7 +95,6 @@ const CodeStep = (props: Props) => {
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onComplete(_accountEntry) {
-          setLoading(false);
           finalizeMutation.mutate(null);
           navigate("/library");
         },
@@ -109,7 +104,6 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
-      setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
     } else {
@@ -177,34 +171,20 @@ const CodeStep = (props: Props) => {
       <Show when={error()}>
         <p class="text-red m-0">{error()}</p>
       </Show>
-      <Show when={loading()}>
-        <span class="mb-4 text-xs absolute text-shade-1 bottom-1">
-          <Trans
-            key="waiting_login_code_msg"
-            options={{
-              defaultValue: "Waiting authorization...",
-            }}
-          />
-        </span>
-        <div class="w-full absolute bottom-0 overflow-hidden">
-          <LoadingBar class="" />
-        </div>
-      </Show>
       <Show when={!expired()}>
         <Button
           class="normal-case"
           onClick={() => {
-            setLoading(true);
             window.openExternalLink(deviceCodeLink() || "");
           }}
         >
           <Trans
-            key="open_in_browser"
+            key="insert_code"
             options={{
-              defaultValue: "Open in browser",
+              defaultValue: "Insert Code",
             }}
           />
-          <div class="text-md i-ri:link" />
+          <div class="i-ri:link text-md" />
         </Button>
       </Show>
       <Show when={expired()}>

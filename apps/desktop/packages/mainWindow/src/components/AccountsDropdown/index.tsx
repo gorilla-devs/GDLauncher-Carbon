@@ -1,6 +1,18 @@
+import { parseTwoDigitNumber } from "@/utils/helpers";
+import { handleStatus } from "@/utils/login";
 import { rspc } from "@/utils/rspcClient";
+import { DeviceCode } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { createSignal, For, Show, JSX, Switch, Match } from "solid-js";
+import { createNotification } from "@gd/ui";
+import {
+  createSignal,
+  For,
+  Show,
+  JSX,
+  Switch,
+  Match,
+  createEffect,
+} from "solid-js";
 
 export type Label = {
   name: string;
@@ -98,7 +110,48 @@ export const AccountsDropdown = (props: Props) => {
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
+  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({});
   const [focusIn, setFocusIn] = createSignal(false);
+  const [expired, setExpired] = createSignal(false);
+  const [addCompleted, setAddCompleted] = createSignal(false);
+
+  const expiresAt = () => loginDeviceCode().expires_at;
+  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtMs = () => expiresAtFormat() - Date.now();
+  const minutes = () =>
+    Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
+  const [countDown, setCountDown] = createSignal(
+    `${minutes()}:${parseTwoDigitNumber(seconds())}`
+  );
+
+  const [addNotification] = createNotification();
+
+  let interval: ReturnType<typeof setTimeout>;
+
+  const resetCountDown = () => {
+    setExpired(false);
+    setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+  };
+
+  const updateExpireTime = () => {
+    if (minutes() <= 0 && seconds() <= 0) {
+      setExpired(true);
+    } else {
+      resetCountDown();
+    }
+  };
+
+  createEffect(() => {
+    if (expired()) {
+      clearInterval(interval);
+      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    } else {
+      interval = setInterval(() => {
+        updateExpireTime();
+      }, 1000);
+    }
+  });
 
   const toggleMenu = () => {
     if (props.disabled) return;
@@ -119,8 +172,42 @@ export const AccountsDropdown = (props: Props) => {
         (account) => account.label.uuid === uuid
       );
 
-      if (selectedAccount) setSelectedValue(selectedAccount.label);
+      if (selectedAccount) {
+        setSelectedValue(selectedAccount.label);
+      }
     },
+  });
+
+  let accountEnrollBeginMutation = rspc.createMutation([
+    "account.enroll.begin",
+  ]);
+
+  let accountEnrollCancelMutation = rspc.createMutation(
+    ["account.enroll.cancel"],
+    {}
+  );
+
+  let data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+
+  createEffect(() => {
+    if (data.isSuccess) {
+      handleStatus(data, {
+        onPolling: (info) => {
+          setAddCompleted(false);
+
+          setLoginDeviceCode(info);
+        },
+        onFail() {
+          setAddCompleted(true);
+
+          accountEnrollCancelMutation.mutate(null);
+          accountEnrollBeginMutation.mutate(null);
+        },
+        onComplete() {
+          setAddCompleted(true);
+        },
+      });
+    }
   });
 
   return (
@@ -264,19 +351,58 @@ export const AccountsDropdown = (props: Props) => {
         </ul>
         <hr class="w-full border-shade-0 opacity-20 mt-0" />
         <div class="flex flex-col">
-          <div class="flex py-2 items-center cursor-pointer group gap-3">
-            <div class="text-shade-0 i-ri:add-circle-fill h-4 w-4 group-hover:text-white transition ease-in-out" />
-            <span class="text-shade-0 group-hover:text-white transition ease-in-out">
-              <Trans
-                key="add_account"
-                options={{
-                  defaultValue: "Add Account",
-                }}
-              />
-            </span>
+          <div class="flex py-2 items-center justify-between cursor-pointer group gap-3">
+            <div class="flex gap-3">
+              <div class="text-shade-0 i-ri:add-circle-fill h-4 w-4 group-hover:text-white transition ease-in-out" />
+              <span class="text-shade-0 group-hover:text-white transition ease-in-out">
+                <p
+                  class="m-0"
+                  onClick={() => {
+                    accountEnrollBeginMutation.mutate(null);
+                  }}
+                >
+                  <Trans
+                    key="add_account"
+                    options={{
+                      defaultValue: "Add Account",
+                    }}
+                  />
+                </p>
+              </span>
+            </div>
+            <Show when={!addCompleted()}>
+              <div class="flex gap-3 items-center">
+                <div
+                  class="w-5 h-5 bg-blue rounded-full flex justify-center items-center"
+                  onClick={() => {
+                    if (loginDeviceCode().verification_uri)
+                      window.openExternalLink(
+                        loginDeviceCode().verification_uri
+                      );
+                  }}
+                >
+                  <div class="i-ri:link text-md text-white" />
+                </div>
+
+                <div class="flex gap-1 items-center text-xs">
+                  {loginDeviceCode().user_code}
+                  <div
+                    class="cursor-pointer text-shade-0 i-ri:file-copy-fill"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        loginDeviceCode().user_code
+                      );
+                      addNotification("The link has been copied");
+                    }}
+                  />
+                </div>
+                <div class="text-xs">{countDown()}</div>
+              </div>
+            </Show>
           </div>
           <div class="flex gap-3 py-2 items-center cursor-pointer color-red">
             <div class="h-4 w-4 i-ri:logout-box-fill" />
+
             <Trans
               key="account_log_out"
               options={{
