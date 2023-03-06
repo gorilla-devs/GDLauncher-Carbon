@@ -142,67 +142,73 @@ impl ManagerRef<'_, AccountManager> {
         Ok(Some(account.status))
     }
 
+    /// Add or update an account
     async fn add_account(self, account: FullAccount) -> Result<(), AddAccountError> {
-        use db::account::SetParam;
-
-        let set_params = match account.type_ {
-            FullAccountType::Offline => Vec::new(),
-            FullAccountType::Microsoft {
-                access_token,
-                refresh_token,
-                token_expires,
-            } => vec![
-                SetParam::SetAccessToken(Some(access_token)),
-                SetParam::SetMsRefreshToken(refresh_token),
-                SetParam::SetTokenExpires(Some(token_expires)),
-            ],
-        };
-
-        self.app
-            .prisma_client
-            .account()
-            .create(account.uuid, account.username, set_params)
-            .exec()
-            .await?;
-
-        self.app.invalidate(GET_ACCOUNTS, None);
-        Ok(())
-    }
-
-    async fn update_account(self, account: FullAccount) -> Result<(), QueryError> {
         use db::account::{SetParam, UniqueWhereParam};
 
-        let mut set_params = vec![SetParam::SetUsername(account.username)];
-
-        match account.type_ {
-            FullAccountType::Offline => set_params.extend([
-                SetParam::SetAccessToken(None),
-                SetParam::SetMsRefreshToken(None),
-                SetParam::SetTokenExpires(None),
-            ]),
-            FullAccountType::Microsoft {
-                access_token,
-                refresh_token,
-                token_expires,
-            } => set_params.extend([
-                SetParam::SetAccessToken(Some(access_token)),
-                SetParam::SetMsRefreshToken(refresh_token),
-                SetParam::SetTokenExpires(Some(token_expires)),
-            ]),
-        }
-
-        self.app
+        let db_account = self
+            .app
             .prisma_client
             .account()
-            .update(
-                UniqueWhereParam::UuidEquals(account.uuid.clone()),
-                set_params,
-            )
+            .find_unique(UniqueWhereParam::UuidEquals(account.uuid.clone()))
             .exec()
             .await?;
 
-        self.app
-            .invalidate(GET_ACCOUNT_STATUS, Some(account.uuid.into()));
+        if db_account.is_some() {
+            let mut set_params = vec![SetParam::SetUsername(account.username)];
+
+            match account.type_ {
+                FullAccountType::Offline => set_params.extend([
+                    SetParam::SetAccessToken(None),
+                    SetParam::SetMsRefreshToken(None),
+                    SetParam::SetTokenExpires(None),
+                ]),
+                FullAccountType::Microsoft {
+                    access_token,
+                    refresh_token,
+                    token_expires,
+                } => set_params.extend([
+                    SetParam::SetAccessToken(Some(access_token)),
+                    SetParam::SetMsRefreshToken(refresh_token),
+                    SetParam::SetTokenExpires(Some(token_expires)),
+                ]),
+            }
+
+            self.app
+                .prisma_client
+                .account()
+                .update(
+                    UniqueWhereParam::UuidEquals(account.uuid.clone()),
+                    set_params,
+                )
+                .exec()
+                .await?;
+
+            self.app
+                .invalidate(GET_ACCOUNT_STATUS, Some(account.uuid.into()));
+        } else {
+            let set_params = match account.type_ {
+                FullAccountType::Offline => Vec::new(),
+                FullAccountType::Microsoft {
+                    access_token,
+                    refresh_token,
+                    token_expires,
+                } => vec![
+                    SetParam::SetAccessToken(Some(access_token)),
+                    SetParam::SetMsRefreshToken(refresh_token),
+                    SetParam::SetTokenExpires(Some(token_expires)),
+                ],
+            };
+
+            self.app
+                .prisma_client
+                .account()
+                .create(account.uuid, account.username, set_params)
+                .exec()
+                .await?;
+
+            self.app.invalidate(GET_ACCOUNTS, None);
+        }
 
         Ok(())
     }
@@ -245,7 +251,7 @@ impl ManagerRef<'_, AccountManager> {
 
                 match status {
                     EnrollmentStatus::Complete(account) => {
-                        app.account_manager().update_account(account.clone().into()).await
+                        app.account_manager().add_account(account.clone().into()).await
                             .expect("db error, this can't be handled in the account invalidator right now");
                         refreshing.remove(&self.account.uuid);
                     }
@@ -254,7 +260,7 @@ impl ManagerRef<'_, AccountManager> {
                             panic!("account type was not microsoft during refresh");
                         };
 
-                        app.account_manager().update_account(FullAccount {
+                        app.account_manager().add_account(FullAccount {
                             username: self.account.username.clone(),
                             uuid: self.account.uuid.clone(),
                             type_: FullAccountType::Microsoft {
