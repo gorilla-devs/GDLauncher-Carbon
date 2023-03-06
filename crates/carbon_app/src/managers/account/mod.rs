@@ -272,8 +272,12 @@ impl ManagerRef<'_, AccountManager> {
 
                 match status {
                     EnrollmentStatus::Complete(account) => {
-                        account_manager.add_account(account.clone().into()).await
-                            .expect("db error, this can't be handled in the account invalidator right now");
+                        account_manager
+                            .add_account(account.clone().into())
+                            .await
+                            .expect(
+                            "db error, this can't be handled in the account invalidator right now",
+                        );
                         refreshing.remove(&self.account.uuid);
                     }
                     EnrollmentStatus::Failed(_) => {
@@ -559,8 +563,7 @@ impl TryFrom<db::account::Data> for FullAccount {
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
                     access_token,
-                    refresh_token: value
-                        .ms_refresh_token,
+                    refresh_token: value.ms_refresh_token,
                     token_expires: value
                         .token_expires
                         .ok_or(FullAccountLoadError::ExpiryMissing)?,
