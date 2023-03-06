@@ -147,7 +147,7 @@ const Instance = () => {
                       </h1>
                       <div class="flex gap-2">
                         <div
-                          class="i-ri:delete-bin-7-fill text-2xl cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-red"
+                          class="text-2xl cursor-pointer transition ease-in-out text-shade-0 i-ri:delete-bin-7-fill duration-50 hover:text-red"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -156,7 +156,7 @@ const Instance = () => {
                           }}
                         />
                         <div
-                          class="i-ri:check-fill cursor-pointer transition ease-in-out duration-50 text-shade-0 hover:text-green text-3xl"
+                          class="i-ri:check-fill cursor-pointer transition ease-in-out duration-50 text-shade-0 text-3xl hover:text-green"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -212,7 +212,7 @@ const Instance = () => {
         </div>
       </div>
       <div
-        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out h-0 opacity-0 px-4 transition-height duration-200 bg-shade-9"
+        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out px-4 bg-shade-9 h-0 opacity-0 transition-height duration-200"
         ref={(el) => {
           refStickyContainer = el;
         }}
@@ -282,7 +282,7 @@ const Instance = () => {
       <div class="bg-shade-8 min-h-2xl">
         <div class="p-6 flex justify-center">
           <div class="bg-shade-8 max-w-full w-185">
-            <div class="sticky z-20 flex flex-col bg-shade-8 top-20 mb-4">
+            <div class="sticky z-20 flex flex-col bg-shade-8 mb-4 top-20">
               <Tabs index={selectedIndex()}>
                 <TabList>
                   <For each={instancePages()}>

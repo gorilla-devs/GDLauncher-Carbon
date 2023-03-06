@@ -42,7 +42,7 @@ const parseStatus = (
   return (
     <Switch
       fallback={
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           <div class="w-3 h-3 bg-green rounded-full" />
           <p class="m-0 text-xs">
             <Trans
@@ -70,7 +70,7 @@ const parseStatus = (
       </Match>
       <Match when={status === "Expired"}>
         <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 bg-red rounded-full" />
+          <div class="w-3 h-3 rounded-full bg-red" />
           <p class="m-0 text-xs">
             <Trans
               key="account_expired"
@@ -118,8 +118,18 @@ export const AccountsDropdown = (props: Props) => {
       (option) => option.key !== (selectedValue() as Label).uuid
     );
 
+  const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
+    onMutate: (uuid) => {
+      const selectedAccount = props.options.find(
+        (account) => account.label.uuid === uuid
+      );
+
+      if (selectedAccount) setSelectedValue(selectedAccount.label);
+    },
+  });
+
   return (
-    <div class="inline-block relative" id={props.id}>
+    <div class="relative inline-block" id={props.id}>
       <Show when={!props.rounded && props.label}>
         <p
           class="mt-0 mb-2 font-bold"
@@ -158,7 +168,7 @@ export const AccountsDropdown = (props: Props) => {
         <Show when={(selectedValue() as Label).icon}>
           <img
             src={(selectedValue() as Label).icon}
-            class="w-5 h-5 rounded-md mr-2"
+            class="mr-2 w-5 h-5 rounded-md"
           />
         </Show>
         <span
@@ -186,7 +196,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="absolute flex-col text-shade-0 bg-shade-9 py-2 px-4 right-0 rounded-md mt-1 w-auto z-40 min-w-80"
+        class="absolute right-0 rounded-md flex-col text-shade-0 bg-shade-9 py-2 px-4 mt-1 w-auto z-40 min-w-80"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -202,7 +212,7 @@ export const AccountsDropdown = (props: Props) => {
           <div class="flex w-full mb-6">
             <img
               src={(selectedValue() as Label).icon}
-              class="w-10 h-10 rounded-md mr-2"
+              class="h-10 rounded-md mr-2 w-10"
             />
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(selectedValue() as Label).name}</h5>
@@ -222,16 +232,17 @@ export const AccountsDropdown = (props: Props) => {
         <Show when={filteredOptions().length > 0}>
           <hr class="w-full border-shade-0 opacity-20 mb-0" />
         </Show>
-        <ul class="text-shade-0 shadow-md shadow-shade-9 list-none m-0 p-0 w-full">
+        <ul class="text-shade-0 m-0 w-full shadow-md shadow-shade-9 list-none p-0">
           <For each={filteredOptions()}>
             {(option) => {
+              // eslint-disable-next-line solid/reactivity
               let accountStatusQuery = rspc.createQuery(() => [
                 "account.getAccountStatus",
                 (selectedValue() as Label).uuid,
               ]);
 
               return (
-                <li class="first:rounded-t last:rounded-b block whitespace-no-wrap text-shade-0 no-underline min-h-10 my-2 flex items-center justify-between">
+                <li class="text-shade-0 flex items-center justify-between first:rounded-t last:rounded-b block whitespace-no-wrap no-underline min-h-10 my-2">
                   <div class="flex gap-2">
                     <img
                       src={(option.label as Label).icon}
@@ -248,7 +259,9 @@ export const AccountsDropdown = (props: Props) => {
                   <p
                     class="m-0 hover:text-blue"
                     onClick={() => {
-                      setSelectedValue(option.label);
+                      setActiveUUIDMutation.mutate(
+                        (option.label as Label).uuid
+                      );
                       props.onChange?.(option);
                       toggleMenu();
                     }}
@@ -267,8 +280,8 @@ export const AccountsDropdown = (props: Props) => {
         </ul>
         <hr class="w-full border-shade-0 opacity-20 mt-0" />
         <div class="flex flex-col">
-          <div class="group flex gap-3 py-2 items-center cursor-pointer">
-            <div class="i-ri:add-circle-fill h-4 w-4 text-shade-0 group-hover:text-white transition ease-in-out" />
+          <div class="flex py-2 items-center cursor-pointer group gap-3">
+            <div class="text-shade-0 i-ri:add-circle-fill h-4 w-4 group-hover:text-white transition ease-in-out" />
             <span class="text-shade-0 group-hover:text-white transition ease-in-out">
               <Trans
                 key="add_account"
@@ -278,7 +291,7 @@ export const AccountsDropdown = (props: Props) => {
               />
             </span>
           </div>
-          <div class="flex gap-3 py-2 items-center color-red cursor-pointer">
+          <div class="flex gap-3 py-2 items-center cursor-pointer color-red">
             <div class="h-4 w-4 i-ri:logout-box-fill" />
             <Trans
               key="account_log_out"

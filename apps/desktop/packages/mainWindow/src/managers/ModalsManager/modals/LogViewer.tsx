@@ -50,7 +50,7 @@ const LogViewer = (props: ModalProps) => {
               <TabList>
                 <Tab>
                   <div class="w-full flex gap-2 items-center h-10 justify-start">
-                    <div class="w-6 rounded-md h-6 bg-green" />
+                    <div class="w-6 rounded-md bg-green h-6" />
                     <p class="my-2">Valhelsia</p>
                   </div>
                 </Tab>

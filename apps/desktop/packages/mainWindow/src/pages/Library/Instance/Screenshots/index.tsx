@@ -173,7 +173,7 @@ const Screenshots = () => {
             {([days, screenshots]) => (
               <div class="flex flex-col">
                 <h3 class="mt-0">{getTitleByDays(days)}</h3>
-                <div class="w-full h-auto flex gap-6 flex-wrap">
+                <div class="w-full flex gap-6 flex-wrap h-auto">
                   <For each={screenshots}>
                     {(screenshot) => (
                       <div class="flex flex-col">
