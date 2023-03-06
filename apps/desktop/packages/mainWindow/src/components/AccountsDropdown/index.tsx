@@ -44,35 +44,41 @@ const parseStatus = (
       fallback={
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 bg-green rounded-full" />
-          <Trans
-            key="account_online"
-            options={{
-              defaultValue: "online",
-            }}
-          />
+          <p class="m-0 text-xs">
+            <Trans
+              key="account_online"
+              options={{
+                defaultValue: "online",
+              }}
+            />
+          </p>
         </div>
       }
     >
       <Match when={status === "Ok"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 bg-green rounded-full" />
-          <Trans
-            key="account_online"
-            options={{
-              defaultValue: "online",
-            }}
-          />
+          <p class="m-0 text-xs">
+            <Trans
+              key="account_online"
+              options={{
+                defaultValue: "online",
+              }}
+            />
+          </p>
         </div>
       </Match>
       <Match when={status === "Expired"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 bg-red rounded-full" />
-          <Trans
-            key="account_expired"
-            options={{
-              defaultValue: "Expired",
-            }}
-          />
+          <p class="m-0 text-xs">
+            <Trans
+              key="account_expired"
+              options={{
+                defaultValue: "Expired",
+              }}
+            />
+          </p>
         </div>
       </Match>
       <Match when={status === "Refreshing"}>
@@ -106,6 +112,11 @@ export const AccountsDropdown = (props: Props) => {
       setMenuOpened(false);
     }, 100);
   };
+
+  const filteredOptions = () =>
+    props.options.filter(
+      (option) => option.key !== (selectedValue() as Label).uuid
+    );
 
   return (
     <div class="inline-block relative" id={props.id}>
@@ -208,14 +219,11 @@ export const AccountsDropdown = (props: Props) => {
           </h5>
           <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
         </div>
-        <hr class="w-full border-shade-0 opacity-20 mb-0" />
+        <Show when={filteredOptions().length > 0}>
+          <hr class="w-full border-shade-0 opacity-20 mb-0" />
+        </Show>
         <ul class="text-shade-0 shadow-md shadow-shade-9 list-none m-0 p-0 w-full">
-          <For
-            each={props.options}
-            // each={props.options.filter(
-            //   (option) => option.key !== (selectedValue() as Label).uuid
-            // )}
-          >
+          <For each={filteredOptions()}>
             {(option) => {
               let accountStatusQuery = rspc.createQuery(() => [
                 "account.getAccountStatus",
@@ -223,14 +231,7 @@ export const AccountsDropdown = (props: Props) => {
               ]);
 
               return (
-                <li
-                  class="first:rounded-t last:rounded-b block whitespace-no-wrap text-shade-0 no-underline min-h-10 my-2 flex items-center justify-between hover:bg-shade-8 pr-2"
-                  onClick={() => {
-                    setSelectedValue(option.label);
-                    props.onChange?.(option);
-                    toggleMenu();
-                  }}
-                >
+                <li class="first:rounded-t last:rounded-b block whitespace-no-wrap text-shade-0 no-underline min-h-10 my-2 flex items-center justify-between">
                   <div class="flex gap-2">
                     <img
                       src={(option.label as Label).icon}
@@ -244,7 +245,14 @@ export const AccountsDropdown = (props: Props) => {
                     </div>
                   </div>
 
-                  <p class="m-0 hover:text-blue">
+                  <p
+                    class="m-0 hover:text-blue"
+                    onClick={() => {
+                      setSelectedValue(option.label);
+                      props.onChange?.(option);
+                      toggleMenu();
+                    }}
+                  >
                     <Trans
                       key="switch_account"
                       options={{
