@@ -51,6 +51,15 @@ export const routes: RouteDefinition[] = [
                 },
               },
               {
+                path: "/settings",
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Settings")
+                ),
+                data: () => {
+                  console.log("Fetching instance settings data...");
+                },
+              },
+              {
                 path: "/resourcepacks",
                 component: lazy(
                   () => import("@/pages/Library/Instance/ResourcePacks")

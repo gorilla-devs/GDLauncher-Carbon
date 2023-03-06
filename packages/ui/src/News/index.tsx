@@ -47,7 +47,7 @@ const News = (props: CarouselProps) => {
 
   const Slider = (props: SliderProps) => {
     return (
-      <div ref={slidesRef} id="slider" class="flex">
+      <div ref={slidesRef} id="slider" class="flex h-80">
         <For each={props.slides}>
           {(slide) => (
             <div
@@ -165,7 +165,7 @@ const News = (props: CarouselProps) => {
   };
 
   return (
-    <div class="h-80 bg-green-400 rounded-lg relative overflow-hidden relative">
+    <div class="h-80 bg-shade-9 rounded-lg relative overflow-hidden relative">
       <Show when={mergedProps.showArrows}>
         <div
           class="h-7 w-7 bg-shade-8 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "

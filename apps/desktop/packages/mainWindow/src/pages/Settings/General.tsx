@@ -1,4 +1,5 @@
-import { Button, Dropdown, Switch } from "@gd/ui";
+/* eslint-disable i18next/no-literal-string */
+import { Button, Dropdown, Input, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_logo.svg";
 import GDLauncherText from "/assets/images/GDLauncher_text.svg";
 import { Trans } from "@gd/i18n";
@@ -38,6 +39,32 @@ const General = () => {
             options={[
               { label: "english", key: "eng" },
               { label: "italian", key: "it" },
+            ]}
+          />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans
+            key="game_resolution"
+            options={{
+              defaultValue: "Game Resolution",
+            }}
+          />
+        </h5>
+        <div class="flex w-full justify-between">
+          <div class="flex gap-4 items-center">
+            <Input class="w-20" placeholder="width" value={"1024"} />
+            x
+            <Input class="w-20" placeholder="height" value={"768"} />
+          </div>
+          <Dropdown
+            value="en"
+            placeholder="presets"
+            options={[
+              { label: "800x600", key: "800x600" },
+              { label: "1024x768", key: "1024x768" },
+              { label: "1920x1080", key: "1920x1080" },
             ]}
           />
         </div>
@@ -114,7 +141,7 @@ const General = () => {
           <Switch checked={false} />
         </div>
       </div>
-      <div class="mb-6 max">
+      <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
             key="settings_potatp_mode_title"

@@ -34,7 +34,7 @@ const Modpack = (props: Props) => {
                 <div class="text-sm">1d ago</div>
               </div>
               <div class="flex gap-2 items-center">
-                <i class="i-ri:download-fill text-shade-1" />
+                <i class="text-shade-1 i-ri:download-fill" />
                 <div class="text-sm">4.8M</div>
               </div>
               <div class="flex gap-2 items-center">

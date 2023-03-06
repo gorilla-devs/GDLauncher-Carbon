@@ -29,6 +29,7 @@ export type Props = {
   bg?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
+  placeholder?: string;
 };
 export interface DropDownButtonProps extends Props {
   children: JSX.Element;
@@ -39,7 +40,11 @@ const Dropdown = (props: Props) => {
     props.options.find((option) => option.key === props.value)?.label ||
     props.options[0]?.label;
 
-  const [selectedValue, setSelectedValue] = createSignal(defaultValue());
+  const placeholder = () => props.placeholder;
+
+  const [selectedValue, setSelectedValue] = createSignal(
+    placeholder() || defaultValue()
+  );
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
 
