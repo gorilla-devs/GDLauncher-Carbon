@@ -1,12 +1,14 @@
-import { Link, useLocation, useMatch } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
-import ProfileImg2 from "/assets/images/profile-img2.png";
+// import ProfileImg2 from "/assets/images/profile-img2.png";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing, Dropdown } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import fetchData from "@/pages/app.data";
+// import { accounts } from "@/pages/app.data";
 
 // import { createMatcher, expandOptionals } from "@solidjs/router";
 
@@ -20,11 +22,6 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 //   }
 // };
 
-const accounts = [
-  { name: "Ladvace", icon: ProfileImg },
-  { name: "Ladvace2", icon: ProfileImg2 },
-];
-
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
@@ -37,6 +34,12 @@ const AppNavbar = () => {
     !!isSettings() || !!isSettingsNested()
       ? 4
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
+
+  const accounts = useRouteData<typeof fetchData>();
+
+  createEffect(() => {
+    console.log("AAAA", accounts.data);
+  });
 
   return (
     <Show when={!isLogin()}>
@@ -99,25 +102,18 @@ const AppNavbar = () => {
             </Tabs>
           </ul>
           <div class="ml-4">
-            <Dropdown
-              options={accounts.map((account) => ({
-                label: {
-                  name: account.name,
-                  icon: account.icon,
-                },
-                key: account.name,
-              }))}
-              // options={accounts.map((account) => ({
-              //   label: (
-              //     <div class="flex justify-between items-center">
-              //       <div class="w-5 h-5 bg-green rounded-md" />
-              //       {account.name}
-              //     </div>
-              //   ),
-              //   key: "test",
-              // }))}
-              value="test"
-            />
+            <Show when={accounts.data && accounts?.data?.length > 0}>
+              <Dropdown
+                options={(accounts.data || []).map((account) => ({
+                  label: {
+                    name: account?.username,
+                    icon: ProfileImg,
+                  },
+                  key: account?.username,
+                }))}
+                value="ladvace"
+              />
+            </Show>
           </div>
         </div>
       </nav>

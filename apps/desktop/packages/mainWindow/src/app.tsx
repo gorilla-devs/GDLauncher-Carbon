@@ -15,9 +15,9 @@ const App: Component = () => {
   initThemes();
 
   return (
-    <div class="w-screen relative">
+    <div class="relative w-screen">
       <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute gap-4 flex justify-center items-center cursor-pointer h-10 bottom-10 right-0 p-2 z-50 bg-light-600">
+        <div class="absolute gap-4 flex justify-center items-center cursor-pointer right-0 h-10 bottom-10 p-2 z-50 bg-light-600">
           <div
             onClick={() => {
               navigate("/library");
@@ -45,14 +45,9 @@ const App: Component = () => {
           </div>
         </div>
       </Show>
-      <AppNavbar />
-      <div class="flex w-screen h-auto z-10">
-        <main class="relative overflow-hidden flex-1">
-          <Suspense fallback={<></>}>
-            <Route />
-          </Suspense>
-        </main>
-      </div>
+      <Suspense fallback={<></>}>
+        <Route />
+      </Suspense>
     </div>
   );
 };
