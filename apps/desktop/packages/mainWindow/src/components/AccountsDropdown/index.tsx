@@ -274,8 +274,8 @@ export const AccountsDropdown = (props: Props) => {
             class="mr-2 w-5 h-5 rounded-md"
           />
         </Show>
-        <span
-          class="w-full"
+        <div
+          class="w-full max-w-10 text-ellipsis overflow-hidden"
           classList={{
             "text-shade-0 hover:text-white group-hover:text-white":
               !props.disabled,
@@ -283,7 +283,7 @@ export const AccountsDropdown = (props: Props) => {
           }}
         >
           {(selectedValue() as Label).name}
-        </span>
+        </div>
 
         <span
           class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
