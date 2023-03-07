@@ -144,6 +144,7 @@ export const AccountsDropdown = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
+      accountEnrollCancelMutation.mutate(null);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
     } else {
@@ -364,12 +365,25 @@ export const AccountsDropdown = (props: Props) => {
         <div class="flex flex-col">
           <div class="flex py-2 items-center justify-between cursor-pointer group gap-3">
             <div class="flex gap-3">
-              <div class="text-shade-0 i-ri:add-circle-fill h-4 w-4 group-hover:text-white transition ease-in-out" />
-              <span class="text-shade-0 group-hover:text-white transition ease-in-out">
+              <div
+                class="text-shade-0 i-ri:add-circle-fill h-4 w-4 transition ease-in-out"
+                classList={{
+                  "text-shade-5": !addCompleted(),
+                  "group-hover:text-white": addCompleted(),
+                }}
+              />
+              <span class="text-shade-0 transition ease-in-out">
                 <p
                   class="m-0"
+                  classList={{
+                    "text-shade-5": !addCompleted(),
+                    "group-hover:text-white": addCompleted(),
+                    "cursor-not-allowed": !addCompleted(),
+                  }}
                   onClick={() => {
-                    accountEnrollBeginMutation.mutate(null);
+                    if (addCompleted()) {
+                      accountEnrollBeginMutation.mutate(null);
+                    }
                   }}
                 >
                   <Trans
@@ -381,7 +395,7 @@ export const AccountsDropdown = (props: Props) => {
                 </p>
               </span>
             </div>
-            <Show when={!addCompleted()}>
+            <Show when={!addCompleted() && !expired()}>
               <div class="flex gap-3 items-center">
                 <div
                   class="w-5 h-5 bg-blue rounded-full flex justify-center items-center"
@@ -392,7 +406,7 @@ export const AccountsDropdown = (props: Props) => {
                       );
                   }}
                 >
-                  <div class="i-ri:link text-md text-white" />
+                  <div class="i-ri:link text-sm text-white" />
                 </div>
 
                 <div class="flex gap-1 items-center text-xs">
