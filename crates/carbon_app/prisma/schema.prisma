@@ -18,11 +18,13 @@ model AppConfiguration {
 }
 
 model Account {
-  uuid           String    @id
-  username       String
-  accessToken    String?
-  tokenExpires   DateTime?
-  msRefreshToken String?
+  uuid             String   @id
+  username         String
+  // presence signifies a microsoft account
+  accessToken      String?
+  tokenExpires     DateTime?
+  msRefreshToken   String?
+  lastUsed DateTime
 }
 
 model MinecraftManifest {

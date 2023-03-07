@@ -58,14 +58,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query ENROLL_GET_STATUS[app, _: ()] {
-            Ok(EnrollmentStatus::from(
-                app.account_manager().get_enrollment_status().await
-                    .map_err(into_rspc)?
-            ))
+            app.account_manager().get_enrollment_status().await.map(EnrollmentStatus::from)
         }
 
         mutation ENROLL_FINALIZE[app, _: ()] {
             app.account_manager().finalize_enrollment().await
+                .map_err(into_rspc)
+        }
+
+        mutation REFRESH_ACCOUNT[app, uuid: String] {
+            app.account_manager().refresh_account(uuid).await
                 .map_err(into_rspc)
         }
     }
@@ -75,6 +77,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 struct AccountEntry {
     username: String,
     uuid: String,
+    last_used: DateTime<Utc>,
     type_: AccountType,
 }
 
@@ -89,6 +92,7 @@ enum AccountStatus {
     Ok,
     Expired,
     Refreshing,
+    Invalid,
 }
 
 #[derive(Type, Serialize)]
@@ -128,6 +132,7 @@ impl From<domain::Account> for AccountEntry {
             username: value.username,
             uuid: value.uuid,
             type_: value.type_.into(),
+            last_used: value.last_used,
         }
     }
 }
@@ -145,8 +150,9 @@ impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
             domain::AccountStatus::Ok { .. } => Self::Ok,
-            domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Refreshing => Self::Refreshing,
+            domain::AccountStatus::Expired => Self::Expired,
+            domain::AccountStatus::Invalid => Self::Invalid,
         }
     }
 }
@@ -192,6 +198,9 @@ impl From<account::EnrollmentError> for EnrollmentError {
             )) => Self::Request(x.into()),
 
             BE::DeviceCodePoll(DeviceCodePollError::CodeExpired) => Self::DeviceCodeExpired,
+
+            // this is a bit nonsensical, but the FE should never get this error
+            BE::MsRefresh(_) => Self::DeviceCodeExpired,
 
             BE::McAuth(McAuthError::Xbox(XboxAuthError::Xbox(x))) => Self::XboxAccount(x),
 

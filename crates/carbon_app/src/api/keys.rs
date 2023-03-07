@@ -33,6 +33,7 @@ keys! {
         ENROLL_CANCEL                 = "enroll.cancel";
         ENROLL_GET_STATUS             = "enroll.getStatus";
         ENROLL_FINALIZE               = "enroll.finalize";
+        REFRESH_ACCOUNT               = "refreshAccount";
     }
 
     java {
