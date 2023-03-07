@@ -1,6 +1,9 @@
+use chrono::{DateTime, Utc};
+
 pub struct Account {
     pub username: String,
     pub uuid: String,
+    pub last_used: DateTime<Utc>,
     pub type_: AccountType,
 }
 

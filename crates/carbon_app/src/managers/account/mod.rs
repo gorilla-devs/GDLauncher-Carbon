@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
-    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, QueryError,
+    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
 use std::{collections::HashMap, mem, sync::Arc};
 
@@ -101,10 +101,13 @@ impl ManagerRef<'_, AccountManager> {
     }
 
     async fn get_account_entries(self) -> Result<Vec<db::account::Data>, QueryError> {
+        use db::account::OrderByParam;
+
         self.app
             .prisma_client
             .account()
             .find_many(Vec::new())
+            .order_by(OrderByParam::LastUsed(Direction::Desc))
             .exec()
             .await
     }
@@ -123,6 +126,7 @@ impl ManagerRef<'_, AccountManager> {
                 Account {
                     username: account.username,
                     uuid: account.uuid,
+                    last_used: account.last_used.into(),
                     type_,
                 }
             })
@@ -175,6 +179,7 @@ impl ManagerRef<'_, AccountManager> {
             .await?;
 
         if db_account.is_some() {
+            // don't change lastUsed
             let mut set_params = vec![SetParam::SetUsername(account.username)];
 
             match account.type_ {
@@ -223,7 +228,12 @@ impl ManagerRef<'_, AccountManager> {
             self.app
                 .prisma_client
                 .account()
-                .create(account.uuid, account.username, set_params)
+                .create(
+                    account.uuid,
+                    account.username,
+                    Utc::now().into(),
+                    set_params,
+                )
                 .exec()
                 .await?;
 
@@ -292,7 +302,8 @@ impl ManagerRef<'_, AccountManager> {
                                 access_token: access_token.clone(),
                                 refresh_token: None,
                                 token_expires: token_expires.clone(),
-                            }
+                            },
+                            last_used: self.account.last_used.clone(),
                         }).await.expect("db error, this can't be handled in the account invalidator right now");
                     }
                     _ => {}
@@ -320,7 +331,7 @@ impl ManagerRef<'_, AccountManager> {
     }
 
     pub async fn delete_account(self, uuid: String) -> Result<(), DeleteAccountError> {
-        use db::account::UniqueWhereParam;
+        use db::account::{OrderByParam, UniqueWhereParam};
 
         let result = self
             .app
@@ -332,6 +343,30 @@ impl ManagerRef<'_, AccountManager> {
 
         match result {
             Ok(_) => {
+                let active_account = self
+                    .app
+                    .configuration_manager()
+                    .configuration()
+                    .get()
+                    .await?
+                    .active_account_uuid;
+
+                if let Some(active_account) = active_account {
+                    if active_account == uuid {
+                        let next_account = self
+                            .app
+                            .prisma_client
+                            .account()
+                            .find_first(Vec::new())
+                            .order_by(OrderByParam::LastUsed(Direction::Desc))
+                            .exec()
+                            .await?
+                            .map(|data| data.uuid);
+
+                        self.set_active_uuid(next_account).await?;
+                    }
+                }
+
                 self.app.invalidate(GET_ACCOUNTS, None);
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
@@ -380,12 +415,10 @@ impl ManagerRef<'_, AccountManager> {
         }
     }
 
-    pub async fn get_enrollment_status(
-        self,
-    ) -> Result<FEEnrollmentStatus, GetEnrollmentStatusError> {
+    pub async fn get_enrollment_status(self) -> Option<FEEnrollmentStatus> {
         match &*self.active_enrollment.read().await {
-            None => Err(GetEnrollmentStatusError::NotActive),
-            Some(enrollment) => Ok(FEEnrollmentStatus::from_enrollment_status(
+            None => None,
+            Some(enrollment) => Some(FEEnrollmentStatus::from_enrollment_status(
                 &*enrollment.status.read().await,
             )),
         }
@@ -458,12 +491,6 @@ pub enum CancelEnrollmentStatusError {
 }
 
 #[derive(Error, Debug)]
-pub enum GetEnrollmentStatusError {
-    #[error("no active enrollment")]
-    NotActive,
-}
-
-#[derive(Error, Debug)]
 pub enum RefreshAccountError {
     #[error("already refreshing")]
     AlreadyRefreshing,
@@ -503,6 +530,12 @@ pub enum DeleteAccountError {
 
     #[error("query error: {0}")]
     Query(#[from] QueryError),
+
+    #[error("configuration error: {0}")]
+    Configuration(#[from] ConfigurationError),
+
+    #[error("set account: {0}")]
+    SetAccount(#[from] SetAccountError),
 }
 
 #[derive(Error, Debug)]
@@ -521,6 +554,7 @@ pub struct FullAccount {
     pub username: String,
     pub uuid: String,
     pub type_: FullAccountType,
+    pub last_used: DateTime<FixedOffset>,
 }
 
 pub enum FullAccountType {
@@ -549,6 +583,7 @@ impl From<FullAccount> for db::account::Data {
             access_token,
             ms_refresh_token: refresh_token,
             token_expires,
+            last_used: value.last_used,
         }
     }
 }
@@ -570,6 +605,7 @@ impl TryFrom<db::account::Data> for FullAccount {
                 },
                 None => FullAccountType::Offline,
             },
+            last_used: value.last_used,
         })
     }
 }
@@ -580,6 +616,7 @@ impl From<FullAccount> for AccountWithStatus {
             account: Account {
                 username: value.username,
                 uuid: value.uuid,
+                last_used: value.last_used.into(),
                 type_: match value.type_ {
                     FullAccountType::Microsoft { .. } => AccountType::Microsoft,
                     FullAccountType::Offline => AccountType::Offline,
@@ -616,6 +653,7 @@ impl From<api::FullAccount> for FullAccount {
                 refresh_token: Some(value.ms.refresh_token),
                 token_expires: DateTime::<FixedOffset>::from(value.mc.auth.expires_at),
             },
+            last_used: Utc::now().into(),
         }
     }
 }
@@ -644,6 +682,7 @@ impl FEEnrollmentStatus {
             EnrollmentStatus::Complete(account) => FEEnrollmentStatus::Complete(Account {
                 username: account.mc.profile.username.clone(),
                 uuid: account.mc.profile.uuid.clone(),
+                last_used: Utc::now(),
                 type_: AccountType::Microsoft,
             }),
             EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(err.clone()),

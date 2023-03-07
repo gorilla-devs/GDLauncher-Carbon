@@ -58,10 +58,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query ENROLL_GET_STATUS[app, _: ()] {
-            Ok(EnrollmentStatus::from(
-                app.account_manager().get_enrollment_status().await
-                    .map_err(into_rspc)?
-            ))
+            app.account_manager().get_enrollment_status().await.map(EnrollmentStatus::from)
         }
 
         mutation ENROLL_FINALIZE[app, _: ()] {
@@ -80,6 +77,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 struct AccountEntry {
     username: String,
     uuid: String,
+    last_used: DateTime<Utc>,
     type_: AccountType,
 }
 
@@ -134,6 +132,7 @@ impl From<domain::Account> for AccountEntry {
             username: value.username,
             uuid: value.uuid,
             type_: value.type_.into(),
+            last_used: value.last_used,
         }
     }
 }
