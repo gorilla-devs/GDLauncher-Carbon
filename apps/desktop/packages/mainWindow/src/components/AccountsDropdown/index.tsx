@@ -44,7 +44,7 @@ export interface DropDownButtonProps extends Props {
 }
 
 const parseStatus = (
-  status: "Ok" | "Expired" | "Refreshing" | null | undefined
+  status: "Ok" | "Expired" | "Refreshing" | "Invalid" | null | undefined
 ) => {
   console.log("STATUS", status);
   return (
@@ -382,7 +382,7 @@ export const AccountsDropdown = (props: Props) => {
                   <div class="flex gap-2">
                     <img
                       src={(option.label as Label).icon}
-                      class="w-10 h-10 rounded-md mr-2"
+                      class="w-10 h-10 rounded-md mr-2 grayscale"
                     />
                     <div class="flex flex-col">
                       <h5 class="m-0 text-white">
