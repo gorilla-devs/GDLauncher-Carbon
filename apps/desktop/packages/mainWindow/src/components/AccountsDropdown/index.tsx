@@ -233,7 +233,7 @@ export const AccountsDropdown = (props: Props) => {
         {props.label}
       </p>
       <button
-        class="group flex justify-between py-2 px-4 items-center min-h-10 box-border font-semibold inline-flex rounded-lg"
+        class="w-36 box-border group flex justify-between py-2 px-4 items-center min-h-10 box-border font-semibold inline-flex rounded-lg"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -278,7 +278,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="absolute right-0 rounded-md flex-col text-shade-0 bg-shade-9 py-2 px-4 mt-1 w-auto z-40 min-w-80"
+        class="absolute right-0 rounded-md flex-col text-shade-0 bg-shade-9 pb-2 px-4 mt-1 w-auto z-40 min-w-80 pt-3"
         onMouseOut={() => {
           setFocusIn(false);
         }}
