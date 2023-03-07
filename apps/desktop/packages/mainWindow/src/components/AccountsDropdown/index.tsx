@@ -109,6 +109,7 @@ export const AccountsDropdown = (props: Props) => {
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
+  const [UUIDHidden, setUUIDHidden] = createSignal(true);
   const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({
     user_code: "",
     verification_uri: "",
@@ -179,7 +180,6 @@ export const AccountsDropdown = (props: Props) => {
     ["account.enroll.begin"],
     {
       onError() {
-        console.log("ERROR");
         accountEnrollCancelMutation.mutate(null);
         accountEnrollBeginMutation.mutate(null);
       },
@@ -219,10 +219,6 @@ export const AccountsDropdown = (props: Props) => {
         },
       });
     }
-  });
-
-  createEffect(() => {
-    console.log("TEST", addCompleted(), expired());
   });
 
   return (
@@ -314,7 +310,13 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               />
             </h5>
-            <div class="flex gap-1">
+            <div
+              class="flex gap-1"
+              classList={{
+                "blur-sm": UUIDHidden(),
+                "select-none": UUIDHidden(),
+              }}
+            >
               <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
               <div
                 class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
@@ -326,6 +328,13 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               />
             </div>
+            <div
+              classList={{
+                "i-ri:eye-fill": UUIDHidden(),
+                "i-ri:eye-off-fill": !UUIDHidden(),
+              }}
+              onClick={() => setUUIDHidden((prev) => !prev)}
+            />
           </div>
         </div>
         <Show when={filteredOptions().length > 0}>
