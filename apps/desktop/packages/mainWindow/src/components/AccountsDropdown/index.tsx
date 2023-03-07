@@ -109,12 +109,16 @@ export const AccountsDropdown = (props: Props) => {
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
-  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({});
+  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({
+    user_code: "",
+    verification_uri: "",
+    expires_at: "",
+  });
   const [focusIn, setFocusIn] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
   const [addCompleted, setAddCompleted] = createSignal(true);
 
-  const expiresAt = () => loginDeviceCode().expires_at;
+  const expiresAt = () => loginDeviceCode()?.expires_at;
   const expiresAtFormat = () => new Date(expiresAt())?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () =>
