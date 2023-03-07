@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
 import { NAVBAR_ROUTES } from "@/constants";
@@ -9,8 +9,6 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType } from "@gd/core_module/bindings";
-import { rspc } from "@/utils/rspcClient";
-
 export interface AccountsStatus {
   [details: string]: {
     username: string;
@@ -34,15 +32,6 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const accounts = useRouteData<typeof fetchData>();
-
-  // let accountGetStatus = rspc.createQuery(() => [
-  //   "account.enroll.getStatus",
-  //   null,
-  // ]);
-
-  // createEffect(() => {
-  //   console.log("accountGetStatus", accountGetStatus);
-  // });
 
   return (
     <Show when={!isLogin()}>

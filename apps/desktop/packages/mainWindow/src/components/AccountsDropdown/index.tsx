@@ -36,7 +36,6 @@ export type Props = {
   value: string;
   disabled?: boolean;
   label?: string;
-  onChange?: (_option: Option) => void;
   id?: string;
 };
 export interface DropDownButtonProps extends Props {
@@ -113,7 +112,7 @@ export const AccountsDropdown = (props: Props) => {
   const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({});
   const [focusIn, setFocusIn] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
-  const [addCompleted, setAddCompleted] = createSignal(false);
+  const [addCompleted, setAddCompleted] = createSignal(true);
 
   const expiresAt = () => loginDeviceCode().expires_at;
   const expiresAtFormat = () => new Date(expiresAt())?.getTime();
@@ -122,6 +121,7 @@ export const AccountsDropdown = (props: Props) => {
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
   const [countDown, setCountDown] = createSignal(
+    // eslint-disable-next-line solid/reactivity
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
 
@@ -153,14 +153,6 @@ export const AccountsDropdown = (props: Props) => {
     }
   });
 
-  const toggleMenu = () => {
-    if (props.disabled) return;
-    setMenuOpened(true);
-    setTimeout(() => {
-      setMenuOpened(false);
-    }, 100);
-  };
-
   const filteredOptions = () =>
     props.options.filter(
       (option) => option.key !== (selectedValue() as Label).uuid
@@ -178,32 +170,40 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  let accountEnrollBeginMutation = rspc.createMutation([
-    "account.enroll.begin",
-  ]);
-
-  let accountEnrollCancelMutation = rspc.createMutation(
-    ["account.enroll.cancel"],
-    {}
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError() {
+        accountEnrollCancelMutation.mutate(null);
+        accountEnrollBeginMutation.mutate(null);
+      },
+    }
   );
 
-  let data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+  const accountEnrollCancelMutation = rspc.createMutation([
+    "account.enroll.cancel",
+  ]);
+
+  const accountEnrollFinalizeMutation = rspc.createMutation([
+    "account.enroll.finalize",
+  ]);
+
+  const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
 
   createEffect(() => {
     if (data.isSuccess) {
       handleStatus(data, {
         onPolling: (info) => {
           setAddCompleted(false);
-
           setLoginDeviceCode(info);
         },
         onFail() {
           setAddCompleted(true);
-
           accountEnrollCancelMutation.mutate(null);
           accountEnrollBeginMutation.mutate(null);
         },
         onComplete() {
+          accountEnrollFinalizeMutation.mutate(null);
           setAddCompleted(true);
         },
       });
@@ -290,15 +290,28 @@ export const AccountsDropdown = (props: Props) => {
               <p class="m-0 text-xs">{(selectedValue() as Label).type}</p>
             </div>
           </div>
-          <h5 class="mt-0 mb-2 text-white">
-            <Trans
-              key="uuid"
-              options={{
-                defaultValue: "UUID",
-              }}
-            />
-          </h5>
-          <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
+          <div class="flex gap-3">
+            <h5 class="mt-0 mb-2 text-white">
+              <Trans
+                key="uuid"
+                options={{
+                  defaultValue: "UUID",
+                }}
+              />
+            </h5>
+            <div class="flex gap-1">
+              <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
+              <div
+                class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
+                onClick={() => {
+                  navigator.clipboard.writeText(
+                    (selectedValue() as Label).uuid
+                  );
+                  addNotification("The UUID has been copied");
+                }}
+              />
+            </div>
+          </div>
         </div>
         <Show when={filteredOptions().length > 0}>
           <hr class="w-full border-shade-0 opacity-20 mb-0" />
@@ -307,7 +320,7 @@ export const AccountsDropdown = (props: Props) => {
           <For each={filteredOptions()}>
             {(option) => {
               // eslint-disable-next-line solid/reactivity
-              let accountStatusQuery = rspc.createQuery(() => [
+              const accountStatusQuery = rspc.createQuery(() => [
                 "account.getAccountStatus",
                 (selectedValue() as Label).uuid,
               ]);
@@ -328,13 +341,11 @@ export const AccountsDropdown = (props: Props) => {
                   </div>
 
                   <p
-                    class="m-0 hover:text-blue"
+                    class="m-0 hover:text-blue cursor-pointer"
                     onClick={() => {
                       setActiveUUIDMutation.mutate(
                         (option.label as Label).uuid
                       );
-                      props.onChange?.(option);
-                      toggleMenu();
                     }}
                   >
                     <Trans
@@ -387,12 +398,12 @@ export const AccountsDropdown = (props: Props) => {
                 <div class="flex gap-1 items-center text-xs">
                   {loginDeviceCode().user_code}
                   <div
-                    class="cursor-pointer text-shade-0 i-ri:file-copy-fill"
+                    class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
                     onClick={() => {
                       navigator.clipboard.writeText(
                         loginDeviceCode().user_code
                       );
-                      addNotification("The link has been copied");
+                      addNotification("The code has been copied");
                     }}
                   />
                 </div>
