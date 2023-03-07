@@ -130,7 +130,7 @@ export const AccountsDropdown = (props: Props) => {
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
 
-  const [addNotification] = createNotification();
+  const addNotification = createNotification();
 
   let interval: ReturnType<typeof setTimeout>;
 
@@ -179,7 +179,8 @@ export const AccountsDropdown = (props: Props) => {
   const accountEnrollBeginMutation = rspc.createMutation(
     ["account.enroll.begin"],
     {
-      onError() {
+      onError(error) {
+        addNotification(error.message, "error");
         accountEnrollCancelMutation.mutate(null);
         accountEnrollBeginMutation.mutate(null);
       },
@@ -192,12 +193,26 @@ export const AccountsDropdown = (props: Props) => {
       onMutate() {
         setAddCompleted(true);
       },
+      onError(error) {
+        addNotification(error.message, "error");
+      },
     }
   );
 
-  const accountEnrollFinalizeMutation = rspc.createMutation([
-    "account.enroll.finalize",
-  ]);
+  const accountEnrollFinalizeMutation = rspc.createMutation(
+    ["account.enroll.finalize"],
+    {
+      onError(error) {
+        addNotification(error.message, "error");
+      },
+    }
+  );
+
+  const deleteAccountMutation = rspc.createMutation(["account.deleteAccount"], {
+    onError(error) {
+      addNotification(error.message, "error");
+    },
+  });
 
   const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
 
@@ -365,7 +380,14 @@ export const AccountsDropdown = (props: Props) => {
                   </div>
 
                   <div class="flex gap-3">
-                    <div class="i-ri:delete-bin-7-fill hover:bg-red cursor-pointer" />
+                    <div
+                      class="i-ri:delete-bin-7-fill hover:bg-red cursor-pointer"
+                      onClick={() =>
+                        deleteAccountMutation.mutate(
+                          (selectedValue() as Label).uuid
+                        )
+                      }
+                    />
                     <p
                       class="m-0 hover:text-blue cursor-pointer"
                       onClick={() => {
@@ -401,6 +423,7 @@ export const AccountsDropdown = (props: Props) => {
               class="flex gap-3 items-center"
               classList={{
                 "cursor-not-allowed": !addCompleted(),
+                "cursor-pointer": addCompleted(),
               }}
             >
               <div

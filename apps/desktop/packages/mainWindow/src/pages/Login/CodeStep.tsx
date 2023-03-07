@@ -121,7 +121,7 @@ const CodeStep = (props: Props) => {
 
   onCleanup(() => clearInterval(interval));
 
-  const [addNotification] = createNotification();
+  const addNotification = createNotification();
 
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
