@@ -3,7 +3,7 @@ import { handleStatus } from "@/utils/login";
 import { rspc } from "@/utils/rspcClient";
 import { DeviceCode } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { createNotification } from "@gd/ui";
+import { Spinner, createNotification } from "@gd/ui";
 import {
   createSignal,
   For,
@@ -116,6 +116,7 @@ export const AccountsDropdown = (props: Props) => {
     expires_at: "",
   });
   const [focusIn, setFocusIn] = createSignal(false);
+  const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
   const [addCompleted, setAddCompleted] = createSignal(true);
 
@@ -224,11 +225,13 @@ export const AccountsDropdown = (props: Props) => {
           setLoginDeviceCode(info);
         },
         onFail() {
+          setLoadingAuthorization(false);
           setAddCompleted(true);
           accountEnrollCancelMutation.mutate(null);
           accountEnrollBeginMutation.mutate(null);
         },
         onComplete() {
+          setLoadingAuthorization(false);
           accountEnrollFinalizeMutation.mutate(null);
           setAddCompleted(true);
         },
@@ -467,10 +470,12 @@ export const AccountsDropdown = (props: Props) => {
                   <div
                     class="w-5 h-5 rounded-full flex justify-center items-center cursor-pointer"
                     onClick={() => {
-                      if (loginDeviceCode().verification_uri)
+                      if (loginDeviceCode().verification_uri) {
+                        setLoadingAuthorization(true);
                         window.openExternalLink(
                           loginDeviceCode().verification_uri
                         );
+                      }
                     }}
                   >
                     <div class="text-sm hover:text-white transition ease-in-out i-ri:external-link-fill" />
@@ -492,12 +497,17 @@ export const AccountsDropdown = (props: Props) => {
                   </div>
                   <div class="text-xs">{countDown()}</div>
                 </div>
-                <div
-                  class="text-sm i-ri:close-fill hover:text-red cursor-pointer"
-                  onClick={() => {
-                    accountEnrollCancelMutation.mutate(null);
-                  }}
-                />
+                <div class="flex gap-3">
+                  <Show when={loadingAuthorization()}>
+                    <Spinner />
+                  </Show>
+                  <div
+                    class="text-sm i-ri:close-fill hover:text-red cursor-pointer"
+                    onClick={() => {
+                      accountEnrollCancelMutation.mutate(null);
+                    }}
+                  />
+                </div>
               </div>
             </Show>
           </div>
