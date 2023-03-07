@@ -271,7 +271,7 @@ export const AccountsDropdown = (props: Props) => {
         <Show when={(selectedValue() as Label).icon}>
           <img
             src={(selectedValue() as Label).icon}
-            class="mr-2 w-5 h-5 rounded-md"
+            class="w-5 h-5 rounded-md"
           />
         </Show>
         <div
@@ -319,8 +319,8 @@ export const AccountsDropdown = (props: Props) => {
               <p class="m-0 text-xs">{(selectedValue() as Label).type}</p>
             </div>
           </div>
-          <div class="flex gap-3">
-            <h5 class="mt-0 mb-2 text-white">
+          <div class="flex gap-3 items-center">
+            <h5 class="m-0 text-white">
               <Trans
                 key="uuid"
                 options={{
@@ -328,14 +328,16 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               />
             </h5>
-            <div
-              class="flex gap-1"
-              classList={{
-                "blur-sm": UUIDHidden(),
-                "select-none": UUIDHidden(),
-              }}
-            >
-              <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
+            <div class="flex items-center gap-1">
+              <div
+                class="flex gap-1"
+                classList={{
+                  "blur-sm": UUIDHidden(),
+                  "select-none": UUIDHidden(),
+                }}
+              >
+                <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
+              </div>
               <div
                 class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
                 onClick={() => {
