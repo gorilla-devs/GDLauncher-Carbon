@@ -14,7 +14,8 @@ CREATE TABLE "Account" (
     "username" TEXT NOT NULL,
     "accessToken" TEXT,
     "tokenExpires" DATETIME,
-    "msRefreshToken" TEXT
+    "msRefreshToken" TEXT,
+    "lastUsed" DATETIME NOT NULL
 );
 
 -- CreateTable
