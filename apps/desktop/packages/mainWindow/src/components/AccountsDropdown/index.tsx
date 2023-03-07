@@ -179,15 +179,21 @@ export const AccountsDropdown = (props: Props) => {
     ["account.enroll.begin"],
     {
       onError() {
+        console.log("ERROR");
         accountEnrollCancelMutation.mutate(null);
         accountEnrollBeginMutation.mutate(null);
       },
     }
   );
 
-  const accountEnrollCancelMutation = rspc.createMutation([
-    "account.enroll.cancel",
-  ]);
+  const accountEnrollCancelMutation = rspc.createMutation(
+    ["account.enroll.cancel"],
+    {
+      onMutate() {
+        setAddCompleted(true);
+      },
+    }
+  );
 
   const accountEnrollFinalizeMutation = rspc.createMutation([
     "account.enroll.finalize",
@@ -213,6 +219,10 @@ export const AccountsDropdown = (props: Props) => {
         },
       });
     }
+  });
+
+  createEffect(() => {
+    console.log("TEST", addCompleted(), expired());
   });
 
   return (
@@ -345,21 +355,24 @@ export const AccountsDropdown = (props: Props) => {
                     </div>
                   </div>
 
-                  <p
-                    class="m-0 hover:text-blue cursor-pointer"
-                    onClick={() => {
-                      setActiveUUIDMutation.mutate(
-                        (option.label as Label).uuid
-                      );
-                    }}
-                  >
-                    <Trans
-                      key="switch_account"
-                      options={{
-                        defaultValue: "Switch",
+                  <div class="flex gap-3">
+                    <div class="i-ri:delete-bin-7-fill hover:bg-red cursor-pointer" />
+                    <p
+                      class="m-0 hover:text-blue cursor-pointer"
+                      onClick={() => {
+                        setActiveUUIDMutation.mutate(
+                          (option.label as Label).uuid
+                        );
                       }}
-                    />
-                  </p>
+                    >
+                      <Trans
+                        key="switch_account"
+                        options={{
+                          defaultValue: "Switch",
+                        }}
+                      />
+                    </p>
+                  </div>
                 </li>
               );
             }}
@@ -367,22 +380,39 @@ export const AccountsDropdown = (props: Props) => {
         </ul>
         <hr class="w-full border-shade-0 opacity-20 mt-0" />
         <div class="flex flex-col">
-          <div class="flex py-2 items-center justify-between cursor-pointer group gap-3">
-            <div class="flex gap-3">
+          <div
+            class="flex py-2 justify-between group gap-3"
+            classList={{
+              "flex-col": !addCompleted(),
+              "min-h-10": !addCompleted(),
+              "items-start": !addCompleted(),
+            }}
+          >
+            <div
+              class="flex gap-3 items-center"
+              classList={{
+                "cursor-not-allowed": !addCompleted(),
+              }}
+            >
               <div
                 class="text-shade-0 i-ri:add-circle-fill h-4 w-4 transition ease-in-out"
                 classList={{
                   "text-shade-5": !addCompleted(),
                   "group-hover:text-white": addCompleted(),
+                  "cursor-not-allowed": !addCompleted(),
                 }}
               />
-              <span class="text-shade-0 transition ease-in-out">
+              <span
+                class="text-shade-0 transition ease-in-out"
+                classList={{
+                  "cursor-not-allowed": !addCompleted(),
+                }}
+              >
                 <p
                   class="m-0"
                   classList={{
                     "text-shade-5": !addCompleted(),
                     "group-hover:text-white": addCompleted(),
-                    "cursor-not-allowed": !addCompleted(),
                   }}
                   onClick={() => {
                     if (addCompleted()) {
@@ -400,32 +430,42 @@ export const AccountsDropdown = (props: Props) => {
               </span>
             </div>
             <Show when={!addCompleted() && !expired()}>
-              <div class="flex gap-3 items-center">
-                <div
-                  class="w-5 h-5 bg-blue rounded-full flex justify-center items-center"
-                  onClick={() => {
-                    if (loginDeviceCode().verification_uri)
-                      window.openExternalLink(
-                        loginDeviceCode().verification_uri
-                      );
-                  }}
-                >
-                  <div class="i-ri:link text-sm text-white" />
-                </div>
-
-                <div class="flex gap-1 items-center text-xs">
-                  {loginDeviceCode().user_code}
+              <div class="flex gap-3 items-center justify-between w-full">
+                <div class="flex gap-4 items-center">
                   <div
-                    class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
+                    class="w-5 h-5 rounded-full flex justify-center items-center cursor-pointer"
                     onClick={() => {
-                      navigator.clipboard.writeText(
-                        loginDeviceCode().user_code
-                      );
-                      addNotification("The code has been copied");
+                      if (loginDeviceCode().verification_uri)
+                        window.openExternalLink(
+                          loginDeviceCode().verification_uri
+                        );
                     }}
-                  />
+                  >
+                    <div class="text-sm hover:text-white transition ease-in-out i-ri:external-link-fill" />
+                  </div>
+
+                  <div class="flex gap-1 items-center text-xs">
+                    <span class="font-bold text-white">
+                      {loginDeviceCode().user_code}
+                    </span>
+                    <div
+                      class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          loginDeviceCode().user_code
+                        );
+                        addNotification("The code has been copied");
+                      }}
+                    />
+                  </div>
+                  <div class="text-xs">{countDown()}</div>
                 </div>
-                <div class="text-xs">{countDown()}</div>
+                <div
+                  class="text-sm i-ri:close-fill hover:text-red cursor-pointer"
+                  onClick={() => {
+                    accountEnrollCancelMutation.mutate(null);
+                  }}
+                />
               </div>
             </Show>
           </div>
