@@ -1,3 +1,4 @@
+import { useGDNavigate } from "@/managers/NavigationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
 import { rspc } from "@/utils/rspcClient";
@@ -45,16 +46,17 @@ export interface DropDownButtonProps extends Props {
 const parseStatus = (
   status: "Ok" | "Expired" | "Refreshing" | null | undefined
 ) => {
+  console.log("STATUS", status);
   return (
     <Switch
       fallback={
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 bg-green rounded-full" />
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 rounded-full bg-red" />
           <p class="m-0 text-xs">
             <Trans
-              key="account_online"
+              key="account_expired"
               options={{
-                defaultValue: "online",
+                defaultValue: "Expired",
               }}
             />
           </p>
@@ -131,6 +133,8 @@ export const AccountsDropdown = (props: Props) => {
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
 
+  const navigate = useGDNavigate();
+
   const addNotification = createNotification();
 
   let interval: ReturnType<typeof setTimeout>;
@@ -147,6 +151,10 @@ export const AccountsDropdown = (props: Props) => {
       resetCountDown();
     }
   };
+
+  createEffect(() => {
+    console.log("ACCOUNTS", props.options, filteredOptions());
+  });
 
   createEffect(() => {
     if (expired()) {
@@ -275,7 +283,7 @@ export const AccountsDropdown = (props: Props) => {
           />
         </Show>
         <div
-          class="w-full max-w-10 text-ellipsis overflow-hidden"
+          class="w-full text-ellipsis overflow-hidden max-w-15"
           classList={{
             "text-shade-0 hover:text-white group-hover:text-white":
               !props.disabled,
@@ -387,11 +395,11 @@ export const AccountsDropdown = (props: Props) => {
                   <div class="flex gap-3">
                     <div
                       class="i-ri:delete-bin-7-fill hover:bg-red cursor-pointer"
-                      onClick={() =>
+                      onClick={() => {
                         deleteAccountMutation.mutate(
-                          (selectedValue() as Label).uuid
-                        )
-                      }
+                          (option.label as Label).uuid
+                        );
+                      }}
                     />
                     <p
                       class="m-0 hover:text-blue cursor-pointer"
@@ -513,7 +521,13 @@ export const AccountsDropdown = (props: Props) => {
               </div>
             </Show>
           </div>
-          <div class="flex gap-3 py-2 items-center cursor-pointer color-red">
+          <div
+            class="flex gap-3 py-2 items-center cursor-pointer color-red"
+            onClick={() => {
+              deleteAccountMutation.mutate((selectedValue() as Label).uuid);
+              navigate("/");
+            }}
+          >
             <div class="h-4 w-4 i-ri:logout-box-fill" />
 
             <Trans
