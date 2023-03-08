@@ -53,7 +53,7 @@ const parseStatus = (status: EnrollStatusResult) => {
     <Switch
       fallback={
         <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full bg-yellow" />
+          <div class="w-3 h-3 rounded-full text-yellow i-ri:alert-fill" />
           <p class="m-0 text-xs">
             <Trans
               key="account_invalid"
@@ -67,7 +67,7 @@ const parseStatus = (status: EnrollStatusResult) => {
     >
       <Match when={status === "Invalid"}>
         <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full bg-yellow" />
+          <div class="w-3 h-3 rounded-full text-yellow i-ri:alert-fill" />
           <p class="m-0 text-xs">
             <Trans
               key="account_invalid"
