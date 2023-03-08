@@ -46,7 +46,6 @@ export interface DropDownButtonProps extends Props {
 const parseStatus = (
   status: "Ok" | "Expired" | "Refreshing" | "Invalid" | null | undefined
 ) => {
-  console.log("STATUS", status);
   return (
     <Switch
       fallback={
@@ -151,10 +150,6 @@ export const AccountsDropdown = (props: Props) => {
       resetCountDown();
     }
   };
-
-  createEffect(() => {
-    console.log("ACCOUNTS", props.options, filteredOptions());
-  });
 
   createEffect(() => {
     if (expired()) {
