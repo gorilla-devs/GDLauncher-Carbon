@@ -8,13 +8,19 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
-import { AccountType } from "@gd/core_module/bindings";
+import { AccountType, Procedures } from "@gd/core_module/bindings";
+
+type EnrollStatusResult = Extract<
+  Procedures["queries"],
+  { key: "account.getAccountStatus" }
+>["result"];
+
 export interface AccountsStatus {
   [details: string]: {
     username: string;
     uuid: string;
     type_: AccountType;
-    status: "Ok" | "Expired" | "Refreshing" | null | undefined;
+    status: EnrollStatusResult;
   };
 }
 
