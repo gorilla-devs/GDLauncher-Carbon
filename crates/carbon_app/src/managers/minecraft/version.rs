@@ -313,12 +313,14 @@ pub async fn generate_startup_command(
 mod tests {
     use super::*;
     use carbon_domain::minecraft::manifest::MinecraftManifest;
+    use chrono::Utc;
 
     async fn get_account() -> FullAccount {
         FullAccount {
             username: "test".to_owned(),
             uuid: "test-uuid".to_owned(),
             type_: FullAccountType::Offline,
+            last_used: Utc::now().into(),
         }
     }
 
