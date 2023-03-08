@@ -237,25 +237,23 @@ export const AccountsDropdown = (props: Props) => {
   const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
 
   createEffect(() => {
-    if (data.isSuccess) {
-      handleStatus(data, {
-        onPolling: (info) => {
-          setAddCompleted(false);
-          setLoginDeviceCode(info);
-        },
-        onFail() {
-          setLoadingAuthorization(false);
-          setAddCompleted(true);
-          accountEnrollCancelMutation.mutate(null);
-          accountEnrollBeginMutation.mutate(null);
-        },
-        onComplete() {
-          setLoadingAuthorization(false);
-          accountEnrollFinalizeMutation.mutate(null);
-          setAddCompleted(true);
-        },
-      });
-    }
+    handleStatus(data, {
+      onPolling: (info) => {
+        setAddCompleted(false);
+        setLoginDeviceCode(info);
+      },
+      onFail() {
+        setLoadingAuthorization(false);
+        setAddCompleted(true);
+        accountEnrollCancelMutation.mutate(null);
+        accountEnrollBeginMutation.mutate(null);
+      },
+      onComplete() {
+        setLoadingAuthorization(false);
+        accountEnrollFinalizeMutation.mutate(null);
+        setAddCompleted(true);
+      },
+    });
   });
 
   return (

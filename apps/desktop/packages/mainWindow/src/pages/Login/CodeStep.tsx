@@ -63,22 +63,6 @@ const CodeStep = (props: Props) => {
   const handleRefersh = async () => {
     accountEnrollCancelMutation.mutate(null);
     accountEnrollBeginMutation.mutate(null);
-    if (routeData.isSuccess) {
-      handleStatus(routeData, {
-        onPolling: (info) => {
-          props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
-          });
-          setExpired(false);
-          setError(null);
-        },
-        onFail() {
-          setError("something went wrong while logging in");
-        },
-      });
-    }
   };
 
   const updateExpireTime = () => {
@@ -92,14 +76,24 @@ const CodeStep = (props: Props) => {
   let interval: ReturnType<typeof setTimeout>;
 
   createEffect(() => {
-    if (routeData.isSuccess) {
-      handleStatus(routeData, {
-        onComplete(_accountEntry) {
-          finalizeMutation.mutate(null);
-          navigate("/library");
-        },
-      });
-    }
+    handleStatus(routeData.status, {
+      onPolling: (info) => {
+        props.setDeviceCodeObject({
+          userCode: info.user_code,
+          link: info.verification_uri,
+          expiresAt: info.expires_at,
+        });
+        setExpired(false);
+        setError(null);
+      },
+      onFail() {
+        setError("something went wrong while logging in");
+      },
+      onComplete(_accountEntry) {
+        finalizeMutation.mutate(null);
+        navigate("/library");
+      },
+    });
   });
 
   createEffect(() => {

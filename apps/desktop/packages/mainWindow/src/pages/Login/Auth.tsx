@@ -41,8 +41,14 @@ const Auth = (props: Props) => {
   };
 
   createEffect(() => {
-    if (routeData.isSuccess && clicked()) {
-      handleStatus(routeData, {
+    if (routeData.accounts.isSuccess && routeData.accounts.data.length > 0) {
+      navigate("/library");
+    }
+  });
+
+  createEffect(() => {
+    if (clicked()) {
+      handleStatus(routeData.status, {
         onPolling: (info) => {
           setError(null);
           props.setDeviceCodeObject({
@@ -73,7 +79,7 @@ const Auth = (props: Props) => {
       <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={routeData.isLoading && clicked()}
+          loading={routeData.status.isLoading && clicked()}
           size="large"
           onClick={() => handleClick()}
         >
