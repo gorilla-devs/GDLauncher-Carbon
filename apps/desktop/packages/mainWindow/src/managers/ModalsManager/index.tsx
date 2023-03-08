@@ -38,6 +38,11 @@ const defaultModals = {
     component: lazy(() => import("./modals/LogViewer")),
     title: "Logs",
   },
+  onBoarding: {
+    component: lazy(() => import("./modals/OnBoarding")),
+    title: "Welcome",
+    noHeader: true,
+  },
 };
 
 export type ModalProps = {

@@ -1,5 +1,6 @@
 type Theme = {
   // Colors
+  accent: string;
   primary: string;
   "primary-hover": string;
   shade0: string;

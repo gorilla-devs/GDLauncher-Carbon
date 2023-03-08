@@ -9,6 +9,7 @@ interface Props extends ModalProps {
   class?: string;
   preventClose?: boolean;
   noPadding?: boolean;
+  noOverflowHidden?: boolean;
 }
 
 const ModalLayout = (props: Props) => {
@@ -38,10 +39,11 @@ const ModalLayout = (props: Props) => {
           }}
         >
           <div
-            class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl transition-scale ease-in-out origin-center duration-100 overflow-hidden ${
+            class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl transition-scale ease-in-out origin-center duration-100 ${
               props.class ?? ""
             }`}
             classList={{
+              "overflow-hidden": !props.noOverflowHidden,
               "scale-100": modalsContext?.isVisible(),
               "scale-0": !modalsContext?.isVisible(),
             }}
