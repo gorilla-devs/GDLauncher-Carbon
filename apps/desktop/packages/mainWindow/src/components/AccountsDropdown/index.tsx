@@ -2,7 +2,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
 import { rspc } from "@/utils/rspcClient";
-import { DeviceCode } from "@gd/core_module/bindings";
+import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import {
@@ -43,25 +43,41 @@ export interface DropDownButtonProps extends Props {
   children: JSX.Element;
 }
 
-const parseStatus = (
-  status: "Ok" | "Expired" | "Refreshing" | "Invalid" | null | undefined
-) => {
+type EnrollStatusResult = Extract<
+  Procedures["queries"],
+  { key: "account.getAccountStatus" }
+>["result"];
+
+const parseStatus = (status: EnrollStatusResult) => {
   return (
     <Switch
       fallback={
-        <div class="flex items-center gap-2">
-          <div class="w-3 h-3 rounded-full bg-red" />
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 rounded-full bg-yellow" />
           <p class="m-0 text-xs">
             <Trans
-              key="account_expired"
+              key="account_invalid"
               options={{
-                defaultValue: "Expired",
+                defaultValue: "invalid",
               }}
             />
           </p>
         </div>
       }
     >
+      <Match when={status === "Invalid"}>
+        <div class="flex gap-2 items-center">
+          <div class="w-3 h-3 rounded-full bg-yellow" />
+          <p class="m-0 text-xs">
+            <Trans
+              key="account_invalid"
+              options={{
+                defaultValue: "invalid",
+              }}
+            />
+          </p>
+        </div>
+      </Match>
       <Match when={status === "Ok"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 rounded-full bg-green" />
