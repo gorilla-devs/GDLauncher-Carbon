@@ -43,7 +43,7 @@ const Card = (props: Props) => {
         props.class || ""
       }`}
     >
-      <div class="flex justify-center items-center bg-shade-8 h-13 w-13 rounded-lg">
+      <div class="flex justify-center items-center rounded-lg bg-shade-8 h-13 w-13">
         <img src={getIcon(props.icon || "vanilla")} />
       </div>
       <div>

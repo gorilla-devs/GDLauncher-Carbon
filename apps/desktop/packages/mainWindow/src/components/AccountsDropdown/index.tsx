@@ -50,7 +50,7 @@ const parseStatus = (
   return (
     <Switch
       fallback={
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           <div class="w-3 h-3 rounded-full bg-red" />
           <p class="m-0 text-xs">
             <Trans
@@ -65,7 +65,7 @@ const parseStatus = (
     >
       <Match when={status === "Ok"}>
         <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 bg-green rounded-full" />
+          <div class="w-3 h-3 rounded-full bg-green" />
           <p class="m-0 text-xs">
             <Trans
               key="account_online"
@@ -259,7 +259,7 @@ export const AccountsDropdown = (props: Props) => {
         {props.label}
       </p>
       <button
-        class="w-36 box-border group flex justify-between py-2 px-4 items-center min-h-10 box-border font-semibold inline-flex rounded-lg"
+        class="flex items-center w-36 box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -304,7 +304,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="absolute right-0 rounded-md flex-col text-shade-0 bg-shade-9 pb-2 px-4 mt-1 w-auto z-40 min-w-80 pt-3"
+        class="absolute right-0 rounded-md px-4 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 w-auto z-40 min-w-80 pt-3"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -327,7 +327,7 @@ export const AccountsDropdown = (props: Props) => {
               <p class="m-0 text-xs">{(selectedValue() as Label).type}</p>
             </div>
           </div>
-          <div class="flex gap-3 items-center">
+          <div class="flex items-center gap-3">
             <h5 class="m-0 text-white">
               <Trans
                 key="uuid"
@@ -378,7 +378,7 @@ export const AccountsDropdown = (props: Props) => {
               ]);
 
               return (
-                <li class="text-shade-0 flex items-center justify-between first:rounded-t last:rounded-b block whitespace-no-wrap no-underline min-h-10 my-2">
+                <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
                     <img
                       src={(option.label as Label).icon}
@@ -394,7 +394,7 @@ export const AccountsDropdown = (props: Props) => {
 
                   <div class="flex gap-3">
                     <div
-                      class="i-ri:delete-bin-7-fill hover:bg-red cursor-pointer"
+                      class="cursor-pointer i-ri:delete-bin-7-fill hover:bg-red"
                       onClick={() => {
                         deleteAccountMutation.mutate(
                           (option.label as Label).uuid
@@ -402,7 +402,7 @@ export const AccountsDropdown = (props: Props) => {
                       }}
                     />
                     <p
-                      class="m-0 hover:text-blue cursor-pointer"
+                      class="m-0 cursor-pointer hover:text-blue"
                       onClick={() => {
                         setActiveUUIDMutation.mutate(
                           (option.label as Label).uuid
@@ -440,7 +440,7 @@ export const AccountsDropdown = (props: Props) => {
               }}
             >
               <div
-                class="text-shade-0 i-ri:add-circle-fill h-4 w-4 transition ease-in-out"
+                class="text-shade-0 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
                 classList={{
                   "text-shade-5": !addCompleted(),
                   "group-hover:text-white": addCompleted(),
@@ -512,7 +512,7 @@ export const AccountsDropdown = (props: Props) => {
                     <Spinner />
                   </Show>
                   <div
-                    class="text-sm i-ri:close-fill hover:text-red cursor-pointer"
+                    class="text-sm cursor-pointer i-ri:close-fill hover:text-red"
                     onClick={() => {
                       accountEnrollCancelMutation.mutate(null);
                     }}
