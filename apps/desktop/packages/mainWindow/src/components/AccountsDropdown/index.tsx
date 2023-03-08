@@ -48,7 +48,7 @@ type EnrollStatusResult = Extract<
   { key: "account.getAccountStatus" }
 >["result"];
 
-const parseStatus = (status: EnrollStatusResult) => {
+const parseStatus = (status: EnrollStatusResult | undefined) => {
   return (
     <Switch
       fallback={
@@ -387,7 +387,6 @@ export const AccountsDropdown = (props: Props) => {
                 "account.getAccountStatus",
                 (selectedValue() as Label).uuid,
               ]);
-
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
