@@ -5,10 +5,7 @@ import {
   Procedures,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import {
-  CreateQueryResult,
-  QueryObserverSuccessResult,
-} from "@tanstack/solid-query";
+import { CreateQueryResult } from "@tanstack/solid-query";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
