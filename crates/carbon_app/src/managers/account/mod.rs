@@ -401,6 +401,7 @@ impl ManagerRef<'_, AccountManager> {
                     EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
 
                 *enrollment = Some(active_enrollment);
+                self.app.invalidate(ENROLL_GET_STATUS, None);
                 Ok(())
             }
         }
@@ -408,6 +409,7 @@ impl ManagerRef<'_, AccountManager> {
 
     pub async fn cancel_enrollment(self) -> Result<(), CancelEnrollmentStatusError> {
         let enrollment = self.active_enrollment.write().await.take();
+        self.app.invalidate(ENROLL_GET_STATUS, None);
 
         match enrollment {
             Some(_) => Ok(()),
@@ -437,8 +439,8 @@ impl ManagerRef<'_, AccountManager> {
                     EnrollmentStatus::Complete(account) => {
                         let uuid = account.mc.profile.uuid.clone();
                         self.add_account(account.into()).await?;
-
                         self.set_active_uuid(Some(uuid)).await?;
+                        self.app.invalidate(ENROLL_GET_STATUS, None);
 
                         Ok(())
                     }
