@@ -1,7 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
@@ -126,19 +126,17 @@ export const AccountsDropdown = (props: Props) => {
 
   const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
-  const [UUIDHidden, setUUIDHidden] = createSignal(true);
-  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode>({
-    user_code: "",
-    verification_uri: "",
-    expires_at: "",
-  });
+  const [addAccountStarting, setAddAccountStarting] = createSignal(false);
+  const [loginDeviceCode, setLoginDeviceCode] = createSignal<
+    DeviceCode | undefined
+  >(undefined);
   const [focusIn, setFocusIn] = createSignal(false);
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
   const [addCompleted, setAddCompleted] = createSignal(true);
 
   const expiresAt = () => loginDeviceCode()?.expires_at;
-  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
@@ -199,7 +197,11 @@ export const AccountsDropdown = (props: Props) => {
   const accountEnrollBeginMutation = rspc.createMutation(
     ["account.enroll.begin"],
     {
+      onMutate() {
+        setAddAccountStarting(true);
+      },
       onError(error) {
+        setAddAccountStarting(false);
         addNotification(error.message, "error");
         accountEnrollCancelMutation.mutate(null);
         accountEnrollBeginMutation.mutate(null);
@@ -228,9 +230,46 @@ export const AccountsDropdown = (props: Props) => {
     }
   );
 
+  type Accounts = Extract<
+    Procedures["queries"],
+    { key: "account.getAccounts" }
+  >["result"];
+
   const deleteAccountMutation = rspc.createMutation(["account.deleteAccount"], {
-    onError(error) {
+    onMutate: async (
+      uuid
+    ): Promise<{ previousAccounts: Accounts } | undefined> => {
+      await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
+
+      const previousAccounts: Accounts | undefined = queryClient.getQueryData([
+        "account.getAccounts",
+      ]);
+
+      queryClient.setQueryData(
+        ["account.getAccounts", null],
+        (old: Accounts | undefined) => {
+          if (old) return old?.filter((account) => account.uuid !== uuid);
+        }
+      );
+
+      if (previousAccounts) return { previousAccounts };
+    },
+    onError: (
+      error,
+      _variables,
+      context: { previousAccounts: Accounts } | undefined
+    ) => {
       addNotification(error.message, "error");
+
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(
+          ["account.getAccounts"],
+          context.previousAccounts
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["account.getAccounts"] });
     },
   });
 
@@ -348,13 +387,7 @@ export const AccountsDropdown = (props: Props) => {
               />
             </h5>
             <div class="flex items-center gap-1">
-              <div
-                class="flex gap-1"
-                classList={{
-                  "blur-sm": UUIDHidden(),
-                  "select-none": UUIDHidden(),
-                }}
-              >
+              <div class="flex gap-1">
                 <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
               </div>
               <div
@@ -367,13 +400,6 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               />
             </div>
-            <div
-              classList={{
-                "i-ri:eye-fill": UUIDHidden(),
-                "i-ri:eye-off-fill": !UUIDHidden(),
-              }}
-              onClick={() => setUUIDHidden((prev) => !prev)}
-            />
           </div>
         </div>
         <Show when={filteredOptions().length > 0}>
@@ -383,10 +409,17 @@ export const AccountsDropdown = (props: Props) => {
           <For each={filteredOptions()}>
             {(option) => {
               // eslint-disable-next-line solid/reactivity
-              const accountStatusQuery = rspc.createQuery(() => [
-                "account.getAccountStatus",
-                (selectedValue() as Label).uuid,
-              ]);
+              const accountStatusQuery = rspc.createQuery(
+                () => [
+                  "account.getAccountStatus",
+                  (selectedValue() as Label).uuid,
+                ],
+                {
+                  onError(err) {
+                    console.log("getAccountStatus ERR", err);
+                  },
+                }
+              );
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
@@ -442,47 +475,52 @@ export const AccountsDropdown = (props: Props) => {
               "items-start": !addCompleted(),
             }}
           >
-            <div
-              class="flex gap-3 items-center"
-              classList={{
-                "cursor-not-allowed": !addCompleted(),
-                "cursor-pointer": addCompleted(),
-              }}
-            >
+            <div class="flex justify-between w-full">
               <div
-                class="text-shade-0 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
-                classList={{
-                  "text-shade-5": !addCompleted(),
-                  "group-hover:text-white": addCompleted(),
-                  "cursor-not-allowed": !addCompleted(),
-                }}
-              />
-              <span
-                class="text-shade-0 transition ease-in-out"
+                class="flex gap-3 items-center"
                 classList={{
                   "cursor-not-allowed": !addCompleted(),
+                  "cursor-pointer": addCompleted(),
                 }}
               >
-                <p
-                  class="m-0"
+                <div
+                  class="text-shade-0 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
                   classList={{
                     "text-shade-5": !addCompleted(),
                     "group-hover:text-white": addCompleted(),
+                    "cursor-not-allowed": !addCompleted(),
                   }}
-                  onClick={() => {
-                    if (addCompleted()) {
-                      accountEnrollBeginMutation.mutate(null);
-                    }
+                />
+                <span
+                  class="text-shade-0 transition ease-in-out"
+                  classList={{
+                    "cursor-not-allowed": !addCompleted(),
                   }}
                 >
-                  <Trans
-                    key="add_account"
-                    options={{
-                      defaultValue: "Add Account",
+                  <p
+                    class="m-0"
+                    classList={{
+                      "text-shade-5": !addCompleted(),
+                      "group-hover:text-white": addCompleted(),
                     }}
-                  />
-                </p>
-              </span>
+                    onClick={() => {
+                      if (addCompleted()) {
+                        accountEnrollBeginMutation.mutate(null);
+                      }
+                    }}
+                  >
+                    <Trans
+                      key="add_account"
+                      options={{
+                        defaultValue: "Add Account",
+                      }}
+                    />
+                  </p>
+                </span>
+              </div>
+              <Show when={addAccountStarting() && !loginDeviceCode()}>
+                <Spinner />
+              </Show>
             </div>
             <Show when={!addCompleted() && !expired()}>
               <div class="flex gap-3 items-center justify-between w-full">
@@ -490,10 +528,10 @@ export const AccountsDropdown = (props: Props) => {
                   <div
                     class="w-5 h-5 rounded-full flex justify-center items-center cursor-pointer"
                     onClick={() => {
-                      if (loginDeviceCode().verification_uri) {
+                      if (loginDeviceCode()?.verification_uri) {
                         setLoadingAuthorization(true);
                         window.openExternalLink(
-                          loginDeviceCode().verification_uri
+                          (loginDeviceCode() as DeviceCode).verification_uri
                         );
                       }
                     }}
@@ -503,14 +541,16 @@ export const AccountsDropdown = (props: Props) => {
 
                   <div class="flex gap-1 items-center text-xs">
                     <span class="font-bold text-white">
-                      {loginDeviceCode().user_code}
+                      {loginDeviceCode()?.user_code}
                     </span>
                     <div
                       class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
                       onClick={() => {
-                        navigator.clipboard.writeText(
-                          loginDeviceCode().user_code
-                        );
+                        if (loginDeviceCode()?.user_code) {
+                          navigator.clipboard.writeText(
+                            (loginDeviceCode() as DeviceCode).user_code
+                          );
+                        }
                         addNotification("The code has been copied");
                       }}
                     />
