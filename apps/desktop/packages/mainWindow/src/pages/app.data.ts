@@ -10,8 +10,9 @@ export type Accounts = {
 const fetchData = () => {
   const accounts = rspc.createQuery(() => ["account.getAccounts", null]);
   const activeUuid = rspc.createQuery(() => ["account.getActiveUuid", null]);
+  const status = rspc.createQuery(() => ["account.enroll.getStatus", null]);
 
-  return { accounts, activeUuid };
+  return { accounts, activeUuid, status };
 };
 
 export default fetchData;

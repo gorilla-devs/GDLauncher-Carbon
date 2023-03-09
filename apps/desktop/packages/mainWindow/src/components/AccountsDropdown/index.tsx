@@ -1,4 +1,5 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
+import fetchData from "@/pages/app.data";
 import {
   msToMinutes,
   msToSeconds,
@@ -11,6 +12,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
+import { useRouteData } from "@solidjs/router";
 import {
   createSignal,
   For,
@@ -163,6 +165,8 @@ export const AccountsDropdown = (props: Props) => {
 
   const addNotification = createNotification();
 
+  const routeData = useRouteData<typeof fetchData>();
+
   let interval: ReturnType<typeof setTimeout>;
 
   const resetCountDown = () => {
@@ -245,11 +249,9 @@ export const AccountsDropdown = (props: Props) => {
     ["account.enroll.cancel"],
     {
       onMutate() {
-        console.log("MUTATE");
         setAddCompleted(true);
       },
       onError(error) {
-        console.log("ERR MUTATE", error);
         addNotification(error.message, "error");
       },
     }
@@ -302,35 +304,26 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  const enrollStatus = rspc.createQuery(
-    () => ["account.enroll.getStatus", null],
-    {
-      onError(err) {
-        addNotification(err.message, "error");
-      },
-    }
-  );
-
   createEffect(() => {
-    handleStatus(enrollStatus, {
+    handleStatus(routeData.status, {
       onPolling: (info) => {
         setAddCompleted(false);
         setLoginDeviceCode(info);
       },
       onFail(error) {
-        console.log("FAIl", error);
         setLoadingAuthorization(false);
         setAddCompleted(true);
       },
       onError(error) {
-        console.log("ERROR", error);
         if (error) addNotification(error?.message, "error");
       },
-      onComplete(account) {
-        console.log("COMPLETE ADD", account);
-        setLoadingAuthorization(false);
-        if (!addCompleted()) accountEnrollFinalizeMutation.mutate(null);
-        setAddCompleted(true);
+      onComplete() {
+        // setLoadingAuthorization(false);
+        if (!addCompleted()) {
+          accountEnrollFinalizeMutation.mutate(null);
+        }
+        accountEnrollCancelMutation.mutate(null);
+        // setAddCompleted(true);
       },
     });
   });
@@ -448,7 +441,7 @@ export const AccountsDropdown = (props: Props) => {
             {(option) => {
               const accountStatusQuery = rspc.createQuery(() => [
                 "account.getAccountStatus",
-                (activeAccount() as Label).uuid,
+                (option.label as Label).uuid,
               ]);
 
               return (
@@ -462,7 +455,11 @@ export const AccountsDropdown = (props: Props) => {
                       <h5 class="m-0 text-white">
                         {(option.label as Label).name}
                       </h5>
-                      <p class="m-0">{parseStatus(accountStatusQuery.data)}</p>
+                      <div class="m-0">
+                        <Show when={accountStatusQuery.isSuccess}>
+                          {parseStatus(accountStatusQuery.data)}
+                        </Show>
+                      </div>
                     </div>
                   </div>
 
