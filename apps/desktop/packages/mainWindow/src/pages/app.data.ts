@@ -8,13 +8,9 @@ export type Accounts = {
 };
 
 const fetchData = () => {
-  const accounts = rspc.createQuery(() => ["account.getAccounts", null], {
-    onError(err) {
-      console.log("DDDDD", err);
-    },
-  });
-
+  const accounts = rspc.createQuery(() => ["account.getAccounts", null]);
   const activeUuid = rspc.createQuery(() => ["account.getActiveUuid", null]);
+
   return { accounts, activeUuid };
 };
 

@@ -27,7 +27,6 @@ const Auth = (props: Props) => {
     ["account.enroll.begin"],
     {
       onError(error) {
-        console.log("ERRR", error, error.code);
         setError(error.message);
       },
     }

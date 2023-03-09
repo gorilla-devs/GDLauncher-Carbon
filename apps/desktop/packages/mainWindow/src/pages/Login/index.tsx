@@ -25,8 +25,6 @@ export default function Login() {
     if (routeData.activeUuid.data && !loggedOut()) {
       navigate("/library");
     } else setStep(0);
-
-    console.log("AAA", routeData, loggedOut());
   });
 
   return (

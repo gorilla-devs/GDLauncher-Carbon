@@ -7,15 +7,21 @@ import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { DeviceCodeObjectType } from ".";
+import { Procedures } from "@gd/core_module";
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
 }
+
+type ActiveUUID = Extract<
+  Procedures["queries"],
+  { key: "account.setActiveUuid" }
+>["result"];
 
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -40,11 +46,45 @@ const CodeStep = (props: Props) => {
     }
   );
 
+  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
+
+  const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
+    onMutate: async (
+      uuid
+    ): Promise<{ previousActiveUUID: ActiveUUID } | undefined> => {
+      await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
+
+      const previousActiveUUID: ActiveUUID | undefined =
+        queryClient.getQueryData(["account.setActiveUuid"]);
+
+      queryClient.setQueryData(["account.setActiveUuid", null], uuid);
+
+      if (previousActiveUUID) return { previousActiveUUID };
+    },
+    onError: (
+      error,
+      _variables,
+      context: { previousActiveUUID: ActiveUUID } | undefined
+    ) => {
+      addNotification(error.message, "error");
+
+      if (context?.previousActiveUUID) {
+        queryClient.setQueryData(
+          ["account.setActiveUuid"],
+          context.previousActiveUUID
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
+    },
+  });
+
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt;
-  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () =>
     Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
@@ -59,9 +99,6 @@ const CodeStep = (props: Props) => {
     setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
   };
   const [loading, setLoading] = createSignal(false);
-
-  const enrollCancelMutation = rspc.createMutation(["account.enroll.cancel"]);
-  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
   const handleRefersh = async () => {
     accountEnrollBeginMutation.mutate(null);
@@ -92,9 +129,9 @@ const CodeStep = (props: Props) => {
       onFail() {
         setError("something went wrong while logging in");
       },
-      onComplete(_accountEntry) {
-        enrollCancelMutation.mutate(null);
+      onComplete(account) {
         finalizeMutation.mutate(null);
+        setActiveUUIDMutation.mutate(account.uuid);
         navigate("/library");
       },
     });

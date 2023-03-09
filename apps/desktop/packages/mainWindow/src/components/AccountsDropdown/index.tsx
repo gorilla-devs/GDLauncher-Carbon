@@ -231,7 +231,6 @@ export const AccountsDropdown = (props: Props) => {
         setAddAccountStarting(true);
       },
       onError(error) {
-        console.log("account.enroll.begin ERROR", error);
         setAddAccountStarting(false);
         addNotification(error.message, "error");
       },
@@ -297,10 +296,14 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  const enrollStatus = rspc.createQuery(() => [
-    "account.enroll.getStatus",
-    null,
-  ]);
+  const enrollStatus = rspc.createQuery(
+    () => ["account.enroll.getStatus", null],
+    {
+      onError(err) {
+        addNotification(err.message, "error");
+      },
+    }
+  );
 
   createEffect(() => {
     handleStatus(enrollStatus, {
@@ -314,11 +317,8 @@ export const AccountsDropdown = (props: Props) => {
       },
       onComplete() {
         setLoadingAuthorization(false);
-        accountEnrollFinalizeMutation.mutate(null);
+        if (!addCompleted()) accountEnrollFinalizeMutation.mutate(null);
         setAddCompleted(true);
-      },
-      onError(error) {
-        console.log("STATUS ERROR NAVBAR", error);
       },
     });
   });
@@ -435,21 +435,10 @@ export const AccountsDropdown = (props: Props) => {
           <For each={filteredOptions()}>
             {(option) => {
               // eslint-disable-next-line solid/reactivity
-              const accountStatusQuery = rspc.createQuery(
-                () => [
-                  "account.getAccountStatus",
-                  (activeAccount() as Label).uuid,
-                ],
-                {
-                  onError(err) {
-                    console.log("getAccountStatus ERR", err);
-                  },
-                }
-              );
-
-              // createEffect(() => {
-
-              // });
+              const accountStatusQuery = rspc.createQuery(() => [
+                "account.getAccountStatus",
+                (activeAccount() as Label).uuid,
+              ]);
 
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">

@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
 import { NAVBAR_ROUTES } from "@/constants";
@@ -43,10 +43,6 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
-
-  createEffect(() => {
-    console.log("ACCOUNTS", routeData, routeData.activeUuid.data);
-  });
 
   return (
     <Show when={!isLogin()}>
@@ -109,7 +105,7 @@ const AppNavbar = () => {
             </Tabs>
           </ul>
           <div class="ml-4">
-            <Show when={routeData?.accounts.data && routeData.activeUuid.data}>
+            <Show when={routeData?.accounts.data && routeData?.activeUuid.data}>
               <AccountsDropdown
                 options={(routeData.accounts.data as Accounts).map(
                   (account) => ({
