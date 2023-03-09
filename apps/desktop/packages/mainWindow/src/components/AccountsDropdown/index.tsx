@@ -1,5 +1,10 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { parseTwoDigitNumber } from "@/utils/helpers";
+import {
+  msToMinutes,
+  msToSeconds,
+  parseTwoDigitNumber,
+  strToMs,
+} from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
 import { setLoggedOut } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -144,13 +149,11 @@ export const AccountsDropdown = (props: Props) => {
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
   const [addCompleted, setAddCompleted] = createSignal(true);
-
-  const expiresAt = () => loginDeviceCode()?.expires_at;
-  const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
+  const expiresAt = () => loginDeviceCode()?.expires_at || "";
+  const expiresAtFormat = () => strToMs(expiresAt());
   const expiresAtMs = () => expiresAtFormat() - Date.now();
-  const minutes = () =>
-    Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
+  const minutes = () => msToMinutes(expiresAtMs());
+  const seconds = () => msToSeconds(expiresAtMs());
   const [countDown, setCountDown] = createSignal(
     // eslint-disable-next-line solid/reactivity
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
@@ -231,6 +234,7 @@ export const AccountsDropdown = (props: Props) => {
         setAddAccountStarting(true);
       },
       onError(error) {
+        accountEnrollCancelMutation.mutate(null);
         setAddAccountStarting(false);
         addNotification(error.message, "error");
       },
@@ -241,9 +245,11 @@ export const AccountsDropdown = (props: Props) => {
     ["account.enroll.cancel"],
     {
       onMutate() {
+        console.log("MUTATE");
         setAddCompleted(true);
       },
       onError(error) {
+        console.log("ERR MUTATE", error);
         addNotification(error.message, "error");
       },
     }
@@ -311,11 +317,17 @@ export const AccountsDropdown = (props: Props) => {
         setAddCompleted(false);
         setLoginDeviceCode(info);
       },
-      onFail() {
+      onFail(error) {
+        console.log("FAIl", error);
         setLoadingAuthorization(false);
         setAddCompleted(true);
       },
-      onComplete() {
+      onError(error) {
+        console.log("ERROR", error);
+        if (error) addNotification(error?.message, "error");
+      },
+      onComplete(account) {
+        console.log("COMPLETE ADD", account);
         setLoadingAuthorization(false);
         if (!addCompleted()) accountEnrollFinalizeMutation.mutate(null);
         setAddCompleted(true);
@@ -434,7 +446,6 @@ export const AccountsDropdown = (props: Props) => {
         <ul class="text-shade-0 m-0 w-full shadow-md shadow-shade-9 list-none p-0">
           <For each={filteredOptions()}>
             {(option) => {
-              // eslint-disable-next-line solid/reactivity
               const accountStatusQuery = rspc.createQuery(() => [
                 "account.getAccountStatus",
                 (activeAccount() as Label).uuid,
@@ -542,7 +553,7 @@ export const AccountsDropdown = (props: Props) => {
                 <Spinner />
               </Show>
             </div>
-            <Show when={!addCompleted() && !expired()}>
+            <Show when={!addCompleted() && !expired() && expiresAt()}>
               <div class="flex gap-3 items-center justify-between w-full">
                 <div class="flex gap-4 items-center">
                   <div
