@@ -1,11 +1,33 @@
 import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match } from "solid-js";
+import { createSignal, Switch, Match, onMount } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
+import fetchData from "./auth.login.data";
+import { useRouteData } from "@solidjs/router";
+import { useGDNavigate } from "@/managers/NavigationManager";
+import { loggedOut } from "@/utils/routes";
+
+export type DeviceCodeObjectType = {
+  userCode: string;
+  link: string;
+  expiresAt: string;
+};
 
 export default function Login() {
-  const [step, setStep] = createSignal(0);
-  const [deviceCodeObject, setDeviceCodeObject] = createSignal<any>(null);
+  const [step, setStep] = createSignal<number | null>(0);
+  const [deviceCodeObject, setDeviceCodeObject] =
+    createSignal<DeviceCodeObjectType | null>(null);
+
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const navigate = useGDNavigate();
+
+  onMount(() => {
+    if (routeData.activeUuid.data && !loggedOut()) {
+      navigate("/library");
+    } else setStep(0);
+
+    console.log("AAA", routeData, loggedOut());
+  });
 
   return (
     <div class="flex justify-center items-center w-full h-screen p-0 bg-img-loginBG.jpg">

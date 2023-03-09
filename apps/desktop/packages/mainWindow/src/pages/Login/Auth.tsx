@@ -7,10 +7,11 @@ import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useModal } from "@/managers/ModalsManager";
+import { DeviceCodeObjectType } from ".";
 
 type Props = {
   setStep: Setter<number>;
-  setDeviceCodeObject: Setter<any>;
+  setDeviceCodeObject: Setter<DeviceCodeObjectType>;
 };
 
 const Auth = (props: Props) => {
@@ -26,6 +27,7 @@ const Auth = (props: Props) => {
     ["account.enroll.begin"],
     {
       onError(error) {
+        console.log("ERRR", error, error.code);
         setError(error.message);
       },
     }
@@ -39,12 +41,6 @@ const Auth = (props: Props) => {
     setClicked(true);
     accountEnrollBeginMutation.mutate(null);
   };
-
-  createEffect(() => {
-    if (routeData.accounts.isSuccess && routeData.accounts.data.length > 0) {
-      navigate("/library");
-    }
-  });
 
   createEffect(() => {
     if (clicked()) {
@@ -79,7 +75,7 @@ const Auth = (props: Props) => {
       <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={routeData.accounts.isLoading || clicked()}
+          loading={routeData.status.isLoading || clicked()}
           size="large"
           onClick={() => handleClick()}
         >

@@ -1,10 +1,10 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
-  const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
-  const accounts = rspc.createQuery(() => ["account.getAccounts", null]);
+  const status = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+  const activeUuid = rspc.createQuery(() => ["account.getActiveUuid", null]);
 
-  return { status: data, accounts };
+  return { status, activeUuid };
 };
 
 export default fetchData;

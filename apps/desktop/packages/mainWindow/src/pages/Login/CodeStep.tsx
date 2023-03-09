@@ -11,9 +11,10 @@ import { rspc } from "@/utils/rspcClient";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { DeviceCodeObjectType } from ".";
 interface Props {
-  deviceCodeObject: any | null;
-  setDeviceCodeObject: Setter<any>;
+  deviceCodeObject: DeviceCodeObjectType | null;
+  setDeviceCodeObject: Setter<DeviceCodeObjectType>;
 }
 
 const CodeStep = (props: Props) => {
@@ -59,10 +60,10 @@ const CodeStep = (props: Props) => {
   };
   const [loading, setLoading] = createSignal(false);
 
+  const enrollCancelMutation = rspc.createMutation(["account.enroll.cancel"]);
   const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
   const handleRefersh = async () => {
-    accountEnrollCancelMutation.mutate(null);
     accountEnrollBeginMutation.mutate(null);
   };
 
@@ -92,6 +93,7 @@ const CodeStep = (props: Props) => {
         setError("something went wrong while logging in");
       },
       onComplete(_accountEntry) {
+        enrollCancelMutation.mutate(null);
         finalizeMutation.mutate(null);
         navigate("/library");
       },
@@ -100,6 +102,7 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
+      accountEnrollCancelMutation.mutate(null);
       setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);

@@ -1,6 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { parseTwoDigitNumber } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
+import { setLoggedOut } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
@@ -230,6 +231,7 @@ export const AccountsDropdown = (props: Props) => {
         setAddAccountStarting(true);
       },
       onError(error) {
+        console.log("account.enroll.begin ERROR", error);
         setAddAccountStarting(false);
         addNotification(error.message, "error");
       },
@@ -295,10 +297,13 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+  const enrollStatus = rspc.createQuery(() => [
+    "account.enroll.getStatus",
+    null,
+  ]);
 
   createEffect(() => {
-    handleStatus(data, {
+    handleStatus(enrollStatus, {
       onPolling: (info) => {
         setAddCompleted(false);
         setLoginDeviceCode(info);
@@ -306,8 +311,6 @@ export const AccountsDropdown = (props: Props) => {
       onFail() {
         setLoadingAuthorization(false);
         setAddCompleted(true);
-        accountEnrollCancelMutation.mutate(null);
-        accountEnrollBeginMutation.mutate(null);
       },
       onComplete() {
         setLoadingAuthorization(false);
@@ -602,6 +605,7 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
+              setLoggedOut(true);
               navigate("/");
               deleteAccountMutation.mutate((activeAccount() as Label).uuid);
             }}
