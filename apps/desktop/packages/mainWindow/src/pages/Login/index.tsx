@@ -22,7 +22,7 @@ export default function Login() {
   const navigate = useGDNavigate();
 
   onMount(() => {
-    if (routeData.activeUuid.data && !loggedOut()) {
+    if (routeData.activeUuid.data && routeData.accounts?.data?.length! > 0) {
       navigate("/library");
     } else setStep(0);
   });

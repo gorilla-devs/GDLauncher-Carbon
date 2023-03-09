@@ -7,7 +7,6 @@ import {
   strToMs,
 } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
-import { setLoggedOut } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
@@ -42,7 +41,7 @@ export type OptionDropDown = {
 
 export type Props = {
   options: Option[];
-  value: string;
+  value: string | null | undefined;
   disabled?: boolean;
   label?: string;
   id?: string;
@@ -140,7 +139,8 @@ const parseStatus = (status: EnrollStatusResult | undefined) => {
 
 export const AccountsDropdown = (props: Props) => {
   const activeAccount = () =>
-    props.options.find((option) => option.key === props.value)?.label;
+    props.options.find((option) => option.key === props.value)?.label ||
+    props.options[0]?.label;
 
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [addAccountStarting, setAddAccountStarting] = createSignal(false);
@@ -148,9 +148,9 @@ export const AccountsDropdown = (props: Props) => {
     DeviceCode | undefined
   >(undefined);
   const [focusIn, setFocusIn] = createSignal(false);
+  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
-  const [addCompleted, setAddCompleted] = createSignal(true);
   const expiresAt = () => loginDeviceCode()?.expires_at || "";
   const expiresAtFormat = () => strToMs(expiresAt());
   const expiresAtMs = () => expiresAtFormat() - Date.now();
@@ -184,7 +184,7 @@ export const AccountsDropdown = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
-      accountEnrollCancelMutation.mutate(null);
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
     } else {
@@ -196,7 +196,7 @@ export const AccountsDropdown = (props: Props) => {
 
   const filteredOptions = () =>
     props.options.filter(
-      (option) => option.key !== (activeAccount() as Label).uuid
+      (option) => option.key !== (activeAccount() as Label)?.uuid
     );
 
   const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
@@ -231,6 +231,19 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
+  const accountEnrollCancelMutation = rspc.createMutation(
+    ["account.enroll.cancel"],
+    {
+      onError(error) {
+        addNotification(error.message, "error");
+      },
+      onMutate() {
+        setLoadingAuthorization(false);
+        setEnrollmentInProgress(false);
+      },
+    }
+  );
+
   const accountEnrollBeginMutation = rspc.createMutation(
     ["account.enroll.begin"],
     {
@@ -238,20 +251,8 @@ export const AccountsDropdown = (props: Props) => {
         setAddAccountStarting(true);
       },
       onError(error) {
-        accountEnrollCancelMutation.mutate(null);
+        if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
         setAddAccountStarting(false);
-        addNotification(error.message, "error");
-      },
-    }
-  );
-
-  const accountEnrollCancelMutation = rspc.createMutation(
-    ["account.enroll.cancel"],
-    {
-      onMutate() {
-        setAddCompleted(true);
-      },
-      onError(error) {
         addNotification(error.message, "error");
       },
     }
@@ -262,6 +263,10 @@ export const AccountsDropdown = (props: Props) => {
     {
       onError(error) {
         addNotification(error.message, "error");
+      },
+      onMutate() {
+        setLoadingAuthorization(false);
+        setEnrollmentInProgress(false);
       },
     }
   );
@@ -279,6 +284,12 @@ export const AccountsDropdown = (props: Props) => {
       queryClient.setQueryData(
         ["account.getAccounts", null],
         (old: Accounts | undefined) => {
+          const filteredAccounts = old?.filter(
+            (account) => account.uuid !== uuid
+          );
+
+          if (filteredAccounts?.length === 0) navigate("/");
+
           if (old) return old?.filter((account) => account.uuid !== uuid);
         }
       );
@@ -305,25 +316,29 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   createEffect(() => {
+    if (routeData.status.isSuccess && !routeData.status.data) {
+      setEnrollmentInProgress(false);
+    }
+
     handleStatus(routeData.status, {
       onPolling: (info) => {
-        setAddCompleted(false);
+        setEnrollmentInProgress(true);
         setLoginDeviceCode(info);
       },
-      onFail(error) {
+      onFail() {
+        setEnrollmentInProgress(false);
         setLoadingAuthorization(false);
-        setAddCompleted(true);
       },
       onError(error) {
+        setEnrollmentInProgress(false);
         if (error) addNotification(error?.message, "error");
       },
       onComplete() {
-        // setLoadingAuthorization(false);
-        if (!addCompleted()) {
+        setLoadingAuthorization(false);
+        if (enrollmentInProgress()) {
           accountEnrollFinalizeMutation.mutate(null);
         }
-        accountEnrollCancelMutation.mutate(null);
-        // setAddCompleted(true);
+        setEnrollmentInProgress(false);
       },
     });
   });
@@ -357,9 +372,9 @@ export const AccountsDropdown = (props: Props) => {
           "bg-shade-7": true,
         }}
       >
-        <Show when={(activeAccount() as Label).icon}>
+        <Show when={(activeAccount() as Label)?.icon}>
           <img
-            src={(activeAccount() as Label).icon}
+            src={(activeAccount() as Label)?.icon}
             class="w-5 h-5 rounded-md"
           />
         </Show>
@@ -371,7 +386,7 @@ export const AccountsDropdown = (props: Props) => {
             "text-shade-5": props.disabled,
           }}
         >
-          {(activeAccount() as Label).name}
+          {(activeAccount() as Label)?.name}
         </div>
 
         <span
@@ -400,12 +415,12 @@ export const AccountsDropdown = (props: Props) => {
         <div class="w-full flex flex-col mb-4">
           <div class="flex w-full mb-6">
             <img
-              src={(activeAccount() as Label).icon}
+              src={(activeAccount() as Label)?.icon}
               class="h-10 rounded-md mr-2 w-10"
             />
             <div class="flex flex-col justify-between">
-              <h5 class="m-0 text-white">{(activeAccount() as Label).name}</h5>
-              <p class="m-0 text-xs">{(activeAccount() as Label).type}</p>
+              <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
+              <p class="m-0 text-xs">{(activeAccount() as Label)?.type}</p>
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -419,13 +434,13 @@ export const AccountsDropdown = (props: Props) => {
             </h5>
             <div class="flex items-center gap-1">
               <div class="flex gap-1">
-                <p class="m-0 text-xs">{(activeAccount() as Label).uuid}</p>
+                <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
               <div
                 class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    (activeAccount() as Label).uuid
+                    (activeAccount() as Label)?.uuid
                   );
                   addNotification("The UUID has been copied");
                 }}
@@ -498,42 +513,45 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex py-2 justify-between group gap-3"
             classList={{
-              "flex-col": !addCompleted(),
-              "min-h-10": !addCompleted(),
-              "items-start": !addCompleted(),
+              "flex-col": !!enrollmentInProgress(),
+              "min-h-10": !!enrollmentInProgress(),
+              "items-start": !!enrollmentInProgress(),
             }}
           >
             <div class="flex justify-between w-full">
               <div
                 class="flex gap-3 items-center"
                 classList={{
-                  "cursor-not-allowed": !addCompleted(),
-                  "cursor-pointer": addCompleted(),
+                  "cursor-not-allowed": !!enrollmentInProgress(),
+                  "cursor-pointer": !enrollmentInProgress(),
                 }}
               >
                 <div
                   class="text-shade-0 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
                   classList={{
-                    "text-shade-5": !addCompleted(),
-                    "group-hover:text-white": addCompleted(),
-                    "cursor-not-allowed": !addCompleted(),
+                    "text-shade-5": !!enrollmentInProgress(),
+                    "group-hover:text-white": !enrollmentInProgress(),
+                    "cursor-not-allowed": !!enrollmentInProgress(),
                   }}
                 />
                 <span
-                  class="text-shade-0 transition ease-in-out"
+                  class="text-shade-0 transition ease-in-out select-none"
                   classList={{
-                    "cursor-not-allowed": !addCompleted(),
+                    "cursor-not-allowed": !!enrollmentInProgress(),
                   }}
                 >
                   <p
                     class="m-0"
                     classList={{
-                      "text-shade-5": !addCompleted(),
-                      "group-hover:text-white": addCompleted(),
+                      "text-shade-5": !!enrollmentInProgress(),
+                      "group-hover:text-white": !enrollmentInProgress(),
                     }}
                     onClick={() => {
-                      if (addCompleted()) {
-                        accountEnrollBeginMutation.mutate(null);
+                      if (!loadingAuthorization()) {
+                        if (!enrollmentInProgress()) {
+                          accountEnrollBeginMutation.mutate(null);
+                        } else accountEnrollCancelMutation.mutate(null);
+                        setLoadingAuthorization(true);
                       }
                     }}
                   >
@@ -550,7 +568,7 @@ export const AccountsDropdown = (props: Props) => {
                 <Spinner />
               </Show>
             </div>
-            <Show when={!addCompleted() && !expired() && expiresAt()}>
+            <Show when={enrollmentInProgress() && !expired() && expiresAt()}>
               <div class="flex gap-3 items-center justify-between w-full">
                 <div class="flex gap-4 items-center">
                   <div
@@ -592,7 +610,9 @@ export const AccountsDropdown = (props: Props) => {
                   <div
                     class="text-sm cursor-pointer i-ri:close-fill hover:text-red"
                     onClick={() => {
-                      accountEnrollCancelMutation.mutate(null);
+                      if (enrollmentInProgress() && loadingAuthorization()) {
+                        accountEnrollCancelMutation.mutate(null);
+                      }
                     }}
                   />
                 </div>
@@ -602,9 +622,7 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
-              setLoggedOut(true);
-              navigate("/");
-              deleteAccountMutation.mutate((activeAccount() as Label).uuid);
+              deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
             }}
           >
             <div class="h-4 w-4 i-ri:logout-box-fill" />

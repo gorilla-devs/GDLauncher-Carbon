@@ -16,6 +16,7 @@ type Props = {
 
 const Auth = (props: Props) => {
   const [t] = useTransContext();
+  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
   const [clicked, setClicked] = createSignal(false);
   const navigate = useNavigate();
@@ -42,9 +43,14 @@ const Auth = (props: Props) => {
   };
 
   createEffect(() => {
+    if (routeData.status.isSuccess && !routeData.status.data) {
+      setEnrollmentInProgress(false);
+    }
+
     if (clicked()) {
       handleStatus(routeData.status, {
         onPolling: (info) => {
+          setEnrollmentInProgress(true);
           setError(null);
           props.setDeviceCodeObject({
             userCode: info.user_code,
@@ -54,12 +60,16 @@ const Auth = (props: Props) => {
           props.setStep(1);
         },
         onFail() {
+          setEnrollmentInProgress(false);
           setError("something went wrong while logging in");
         },
         onComplete() {
           setError(null);
-          accountEnrollFinalizeMutation.mutate(null);
+          if (enrollmentInProgress()) {
+            accountEnrollFinalizeMutation.mutate(null);
+          }
           navigate("/library");
+          setEnrollmentInProgress(false);
         },
       });
     }

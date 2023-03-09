@@ -2,7 +2,7 @@ import { Button, LoadingBar } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { parseTwoDigitNumber } from "@/utils/helpers";
+import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
@@ -26,6 +26,7 @@ type ActiveUUID = Extract<
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const navigate = useGDNavigate();
+  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
 
   const accountEnrollCancelMutation = rspc.createMutation(
@@ -86,9 +87,8 @@ const CodeStep = (props: Props) => {
   const expiresAt = () => props.deviceCodeObject?.expiresAt;
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
-  const minutes = () =>
-    Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
+  const minutes = () => msToMinutes(expiresAtMs());
+  const seconds = () => msToSeconds(expiresAtMs());
   const [countDown, setCountDown] = createSignal(
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
@@ -116,8 +116,13 @@ const CodeStep = (props: Props) => {
   let interval: ReturnType<typeof setTimeout>;
 
   createEffect(() => {
+    if (routeData.status.isSuccess && !routeData.status.data) {
+      setEnrollmentInProgress(false);
+    }
+
     handleStatus(routeData.status, {
       onPolling: (info) => {
+        setEnrollmentInProgress(true);
         props.setDeviceCodeObject({
           userCode: info.user_code,
           link: info.verification_uri,
@@ -127,19 +132,21 @@ const CodeStep = (props: Props) => {
         setError(null);
       },
       onFail() {
+        setEnrollmentInProgress(false);
         setError("something went wrong while logging in");
       },
       onComplete(account) {
         finalizeMutation.mutate(null);
         setActiveUUIDMutation.mutate(account.uuid);
         navigate("/library");
+        setEnrollmentInProgress(false);
       },
     });
   });
 
   createEffect(() => {
     if (expired()) {
-      accountEnrollCancelMutation.mutate(null);
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
       setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);

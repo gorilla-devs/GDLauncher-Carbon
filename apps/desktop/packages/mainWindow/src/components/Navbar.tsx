@@ -105,7 +105,7 @@ const AppNavbar = () => {
             </Tabs>
           </ul>
           <div class="ml-4">
-            <Show when={routeData?.accounts.data && routeData?.activeUuid.data}>
+            <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 options={(routeData.accounts.data as Accounts).map(
                   (account) => ({
@@ -118,7 +118,7 @@ const AppNavbar = () => {
                     key: account?.uuid,
                   })
                 )}
-                value={routeData.activeUuid.data as string}
+                value={routeData.activeUuid.data}
               />
             </Show>
           </div>
