@@ -73,7 +73,7 @@ const Auth = (props: Props) => {
       <div class="flex flex-col justify-center items-center text-center">
         <Button
           id="auth-button"
-          loading={routeData.isLoading && clicked()}
+          loading={routeData.isLoading || clicked()}
           size="large"
           onClick={() => handleClick()}
         >

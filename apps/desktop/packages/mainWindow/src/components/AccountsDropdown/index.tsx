@@ -183,14 +183,54 @@ export const AccountsDropdown = (props: Props) => {
     );
 
   const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
-    onMutate: (uuid) => {
-      const selectedAccount = props.options.find(
-        (account) => account.label.uuid === uuid
+    onMutate: async (
+      uuid
+    ): Promise<{ previousAccounts: Accounts } | undefined> => {
+      await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
+
+      const previousAccounts: Accounts | undefined = queryClient.getQueryData([
+        "account.getAccounts",
+      ]);
+
+      // const selectedAccount = props.options.find(
+      //   (account) => account.label.uuid === uuid
+      // );
+
+      // if (selectedAccount) {
+      //   setSelectedValue(selectedAccount.label);
+      // }
+
+      queryClient.setQueryData(
+        ["account.getAccounts", null],
+        (old: Accounts | undefined) => {
+          // const selectedAccount = props.options.find(
+          //   (account) => account.label.uuid === uuid
+          // );
+          // if (selectedAccount) {
+          //   setSelectedValue(selectedAccount.label);
+          // }
+          // if (old) return old?.filter((account) => account.uuid !== uuid);
+        }
       );
 
-      if (selectedAccount) {
-        setSelectedValue(selectedAccount.label);
+      if (previousAccounts) return { previousAccounts };
+    },
+    onError: (
+      error,
+      _variables,
+      context: { previousAccounts: Accounts } | undefined
+    ) => {
+      addNotification(error.message, "error");
+
+      if (context?.previousAccounts) {
+        queryClient.setQueryData(
+          ["account.getAccounts"],
+          context.previousAccounts
+        );
       }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["account.getAccounts"] });
     },
   });
 
@@ -273,7 +313,11 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
+  const data = rspc.createQuery(() => ["account.enroll.getStatus", null], {
+    onError(err) {
+      console.log("ERRRORRR", err);
+    },
+  });
 
   createEffect(() => {
     if (data.isSuccess) {
@@ -283,6 +327,7 @@ export const AccountsDropdown = (props: Props) => {
           setLoginDeviceCode(info);
         },
         onFail() {
+          console.log("FAIl");
           setLoadingAuthorization(false);
           setAddCompleted(true);
           accountEnrollCancelMutation.mutate(null);
@@ -420,6 +465,11 @@ export const AccountsDropdown = (props: Props) => {
                   },
                 }
               );
+
+              // createEffect(() => {
+
+              // });
+
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
@@ -574,8 +624,8 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
-              deleteAccountMutation.mutate((selectedValue() as Label).uuid);
               navigate("/");
+              deleteAccountMutation.mutate((selectedValue() as Label).uuid);
             }}
           >
             <div class="h-4 w-4 i-ri:logout-box-fill" />

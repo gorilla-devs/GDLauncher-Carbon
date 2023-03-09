@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import ProfileImg from "/assets/images/profile-img.png";
 import { NAVBAR_ROUTES } from "@/constants";
@@ -38,6 +38,10 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const accounts = useRouteData<typeof fetchData>();
+
+  createEffect(() => {
+    console.log("ACCOUNTS", accounts);
+  });
 
   return (
     <Show when={!isLogin()}>

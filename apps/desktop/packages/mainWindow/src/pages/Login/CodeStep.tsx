@@ -182,7 +182,7 @@ const CodeStep = (props: Props) => {
           <Trans
             key="waiting_login_code_msg"
             options={{
-              defaultValue: "Waiting authorization...",
+              defaultValue: "Waiting for authorization...",
             }}
           />
         </span>

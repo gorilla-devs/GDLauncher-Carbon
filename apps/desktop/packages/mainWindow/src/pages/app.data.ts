@@ -8,7 +8,11 @@ export type Accounts = {
 };
 
 const fetchData = () => {
-  let data = rspc.createQuery(() => ["account.getAccounts", null]);
+  let data = rspc.createQuery(() => ["account.getAccounts", null], {
+    onError(err) {
+      console.log("DDDDD", err);
+    },
+  });
   return data;
 };
 
