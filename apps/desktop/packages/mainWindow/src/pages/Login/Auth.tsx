@@ -41,8 +41,14 @@ const Auth = (props: Props) => {
   };
 
   createEffect(() => {
-    if (routeData.isSuccess && clicked()) {
-      handleStatus(routeData, {
+    if (routeData.accounts.isSuccess && routeData.accounts.data.length > 0) {
+      navigate("/library");
+    }
+  });
+
+  createEffect(() => {
+    if (clicked()) {
+      handleStatus(routeData.status, {
         onPolling: (info) => {
           setError(null);
           props.setDeviceCodeObject({
