@@ -59,7 +59,7 @@ CREATE TABLE "Instance" (
 CREATE TABLE "InstanceGroup" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
-    "index" INTEGER NOT NULL
+    "groupIndex" INTEGER NOT NULL
 );
 
 -- CreateIndex
@@ -76,6 +76,3 @@ CREATE UNIQUE INDEX "MinecraftAssets_assetsIdSha1_key" ON "MinecraftAssets"("ass
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "InstanceGroup_index_key" ON "InstanceGroup"("index");

@@ -58,9 +58,10 @@ model Instance {
   groupId   Int
 }
 
+// WARNING: this table is accessed with raw sql. Check InstanceManager::move_group before modifying.
 model InstanceGroup {
-  id        Int        @id @default(autoincrement())
-  name      String
-  index     Int        @unique
-  instances Instance[]
+  id         Int        @id @default(autoincrement())
+  name       String
+  groupIndex Int        //@unique
+  instances  Instance[]
 }

@@ -3,6 +3,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use anyhow::bail;
 use carbon_domain::instance::InstanceConfiguration;
 use futures::future::BoxFuture;
+use prisma_client_rust::{Raw, PrismaValue};
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
@@ -155,6 +156,67 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
     }
 
+    async fn move_group(self, start: i32, target: i32) -> anyhow::Result<()> {
+        if start < 0 || target < 0 {
+            bail!("group indexes cannot be negative");
+        }
+
+        let group_count = self.app
+            .prisma_client
+            .instance_group()
+            .count(vec![])
+            .exec()
+            .await?;
+
+        if start as i64 > group_count {
+            bail!("group indexes are out of range");
+        }
+
+        let statement = {
+            let build_statment = |shift| format!("
+                UPDATE InstanceGroup
+                SET groupIndex = CASE groupIndex
+                    WHEN ? THEN ?
+                    ELSE groupIndex {shift} 1
+                END
+                WHERE groupIndex BETWEEN ? AND ?;
+            ");
+
+            let statement = match (start, target) {
+                (start, target) if start < target => build_statment("-"),
+                (start, target) if start > target => build_statment("+"),
+                _ => unreachable!(),
+            };
+
+            let min = i32::min(start, target);
+            let max = i32::max(start, target);
+
+            use PrismaValue::Int;
+
+            #[rustfmt::skip]
+            let statement = Raw::new(
+                &statement,
+                vec![
+                    /* UPDATE InstanceGroup */
+                    /* SET groupIndex = CASE groupIndex */
+                    /*     WHEN */ Int(start as i64), /* THEN */ Int(target as i64),
+                    /*     ELSE groupIndex +/- 1 */
+                    /* END */
+                    /* WHERE groupIndex BETWEEN */ Int(min as i64), /* AND */ Int(max as i64), /* ; */
+                ],
+            );
+
+            statement
+        };
+
+        self.app.prisma_client
+            ._execute_raw(statement)
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+
     fn get_default_group(self) -> BoxFuture<'s, anyhow::Result<GroupId>> {
         Box::pin(async move {
             use db::instance_group::WhereParam;
@@ -228,7 +290,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .create(
                 name,
                 shortpath,
-                *index.value,
+                index.value,
                 UniqueWhereParam::IdEquals(*group),
                 vec![],
             )
@@ -258,7 +320,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     async fn next_instance_index(
         self,
         group: GroupId,
-    ) -> anyhow::Result<IdLock<'s, InstanceIndex>> {
+    ) -> anyhow::Result<IdLock<'s, i32>> {
         use db::instance::WhereParam;
 
         let guard = self.manager.index_lock.lock().await;
@@ -272,7 +334,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         Ok(IdLock {
-            value: InstanceIndex(count as i32),
+            value: count as i32,
             guard,
         })
     }
@@ -291,22 +353,10 @@ struct IdLock<'a, V: Copy + Clone> {
 }
 
 // Typed group id to avoid dealing with a raw int
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 struct GroupId(i32);
 
-// Typed instance index to avoid dealing with a raw int
-#[derive(Copy, Clone, PartialEq, Eq)]
-struct InstanceIndex(i32);
-
 impl Deref for GroupId {
-    type Target = i32;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for InstanceIndex {
     type Target = i32;
 
     fn deref(&self) -> &Self::Target {
@@ -351,9 +401,62 @@ enum ConfigurationParseErrorType {
 
 #[cfg(test)]
 mod test {
+    use prisma_client_rust::Direction;
+
+    use crate::{db::PrismaClient, managers::instance::GroupId};
+
     #[tokio::test]
     async fn test_scan() {
         let app = crate::setup_managers_for_test().await;
         app.instance_manager().scan_instances().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_move_groups() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+
+        async fn get_ordered_groups(prisma_client: &PrismaClient) -> anyhow::Result<Vec<GroupId>> {
+            use crate::db::instance_group::OrderByParam;
+
+            Ok(prisma_client
+               .instance_group()
+               .find_many(vec![])
+               .order_by(OrderByParam::GroupIndex(Direction::Asc))
+               .exec()
+               .await?
+               .into_iter()
+               .map(|group| GroupId(group.id))
+               .collect())
+        }
+
+        let mut groups = [
+            app.instance_manager().create_group(String::from("move0")).await?,
+            app.instance_manager().create_group(String::from("move1")).await?,
+            app.instance_manager().create_group(String::from("move2")).await?,
+            app.instance_manager().create_group(String::from("move3")).await?,
+            app.instance_manager().create_group(String::from("move4")).await?,
+        ];
+
+        // move 1 to 3 as if dragged
+        app.instance_manager().move_group(1, 3).await?;
+        groups = [groups[0], groups[2], groups[3], groups[1], groups[4]];
+        assert_eq!(groups[..], get_ordered_groups(&app.prisma_client).await?[..]);
+
+        // move 3 back to 1
+        app.instance_manager().move_group(3, 1).await?;
+        groups = [groups[0], groups[3], groups[1], groups[2], groups[4]];
+        assert_eq!(groups[..], get_ordered_groups(&app.prisma_client).await?[..]);
+
+        // move 1 to 4 (end of list)
+        app.instance_manager().move_group(1, 4).await?;
+        groups = [groups[0], groups[2], groups[3], groups[4], groups[1]];
+        assert_eq!(groups[..], get_ordered_groups(&app.prisma_client).await?[..]);
+
+        // move 4 to 0 (beginning of list)
+        app.instance_manager().move_group(4, 0).await?;
+        groups = [groups[4], groups[0], groups[1], groups[2], groups[3]];
+        assert_eq!(groups[..], get_ordered_groups(&app.prisma_client).await?[..]);
+
+        Ok(())
     }
 }
