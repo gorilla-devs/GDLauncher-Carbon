@@ -5,7 +5,8 @@ CREATE TABLE "AppConfiguration" (
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
     "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
-    "activeAccountUuid" TEXT
+    "activeAccountUuid" TEXT,
+    "defaultInstanceGroup" INTEGER
 );
 
 -- CreateTable
@@ -45,6 +46,22 @@ CREATE TABLE "ActiveDownloads" (
     "file_id" TEXT NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "Instance" (
+    "name" TEXT NOT NULL,
+    "shortpath" TEXT NOT NULL PRIMARY KEY,
+    "index" INTEGER NOT NULL,
+    "groupId" INTEGER NOT NULL,
+    CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InstanceGroup" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "index" INTEGER NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "MinecraftManifest_id_key" ON "MinecraftManifest"("id");
 
@@ -59,3 +76,6 @@ CREATE UNIQUE INDEX "MinecraftAssets_assetsIdSha1_key" ON "MinecraftAssets"("ass
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "InstanceGroup_index_key" ON "InstanceGroup"("index");

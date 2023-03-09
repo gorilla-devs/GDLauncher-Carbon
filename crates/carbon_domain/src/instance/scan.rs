@@ -98,9 +98,7 @@ async fn scan_for_instances_single_directory(
             .to_str()
             .unwrap()
             .to_string(),
-        minecraft_package: instance_configuration_file
-            .minecraft_package_configuration
-            .into(),
+        minecraft_package: instance_configuration_file.game_configuration.into(),
         persistence_status: InstanceStatus::Persisted(directory_path.to_path_buf()),
     })
 }

@@ -1,7 +1,7 @@
 pub(crate) mod configuration;
 
 use crate::minecraft_mod::MinecraftMod;
-use crate::minecraft_package::configuration::MinecraftPackageConfigurationFile;
+use crate::minecraft_package::configuration::MinecraftConfiguration;
 use crate::modloader::ModLoader;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -31,8 +31,8 @@ impl MinecraftPackage {
     }
 }
 
-impl From<MinecraftPackageConfigurationFile> for MinecraftPackage {
-    fn from(value: MinecraftPackageConfigurationFile) -> Self {
+impl From<MinecraftConfiguration> for MinecraftPackage {
+    fn from(value: MinecraftConfiguration) -> Self {
         MinecraftPackage {
             version: value.version,
             mods: Default::default(),
@@ -42,8 +42,8 @@ impl From<MinecraftPackageConfigurationFile> for MinecraftPackage {
     }
 }
 
-impl From<&MinecraftPackageConfigurationFile> for MinecraftPackage {
-    fn from(value: &MinecraftPackageConfigurationFile) -> Self {
+impl From<&MinecraftConfiguration> for MinecraftPackage {
+    fn from(value: &MinecraftConfiguration) -> Self {
         MinecraftPackage {
             version: value.version.clone(),
             mods: Default::default(),

@@ -13,12 +13,14 @@ use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
+use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
 use self::queue::TaskQueue;
 
 pub mod account;
 mod configuration;
 pub mod download;
+mod instance;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
@@ -41,6 +43,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        instance_manager: InstanceManager,
         pub(crate) reqwest_client: reqwest::Client,
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_queue: TaskQueue,
@@ -71,6 +74,7 @@ mod app {
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
                 download_manager: DownloadManager::new(),
+                instance_manager: InstanceManager::new(),
                 invalidation_channel,
                 reqwest_client: reqwest::Client::new(),
                 prisma_client: Arc::new(db_client),
@@ -82,6 +86,7 @@ mod app {
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
+        manager_getter!(instance_manager: InstanceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
@@ -104,7 +109,7 @@ mod app {
 pub use app::AppInner;
 
 pub struct ManagerRef<'a, T> {
-    manager: &'a T,
+    pub manager: &'a T,
     pub app: &'a Arc<AppInner>,
 }
 

@@ -7,7 +7,7 @@ pub mod write;
 use crate::minecraft_package::MinecraftPackage;
 use crate::{
     instance::InstanceStatus::NotPersisted,
-    minecraft_package::configuration::MinecraftPackageConfigurationFile,
+    minecraft_package::configuration::MinecraftConfiguration,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -54,17 +54,16 @@ impl Instance {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InstanceConfigurationFile {
+pub struct InstanceConfiguration {
     pub instance_name: String,
-    #[serde(rename = "minecraft_package")]
-    pub minecraft_package_configuration: MinecraftPackageConfigurationFile,
+    pub game_configuration: MinecraftConfiguration,
 }
 
-impl From<&Instance> for InstanceConfigurationFile {
+impl From<&Instance> for InstanceConfiguration {
     fn from(value: &Instance) -> Self {
-        InstanceConfigurationFile {
+        InstanceConfiguration {
             instance_name: value.name.clone(),
-            minecraft_package_configuration: MinecraftPackageConfigurationFile {
+            game_configuration: MinecraftConfiguration {
                 version: value.minecraft_package.version.clone(),
                 description: value.minecraft_package.description.clone(),
                 modloader: value.minecraft_package.modloader.clone(),

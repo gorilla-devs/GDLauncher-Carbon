@@ -9,12 +9,13 @@ generator client {
 }
 
 model AppConfiguration {
-  id                 Int     @id @default(0)
-  theme              String  @default("main")
-  reducedMotion      Boolean @default(false)
-  discordIntegration Boolean @default(true)
-  releaseChannel     String  @default("stable")
-  activeAccountUuid  String?
+  id                   Int     @id @default(0)
+  theme                String  @default("main")
+  reducedMotion        Boolean @default(false)
+  discordIntegration   Boolean @default(true)
+  releaseChannel       String  @default("stable")
+  activeAccountUuid    String?
+  defaultInstanceGroup Int?
 }
 
 model Account {
@@ -47,4 +48,19 @@ model MinecraftAssets {
 model ActiveDownloads {
   url     String @id
   file_id String @unique
+}
+
+model Instance {
+  name      String
+  shortpath String         @id
+  index     Int
+  group     InstanceGroup  @relation(fields: [groupId], references: [id])
+  groupId   Int
+}
+
+model InstanceGroup {
+  id        Int        @id @default(autoincrement())
+  name      String
+  index     Int        @unique
+  instances Instance[]
 }

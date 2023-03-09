@@ -8,7 +8,7 @@ use std::time::{SystemTime, SystemTimeError};
 use thiserror::Error;
 use tokio::io::AsyncReadExt;
 
-use super::InstanceConfigurationFile;
+use super::InstanceConfiguration;
 
 #[derive(Error, Debug)]
 pub enum ConfigurationFileParsingError {
@@ -24,7 +24,7 @@ pub enum ConfigurationFileParsingError {
 
 pub async fn parse_from_file<T: AsRef<Path> + Sync>(
     configuration_file_path: &T,
-) -> Result<InstanceConfigurationFile, ConfigurationFileParsingError> {
+) -> Result<InstanceConfiguration, ConfigurationFileParsingError> {
     trace!(
         "prepare reading of instance configuration file at {}",
         try_path_fmt!(configuration_file_path.as_ref())
@@ -36,7 +36,7 @@ pub async fn parse_from_file<T: AsRef<Path> + Sync>(
         "read {bytes_read} bytes from configuration file at {}",
         try_path_fmt!(configuration_file_path.as_ref())
     );
-    let instance_configuration: InstanceConfigurationFile =
+    let instance_configuration: InstanceConfiguration =
         serde_json::from_str(conf_file_content.as_str())?;
     Ok(instance_configuration)
 }
@@ -44,13 +44,13 @@ pub async fn parse_from_file<T: AsRef<Path> + Sync>(
 pub async fn write_in_file<T: AsRef<Path> + Sync>(
     instance: &Instance,
     configuration_file_path: &T,
-) -> Result<InstanceConfigurationFile, ConfigurationFileParsingError> {
+) -> Result<InstanceConfiguration, ConfigurationFileParsingError> {
     trace!(
         "prepare writing of instance configuration file at {}",
         try_path_fmt!(configuration_file_path.as_ref())
     );
     let configuration_file_path = configuration_file_path.as_ref();
-    let instance_configuration_file: InstanceConfigurationFile = instance.into();
+    let instance_configuration_file: InstanceConfiguration = instance.into();
     let instance_configuration_file_content =
         serde_json::to_string_pretty(&instance_configuration_file)?;
     let duration_since_epoch = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
