@@ -15,6 +15,11 @@ type EnrollStatusResult = Extract<
   { key: "account.getAccountStatus" }
 >["result"];
 
+type Accounts = Extract<
+  Procedures["queries"],
+  { key: "account.getAccounts" }
+>["result"];
+
 export interface AccountsStatus {
   [details: string]: {
     username: string;
@@ -37,10 +42,10 @@ const AppNavbar = () => {
       ? 4
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
-  const accounts = useRouteData<typeof fetchData>();
+  const routeData = useRouteData<typeof fetchData>();
 
   createEffect(() => {
-    console.log("ACCOUNTS", accounts);
+    console.log("ACCOUNTS", routeData, routeData.activeUuid.data);
   });
 
   return (
@@ -104,18 +109,20 @@ const AppNavbar = () => {
             </Tabs>
           </ul>
           <div class="ml-4">
-            <Show when={accounts.data && accounts?.data?.length > 0}>
+            <Show when={routeData?.accounts.data && routeData.activeUuid.data}>
               <AccountsDropdown
-                options={(accounts.data || []).map((account) => ({
-                  label: {
-                    name: account?.username,
-                    icon: ProfileImg,
-                    uuid: account.uuid,
-                    type: account.type_,
-                  },
-                  key: account?.uuid,
-                }))}
-                value="ladvace"
+                options={(routeData.accounts.data as Accounts).map(
+                  (account) => ({
+                    label: {
+                      name: account?.username,
+                      icon: ProfileImg,
+                      uuid: account.uuid,
+                      type: account.type_,
+                    },
+                    key: account?.uuid,
+                  })
+                )}
+                value={routeData.activeUuid.data as string}
               />
             </Show>
           </div>

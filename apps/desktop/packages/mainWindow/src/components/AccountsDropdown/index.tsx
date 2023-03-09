@@ -39,6 +39,17 @@ export type Props = {
   label?: string;
   id?: string;
 };
+
+type Accounts = Extract<
+  Procedures["queries"],
+  { key: "account.getAccounts" }
+>["result"];
+
+type ActiveUUID = Extract<
+  Procedures["queries"],
+  { key: "account.setActiveUuid" }
+>["result"];
+
 export interface DropDownButtonProps extends Props {
   children: JSX.Element;
 }
@@ -120,11 +131,9 @@ const parseStatus = (status: EnrollStatusResult | undefined) => {
 };
 
 export const AccountsDropdown = (props: Props) => {
-  const defaultValue = () =>
-    props.options.find((option) => option.key === props.value)?.label ||
-    props.options[0]?.label;
+  const activeAccount = () =>
+    props.options.find((option) => option.key === props.value)?.label;
 
-  const [selectedValue, setSelectedValue] = createSignal(defaultValue());
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [addAccountStarting, setAddAccountStarting] = createSignal(false);
   const [loginDeviceCode, setLoginDeviceCode] = createSignal<
@@ -179,58 +188,38 @@ export const AccountsDropdown = (props: Props) => {
 
   const filteredOptions = () =>
     props.options.filter(
-      (option) => option.key !== (selectedValue() as Label).uuid
+      (option) => option.key !== (activeAccount() as Label).uuid
     );
 
   const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
     onMutate: async (
       uuid
-    ): Promise<{ previousAccounts: Accounts } | undefined> => {
-      await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
+    ): Promise<{ previousActiveUUID: ActiveUUID } | undefined> => {
+      await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
 
-      const previousAccounts: Accounts | undefined = queryClient.getQueryData([
-        "account.getAccounts",
-      ]);
+      const previousActiveUUID: ActiveUUID | undefined =
+        queryClient.getQueryData(["account.setActiveUuid"]);
 
-      // const selectedAccount = props.options.find(
-      //   (account) => account.label.uuid === uuid
-      // );
+      queryClient.setQueryData(["account.setActiveUuid", null], uuid);
 
-      // if (selectedAccount) {
-      //   setSelectedValue(selectedAccount.label);
-      // }
-
-      queryClient.setQueryData(
-        ["account.getAccounts", null],
-        (old: Accounts | undefined) => {
-          // const selectedAccount = props.options.find(
-          //   (account) => account.label.uuid === uuid
-          // );
-          // if (selectedAccount) {
-          //   setSelectedValue(selectedAccount.label);
-          // }
-          // if (old) return old?.filter((account) => account.uuid !== uuid);
-        }
-      );
-
-      if (previousAccounts) return { previousAccounts };
+      if (previousActiveUUID) return { previousActiveUUID };
     },
     onError: (
       error,
       _variables,
-      context: { previousAccounts: Accounts } | undefined
+      context: { previousActiveUUID: ActiveUUID } | undefined
     ) => {
       addNotification(error.message, "error");
 
-      if (context?.previousAccounts) {
+      if (context?.previousActiveUUID) {
         queryClient.setQueryData(
-          ["account.getAccounts"],
-          context.previousAccounts
+          ["account.setActiveUuid"],
+          context.previousActiveUUID
         );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["account.getAccounts"] });
+      queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
     },
   });
 
@@ -243,8 +232,6 @@ export const AccountsDropdown = (props: Props) => {
       onError(error) {
         setAddAccountStarting(false);
         addNotification(error.message, "error");
-        accountEnrollCancelMutation.mutate(null);
-        accountEnrollBeginMutation.mutate(null);
       },
     }
   );
@@ -269,11 +256,6 @@ export const AccountsDropdown = (props: Props) => {
       },
     }
   );
-
-  type Accounts = Extract<
-    Procedures["queries"],
-    { key: "account.getAccounts" }
-  >["result"];
 
   const deleteAccountMutation = rspc.createMutation(["account.deleteAccount"], {
     onMutate: async (
@@ -313,11 +295,7 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
-  const data = rspc.createQuery(() => ["account.enroll.getStatus", null], {
-    onError(err) {
-      console.log("ERRRORRR", err);
-    },
-  });
+  const data = rspc.createQuery(() => ["account.enroll.getStatus", null]);
 
   createEffect(() => {
     handleStatus(data, {
@@ -335,6 +313,9 @@ export const AccountsDropdown = (props: Props) => {
         setLoadingAuthorization(false);
         accountEnrollFinalizeMutation.mutate(null);
         setAddCompleted(true);
+      },
+      onError(error) {
+        console.log("STATUS ERROR NAVBAR", error);
       },
     });
   });
@@ -368,9 +349,9 @@ export const AccountsDropdown = (props: Props) => {
           "bg-shade-7": true,
         }}
       >
-        <Show when={(selectedValue() as Label).icon}>
+        <Show when={(activeAccount() as Label).icon}>
           <img
-            src={(selectedValue() as Label).icon}
+            src={(activeAccount() as Label).icon}
             class="w-5 h-5 rounded-md"
           />
         </Show>
@@ -382,7 +363,7 @@ export const AccountsDropdown = (props: Props) => {
             "text-shade-5": props.disabled,
           }}
         >
-          {(selectedValue() as Label).name}
+          {(activeAccount() as Label).name}
         </div>
 
         <span
@@ -411,12 +392,12 @@ export const AccountsDropdown = (props: Props) => {
         <div class="w-full flex flex-col mb-4">
           <div class="flex w-full mb-6">
             <img
-              src={(selectedValue() as Label).icon}
+              src={(activeAccount() as Label).icon}
               class="h-10 rounded-md mr-2 w-10"
             />
             <div class="flex flex-col justify-between">
-              <h5 class="m-0 text-white">{(selectedValue() as Label).name}</h5>
-              <p class="m-0 text-xs">{(selectedValue() as Label).type}</p>
+              <h5 class="m-0 text-white">{(activeAccount() as Label).name}</h5>
+              <p class="m-0 text-xs">{(activeAccount() as Label).type}</p>
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -430,13 +411,13 @@ export const AccountsDropdown = (props: Props) => {
             </h5>
             <div class="flex items-center gap-1">
               <div class="flex gap-1">
-                <p class="m-0 text-xs">{(selectedValue() as Label).uuid}</p>
+                <p class="m-0 text-xs">{(activeAccount() as Label).uuid}</p>
               </div>
               <div
                 class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
                 onClick={() => {
                   navigator.clipboard.writeText(
-                    (selectedValue() as Label).uuid
+                    (activeAccount() as Label).uuid
                   );
                   addNotification("The UUID has been copied");
                 }}
@@ -454,7 +435,7 @@ export const AccountsDropdown = (props: Props) => {
               const accountStatusQuery = rspc.createQuery(
                 () => [
                   "account.getAccountStatus",
-                  (selectedValue() as Label).uuid,
+                  (activeAccount() as Label).uuid,
                 ],
                 {
                   onError(err) {
@@ -622,7 +603,7 @@ export const AccountsDropdown = (props: Props) => {
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
               navigate("/");
-              deleteAccountMutation.mutate((selectedValue() as Label).uuid);
+              deleteAccountMutation.mutate((activeAccount() as Label).uuid);
             }}
           >
             <div class="h-4 w-4 i-ri:logout-box-fill" />

@@ -44,5 +44,5 @@ export const handleStatus = (
       const complete = data.Complete;
       callbacks?.onComplete?.(complete);
     }
-  } else callbacks?.onError?.(routeData.error);
+  } else if (routeData.isError) callbacks?.onError?.(routeData.error);
 };
