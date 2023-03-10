@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use anyhow::bail;
 use carbon_domain::instance::InstanceConfiguration;
 use futures::future::BoxFuture;
+use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
@@ -157,22 +158,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     async fn move_group(self, start: i32, target: i32) -> anyhow::Result<()> {
-        use db::instance_group::{SetParam, UniqueWhereParam, WhereParam};
+        use db::instance_group::{OrderByParam, SetParam, UniqueWhereParam, WhereParam};
 
         if start < 0 || target < 0 {
             bail!("group indexes cannot be negative");
         }
 
-        let group_count = self
+        let group_max = self
             .app
             .prisma_client
             .instance_group()
-            .count(vec![])
+            .find_first(vec![])
+            .order_by(OrderByParam::GroupIndex(Direction::Desc))
             .exec()
-            .await?;
+            .await?
+            .map(|group| group.group_index)
+            .unwrap_or(0);
 
-        if start as i64 > group_count {
-            bail!("group indexes are out of range");
+        if target > group_max {
+            bail!("target index out of range");
         }
 
         let start_id = self
@@ -216,6 +220,122 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.app.prisma_client.instance_group().update(
                     UniqueWhereParam::IdEquals(start_id),
                     vec![SetParam::SetGroupIndex(target)],
+                ),
+            ))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn move_instance(
+        self,
+        start: (GroupId, i32),
+        target: (GroupId, i32),
+    ) -> anyhow::Result<()> {
+        use db::instance::{OrderByParam, SetParam, UniqueWhereParam, WhereParam};
+
+        if start.1 < 0 || target.1 < 0 {
+            bail!("instance indexes cannot be negative")
+        }
+
+        let instance_max = self
+            .app
+            .prisma_client
+            .instance()
+            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*target.0))])
+            .order_by(OrderByParam::Index(Direction::Desc))
+            .exec()
+            .await?
+            .into_iter()
+            .map(|instance| instance.index)
+            .collect::<Vec<_>>();
+
+        dbg!(instance_max);
+
+        let instance_max = self
+            .app
+            .prisma_client
+            .instance()
+            .find_first(vec![WhereParam::GroupId(IntFilter::Equals(*target.0))])
+            .order_by(OrderByParam::Index(Direction::Desc))
+            .exec()
+            .await?
+            .map(|instance| instance.index)
+            .unwrap_or(0);
+
+        if (start.0 == target.0 && target.1 > instance_max)
+            || (start.0 != target.0 && target.1 - 1 > instance_max)
+        {
+            dbg!(start, target, instance_max);
+            bail!("target index out of range");
+        }
+
+        let start_shortpath = self
+            .app
+            .prisma_client
+            .instance()
+            .find_first(vec![
+                WhereParam::GroupId(IntFilter::Equals(*start.0)),
+                WhereParam::Index(IntFilter::Equals(start.1)),
+            ])
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow!("database corruption: in range indexed instance is missing"))?
+            .shortpath;
+
+        let index_shifts = if start.0 == target.0 {
+            vec![match (start, target.1) {
+                ((group, start), target) if start < target => {
+                    self.app.prisma_client.instance().update_many(
+                        vec![
+                            WhereParam::GroupId(IntFilter::Equals(*group)),
+                            WhereParam::Index(IntFilter::Gt(start)),
+                            WhereParam::Index(IntFilter::Lte(target)),
+                        ],
+                        vec![SetParam::DecrementIndex(1)],
+                    )
+                }
+                ((group, start), target) if start > target => {
+                    self.app.prisma_client.instance().update_many(
+                        vec![
+                            WhereParam::GroupId(IntFilter::Equals(*group)),
+                            WhereParam::Index(IntFilter::Gte(target)),
+                            WhereParam::Index(IntFilter::Lt(start)),
+                        ],
+                        vec![SetParam::IncrementIndex(1)],
+                    )
+                }
+                _ => return Ok(()),
+            }]
+        } else {
+            vec![
+                self.app.prisma_client.instance().update_many(
+                    vec![
+                        WhereParam::GroupId(IntFilter::Equals(*start.0)),
+                        WhereParam::Index(IntFilter::Gt(start.1)),
+                    ],
+                    vec![SetParam::DecrementIndex(1)],
+                ),
+                self.app.prisma_client.instance().update_many(
+                    vec![
+                        WhereParam::GroupId(IntFilter::Equals(*target.0)),
+                        WhereParam::Index(IntFilter::Gte(target.1)),
+                    ],
+                    vec![SetParam::IncrementIndex(1)],
+                ),
+            ]
+        };
+
+        self.app
+            .prisma_client
+            ._batch((
+                index_shifts,
+                self.app.prisma_client.instance().update(
+                    UniqueWhereParam::ShortpathEquals(start_shortpath),
+                    vec![
+                        SetParam::SetGroupId(*target.0),
+                        SetParam::SetIndex(target.1),
+                    ],
                 ),
             ))
             .await?;
@@ -406,7 +526,10 @@ enum ConfigurationParseErrorType {
 mod test {
     use prisma_client_rust::Direction;
 
-    use crate::{db::PrismaClient, managers::instance::GroupId};
+    use crate::{
+        db::{read_filters::IntFilter, PrismaClient},
+        managers::instance::GroupId,
+    };
 
     #[tokio::test]
     async fn test_scan() {
@@ -480,6 +603,122 @@ mod test {
         assert_eq!(
             groups[..],
             get_ordered_groups(&app.prisma_client).await?[..]
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_move_instances() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+
+        async fn get_ordered_instances(
+            prisma_client: &PrismaClient,
+            group: GroupId,
+        ) -> anyhow::Result<Vec<String>> {
+            use crate::db::instance::{OrderByParam, WhereParam};
+
+            Ok(prisma_client
+                .instance()
+                .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*group))])
+                .order_by(OrderByParam::Index(Direction::Asc))
+                .exec()
+                .await?
+                .into_iter()
+                .map(|instance| instance.shortpath)
+                .collect())
+        }
+
+        let [group0, group1] = [
+            app.instance_manager()
+                .create_group(String::from("group0"))
+                .await?,
+            app.instance_manager()
+                .create_group(String::from("group1"))
+                .await?,
+        ];
+
+        let mk_instance = |shortpath: &'static str, group| {
+            let app = &app;
+            async move {
+                app.instance_manager()
+                    .create_instance(shortpath.to_string(), shortpath.to_string(), group)
+                    .await?;
+
+                Ok::<_, anyhow::Error>(shortpath)
+            }
+        };
+
+        let mut group0_instances = [
+            mk_instance("g0i0", group0.clone()).await?,
+            mk_instance("g0i1", group0.clone()).await?,
+            mk_instance("g0i2", group0.clone()).await?,
+        ];
+
+        let group1_instances = [
+            mk_instance("g1i0", group1.clone()).await?,
+            mk_instance("g1i1", group1.clone()).await?,
+        ];
+
+        // move 1 to 2 as if dragged
+        app.instance_manager()
+            .move_instance((group0, 1), (group0, 2))
+            .await?;
+        group0_instances = [
+            group0_instances[0],
+            group0_instances[2],
+            group0_instances[1],
+        ];
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
+
+        // move 0 to 2
+        app.instance_manager()
+            .move_instance((group0, 0), (group0, 2))
+            .await?;
+        group0_instances = [
+            group0_instances[1],
+            group0_instances[2],
+            group0_instances[0],
+        ];
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
+
+        // move 2 back to 0
+        app.instance_manager()
+            .move_instance((group0, 2), (group0, 0))
+            .await?;
+        group0_instances = [
+            group0_instances[2],
+            group0_instances[0],
+            group0_instances[1],
+        ];
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
+
+        // move 0:1 to 1:1
+        app.instance_manager()
+            .move_instance((group0, 1), (group1, 1))
+            .await?;
+        let group1_instances = [
+            group1_instances[0],
+            group0_instances[1],
+            group1_instances[1],
+        ];
+        let group0_instances = [group0_instances[0], group0_instances[2]];
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
+        assert_eq!(
+            group1_instances[..],
+            get_ordered_instances(&app.prisma_client, group1).await?[..],
         );
 
         Ok(())
