@@ -5,7 +5,6 @@ import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { useRouteData } from "@solidjs/router";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { loggedOut } from "@/utils/routes";
 
 export type DeviceCodeObjectType = {
   userCode: string;

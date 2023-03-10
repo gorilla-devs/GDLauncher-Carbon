@@ -37,14 +37,25 @@ const Auth = (props: Props) => {
     "account.enroll.finalize",
   ]);
 
+  const accountEnrollCancelMutation = rspc.createMutation([
+    "account.enroll.cancel",
+  ]);
+
   const handleClick = async () => {
     setClicked(true);
-    accountEnrollBeginMutation.mutate(null);
+    if (!routeData.status.data || !enrollmentInProgress()) {
+      accountEnrollBeginMutation.mutate(null);
+    } else {
+      accountEnrollCancelMutation.mutate(null);
+      accountEnrollBeginMutation.mutate(null);
+    }
   };
 
   createEffect(() => {
     if (routeData.status.isSuccess && !routeData.status.data) {
       setEnrollmentInProgress(false);
+    } else {
+      setEnrollmentInProgress(true);
     }
 
     if (clicked()) {

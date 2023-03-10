@@ -118,6 +118,8 @@ const CodeStep = (props: Props) => {
   createEffect(() => {
     if (routeData.status.isSuccess && !routeData.status.data) {
       setEnrollmentInProgress(false);
+    } else {
+      setEnrollmentInProgress(true);
     }
 
     handleStatus(routeData.status, {

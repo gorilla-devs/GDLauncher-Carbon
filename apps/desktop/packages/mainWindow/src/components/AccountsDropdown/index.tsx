@@ -151,8 +151,8 @@ export const AccountsDropdown = (props: Props) => {
   const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
-  const expiresAt = () => loginDeviceCode()?.expires_at || "";
-  const expiresAtFormat = () => strToMs(expiresAt());
+  const expiresAt = () => loginDeviceCode()?.expires_at;
+  const expiresAtFormat = () => strToMs(expiresAt() || "");
   const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () => msToMinutes(expiresAtMs());
   const seconds = () => msToSeconds(expiresAtMs());
@@ -622,6 +622,9 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
+              if (enrollmentInProgress() && loadingAuthorization()) {
+                accountEnrollCancelMutation.mutate(null);
+              }
               deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
             }}
           >
