@@ -122,7 +122,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     GroupId(cached.group_id)
                 } else {
                     let group = self.get_default_group().await?;
-                    self.create_instance(shortpath.clone(), shortpath.clone(), group)
+                    self.add_instance(shortpath.clone(), shortpath.clone(), group)
                         .await?;
                     group
                 };
@@ -157,6 +157,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
     }
 
+    // TODO: take id to lock idx move order
     async fn move_group(self, start: i32, target: i32) -> anyhow::Result<()> {
         use db::instance_group::{OrderByParam, SetParam, UniqueWhereParam, WhereParam};
 
@@ -227,6 +228,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    // TODO: take id to lock idx move order
     async fn move_instance(
         self,
         start: (GroupId, i32),
@@ -237,20 +239,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if start.1 < 0 || target.1 < 0 {
             bail!("instance indexes cannot be negative")
         }
-
-        let instance_max = self
-            .app
-            .prisma_client
-            .instance()
-            .find_many(vec![WhereParam::GroupId(IntFilter::Equals(*target.0))])
-            .order_by(OrderByParam::Index(Direction::Desc))
-            .exec()
-            .await?
-            .into_iter()
-            .map(|instance| instance.index)
-            .collect::<Vec<_>>();
-
-        dbg!(instance_max);
 
         let instance_max = self
             .app
@@ -374,7 +362,38 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
                 None => {
                     match DEFAULT_MUTEX.try_lock() {
-                        Ok(_lock) => self.create_group(String::from("localize➽default")).await,
+                        Ok(_lock) => {
+                            let index = self.next_group_index().await?;
+
+                            self.app
+                                .prisma_client
+                                ._transaction()
+                                .run(|prisma| async move {
+                                    let group = prisma
+                                        .instance_group()
+                                        .create(
+                                            String::from("localize➽default"),
+                                            index.value,
+                                            vec![],
+                                        )
+                                        .exec()
+                                        .await?;
+
+                                    use db::app_configuration::{SetParam, UniqueWhereParam};
+
+                                    prisma
+                                        .app_configuration()
+                                        .update(
+                                            UniqueWhereParam::IdEquals(0),
+                                            vec![SetParam::SetDefaultInstanceGroup(Some(group.id))],
+                                        )
+                                        .exec()
+                                        .await?;
+
+                                    Ok(GroupId(group.id))
+                                })
+                                .await
+                        }
                         Err(_) => {
                             // Wait for the lock to finish, some other thread probably
                             // wrote the group to the DB at this point, so just retry getting it from the db.
@@ -394,14 +413,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .prisma_client
             .instance_group()
-            .create(name, *index.value, vec![])
+            .create(name, index.value, vec![])
             .exec()
             .await?;
 
         Ok(GroupId(group.id))
     }
 
-    async fn create_instance(
+    /// Add an instance to the database without checking if it exists.
+    async fn add_instance(
         self,
         name: String,
         shortpath: String,
@@ -426,7 +446,72 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    async fn next_group_index(self) -> anyhow::Result<IdLock<'s, GroupId>> {
+    /// Delete an instance group and move all contained instances into the default group.
+    // TODO: handle deleting the default group while it has instances.
+    async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
+        use db::{instance, instance_group};
+
+        // lock indexes before checking for instances to make sure none can be moved or created.
+        let _index_lock = self.index_lock.lock().await;
+
+        let any_instances = self
+            .app
+            .prisma_client
+            .instance()
+            .count(vec![instance::WhereParam::GroupId(IntFilter::Equals(
+                *group,
+            ))])
+            .exec()
+            .await?
+            != 0;
+
+        // a default group will be created if get_default_group is called, so
+        // we check if any instances exist before creating it to avoid making an
+        // empty group every time a group is deleted.
+        if any_instances {
+            let default_group = self.get_default_group().await?;
+
+            // next_instance_index can't be used due to _index_lock, and dropping it
+            // first would be a race condition.
+            let base_index = self
+                .app
+                .prisma_client
+                .instance()
+                .count(vec![instance::WhereParam::GroupId(IntFilter::Equals(
+                    *group,
+                ))])
+                .exec()
+                .await?;
+
+            self.app
+                .prisma_client
+                ._batch((
+                    self.app.prisma_client.instance().update_many(
+                        vec![instance::WhereParam::GroupId(IntFilter::Equals(*group))],
+                        vec![
+                            instance::SetParam::SetGroupId(*default_group),
+                            instance::SetParam::IncrementIndex(base_index as i32),
+                        ],
+                    ),
+                    self.app
+                        .prisma_client
+                        .instance_group()
+                        .delete(instance_group::UniqueWhereParam::IdEquals(*group)),
+                ))
+                .await?;
+        } else {
+            self.app
+                .prisma_client
+                .instance_group()
+                .delete(instance_group::UniqueWhereParam::IdEquals(*group))
+                .exec()
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn next_group_index(self) -> anyhow::Result<IdLock<'s, i32>> {
         let guard = self.manager.index_lock.lock().await;
 
         let count = self
@@ -438,7 +523,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         Ok(IdLock {
-            value: GroupId(count as i32),
+            value: count as i32,
             guard,
         })
     }
@@ -527,18 +612,12 @@ mod test {
     use prisma_client_rust::Direction;
 
     use crate::{
-        db::{read_filters::IntFilter, PrismaClient},
+        db::{self, read_filters::IntFilter, PrismaClient},
         managers::instance::GroupId,
     };
 
     #[tokio::test]
-    async fn test_scan() {
-        let app = crate::setup_managers_for_test().await;
-        app.instance_manager().scan_instances().await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_move_groups() -> anyhow::Result<()> {
+    async fn move_groups() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
         async fn get_ordered_groups(prisma_client: &PrismaClient) -> anyhow::Result<Vec<GroupId>> {
@@ -609,7 +688,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_move_instances() -> anyhow::Result<()> {
+    async fn move_instances() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
         async fn get_ordered_instances(
@@ -642,7 +721,7 @@ mod test {
             let app = &app;
             async move {
                 app.instance_manager()
-                    .create_instance(shortpath.to_string(), shortpath.to_string(), group)
+                    .add_instance(shortpath.to_string(), shortpath.to_string(), group)
                     .await?;
 
                 Ok::<_, anyhow::Error>(shortpath)
@@ -720,6 +799,99 @@ mod test {
             group1_instances[..],
             get_ordered_instances(&app.prisma_client, group1).await?[..],
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_group() -> anyhow::Result<()> {
+        use db::instance::UniqueWhereParam::ShortpathEquals;
+
+        let app = crate::setup_managers_for_test().await;
+
+        let default_group = app.instance_manager().get_default_group().await?;
+        let group = app
+            .instance_manager()
+            .create_group(String::from("foo"))
+            .await?;
+        app.instance_manager()
+            .add_instance(String::from("baz"), String::from("baz"), default_group)
+            .await?;
+        app.instance_manager()
+            .add_instance(String::from("bar"), String::from("bar"), group)
+            .await?;
+
+        let instance = app
+            .prisma_client
+            .instance()
+            .find_unique(ShortpathEquals(String::from("bar")))
+            .exec()
+            .await?
+            .unwrap();
+
+        assert_eq!(instance.index, 0);
+        assert_eq!(instance.group_id, *group);
+
+        app.instance_manager().delete_group(group).await?;
+
+        let instance = app
+            .prisma_client
+            .instance()
+            .find_unique(ShortpathEquals(String::from("bar")))
+            .exec()
+            .await?
+            .unwrap();
+
+        // index should be `1` due to instance already present in default group.
+        assert_eq!(instance.index, 1);
+        assert_eq!(
+            instance.group_id,
+            *app.instance_manager().get_default_group().await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn delete_group_empty() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+
+        let group_count = app
+            .prisma_client
+            .instance_group()
+            .count(vec![])
+            .exec()
+            .await?;
+
+        // assert no default group exists
+        assert_eq!(group_count, 0);
+
+        let group = app
+            .instance_manager()
+            .create_group(String::from("foo"))
+            .await?;
+
+        let group_count = app
+            .prisma_client
+            .instance_group()
+            .count(vec![])
+            .exec()
+            .await?;
+
+        // assert only the created group exists
+        assert_eq!(group_count, 1);
+
+        app.instance_manager().delete_group(group).await?;
+
+        let group_count = app
+            .prisma_client
+            .instance_group()
+            .count(vec![])
+            .exec()
+            .await?;
+
+        // assert the default group was not created while deleting the new group
+        assert_eq!(group_count, 0);
 
         Ok(())
     }
