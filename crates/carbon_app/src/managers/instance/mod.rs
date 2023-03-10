@@ -185,7 +185,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let statement = match (start, target) {
                 (start, target) if start < target => build_statment("-"),
                 (start, target) if start > target => build_statment("+"),
-                _ => unreachable!(),
+                _ => return Ok(()),
             };
 
             let min = i32::min(start, target);
