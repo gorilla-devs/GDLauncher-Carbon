@@ -51,8 +51,9 @@ model ActiveDownloads {
 }
 
 model Instance {
+  id        Int            @id @default(autoincrement())
   name      String
-  shortpath String         @id
+  shortpath String         @unique
   index     Int
   group     InstanceGroup  @relation(fields: [groupId], references: [id])
   groupId   Int

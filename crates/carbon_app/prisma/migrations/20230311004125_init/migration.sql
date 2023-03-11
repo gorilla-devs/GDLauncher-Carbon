@@ -48,8 +48,9 @@ CREATE TABLE "ActiveDownloads" (
 
 -- CreateTable
 CREATE TABLE "Instance" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
-    "shortpath" TEXT NOT NULL PRIMARY KEY,
+    "shortpath" TEXT NOT NULL,
     "index" INTEGER NOT NULL,
     "groupId" INTEGER NOT NULL,
     CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -76,3 +77,6 @@ CREATE UNIQUE INDEX "MinecraftAssets_assetsIdSha1_key" ON "MinecraftAssets"("ass
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");
