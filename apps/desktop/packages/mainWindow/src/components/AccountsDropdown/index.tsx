@@ -144,9 +144,9 @@ export const AccountsDropdown = (props: Props) => {
 
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [addAccountStarting, setAddAccountStarting] = createSignal(false);
-  const [loginDeviceCode, setLoginDeviceCode] = createSignal<
-    DeviceCode | undefined
-  >(undefined);
+  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode | null>(
+    null
+  );
   const [focusIn, setFocusIn] = createSignal(false);
   const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
@@ -236,10 +236,14 @@ export const AccountsDropdown = (props: Props) => {
     {
       onError(error) {
         addNotification(error.message, "error");
+        setLoginDeviceCode(null);
+        setAddAccountStarting(false);
       },
       onMutate() {
         setLoadingAuthorization(false);
         setEnrollmentInProgress(false);
+        setLoginDeviceCode(null);
+        setAddAccountStarting(false);
       },
     }
   );
@@ -328,9 +332,13 @@ export const AccountsDropdown = (props: Props) => {
       onFail() {
         setEnrollmentInProgress(false);
         setLoadingAuthorization(false);
+        setLoginDeviceCode(null);
+        setAddAccountStarting(false);
       },
       onError(error) {
+        setLoginDeviceCode(null);
         setEnrollmentInProgress(false);
+        setAddAccountStarting(false);
         if (error) addNotification(error?.message, "error");
       },
       onComplete() {
@@ -338,6 +346,8 @@ export const AccountsDropdown = (props: Props) => {
         if (enrollmentInProgress()) {
           accountEnrollFinalizeMutation.mutate(null);
         }
+        setLoginDeviceCode(null);
+        setAddAccountStarting(false);
         setEnrollmentInProgress(false);
       },
     });
