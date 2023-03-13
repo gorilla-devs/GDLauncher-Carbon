@@ -2,7 +2,7 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import ModalLayout from "../../ModalLayout";
 import { ModalProps, useModal } from "../..";
 import { Trans } from "@gd/i18n";
-import { Button, Steps } from "@gd/ui";
+import { Button, Radio, Steps } from "@gd/ui";
 import { createSignal } from "solid-js";
 
 const OnBoarding = (props: ModalProps) => {
@@ -25,37 +25,30 @@ const OnBoarding = (props: ModalProps) => {
           ]}
           currentStep={1}
         />
-        <div class="flex flex-col">
-          <h2 class="text-center font-normal text-sm">
+        <div class="flex flex-col mt-4">
+          <h2 class="text-center mb-2 text-base">
             <Trans
-              key="welcome_gdlauncher_title"
+              key="select_user_mode_title"
               options={{
-                defaultValue: "Welcome to GDLauncher",
+                defaultValue: "Select your user type",
               }}
             />
           </h2>
-          <p class="text-center text-shade-0 leading-6 mb-8">
+          <p class="text-center text-shade-0 leading-6 m-0">
             <Trans
-              key="welcome_gdlauncher_text"
+              key="select_user_mode_text"
               options={{
                 defaultValue:
-                  "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
+                  "The user type affects how many settings customization options you will have.",
               }}
             />
           </p>
         </div>
         <div class="flex flex-col items-center gap-6">
-          <Button
-            variant="outline"
-            style={{ width: "100%", "max-width": "200px" }}
-          >
-            <Trans
-              key="add_instance"
-              options={{
-                defaultValue: "+ Add Instance",
-              }}
-            />
-          </Button>
+          <Radio.group onChange={(value) => {}}>
+            <Radio name="user-mode" />
+            <Radio name="user-mode" />
+          </Radio.group>
 
           <div class="flex items-center gap-2 text-accent cursor-pointer hover:text-primary transition ease-in-out">
             <div class="i-ri:download-2-line text-2xl" />
