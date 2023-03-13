@@ -65,6 +65,14 @@ keys! {
         UPDATE_INSTANCE_JAVA_ARGS     = "updateInstanceJavaArgs";
     }
 
+    instance {
+        GET_GROUPS                    = "getGroups";
+        CREATE_GROUP                  = "createGroup";
+        DELETE_GROUP                  = "deleteGroup";
+        MOVE_GROUP                    = "moveGroup";
+        MOVE_INSTANCE                 = "moveInstance";
+    }
+
     queue {
         GET_TASKS                     = "getTasks";
         GET_TASK_STATUS               = "getTaskStatus";

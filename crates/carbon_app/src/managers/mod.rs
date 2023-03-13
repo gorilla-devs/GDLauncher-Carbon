@@ -20,7 +20,7 @@ use self::queue::TaskQueue;
 pub mod account;
 mod configuration;
 pub mod download;
-mod instance;
+pub mod instance;
 mod minecraft;
 mod prisma_client;
 pub mod queue;

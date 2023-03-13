@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use anyhow::bail;
 use carbon_domain::instance::InstanceConfiguration;
 use futures::future::BoxFuture;
+use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
@@ -156,9 +157,43 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
     }
 
+    pub async fn list_groups(self) -> anyhow::Result<Vec<ListGroup>> {
+        use db::{instance, instance_group};
+
+        let groups = self
+            .app
+            .prisma_client
+            .instance_group()
+            .find_many(vec![])
+            .order_by(instance_group::OrderByParam::GroupIndex(Direction::Asc))
+            .with(
+                db::instance_group::instances::fetch(vec![])
+                    .order_by(instance::OrderByParam::Index(Direction::Asc)),
+            )
+            .exec()
+            .await?;
+
+        Ok(groups
+            .into_iter()
+            .map(|group| ListGroup {
+                id: group.id,
+                name: group.name,
+                instances: group
+                    .instances
+                    .expect("instance groups were requested with group list yet are not present")
+                    .into_iter()
+                    .map(|instance| ListInstance {
+                        id: instance.id,
+                        name: instance.name,
+                    })
+                    .collect::<Vec<_>>(),
+            })
+            .collect::<Vec<_>>())
+    }
+
     /// Move the given group to the index directly before `before`.
     /// If `before` is None, move to the end of the list.
-    async fn move_group(self, group: GroupId, before: Option<GroupId>) -> anyhow::Result<()> {
+    pub async fn move_group(self, group: GroupId, before: Option<GroupId>) -> anyhow::Result<()> {
         use db::instance_group::{SetParam, UniqueWhereParam, WhereParam};
 
         // lock indexes while we're changing them
@@ -235,7 +270,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Move the given instance to the index directly before `target` in the target instance group.
     /// If `target` is None, move to the end of the instance group.
-    async fn move_instance(
+    pub async fn move_instance(
         self,
         instance: InstanceId,
         target: InstanceMoveTarget,
@@ -419,7 +454,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
-    async fn create_group(self, name: String) -> anyhow::Result<GroupId> {
+    pub async fn create_group(self, name: String) -> anyhow::Result<GroupId> {
         let index = self.next_group_index().await?;
 
         let group = self
@@ -462,7 +497,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Delete an instance group and move all contained instances into the default group.
     // TODO: handle deleting the default group while it has instances.
-    async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
+    pub async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
         use db::{instance, instance_group};
 
         // lock indexes before checking for instances to make sure none can be moved or created.
@@ -562,10 +597,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 }
 
-struct Group {
-    id: GroupId,
+#[derive(Type, Serialize)]
+pub struct ListGroup {
+    id: i32,
     name: String,
-    // index intentionally omitted
+    instances: Vec<ListInstance>,
+}
+
+#[derive(Type, Serialize)]
+pub struct ListInstance {
+    id: i32,
+    name: String,
 }
 
 /// Lock used to prevent race conditions when modifying group or instance indexes
@@ -575,12 +617,12 @@ struct IdLock<'a, V: Copy + Clone> {
 }
 
 // Typed group id to avoid dealing with a raw integer ids.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct GroupId(i32);
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize)]
+pub struct GroupId(pub i32);
 
 // Typed instance id to avoid dealing with a raw integer ids.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-struct InstanceId(i32);
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize)]
+pub struct InstanceId(pub i32);
 
 impl Deref for GroupId {
     type Target = i32;
@@ -598,7 +640,7 @@ impl Deref for InstanceId {
     }
 }
 
-enum InstanceMoveTarget {
+pub enum InstanceMoveTarget {
     Before(InstanceId),
     EndOfGroup(GroupId),
 }
