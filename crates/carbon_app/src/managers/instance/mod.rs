@@ -683,6 +683,15 @@ mod test {
                 .await?,
         ];
 
+        // move 1 to 1 (do nothing)
+        app.instance_manager()
+            .move_group(groups[1], Some(groups[1]))
+            .await?;
+        assert_eq!(
+            groups[..],
+            get_ordered_groups(&app.prisma_client).await?[..]
+        );
+
         // move 1 to 3 as if dragged
         app.instance_manager()
             .move_group(groups[1], Some(groups[3]))
@@ -776,6 +785,19 @@ mod test {
             mk_instance("g1i0", group1.clone()).await?,
             mk_instance("g1i1", group1.clone()).await?,
         ];
+
+        // move 1 to 1 (do nothing)
+        app.instance_manager()
+            .move_instance(
+                group0_instances[1],
+                InstanceMoveTarget::Before(group0_instances[1]),
+            )
+            .await?;
+
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
 
         // move 1 to end of list
         app.instance_manager()
