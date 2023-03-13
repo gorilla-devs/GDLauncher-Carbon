@@ -45,10 +45,16 @@ const OnBoarding = (props: ModalProps) => {
           </p>
         </div>
         <div class="flex flex-col items-center gap-6">
-          <Radio.group onChange={(value) => {}}>
-            <Radio name="user-mode" />
-            <Radio name="user-mode" />
-          </Radio.group>
+          <div class="flex justify-between">
+            <Radio.group onChange={(value) => console.log("onChange", value)}>
+              <div class="px-4 py-5 border-1 border-solid border-shade-5 rounded-xl">
+                <Radio name="user-mode" value="basic" />
+              </div>
+              <div class="px-4 py-5 border-1 border-solid border-shade-5 rounded-xl">
+                <Radio name="user-mode" value="advanced" />
+              </div>
+            </Radio.group>
+          </div>
 
           <div class="flex items-center gap-2 text-accent cursor-pointer hover:text-primary transition ease-in-out">
             <div class="i-ri:download-2-line text-2xl" />
