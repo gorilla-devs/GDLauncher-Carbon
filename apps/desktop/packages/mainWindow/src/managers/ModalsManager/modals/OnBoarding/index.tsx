@@ -2,12 +2,10 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import ModalLayout from "../../ModalLayout";
 import { ModalProps, useModal } from "../..";
 import { Trans } from "@gd/i18n";
-import { Button, Radio, Steps } from "@gd/ui";
-import { createSignal } from "solid-js";
+import { Button } from "@gd/ui";
 
 const OnBoarding = (props: ModalProps) => {
   const modalsContext = useModal();
-  const [steps, setSteps] = createSignal(0);
 
   return (
     <ModalLayout
@@ -15,46 +13,47 @@ const OnBoarding = (props: ModalProps) => {
       title={props?.title}
       noOverflowHidden={true}
     >
-      <div class="w-120 h-90 flex flex-col items-center justify-around">
-        <Steps
-          class="max-w-56"
-          steps={[
-            { label: "User type" },
-            { label: "Instance" },
-            { label: "Import" },
-          ]}
-          currentStep={1}
-        />
-        <div class="flex flex-col mt-4">
-          <h2 class="text-center mb-2 text-base">
+      <div class="w-120 pt-20 h-90 flex flex-col items-center justify-around">
+        <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
+          <img class="w-40" src={Logo} />
+        </div>
+        <div class="absolute top-5 right-5">
+          <div
+            class="i-ri:close-fill text-2xl text-shade-0 cursor-pointer"
+            onClick={() => modalsContext?.closeModal()}
+          />
+        </div>
+        <div class="flex flex-col">
+          <h2 class="text-center font-normal text-sm">
             <Trans
-              key="select_user_mode_title"
+              key="welcome_gdlauncher_title"
               options={{
-                defaultValue: "Select your user type",
+                defaultValue: "Welcome to GDLauncher",
               }}
             />
           </h2>
-          <p class="text-center text-shade-0 leading-6 m-0">
+          <p class="text-center text-shade-0 leading-6 mb-8">
             <Trans
-              key="select_user_mode_text"
+              key="welcome_gdlauncher_text"
               options={{
                 defaultValue:
-                  "The user type affects how many settings customization options you will have.",
+                  "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
               }}
             />
           </p>
         </div>
         <div class="flex flex-col items-center gap-6">
-          <div class="flex justify-between">
-            <Radio.group onChange={(value) => console.log("onChange", value)}>
-              <div class="px-4 py-5 border-1 border-solid border-shade-5 rounded-xl">
-                <Radio name="user-mode" value="basic" />
-              </div>
-              <div class="px-4 py-5 border-1 border-solid border-shade-5 rounded-xl">
-                <Radio name="user-mode" value="advanced" />
-              </div>
-            </Radio.group>
-          </div>
+          <Button
+            variant="outline"
+            style={{ width: "100%", "max-width": "200px" }}
+          >
+            <Trans
+              key="add_instance"
+              options={{
+                defaultValue: "+ Add Instance",
+              }}
+            />
+          </Button>
 
           <div class="flex items-center gap-2 text-accent cursor-pointer hover:text-primary transition ease-in-out">
             <div class="i-ri:download-2-line text-2xl" />
