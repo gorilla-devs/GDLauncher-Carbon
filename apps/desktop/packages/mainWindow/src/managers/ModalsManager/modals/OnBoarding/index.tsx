@@ -2,10 +2,12 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import ModalLayout from "../../ModalLayout";
 import { ModalProps, useModal } from "../..";
 import { Trans } from "@gd/i18n";
-import { Button } from "@gd/ui";
+import { Button, Steps } from "@gd/ui";
+import { createSignal } from "solid-js";
 
 const OnBoarding = (props: ModalProps) => {
   const modalsContext = useModal();
+  const [steps, setSteps] = createSignal(0);
 
   return (
     <ModalLayout
@@ -13,16 +15,16 @@ const OnBoarding = (props: ModalProps) => {
       title={props?.title}
       noOverflowHidden={true}
     >
-      <div class="w-120 pt-20 h-90 flex flex-col items-center justify-around">
-        <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
-          <img class="w-40" src={Logo} />
-        </div>
-        <div class="absolute top-5 right-5">
-          <div
-            class="i-ri:close-fill text-2xl text-shade-0 cursor-pointer"
-            onClick={() => modalsContext?.closeModal()}
-          />
-        </div>
+      <div class="w-120 h-90 flex flex-col items-center justify-around">
+        <Steps
+          class="max-w-56"
+          steps={[
+            { label: "User type" },
+            { label: "Instance" },
+            { label: "Import" },
+          ]}
+          currentStep={1}
+        />
         <div class="flex flex-col">
           <h2 class="text-center font-normal text-sm">
             <Trans
