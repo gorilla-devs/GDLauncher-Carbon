@@ -4,7 +4,7 @@ use carbon_domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
-        version::{Argument, Library, OsName, Value, Version},
+        version::{Argument, Library, Value, Version},
     },
 };
 use prisma_client_rust::QueryError;
