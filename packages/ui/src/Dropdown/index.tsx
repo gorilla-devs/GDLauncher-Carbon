@@ -21,8 +21,21 @@ export type Props = {
   icon?: JSX.Element;
   placeholder?: string;
 };
-export interface DropDownButtonProps extends Props {
+export interface DropDownButtonProps {
   children: JSX.Element;
+  options: Option[];
+  value: string;
+  error?: boolean;
+  disabled?: boolean;
+  rounded?: boolean;
+  label?: string;
+  onChange?: (_value: string) => void;
+  class?: string;
+  id?: string;
+  bg?: string;
+  btnDropdown?: boolean;
+  icon?: JSX.Element;
+  placeholder?: string;
 }
 
 const Dropdown = (props: Props) => {
@@ -143,17 +156,14 @@ const Dropdown = (props: Props) => {
 };
 
 const DropDownButton = (props: DropDownButtonProps) => {
-  const [selectedValue, setSelectedValue] = createSignal("");
-
   const handleChange = (option: Option) => {
-    setSelectedValue(option.label);
+    props.onChange?.(option.label);
   };
 
   return (
     <div class="flex">
       <Button class="rounded-r-0 pr-0 flex gap-1">
         <span>{props.children}</span>
-        <span class="text-white font-light text-xs">{selectedValue()}</span>
       </Button>
       <Dropdown
         btnDropdown

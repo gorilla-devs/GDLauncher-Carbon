@@ -6,6 +6,7 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
 import CurseforgeIcon from "/assets/images/icons/curseforge.png";
+import LogoDark from "/assets/images/logo-dark.svg";
 
 const modpacks = [
   {
@@ -144,6 +145,53 @@ export default function Browser() {
         </div>
       </div>
       <div class="overflow-y-hidden px-5 pb-5 flex flex-col gap-2">
+        <div class="p-5 flex flex-col gap-4 bg-shade-7 rounded-xl">
+          <div class="flex gap-4 items-center">
+            <div class="flex justify-center items-center h-22 w-22 bg-shade-9 rounded-xl">
+              <img class="h-14" src={LogoDark} />
+            </div>
+            <div class="flex flex-col justify-around">
+              <h2 class="m-0">
+                <Trans
+                  key="create_new_instance_title"
+                  options={{
+                    defaultValue: "New instance",
+                  }}
+                />
+              </h2>
+              <p class="m-0 text-shade-0">
+                <Trans
+                  key="create_new_instance_text"
+                  options={{
+                    defaultValue: "Create your own empty instance",
+                  }}
+                />
+              </p>
+            </div>
+            <div class="flex gap-3">
+              <Dropdown
+                options={[
+                  { label: "1.16.5", key: "1.16.5" },
+                  { label: "1.16.4", key: "1.16.4" },
+                  { label: "1.16.3", key: "1.16.3" },
+                  { label: "1.16.2", key: "1.16.2" },
+                ]}
+                icon={<div class="i-ri:price-tag-3-fill" />}
+                rounded
+                bg="bg-shade-4"
+                value="1.16.2"
+              />
+              <Button variant="primary">
+                <Trans
+                  key="create_instance_btn"
+                  options={{
+                    defaultValue: "Create",
+                  }}
+                />
+              </Button>
+            </div>
+          </div>
+        </div>
         <Show when={modpacks.length > 0} fallback={<NoModpacks />}>
           <For each={modpacks}>{(props) => <Modpack modpack={props} />}</For>
         </Show>
