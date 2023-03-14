@@ -2,13 +2,13 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use anyhow::anyhow;
 use anyhow::bail;
-use carbon_domain::instance::InstanceConfiguration;
 use futures::future::BoxFuture;
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use tokio::sync::{Mutex, MutexGuard, RwLock};
+use crate::api::keys::instance::*;
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
@@ -265,6 +265,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             ))
             .await?;
 
+        self.app.invalidate(GET_GROUPS, None);
         Ok(())
     }
 
@@ -376,6 +377,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             ))
             .await?;
 
+        self.app.invalidate(GET_GROUPS, None);
         Ok(())
     }
 
@@ -464,6 +466,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .create(name, index.value, vec![])
             .exec()
             .await?;
+
+        self.app.invalidate(GET_GROUPS, None);
 
         Ok(GroupId(group.id))
     }
@@ -557,6 +561,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await?;
         }
 
+        self.app.invalidate(GET_GROUPS, None);
         Ok(())
     }
 
