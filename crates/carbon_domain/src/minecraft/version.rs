@@ -27,14 +27,11 @@ impl IntoVecDownloadable for Libraries {
                 continue;
             };
 
-            let Some(path) = artifact.path else {
-                continue;
-            };
             let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
             files.push(carbon_net::Downloadable {
                 url: artifact.url,
-                path: PathBuf::from(base_path).join(path),
+                path: PathBuf::from(base_path).join(artifact.path),
                 checksum,
                 size: Some(artifact.size),
             })
@@ -52,7 +49,7 @@ pub struct Version {
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
     pub compliance_level: Option<i64>,
-    pub downloads: Option<VersionInfoDownloads>,
+    pub downloads: Option<VersionDownloads>,
     pub id: String,
     pub java_version: Option<JavaVersion>,
     #[serde(flatten)]
@@ -202,22 +199,21 @@ pub struct VersionAssetIndex {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VersionInfoDownloads {
-    pub client: MappingsClass,
-    pub client_mappings: Option<MappingsClass>,
-    pub server: Option<MappingsClass>,
-    pub server_mappings: Option<MappingsClass>,
+pub struct VersionDownloads {
+    pub client: VersionDownloadsMappingsClass,
+    pub client_mappings: Option<VersionDownloadsMappingsClass>,
+    pub server: Option<VersionDownloadsMappingsClass>,
+    pub server_mappings: Option<VersionDownloadsMappingsClass>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MappingsClass {
+pub struct VersionDownloadsMappingsClass {
     pub sha1: String,
     pub size: u64,
     pub url: String,
-    pub path: Option<String>,
 }
 
-impl IntoDownloadable for MappingsClass {
+impl IntoDownloadable for VersionDownloadsMappingsClass {
     fn into_downloadable(self, base_path: &std::path::Path) -> carbon_net::Downloadable {
         let jar_path = base_path
             .join("clients")
@@ -247,25 +243,47 @@ pub struct Library {
     pub extract: Option<Extract>,
 }
 
-impl IntoVecDownloadable for Library {
-    fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
-        let mut libs = vec![];
-
+impl Library {
+    pub fn into_lib_downloadable(
+        self,
+        base_path: &std::path::Path,
+    ) -> Option<carbon_net::Downloadable> {
         let artifact = self.downloads.artifact;
 
-        if let Some(artifact) = artifact {}
+        if let Some(artifact) = artifact {
+            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
-        // Main lib, if allowed
-        let artifact = self.downloads.artifact.unwrap();
-        let path = artifact.path.unwrap();
-        let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-        carbon_net::Downloadable {
-            url: artifact.url,
-            path: PathBuf::from(base_path).join(path),
-            checksum,
-            size: Some(artifact.size),
+            return Some(carbon_net::Downloadable {
+                url: artifact.url,
+                path: PathBuf::from(base_path).join(artifact.path),
+                checksum,
+                size: Some(artifact.size),
+            });
         }
+
+        None
+    }
+
+    pub fn into_natives_downloadable(
+        self,
+        base_path: &std::path::Path,
+    ) -> Option<carbon_net::Downloadable> {
+        let Some(classifiers) = self.downloads.classifiers else {
+            return None;
+        };
+
+        let Some(native) = classifiers.get(OsName::get_os_name()) else {
+            return None;
+        };
+
+        let checksum = Some(carbon_net::Checksum::Sha1(native.sha1));
+
+        Some(carbon_net::Downloadable {
+            url: native.url,
+            path: PathBuf::from(base_path).join(native.path),
+            checksum,
+            size: Some(native.size),
+        })
     }
 }
 
@@ -291,6 +309,14 @@ impl Library {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MappingsClass {
+    pub sha1: String,
+    pub size: u64,
+    pub url: String,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LibraryDownloads {
     pub artifact: Option<MappingsClass>,
     pub classifiers: Option<Classifiers>,
@@ -309,6 +335,17 @@ pub struct Classifiers {
     #[serde(rename = "natives-osx")]
     pub natives_osx: Option<MappingsClass>,
 }
+
+impl Classifiers {
+    pub fn get(self, os: OsName) -> Option<MappingsClass> {
+        match os {
+            OsName::Linux => self.natives_linux,
+            OsName::Windows => self.natives_windows,
+            OsName::Osx => self.natives_osx,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Extract {
     pub exclude: Vec<String>,
