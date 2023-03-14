@@ -381,7 +381,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    fn get_default_group(self) -> BoxFuture<'s, anyhow::Result<GroupId>> {
+    pub fn get_default_group(self) -> BoxFuture<'s, anyhow::Result<GroupId>> {
         Box::pin(async move {
             use db::instance_group::WhereParam;
 
@@ -473,7 +473,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Add an instance to the database without checking if it exists.
-    async fn add_instance(
+    pub async fn add_instance(
         self,
         name: String,
         shortpath: String,
