@@ -67,6 +67,15 @@ pub struct Progress {
     pub current_size: u64,
 }
 
+impl Progress {
+    pub fn new() -> Self {
+        Self {
+            current_count: 0,
+            current_size: 0,
+        }
+    }
+}
+
 // Todo: Add checksum/size verification
 pub async fn download_file(
     file: &Downloadable,

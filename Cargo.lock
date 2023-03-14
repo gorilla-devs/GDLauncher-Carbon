@@ -384,6 +384,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "axum",
+ "carbon_compression",
  "carbon_domain",
  "carbon_java_manager",
  "carbon_macro",

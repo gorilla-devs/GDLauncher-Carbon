@@ -4,7 +4,7 @@ use carbon_domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
-        version::{Argument, Value, Version},
+        version::{Argument, Library, OsName, Value, Version},
     },
 };
 use prisma_client_rust::QueryError;
@@ -243,7 +243,7 @@ pub async fn generate_startup_command(
         .map(|library| {
             let path = runtime_path
                 .get_libraries()
-                .get_library_path(MavenCoordinates::try_from(library.name.clone()).unwrap());
+                .get_library_path(MavenCoordinates::try_from(library.name.clone(), None).unwrap());
 
             path.display().to_string()
         })
@@ -309,20 +309,81 @@ pub async fn generate_startup_command(
     )
 }
 
+async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
+    async fn extract_single_library_natives(
+        runtime_path: &RuntimePath,
+        library: &Library,
+        version_id: &str,
+        native_name: &str,
+    ) {
+        let maven = MavenCoordinates::try_from(library.name.clone(), Some(native_name.to_string()))
+            .unwrap();
+        let path = runtime_path.get_libraries().get_library_path(maven);
+        let dest = runtime_path.get_natives().get_versioned(version_id);
+        tokio::fs::create_dir_all(&dest).await.unwrap();
+
+        println!("Extracting natives from {}", path.display());
+
+        carbon_compression::decompress(path, &dest).await.unwrap();
+    }
+
+    for library in version.libraries.get_libraries() {
+        match &library.natives {
+            Some(natives) => {
+                if cfg!(target_os = "windows") {
+                    match natives.windows.as_ref() {
+                        Some(native_name) => {
+                            extract_single_library_natives(
+                                runtime_path,
+                                library,
+                                &version.id,
+                                native_name,
+                            )
+                            .await
+                        }
+                        None => continue,
+                    }
+                } else if cfg!(target_os = "linux") {
+                    match natives.linux.as_ref() {
+                        Some(native_name) => {
+                            extract_single_library_natives(
+                                runtime_path,
+                                library,
+                                &version.id,
+                                native_name,
+                            )
+                            .await
+                        }
+                        None => continue,
+                    }
+                } else if cfg!(target_os = "macos") {
+                    match natives.osx.as_ref() {
+                        Some(native_name) => {
+                            extract_single_library_natives(
+                                runtime_path,
+                                library,
+                                &version.id,
+                                native_name,
+                            )
+                            .await
+                        }
+                        None => continue,
+                    }
+                } else {
+                    panic!("Unsupported platform");
+                }
+            }
+            None => continue,
+        };
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use carbon_domain::minecraft::manifest::MinecraftManifest;
+    use carbon_net::{IntoDownloadable, Progress};
 
-    async fn get_account() -> FullAccount {
-        FullAccount {
-            username: "test".to_owned(),
-            uuid: "test-uuid".to_owned(),
-            type_: FullAccountType::Offline,
-        }
-    }
-
-    // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
         let manifest = MinecraftManifest::fetch().await.unwrap();
@@ -336,7 +397,11 @@ mod tests {
             .await
             .unwrap();
 
-        let full_account = get_account().await;
+        let full_account = FullAccount {
+            username: "test".to_owned(),
+            uuid: "test-uuid".to_owned(),
+            type_: FullAccountType::Offline,
+        };
 
         // Mock RuntimePath to have a stable path
         let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
@@ -355,21 +420,42 @@ mod tests {
         assert_eq!(command, fixture);
     }
 
-    // #[tokio::test]
-    // async fn test_replace_placeholder() {
-    //     let app = setup_managers_for_test().await;
-    //     let version = Version::default();
-    //     let placeholder = "auth_player_name";
-    //     let result = replace_placeholder(app, placeholder, &version);
-    //     assert_eq!(result, "killpowa");
-    // }
+    #[tokio::test]
+    async fn test_extract_natives() {
+        let app = crate::setup_managers_for_test().await;
 
-    // #[tokio::test]
-    // async fn test_replace_placeholders() {
-    //     let app = setup_managers_for_test().await;
-    //     let version = Version::default();
-    //     let command = "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --clientId ${clientid} --xuid ${auth_xuid} --userType ${user_type} --versionType ${version_type} --width=854 --height=480".to_owned();
-    //     let result = replace_placeholders(app, command, &version);
-    //     assert_eq!(result, "--username killpowa --version 1.19.3 --gameDir ..\\..\\instances\\Minecraft vanilla --assetsDir ..\\..\\datastore\\assets --assetIndex 2 --uuid 3b40f99969e64dbcabd01f87cddcb1fd --accessToken __HIDDEN_TOKEN__ --clientId ${clientid} --xuid ${auth_xuid} --userType mojang --versionType release --width=854 --height=480".to_owned());
-    // }
+        let runtime_path = &app.configuration_manager().runtime_path;
+
+        let manifest = MinecraftManifest::fetch().await.unwrap();
+        let version = manifest
+            .versions
+            .into_iter()
+            .find(|v| v.id == "1.16.5")
+            .unwrap()
+            .fetch()
+            .await
+            .unwrap();
+
+        let natives = version
+            .libraries
+            .get_libraries()
+            .iter()
+            .filter(|lib| lib.is_native_artifact())
+            .collect::<Vec<_>>();
+
+        let mut downloadables = vec![];
+        let libraries_path = runtime_path.get_libraries().to_path();
+        for native in natives {
+            downloadables.push(native.clone().into_downloadable(&libraries_path));
+        }
+
+        let progress = tokio::sync::watch::channel(Progress::new());
+
+        println!("{:#?}", downloadables);
+        carbon_net::download_multiple(downloadables, progress.0)
+            .await
+            .unwrap();
+
+        extract_natives(runtime_path, &version).await;
+    }
 }

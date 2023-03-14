@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fmt::format, path::PathBuf};
 
 use regex::Regex;
 use thiserror::Error;
@@ -7,24 +7,40 @@ pub struct MavenCoordinates {
     group_id: String,
     artifact_id: String,
     version: String,
+    additional: Option<String>,
 }
 
 impl MavenCoordinates {
     /// Needs to be in the format of `group:artifact:version`
-    pub fn try_from(coordinates: String) -> Result<Self, MavenError> {
+    pub fn try_from(coordinates: String, additional: Option<String>) -> Result<Self, MavenError> {
         let coordinates = coordinates.trim();
         if coordinates.is_empty() || !is_maven_coordinates(coordinates) {
             return Err(MavenError::InvalidCoordinates);
         }
 
-        parse_maven_coordinates(coordinates)
+        parse_maven_coordinates(coordinates, additional)
     }
 
     pub fn into_path(self) -> PathBuf {
-        PathBuf::new()
-            .join(self.group_id)
-            .join(self.artifact_id)
-            .join(self.version)
+        let mut path = PathBuf::new();
+
+        for part in self.group_id.split('.') {
+            path = path.join(part);
+        }
+
+        path = path.join(&self.artifact_id);
+        path = path.join(&self.version);
+
+        if let Some(additional) = self.additional {
+            path = path.join(format!(
+                "{}-{}-{}.jar",
+                self.artifact_id, self.version, additional
+            ));
+        } else {
+            path = path.join(format!("{}-{}.jar", self.artifact_id, self.version));
+        }
+
+        path
     }
 }
 
@@ -42,7 +58,10 @@ fn is_maven_coordinates(maven_coordinates: &str) -> bool {
         .is_match(maven_coordinates)
 }
 
-fn parse_maven_coordinates(maven_coordinates: &str) -> Result<MavenCoordinates, MavenError> {
+fn parse_maven_coordinates(
+    maven_coordinates: &str,
+    additional: Option<String>,
+) -> Result<MavenCoordinates, MavenError> {
     let mut split = maven_coordinates.split(':');
     let group_id = split.next().ok_or(MavenError::InvalidCoordinates)?;
     let artifact_id = split.next().ok_or(MavenError::InvalidCoordinates)?;
@@ -52,6 +71,7 @@ fn parse_maven_coordinates(maven_coordinates: &str) -> Result<MavenCoordinates, 
         group_id: group_id.to_string(),
         artifact_id: artifact_id.to_string(),
         version: version.to_string(),
+        additional,
     })
 }
 
@@ -91,13 +111,13 @@ mod tests {
     #[test]
     fn test_parse_coordinates() {
         let coordinates = "com.example:example:1.0.0".to_string();
-        let parsed_coordinates = parse_maven_coordinates(&coordinates).unwrap();
+        let parsed_coordinates = parse_maven_coordinates(&coordinates, None).unwrap();
         assert_eq!(parsed_coordinates.group_id, "com.example");
         assert_eq!(parsed_coordinates.artifact_id, "example");
         assert_eq!(parsed_coordinates.version, "1.0.0");
 
         let coordinates = "com.example.example:example-example:1.0.0-SNAPSHOT".to_string();
-        let parsed_coordinates = parse_maven_coordinates(&coordinates).unwrap();
+        let parsed_coordinates = parse_maven_coordinates(&coordinates, None).unwrap();
         assert_eq!(parsed_coordinates.group_id, "com.example.example");
         assert_eq!(parsed_coordinates.artifact_id, "example-example");
         assert_eq!(parsed_coordinates.version, "1.0.0-SNAPSHOT");
@@ -106,26 +126,55 @@ mod tests {
     #[test]
     fn test_try_from() {
         let coordinates = "com.example:example:1.0.0".to_string();
-        let parsed_coordinates = MavenCoordinates::try_from(coordinates).unwrap();
+        let parsed_coordinates = MavenCoordinates::try_from(coordinates, None).unwrap();
         assert_eq!(parsed_coordinates.group_id, "com.example");
         assert_eq!(parsed_coordinates.artifact_id, "example");
         assert_eq!(parsed_coordinates.version, "1.0.0");
+        assert_eq!(parsed_coordinates.additional, None);
+
+        let coordinates = "com.example:example:1.0.0".to_string();
+        let parsed_coordinates =
+            MavenCoordinates::try_from(coordinates, Some("natives-something".to_string())).unwrap();
+        assert_eq!(parsed_coordinates.group_id, "com.example");
+        assert_eq!(parsed_coordinates.artifact_id, "example");
+        assert_eq!(parsed_coordinates.version, "1.0.0");
+        assert_eq!(
+            parsed_coordinates.additional,
+            Some("natives-something".to_string())
+        );
 
         let coordinates = "".to_string();
-        assert!(MavenCoordinates::try_from(coordinates).is_err());
+        assert!(MavenCoordinates::try_from(coordinates, None).is_err());
 
         let coordinates = "com.example.example:example-example:1.0.0.0:extra".to_string();
-        assert!(MavenCoordinates::try_from(coordinates).is_err());
+        assert!(MavenCoordinates::try_from(coordinates, None).is_err());
     }
 
     #[test]
-    fn test_into_pathbuf() {
+    fn test_into_path() {
         let coordinates = "com.example:example:1.0.0".to_string();
-        let parsed_coordinates = MavenCoordinates::try_from(coordinates).unwrap();
+        let parsed_coordinates = MavenCoordinates::try_from(coordinates, None).unwrap();
         let path = parsed_coordinates.into_path();
         assert_eq!(
             path,
-            PathBuf::from("com.example").join("example").join("1.0.0")
+            PathBuf::from("com")
+                .join("example")
+                .join("example")
+                .join("1.0.0")
+                .join("example-1.0.0.jar")
+        );
+
+        let coordinates = "com.example:example-mc:1.0.0".to_string();
+        let parsed_coordinates =
+            MavenCoordinates::try_from(coordinates, Some("natives-example".to_string())).unwrap();
+        let path = parsed_coordinates.into_path();
+        assert_eq!(
+            path,
+            PathBuf::from("com")
+                .join("example")
+                .join("example-mc")
+                .join("1.0.0")
+                .join("example-mc-1.0.0-natives-example.jar")
         );
     }
 }

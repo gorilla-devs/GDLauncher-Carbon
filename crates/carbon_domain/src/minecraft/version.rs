@@ -247,6 +247,28 @@ pub struct Library {
     pub extract: Option<Extract>,
 }
 
+impl IntoVecDownloadable for Library {
+    fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
+        let mut libs = vec![];
+
+        let artifact = self.downloads.artifact;
+
+        if let Some(artifact) = artifact {}
+
+        // Main lib, if allowed
+        let artifact = self.downloads.artifact.unwrap();
+        let path = artifact.path.unwrap();
+        let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
+
+        carbon_net::Downloadable {
+            url: artifact.url,
+            path: PathBuf::from(base_path).join(path),
+            checksum,
+            size: Some(artifact.size),
+        }
+    }
+}
+
 impl Library {
     #[tracing::instrument]
     pub fn is_allowed(&self) -> bool {
@@ -392,3 +414,6 @@ pub enum Value {
     String(String),
     StringArray(Vec<String>),
 }
+
+#[cfg(test)]
+mod test {}

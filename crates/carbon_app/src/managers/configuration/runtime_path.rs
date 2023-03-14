@@ -19,6 +19,10 @@ impl LibrariesPath {
     pub fn get_library_path(&self, maven_coordinate: MavenCoordinates) -> PathBuf {
         self.0.join(maven_coordinate.into_path())
     }
+
+    pub fn to_path(&self) -> PathBuf {
+        self.0.clone()
+    }
 }
 
 pub struct AssetsPath(PathBuf);

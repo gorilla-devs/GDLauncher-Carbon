@@ -29,6 +29,7 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
 carbon_java_manager = { path = "../carbon_java_manager" }
+carbon_compression = { path = "../carbon_compression" }
 carbon_domain = { path = "../carbon_domain" }
 carbon_net = { path = "../carbon_net" }
 uuid = { workspace = true }
