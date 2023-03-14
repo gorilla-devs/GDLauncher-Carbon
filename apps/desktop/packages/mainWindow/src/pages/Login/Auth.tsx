@@ -58,32 +58,33 @@ const Auth = (props: Props) => {
       setEnrollmentInProgress(true);
     }
 
-    if (clicked()) {
-      handleStatus(routeData.status, {
-        onPolling: (info) => {
-          setEnrollmentInProgress(true);
-          setError(null);
-          props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
-          });
-          props.setStep(1);
-        },
-        onFail() {
-          setEnrollmentInProgress(false);
-          setError("something went wrong while logging in");
-        },
-        onComplete() {
-          setError(null);
-          if (enrollmentInProgress()) {
-            accountEnrollFinalizeMutation.mutate(null);
-          }
-          navigate("/library");
-          setEnrollmentInProgress(false);
-        },
-      });
-    }
+    // if (clicked()) {
+    handleStatus(routeData.status, {
+      onPolling: (info) => {
+        setEnrollmentInProgress(true);
+        setError(null);
+        props.setDeviceCodeObject({
+          userCode: info.user_code,
+          link: info.verification_uri,
+          expiresAt: info.expires_at,
+        });
+        props.setStep(1);
+      },
+      onFail() {
+        setEnrollmentInProgress(false);
+        setError("something went wrong while logging in");
+        accountEnrollCancelMutation.mutate(null);
+      },
+      onComplete() {
+        setError(null);
+        if (enrollmentInProgress()) {
+          accountEnrollFinalizeMutation.mutate(null);
+        }
+        navigate("/library");
+        setEnrollmentInProgress(false);
+      },
+    });
+    // }
   });
 
   return (
