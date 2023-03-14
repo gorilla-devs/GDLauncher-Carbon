@@ -1,4 +1,4 @@
-use std::{fmt::format, path::PathBuf};
+use std::path::PathBuf;
 
 use regex::Regex;
 use thiserror::Error;
