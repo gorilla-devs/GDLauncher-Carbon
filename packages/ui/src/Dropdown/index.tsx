@@ -15,6 +15,7 @@ export type Props = {
   label?: string;
   onChange?: (_option: Option) => void;
   class?: string;
+  containerClass?: string;
   id?: string;
   bg?: string;
   btnDropdown?: boolean;
@@ -60,7 +61,10 @@ const Dropdown = (props: Props) => {
   };
 
   return (
-    <div class="inline-block relative" id={props.id}>
+    <div
+      class={`inline-block relative ${props.containerClass || ""}`}
+      id={props.id}
+    >
       <Show when={!props.rounded && props.label}>
         <p
           class="mt-0 mb-2 font-bold"

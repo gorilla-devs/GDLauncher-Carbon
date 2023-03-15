@@ -7,6 +7,7 @@ import Modpack from "./Modpack";
 import Tags from "./Tags";
 import CurseforgeIcon from "/assets/images/icons/curseforge.png";
 import LogoDark from "/assets/images/logo-dark.svg";
+import { useModal } from "@/managers/ModalsManager";
 
 const modpacks = [
   {
@@ -96,6 +97,7 @@ const NoModpacks = () => {
 };
 
 export default function Browser() {
+  const modalsContext = useModal();
   return (
     <div class="relative w-full box-border">
       <div class="sticky top-0 left-0 right-0 flex flex-col bg-shade-8 z-10 px-5 pt-5">
@@ -181,7 +183,12 @@ export default function Browser() {
                 bg="bg-shade-4"
                 value="1.16.2"
               />
-              <Button variant="primary">
+              <Button
+                variant="primary"
+                onClick={() =>
+                  modalsContext?.openModal({ name: "instanceCreation" })
+                }
+              >
                 <Trans
                   key="create_instance_btn"
                   options={{
