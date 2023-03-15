@@ -170,6 +170,7 @@ const Sidebar = () => {
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-shade-8 py-5">
           <Button
             variant="outline"
+            onClick={() => navigate(`/modpacks`)}
             style={{
               ...(isSidebarOpened()
                 ? { width: "100%", "max-width": "200px" }

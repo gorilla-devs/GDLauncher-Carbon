@@ -20,7 +20,7 @@ const ModalLayout = (props: Props) => {
   return (
     <div class="w-screen h-screen">
       <div
-        class="h-screen w-screen absolute text-white ease-in-out duration-100 will-change-auto transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center"
+        class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
         classList={{
           "opacity-100": modalsContext?.isVisible(),
           "opacity-0": !modalsContext?.isVisible(),
