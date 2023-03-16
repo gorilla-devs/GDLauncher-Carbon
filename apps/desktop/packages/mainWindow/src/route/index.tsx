@@ -5,8 +5,8 @@ import NewsData from "@/pages/news.data";
 import SettingsAppearanceData from "@/pages/Settings/settings.appearance.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
-
 /* Defining the routes for the application. */
+
 export const routes: RouteDefinition[] = [
   {
     path: "/",

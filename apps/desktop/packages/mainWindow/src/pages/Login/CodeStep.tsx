@@ -79,6 +79,10 @@ const CodeStep = (props: Props) => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
     },
+    onSuccess() {
+      navigate("/library");
+      setEnrollmentInProgress(false);
+    },
   });
 
   const userCode = () => props.deviceCodeObject?.userCode;
@@ -139,9 +143,9 @@ const CodeStep = (props: Props) => {
       },
       onComplete(account) {
         finalizeMutation.mutate(null);
-        setActiveUUIDMutation.mutate(account.uuid);
-        navigate("/library");
-        setEnrollmentInProgress(false);
+        if (finalizeMutation.isSuccess) {
+          setActiveUUIDMutation.mutate(account.uuid);
+        }
       },
     });
   });
@@ -183,7 +187,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="mt-2 mb-0 text-[#E54B4B]">
+            <p class="mb-0 mt-2 text-[#E54B4B]">
               <Trans
                 key="code_expired_message"
                 options={{
@@ -226,7 +230,7 @@ const CodeStep = (props: Props) => {
             }}
           />
         </span>
-        <div class="w-full absolute bottom-0 overflow-hidden">
+        <div class="w-full absolute overflow-hidden bottom-0">
           <LoadingBar class="" />
         </div>
       </Show>

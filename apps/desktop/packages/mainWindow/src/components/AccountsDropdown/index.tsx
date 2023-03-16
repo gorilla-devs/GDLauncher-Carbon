@@ -434,7 +434,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="absolute right-0 rounded-md px-4 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 w-auto z-40 min-w-80 pt-3"
+        class="rounded-md px-4 absolute right-0 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 w-auto z-40 min-w-80 pt-3"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -450,7 +450,7 @@ export const AccountsDropdown = (props: Props) => {
           <div class="flex w-full mb-6">
             <img
               src={(activeAccount() as Label)?.icon}
-              class="h-10 rounded-md mr-2 w-10"
+              class="rounded-md h-10 mr-2 w-10"
             />
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
@@ -471,7 +471,7 @@ export const AccountsDropdown = (props: Props) => {
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
               <div
-                class="cursor-pointer text-shade-0 i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
+                class="text-shade-0 cursor-pointer i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
                 onClick={() => {
                   navigator.clipboard.writeText(
                     (activeAccount() as Label)?.uuid
@@ -604,9 +604,9 @@ export const AccountsDropdown = (props: Props) => {
             </div>
             <Show when={enrollmentInProgress() && !expired() && expiresAt()}>
               <div class="flex gap-3 items-center justify-between w-full">
-                <div class="flex gap-4 items-center">
+                <div class="flex items-center gap-4">
                   <div
-                    class="w-5 h-5 rounded-full flex justify-center items-center cursor-pointer"
+                    class="w-5 h-5 rounded-full flex items-center cursor-pointer justify-center"
                     onClick={() => {
                       if (loginDeviceCode()?.verification_uri) {
                         setLoadingAuthorization(true);
