@@ -143,9 +143,9 @@ const CodeStep = (props: Props) => {
       },
       onComplete(account) {
         finalizeMutation.mutate(null);
-        if (finalizeMutation.isSuccess) {
-          setActiveUUIDMutation.mutate(account.uuid);
-        }
+        // if (finalizeMutation.isSuccess) {
+        setActiveUUIDMutation.mutate(account.uuid);
+        // }
       },
     });
   });
