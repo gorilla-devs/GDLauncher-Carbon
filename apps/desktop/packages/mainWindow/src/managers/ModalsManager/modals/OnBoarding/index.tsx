@@ -11,7 +11,7 @@ const OnBoarding = (props: ModalProps) => {
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      noOverflowHidden={true}
+      overflowHiddenDisabled={true}
     >
       <div class="w-120 pt-20 h-90 flex flex-col items-center justify-around">
         <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">

@@ -20,9 +20,7 @@ const RadioContext = createContext<RadioGroupContext>();
 const useRadioContext = () => {
   const context = useContext(RadioContext);
 
-  if (!context) return;
-
-  return context;
+  return context as RadioGroupContext;
 };
 
 const Radio = (props: Props) => {

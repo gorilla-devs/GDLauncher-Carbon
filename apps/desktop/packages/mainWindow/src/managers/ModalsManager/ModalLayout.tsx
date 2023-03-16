@@ -9,7 +9,7 @@ interface Props extends ModalProps {
   class?: string;
   preventClose?: boolean;
   noPadding?: boolean;
-  noOverflowHidden?: boolean;
+  overflowHiddenDisabled?: boolean;
 }
 
 const ModalLayout = (props: Props) => {
@@ -43,7 +43,7 @@ const ModalLayout = (props: Props) => {
               props.class ?? ""
             }`}
             classList={{
-              "overflow-hidden": !props.noOverflowHidden,
+              "overflow-hidden": !props.overflowHiddenDisabled,
               "scale-100": modalsContext?.isVisible(),
               "scale-0": !modalsContext?.isVisible(),
             }}
