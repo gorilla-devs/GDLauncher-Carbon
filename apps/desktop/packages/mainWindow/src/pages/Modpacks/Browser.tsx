@@ -182,7 +182,7 @@ export default function Browser() {
                 ]}
                 icon={<div class="i-ri:price-tag-3-fill" />}
                 rounded
-                bg="bg-shade-4"
+                bgColorClass="bg-shade-4"
                 value="1.16.2"
               />
               <Button

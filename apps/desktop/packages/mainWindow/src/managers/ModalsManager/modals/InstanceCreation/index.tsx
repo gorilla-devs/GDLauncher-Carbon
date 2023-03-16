@@ -44,7 +44,7 @@ const InstanceCreation = (props: ModalProps) => {
               { label: "forge", key: "forge" },
               { label: "fabric", key: "fabric" },
             ]}
-            bg="bg-shade-8"
+            bgColorClass="bg-shade-8"
             containerClass="w-full"
             class="w-full"
             value="vanilla"
@@ -66,7 +66,7 @@ const InstanceCreation = (props: ModalProps) => {
               { label: "1.16.3", key: "1.16.3" },
               { label: "1.16.2", key: "1.16.2" },
             ]}
-            bg="bg-shade-8"
+            bgColorClass="bg-shade-8"
             containerClass="w-full"
             class="w-full"
             value="1.16.2"

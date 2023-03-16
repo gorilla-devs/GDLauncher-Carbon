@@ -17,7 +17,7 @@ export type Props = {
   class?: string;
   containerClass?: string;
   id?: string;
-  bg?: string;
+  bgColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
@@ -33,7 +33,7 @@ export interface DropDownButtonProps {
   onChange?: (_value: string) => void;
   class?: string;
   id?: string;
-  bg?: string;
+  bgColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
@@ -77,7 +77,7 @@ const Dropdown = (props: Props) => {
         </p>
       </Show>
       <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bg}`}
+        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -94,7 +94,7 @@ const Dropdown = (props: Props) => {
           "text-shade-5": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
-          "bg-shade-7": !props.bg,
+          "bg-shade-7": !props.bgColorClass,
         }}
       >
         <Show when={!props.btnDropdown}>
@@ -174,7 +174,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bg="bg-primary"
+        bgColorClass="bg-primary"
         value={props.value}
         onChange={(option) => handleChange(option)}
       />

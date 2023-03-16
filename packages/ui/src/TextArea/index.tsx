@@ -7,7 +7,7 @@ interface Props extends JSX.TextareaHTMLAttributes<HTMLTextAreaElement> {
   disabled?: boolean;
   class?: string;
   inputClass?: string;
-  icon?: Element | any;
+  icon?: Element;
   onInput?: (_e: InputEvent) => void;
 }
 
