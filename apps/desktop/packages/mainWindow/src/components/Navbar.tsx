@@ -1,7 +1,6 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Show } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
-import ProfileImg from "/assets/images/profile-img.png";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
@@ -111,7 +110,7 @@ const AppNavbar = () => {
                   (account) => ({
                     label: {
                       name: account?.username,
-                      icon: ProfileImg,
+                      icon: " ",
                       uuid: account.uuid,
                       type: account.type_,
                     },

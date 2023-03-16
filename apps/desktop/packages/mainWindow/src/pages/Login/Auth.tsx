@@ -58,7 +58,6 @@ const Auth = (props: Props) => {
       setEnrollmentInProgress(true);
     }
 
-    // if (clicked()) {
     handleStatus(routeData.status, {
       onPolling: (info) => {
         setEnrollmentInProgress(true);
@@ -84,7 +83,6 @@ const Auth = (props: Props) => {
         setEnrollmentInProgress(false);
       },
     });
-    // }
   });
 
   return (

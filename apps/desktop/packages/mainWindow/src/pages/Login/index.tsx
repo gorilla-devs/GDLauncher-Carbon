@@ -12,13 +12,13 @@ export type DeviceCodeObjectType = {
 };
 
 export default function Login() {
-  const [step, setStep] = createSignal<number | null>(0);
+  const [step, setStep] = createSignal<number>(0);
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
-    routeData.activeUuid.data && routeData.accounts?.data?.length! > 0;
+    routeData?.activeUuid?.data && routeData?.accounts?.data?.length! > 0;
 
   return (
     <Switch>
@@ -59,14 +59,7 @@ export default function Login() {
               "overflow-hidden": step() === 1,
             }}
           >
-            <Switch
-              fallback={
-                <Auth
-                  setStep={setStep}
-                  setDeviceCodeObject={setDeviceCodeObject}
-                />
-              }
-            >
+            <Switch>
               <Match when={step() === 0}>
                 <Auth
                   setStep={setStep}

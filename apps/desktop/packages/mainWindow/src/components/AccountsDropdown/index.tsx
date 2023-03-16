@@ -278,12 +278,20 @@ export const AccountsDropdown = (props: Props) => {
   const deleteAccountMutation = rspc.createMutation(["account.deleteAccount"], {
     onMutate: async (
       uuid
-    ): Promise<{ previousAccounts: Accounts } | undefined> => {
+    ): Promise<
+      { previousAccounts: Accounts; previousActiveUUID: ActiveUUID } | undefined
+    > => {
       await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
+      await queryClient.cancelQueries({ queryKey: ["account.getActiveUuid"] });
 
       const previousAccounts: Accounts | undefined = queryClient.getQueryData([
         "account.getAccounts",
       ]);
+
+      const previousActiveUUID: ActiveUUID | undefined =
+        queryClient.getQueryData(["account.getActiveUuid"]);
+
+      queryClient.setQueryData(["account.getActiveUuid", null], null);
 
       queryClient.setQueryData(
         ["account.getAccounts", null],
@@ -292,30 +300,46 @@ export const AccountsDropdown = (props: Props) => {
             (account) => account.uuid !== uuid
           );
 
-          if (filteredAccounts?.length === 0) navigate("/");
-
-          if (old) return old?.filter((account) => account.uuid !== uuid);
+          if (filteredAccounts) return filteredAccounts;
         }
       );
 
-      if (previousAccounts) return { previousAccounts };
+      if (previousAccounts && previousActiveUUID)
+        return { previousAccounts, previousActiveUUID };
     },
     onError: (
       error,
       _variables,
-      context: { previousAccounts: Accounts } | undefined
+      context:
+        | { previousAccounts: Accounts; previousActiveUUID: ActiveUUID }
+        | undefined
     ) => {
-      addNotification(error.message, "error");
+      if (routeData.accounts.data?.length === 0) {
+        navigate("/");
+      } else {
+        addNotification(error.message, "error");
 
-      if (context?.previousAccounts) {
-        queryClient.setQueryData(
-          ["account.getAccounts"],
-          context.previousAccounts
-        );
+        if (context?.previousAccounts) {
+          queryClient.setQueryData(
+            ["account.getAccounts"],
+            context.previousAccounts
+          );
+        }
+        if (context?.previousActiveUUID) {
+          queryClient.setQueryData(
+            ["account.getActiveUuid"],
+            context.previousActiveUUID
+          );
+        }
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["account.getAccounts"] });
+    },
+    onSuccess() {
+      if (routeData.accounts.data?.length === 0) {
+        navigate("/");
+      }
     },
   });
 
