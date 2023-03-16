@@ -1,22 +1,27 @@
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
+use crate::api::keys::instance::*;
 use anyhow::anyhow;
 use anyhow::bail;
+use chrono::DateTime;
+use chrono::Utc;
 use futures::future::BoxFuture;
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use tokio::sync::{Mutex, MutexGuard, RwLock};
-use crate::api::keys::instance::*;
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
 use super::ManagerRef;
 
+use carbon_domain::instance as domain;
+use domain::schema;
+
 pub struct InstanceManager {
-    instances: RwLock<HashMap<String, InstanceType>>,
+    instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
 }
 
@@ -63,8 +68,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .find(|instance| instance.shortpath == shortpath);
 
             let Some(_instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
-
-            // todo: cache
         }
 
         Ok(())
@@ -106,7 +109,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         };
 
-        match serde_json::from_str::<InstanceConfiguration>(&config_text) {
+        match serde_json::from_str::<schema::Instance>(&config_text) {
             Ok(config) => {
                 let group = if let Some(cached) = cached {
                     self.app
@@ -114,7 +117,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .instance()
                         .update(
                             UniqueWhereParam::ShortpathEquals(shortpath.clone()),
-                            vec![SetParam::SetName(config.instance_name.clone())],
+                            vec![SetParam::SetName(config.name.clone())],
                         )
                         .exec()
                         .await?;
@@ -127,11 +130,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     group
                 };
 
+                let instance = InstanceData {
+                    config,
+                    instance_start_time: None,
+                    mods: Late::Loading,
+                };
+
                 Ok(Some(Instance {
-                    name: config.instance_name.clone(),
+                    name: instance.config.name.clone(),
                     shortpath: shortpath.clone(),
                     group,
-                    type_: InstanceType::Valid(config),
+                    type_: InstanceType::Valid(instance),
                 }))
             }
             Err(e) => {
@@ -173,6 +182,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
+        let active_instances = self.instances.read().await;
         Ok(groups
             .into_iter()
             .map(|group| ListGroup {
@@ -182,6 +192,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .instances
                     .expect("instance groups were requested with group list yet are not present")
                     .into_iter()
+                    .filter(|instance| active_instances.contains_key(&InstanceId(instance.id)))
                     .map(|instance| ListInstance {
                         id: instance.id,
                         name: instance.name,
@@ -565,6 +576,47 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    pub async fn instance_details(
+        self,
+        instance: InstanceId,
+    ) -> anyhow::Result<domain::InstanceDetails> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance)
+            .ok_or_else(|| anyhow!("instance_details called with invalid instance id"))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!("instance_details called on invalid instance"),
+            InstanceType::Valid(x) => x,
+        };
+
+        Ok(domain::InstanceDetails {
+            name: instance.config.name.clone(),
+            version: match &instance.config.game_configuration.version {
+                schema::GameVersion::Standard(version) => version.release.clone(),
+                schema::GameVersion::Custom(custom) => custom.clone(),
+            },
+            last_played: instance.config.last_played,
+            seconds_played: instance.config.seconds_played as u32,
+            instance_start_time: instance.instance_start_time,
+            modloaders: match &instance.config.game_configuration.version {
+                schema::GameVersion::Standard(version) => version
+                    .modloaders
+                    .iter()
+                    .map(|loader| domain::ModLoader {
+                        version: loader.version.clone(),
+                        type_: match loader.type_ {
+                            schema::ModLoaderType::Forge => domain::ModLoaderType::Forge,
+                            schema::ModLoaderType::Fabric => domain::ModLoaderType::Fabirc,
+                        },
+                    })
+                    .collect::<Vec<_>>(),
+                schema::GameVersion::Custom(_) => Vec::new(), // todo
+            },
+            notes: instance.config.notes.clone(),
+        })
+    }
+
     async fn next_group_index(self) -> anyhow::Result<IdLock<'s, i32>> {
         let guard = self.manager.index_lock.lock().await;
 
@@ -626,7 +678,7 @@ struct IdLock<'a, V: Copy + Clone> {
 pub struct GroupId(pub i32);
 
 // Typed instance id to avoid dealing with a raw integer ids.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize, Hash)]
 pub struct InstanceId(pub i32);
 
 impl Deref for GroupId {
@@ -659,7 +711,7 @@ struct Instance {
 }
 
 enum InstanceType {
-    Valid(InstanceConfiguration),
+    Valid(InstanceData),
     Invalid(InvalidConfiguration),
 }
 
@@ -683,6 +735,22 @@ enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
+}
+
+pub enum Late<T> {
+    Loading,
+    Ready(T),
+}
+
+pub struct InstanceData {
+    config: schema::Instance,
+    instance_start_time: Option<DateTime<Utc>>,
+    mods: Late<Vec<Mod>>,
+}
+
+pub struct Mod {
+    name: String,
+    // todo
 }
 
 #[cfg(test)]

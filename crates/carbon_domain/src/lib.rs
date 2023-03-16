@@ -2,13 +2,10 @@
 #![allow(dead_code)]
 
 pub mod account;
-pub mod app;
 pub mod instance;
 pub mod maven;
 pub mod minecraft;
 mod minecraft_mod;
-mod minecraft_package;
-pub mod modloader;
 
 #[macro_export]
 macro_rules! try_path_fmt {

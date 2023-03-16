@@ -1,5 +1,6 @@
+use chrono::{DateTime, Utc};
 use rspc::{RouterBuilderLike, Type};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::managers::App;
 use crate::{error::anyhow_into_rspc, managers::instance::InstanceMoveTarget};
@@ -8,6 +9,7 @@ use super::keys::instance::*;
 use super::router::router;
 
 use crate::managers::instance::{GroupId, InstanceId};
+use carbon_domain::instance as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -56,6 +58,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
                 .map_err(anyhow_into_rspc)
         }
+
+        query INSTANCE_DETAILS[app, id: i32] {
+            app.instance_manager()
+                .instance_details(InstanceId(id))
+                .await
+                .map(InstanceDetails::from)
+                .map_err(anyhow_into_rspc)
+        }
     }
 }
 
@@ -75,4 +85,59 @@ struct MoveInstance {
 enum MoveInstanceTarget {
     BeforeInstance(i32),
     EndOfGroup(i32),
+}
+
+#[derive(Type, Serialize)]
+pub struct InstanceDetails {
+    pub name: String,
+    pub version: String,
+    pub last_played: DateTime<Utc>,
+    pub seconds_played: u32,
+    pub instance_start_time: Option<DateTime<Utc>>,
+    pub modloaders: Vec<ModLoader>,
+    pub notes: String,
+}
+
+#[derive(Type, Serialize)]
+pub struct ModLoader {
+    pub type_: ModLoaderType,
+    pub version: String,
+}
+
+#[derive(Type, Serialize)]
+pub enum ModLoaderType {
+    Forge,
+    Fabirc,
+}
+
+impl From<domain::InstanceDetails> for InstanceDetails {
+    fn from(value: domain::InstanceDetails) -> Self {
+        Self {
+            name: value.name,
+            version: value.version,
+            last_played: value.last_played,
+            seconds_played: value.seconds_played,
+            instance_start_time: value.instance_start_time,
+            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            notes: value.notes,
+        }
+    }
+}
+
+impl From<domain::ModLoader> for ModLoader {
+    fn from(value: domain::ModLoader) -> Self {
+        Self {
+            type_: value.type_.into(),
+            version: value.version,
+        }
+    }
+}
+
+impl From<domain::ModLoaderType> for ModLoaderType {
+    fn from(value: domain::ModLoaderType) -> Self {
+        match value {
+            domain::ModLoaderType::Forge => Self::Forge,
+            domain::ModLoaderType::Fabirc => Self::Fabirc,
+        }
+    }
 }

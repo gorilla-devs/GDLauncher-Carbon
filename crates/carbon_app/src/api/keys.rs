@@ -71,6 +71,7 @@ keys! {
         DELETE_GROUP                  = "deleteGroup";
         MOVE_GROUP                    = "moveGroup";
         MOVE_INSTANCE                 = "moveInstance";
+        INSTANCE_DETAILS              = "getInstanceDetails";
     }
 
     queue {
