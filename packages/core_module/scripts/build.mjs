@@ -9,7 +9,7 @@ if (target) {
   args.push("--target", target);
 }
 
-spawnSync(path.join(process.cwd(), "node_modules", ".bin", "napi"), args, {
+spawnSync("cargo", args, {
   stdio: "inherit",
   shell: true,
 });

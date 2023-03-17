@@ -14,20 +14,40 @@ mod error;
 pub mod generate_rspc_ts_bindings;
 mod runtime_path_override;
 
-// Since it's module_init, make sure it's not running during tests
-#[cfg(not(test))]
-pub fn init() {
-    std::thread::spawn(|| {
-        let runtime = tokio::runtime::Runtime::new();
-        runtime
-            .unwrap() /* This should never fail */
-            .block_on(async {
-                let runtime_path = runtime_path_override::get_runtime_path_override().await;
-                start_router(runtime_path).await;
-            })
-    });
+#[tokio::main]
+pub async fn init() {
+    dotenv::from_filename(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(".env"),
+    )
+    .ok();
+
+    println!(
+        "{}",
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".env")
+            .to_string_lossy()
+    );
+
+    let _guard = sentry::init((
+        std::env::var("SENTRY_DSN").unwrap(),
+        sentry::ClientOptions {
+            release: sentry::release_name!(),
+            ..Default::default()
+        },
+    ));
+
+    println!("{}", std::env::var("SENTRY_DSN").unwrap());
+
+    let runtime_path = runtime_path_override::get_runtime_path_override().await;
+    start_router(runtime_path).await;
 }
 
+#[inline(never)]
 async fn start_router(runtime_path: PathBuf) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
@@ -40,6 +60,8 @@ async fn start_router(runtime_path: PathBuf) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
+
+    panic!("Uh oh, my lord...");
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())

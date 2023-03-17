@@ -10,11 +10,13 @@ crate-type = ["lib"]
 
 [dependencies]
 thiserror = { workspace = true }
+sentry = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 tracing-test = { workspace = true }
+dotenv = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }
