@@ -46,3 +46,6 @@ regex = { workspace = true }
 [dev-dependencies]
 tempdir = { workspace = true }
 ntest = { workspace = true }
+
+[build-dependencies]
+serde_json = { workspace = true }

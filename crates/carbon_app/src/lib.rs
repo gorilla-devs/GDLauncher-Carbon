@@ -1,7 +1,10 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-use crate::managers::{App, AppInner};
+use crate::{
+    app_version::APP_VERSION,
+    managers::{App, AppInner},
+};
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
@@ -10,6 +13,7 @@ pub mod api;
 pub(crate) mod db;
 pub mod managers;
 
+mod app_version;
 mod error;
 pub mod generate_rspc_ts_bindings;
 mod runtime_path_override;
@@ -36,12 +40,10 @@ pub async fn init() {
     let _guard = sentry::init((
         std::env::var("SENTRY_DSN").unwrap(),
         sentry::ClientOptions {
-            release: sentry::release_name!(),
+            release: Some(APP_VERSION.into()),
             ..Default::default()
         },
     ));
-
-    println!("{}", std::env::var("SENTRY_DSN").unwrap());
 
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     start_router(runtime_path).await;
@@ -60,8 +62,6 @@ async fn start_router(runtime_path: PathBuf) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
-
-    panic!("Uh oh, my lord...");
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())

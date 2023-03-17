@@ -13,8 +13,6 @@ module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
-  buildVersion: "5.0.0",
-  buildNumber: "5.0.0",
   asar: true,
   directories: {
     output: "release",
@@ -23,8 +21,12 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/core_module/core.node",
-      to: "core.node",
+      from: "../../target/release/core_module.exe",
+      to: "core_module.exe",
+    },
+    {
+      from: "../../target/release/core_module",
+      to: "core_module",
     },
     {
       from: "./JavaCheck.class",
