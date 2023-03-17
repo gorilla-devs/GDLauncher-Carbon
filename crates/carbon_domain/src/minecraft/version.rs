@@ -15,6 +15,7 @@ impl Libraries {
 }
 
 impl IntoVecDownloadable for Libraries {
+    /// Returns a list of Downloadable objects for all libraries (native and non-native)
     fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
         let mut files = vec![];
 
@@ -23,18 +24,13 @@ impl IntoVecDownloadable for Libraries {
                 continue;
             }
 
-            let Some(artifact) = library.downloads.artifact else {
-                continue;
-            };
+            if let Some(downloadable) = library.clone().into_lib_downloadable(base_path) {
+                files.push(downloadable);
+            }
 
-            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-            files.push(carbon_net::Downloadable {
-                url: artifact.url,
-                path: PathBuf::from(base_path).join(artifact.path),
-                checksum,
-                size: Some(artifact.size),
-            })
+            if let Some(downloadable) = library.into_natives_downloadable(base_path) {
+                files.push(downloadable);
+            }
         }
 
         files
