@@ -28,7 +28,7 @@ loadLanguageFile(DEFAULT_LANG).then((langFile) => {
 });
 
 render(() => {
-  window.napiLoaded
+  window.coreModuleLoaded
     .then(() => {
       window.clearLoading();
     })

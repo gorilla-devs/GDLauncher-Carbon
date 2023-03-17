@@ -19,7 +19,6 @@
     "name": "core"
   },
   "devDependencies": {
-    "@gd/config": "workspace:*",
-    "@napi-rs/cli": "^2.14.1"
+    "@gd/config": "workspace:*"
   }
 }

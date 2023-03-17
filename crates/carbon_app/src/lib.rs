@@ -20,6 +20,7 @@ mod runtime_path_override;
 
 #[tokio::main]
 pub async fn init() {
+    println!("Starting Carbon App");
     dotenv::from_filename(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
@@ -33,6 +34,10 @@ pub async fn init() {
     println!(
         "{}",
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
             .join(".env")
             .to_string_lossy()
     );
