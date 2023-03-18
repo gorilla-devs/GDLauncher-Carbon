@@ -394,6 +394,7 @@ dependencies = [
  "env_logger",
  "futures",
  "jsonwebtoken",
+ "libc",
  "log",
  "ntest",
  "prisma-client-rust",
