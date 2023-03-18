@@ -674,13 +674,7 @@ pub enum AccessTokenStatus {
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
-
-    use chrono::{DateTime, Utc};
-
-    use crate::managers::account::api::McAuth;
-
-    use super::{validate_access_token, McEntitlement};
+    use super::McEntitlement;
 
     /// Make sure it's possible to get a JWT decoding key from
     /// the saved public key.
