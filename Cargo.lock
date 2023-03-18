@@ -412,6 +412,7 @@ dependencies = [
  "tracing",
  "tracing-test",
  "uuid",
+ "winapi",
 ]
 
 [[package]]

@@ -8,17 +8,24 @@ const isDev = import.meta.env.MODE === "development";
 const binaryName =
   os.platform() === "win32" ? "core_module.exe" : "core_module";
 
+console.log(process.ppid);
+
 let coreModuleLoaded = new Promise((resolve, reject) => {
+  if (isDev) {
+    resolve(0);
+    return;
+  }
   const coreModulePath = path.resolve(
     __dirname,
-    isDev ? "../../../../target/debug" : "../../../target/release",
+    "../../../../target/debug",
     binaryName
   );
 
   console.log(`[CORE] Spawning core module: ${coreModulePath}`);
 
-  const coreModule = spawn(coreModulePath, {
+  const coreModule = spawn(coreModulePath, ["--ppid", `${process.ppid}`], {
     shell: true,
+    detached: false,
   });
 
   coreModule.stdout.on("data", (data) => {
@@ -26,8 +33,7 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   });
 
   coreModule.stderr.on("data", (data) => {
-    console.log(`[CORE] Error: ${data}`);
-    reject(data);
+    console.log(`[CORE] Error: ${data.toString()}`);
   });
 
   coreModule.on("exit", (code) => {
@@ -42,8 +48,4 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   });
 });
 
-contextBridge.exposeInMainWorld(
-  "coreModuleLoaded",
-  // isDev ? Promise.resolve() : coreModuleLoaded
-  coreModuleLoaded
-);
+contextBridge.exposeInMainWorld("coreModuleLoaded", coreModuleLoaded);

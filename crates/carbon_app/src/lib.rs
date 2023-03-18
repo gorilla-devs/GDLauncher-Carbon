@@ -16,10 +16,13 @@ pub mod managers;
 mod app_version;
 mod error;
 pub mod generate_rspc_ts_bindings;
+mod pprocess_keepalive;
 mod runtime_path_override;
 
 #[tokio::main]
 pub async fn init() {
+    pprocess_keepalive::init();
+
     println!("Starting Carbon App");
     dotenv::from_filename(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
