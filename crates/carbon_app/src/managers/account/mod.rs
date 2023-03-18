@@ -1,7 +1,7 @@
 use crate::{
     api::keys::account::*,
     db::{self, read_filters::StringFilter},
-    error::define_single_error,
+    error::{define_single_error, request::RequestError},
     managers::{account::enroll::InvalidateCtx, AppRef},
 };
 use async_trait::async_trait;
@@ -10,18 +10,23 @@ use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
-use std::{collections::HashMap, mem, sync::Arc};
+use std::{
+    collections::HashMap,
+    mem,
+    sync::{Arc, Weak},
+    time::{Duration, Instant},
+};
 
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 pub use self::enroll::EnrollmentError;
 use self::{
-    api::DeviceCode,
+    api::{AccessTokenStatus, DeviceCode},
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{configuration::ConfigurationError, ManagerRef};
+use super::{configuration::ConfigurationError, AppInner, ManagerRef};
 
 pub mod api;
 mod enroll;
@@ -29,6 +34,10 @@ mod enroll;
 pub(crate) struct AccountManager {
     currently_refreshing: RwLock<HashMap<String, EnrollmentTask>>,
     active_enrollment: RwLock<Option<EnrollmentTask>>,
+    /// Account refreshing will be disabled until this time has passed
+    refreshloop_sleep: Mutex<Option<Instant>>,
+    /// Additional statuses that override an `Ok` status.
+    status_flags: RwLock<HashMap<String, StatusFlags>>,
 }
 
 impl AccountManager {
@@ -36,6 +45,8 @@ impl AccountManager {
         Self {
             currently_refreshing: RwLock::new(HashMap::new()),
             active_enrollment: RwLock::new(None),
+            refreshloop_sleep: Mutex::new(None),
+            status_flags: RwLock::new(HashMap::new()),
         }
     }
 }
@@ -133,10 +144,7 @@ impl ManagerRef<'_, AccountManager> {
             .collect())
     }
 
-    pub async fn get_account_status(
-        self,
-        uuid: String,
-    ) -> Result<Option<AccountStatus>, GetAccountStatusError> {
+    async fn get_account(self, uuid: String) -> Result<Option<AccountWithStatus>, GetAccountError> {
         use db::account::UniqueWhereParam;
 
         let account = self
@@ -150,6 +158,23 @@ impl ManagerRef<'_, AccountManager> {
         let Some(account) = account else { return Ok(None) };
         let account = FullAccount::try_from(account)?;
         let mut account = AccountWithStatus::from(account);
+
+        if let AccountStatus::Ok { flags, .. } = &mut account.status {
+            *flags = self
+                .status_flags
+                .read()
+                .await
+                .get(&account.account.uuid)
+                .map(|x| *x);
+        }
+
+        Ok(Some(AccountWithStatus::from(account)))
+    }
+    pub async fn get_account_status(
+        self,
+        uuid: String,
+    ) -> Result<Option<AccountStatus>, GetAccountError> {
+        let Some(mut account) = self.get_account(uuid).await? else { return Ok(None) };
 
         if let AccountType::Microsoft = &account.account.type_ {
             let refreshing = self
@@ -449,6 +474,179 @@ impl ManagerRef<'_, AccountManager> {
             }
         }
     }
+
+    /// Attempt to immediately update an account's validity.
+    ///
+    /// This function will reset the ongoing refresh countdown to avoid possible
+    /// rate limiting.
+    ///
+    /// # Parameters
+    /// lock_refresh - stop any new background account refreshes and wait 30 seconds
+    ///                before performing more.
+    pub async fn validate_account(
+        self,
+        uuid: String,
+        lock_refresh: bool,
+    ) -> Result<(), ValidateAccountError> {
+        let mut refresh_lock = match lock_refresh {
+            true => Some(self.refreshloop_sleep.lock().await),
+            false => None,
+        };
+
+        let account = self
+            .get_account(uuid.clone())
+            .await?
+            .ok_or(ValidateAccountError::AccountMissing)?;
+
+        let AccountStatus::Ok { access_token: Some(access_token), flags: old_flags } = account.status else { return Ok(()) };
+
+        let response =
+            api::validate_access_token(&self.app.reqwest_client, &access_token, &uuid).await?;
+
+        if let Some(refresh_lock) = &mut refresh_lock {
+            **refresh_lock = Some(Instant::now() + Duration::from_secs(30));
+        }
+
+        drop(refresh_lock);
+
+        let flags = match response {
+            AccessTokenStatus::Ok => None,
+            AccessTokenStatus::BannedFromMultiplayer => Some(StatusFlags::BannedFromMultiplayer),
+            AccessTokenStatus::XboxMultiplayerDisabled => {
+                Some(StatusFlags::XboxMultiplayerDisabled)
+            }
+            AccessTokenStatus::Invalid => {
+                // the account was expired prematurely
+
+                use db::account::{SetParam, UniqueWhereParam};
+
+                // ignore errors (e.g. account was removed)
+                let _ = self
+                    .app
+                    .prisma_client
+                    .account()
+                    .update(
+                        UniqueWhereParam::UuidEquals(uuid.clone()),
+                        vec![SetParam::SetTokenExpires(Some(Utc::now().into()))],
+                    )
+                    .exec()
+                    .await;
+
+                self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+                return Ok(());
+            }
+        };
+
+        if flags != old_flags {
+            let mut flag_map = self.status_flags.write().await;
+            match flags {
+                Some(flags) => {
+                    flag_map.insert(uuid.clone(), flags);
+                }
+                None => {
+                    flag_map.remove(&uuid);
+                }
+            }
+
+            self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+        }
+
+        Ok(())
+    }
+}
+
+pub struct AccountRefreshService;
+
+impl AccountRefreshService {
+    pub fn start(app: Weak<AppInner>) {
+        // account status check
+        let app1 = app.clone();
+        tokio::spawn(async move {
+            let mut last_check_times = HashMap::<String, Instant>::new();
+
+            while let Some(app) = app1.upgrade() {
+                let account_manager = app.account_manager();
+
+                // wait for all additional refreshing delays to complete to avoid rate limiting
+                loop {
+                    let mut sleep_until = account_manager.refreshloop_sleep.lock().await;
+
+                    match &mut *sleep_until {
+                        Some(time) => {
+                            if *time < Instant::now() {
+                                *sleep_until = None;
+                                break;
+                            }
+
+                            tokio::time::sleep_until((*time).into()).await;
+                        }
+                        None => break,
+                    }
+                }
+
+                // TODO: there's not really a way to handle an error in here
+                if let Ok(accounts) = account_manager.get_account_entries().await {
+                    // discard deleted accounts
+                    last_check_times = last_check_times
+                        .into_iter()
+                        .filter(|(uuid, _)| {
+                            accounts.iter().any(|account| {
+                                &account.uuid == uuid
+                                // any account that may have been removed and re-added as an offline account
+                                // since last refresh
+                                && account.access_token.is_some()
+                            })
+                        })
+                        .collect();
+
+                    // add any new accounts
+                    for account in accounts {
+                        if !last_check_times.contains_key(&account.uuid)
+                            && account.access_token.is_some()
+                        {
+                            last_check_times.insert(account.uuid, Instant::now());
+                        }
+                    }
+
+                    let least_recently_checked = last_check_times
+                        .iter()
+                        .min_by(|(_, a), (_, b)| a.cmp(b))
+                        .map(|(uuid, _)| uuid);
+
+                    let Some(uuid) = least_recently_checked else { continue };
+
+                    // ignore the result since we can't do anything if it failed.
+                    let _ = account_manager.validate_account(uuid.clone(), false).await;
+                    last_check_times.insert(uuid.clone(), Instant::now());
+                }
+
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+
+        tokio::spawn(async move {
+            while let Some(app) = app.upgrade() {
+                let account_manager = app.account_manager();
+
+                // TODO: there's not really a way to handle an error in here
+                if let Ok(accounts) = account_manager.get_account_entries().await {
+                    for account in accounts {
+                        // ignore badly formed account entries since we can't handle them
+                        let Ok(account) = FullAccount::try_from(account) else { continue };
+                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else { continue };
+
+                        if token_expires < Utc::now() - chrono::Duration::hours(1) {
+                            // still can't handle errors
+                            let _ = account_manager.refresh_account(account.uuid).await;
+                            break;
+                        }
+                    }
+                }
+
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+    }
 }
 
 define_single_error!(GetActiveUuidError::Query(ConfigurationError));
@@ -472,7 +670,7 @@ pub enum GetActiveAccountError {
 }
 
 #[derive(Error, Debug)]
-pub enum GetAccountStatusError {
+pub enum GetAccountError {
     #[error("loading account from db: {0}")]
     DbLoad(#[from] FullAccountLoadError),
 
@@ -550,6 +748,18 @@ pub enum SetAccountError {
 
     #[error("account does not exist and cannot be set as the active account")]
     NoAccount,
+}
+
+#[derive(Error, Debug)]
+pub enum ValidateAccountError {
+    #[error("account missing")]
+    AccountMissing,
+
+    #[error("getting account: {0}")]
+    Query(#[from] GetAccountError),
+
+    #[error("request: {0}")]
+    Request(#[from] RequestError),
 }
 
 pub struct FullAccount {
@@ -637,9 +847,13 @@ impl From<FullAccount> for AccountWithStatus {
                     true => AccountStatus::Expired,
                     false => AccountStatus::Ok {
                         access_token: Some(access_token),
+                        flags: None,
                     },
                 },
-                FullAccountType::Offline => AccountStatus::Ok { access_token: None },
+                FullAccountType::Offline => AccountStatus::Ok {
+                    access_token: None,
+                    flags: None,
+                },
             },
         }
     }

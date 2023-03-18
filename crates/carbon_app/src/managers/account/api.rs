@@ -7,6 +7,7 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
 
@@ -614,9 +615,72 @@ pub struct FullAccount {
     pub mc: McAccount,
 }
 
+pub async fn validate_access_token(
+    client: &Client,
+    access_token: &str,
+    uuid: &str,
+) -> Result<AccessTokenStatus, RequestError> {
+    // generate a random uuid since we aren't actually connecting to a server
+    let server_id = Uuid::new_v4().to_string().replace('-', "");
+    dbg!(&server_id);
+    let json = json!({
+        "accessToken": access_token,
+        "selectedProfile": uuid,
+        "serverId": server_id,
+    });
+
+    let query = client
+        .post("https://sessionserver.mojang.com/session/minecraft/join")
+        .json(&json)
+        .send()
+        .await
+        .map_err(RequestError::from_error)?;
+
+    match query.status() {
+        StatusCode::NO_CONTENT => Ok(AccessTokenStatus::Ok),
+        StatusCode::FORBIDDEN => {
+            #[derive(Deserialize)]
+            struct ErrorResponse {
+                error: String,
+            }
+            let error = query
+                .json::<ErrorResponse>()
+                .await
+                .map_err(RequestError::from_error)?
+                .error;
+
+            match &error as &str {
+                "ForbiddedOperationException" => Ok(AccessTokenStatus::Invalid),
+                "InsufficientPrivilegesException" => Ok(AccessTokenStatus::XboxMultiplayerDisabled),
+                "UserBannedException" => Ok(AccessTokenStatus::BannedFromMultiplayer),
+                // just consider any unhandled errors the same as a normal invalid state
+                _ => {
+                    dbg!(error);
+                    Ok(AccessTokenStatus::Invalid)
+                }
+            }
+        }
+        _ => Err(RequestError::from_status(&query)),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum AccessTokenStatus {
+    Ok,
+    Invalid,
+    XboxMultiplayerDisabled,
+    BannedFromMultiplayer,
+}
+
 #[cfg(test)]
 mod test {
-    use super::McEntitlement;
+    use std::time::Duration;
+
+    use chrono::{DateTime, Utc};
+
+    use crate::managers::account::api::McAuth;
+
+    use super::{validate_access_token, McEntitlement};
 
     /// Make sure it's possible to get a JWT decoding key from
     /// the saved public key.

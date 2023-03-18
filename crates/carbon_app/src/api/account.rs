@@ -89,10 +89,16 @@ enum AccountType {
 
 #[derive(Type, Serialize)]
 enum AccountStatus {
-    Ok,
+    Ok { flags: StatusFlags },
     Expired,
     Refreshing,
     Invalid,
+}
+
+#[derive(Type, Serialize)]
+struct StatusFlags {
+    banned_from_multiplayer: bool,
+    xbox_disabled_multiplayer: bool,
 }
 
 #[derive(Type, Serialize)]
@@ -149,10 +155,34 @@ impl From<domain::AccountType> for AccountType {
 impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
-            domain::AccountStatus::Ok { .. } => Self::Ok,
+            domain::AccountStatus::Ok {
+                access_token: _,
+                flags,
+            } => Self::Ok {
+                flags: flags.into(),
+            },
             domain::AccountStatus::Refreshing => Self::Refreshing,
             domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Invalid => Self::Invalid,
+        }
+    }
+}
+
+impl From<Option<domain::StatusFlags>> for StatusFlags {
+    fn from(value: Option<domain::StatusFlags>) -> Self {
+        match value {
+            Some(domain::StatusFlags::BannedFromMultiplayer) => Self {
+                banned_from_multiplayer: true,
+                xbox_disabled_multiplayer: false,
+            },
+            Some(domain::StatusFlags::XboxMultiplayerDisabled) => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: true,
+            },
+            None => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: false,
+            },
         }
     }
 }
