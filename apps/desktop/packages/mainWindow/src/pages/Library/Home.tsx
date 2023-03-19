@@ -90,17 +90,19 @@ const Home = () => {
           />
         </Show>
         <div class="mt-4">
-          <Carousel title={t("recent_played")}>
+          <Carousel
+            title={t("recent_played")}
+            onClick={() => {
+              navigate(`/library/${instance.id}`);
+            }}
+          >
             <For each={mockCarousel}>
               {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
+                <Tile
+                  title={instance.title}
+                  modloader={instance.modloader}
+                  version={instance.mcVersion}
+                />
               )}
             </For>
           </Carousel>

@@ -2,7 +2,7 @@ import { createEffect, createSignal, onMount, JSX, onCleanup } from "solid-js";
 import "./index.css";
 
 export interface Props {
-  children?: JSX.Element;
+  children: JSX.Element;
   class?: string;
   title: string;
 }
@@ -42,16 +42,57 @@ const Carousel = (props: Props) => {
         "snap-mandatory",
         "scroll-smooth"
       );
+      // Get the current scroll position and calculate the target position
+      const currentScrollLeft = horizontalSlider.scrollLeft;
+      const snapDistance = 168;
+      const targetScrollLeft =
+        Math.round(currentScrollLeft / snapDistance) * snapDistance;
+      // Animate the scroll to the target position using requestAnimationFrame
+      const animateScroll = () => {
+        if (horizontalSlider) {
+          const distance = targetScrollLeft - horizontalSlider.scrollLeft;
+          const speed = distance / 8;
+          if (Math.abs(distance) < 1) {
+            horizontalSlider.scrollLeft = targetScrollLeft;
+            horizontalSlider.classList.add("snap-x");
+            horizontalSlider.classList.remove("snap-mandatory");
+          } else {
+            horizontalSlider.scrollLeft += speed;
+            requestAnimationFrame(animateScroll);
+          }
+        }
+      };
+      requestAnimationFrame(animateScroll);
     }
   };
+
   const mousemove = (e: MouseEvent) => {
-    if (horizontalSlider) {
-      if (!isDown()) return;
+    if (horizontalSlider && isDown()) {
       e.preventDefault();
 
       const x = e.pageX - horizontalSlider.offsetLeft;
       const walk = (x - startX()) * 3;
-      horizontalSlider.scrollLeft = scrollLeft() - walk;
+      const newScrollLeft = scrollLeft() - walk;
+
+      // Calculate the target scroll position based on the snap distance
+      const snapDistance = 168;
+      const targetScrollLeft =
+        Math.round(newScrollLeft / snapDistance) * snapDistance;
+
+      // Update the scroll position using requestAnimationFrame for smoother scrolling
+      const updateScroll = () => {
+        if (!horizontalSlider) return;
+        const currentScrollLeft = horizontalSlider.scrollLeft;
+        const distance = targetScrollLeft - currentScrollLeft;
+        const speed = distance / 8;
+        if (Math.abs(distance) < 1) {
+          horizontalSlider.scrollLeft = targetScrollLeft;
+        } else {
+          horizontalSlider.scrollLeft = currentScrollLeft + speed;
+          requestAnimationFrame(updateScroll);
+        }
+      };
+      requestAnimationFrame(updateScroll);
     }
   };
 
