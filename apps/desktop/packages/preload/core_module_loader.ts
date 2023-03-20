@@ -24,6 +24,9 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   const coreModule = spawn(coreModulePath, [], {
     shell: false,
     detached: false,
+    env: {
+      RUST_BACKTRACE: "full",
+    },
   });
 
   coreModule.stdout.on("data", (data) => {
