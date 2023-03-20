@@ -394,7 +394,6 @@ dependencies = [
  "env_logger",
  "futures",
  "jsonwebtoken",
- "libc",
  "log",
  "ntest",
  "prisma-client-rust",
@@ -413,7 +412,6 @@ dependencies = [
  "tracing",
  "tracing-test",
  "uuid",
- "winapi",
 ]
 
 [[package]]

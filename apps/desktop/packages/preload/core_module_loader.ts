@@ -8,8 +8,6 @@ const isDev = import.meta.env.MODE === "development";
 const binaryName =
   os.platform() === "win32" ? "core_module.exe" : "core_module";
 
-console.log(process.ppid);
-
 let coreModuleLoaded = new Promise((resolve, reject) => {
   if (isDev) {
     resolve(0);
@@ -23,9 +21,9 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
 
   console.log(`[CORE] Spawning core module: ${coreModulePath}`);
 
-  const coreModule = spawn(coreModulePath, ["--ppid", `${process.ppid}`], {
+  const coreModule = spawn(coreModulePath, [], {
     shell: false,
-    detached: true,
+    detached: false,
   });
 
   coreModule.stdout.on("data", (data) => {
@@ -33,7 +31,7 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   });
 
   coreModule.stderr.on("data", (data) => {
-    console.log(`[CORE] Error: ${data.toString()}`);
+    console.error(`[CORE] Error: ${data.toString()}`);
   });
 
   coreModule.on("exit", (code) => {

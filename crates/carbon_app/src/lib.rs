@@ -16,12 +16,12 @@ pub mod managers;
 mod app_version;
 mod error;
 pub mod generate_rspc_ts_bindings;
-mod pprocess_keepalive;
+// mod pprocess_keepalive;
 mod runtime_path_override;
 
 #[tokio::main]
 pub async fn init() {
-    pprocess_keepalive::init();
+    // pprocess_keepalive::init();
 
     println!("Starting Carbon App");
     dotenv::from_filename(
@@ -33,17 +33,6 @@ pub async fn init() {
             .join(".env"),
     )
     .ok();
-
-    println!(
-        "{}",
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(".env")
-            .to_string_lossy()
-    );
 
     let _guard = sentry::init((
         std::env::var("SENTRY_DSN").unwrap(),
