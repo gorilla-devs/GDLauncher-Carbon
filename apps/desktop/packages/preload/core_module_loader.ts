@@ -17,14 +17,14 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   }
   const coreModulePath = path.resolve(
     __dirname,
-    "../../../../target/debug",
+    "../../../../resources",
     binaryName
   );
 
   console.log(`[CORE] Spawning core module: ${coreModulePath}`);
 
   const coreModule = spawn(coreModulePath, ["--ppid", `${process.ppid}`], {
-    shell: true,
+    shell: false,
     detached: false,
   });
 

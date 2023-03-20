@@ -29,7 +29,7 @@ importers:
       chokidar: ^3.5.3
       custom-electron-titlebar: ^4.1.5
       date-fns: ^2.29.3
-      electron: 22.0.0
+      electron: 23.1.4
       electron-builder: ^23.6.0
       electron-playwright-helpers: ^1.2.2
       electron-updater: ^5.3.0
@@ -44,7 +44,7 @@ importers:
       playwright: ^1.29.1
       posthog-js: ^1.39.1
       prettier: ^2.8.1
-      solid-js: ^1.6.7
+      solid-js: ^1.6.15
       solid-transition-group: ^0.0.12
       typescript: ^4.9.4
       vite: ^3.2.4
@@ -57,15 +57,15 @@ importers:
       '@gd/ui': link:../../packages/ui
       '@playwright/test': 1.29.1
       '@rspc/client': 0.0.0-main-7c0a67c1
-      '@rspc/solid': 0.0.0-main-7c0a67c1_5uegwywychtc54xzkqigxb4wku
-      '@solidjs/router': 0.6.0_solid-js@1.6.7
-      '@tanstack/solid-query': 4.22.0_solid-js@1.6.7
+      '@rspc/solid': 0.0.0-main-7c0a67c1_nnjowgyzd7355kxfhuwf5a7dzu
+      '@solidjs/router': 0.6.0_solid-js@1.6.15
+      '@tanstack/solid-query': 4.22.0_solid-js@1.6.15
       '@typescript-eslint/parser': 5.48.0_iukboom6ndih5an6iafl45j2fe
       '@unocss/eslint-config': 0.49.4_iukboom6ndih5an6iafl45j2fe
       chokidar: 3.5.3
-      custom-electron-titlebar: 4.1.5_electron@22.0.0
+      custom-electron-titlebar: 4.1.5_electron@23.1.4
       date-fns: 2.29.3
-      electron: 22.0.0
+      electron: 23.1.4
       electron-builder: 23.6.0
       electron-playwright-helpers: 1.2.2
       electron-updater: 5.3.0
@@ -80,11 +80,11 @@ importers:
       playwright: 1.29.1
       posthog-js: 1.39.1
       prettier: 2.8.1
-      solid-js: 1.6.7
-      solid-transition-group: 0.0.12_solid-js@1.6.7
+      solid-js: 1.6.15
+      solid-transition-group: 0.0.12_solid-js@1.6.15
       typescript: 4.9.4
       vite: 3.2.5
-      vite-plugin-solid: 2.5.0_solid-js@1.6.7+vite@3.2.5
+      vite-plugin-solid: 2.5.0_solid-js@1.6.15+vite@3.2.5
 
   apps/website:
     specifiers:
@@ -151,12 +151,8 @@ importers:
   packages/core_module:
     specifiers:
       '@gd/config': workspace:*
-      '@napi-rs/cli': ^2.14.1
-      chokidar: ^3.5.3
     devDependencies:
       '@gd/config': link:../config
-      '@napi-rs/cli': 2.14.1
-      chokidar: 3.5.3
 
   packages/i18n:
     specifiers:
@@ -166,7 +162,7 @@ importers:
       i18next-icu: ^2.1.0
       intl-messageformat: ^10.2.5
     devDependencies:
-      '@mbarzda/solid-i18next': 1.2.0_apk5tq3hzmnmypqfjbvurzmbyi
+      '@mbarzda/solid-i18next': 1.2.0_rdshcnphas4bptyw7waqxy46li
       html-parse-string: 0.0.8
       i18next: 22.1.5
       i18next-icu: 2.1.0_intl-messageformat@10.2.5
@@ -3762,14 +3758,14 @@ packages:
       - supports-color
     dev: true
 
-  /@mbarzda/solid-i18next/1.2.0_apk5tq3hzmnmypqfjbvurzmbyi:
+  /@mbarzda/solid-i18next/1.2.0_rdshcnphas4bptyw7waqxy46li:
     resolution: {integrity: sha512-qMK/85MkT5EFaVOOmj68kPRVefQTAntbGMKT0625GE+pvOiQBb/isiYq5e/laY6n34F9rLIaYI8Ka0VTyvc7fQ==}
     peerDependencies:
       i18next: '>=21.x'
       solid-js: '>=1.5.x'
     dependencies:
       i18next: 22.1.5
-      solid-js: 1.6.7
+      solid-js: 1.6.15
     dev: true
 
   /@mdx-js/mdx/1.6.22:
@@ -3903,12 +3899,6 @@ packages:
       glob-to-regexp: 0.3.0
     dev: true
 
-  /@napi-rs/cli/2.14.1:
-    resolution: {integrity: sha512-+mnge6gvdbOrwtYrBO7iMlTjXcaRk17wDqzxSG4SPBKPhI3HroWY+tRsx+OdluAuRyJZOkWTdsvGnMsGO1ff/A==}
-    engines: {node: '>= 10'}
-    hasBin: true
-    dev: true
-
   /@nodelib/fs.scandir/2.1.5:
     resolution: {integrity: sha512-vq24Bq3ym5HEQm2NKCr3yXDwjc7vTsEThRDnkp2DK9p1uqLR+DHurm/NOTo0KG7HYHU7eppKZj3MyqYuMBf62g==}
     engines: {node: '>= 8'}
@@ -4033,15 +4023,15 @@ packages:
     resolution: {integrity: sha512-PpFkqhp8KlfdFSa8f/Ff5nOg8jhHNq12q8p0ZLYU/1K68JVPQRIk432zpXg48QT/MQbMrogx/PF5E7refhEtvw==}
     dev: true
 
-  /@rspc/solid/0.0.0-main-7c0a67c1_5uegwywychtc54xzkqigxb4wku:
+  /@rspc/solid/0.0.0-main-7c0a67c1_nnjowgyzd7355kxfhuwf5a7dzu:
     resolution: {integrity: sha512-z4CJQX+Ci5/p/fC9XAN8x7aWMfm7chMSICQ4ks/PVC2IB1NZ5NYvOfzWA28KxHXJijBOAV45z2RRuxPR57+dqQ==}
     peerDependencies:
       '@tanstack/solid-query': ^4.6.0
       solid-js: ^1.5.5
     dependencies:
       '@rspc/client': 0.0.0-main-7c0a67c1
-      '@tanstack/solid-query': 4.22.0_solid-js@1.6.7
-      solid-js: 1.6.7
+      '@tanstack/solid-query': 4.22.0_solid-js@1.6.15
+      solid-js: 1.6.15
     dev: true
 
   /@rushstack/node-core-library/3.53.2:
@@ -4087,12 +4077,12 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
-  /@solidjs/router/0.6.0_solid-js@1.6.7:
+  /@solidjs/router/0.6.0_solid-js@1.6.15:
     resolution: {integrity: sha512-7ug2fzXXhvvDBL4CQyMvMM9o3dgBE6PoRh38T8UTmMnYz4rcCfROqSZc9yq+YEC96qWt5OvJgZ1Uj/4EAQXlfA==}
     peerDependencies:
       solid-js: ^1.5.3
     dependencies:
-      solid-js: 1.6.7
+      solid-js: 1.6.15
     dev: true
 
   /@storybook/addon-actions/6.5.15_yicqvriqha7ppr6zyvk5y4bjya:
@@ -5953,13 +5943,13 @@ packages:
     resolution: {integrity: sha512-OeLyBKBQoT265f5G9biReijeP8mBxNFwY7ZUu1dKL+YzqpG5q5z7J/N1eT8aWyKuhyDTiUHuKm5l+oIVzbtrjw==}
     dev: true
 
-  /@tanstack/solid-query/4.22.0_solid-js@1.6.7:
+  /@tanstack/solid-query/4.22.0_solid-js@1.6.15:
     resolution: {integrity: sha512-xNS9tS1XGAY1CD2i6+Lo31wFbizMPPO+NfT3E1E8EFq4Y6t2ewrcEI43X7Wl9mKrntWfLLD75KvnK5LWDhpCiw==}
     peerDependencies:
       solid-js: ^1.5.7
     dependencies:
       '@tanstack/query-core': 4.22.0
-      solid-js: 1.6.7
+      solid-js: 1.6.15
     dev: true
 
   /@testing-library/dom/8.19.0:
@@ -6120,7 +6110,7 @@ packages:
   /@types/fs-extra/9.0.13:
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
     dependencies:
-      '@types/node': 18.11.4
+      '@types/node': 18.11.9
     dev: true
 
   /@types/glob/7.2.0:
@@ -6248,10 +6238,6 @@ packages:
 
   /@types/node/17.0.45:
     resolution: {integrity: sha512-w+tIMs3rq2afQdsPJlODhoUEKzFP1ayaoyl1CcnwtIlsVe7K7bA1NGm4s3PraqTLlXnbIN84zuBlxBWo1u9BLw==}
-    dev: true
-
-  /@types/node/18.11.4:
-    resolution: {integrity: sha512-BxcJpBu8D3kv/GZkx/gSMz6VnTJREBj/4lbzYOQueUOELkt8WrO6zAcSPmp9uRPEW/d+lUO8QK0W2xnS1hEU0A==}
     dev: true
 
   /@types/node/18.11.9:
@@ -9670,12 +9656,12 @@ packages:
     dev: true
     optional: true
 
-  /custom-electron-titlebar/4.1.5_electron@22.0.0:
+  /custom-electron-titlebar/4.1.5_electron@23.1.4:
     resolution: {integrity: sha512-KpVmO+Fz34zNw/jYbOD6YwxPr6h2hgZmNbjy0AvhlXiH4dxeZJXDlMcBX08NqsESymMQvIWwsGaA//YGW1bXjA==}
     peerDependencies:
       electron: '>20'
     dependencies:
-      electron: 22.0.0
+      electron: 23.1.4
     dev: true
 
   /cyclist/1.0.1:
@@ -10224,8 +10210,8 @@ packages:
       - supports-color
     dev: true
 
-  /electron/22.0.0:
-    resolution: {integrity: sha512-cgRc4wjyM+81A0E8UGv1HNJjL1HBI5cWNh/DUIjzYvoUuiEM0SS0hAH/zaFQ18xOz2ced6Yih8SybpOiOYJhdg==}
+  /electron/23.1.4:
+    resolution: {integrity: sha512-3Z6CpAPdhv6haYX9DTO7k0l6uAUreZM3/EngQYqGN3Gz7Fp0DPb/egt8BwR3ClG/jTlQM+PQ+5WkTK0eMjm07A==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
     requiresBuild: true
@@ -17479,6 +17465,12 @@ packages:
       - supports-color
     dev: true
 
+  /solid-js/1.6.15:
+    resolution: {integrity: sha512-xEuMUIdDf4YRFT4i3XEJCNg4Y21lZiWWPSEqj0R3UnLLpENGJVXkqpmbIyRU5CuMImKPIEu5CYgmFKL7Npfe1A==}
+    dependencies:
+      csstype: 3.1.1
+    dev: true
+
   /solid-js/1.6.4:
     resolution: {integrity: sha512-IfJJ1ejAcRTOEB0XXk/J8tzvVNZXAdEuHtWQwTXefUteZPGWOl4aVSOrkoj3y1bjwDayqok3+Vv3TV/j4IhKyw==}
     dependencies:
@@ -17489,6 +17481,17 @@ packages:
     resolution: {integrity: sha512-yLLw9mtTqPEEPxmZfAHZi3DyP25XnQZ42+mDYuzhAdeqa+8EDuNKyxOXKY7PEFddCqp1G2UQI5O3JiJtE7yxBQ==}
     dependencies:
       csstype: 3.1.1
+    dev: true
+
+  /solid-refresh/0.4.1_solid-js@1.6.15:
+    resolution: {integrity: sha512-v3tD/OXQcUyXLrWjPW1dXZyeWwP7/+GQNs8YTL09GBq+5FguA6IejJWUvJDrLIA4M0ho9/5zK2e9n+uy+4488g==}
+    peerDependencies:
+      solid-js: ^1.3
+    dependencies:
+      '@babel/generator': 7.20.5
+      '@babel/helper-module-imports': 7.18.6
+      '@babel/types': 7.20.5
+      solid-js: 1.6.15
     dev: true
 
   /solid-refresh/0.4.1_solid-js@1.6.4:
@@ -17502,17 +17505,6 @@ packages:
       solid-js: 1.6.4
     dev: true
 
-  /solid-refresh/0.4.1_solid-js@1.6.7:
-    resolution: {integrity: sha512-v3tD/OXQcUyXLrWjPW1dXZyeWwP7/+GQNs8YTL09GBq+5FguA6IejJWUvJDrLIA4M0ho9/5zK2e9n+uy+4488g==}
-    peerDependencies:
-      solid-js: ^1.3
-    dependencies:
-      '@babel/generator': 7.20.5
-      '@babel/helper-module-imports': 7.18.6
-      '@babel/types': 7.20.5
-      solid-js: 1.6.7
-    dev: true
-
   /solid-testing-library/0.5.0_solid-js@1.6.7:
     resolution: {integrity: sha512-vr4Ke9Dq3bUFLaXOcN8/IVn2e9Q37w4vdmoIOmFBIPs7iCJX9IxuC0IdQqK8nzBZMQqceijkfyCE3Qc407KmaA==}
     engines: {node: '>= 14'}
@@ -17523,12 +17515,12 @@ packages:
       solid-js: 1.6.7
     dev: true
 
-  /solid-transition-group/0.0.12_solid-js@1.6.7:
+  /solid-transition-group/0.0.12_solid-js@1.6.15:
     resolution: {integrity: sha512-Eu4MfNZSSxM67C+4EXaoDiWr4BFbDLg3j30JQJgQEIH9UDOfgNPfZlsFDhT/PxwJqhe6sn85W+dbmYJzBmjpAA==}
     peerDependencies:
       solid-js: ^1.0.0
     dependencies:
-      solid-js: 1.6.7
+      solid-js: 1.6.15
     dev: true
 
   /source-list-map/2.0.1:
@@ -19183,6 +19175,24 @@ packages:
       - supports-color
     dev: true
 
+  /vite-plugin-solid/2.5.0_solid-js@1.6.15+vite@3.2.5:
+    resolution: {integrity: sha512-VneGd3RyFJvwaiffsqgymeMaofn0IzQLPwDzafTV2f1agoWeeJlk5VrI5WqT9BTtLe69vNNbCJWqLhHr9fOdDw==}
+    peerDependencies:
+      solid-js: ^1.3.17 || ^1.4.0 || ^1.5.0 || ^1.6.0
+      vite: ^3.0.0 || ^4.0.0
+    dependencies:
+      '@babel/core': 7.20.5
+      '@babel/preset-typescript': 7.18.6_@babel+core@7.20.5
+      babel-preset-solid: 1.6.3_@babel+core@7.20.5
+      merge-anything: 5.1.4
+      solid-js: 1.6.15
+      solid-refresh: 0.4.1_solid-js@1.6.15
+      vite: 3.2.5
+      vitefu: 0.2.3_vite@3.2.5
+    transitivePeerDependencies:
+      - supports-color
+    dev: true
+
   /vite-plugin-solid/2.5.0_solid-js@1.6.4+vite@3.2.5:
     resolution: {integrity: sha512-VneGd3RyFJvwaiffsqgymeMaofn0IzQLPwDzafTV2f1agoWeeJlk5VrI5WqT9BTtLe69vNNbCJWqLhHr9fOdDw==}
     peerDependencies:
@@ -19196,24 +19206,6 @@ packages:
       solid-js: 1.6.4
       solid-refresh: 0.4.1_solid-js@1.6.4
       vite: 3.2.5_sass@1.56.2
-      vitefu: 0.2.3_vite@3.2.5
-    transitivePeerDependencies:
-      - supports-color
-    dev: true
-
-  /vite-plugin-solid/2.5.0_solid-js@1.6.7+vite@3.2.5:
-    resolution: {integrity: sha512-VneGd3RyFJvwaiffsqgymeMaofn0IzQLPwDzafTV2f1agoWeeJlk5VrI5WqT9BTtLe69vNNbCJWqLhHr9fOdDw==}
-    peerDependencies:
-      solid-js: ^1.3.17 || ^1.4.0 || ^1.5.0 || ^1.6.0
-      vite: ^3.0.0 || ^4.0.0
-    dependencies:
-      '@babel/core': 7.20.5
-      '@babel/preset-typescript': 7.18.6_@babel+core@7.20.5
-      babel-preset-solid: 1.6.3_@babel+core@7.20.5
-      merge-anything: 5.1.4
-      solid-js: 1.6.7
-      solid-refresh: 0.4.1_solid-js@1.6.7
-      vite: 3.2.5
       vitefu: 0.2.3_vite@3.2.5
     transitivePeerDependencies:
       - supports-color

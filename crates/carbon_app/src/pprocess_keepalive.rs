@@ -21,7 +21,7 @@ pub fn init() {
     unsafe impl<T> Send for SendablePtr<T> {}
 
     tokio::spawn(async move {
-        let ppid: DWORD = scan_args_for_ppid().expect("Parent Pid not found");
+        let ppid: DWORD = scan_args_for_ppid().expect("Parent pid not found");
         let parent =
             SendablePtr(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, ppid) });
 
