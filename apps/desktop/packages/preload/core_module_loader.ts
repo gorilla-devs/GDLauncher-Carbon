@@ -25,7 +25,7 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
 
   const coreModule = spawn(coreModulePath, ["--ppid", `${process.ppid}`], {
     shell: false,
-    detached: false,
+    detached: true,
   });
 
   coreModule.stdout.on("data", (data) => {
