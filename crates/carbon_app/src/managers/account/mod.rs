@@ -1,9 +1,9 @@
 use crate::{
     api::keys::account::*,
     db::{self, read_filters::StringFilter},
-    error::{define_single_error, request::RequestError},
-    managers::{account::enroll::InvalidateCtx, AppRef},
+    managers::account::enroll::InvalidateCtx,
 };
+use anyhow::ensure;
 use async_trait::async_trait;
 use carbon_domain::account::*;
 use chrono::{FixedOffset, Utc};
@@ -20,13 +20,15 @@ use std::{
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 
+use anyhow::{anyhow, bail};
+
 pub use self::enroll::EnrollmentError;
 use self::{
     api::{AccessTokenStatus, DeviceCode},
     enroll::{EnrollmentStatus, EnrollmentTask},
 };
 
-use super::{configuration::ConfigurationError, AppInner, ManagerRef};
+use super::{AppRef, ManagerRef, AppInner};
 
 pub mod api;
 mod enroll;
@@ -52,7 +54,7 @@ impl AccountManager {
 }
 
 impl ManagerRef<'_, AccountManager> {
-    pub async fn get_active_uuid(self) -> Result<Option<String>, GetActiveUuidError> {
+    pub async fn get_active_uuid(self) -> anyhow::Result<Option<String>> {
         Ok(self
             .app
             .configuration_manager()
@@ -62,7 +64,7 @@ impl ManagerRef<'_, AccountManager> {
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(self, uuid: Option<String>) -> Result<(), SetAccountError> {
+    pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
         use db::account::WhereParam::Uuid;
         use db::app_configuration::SetParam::SetActiveAccountUuid;
 
@@ -71,14 +73,15 @@ impl ManagerRef<'_, AccountManager> {
                 .app
                 .prisma_client
                 .account()
-                .find_first(vec![Uuid(StringFilter::Equals(uuid))])
+                .find_first(vec![Uuid(StringFilter::Equals(uuid.clone()))])
                 .exec()
                 .await?;
 
             // Setting the active account to one not in the DB does not make sense.
-            if account_entry.is_none() {
-                return Err(SetAccountError::NoAccount);
-            }
+            ensure!(
+                account_entry.is_some(),
+                SetActiveUuidError::AccountDoesNotExist(uuid)
+            );
         }
 
         self.app
@@ -94,7 +97,7 @@ impl ManagerRef<'_, AccountManager> {
     /// Get the active account's details.
     ///
     /// Not exposed to the frontend on purpose. Will NOT be invalidated.
-    pub async fn get_active_account(&self) -> Result<Option<FullAccount>, GetActiveAccountError> {
+    pub async fn get_active_account(&self) -> anyhow::Result<Option<FullAccount>> {
         use db::account::WhereParam::Uuid;
 
         let Some(uuid) = self.get_active_uuid().await? else { return Ok(None) };
@@ -106,24 +109,25 @@ impl ManagerRef<'_, AccountManager> {
             .find_first(vec![Uuid(StringFilter::Equals(uuid))])
             .exec()
             .await?
-            .ok_or(GetActiveAccountError::AccountNotPresent)?;
+            .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
 
         Ok(Some(account.try_into()?))
     }
 
-    async fn get_account_entries(self) -> Result<Vec<db::account::Data>, QueryError> {
+    async fn get_account_entries(self) -> anyhow::Result<Vec<db::account::Data>> {
         use db::account::OrderByParam;
 
-        self.app
+        Ok(self
+            .app
             .prisma_client
             .account()
             .find_many(Vec::new())
             .order_by(OrderByParam::LastUsed(Direction::Desc))
             .exec()
-            .await
+            .await?)
     }
 
-    pub async fn get_account_list(self) -> Result<Vec<Account>, GetAccountListError> {
+    pub async fn get_account_list(self) -> anyhow::Result<Vec<Account>> {
         let accounts = self.get_account_entries().await?;
 
         Ok(accounts
@@ -144,7 +148,7 @@ impl ManagerRef<'_, AccountManager> {
             .collect())
     }
 
-    async fn get_account(self, uuid: String) -> Result<Option<AccountWithStatus>, GetAccountError> {
+    async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
         use db::account::UniqueWhereParam;
 
         let account = self
@@ -170,10 +174,11 @@ impl ManagerRef<'_, AccountManager> {
 
         Ok(Some(AccountWithStatus::from(account)))
     }
+
     pub async fn get_account_status(
         self,
         uuid: String,
-    ) -> Result<Option<AccountStatus>, GetAccountError> {
+    ) -> anyhow::Result<Option<AccountStatus>> {
         let Some(mut account) = self.get_account(uuid).await? else { return Ok(None) };
 
         if let AccountType::Microsoft = &account.account.type_ {
@@ -192,7 +197,7 @@ impl ManagerRef<'_, AccountManager> {
     }
 
     /// Add or update an account
-    async fn add_account(self, account: FullAccount) -> Result<(), AddAccountError> {
+    async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
 
         let db_account = self
@@ -268,7 +273,7 @@ impl ManagerRef<'_, AccountManager> {
         Ok(())
     }
 
-    pub async fn refresh_account(self, uuid: String) -> Result<(), RefreshAccountError> {
+    pub async fn refresh_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::UniqueWhereParam;
 
         let account = self
@@ -281,13 +286,13 @@ impl ManagerRef<'_, AccountManager> {
             .ok_or(RefreshAccountError::NoAccount)?;
 
         let Some(refresh_token) = &account.ms_refresh_token else {
-            return Err(RefreshAccountError::NoRefreshToken)
+            bail!(RefreshAccountError::NoRefreshToken)
         };
 
         // stays locked until we insert an enrollment task
         let mut refreshing = self.currently_refreshing.write().await;
         if refreshing.contains_key(&uuid) {
-            return Err(RefreshAccountError::AlreadyRefreshing);
+            bail!(RefreshAccountError::AlreadyRefreshing);
         }
 
         struct Invalidator {
@@ -355,7 +360,7 @@ impl ManagerRef<'_, AccountManager> {
         Ok(())
     }
 
-    pub async fn delete_account(self, uuid: String) -> Result<(), DeleteAccountError> {
+    pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
         let result = self
@@ -399,17 +404,17 @@ impl ManagerRef<'_, AccountManager> {
             }
             Err(e) => {
                 if e.is_prisma_error::<RecordNotFound>() {
-                    Err(DeleteAccountError::NoAccount)
+                    bail!(DeleteAccountError::AccountDoesNotExist(uuid))
                 } else {
-                    Err(DeleteAccountError::Query(e))
+                    bail!(e)
                 }
             }
         }
     }
 
-    pub async fn begin_enrollment(self) -> Result<(), BeginEnrollmentStatusError> {
+    pub async fn begin_enrollment(self) -> anyhow::Result<()> {
         match &mut *self.active_enrollment.write().await {
-            Some(_) => Err(BeginEnrollmentStatusError::InProgress),
+            Some(_) => bail!(BeginEnrollmentStatusError::InProgress),
             enrollment @ None => {
                 let client = self.app.reqwest_client.clone();
 
@@ -432,13 +437,13 @@ impl ManagerRef<'_, AccountManager> {
         }
     }
 
-    pub async fn cancel_enrollment(self) -> Result<(), CancelEnrollmentStatusError> {
+    pub async fn cancel_enrollment(self) -> anyhow::Result<()> {
         let enrollment = self.active_enrollment.write().await.take();
         self.app.invalidate(ENROLL_GET_STATUS, None);
 
         match enrollment {
             Some(_) => Ok(()),
-            None => Err(CancelEnrollmentStatusError::NotActive),
+            None => bail!(CancelEnrollmentStatusError::NotActive),
         }
     }
 
@@ -451,11 +456,11 @@ impl ManagerRef<'_, AccountManager> {
         }
     }
 
-    pub async fn finalize_enrollment(self) -> Result<(), FinalizeEnrollmentError> {
+    pub async fn finalize_enrollment(self) -> anyhow::Result<()> {
         let enrollment = self.active_enrollment.write().await.take();
 
         match enrollment {
-            None => Err(FinalizeEnrollmentError::NotActive),
+            None => bail!(FinalizeEnrollmentError::NotActive),
             Some(enrollment) => {
                 let mut status = EnrollmentStatus::RequestingCode;
                 mem::swap(&mut *enrollment.status.write().await, &mut status);
@@ -469,7 +474,7 @@ impl ManagerRef<'_, AccountManager> {
 
                         Ok(())
                     }
-                    _ => Err(FinalizeEnrollmentError::NotComplete),
+                    _ => bail!(FinalizeEnrollmentError::NotComplete),
                 }
             }
         }
@@ -487,7 +492,7 @@ impl ManagerRef<'_, AccountManager> {
         self,
         uuid: String,
         lock_refresh: bool,
-    ) -> Result<(), ValidateAccountError> {
+    ) -> anyhow::Result<()> {
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
             false => None,
@@ -496,7 +501,7 @@ impl ManagerRef<'_, AccountManager> {
         let account = self
             .get_account(uuid.clone())
             .await?
-            .ok_or(ValidateAccountError::AccountMissing)?;
+            .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
 
         let AccountStatus::Ok { access_token: Some(access_token), flags: old_flags } = account.status else { return Ok(()) };
 
@@ -649,33 +654,21 @@ impl AccountRefreshService {
     }
 }
 
-define_single_error!(GetActiveUuidError::Query(ConfigurationError));
-define_single_error!(GetAccountEntriesError::Query(QueryError));
-define_single_error!(AddAccountError::Query(QueryError));
-define_single_error!(GetAccountListError::Query(QueryError));
-
 #[derive(Error, Debug)]
 pub enum GetActiveAccountError {
-    #[error("get active uuid error: {0}")]
-    GetActiveUuid(#[from] GetActiveUuidError),
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
-
     #[error("account selected but not present")]
     AccountNotPresent,
-
-    #[error("could not parse account from db: {0}")]
-    Parse(#[from] FullAccountLoadError),
 }
 
 #[derive(Error, Debug)]
-pub enum GetAccountError {
-    #[error("loading account from db: {0}")]
-    DbLoad(#[from] FullAccountLoadError),
+pub enum GetAccountStatusError {
+    #[error(
+        "getting account status: microsoft account token expiry date is unset (invalid state)"
+    )]
+    TokenExpiryUnset,
 
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
+    #[error("getting account status: microsoft account token is unset")]
+    TokenUnset,
 }
 
 #[derive(Error, Debug)]
@@ -715,51 +708,26 @@ pub enum FinalizeEnrollmentError {
 
     #[error("enrollment is not complete")]
     NotComplete,
-
-    #[error("account add error: {0}")]
-    AddAccount(#[from] AddAccountError),
-
-    #[error("set account error: {0}")]
-    SetAccount(#[from] SetAccountError),
 }
 
 #[derive(Error, Debug)]
 pub enum DeleteAccountError {
-    #[error("account does not exist and cannot be deleted")]
-    NoAccount,
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
-
-    #[error("configuration error: {0}")]
-    Configuration(#[from] ConfigurationError),
-
-    #[error("set account: {0}")]
-    SetAccount(#[from] SetAccountError),
+    #[error("attempted to delete account that is not in the account list: {0}")]
+    AccountDoesNotExist(String),
 }
 
 #[derive(Error, Debug)]
-pub enum SetAccountError {
-    #[error("config error: {0}")]
-    Configuration(#[from] ConfigurationError),
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
-
-    #[error("account does not exist and cannot be set as the active account")]
-    NoAccount,
+pub enum SetActiveUuidError {
+    #[error(
+        "attempted to set the active account to one that does not exist in the account list: {0}"
+    )]
+    AccountDoesNotExist(String),
 }
 
 #[derive(Error, Debug)]
 pub enum ValidateAccountError {
-    #[error("account missing")]
-    AccountMissing,
-
-    #[error("getting account: {0}")]
-    Query(#[from] GetAccountError),
-
-    #[error("request: {0}")]
-    Request(#[from] RequestError),
+    #[error("attempted to validate an account that was not present in the account list: {0}")]
+    AccountMissing(String),
 }
 
 pub struct FullAccount {
@@ -805,19 +773,19 @@ impl TryFrom<db::account::Data> for FullAccount {
 
     fn try_from(value: db::account::Data) -> Result<Self, Self::Error> {
         Ok(Self {
-            uuid: value.uuid,
-            username: value.username,
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
                     access_token,
                     refresh_token: value.ms_refresh_token,
-                    token_expires: value
-                        .token_expires
-                        .ok_or(FullAccountLoadError::ExpiryMissing)?,
+                    token_expires: value.token_expires.ok_or_else(|| {
+                        FullAccountLoadError::MissingExpiration(value.uuid.clone())
+                    })?,
                 },
                 None => FullAccountType::Offline,
             },
             last_used: value.last_used,
+            uuid: value.uuid,
+            username: value.username,
         })
     }
 }
@@ -876,8 +844,8 @@ impl From<api::FullAccount> for FullAccount {
 
 #[derive(Error, Debug)]
 pub enum FullAccountLoadError {
-    #[error("missing token expiration time")]
-    ExpiryMissing,
+    #[error("attempted to parse microsoft account DB entry(uuid {0}), but was missing refresh token expiration timestamp")]
+    MissingExpiration(String),
 }
 
 // Temporary until enroll errors are fixed
