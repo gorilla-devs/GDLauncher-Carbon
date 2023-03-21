@@ -200,7 +200,7 @@ jobs:
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
             RUSTFLAGS: -D warnings
-      -run:
+      - run:
           name: "Upload debug info to sentry"
           shell: bash.exe
           command: |
@@ -293,7 +293,7 @@ jobs:
           command: pnpm test
           environment:
             RUSTFLAGS: -D warnings
-      -run:
+      - run:
           name: "Upload debug info to sentry"
           shell: bash.exe
           command: |
@@ -318,23 +318,8 @@ workflows:
   master-develop-builds:
     jobs:
       - buildMac:
-          filters:
-            branches:
-              only:
-                - master
-                - develop
           matrix:
             parameters:
               os: ["mac", "macm1"]
-      - buildWin:
-          filters:
-            branches:
-              only:
-                - master
-                - develop
-      - buildLinux:
-          filters:
-            branches:
-              only:
-                - master
-                - develop
+      - buildWin
+      - buildLinux
