@@ -10,12 +10,13 @@ opt-level = "s"
 split-debuginfo = "unpacked"
 
 [workspace.dependencies]
-anyhow = "1.0.51"
+anyhow = { version = "1.0.51", features = ["backtrace"] }
 async-recursion = "1.0.0"
 async-stream = "0.3.3"
 async-trait = "0.1.61"
 axum = "0.6.2"
 chrono = "0.4.23"
+derive_more = "0.99.17"
 directories = "4.0.1"
 dirs = "4.0.0"
 dotenv = "0.15.0"
