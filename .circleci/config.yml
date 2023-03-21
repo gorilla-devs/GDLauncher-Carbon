@@ -204,6 +204,8 @@ jobs:
             RUSTFLAGS: -D warnings
       - run:
           name: "Upload debug info to sentry"
+          when:
+            branch: release
           shell: bash.exe
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -295,14 +297,14 @@ jobs:
           command: pnpm test
           environment:
             RUSTFLAGS: -D warnings
-      - run:
-          name: "Upload debug info to sentry"
-          command: |
-            npm install -g @sentry/cli
-            cd ./target/x86_64-unknown-linux-gnu/release
-            sentry-cli login --auth-token $SENTRY_AUTH_TOKEN --log-level=debug
-            sentry-cli difutil check core_module.pdb --log-level=debug
-            sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb --log-level=debug
+      # - run:
+      #     name: "Upload debug info to sentry"
+      #     command: |
+      #       npm install -g @sentry/cli
+      #       cd ./target/x86_64-unknown-linux-gnu/release
+      #       sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+      #       sentry-cli difutil check core_module.pdb
+      #       sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
@@ -314,7 +316,7 @@ workflows:
           filters:
             branches:
               ignore:
-                - master
+                - release
                 - develop
   master-develop-builds:
     jobs:

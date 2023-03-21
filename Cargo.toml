@@ -3,10 +3,11 @@ members = ["packages/core_module", "crates/*"]
 resolver = "2"
 
 [profile.release]
-debug = true
+debug = 2
 codegen-units = 1
 lto = true
-opt-level = "z"
+opt-level = "s"
+split-debuginfo = "unpacked"
 
 [workspace.dependencies]
 anyhow = "1.0.51"
