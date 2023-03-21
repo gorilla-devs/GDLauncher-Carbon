@@ -25,11 +25,20 @@ macro_rules! router {
         let mut router = ::rspc::Router::<$crate::managers::App>::new();
         $(
             router = router.$type($endpoint.local, |t| {
-                t(|$app: $crate::managers::App, $args: $args_ty| async move { $block })
+                t(|$app: $crate::managers::App, $args: $args_ty| async move {
+                    let mut block: ::anyhow::Result::<_> = (|| async move { $block })().await;
+                    block = ::anyhow::Context::context(block, $crate::api::router::Endpoint($endpoint.full));
+                    block.map_err($crate::error::anyhow_into_fe_error)
+                })
             });
         )*
         router
     }}
 }
 
+use derive_more::Display;
 pub(crate) use router;
+
+#[derive(Display)]
+#[display(fmt = "endpoint {_0}")]
+pub struct Endpoint(pub &'static str);
