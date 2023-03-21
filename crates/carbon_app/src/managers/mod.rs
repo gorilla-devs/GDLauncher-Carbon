@@ -2,7 +2,6 @@ use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::error;
 use crate::managers::configuration::ConfigurationManager;
 use rspc::RouterBuilderLike;
 use std::ops::Deref;
@@ -139,15 +138,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.configuration_manager()
                 .get_theme()
                 .await
-                .map_err(error::into_rspc)
         }
 
         mutation SET_THEME[app, new_theme: String] {
             app.configuration_manager()
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(error::into_rspc)?;
-            Ok(())
         }
     }
 }

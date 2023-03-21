@@ -1,21 +1,33 @@
-use std::error::Error;
 pub mod request;
 
-macro_rules! define_single_error {
-    ($name:ident::$variant:ident($error:path)) => {
-        #[derive(Error, Debug)]
-        pub enum $name {
-            #[error("{0}")]
-            $variant(#[from] $error),
-        }
+use serde::Serialize;
+
+pub fn anyhow_into_fe_error(error: anyhow::Error) -> rspc::Error {
+    #[derive(Serialize)]
+    struct FeError {
+        cause: Vec<CauseSegment>,
+        backtrace: String,
+    }
+
+    #[derive(Serialize)]
+    struct CauseSegment {
+        display: String,
+        debug: String,
+    }
+
+    let error = FeError {
+        cause: error
+            .chain()
+            .map(|entry| CauseSegment {
+                display: format!("{entry}"),
+                debug: format!("{entry:#?}"),
+            })
+            .collect(),
+        backtrace: format!("{:?}", error.backtrace()),
     };
-}
 
-pub(crate) use define_single_error;
-
-pub fn into_rspc<E: Error>(err: E) -> rspc::Error {
     rspc::Error::new(
         rspc::ErrorCode::InternalServerError,
-        format!("backend error: {err:#?}"),
+        serde_json::to_string_pretty(&error).expect("could not convert error to json"),
     )
 }
