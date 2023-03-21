@@ -297,7 +297,6 @@ jobs:
             RUSTFLAGS: -D warnings
       - run:
           name: "Upload debug info to sentry"
-          shell: bash.exe
           command: |
             npm install -g @sentry/cli
             cd ./target/x86_64-pc-windows-msvc/release
