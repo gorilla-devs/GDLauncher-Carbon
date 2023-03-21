@@ -23,7 +23,7 @@ pub fn anyhow_into_fe_error(error: anyhow::Error) -> rspc::Error {
                 debug: format!("{entry:#?}"),
             })
             .collect(),
-        backtrace: format!("{:?}", error.backtrace()),
+        backtrace: format!("{}", error.backtrace()),
     };
 
     rspc::Error::new(
