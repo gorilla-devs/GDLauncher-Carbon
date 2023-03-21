@@ -86,7 +86,7 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-
+                rustup target add aarch64-apple-darwin
             - run: |
                 node -v
                 cargo --version
