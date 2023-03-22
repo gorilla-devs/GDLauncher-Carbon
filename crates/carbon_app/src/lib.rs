@@ -7,6 +7,7 @@ use crate::{
 };
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
+use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
@@ -46,8 +47,19 @@ pub async fn init() {
     start_router(runtime_path).await;
 }
 
+async fn get_available_port() -> Option<u16> {
+    for port in 1025..65535 {
+        if let Ok(_) = TcpListener::bind(("[::]:", port)).await {
+            return Some(port);
+        }
+    }
+
+    None
+}
+
 #[inline(never)]
 async fn start_router(runtime_path: PathBuf) {
+    let port = get_available_port().await.expect("No available port found");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -65,7 +77,35 @@ async fn start_router(runtime_path: PathBuf) {
         .nest("/rspc", router.endpoint(move || app).axum())
         .layer(cors);
 
-    let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
+    let addr = format!("[::]:{port}")
+        .parse::<std::net::SocketAddr>()
+        .unwrap(); // This listens on IPv6 and IPv4
+
+    // As soon as the server is ready, notify via stdout
+    tokio::spawn(async move {
+        let mut counter = 0;
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
+        let reqwest_client = reqwest::Client::new();
+        loop {
+            counter += 1;
+            // If we've waited for 10 seconds, give up
+            if counter > 50 {
+                panic!("Server failed to start in time");
+            }
+
+            interval.tick().await;
+            let res = reqwest_client
+                .get(format!("http://localhost:{port}/health"))
+                .send()
+                .await;
+
+            if res.is_ok() {
+                println!("_STATUS_: READY|{port}");
+                break;
+            }
+        }
+    });
+
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await

@@ -1,7 +1,8 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
+import { createResource, Show } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
-import { client, queryClient, rspc } from "@/utils/rspcClient";
+import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
 import { ModalProvider } from "@/managers/ModalsManager";
@@ -15,36 +16,62 @@ queueMicrotask(() => {
   initAnalytics();
 });
 
-const DEFAULT_LANG = "en";
-
-const instance = i18n.createInstance({
-  defaultNS: "common",
-  fallbackLng: DEFAULT_LANG,
-});
-instance.use(icu);
-
-loadLanguageFile(DEFAULT_LANG).then((langFile) => {
-  instance.addResourceBundle(DEFAULT_LANG, "common", langFile);
-});
-
 render(() => {
-  window.coreModuleLoaded
-    .then(() => {
-      window.clearLoading();
-    })
-    .catch((e) => {
-      console.error(e);
-      window.fatalError("Failed to load native core");
+  const [coreModuleLoaded] = createResource(async () => {
+    let port = await window.coreModuleLoaded;
+    console.log("PORT", port);
+    window.clearLoading();
+    return port;
+  });
+
+  const [i18nInstance] = createResource(async () => {
+    const DEFAULT_LANG = "en";
+    const langFile = await loadLanguageFile(DEFAULT_LANG);
+
+    const instance = await i18n.use(icu).createInstance({
+      defaultNS: "common",
+      fallbackLng: DEFAULT_LANG,
+      resources: {
+        [DEFAULT_LANG]: {
+          common: langFile,
+        },
+      },
     });
+
+    return instance;
+  });
+
+  return (
+    <Show
+      when={
+        i18nInstance.state === "ready" && coreModuleLoaded.state === "ready"
+      }
+    >
+      <InnerApp
+        port={coreModuleLoaded()!}
+        i18nInstance={i18nInstance() as unknown as typeof i18n}
+      />
+    </Show>
+  );
+}, document.getElementById("root") as HTMLElement);
+
+type InnerAppProps = {
+  port: number;
+  i18nInstance: typeof i18n;
+};
+
+const InnerApp = (props: InnerAppProps) => {
+  // eslint-disable-next-line solid/reactivity
+  let { client, createInvalidateQuery } = initRspc(props.port);
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
         <NavigationManager>
-          <TransProvider instance={instance}>
+          <TransProvider instance={props.i18nInstance}>
             <NotificationsProvider>
               <ModalProvider>
-                <App />
+                <App createInvalidateQuery={createInvalidateQuery} />
               </ModalProvider>
             </NotificationsProvider>
           </TransProvider>
@@ -52,4 +79,4 @@ render(() => {
       </Router>
     </rspc.Provider>
   );
-}, document.getElementById("root") as HTMLElement);
+};

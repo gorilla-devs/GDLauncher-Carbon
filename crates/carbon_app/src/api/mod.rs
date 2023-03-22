@@ -54,5 +54,6 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
 pub fn build_axum_vanilla_router() -> axum::Router<()> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
+        .route("/health", axum::routing::get(|| async { "OK" }))
         .nest("/mc", mc::mount_axum_router())
 }

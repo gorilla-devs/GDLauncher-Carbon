@@ -30,7 +30,12 @@ let coreModuleLoaded = new Promise((resolve, reject) => {
   });
 
   coreModule.stdout.on("data", (data) => {
-    console.log(`[CORE] Message: ${data}`);
+    let dataString = data.toString();
+    if (dataString.startsWith("_STATUS_: ")) {
+      let port = dataString.split("|")[1];
+      resolve(port);
+    }
+    console.log(`[CORE] Message: ${dataString}`);
   });
 
   coreModule.stderr.on("data", (data) => {
