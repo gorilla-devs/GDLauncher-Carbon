@@ -154,9 +154,11 @@ async function createWindow() {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault();
+      console.log("Opening dev tools");
       win?.webContents.openDevTools();
     }
   });
+
   win.on("ready-to-show", () => {
     win?.show();
     if (import.meta.env.DEV) {
