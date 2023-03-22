@@ -44,12 +44,14 @@ pub async fn init() {
     ));
 
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
-    start_router(runtime_path).await;
+    let port = get_available_port().await.unwrap();
+
+    start_router(runtime_path, port).await;
 }
 
 async fn get_available_port() -> Option<u16> {
     for port in 1025..65535 {
-        if let Ok(_) = TcpListener::bind(("[::]:", port)).await {
+        if (TcpListener::bind(("[::]:", port))).await.is_ok() {
             return Some(port);
         }
     }
@@ -58,8 +60,7 @@ async fn get_available_port() -> Option<u16> {
 }
 
 #[inline(never)]
-async fn start_router(runtime_path: PathBuf) {
-    let port = get_available_port().await.expect("No available port found");
+async fn start_router(runtime_path: PathBuf, port: u16) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -127,7 +128,7 @@ mod test {
     async fn test_router() {
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
         let server = tokio::spawn(async {
-            super::start_router(temp_dir.into_path()).await;
+            super::start_router(temp_dir.into_path(), 4000).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
