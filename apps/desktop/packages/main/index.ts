@@ -16,6 +16,8 @@ import { release } from "os";
 import { join, resolve } from "path";
 import "./preloadListeners";
 
+(app as any).overwolf.disableAnonymousAnalytics();
+
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
 
@@ -109,6 +111,7 @@ async function createWindow() {
     width,
     titleBarStyle: "hidden",
     frame: false,
+    show: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -136,7 +139,7 @@ async function createWindow() {
   attachTitlebarToWindow(win);
 
   if (app.isPackaged) {
-    win.loadFile(join(__dirname, "../mainWindow/index.html"));
+    // win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
     const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${
@@ -154,10 +157,12 @@ async function createWindow() {
       win?.webContents.openDevTools();
     }
   });
-
-  if (import.meta.env.DEV) {
-    win.webContents.openDevTools();
-  }
+  win.on("ready-to-show", () => {
+    win?.show();
+    if (import.meta.env.DEV) {
+      win?.webContents.openDevTools();
+    }
+  });
 
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
