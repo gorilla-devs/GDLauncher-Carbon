@@ -18,7 +18,8 @@ log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 tracing-test = { workspace = true }
-dotenv = { workspace = true }
+dotenvy = { workspace = true }
+dotenvy_macro = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }

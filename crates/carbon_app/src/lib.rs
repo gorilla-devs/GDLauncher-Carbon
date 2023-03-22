@@ -25,7 +25,7 @@ pub async fn init() {
     // pprocess_keepalive::init();
 
     println!("Starting Carbon App");
-    dotenv::from_filename(
+    dotenvy::from_filename(
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .parent()
             .unwrap()
@@ -36,7 +36,7 @@ pub async fn init() {
     .ok();
 
     let _guard = sentry::init((
-        std::env::var("SENTRY_DSN").unwrap(),
+        dotenvy_macro::dotenv!("SENTRY_DSN"),
         sentry::ClientOptions {
             release: Some(APP_VERSION.into()),
             ..Default::default()
