@@ -25,31 +25,17 @@ pub async fn init() {
     // pprocess_keepalive::init();
 
     println!("Starting Carbon App");
-    dotenvy::from_filename(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(".env"),
-    )
-    .ok();
-
-    println!(
-        "Folder {}",
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(".env")
-            .display()
-    );
-
-    println!(
-        "Variable PPP_TEST = {}",
-        std::env::var("PPP_TEST").unwrap_or("UNDEFINED".to_string())
-    );
+    if cfg!(debug_assertions) {
+        dotenvy::from_filename(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join(".env"),
+        )
+        .ok();
+    }
 
     let _guard = sentry::init((
         dotenvy_macro::dotenv!("SENTRY_DSN"),
