@@ -139,7 +139,7 @@ async function createWindow() {
   attachTitlebarToWindow(win);
 
   if (app.isPackaged) {
-    // win.loadFile(join(__dirname, "../mainWindow/index.html"));
+    win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
     // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
     const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${
