@@ -26,15 +26,16 @@ pub async fn init() {
 
     println!("Starting Carbon App");
     if cfg!(debug_assertions) {
-        dotenvy::from_filename(
-            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .join(".env"),
-        )
-        .ok();
+        let parent_env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(".env");
+
+        if parent_env_path.exists() {
+            dotenvy::from_filename(parent_env_path).ok();
+        }
     }
 
     let _guard = sentry::init((
