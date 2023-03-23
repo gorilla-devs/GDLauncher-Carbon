@@ -5,6 +5,7 @@ pub struct Account {
     pub uuid: String,
     pub last_used: DateTime<Utc>,
     pub type_: AccountType,
+    pub skin_id: Option<String>,
 }
 
 pub enum AccountType {

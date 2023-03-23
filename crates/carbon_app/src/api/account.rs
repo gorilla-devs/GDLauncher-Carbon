@@ -64,6 +64,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation REFRESH_ACCOUNT[app, uuid: String] {
             app.account_manager().refresh_account(uuid).await
         }
+
+        query GET_HEAD[_, _uuid: String] { Ok(()) }
     }
 }
 

@@ -146,6 +146,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     uuid: account.uuid,
                     last_used: account.last_used.into(),
                     type_,
+                    skin_id: account.skin_id,
                 }
             })
             .collect())
@@ -537,11 +538,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
             Err(e) => bail!(e),
         };
 
+        let skin_changed = account.account.skin_id.as_ref().map(|s| s as &str)
+            != profile.skin.as_ref().map(|skin| &skin.id as &str);
+
         self.app
             .prisma_client
             .account()
             .update(
-                UniqueWhereParam::UuidEquals(uuid),
+                UniqueWhereParam::UuidEquals(uuid.clone()),
                 vec![
                     SetParam::SetUsername(profile.username),
                     SetParam::SetSkinId(profile.skin.map(|skin| skin.id)),
@@ -549,6 +553,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             )
             .exec()
             .await?;
+
+        if skin_changed {
+            self.app.invalidate(GET_HEAD, Some(uuid.into()));
+        }
 
         Ok(())
     }
@@ -806,6 +814,10 @@ impl From<FullAccount> for AccountWithStatus {
                     FullAccountType::Microsoft { .. } => AccountType::Microsoft,
                     FullAccountType::Offline => AccountType::Offline,
                 },
+                skin_id: match &value.type_ {
+                    FullAccountType::Microsoft { skin_id, .. } => skin_id.clone(),
+                    _ => None,
+                },
             },
             status: match value.type_ {
                 FullAccountType::Microsoft {
@@ -871,6 +883,7 @@ impl FEEnrollmentStatus {
                 uuid: account.mc.profile.uuid.clone(),
                 last_used: Utc::now(),
                 type_: AccountType::Microsoft,
+                skin_id: account.mc.profile.skin.as_ref().map(|skin| skin.id.clone()),
             }),
             EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(err.clone()),
         }
