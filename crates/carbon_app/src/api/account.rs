@@ -1,16 +1,20 @@
+use std::sync::Arc;
+
+use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
 use rspc::{RouterBuilderLike, Type};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::keys::account::*;
 use crate::api::router::router;
+use crate::error;
 use crate::error::request::FERequestError;
 use crate::managers::account::api::{
     DeviceCodePollError, DeviceCodeRequestError, McAccountPopulateError, McAuthError,
     McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
     XboxAuthError, XboxError,
 };
-use crate::managers::{account, App};
+use crate::managers::{account, App, AppInner};
 use carbon_domain::account as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -61,6 +65,26 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.account_manager().refresh_account(uuid).await
         }
     }
+}
+
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
+    #[derive(Deserialize)]
+    struct HeadQuery {
+        uuid: String,
+    }
+
+    axum::Router::new().route(
+        "/headImage",
+        axum::routing::get(
+            |State(app): State<Arc<AppInner>>, Query(query): Query<HeadQuery>| async move {
+                app.account_manager()
+                    .skin_manager()
+                    .make_head(query.uuid)
+                    .await
+                    .map_err(error::anyhow_into_axum_error)
+            },
+        ),
+    )
 }
 
 #[derive(Type, Serialize)]

@@ -93,6 +93,12 @@ impl ManagerRef<'_, SkinManager> {
             }
         })
     }
+
+    pub async fn make_head(self, uuid: String) -> anyhow::Result<Vec<u8>> {
+        let skin = self.get_skin(uuid).await?.data;
+        let head = tokio::task::spawn_blocking(move || stitch_head(&skin)).await??;
+        Ok(head)
+    }
 }
 
 fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
@@ -219,8 +225,12 @@ mod test {
 
         let accounts = app.account_manager().get_account_list().await?;
 
-        let futures = accounts.into_iter()
-            .map(|account| (account.username.clone(), app.account_manager().skin_manager().get_skin(account.uuid)));
+        let futures = accounts.into_iter().map(|account| {
+            (
+                account.username.clone(),
+                app.account_manager().skin_manager().get_skin(account.uuid),
+            )
+        });
 
         for (uname, future) in futures {
             println!("Getting {uname}");

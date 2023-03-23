@@ -41,10 +41,12 @@ async fn start_router(runtime_path: PathBuf) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
 
+    let app1 = app.clone();
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(move || app).axum())
-        .layer(cors);
+        .layer(cors)
+        .with_state(app1);
 
     let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
     axum::Server::bind(&addr)
