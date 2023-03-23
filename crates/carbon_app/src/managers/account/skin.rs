@@ -120,23 +120,23 @@ fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     let hat_front = image.view(40, 8, 8, 8);
     let hat_back = image.view(56, 8, 8, 8);
 
-    let mut target = image::RgbaImage::new(140, 140);
+    let mut target = image::RgbaImage::new(144, 144);
 
     overlay(
         &mut target,
         &resize(&hat_back.to_image(), 136, 136, FilterType::Nearest),
-        2,
-        2,
+        4,
+        4,
     );
     overlay(
         &mut target,
         &resize(&head.to_image(), 128, 128, FilterType::Nearest),
-        6,
-        6,
+        8,
+        8,
     );
     overlay(
         &mut target,
-        &resize(&hat_front.to_image(), 140, 140, FilterType::Nearest),
+        &resize(&hat_front.to_image(), 144, 144, FilterType::Nearest),
         0,
         0,
     );
