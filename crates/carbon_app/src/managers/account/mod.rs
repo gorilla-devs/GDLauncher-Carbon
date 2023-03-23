@@ -360,6 +360,30 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
+        let active_account = self
+            .app
+            .configuration_manager()
+            .configuration()
+            .get()
+            .await?
+            .active_account_uuid;
+
+        if let Some(active_account) = active_account {
+            if active_account == uuid {
+                let next_account = self
+                    .app
+                    .prisma_client
+                    .account()
+                    .find_first(Vec::new())
+                    .order_by(OrderByParam::LastUsed(Direction::Desc))
+                    .exec()
+                    .await?
+                    .map(|data| data.uuid);
+
+                self.set_active_uuid(next_account).await?;
+            }
+        }
+
         let result = self
             .app
             .prisma_client
@@ -370,30 +394,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         match result {
             Ok(_) => {
-                let active_account = self
-                    .app
-                    .configuration_manager()
-                    .configuration()
-                    .get()
-                    .await?
-                    .active_account_uuid;
-
-                if let Some(active_account) = active_account {
-                    if active_account == uuid {
-                        let next_account = self
-                            .app
-                            .prisma_client
-                            .account()
-                            .find_first(Vec::new())
-                            .order_by(OrderByParam::LastUsed(Direction::Desc))
-                            .exec()
-                            .await?
-                            .map(|data| data.uuid);
-
-                        self.set_active_uuid(next_account).await?;
-                    }
-                }
-
                 self.app.invalidate(GET_ACCOUNTS, None);
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
