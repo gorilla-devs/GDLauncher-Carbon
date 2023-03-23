@@ -8,10 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crate::{
-    error::request::{RequestContext, RequestError, RequestErrorDetails},
-    managers::account::skin::SkinModel,
-};
+use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
@@ -516,7 +513,6 @@ pub async fn get_profile(
                 id: String,
                 state: String, // unknown possible states,
                 url: String,
-                variant: SkinModel,
             }
 
             let response = response
@@ -531,7 +527,6 @@ pub async fn get_profile(
                 .map(|skin| McSkin {
                     id: skin.id,
                     url: skin.url,
-                    model: skin.variant,
                 });
 
             Ok(McProfile {
@@ -621,7 +616,6 @@ pub enum McProfileRequestError {
 pub struct McSkin {
     pub id: String,
     pub url: String,
-    pub model: SkinModel,
 }
 
 #[derive(Debug, Clone)]

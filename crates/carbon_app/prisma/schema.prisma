@@ -31,7 +31,6 @@ model Account {
 model Skin {
   id       String @id
   skin     Bytes
-  slim     Boolean
 }
 
 model MinecraftManifest {

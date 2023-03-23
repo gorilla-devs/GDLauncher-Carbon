@@ -2,7 +2,6 @@ use std::io::Cursor;
 
 use anyhow::ensure;
 use image::{GenericImageView, ImageOutputFormat};
-use serde::Deserialize;
 use thiserror::Error;
 
 use crate::{
@@ -44,10 +43,6 @@ impl ManagerRef<'_, SkinManager> {
         Ok(match cached_skin {
             Some(skin) => Skin {
                 data: skin.skin.into(),
-                model: match skin.slim {
-                    true => SkinModel::Slim,
-                    false => SkinModel::Classic,
-                },
             },
             None => {
                 let skin = match account.access_token.as_ref() {
@@ -83,7 +78,6 @@ impl ManagerRef<'_, SkinManager> {
                         self.app.prisma_client.skin().create(
                             skin.id.clone(),
                             skin_data.to_vec(),
-                            skin.model.is_slim(),
                             vec![],
                         ),
                         self.app.prisma_client.account().update(
@@ -95,7 +89,6 @@ impl ManagerRef<'_, SkinManager> {
 
                 Skin {
                     data: skin_data.to_vec(),
-                    model: skin.model,
                 }
             }
         })
@@ -148,21 +141,6 @@ fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
 
 pub struct Skin {
     data: Vec<u8>,
-    model: SkinModel,
-}
-
-#[derive(Debug, Copy, Clone, Deserialize)]
-pub enum SkinModel {
-    #[serde(rename = "CLASSIC")]
-    Classic,
-    #[serde(rename = "SLIM")]
-    Slim,
-}
-
-impl SkinModel {
-    fn is_slim(self) -> bool {
-        matches!(self, Self::Slim)
-    }
 }
 
 #[derive(Copy, Clone)]
@@ -214,18 +192,10 @@ impl DefaultSkin {
         }
     }
 
-    pub fn skin_model(self) -> SkinModel {
-        match self {
-            Self::Steve => SkinModel::Classic,
-            Self::Alex => SkinModel::Slim,
-        }
-    }
-
     pub fn make_api_skin(self) -> ApiSkin {
         ApiSkin {
             id: self.skin_id().to_string(),
             url: self.skin_url().to_string(),
-            model: self.skin_model(),
         }
     }
 }

@@ -15,7 +15,14 @@ CREATE TABLE "Account" (
     "accessToken" TEXT,
     "tokenExpires" DATETIME,
     "msRefreshToken" TEXT,
-    "lastUsed" DATETIME NOT NULL
+    "lastUsed" DATETIME NOT NULL,
+    "skinId" TEXT
+);
+
+-- CreateTable
+CREATE TABLE "Skin" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "skin" BLOB NOT NULL
 );
 
 -- CreateTable
