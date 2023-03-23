@@ -1,7 +1,14 @@
+use std::io::Cursor;
+
+use anyhow::ensure;
+use image::{GenericImageView, ImageOutputFormat};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::{db::{self, read_filters::StringFilter}, managers::ManagerRef};
+use crate::{
+    db::{self, read_filters::StringFilter},
+    managers::ManagerRef,
+};
 
 use super::api::McSkin as ApiSkin;
 
@@ -13,20 +20,22 @@ impl ManagerRef<'_, SkinManager> {
         use db::skin::{UniqueWhereParam, WhereParam};
 
         let account = self
-            .app.prisma_client
+            .app
+            .prisma_client
             .account()
             .find_unique(db::account::UniqueWhereParam::UuidEquals(uuid.clone()))
             .exec()
             .await?
             .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
 
-
         let skin_id = match account.skin_id.as_ref() {
             Some(x) => x,
             None => DefaultSkin::from_uuid(uuid.clone()).skin_id(),
         };
 
-        let cached_skin = self.app.prisma_client
+        let cached_skin = self
+            .app
+            .prisma_client
             .skin()
             .find_unique(UniqueWhereParam::IdEquals(skin_id.to_string()))
             .exec()
@@ -42,7 +51,8 @@ impl ManagerRef<'_, SkinManager> {
             },
             None => {
                 let skin = match account.access_token.as_ref() {
-                    Some(token) => super::api::get_profile(&self.app.reqwest_client, token).await
+                    Some(token) => super::api::get_profile(&self.app.reqwest_client, token)
+                        .await
                         .ok()
                         .map(|profile| profile.skin)
                         // use the default if there is no skin or an error occured.
@@ -51,7 +61,9 @@ impl ManagerRef<'_, SkinManager> {
                     None => DefaultSkin::from_uuid(uuid.clone()).make_api_skin(),
                 };
 
-                let skin_data = self.app.reqwest_client
+                let skin_data = self
+                    .app
+                    .reqwest_client
                     .get(&skin.url)
                     .send()
                     .await?
@@ -62,15 +74,21 @@ impl ManagerRef<'_, SkinManager> {
                     .prisma_client
                     ._batch((
                         // won't error on 0 deleted
-                        self.app.prisma_client.skin().delete_many(
-                            vec![WhereParam::Id(StringFilter::Equals(skin.id.clone()))]
-                        ),
+                        self.app
+                            .prisma_client
+                            .skin()
+                            .delete_many(vec![WhereParam::Id(StringFilter::Equals(
+                                skin.id.clone(),
+                            ))]),
                         self.app.prisma_client.skin().create(
-                            skin.id.clone(), skin_data.to_vec(), skin.model.is_slim(), vec![]
+                            skin.id.clone(),
+                            skin_data.to_vec(),
+                            skin.model.is_slim(),
+                            vec![],
                         ),
                         self.app.prisma_client.account().update(
                             db::account::UniqueWhereParam::UuidEquals(uuid),
-                            vec![db::account::SetParam::SetSkinId(Some(skin.id.clone()))]
+                            vec![db::account::SetParam::SetSkinId(Some(skin.id.clone()))],
                         ),
                     ))
                     .await?;
@@ -79,9 +97,53 @@ impl ManagerRef<'_, SkinManager> {
                     data: skin_data.to_vec(),
                     model: skin.model,
                 }
-            },
+            }
         })
     }
+}
+
+fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
+    use image::imageops::*;
+
+    let reader = image::io::Reader::new(Cursor::new(image))
+        .with_guessed_format()
+        .expect("cursor io cannot fail");
+
+    let image = reader.decode()?;
+
+    ensure!(
+        image.width() == 64 && (image.height() == 64 || image.height() == 32),
+        "cannot stitch head from unsupported skin image"
+    );
+
+    let head = image.view(8, 8, 8, 8);
+    let hat_front = image.view(40, 8, 8, 8);
+    let hat_back = image.view(56, 8, 8, 8);
+
+    let mut target = image::RgbaImage::new(140, 140);
+
+    overlay(
+        &mut target,
+        &resize(&hat_back.to_image(), 136, 136, FilterType::Nearest),
+        2,
+        2,
+    );
+    overlay(
+        &mut target,
+        &resize(&head.to_image(), 128, 128, FilterType::Nearest),
+        6,
+        6,
+    );
+    overlay(
+        &mut target,
+        &resize(&hat_front.to_image(), 140, 140, FilterType::Nearest),
+        0,
+        0,
+    );
+
+    let mut output = Vec::<u8>::new();
+    target.write_to(&mut Cursor::new(&mut output), ImageOutputFormat::Png)?;
+    Ok(output)
 }
 
 pub struct Skin {
@@ -113,7 +175,9 @@ impl DefaultSkin {
     pub fn from_uuid(uuid: String) -> DefaultSkin {
         // if the uuid is invalid, just give steve.
         if uuid.len() != 32
-            || uuid.bytes().any(|b| (b < b'0' || b > b'9') && (b < b'a' && b > b'f'))
+            || uuid
+                .bytes()
+                .any(|b| (b < b'0' || b > b'9') && (b < b'a' && b > b'f'))
         {
             Self::Steve
         } else {
@@ -168,13 +232,17 @@ impl DefaultSkin {
 
 #[derive(Debug, Error)]
 pub enum GetSkinError {
-    #[error("attempted to get the skin for an account that does not exist in the account list: {0}")]
+    #[error(
+        "attempted to get the skin for an account that does not exist in the account list: {0}"
+    )]
     AccountDoesNotExist(String),
 }
 
 /*
 #[cfg(test)]
 mod test {
+    use crate::managers::account::skin::stitch_head;
+
     #[tokio::test]
     async fn get_all_skins() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
@@ -187,7 +255,10 @@ mod test {
         for (uname, future) in futures {
             println!("Getting {uname}");
             let skin = future.await?;
-            tokio::fs::write(format!("{uname}.png"), skin.data).await?;
+            tokio::fs::write(format!("{uname}.png"), &skin.data).await?;
+            println!("Stitching head");
+            let head = stitch_head(&skin.data)?;
+            tokio::fs::write(format!("{uname}_head.png"), &head).await?;
         }
         Ok(())
     }
