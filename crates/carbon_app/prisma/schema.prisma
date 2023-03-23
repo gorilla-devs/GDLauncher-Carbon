@@ -25,6 +25,13 @@ model Account {
   tokenExpires     DateTime?
   msRefreshToken   String?
   lastUsed         DateTime
+  skinId           String?
+}
+
+model Skin {
+  id       String @id
+  skin     Bytes
+  slim     Boolean
 }
 
 model MinecraftManifest {

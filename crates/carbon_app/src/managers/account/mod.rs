@@ -26,12 +26,14 @@ pub use self::enroll::EnrollmentError;
 use self::{
     api::{AccessTokenStatus, DeviceCode},
     enroll::{EnrollmentStatus, EnrollmentTask},
+    skin::SkinManager,
 };
 
-use super::{AppRef, ManagerRef, AppInner};
+use super::{AppInner, AppRef, ManagerRef};
 
 pub mod api;
 mod enroll;
+pub mod skin;
 
 pub(crate) struct AccountManager {
     currently_refreshing: RwLock<HashMap<String, EnrollmentTask>>,
@@ -40,6 +42,7 @@ pub(crate) struct AccountManager {
     refreshloop_sleep: Mutex<Option<Instant>>,
     /// Additional statuses that override an `Ok` status.
     status_flags: RwLock<HashMap<String, StatusFlags>>,
+    skin_manager: SkinManager,
 }
 
 impl AccountManager {
@@ -49,11 +52,12 @@ impl AccountManager {
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
             status_flags: RwLock::new(HashMap::new()),
+            skin_manager: SkinManager {},
         }
     }
 }
 
-impl ManagerRef<'_, AccountManager> {
+impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn get_active_uuid(self) -> anyhow::Result<Option<String>> {
         Ok(self
             .app
@@ -175,10 +179,7 @@ impl ManagerRef<'_, AccountManager> {
         Ok(Some(AccountWithStatus::from(account)))
     }
 
-    pub async fn get_account_status(
-        self,
-        uuid: String,
-    ) -> anyhow::Result<Option<AccountStatus>> {
+    pub async fn get_account_status(self, uuid: String) -> anyhow::Result<Option<AccountStatus>> {
         let Some(mut account) = self.get_account(uuid).await? else { return Ok(None) };
 
         if let AccountType::Microsoft = &account.account.type_ {
@@ -488,11 +489,7 @@ impl ManagerRef<'_, AccountManager> {
     /// # Parameters
     /// lock_refresh - stop any new background account refreshes and wait 30 seconds
     ///                before performing more.
-    pub async fn validate_account(
-        self,
-        uuid: String,
-        lock_refresh: bool,
-    ) -> anyhow::Result<()> {
+    pub async fn validate_account(self, uuid: String, lock_refresh: bool) -> anyhow::Result<()> {
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
             false => None,
@@ -557,6 +554,13 @@ impl ManagerRef<'_, AccountManager> {
         }
 
         Ok(())
+    }
+
+    pub fn skin_manager(self) -> ManagerRef<'s, SkinManager> {
+        ManagerRef {
+            app: self.app,
+            manager: &self.manager.skin_manager,
+        }
     }
 }
 
@@ -746,7 +750,7 @@ pub enum FullAccountType {
     },
 }
 
-impl From<FullAccount> for db::account::Data {
+/*impl From<FullAccount> for db::account::Data {
     fn from(value: FullAccount) -> Self {
         let (access_token, refresh_token, token_expires) = match value.type_ {
             FullAccountType::Offline => (None, None, None),
@@ -766,7 +770,7 @@ impl From<FullAccount> for db::account::Data {
             last_used: value.last_used,
         }
     }
-}
+}*/
 
 impl TryFrom<db::account::Data> for FullAccount {
     type Error = FullAccountLoadError;
