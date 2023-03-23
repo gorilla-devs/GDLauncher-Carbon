@@ -1,6 +1,14 @@
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 fn main() {
+    let parent_env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(".env");
+
     println!("cargo:rerun-if-changed=../../.git/HEAD");
+    println!("cargo:rerun-if-changed={}", parent_env_path.display());
     println!("cargo:rerun-if-changed=../../packages/config/version.json");
     let output = Command::new("git")
         .args(["rev-parse", "--short", "HEAD"])
@@ -17,4 +25,11 @@ fn main() {
         "cargo:rustc-env=APP_VERSION={}{}+{}",
         version, channel, git_hash
     );
+
+    if parent_env_path.exists() {
+        for file in dotenvy::from_filename_iter(parent_env_path).unwrap() {
+            let (key, value) = file.unwrap();
+            println!("cargo:rustc-env={}={}", key, value);
+        }
+    }
 }
