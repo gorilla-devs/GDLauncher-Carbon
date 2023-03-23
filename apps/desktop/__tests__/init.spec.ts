@@ -68,7 +68,7 @@ test.describe("Init Tests", () => {
     //   expect(msg.type()).not.toBe("error");
     // });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 8000));
 
     const errorInnerText = await (
       await page.$("#appFatalCrashState")
