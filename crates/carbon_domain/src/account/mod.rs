@@ -21,10 +21,7 @@ pub struct AccountWithStatus {
 
 pub enum AccountStatus {
     /// An account that can be launched with the given access token.
-    Ok {
-        access_token: Option<String>,
-        flags: Option<StatusFlags>,
-    },
+    Ok { access_token: Option<String> },
     /// An account with an expired access token that needs to be refreshed.
     Expired,
     /// An account that is currently having its access token refreshed.

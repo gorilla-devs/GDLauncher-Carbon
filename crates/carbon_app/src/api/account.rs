@@ -79,7 +79,7 @@ enum AccountType {
 
 #[derive(Type, Serialize)]
 enum AccountStatus {
-    Ok { flags: StatusFlags },
+    Ok,
     Expired,
     Refreshing,
     Invalid,
@@ -145,12 +145,7 @@ impl From<domain::AccountType> for AccountType {
 impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
-            domain::AccountStatus::Ok {
-                access_token: _,
-                flags,
-            } => Self::Ok {
-                flags: flags.into(),
-            },
+            domain::AccountStatus::Ok { access_token: _ } => Self::Ok,
             domain::AccountStatus::Refreshing => Self::Refreshing,
             domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Invalid => Self::Invalid,

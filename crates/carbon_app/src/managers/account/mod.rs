@@ -1,6 +1,7 @@
 use crate::{
     api::keys::account::*,
     db::{self, read_filters::StringFilter},
+    error::request::{RequestError, RequestErrorDetails},
     managers::account::enroll::InvalidateCtx,
 };
 use anyhow::ensure;
@@ -10,6 +11,7 @@ use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
+use reqwest::StatusCode;
 use std::{
     collections::HashMap,
     mem,
@@ -24,7 +26,7 @@ use anyhow::{anyhow, bail};
 
 pub use self::enroll::EnrollmentError;
 use self::{
-    api::{AccessTokenStatus, DeviceCode},
+    api::{DeviceCode, McProfileRequestError},
     enroll::{EnrollmentStatus, EnrollmentTask},
     skin::SkinManager,
 };
@@ -40,8 +42,6 @@ pub(crate) struct AccountManager {
     active_enrollment: RwLock<Option<EnrollmentTask>>,
     /// Account refreshing will be disabled until this time has passed
     refreshloop_sleep: Mutex<Option<Instant>>,
-    /// Additional statuses that override an `Ok` status.
-    status_flags: RwLock<HashMap<String, StatusFlags>>,
     skin_manager: SkinManager,
 }
 
@@ -51,7 +51,6 @@ impl AccountManager {
             currently_refreshing: RwLock::new(HashMap::new()),
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
-            status_flags: RwLock::new(HashMap::new()),
             skin_manager: SkinManager {},
         }
     }
@@ -165,18 +164,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         let Some(account) = account else { return Ok(None) };
         let account = FullAccount::try_from(account)?;
-        let mut account = AccountWithStatus::from(account);
+        let account = AccountWithStatus::from(account);
 
-        if let AccountStatus::Ok { flags, .. } = &mut account.status {
-            *flags = self
-                .status_flags
-                .read()
-                .await
-                .get(&account.account.uuid)
-                .map(|x| *x);
-        }
-
-        Ok(Some(AccountWithStatus::from(account)))
+        Ok(Some(account))
     }
 
     pub async fn get_account_status(self, uuid: String) -> anyhow::Result<Option<AccountStatus>> {
@@ -223,10 +213,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     access_token,
                     refresh_token,
                     token_expires,
+                    skin_id,
                 } => set_params.extend([
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
                     SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetSkinId(skin_id),
                 ]),
             }
 
@@ -249,10 +241,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     access_token,
                     refresh_token,
                     token_expires,
+                    skin_id,
                 } => vec![
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
                     SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetSkinId(skin_id),
                 ],
             };
 
@@ -322,7 +316,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         refreshing.remove(&self.account.uuid);
                     }
                     EnrollmentStatus::Failed(_) => {
-                        let FullAccountType::Microsoft { access_token, token_expires, .. } = &self.account.type_ else {
+                        let FullAccountType::Microsoft { access_token, token_expires, skin_id, .. } = &self.account.type_ else {
                             panic!("account type was not microsoft during refresh");
                         };
 
@@ -333,6 +327,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                                 access_token: access_token.clone(),
                                 refresh_token: None,
                                 token_expires: token_expires.clone(),
+                                skin_id: skin_id.clone(),
                             },
                             last_used: self.account.last_used.clone(),
                         }).await.expect("db error, this can't be handled in the account invalidator right now");
@@ -481,7 +476,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
     }
 
-    /// Attempt to immediately update an account's validity.
+    /// Attempt to immediately update account information, expiring the account on failure.
     ///
     /// This function will reset the ongoing refresh countdown to avoid possible
     /// rate limiting.
@@ -489,7 +484,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// # Parameters
     /// lock_refresh - stop any new background account refreshes and wait 30 seconds
     ///                before performing more.
-    pub async fn validate_account(self, uuid: String, lock_refresh: bool) -> anyhow::Result<()> {
+    pub async fn refresh_account_status(
+        self,
+        uuid: String,
+        lock_refresh: bool,
+    ) -> anyhow::Result<()> {
+        use db::account::{SetParam, UniqueWhereParam};
+
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
             false => None,
@@ -500,10 +501,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?
             .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
 
-        let AccountStatus::Ok { access_token: Some(access_token), flags: old_flags } = account.status else { return Ok(()) };
-
-        let response =
-            api::validate_access_token(&self.app.reqwest_client, &access_token, &uuid).await?;
+        let AccountStatus::Ok { access_token: Some(access_token) } = account.status else { return Ok(()) };
+        let profile = api::get_profile(&self.app.reqwest_client, &access_token).await;
 
         if let Some(refresh_lock) = &mut refresh_lock {
             **refresh_lock = Some(Instant::now() + Duration::from_secs(30));
@@ -511,20 +510,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         drop(refresh_lock);
 
-        let flags = match response {
-            AccessTokenStatus::Ok => None,
-            AccessTokenStatus::BannedFromMultiplayer => Some(StatusFlags::BannedFromMultiplayer),
-            AccessTokenStatus::XboxMultiplayerDisabled => {
-                Some(StatusFlags::XboxMultiplayerDisabled)
-            }
-            AccessTokenStatus::Invalid => {
+        let profile = match profile {
+            Ok(x) => x,
+            Err(McProfileRequestError::Request(RequestError {
+                error:
+                    RequestErrorDetails::UnexpectedStatus {
+                        status: StatusCode::UNAUTHORIZED,
+                        ..
+                    },
+                ..
+            })) => {
                 // the account was expired prematurely
-
-                use db::account::{SetParam, UniqueWhereParam};
-
-                // ignore errors (e.g. account was removed)
-                let _ = self
-                    .app
+                self.app
                     .prisma_client
                     .account()
                     .update(
@@ -532,26 +529,26 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         vec![SetParam::SetTokenExpires(Some(Utc::now().into()))],
                     )
                     .exec()
-                    .await;
+                    .await?;
 
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
                 return Ok(());
             }
+            Err(e) => bail!(e),
         };
 
-        if flags != old_flags {
-            let mut flag_map = self.status_flags.write().await;
-            match flags {
-                Some(flags) => {
-                    flag_map.insert(uuid.clone(), flags);
-                }
-                None => {
-                    flag_map.remove(&uuid);
-                }
-            }
-
-            self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
-        }
+        self.app
+            .prisma_client
+            .account()
+            .update(
+                UniqueWhereParam::UuidEquals(uuid),
+                vec![
+                    SetParam::SetUsername(profile.username),
+                    SetParam::SetSkinId(profile.skin.map(|skin| skin.id)),
+                ],
+            )
+            .exec()
+            .await?;
 
         Ok(())
     }
@@ -625,7 +622,9 @@ impl AccountRefreshService {
                     let Some(uuid) = least_recently_checked else { continue };
 
                     // ignore the result since we can't do anything if it failed.
-                    let _ = account_manager.validate_account(uuid.clone(), false).await;
+                    let _ = account_manager
+                        .refresh_account_status(uuid.clone(), false)
+                        .await;
                     last_check_times.insert(uuid.clone(), Instant::now());
                 }
 
@@ -747,6 +746,7 @@ pub enum FullAccountType {
         access_token: String,
         refresh_token: Option<String>,
         token_expires: DateTime<FixedOffset>,
+        skin_id: Option<String>,
     },
 }
 
@@ -784,6 +784,7 @@ impl TryFrom<db::account::Data> for FullAccount {
                     token_expires: value.token_expires.ok_or_else(|| {
                         FullAccountLoadError::MissingExpiration(value.uuid.clone())
                     })?,
+                    skin_id: value.skin_id,
                 },
                 None => FullAccountType::Offline,
             },
@@ -815,17 +816,14 @@ impl From<FullAccount> for AccountWithStatus {
                     access_token,
                     token_expires,
                     refresh_token: Some(_),
+                    skin_id: _,
                 } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
                     false => AccountStatus::Ok {
                         access_token: Some(access_token),
-                        flags: None,
                     },
                 },
-                FullAccountType::Offline => AccountStatus::Ok {
-                    access_token: None,
-                    flags: None,
-                },
+                FullAccountType::Offline => AccountStatus::Ok { access_token: None },
             },
         }
     }
@@ -840,6 +838,7 @@ impl From<api::FullAccount> for FullAccount {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
                 token_expires: DateTime::<FixedOffset>::from(value.mc.auth.expires_at),
+                skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },
             last_used: Utc::now().into(),
         }
