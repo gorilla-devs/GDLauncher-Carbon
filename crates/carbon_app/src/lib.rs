@@ -50,7 +50,6 @@ async fn get_available_port() -> Option<u16> {
     None
 }
 
-#[inline(never)]
 async fn start_router(runtime_path: PathBuf, port: u16) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
