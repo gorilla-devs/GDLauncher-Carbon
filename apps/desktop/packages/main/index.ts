@@ -16,7 +16,9 @@ import { release } from "os";
 import { join, resolve } from "path";
 import "./preloadListeners";
 
-(app as any).overwolf.disableAnonymousAnalytics();
+if ((app as any).overwolf) {
+  (app as any).overwolf.disableAnonymousAnalytics();
+}
 
 // Disable GPU Acceleration for Windows 7
 if (release().startsWith("6.1")) app.disableHardwareAcceleration();
