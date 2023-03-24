@@ -2,7 +2,7 @@ module.exports = {
   normalizeFilenames: /^.+?(\.\w+?)?\..+$/,
   files: [
     {
-      path: "apps/desktop/release/*",
+      path: "apps/desktop/dist/**/*.*",
     },
   ],
   defaultCompression: "none",
