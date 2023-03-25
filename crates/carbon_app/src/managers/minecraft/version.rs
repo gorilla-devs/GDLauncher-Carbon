@@ -383,8 +383,8 @@ async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 mod tests {
     use super::*;
     use carbon_domain::minecraft::manifest::MinecraftManifest;
-    use chrono::Utc;
     use carbon_net::Progress;
+    use chrono::Utc;
 
     async fn get_account() -> FullAccount {
         FullAccount {
@@ -413,6 +413,7 @@ mod tests {
             username: "test".to_owned(),
             uuid: "test-uuid".to_owned(),
             type_: FullAccountType::Offline,
+            last_used: Utc::now().into(),
         };
 
         // Mock RuntimePath to have a stable path
