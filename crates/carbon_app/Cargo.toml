@@ -43,10 +43,14 @@ prisma-client-rust = { workspace = true, features = [
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
+image = { workspace = true, features = [
+  "png"
+], default-features = false }
 # libc = { workspace = true }
 
 # [target.'cfg(windows)'.dependencies]
 # winapi = { version = "0.3.9" }
+
 
 [dev-dependencies]
 tempdir = { workspace = true }

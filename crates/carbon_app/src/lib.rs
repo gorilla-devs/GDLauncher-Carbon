@@ -63,10 +63,12 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
 
+    let app1 = app.clone();
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(move || app).axum())
-        .layer(cors);
+        .layer(cors)
+        .with_state(app1);
 
     let addr = format!("[::]:{port}")
         .parse::<std::net::SocketAddr>()

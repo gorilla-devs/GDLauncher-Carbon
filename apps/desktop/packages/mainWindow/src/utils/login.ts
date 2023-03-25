@@ -2,22 +2,16 @@ import {
   AccountEntry,
   DeviceCode,
   EnrollmentError,
+  Procedures,
 } from "@gd/core_module/bindings";
+import { QueryObserverSuccessResult } from "@tanstack/solid-query";
 
-type RouteData = {
-  data:
-    | "RequestingCode"
-    | {
-        PollingCode: DeviceCode;
-      }
-    | "QueryingAccount"
-    | {
-        Complete: AccountEntry;
-      }
-    | {
-        Failed: EnrollmentError;
-      };
-};
+type EnrollStatusResult = Extract<
+  Procedures["queries"],
+  { key: "account.enroll.getStatus" }
+>["result"];
+
+type RouteData = QueryObserverSuccessResult<EnrollStatusResult>;
 
 type EventsCallbacks = {
   onPolling?: (_info: DeviceCode) => void;
@@ -32,15 +26,15 @@ export const handleStatus = (
 ) => {
   const data = routeData.data;
   if (typeof data === "string") return;
-  if ("PollingCode" in data) {
+  if (data && "PollingCode" in data) {
     const info = data.PollingCode;
     if (info) {
       callbacks?.onPolling?.(info);
     }
-  } else if ("Failed" in data) {
+  } else if (data && "Failed" in data) {
     const error = data.Failed;
     callbacks?.onFail?.(error);
-  } else if ("Complete" in data) {
+  } else if (data && "Complete" in data) {
     const complete = data.Complete;
     callbacks?.onComplete?.(complete);
   }

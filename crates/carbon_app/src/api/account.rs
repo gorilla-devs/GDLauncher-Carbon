@@ -1,16 +1,20 @@
+use std::sync::Arc;
+
+use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
 use rspc::{RouterBuilderLike, Type};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::keys::account::*;
 use crate::api::router::router;
+use crate::error;
 use crate::error::request::FERequestError;
 use crate::managers::account::api::{
     DeviceCodePollError, DeviceCodeRequestError, McAccountPopulateError, McAuthError,
     McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
     XboxAuthError, XboxError,
 };
-use crate::managers::{account, App};
+use crate::managers::{account, App, AppInner};
 use carbon_domain::account as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -50,21 +54,46 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query ENROLL_GET_STATUS[app, _: ()] {
-            Ok(EnrollmentStatus::from(
-                app.account_manager().get_enrollment_status().await?
-            ))
+            Ok(app.account_manager().get_enrollment_status().await.map(EnrollmentStatus::from))
         }
 
         mutation ENROLL_FINALIZE[app, _: ()] {
             app.account_manager().finalize_enrollment().await
         }
+
+        mutation REFRESH_ACCOUNT[app, uuid: String] {
+            app.account_manager().refresh_account(uuid).await
+        }
+
+        query GET_HEAD[_, _uuid: String] { Ok(()) }
     }
+}
+
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
+    #[derive(Deserialize)]
+    struct HeadQuery {
+        uuid: String,
+    }
+
+    axum::Router::new().route(
+        "/headImage",
+        axum::routing::get(
+            |State(app): State<Arc<AppInner>>, Query(query): Query<HeadQuery>| async move {
+                app.account_manager()
+                    .skin_manager()
+                    .make_head(query.uuid)
+                    .await
+                    .map_err(error::anyhow_into_axum_error)
+            },
+        ),
+    )
 }
 
 #[derive(Type, Serialize)]
 struct AccountEntry {
     username: String,
     uuid: String,
+    last_used: DateTime<Utc>,
     type_: AccountType,
 }
 
@@ -79,6 +108,13 @@ enum AccountStatus {
     Ok,
     Expired,
     Refreshing,
+    Invalid,
+}
+
+#[derive(Type, Serialize)]
+struct StatusFlags {
+    banned_from_multiplayer: bool,
+    xbox_disabled_multiplayer: bool,
 }
 
 #[derive(Type, Serialize)]
@@ -118,6 +154,7 @@ impl From<domain::Account> for AccountEntry {
             username: value.username,
             uuid: value.uuid,
             type_: value.type_.into(),
+            last_used: value.last_used,
         }
     }
 }
@@ -134,9 +171,29 @@ impl From<domain::AccountType> for AccountType {
 impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
-            domain::AccountStatus::Ok { .. } => Self::Ok,
-            domain::AccountStatus::Expired => Self::Expired,
+            domain::AccountStatus::Ok { access_token: _ } => Self::Ok,
             domain::AccountStatus::Refreshing => Self::Refreshing,
+            domain::AccountStatus::Expired => Self::Expired,
+            domain::AccountStatus::Invalid => Self::Invalid,
+        }
+    }
+}
+
+impl From<Option<domain::StatusFlags>> for StatusFlags {
+    fn from(value: Option<domain::StatusFlags>) -> Self {
+        match value {
+            Some(domain::StatusFlags::BannedFromMultiplayer) => Self {
+                banned_from_multiplayer: true,
+                xbox_disabled_multiplayer: false,
+            },
+            Some(domain::StatusFlags::XboxMultiplayerDisabled) => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: true,
+            },
+            None => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: false,
+            },
         }
     }
 }
@@ -182,6 +239,9 @@ impl From<account::EnrollmentError> for EnrollmentError {
             )) => Self::Request(x.into()),
 
             BE::DeviceCodePoll(DeviceCodePollError::CodeExpired) => Self::DeviceCodeExpired,
+
+            // this is a bit nonsensical, but the FE should never get this error
+            BE::MsRefresh(_) => Self::DeviceCodeExpired,
 
             BE::McAuth(McAuthError::Xbox(XboxAuthError::Xbox(x))) => Self::XboxAccount(x),
 
