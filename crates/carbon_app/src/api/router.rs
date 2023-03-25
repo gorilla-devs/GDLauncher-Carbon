@@ -28,7 +28,7 @@ macro_rules! router {
                 t(|$app: $crate::managers::App, $args: $args_ty| async move {
                     let mut block: ::anyhow::Result::<_> = (|| async move { $block })().await;
                     block = ::anyhow::Context::context(block, $crate::api::router::Endpoint($endpoint.full));
-                    block.map_err($crate::error::anyhow_into_fe_error)
+                    block.map_err($crate::error::anyhow_into_rspc_error)
                 })
             });
         )*

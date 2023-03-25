@@ -42,6 +42,9 @@ prisma-client-rust = { workspace = true, features = [
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
+image = { workspace = true, features = [
+  "png"
+], default-features = false }
 
 [dev-dependencies]
 tempdir = { workspace = true }

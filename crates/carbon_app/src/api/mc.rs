@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::api::keys::mc::*;
 use crate::api::managers::App;
 use crate::api::router::router;
+use crate::managers::AppInner;
 use axum::extract::DefaultBodyLimit;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -156,7 +159,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     }
 }
 
-pub(super) fn mount_axum_router() -> axum::Router<()> {
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route(
             "/instanceThumbnail",

@@ -65,7 +65,7 @@ mod app {
                 .await
                 .unwrap();
 
-            Arc::new(AppInner {
+            let app = Arc::new(AppInner {
                 configuration_manager: ConfigurationManager::new(runtime_path),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
@@ -74,7 +74,11 @@ mod app {
                 reqwest_client: reqwest::Client::new(),
                 prisma_client: Arc::new(db_client),
                 task_queue: TaskQueue::new(2 /* todo: download slots */),
-            })
+            });
+
+            account::AccountRefreshService::start(Arc::downgrade(&app));
+
+            app
         }
 
         manager_getter!(configuration_manager: ConfigurationManager);

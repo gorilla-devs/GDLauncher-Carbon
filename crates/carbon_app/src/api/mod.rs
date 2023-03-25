@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use crate::managers;
-use crate::managers::App;
+use crate::managers::{App, AppInner};
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -51,8 +53,9 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         })
 }
 
-pub fn build_axum_vanilla_router() -> axum::Router<()> {
+pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
         .nest("/mc", mc::mount_axum_router())
+        .nest("/account", account::mount_axum_router())
 }
