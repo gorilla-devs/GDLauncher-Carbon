@@ -68,10 +68,18 @@ test.describe("Init Tests", () => {
     //   expect(msg.type()).not.toBe("error");
     // });
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 8000));
 
-    const innerText = await (await page.$("#appFatalCrashState"))?.innerHTML();
-    expect(innerText).toBe(undefined);
+    const errorInnerText = await (
+      await page.$("#appFatalCrashState")
+    )?.innerHTML();
+    expect(errorInnerText).toBe(undefined);
+
+    const loadingInnerText = await (
+      await page.$("#appLoadingState")
+    )?.innerHTML();
+    expect(loadingInnerText).toBe(undefined);
+
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
   });
