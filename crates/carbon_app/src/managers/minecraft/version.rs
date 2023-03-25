@@ -383,8 +383,19 @@ async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 mod tests {
     use super::*;
     use carbon_domain::minecraft::manifest::MinecraftManifest;
+    use chrono::Utc;
     use carbon_net::Progress;
 
+    async fn get_account() -> FullAccount {
+        FullAccount {
+            username: "test".to_owned(),
+            uuid: "test-uuid".to_owned(),
+            type_: FullAccountType::Offline,
+            last_used: Utc::now().into(),
+        }
+    }
+
+    // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
         let manifest = MinecraftManifest::fetch().await.unwrap();

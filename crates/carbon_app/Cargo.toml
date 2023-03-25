@@ -9,7 +9,10 @@ crate-type = ["lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { workspace = true }
+derive_more = { workspace = true }
 thiserror = { workspace = true }
+sentry = { workspace = true }
 env_logger = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
@@ -41,7 +44,19 @@ prisma-client-rust = { workspace = true, features = [
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
+image = { workspace = true, features = [
+  "png"
+], default-features = false }
+# libc = { workspace = true }
+
+# [target.'cfg(windows)'.dependencies]
+# winapi = { version = "0.3.9" }
+
 
 [dev-dependencies]
 tempdir = { workspace = true }
 ntest = { workspace = true }
+
+[build-dependencies]
+serde_json = { workspace = true }
+dotenvy = { workspace = true }
