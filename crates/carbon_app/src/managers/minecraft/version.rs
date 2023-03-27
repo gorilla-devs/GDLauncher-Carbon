@@ -453,7 +453,7 @@ mod tests {
             .libraries
             .get_libraries()
             .iter()
-            .filter(|lib| lib.is_native_artifact())
+            .filter(|&lib| lib.is_native_artifact())
             .collect::<Vec<_>>();
 
         let mut downloadables = vec![];

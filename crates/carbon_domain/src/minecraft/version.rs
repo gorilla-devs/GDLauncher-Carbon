@@ -110,7 +110,7 @@ impl Default for Arguments {
                     rules: vec![Rule {
                         action: Action::Allow,
                         os: Some(OsRule {
-                            name: Some(OsName::Osx),
+                            name: Some(OsName::MacOS),
                             version: None,
                             arch: None,
                         }),
@@ -268,17 +268,25 @@ impl Library {
             return None;
         };
 
-        let Some(native) = classifiers.get(OsName::get_os_name()) else {
+        let Some(natives) = self.natives else {
             return None;
         };
 
-        let checksum = Some(carbon_net::Checksum::Sha1(native.sha1));
+        let Some(natives_name) = natives.get_os_specific(OsName::default()) else {
+            return None;
+        };
+
+        let Some(mapping_class) = classifiers.get(&natives_name) else {
+            return None;
+        };
+
+        let checksum = Some(carbon_net::Checksum::Sha1(mapping_class.sha1));
 
         Some(carbon_net::Downloadable {
-            url: native.url,
-            path: PathBuf::from(base_path).join(native.path),
+            url: mapping_class.url,
+            path: PathBuf::from(base_path).join(mapping_class.path),
             checksum,
-            size: Some(native.size),
+            size: Some(mapping_class.size),
         })
     }
 }
@@ -323,21 +331,26 @@ pub struct Classifiers {
     pub javadoc: Option<MappingsClass>,
     #[serde(rename = "natives-linux")]
     pub natives_linux: Option<MappingsClass>,
+
+    // For some reasons they have both macos and osx...
     #[serde(rename = "natives-macos")]
     pub natives_macos: Option<MappingsClass>,
+    #[serde(rename = "natives-osx")]
+    pub natives_osx: Option<MappingsClass>,
+
     #[serde(rename = "natives-windows")]
     pub natives_windows: Option<MappingsClass>,
     pub sources: Option<MappingsClass>,
-    #[serde(rename = "natives-osx")]
-    pub natives_osx: Option<MappingsClass>,
 }
 
 impl Classifiers {
-    pub fn get(self, os: OsName) -> Option<MappingsClass> {
-        match os {
-            OsName::Linux => self.natives_linux,
-            OsName::Windows => self.natives_windows,
-            OsName::Osx => self.natives_osx,
+    pub fn get(self, natives_name: &str) -> Option<MappingsClass> {
+        match natives_name {
+            "natives-linux" => self.natives_linux,
+            "natives-macos" => self.natives_macos,
+            "natives-osx" => self.natives_osx,
+            "natives-windows" => self.natives_windows,
+            _ => None,
         }
     }
 }
@@ -352,6 +365,16 @@ pub struct Natives {
     pub osx: Option<String>,
     pub linux: Option<String>,
     pub windows: Option<String>,
+}
+
+impl Natives {
+    fn get_os_specific(self, os: OsName) -> Option<String> {
+        match os {
+            OsName::Linux => self.linux,
+            OsName::Windows => self.windows,
+            OsName::MacOS => self.osx,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -379,7 +402,7 @@ impl Rule {
             arch: None,
         });
 
-        let is_os_allowed = os.name.clone().unwrap_or_default() == OsName::get_os_name();
+        let is_os_allowed = os.name.clone().unwrap_or_default() == OsName::get_current_os();
         let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
         let is_feature_allowed = self.features.is_none();
         // TODO: Check version
@@ -405,15 +428,15 @@ pub enum OsName {
     #[serde(rename = "windows")]
     Windows,
     #[serde(rename = "osx")]
-    Osx,
+    MacOS,
 }
 
 impl OsName {
-    pub fn get_os_name() -> OsName {
+    pub fn get_current_os() -> OsName {
         if cfg!(target_os = "linux") {
             OsName::Linux
         } else if cfg!(target_os = "macos") {
-            OsName::Osx
+            OsName::MacOS
         } else if cfg!(target_os = "windows") {
             OsName::Windows
         } else {
@@ -424,7 +447,7 @@ impl OsName {
 
 impl Default for OsName {
     fn default() -> Self {
-        Self::get_os_name()
+        Self::get_current_os()
     }
 }
 
