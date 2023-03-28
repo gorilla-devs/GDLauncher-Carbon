@@ -2,7 +2,6 @@ use crate::api::keys::{app::*, Key};
 use crate::api::router::router;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::error;
 use crate::managers::configuration::ConfigurationManager;
 use rspc::RouterBuilderLike;
 use std::ops::Deref;
@@ -67,7 +66,7 @@ mod app {
                 .await
                 .unwrap();
 
-            Arc::new(AppInner {
+            let app = Arc::new(AppInner {
                 configuration_manager: ConfigurationManager::new(runtime_path),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
@@ -76,7 +75,11 @@ mod app {
                 reqwest_client: reqwest::Client::new(),
                 prisma_client: Arc::new(db_client),
                 task_queue: TaskQueue::new(2 /* todo: download slots */),
-            })
+            });
+
+            account::AccountRefreshService::start(Arc::downgrade(&app));
+
+            app
         }
 
         manager_getter!(configuration_manager: ConfigurationManager);
@@ -140,15 +143,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.configuration_manager()
                 .get_theme()
                 .await
-                .map_err(error::into_rspc)
         }
 
         mutation SET_THEME[app, new_theme: String] {
             app.configuration_manager()
                 .set_theme(new_theme.clone())
                 .await
-                .map_err(error::into_rspc)?;
-            Ok(())
         }
     }
 }

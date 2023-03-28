@@ -9,12 +9,24 @@ console.log(
   isDockerBuild
 );
 
+let os = process.argv[5].replace(/-/g, "");
+let arch = process.argv[4].replace(/-/g, "");
+
+let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
+
+let targetTripleLookup = {
+  "win-x64": "x86_64-pc-windows-msvc",
+  "linux-x64": "x86_64-unknown-linux-gnu",
+  "mac-x64": "x86_64-apple-darwin",
+  "mac-arm64": "aarch64-apple-darwin",
+};
+
+let targetTriple = targetTripleLookup[`${os}-${arch}`];
+
 module.exports = {
   productName: "GDLauncher Carbon",
   appId: "org.gorilladevs.GDLauncherCarbon",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
-  buildVersion: "5.0.0",
-  buildNumber: "5.0.0",
   asar: true,
   directories: {
     output: "release",
@@ -23,8 +35,8 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: "../../packages/core_module/core.node",
-      to: "core.node",
+      from: `../../target/${targetTriple}/release/${coreModuleBinName}`,
+      to: coreModuleBinName,
     },
     {
       from: "./JavaCheck.class",

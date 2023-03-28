@@ -1,7 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
 use log::trace;
-use prisma_client_rust::QueryError;
 use thiserror::Error;
 
 use crate::{
@@ -26,13 +25,13 @@ impl ConfigurationManager {
 }
 
 impl ManagerRef<'_, ConfigurationManager> {
-    pub async fn get_theme(self) -> Result<String, ConfigurationError> {
+    pub async fn get_theme(self) -> anyhow::Result<String> {
         trace!("retrieving current theme from db");
 
         Ok(self.configuration().get().await?.theme)
     }
 
-    pub async fn set_theme(self, theme: String) -> Result<(), ConfigurationError> {
+    pub async fn set_theme(self, theme: String) -> anyhow::Result<()> {
         use crate::db::app_configuration::SetParam::SetTheme;
 
         trace!("writing theme in db: {theme}");
@@ -56,16 +55,17 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub async fn get(self) -> Result<app_configuration::Data, ConfigurationError> {
-        self.client
+    pub async fn get(self) -> anyhow::Result<app_configuration::Data> {
+        Ok(self
+            .client
             .app_configuration()
             .find_unique(app_configuration::id::equals(0))
             .exec()
             .await?
-            .ok_or(ConfigurationError::Missing)
+            .ok_or(ConfigurationError::Missing)?)
     }
 
-    pub async fn set(self, value: app_configuration::SetParam) -> Result<(), ConfigurationError> {
+    pub async fn set(self, value: app_configuration::SetParam) -> anyhow::Result<()> {
         self.client
             .app_configuration()
             .update(
@@ -81,9 +81,6 @@ impl Configuration {
 
 #[derive(Error, Debug)]
 pub enum ConfigurationError {
-    #[error("configuration row missing from DB")]
+    #[error("configuration row missing from gdl db")]
     Missing,
-
-    #[error("query error: {0}")]
-    Query(#[from] QueryError),
 }
