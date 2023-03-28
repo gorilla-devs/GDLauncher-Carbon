@@ -22,6 +22,7 @@ pub mod download;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
+pub mod vqueue;
 
 pub type App = Arc<AppInner>;
 
