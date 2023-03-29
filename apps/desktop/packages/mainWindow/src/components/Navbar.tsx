@@ -106,7 +106,7 @@ const AppNavbar = () => {
           <div class="ml-4">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
-                options={(routeData.accounts.data as Accounts).map(
+                accounts={(routeData.accounts.data as Accounts).map(
                   (account) => ({
                     label: {
                       name: account?.username,

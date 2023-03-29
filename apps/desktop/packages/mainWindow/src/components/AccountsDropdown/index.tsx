@@ -12,6 +12,7 @@ import { DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
+import { createQuery } from "@tanstack/solid-query";
 import {
   createSignal,
   For,
@@ -29,7 +30,7 @@ export type Label = {
   icon: string;
 };
 
-export type Option = {
+export type Account = {
   label: Label;
   key: string;
 };
@@ -40,7 +41,7 @@ export type OptionDropDown = {
 };
 
 export type Props = {
-  options: Option[];
+  accounts: Account[];
   value: string | null | undefined;
   disabled?: boolean;
   label?: string;
@@ -139,8 +140,8 @@ const parseStatus = (status: EnrollStatusResult | undefined) => {
 
 export const AccountsDropdown = (props: Props) => {
   const activeAccount = () =>
-    props.options.find((option) => option.key === props.value)?.label ||
-    props.options[0]?.label;
+    props.accounts.find((option) => option.key === props.value)?.label ||
+    props.accounts[0]?.label;
 
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [addAccountStarting, setAddAccountStarting] = createSignal(false);
@@ -195,7 +196,7 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   const filteredOptions = () =>
-    props.options.filter(
+    props.accounts.filter(
       (option) => option.key !== (activeAccount() as Label)?.uuid
     );
 
@@ -377,6 +378,16 @@ export const AccountsDropdown = (props: Props) => {
     });
   });
 
+  const img = createQuery(
+    () => ["skinImg"],
+    () =>
+      fetch(
+        `http://localhost:1025/account/headImage?uuid=${
+          (activeAccount() as Label).uuid
+        }`
+      )
+  );
+
   return (
     <div class="relative inline-block" id={props.id}>
       <p
@@ -407,10 +418,7 @@ export const AccountsDropdown = (props: Props) => {
         }}
       >
         <Show when={(activeAccount() as Label)?.icon}>
-          <img
-            src={(activeAccount() as Label)?.icon}
-            class="w-5 h-5 rounded-md"
-          />
+          <img src={img.data?.url} class="w-5 h-5 rounded-md" />
         </Show>
         <div
           class="w-full text-ellipsis overflow-hidden max-w-15"
@@ -448,10 +456,7 @@ export const AccountsDropdown = (props: Props) => {
       >
         <div class="w-full flex flex-col mb-4">
           <div class="flex w-full mb-6">
-            <img
-              src={(activeAccount() as Label)?.icon}
-              class="rounded-md h-10 mr-2 w-10"
-            />
+            <img src={img.data?.url} class="rounded-md h-10 mr-2 w-10" />
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
               <p class="m-0 text-xs">{(activeAccount() as Label)?.type}</p>
@@ -493,11 +498,21 @@ export const AccountsDropdown = (props: Props) => {
                 (option.label as Label).uuid,
               ]);
 
+              const img = createQuery(
+                () => ["skinImg"],
+                () =>
+                  fetch(
+                    `http://localhost:1025/account/headImage?uuid=${
+                      (option.label as Label).uuid
+                    }`
+                  )
+              );
+
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
                     <img
-                      src={(option.label as Label).icon}
+                      src={img.data?.url}
                       class="w-10 h-10 rounded-md mr-2 grayscale"
                     />
                     <div class="flex flex-col">
