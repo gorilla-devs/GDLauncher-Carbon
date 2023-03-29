@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use crate::api::keys::mc::*;
 use crate::api::managers::App;
 use crate::api::router::router;
+use crate::managers::AppInner;
 use axum::extract::DefaultBodyLimit;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -46,7 +49,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager().get_minecraft_versions().await;
 
-            res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>()
+            Ok(res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>())
         }
 
         query GET_INSTANCES[_, _args: ()] {
@@ -134,29 +137,29 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
             Ok(instance)
         }
-        mutation OPEN_INSTANCE_FOLDER_PATH[_, _args: String] {}
-        mutation START_INSTANCE[_, _args: String] {}
-        mutation STOP_INSTANCE[_, _args: String] {}
-        mutation DELETE_INSTANCE[_, _args: String] {}
+        mutation OPEN_INSTANCE_FOLDER_PATH[_, _args: String] { Ok(()) }
+        mutation START_INSTANCE[_, _args: String] { Ok(()) }
+        mutation STOP_INSTANCE[_, _args: String] { Ok(()) }
+        mutation DELETE_INSTANCE[_, _args: String] { Ok(()) }
         // Actions on mods
-        mutation ENABLE_MOD[_, _args: String] {}
-        mutation DISABLE_MOD[_, _args: String] {}
-        mutation REMOVE_MOD[_, _args: String] {}
-        mutation REMOVE_MODS[_, _args: Vec<String>] {}
+        mutation ENABLE_MOD[_, _args: String] { Ok(()) }
+        mutation DISABLE_MOD[_, _args: String] { Ok(()) }
+        mutation REMOVE_MOD[_, _args: String] { Ok(()) }
+        mutation REMOVE_MODS[_, _args: Vec<String>] { Ok(()) }
         // Change versions
-        mutation SWITCH_MINECRAFT_VERSION[_, _args: String] {}
-        mutation SWITCH_MODLOADER[_, _args: String] {}
-        mutation SWITCH_MODLOADER_VERSION[_, _args: String] {}
+        mutation SWITCH_MINECRAFT_VERSION[_, _args: String] { Ok(()) }
+        mutation SWITCH_MODLOADER[_, _args: String] { Ok(()) }
+        mutation SWITCH_MODLOADER_VERSION[_, _args: String] { Ok(()) }
         // Instance settings
-        mutation UPDATE_INSTANCE_NAME[_, _args: UpdateInstanceArgs] {}
-        query GET_INSTANCE_MEMORY[_, _args: String] {}
-        mutation UPDATE_INSTANCE_MEMORY[_, _args: u8] {}
-        query GET_INSTANCE_JAVA_ARGS[_, _args: String] {}
-        mutation UPDATE_INSTANCE_JAVA_ARGS[_, _args: String] {}
+        mutation UPDATE_INSTANCE_NAME[_, _args: UpdateInstanceArgs] { Ok(()) }
+        query GET_INSTANCE_MEMORY[_, _args: String] { Ok(()) }
+        mutation UPDATE_INSTANCE_MEMORY[_, _args: u8] { Ok(()) }
+        query GET_INSTANCE_JAVA_ARGS[_, _args: String] { Ok(()) }
+        mutation UPDATE_INSTANCE_JAVA_ARGS[_, _args: String] { Ok(()) }
     }
 }
 
-pub(super) fn mount_axum_router() -> axum::Router<()> {
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route(
             "/instanceThumbnail",

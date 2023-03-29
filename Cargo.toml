@@ -3,32 +3,34 @@ members = ["packages/core_module", "crates/*"]
 resolver = "2"
 
 [profile.release]
+# debug = 2
 # codegen-units = 1
 # lto = true
-# opt-level = 2
-# strip = "symbols"
+# opt-level = "s"
+split-debuginfo = "unpacked"
 
 [workspace.dependencies]
-anyhow = "1.0.51"
+anyhow = { version = "1.0.51", features = ["backtrace"] }
 async-recursion = "1.0.0"
 async-stream = "0.3.3"
 async-trait = "0.1.61"
 axum = "0.6.2"
 chrono = "0.4.23"
+derive_more = "0.99.17"
 directories = "4.0.1"
 dirs = "4.0.0"
-dotenv = "0.15.0"
+dotenvy = "0.15.6"
 env_logger = "0.10.0"
 flate2 = "1.0.25"
 futures = "0.3.25"
+image = { version = "0.24.5", features = ["png"], default-features = false }
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
+libc = "0.2"
 log = "0.4.17"
 mockall = "0.11.3"
-napi = "2.10.4"
-napi-derive = "2.9.3"
 ntest = "0.9.0"
-prisma-client-rust = {git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = [
+prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = [
   "sqlite-create-many",
   "sqlite",
   "migrations",
@@ -61,3 +63,4 @@ uuid = "1.2.2"
 winreg = "0.10.1"
 zip = "0.6.3"
 tempdir = "0.3.7"
+sentry = "0.30.0"
