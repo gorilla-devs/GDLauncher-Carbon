@@ -107,7 +107,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> App {
-    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_dir = tempdir::TempDir::new_in(env!("CARGO_MANIFEST_DIR"), "carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);

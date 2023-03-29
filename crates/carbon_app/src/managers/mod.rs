@@ -21,6 +21,7 @@ pub mod download;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
+pub mod reqwest_cached_client;
 
 pub type App = Arc<AppInner>;
 
@@ -71,7 +72,7 @@ mod app {
                 account_manager: AccountManager::new(),
                 download_manager: DownloadManager::new(),
                 invalidation_channel,
-                reqwest_client: reqwest::Client::new(),
+                reqwest_client: reqwest_cached_client::new(),
                 prisma_client: Arc::new(db_client),
                 task_queue: TaskQueue::new(2 /* todo: download slots */),
             });
