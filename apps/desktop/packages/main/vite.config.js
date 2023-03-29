@@ -7,6 +7,11 @@ export default defineConfig(() => {
     root: __dirname,
     plugins: [],
     envDir: resolve(__dirname, "../../../../"),
+    resolve: {
+      alias: {
+        electron: "@overwolf/ow-electron",
+      },
+    },
     build: {
       outDir: "../../dist/main",
       lib: {
@@ -19,6 +24,7 @@ export default defineConfig(() => {
       rollupOptions: {
         external: [
           "electron",
+          "@overwolf/ow-electron",
           ...builtinModules,
           // ...Object.keys(pkg.dependencies || {}),
         ],

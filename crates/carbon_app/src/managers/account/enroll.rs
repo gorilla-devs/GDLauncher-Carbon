@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use super::api::{
     DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
-    McAuth, McAuthError,
+    McAuth, McAuthError, MsAuth, MsAuthRefreshError,
 };
 use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
@@ -79,6 +79,55 @@ impl EnrollmentTask {
             abort: abort_handle,
         }
     }
+
+    pub fn refresh(
+        client: reqwest::Client,
+        refresh_token: String,
+        invalidate: impl InvalidateCtx + Send + Sync + 'static,
+    ) -> Self {
+        let status = Arc::new(RwLock::new(EnrollmentStatus::RequestingCode));
+        let task_status = status.clone();
+
+        let task = async move {
+            let update_status = |status: EnrollmentStatus| async {
+                *task_status.write().await = status;
+                invalidate.invalidate().await;
+            };
+
+            let task = || async {
+                // attempt to refresh token
+                let ms_auth = MsAuth::refresh(&client, &refresh_token).await?;
+
+                // authenticate with MC
+                update_status(EnrollmentStatus::McLogin).await;
+                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
+
+                update_status(EnrollmentStatus::PopulateAccount).await;
+                let populated = mc_auth.populate(&client).await?;
+
+                update_status(EnrollmentStatus::Complete(FullAccount {
+                    ms: ms_auth,
+                    mc: populated,
+                }))
+                .await;
+
+                Ok(())
+            };
+
+            match task().await {
+                Ok(()) => {}
+                Err(e) => update_status(EnrollmentStatus::Failed(e)).await,
+            };
+        };
+
+        let (task, abort_handle) = abortable(task);
+        tokio::task::spawn(task);
+
+        Self {
+            status,
+            abort: abort_handle,
+        }
+    }
 }
 
 impl Drop for EnrollmentTask {
@@ -99,6 +148,9 @@ pub enum EnrollmentError {
 
     #[error("device code poll: {0}")]
     DeviceCodePoll(#[from] DeviceCodePollError),
+
+    #[error("ms auth refresh: {0}")]
+    MsRefresh(#[from] MsAuthRefreshError),
 
     #[error("mc auth: {0}")]
     McAuth(#[from] McAuthError),

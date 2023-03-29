@@ -1,7 +1,11 @@
+use chrono::{DateTime, Utc};
+
 pub struct Account {
     pub username: String,
     pub uuid: String,
+    pub last_used: DateTime<Utc>,
     pub type_: AccountType,
+    pub skin_id: Option<String>,
 }
 
 pub enum AccountType {
@@ -23,4 +27,12 @@ pub enum AccountStatus {
     Expired,
     /// An account that is currently having its access token refreshed.
     Refreshing,
+    /// An account that is unable to be refreshed and needs re-login.
+    Invalid,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum StatusFlags {
+    BannedFromMultiplayer,
+    XboxMultiplayerDisabled,
 }

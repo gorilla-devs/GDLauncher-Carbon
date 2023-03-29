@@ -9,12 +9,17 @@ pub struct Libraries {
     libraries: Vec<Library>,
 }
 impl Libraries {
-    pub fn get_libraries(&self) -> &Vec<Library> {
-        &self.libraries
+    pub fn get_allowed_libraries(&self) -> Vec<Library> {
+        let libs = &self.libraries;
+
+        let results = libs.iter().filter(|l| l.is_allowed());
+
+        results.cloned().collect()
     }
 }
 
 impl IntoVecDownloadable for Libraries {
+    /// Returns a list of Downloadable objects for all libraries (native and non-native)
     fn into_vec_downloadable(self, base_path: &std::path::Path) -> Vec<carbon_net::Downloadable> {
         let mut files = vec![];
 
@@ -23,21 +28,13 @@ impl IntoVecDownloadable for Libraries {
                 continue;
             }
 
-            let Some(artifact) = library.downloads.artifact else {
-                continue;
-            };
+            if let Some(downloadable) = library.clone().into_lib_downloadable(base_path) {
+                files.push(downloadable);
+            }
 
-            let Some(path) = artifact.path else {
-                continue;
-            };
-            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-            files.push(carbon_net::Downloadable {
-                url: artifact.url,
-                path: PathBuf::from(base_path).join(path),
-                checksum,
-                size: Some(artifact.size),
-            })
+            if let Some(downloadable) = library.into_natives_downloadable(base_path) {
+                files.push(downloadable);
+            }
         }
 
         files
@@ -52,7 +49,7 @@ pub struct Version {
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
     pub compliance_level: Option<i64>,
-    pub downloads: Option<VersionInfoDownloads>,
+    pub downloads: Option<VersionDownloads>,
     pub id: String,
     pub java_version: Option<JavaVersion>,
     #[serde(flatten)]
@@ -117,7 +114,7 @@ impl Default for Arguments {
                     rules: vec![Rule {
                         action: Action::Allow,
                         os: Some(OsRule {
-                            name: Some(OsName::Osx),
+                            name: Some(OsName::MacOS),
                             version: None,
                             arch: None,
                         }),
@@ -202,26 +199,23 @@ pub struct VersionAssetIndex {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct VersionInfoDownloads {
-    pub client: MappingsClass,
-    pub client_mappings: Option<MappingsClass>,
-    pub server: Option<MappingsClass>,
-    pub server_mappings: Option<MappingsClass>,
+pub struct VersionDownloads {
+    pub client: VersionDownloadsMappingsClass,
+    pub client_mappings: Option<VersionDownloadsMappingsClass>,
+    pub server: Option<VersionDownloadsMappingsClass>,
+    pub server_mappings: Option<VersionDownloadsMappingsClass>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MappingsClass {
+pub struct VersionDownloadsMappingsClass {
     pub sha1: String,
     pub size: u64,
     pub url: String,
-    pub path: Option<String>,
 }
 
-impl IntoDownloadable for MappingsClass {
+impl IntoDownloadable for VersionDownloadsMappingsClass {
     fn into_downloadable(self, base_path: &std::path::Path) -> carbon_net::Downloadable {
-        let jar_path = base_path
-            .join("clients")
-            .join(format!("{}.jar", &self.sha1));
+        let jar_path = base_path.join(format!("{}.jar", &self.sha1));
 
         carbon_net::Downloadable::new(self.url, jar_path)
             .with_checksum(Some(carbon_net::Checksum::Sha1(self.sha1)))
@@ -248,6 +242,58 @@ pub struct Library {
 }
 
 impl Library {
+    pub fn into_lib_downloadable(
+        self,
+        base_path: &std::path::Path,
+    ) -> Option<carbon_net::Downloadable> {
+        let artifact = self.downloads.artifact;
+
+        if let Some(artifact) = artifact {
+            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
+
+            return Some(carbon_net::Downloadable {
+                url: artifact.url,
+                path: PathBuf::from(base_path).join(artifact.path),
+                checksum,
+                size: Some(artifact.size),
+            });
+        }
+
+        None
+    }
+
+    pub fn into_natives_downloadable(
+        self,
+        base_path: &std::path::Path,
+    ) -> Option<carbon_net::Downloadable> {
+        let Some(classifiers) = self.downloads.classifiers else {
+            return None;
+        };
+
+        let Some(natives) = self.natives else {
+            return None;
+        };
+
+        let Some(natives_name) = natives.get_os_specific(OsName::default()) else {
+            return None;
+        };
+
+        let Some(mapping_class) = classifiers.get(&natives_name) else {
+            return None;
+        };
+
+        let checksum = Some(carbon_net::Checksum::Sha1(mapping_class.sha1));
+
+        Some(carbon_net::Downloadable {
+            url: mapping_class.url,
+            path: PathBuf::from(base_path).join(mapping_class.path),
+            checksum,
+            size: Some(mapping_class.size),
+        })
+    }
+}
+
+impl Library {
     #[tracing::instrument]
     pub fn is_allowed(&self) -> bool {
         let Some(rules) = &self.rules else {
@@ -269,6 +315,14 @@ impl Library {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MappingsClass {
+    pub sha1: String,
+    pub size: u64,
+    pub url: String,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LibraryDownloads {
     pub artifact: Option<MappingsClass>,
     pub classifiers: Option<Classifiers>,
@@ -279,14 +333,30 @@ pub struct Classifiers {
     pub javadoc: Option<MappingsClass>,
     #[serde(rename = "natives-linux")]
     pub natives_linux: Option<MappingsClass>,
+
+    // For some reasons they have both macos and osx...
     #[serde(rename = "natives-macos")]
     pub natives_macos: Option<MappingsClass>,
+    #[serde(rename = "natives-osx")]
+    pub natives_osx: Option<MappingsClass>,
+
     #[serde(rename = "natives-windows")]
     pub natives_windows: Option<MappingsClass>,
     pub sources: Option<MappingsClass>,
-    #[serde(rename = "natives-osx")]
-    pub natives_osx: Option<MappingsClass>,
 }
+
+impl Classifiers {
+    pub fn get(self, natives_name: &str) -> Option<MappingsClass> {
+        match natives_name {
+            "natives-linux" => self.natives_linux,
+            "natives-macos" => self.natives_macos,
+            "natives-osx" => self.natives_osx,
+            "natives-windows" => self.natives_windows,
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Extract {
     pub exclude: Vec<String>,
@@ -297,6 +367,16 @@ pub struct Natives {
     pub osx: Option<String>,
     pub linux: Option<String>,
     pub windows: Option<String>,
+}
+
+impl Natives {
+    fn get_os_specific(self, os: OsName) -> Option<String> {
+        match os {
+            OsName::Linux => self.linux,
+            OsName::Windows => self.windows,
+            OsName::MacOS => self.osx,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -324,7 +404,7 @@ impl Rule {
             arch: None,
         });
 
-        let is_os_allowed = os.name.clone().unwrap_or_default() == OsName::get_os_name();
+        let is_os_allowed = os.name.clone().unwrap_or_default() == OsName::get_current_os();
         let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
         let is_feature_allowed = self.features.is_none();
         // TODO: Check version
@@ -350,15 +430,15 @@ pub enum OsName {
     #[serde(rename = "windows")]
     Windows,
     #[serde(rename = "osx")]
-    Osx,
+    MacOS,
 }
 
 impl OsName {
-    pub fn get_os_name() -> OsName {
+    pub fn get_current_os() -> OsName {
         if cfg!(target_os = "linux") {
             OsName::Linux
         } else if cfg!(target_os = "macos") {
-            OsName::Osx
+            OsName::MacOS
         } else if cfg!(target_os = "windows") {
             OsName::Windows
         } else {
@@ -369,7 +449,7 @@ impl OsName {
 
 impl Default for OsName {
     fn default() -> Self {
-        Self::get_os_name()
+        Self::get_current_os()
     }
 }
 
@@ -392,3 +472,6 @@ pub enum Value {
     String(String),
     StringArray(Vec<String>),
 }
+
+#[cfg(test)]
+mod test {}

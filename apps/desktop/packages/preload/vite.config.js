@@ -6,6 +6,11 @@ export default defineConfig({
   root: __dirname,
   envDir: resolve(__dirname, "../../../../"),
   plugins: [],
+  resolve: {
+    alias: {
+      electron: "@overwolf/ow-electron",
+    },
+  },
   build: {
     outDir: "../../dist/preload",
     lib: {
@@ -18,6 +23,7 @@ export default defineConfig({
     rollupOptions: {
       external: [
         "electron",
+        "@overwolf/ow-electron",
         ...builtinModules,
         ...builtinModules.map((e) => `node:${e}`),
         // ...Object.keys(pkg.dependencies || {}),
