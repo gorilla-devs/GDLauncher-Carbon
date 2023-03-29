@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -8,29 +8,29 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType, Procedures } from "@gd/core_module/bindings";
+import { createStore } from "solid-js/store";
+import { rspc } from "@/utils/rspcClient";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
   { key: "account.getAccountStatus" }
 >["result"];
 
-type Accounts = Extract<
-  Procedures["queries"],
-  { key: "account.getAccounts" }
->["result"];
-
 export interface AccountsStatus {
-  [details: string]: {
-    username: string;
+  label: {
+    name: string;
+    icon: string | undefined;
     uuid: string;
-    type_: AccountType;
-    status: EnrollStatusResult;
+    type: AccountType;
+    status: EnrollStatusResult | undefined;
   };
+  key: string;
 }
 
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
+  const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -42,6 +42,27 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
+
+  createEffect(() => {
+    const mappedAccounts = routeData.accounts.data?.map((account) => {
+      const accountStatusQuery = rspc.createQuery(() => [
+        "account.getAccountStatus",
+        account.uuid,
+      ]);
+
+      return {
+        label: {
+          name: account?.username,
+          icon: `http://localhost:1025/account/headImage?uuid=${account.uuid}`,
+          uuid: account.uuid,
+          type: account.type_,
+          status: accountStatusQuery.data,
+        },
+        key: account?.uuid,
+      };
+    });
+    if (mappedAccounts) setAccounts(mappedAccounts);
+  });
 
   return (
     <Show when={!isLogin()}>
@@ -106,17 +127,7 @@ const AppNavbar = () => {
           <div class="ml-4">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
-                accounts={(routeData.accounts.data as Accounts).map(
-                  (account) => ({
-                    label: {
-                      name: account?.username,
-                      icon: " ",
-                      uuid: account.uuid,
-                      type: account.type_,
-                    },
-                    key: account?.uuid,
-                  })
-                )}
+                accounts={accounts}
                 value={routeData.activeUuid.data}
               />
             </Show>
