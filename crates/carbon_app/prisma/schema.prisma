@@ -18,32 +18,26 @@ model AppConfiguration {
 }
 
 model Account {
-  uuid             String   @id
-  username         String
+  uuid           String    @id
+  username       String
   // presence signifies a microsoft account
-  accessToken      String?
-  tokenExpires     DateTime?
-  msRefreshToken   String?
-  lastUsed DateTime
+  accessToken    String?
+  tokenExpires   DateTime?
+  msRefreshToken String?
+  lastUsed       DateTime
+  skinId         String?
 }
 
-model MinecraftManifest {
-  id          String @unique
-  type        String
-  url         String
-  time        String
-  releaseTime String
-  sha1        String @unique
+model Skin {
+  id   String @id
+  skin Bytes
 }
 
-model MinecraftVersion {
-  id   String @unique
-  json Bytes
-}
-
-model MinecraftAssets {
-  assetsIdSha1 String @unique
-  json         Bytes
+model HTTPCache {
+  id        String   @id
+  url       String
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model ActiveDownloads {

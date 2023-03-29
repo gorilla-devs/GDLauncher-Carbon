@@ -5,6 +5,7 @@ pub struct Account {
     pub uuid: String,
     pub last_used: DateTime<Utc>,
     pub type_: AccountType,
+    pub skin_id: Option<String>,
 }
 
 pub enum AccountType {
@@ -28,4 +29,10 @@ pub enum AccountStatus {
     Refreshing,
     /// An account that is unable to be refreshed and needs re-login.
     Invalid,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum StatusFlags {
+    BannedFromMultiplayer,
+    XboxMultiplayerDisabled,
 }

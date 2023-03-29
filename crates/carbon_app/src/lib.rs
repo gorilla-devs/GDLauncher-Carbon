@@ -1,34 +1,56 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-use crate::managers::{App, AppInner};
+use crate::{
+    app_version::APP_VERSION,
+    managers::{App, AppInner},
+};
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
+use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
 pub(crate) mod db;
 pub mod managers;
 
+mod app_version;
 mod error;
 pub mod generate_rspc_ts_bindings;
+// mod pprocess_keepalive;
 mod runtime_path_override;
 
-// Since it's module_init, make sure it's not running during tests
-#[cfg(not(test))]
-pub fn init() {
-    std::thread::spawn(|| {
-        let runtime = tokio::runtime::Runtime::new();
-        runtime
-            .unwrap() /* This should never fail */
-            .block_on(async {
-                let runtime_path = runtime_path_override::get_runtime_path_override().await;
-                start_router(runtime_path).await;
-            })
-    });
+#[tokio::main]
+pub async fn init() {
+    // pprocess_keepalive::init();
+
+    println!("Starting Carbon App");
+
+    let _guard = sentry::init((
+        env!("SENTRY_DSN"),
+        sentry::ClientOptions {
+            release: Some(APP_VERSION.into()),
+            ..Default::default()
+        },
+    ));
+
+    let runtime_path = runtime_path_override::get_runtime_path_override().await;
+    let port = get_available_port().await.unwrap();
+
+    start_router(runtime_path, port).await;
 }
 
-async fn start_router(runtime_path: PathBuf) {
+async fn get_available_port() -> Option<u16> {
+    for port in 1025..65535 {
+        if (TcpListener::bind(("[::]:", port))).await.is_ok() {
+            return Some(port);
+        }
+    }
+
+    None
+}
+
+async fn start_router(runtime_path: PathBuf, port: u16) {
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -41,12 +63,42 @@ async fn start_router(runtime_path: PathBuf) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
 
+    let app1 = app.clone();
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
         .nest("/rspc", router.endpoint(move || app).axum())
-        .layer(cors);
+        .layer(cors)
+        .with_state(app1);
 
-    let addr = "[::]:4000".parse::<std::net::SocketAddr>().unwrap(); // This listens on IPv6 and IPv4
+    let addr = format!("[::]:{port}")
+        .parse::<std::net::SocketAddr>()
+        .unwrap(); // This listens on IPv6 and IPv4
+
+    // As soon as the server is ready, notify via stdout
+    tokio::spawn(async move {
+        let mut counter = 0;
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
+        let reqwest_client = reqwest::Client::new();
+        loop {
+            counter += 1;
+            // If we've waited for 10 seconds, give up
+            if counter > 50 {
+                panic!("Server failed to start in time");
+            }
+
+            interval.tick().await;
+            let res = reqwest_client
+                .get(format!("http://localhost:{port}/health"))
+                .send()
+                .await;
+
+            if res.is_ok() {
+                println!("_STATUS_: READY|{port}");
+                break;
+            }
+        }
+    });
+
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
@@ -55,7 +107,7 @@ async fn start_router(runtime_path: PathBuf) {
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> App {
-    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_dir = tempdir::TempDir::new_in(env!("CARGO_MANIFEST_DIR"), "carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
@@ -68,7 +120,7 @@ mod test {
     async fn test_router() {
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
         let server = tokio::spawn(async {
-            super::start_router(temp_dir.into_path()).await;
+            super::start_router(temp_dir.into_path(), 4000).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 

@@ -478,47 +478,66 @@ impl McAuth {
         }
     }
 
-    pub async fn get_profile(&self, client: &Client) -> Result<McProfile, McProfileRequestError> {
-        let response = client
-            .get("https://api.minecraftservices.com/minecraft/profile")
-            .bearer_auth(&self.access_token)
-            .send()
-            .await
-            .map_err(RequestError::from_error)?;
-
-        match response.status() {
-            StatusCode::NOT_FOUND => {
-                Err(McProfileRequestError::Profile(McProfileError::NoProfile))?
-            }
-            StatusCode::OK => {
-                #[derive(Debug, Deserialize)]
-                struct McProfileResponse {
-                    id: String,
-                    name: String,
-                }
-
-                let response = response
-                    .json::<McProfileResponse>()
-                    .await
-                    .map_err(RequestError::from_error)?;
-
-                Ok(McProfile {
-                    uuid: response.id,
-                    username: response.name,
-                })
-            }
-            _ => Err(McProfileRequestError::Request(RequestError::from_status(
-                &response,
-            )))?,
-        }
-    }
-
     pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
         Ok(McAccount {
             auth: self.clone(),
             entitlement: self.get_entitlement(client).await?,
-            profile: self.get_profile(client).await?,
+            profile: get_profile(client, &self.access_token).await?,
         })
+    }
+}
+
+pub async fn get_profile(
+    client: &Client,
+    access_token: &str,
+) -> Result<McProfile, McProfileRequestError> {
+    let response = client
+        .get("https://api.minecraftservices.com/minecraft/profile")
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .map_err(RequestError::from_error)?;
+
+    match response.status() {
+        StatusCode::NOT_FOUND => Err(McProfileRequestError::Profile(McProfileError::NoProfile))?,
+        StatusCode::OK => {
+            #[derive(Debug, Deserialize)]
+            struct McProfileResponse {
+                id: String,
+                name: String,
+                skins: Vec<Skin>,
+            }
+
+            #[derive(Debug, Deserialize)]
+            struct Skin {
+                id: String,
+                state: String, // unknown possible states,
+                url: String,
+            }
+
+            let response = response
+                .json::<McProfileResponse>()
+                .await
+                .map_err(RequestError::from_error)?;
+
+            let skin = response
+                .skins
+                .into_iter()
+                .find(|skin| skin.state == "ACTIVE")
+                .map(|skin| McSkin {
+                    id: skin.id,
+                    url: skin.url,
+                });
+
+            Ok(McProfile {
+                uuid: response.id,
+                username: response.name,
+                skin,
+            })
+        }
+        _ => Err(McProfileRequestError::Request(RequestError::from_status(
+            &response,
+        )))?,
     }
 }
 
@@ -575,6 +594,7 @@ pub enum McEntitlementCheckError {
 pub struct McProfile {
     pub uuid: String,
     pub username: String,
+    pub skin: Option<McSkin>,
 }
 
 #[derive(Error, Debug, Clone)]
@@ -590,6 +610,12 @@ pub enum McProfileRequestError {
 
     #[error("profile error: {0}")]
     Profile(#[from] McProfileError),
+}
+
+#[derive(Debug, Clone)]
+pub struct McSkin {
+    pub id: String,
+    pub url: String,
 }
 
 #[derive(Debug, Clone)]
@@ -612,6 +638,14 @@ pub enum McAccountPopulateError {
 pub struct FullAccount {
     pub ms: MsAuth,
     pub mc: McAccount,
+}
+
+#[derive(Debug, Clone)]
+pub enum AccessTokenStatus {
+    Ok,
+    Invalid,
+    XboxMultiplayerDisabled,
+    BannedFromMultiplayer,
 }
 
 #[cfg(test)]

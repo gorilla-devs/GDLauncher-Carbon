@@ -19,6 +19,10 @@ impl LibrariesPath {
     pub fn get_library_path(&self, maven_coordinate: MavenCoordinates) -> PathBuf {
         self.0.join(maven_coordinate.into_path())
     }
+
+    pub fn to_path(&self) -> PathBuf {
+        self.0.clone()
+    }
 }
 
 pub struct AssetsPath(PathBuf);
@@ -26,6 +30,10 @@ pub struct AssetsPath(PathBuf);
 impl AssetsPath {
     pub fn to_path(&self) -> PathBuf {
         self.0.clone()
+    }
+
+    pub fn get_indexes_path(&self) -> PathBuf {
+        self.0.join("indexes")
     }
 
     pub fn get_legacy_path(&self) -> PathBuf {
@@ -43,12 +51,12 @@ impl AssetsPath {
 pub struct VersionsPath(PathBuf);
 
 impl VersionsPath {
-    pub fn get_client_version_path(&self, version: &str) -> PathBuf {
-        self.0.join("client").join(version).with_extension("jar")
+    pub fn get_clients_path(&self) -> PathBuf {
+        self.0.join("clients")
     }
 
-    pub fn get_server_version_path(&self, version: &str) -> PathBuf {
-        self.0.join("server").join(version).with_extension("jar")
+    pub fn get_servers_path(&self) -> PathBuf {
+        self.0.join("servers")
     }
 }
 

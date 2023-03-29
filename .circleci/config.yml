@@ -66,6 +66,17 @@ jobs:
                 command: pnpm test
                 environment:
                   RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  branch: release
+                steps:
+                  - run:
+                      name: "Upload debug info to sentry"
+                      command: |
+                        cd ./target/x86_64-apple-darwin/release
+                        npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
+                        npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
+                        npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -78,7 +89,7 @@ jobs:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
-
+                rustup target add aarch64-apple-darwin
             - run: |
                 node -v
                 cargo --version
@@ -105,6 +116,17 @@ jobs:
                 command: pnpm test
                 environment:
                   RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  branch: release
+                steps:
+                  - run:
+                      name: "Upload debug info to sentry"
+                      command: |
+                        cd ./target/aarch64-apple-darwin/release
+                        npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
+                        npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
+                        npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -186,6 +208,20 @@ jobs:
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
             RUSTFLAGS: -D warnings
+      - when:
+          condition:
+            branch: release
+          steps:
+            - run:
+                name: "Upload debug info to sentry"
+                shell: bash.exe
+                command: |
+                  export PATH="$HOME/.cargo/bin:$PATH"
+                  npm install -g @sentry/cli
+                  cd ./target/x86_64-pc-windows-msvc/release
+                  sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+                  sentry-cli difutil check core_module.pdb
+                  sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -269,6 +305,14 @@ jobs:
           command: pnpm test
           environment:
             RUSTFLAGS: -D warnings
+      # - run:
+      #     name: "Upload debug info to sentry"
+      #     command: |
+      #       npm install -g @sentry/cli
+      #       cd ./target/x86_64-unknown-linux-gnu/release
+      #       sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+      #       sentry-cli difutil check core_module.pdb
+      #       sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
@@ -280,7 +324,7 @@ workflows:
           filters:
             branches:
               ignore:
-                - master
+                - release
                 - develop
   master-develop-builds:
     jobs:
@@ -288,7 +332,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop
           matrix:
             parameters:
@@ -297,11 +341,11 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop
       - buildLinux:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop

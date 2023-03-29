@@ -1,76 +1,92 @@
+use std::sync::Arc;
+
+use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
 use rspc::{RouterBuilderLike, Type};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::keys::account::*;
 use crate::api::router::router;
-use crate::error::into_rspc;
+use crate::error;
 use crate::error::request::FERequestError;
 use crate::managers::account::api::{
     DeviceCodePollError, DeviceCodeRequestError, McAccountPopulateError, McAuthError,
     McEntitlementCheckError, McEntitlementError, McProfileError, McProfileRequestError,
     XboxAuthError, XboxError,
 };
-use crate::managers::{account, App};
+use crate::managers::{account, App, AppInner};
 use carbon_domain::account as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_ACTIVE_UUID[app, _: ()] {
             app.account_manager().get_active_uuid().await
-               .map_err(into_rspc)
         }
 
         mutation SET_ACTIVE_UUID[app, uuid: Option<String>] {
             app.account_manager().set_active_uuid(uuid).await
-                .map_err(into_rspc)
         }
 
         query GET_ACCOUNTS[app, _: ()] {
             Ok(app.account_manager()
                .get_account_list()
-               .await
-               .map_err(into_rspc)?
+               .await?
                .into_iter()
                .map(AccountEntry::from)
                .collect::<Vec<_>>())
         }
 
         query GET_ACCOUNT_STATUS[app, uuid: String] {
-            Ok(app.account_manager().get_account_status(uuid).await
-                .map_err(into_rspc)?
+            Ok(app.account_manager().get_account_status(uuid).await?
                 .map(AccountStatus::from))
         }
 
         mutation DELETE_ACCOUNT[app, uuid: String] {
             app.account_manager().delete_account(uuid).await
-                .map_err(into_rspc)
         }
 
         mutation ENROLL_BEGIN[app, _: ()] {
             app.account_manager().begin_enrollment().await
-                .map_err(into_rspc)
         }
 
         mutation ENROLL_CANCEL[app, _: ()] {
             app.account_manager().cancel_enrollment().await
-                .map_err(into_rspc)
         }
 
         query ENROLL_GET_STATUS[app, _: ()] {
-            app.account_manager().get_enrollment_status().await.map(EnrollmentStatus::from)
+            Ok(app.account_manager().get_enrollment_status().await.map(EnrollmentStatus::from))
         }
 
         mutation ENROLL_FINALIZE[app, _: ()] {
             app.account_manager().finalize_enrollment().await
-                .map_err(into_rspc)
         }
 
         mutation REFRESH_ACCOUNT[app, uuid: String] {
             app.account_manager().refresh_account(uuid).await
-                .map_err(into_rspc)
         }
+
+        query GET_HEAD[_, _uuid: String] { Ok(()) }
     }
+}
+
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
+    #[derive(Deserialize)]
+    struct HeadQuery {
+        uuid: String,
+    }
+
+    axum::Router::new().route(
+        "/headImage",
+        axum::routing::get(
+            |State(app): State<Arc<AppInner>>, Query(query): Query<HeadQuery>| async move {
+                app.account_manager()
+                    .skin_manager()
+                    .make_head(query.uuid)
+                    .await
+                    .map_err(error::anyhow_into_axum_error)
+            },
+        ),
+    )
 }
 
 #[derive(Type, Serialize)]
@@ -93,6 +109,12 @@ enum AccountStatus {
     Expired,
     Refreshing,
     Invalid,
+}
+
+#[derive(Type, Serialize)]
+struct StatusFlags {
+    banned_from_multiplayer: bool,
+    xbox_disabled_multiplayer: bool,
 }
 
 #[derive(Type, Serialize)]
@@ -149,10 +171,29 @@ impl From<domain::AccountType> for AccountType {
 impl From<domain::AccountStatus> for AccountStatus {
     fn from(value: domain::AccountStatus) -> Self {
         match value {
-            domain::AccountStatus::Ok { .. } => Self::Ok,
+            domain::AccountStatus::Ok { access_token: _ } => Self::Ok,
             domain::AccountStatus::Refreshing => Self::Refreshing,
             domain::AccountStatus::Expired => Self::Expired,
             domain::AccountStatus::Invalid => Self::Invalid,
+        }
+    }
+}
+
+impl From<Option<domain::StatusFlags>> for StatusFlags {
+    fn from(value: Option<domain::StatusFlags>) -> Self {
+        match value {
+            Some(domain::StatusFlags::BannedFromMultiplayer) => Self {
+                banned_from_multiplayer: true,
+                xbox_disabled_multiplayer: false,
+            },
+            Some(domain::StatusFlags::XboxMultiplayerDisabled) => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: true,
+            },
+            None => Self {
+                banned_from_multiplayer: false,
+                xbox_disabled_multiplayer: false,
+            },
         }
     }
 }
