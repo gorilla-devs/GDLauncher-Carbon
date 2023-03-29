@@ -448,7 +448,7 @@ export const AccountsDropdown = (props: Props) => {
         }}
       >
         <div class="w-full flex flex-col mb-4">
-          <div class="flex w-full mb-6">
+          <div class="flex w-full mb-4">
             <img
               src={(activeAccount() as Label)?.icon}
               class="rounded-md h-10 mr-2 w-10"
@@ -489,11 +489,6 @@ export const AccountsDropdown = (props: Props) => {
         <ul class="text-shade-0 m-0 w-full shadow-md shadow-shade-9 list-none p-0">
           <For each={filteredOptions()}>
             {(option) => {
-              const accountStatusQuery = rspc.createQuery(() => [
-                "account.getAccountStatus",
-                (option.label as Label).uuid,
-              ]);
-
               return (
                 <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
                   <div class="flex gap-2">
@@ -501,14 +496,12 @@ export const AccountsDropdown = (props: Props) => {
                       src={(option.label as Label)?.icon}
                       class="w-10 h-10 rounded-md mr-2 grayscale"
                     />
-                    <div class="flex flex-col">
+                    <div class="flex flex-col justify-between">
                       <h5 class="m-0 text-white">
                         {(option.label as Label).name}
                       </h5>
                       <div class="m-0">
-                        <Show when={accountStatusQuery.isSuccess}>
-                          {parseStatus(accountStatusQuery.data)}
-                        </Show>
+                        {parseStatus((option.label as Label).status)}
                       </div>
                     </div>
                   </div>
