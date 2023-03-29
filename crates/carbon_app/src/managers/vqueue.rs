@@ -1,24 +1,58 @@
-use std::sync::Arc;
+use crate::api::keys::queue::*;
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
 use tokio::sync::{watch, RwLock};
 
-struct VisualTaskManager {
-    tasks: RwLock<Vec<VisualTask>>,
+use super::ManagerRef;
+
+use carbon_domain::vqueue as domain;
+
+pub struct VisualTaskManager {
+    tasks: RwLock<HashMap<usize, VisualTask>>,
 }
 
 impl VisualTaskManager {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            tasks: RwLock::new(Vec::new()),
+            tasks: RwLock::new(HashMap::new()),
         }
     }
 }
 
+impl ManagerRef<'_, VisualTaskManager> {
+    pub async fn spawn_task(self, task: VisualTask) {
+        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+
+        // Note: the id also keeps tasks in order.
+        let id = ATOMIC_ID.fetch_add(1, Ordering::Relaxed);
+
+        let mut notify = task.notify_rx.clone();
+
+        self.tasks.write().await.insert(id, task);
+        self.app.invalidate(GET_TASKS, None);
+
+        let app = self.app.clone();
+        tokio::task::spawn(async move {
+            // Invalidate when changed until dropped.
+            // On drop remove the task from the list.
+            while let Ok(_) = notify.changed().await {
+                app.invalidate(GET_TASKS, None);
+            }
+
+            app.task_manager().tasks.write().await.remove(&id);
+            app.invalidate(GET_TASKS, None);
+        });
+    }
+}
+
 struct VisualTask {
-    pub name: String,
-    /// the indeterminate flag hides the progress bar before tasks have decided
-    /// their respective weights.
-    pub indeterminate: bool,
+    data: RwLock<TaskData>,
     notify_rx: watch::Receiver<()>,
     notify_tx: Arc<watch::Sender<()>>,
     subtasks: Vec<watch::Receiver<SubtaskData>>,
@@ -29,8 +63,10 @@ impl VisualTask {
         let (notify_tx, notify_rx) = watch::channel(());
 
         Self {
-            name,
-            indeterminate: true,
+            data: RwLock::new(TaskData {
+                name,
+                indeterminate: true,
+            }),
             notify_rx,
             notify_tx: Arc::new(notify_tx),
             subtasks: Vec::new(),
@@ -53,8 +89,12 @@ impl VisualTask {
         }
     }
 
+    pub async fn edit(&self, f: impl FnOnce(&mut TaskData)) {
+        f(&mut *self.data.write().await);
+    }
+
     // Get the current task progress as a float from 0.0 to 1.0
-    pub fn get_progress_float(&self) -> f32 {
+    pub fn progress_float(&self) -> f32 {
         let total_weight = self
             .subtasks
             .iter()
@@ -68,7 +108,44 @@ impl VisualTask {
                 let mul = task.weight / total_weight;
                 task.progress.as_float() * mul
             })
-            .sum::<f32>()
+            .sum()
+    }
+
+    pub fn downloaded_bytes(&self) -> u32 {
+        self.subtasks
+            .iter()
+            .map(|task| match task.borrow().progress {
+                Progress::Download { downloaded, .. } => downloaded,
+                _ => 0,
+            })
+            .sum()
+    }
+
+    pub async fn make_domain_task(&self) -> domain::Task {
+        let (name, indeterminate) = {
+            let data = self.data.read().await;
+            (data.name.clone(), data.indeterminate)
+        };
+
+        domain::Task {
+            name,
+            progress: match indeterminate {
+                true => domain::Progress::Indeterminate,
+                false => domain::Progress::Known(self.progress_float()),
+            },
+            downloaded: self.downloaded_bytes(),
+            active_subtasks: self
+                .subtasks
+                .iter()
+                .map(|t| t.borrow())
+                .filter(|t| t.started)
+                .filter(|t| !t.progress.is_complete())
+                .map(|t| domain::Subtask {
+                    name: t.name.clone(),
+                    progress: t.progress.into(),
+                })
+                .collect(),
+        }
     }
 }
 
@@ -78,48 +155,43 @@ struct Subtask {
 }
 
 impl Subtask {
-    pub async fn update(&self, f: impl FnOnce(&mut SubtaskData)) {
+    pub fn update(&self, f: impl FnOnce(&mut SubtaskData)) {
         self.data.send_modify(f);
         let _ = self.notify.send(());
     }
 
     // convenience functions
 
-    pub async fn start_task(&self) {
-        self.update(|data| data.started = true).await;
+    pub fn start_task(&self) {
+        self.update(|data| data.started = true);
     }
 
-    pub async fn update_progress(&self, progress: Progress) {
-        self.update(|data| data.progress = progress).await;
+    pub fn update_progress(&self, progress: Progress) {
+        self.update(|data| data.progress = progress);
     }
 
-    pub async fn update_download(&self, downloaded: u32, total: u32) {
-        self.update_progress(Progress::Download { downloaded, total })
-            .await;
+    pub fn update_download(&self, downloaded: u32, total: u32) {
+        self.update_progress(Progress::Download { downloaded, total });
     }
 
-    pub async fn update_items(&self, current: u32, total: u32) {
-        self.update_progress(Progress::Item { current, total })
-            .await;
+    pub fn update_items(&self, current: u32, total: u32) {
+        self.update_progress(Progress::Item { current, total });
     }
 
-    pub async fn complete_opaque(&self) {
-        self.update_progress(Progress::Opaque(true)).await;
+    pub fn complete_opaque(&self) {
+        self.update_progress(Progress::Opaque(true));
     }
 
-    pub async fn set_weight(&self, weight: f32) {
-        self.update(|data| data.weight = weight).await;
+    pub fn set_weight(&self, weight: f32) {
+        self.update(|data| data.weight = weight);
     }
 }
 
-async fn test(st: Subtask) {
-    st.update(|task| {
-        task.progress = Progress::Download {
-            downloaded: 0,
-            total: 0,
-        }
-    })
-    .await;
+struct TaskData {
+    pub name: String,
+    /// the indeterminate flag hides the progress bar before tasks have decided
+    /// their respective weights.
+    pub indeterminate: bool,
 }
 
 struct SubtaskData {
@@ -162,6 +234,16 @@ impl Progress {
             Self::Download { downloaded, total } => downloaded >= total,
             Self::Item { current, total } => current >= total,
             Self::Opaque(complete) => complete,
+        }
+    }
+}
+
+impl From<Progress> for domain::SubtaskProgress {
+    fn from(value: Progress) -> Self {
+        match value {
+            Progress::Download { downloaded, total } => Self::Download { downloaded, total },
+            Progress::Item { current, total } => Self::Item { current, total },
+            Progress::Opaque(_) => Self::Opaque,
         }
     }
 }
