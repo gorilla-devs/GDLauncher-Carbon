@@ -390,7 +390,7 @@ export const AccountsDropdown = (props: Props) => {
         {props.label}
       </p>
       <button
-        class="flex items-center w-36 box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg"
+        class="flex items-center box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg w-44"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -407,21 +407,23 @@ export const AccountsDropdown = (props: Props) => {
           "bg-shade-7": true,
         }}
       >
-        <Show when={(activeAccount() as Label)?.icon}>
-          <img
-            src={(activeAccount() as Label)?.icon}
-            class="w-5 h-5 rounded-md"
-          />
-        </Show>
-        <div
-          class="w-full text-ellipsis overflow-hidden max-w-15"
-          classList={{
-            "text-shade-0 hover:text-white group-hover:text-white":
-              !props.disabled,
-            "text-shade-5": props.disabled,
-          }}
-        >
-          {(activeAccount() as Label)?.name}
+        <div class="flex gap-2 items-center">
+          <Show when={(activeAccount() as Label)?.icon}>
+            <img
+              src={(activeAccount() as Label)?.icon}
+              class="w-5 h-5 rounded-md"
+            />
+          </Show>
+          <p
+            class="justify-center w-full text-ellipsis overflow-hidden m-0 align-middle leading-loose max-w-20"
+            classList={{
+              "text-shade-0 hover:text-white group-hover:text-white":
+                !props.disabled,
+              "text-shade-5": props.disabled,
+            }}
+          >
+            {(activeAccount() as Label)?.name}
+          </p>
         </div>
 
         <span
