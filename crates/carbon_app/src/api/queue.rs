@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use crate::api::keys::queue::*;
 use crate::managers::App;
-use carbon_domain::vqueue as domain;
+use carbon_domain::queue as domain;
 
 use super::router::router;
 
