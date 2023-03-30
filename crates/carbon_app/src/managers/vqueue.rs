@@ -49,9 +49,26 @@ impl ManagerRef<'_, VisualTaskManager> {
             app.invalidate(GET_TASKS, None);
         });
     }
+
+    pub async fn get_tasks(self) -> Vec<domain::Task> {
+        let tasklist = self.tasks.read().await;
+        let mut tasks = tasklist
+            .iter()
+            .map(|(i, task)| (i, task.make_domain_task()))
+            .collect::<Vec<_>>();
+        tasks.sort_by(|(a, _), (b, _)| Ord::cmp(a, b));
+
+        let mut ret = Vec::<domain::Task>::with_capacity(tasks.len());
+
+        for (_, task) in tasks {
+            ret.push(task.await);
+        }
+
+        ret
+    }
 }
 
-struct VisualTask {
+pub struct VisualTask {
     data: RwLock<TaskData>,
     notify_rx: watch::Receiver<()>,
     notify_tx: Arc<watch::Sender<()>>,
@@ -111,14 +128,14 @@ impl VisualTask {
             .sum()
     }
 
-    pub fn downloaded_bytes(&self) -> u32 {
+    pub fn downloaded_bytes(&self) -> (u32, u32) {
         self.subtasks
             .iter()
             .map(|task| match task.borrow().progress {
-                Progress::Download { downloaded, .. } => downloaded,
-                _ => 0,
+                Progress::Download { downloaded, total } => (downloaded, total),
+                _ => (0, 0),
             })
-            .sum()
+            .fold((0, 0), |(ad, at), (d, t)| (ad + d, at + t))
     }
 
     pub async fn make_domain_task(&self) -> domain::Task {
@@ -127,13 +144,16 @@ impl VisualTask {
             (data.name.clone(), data.indeterminate)
         };
 
+        let (downloaded, download_total) = self.downloaded_bytes();
+
         domain::Task {
             name,
             progress: match indeterminate {
                 true => domain::Progress::Indeterminate,
                 false => domain::Progress::Known(self.progress_float()),
             },
-            downloaded: self.downloaded_bytes(),
+            downloaded,
+            download_total,
             active_subtasks: self
                 .subtasks
                 .iter()
@@ -149,7 +169,7 @@ impl VisualTask {
     }
 }
 
-struct Subtask {
+pub struct Subtask {
     notify: Arc<watch::Sender<()>>,
     data: watch::Sender<SubtaskData>,
 }
@@ -187,14 +207,14 @@ impl Subtask {
     }
 }
 
-struct TaskData {
+pub struct TaskData {
     pub name: String,
     /// the indeterminate flag hides the progress bar before tasks have decided
     /// their respective weights.
     pub indeterminate: bool,
 }
 
-struct SubtaskData {
+pub struct SubtaskData {
     /// The subtask's name. Shows as subtext under the main task name.
     pub name: String,
     /// Relative amount of space on the task progress bar this subtask takes.

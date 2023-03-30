@@ -1,8 +1,9 @@
 pub struct Task {
-    name: String,
-    progress: Progress,
-    downloaded: u32,
-    active_subtasks: Vec<Subtask>,
+    pub name: String,
+    pub progress: Progress,
+    pub downloaded: u32,
+    pub download_total: u32,
+    pub active_subtasks: Vec<Subtask>,
 }
 
 pub enum Progress {
@@ -11,8 +12,8 @@ pub enum Progress {
 }
 
 pub struct Subtask {
-    name: String,
-    progress: SubtaskProgress,
+    pub name: String,
+    pub progress: SubtaskProgress,
 }
 
 pub enum SubtaskProgress {

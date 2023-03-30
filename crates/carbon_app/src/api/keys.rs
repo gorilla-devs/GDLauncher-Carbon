@@ -69,7 +69,6 @@ keys! {
 
     queue {
         GET_TASKS                     = "getTasks";
-        GET_TASK_STATUS               = "getTaskStatus";
     }
 
     app {
