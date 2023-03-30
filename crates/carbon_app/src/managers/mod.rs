@@ -15,7 +15,7 @@ use self::queue::TaskQueue;
 
 pub mod account;
 pub mod download;
-mod java;
+pub mod java;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
@@ -31,11 +31,12 @@ pub enum AppError {
 }
 
 mod app {
-    use super::*;
+    use super::{java::JavaManager, *};
 
     pub struct AppInner {
         //instances: Instances,
         settings_manager: SettingsManager,
+        java_manager: JavaManager,
         minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
@@ -67,6 +68,7 @@ mod app {
 
             let app = Arc::new(AppInner {
                 settings_manager: SettingsManager::new(runtime_path),
+                java_manager: JavaManager::new(),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
                 download_manager: DownloadManager::new(),
@@ -82,6 +84,7 @@ mod app {
         }
 
         manager_getter!(settings_manager: SettingsManager);
+        manager_getter!(java_manager: JavaManager);
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);

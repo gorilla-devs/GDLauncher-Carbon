@@ -9,7 +9,7 @@ generator client {
 }
 
 model AppConfiguration {
-  id                  Int     @id @default(0)
+  id                  Int     @id @unique @default(0)
   theme               String  @default("main")
   reducedMotion       Boolean @default(false)
   language            String  @default("en")
@@ -22,6 +22,21 @@ model AppConfiguration {
   javaCustomArgs      String  @default("")
   xmx                 Int     @default(1024)
   xms                 Int     @default(1024)
+}
+
+model Java {
+  path        String       @id @unique
+  major       Int
+  fullVersion String
+  type        String
+  arch        String
+  defaultJava DefaultJava?
+}
+
+model DefaultJava {
+  path     String @id
+  major    Int    @unique
+  javaPath Java   @relation(fields: [path], references: [path])
 }
 
 model Account {

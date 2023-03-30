@@ -1,33 +1,55 @@
-use crate::api::keys::java::*;
 use crate::api::managers::App;
 use crate::api::router::router;
+use crate::{api::keys::java::*, managers::java::JavaComponent};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 
-#[derive(Type, Serialize)]
-enum JavaType {
-    Local,
-    Controlled,
+pub(super) fn mount() -> impl RouterBuilderLike<App> {
+    router! {
+        query GET_AVAILABLE[app, _args: ()] {
+            let all_javas = app.java_manager().get_available_javas().await?;
+
+            Ok(all_javas)
+        }
+
+        mutation SET_DEFAULT[_, _args: SetDefaultArgs] { Ok(()) }
+
+        mutation SETUP_CONTROLLED[_, _args: SetupArgs] {
+            // invalidate_query!("java.autoSetupjavaProgress");
+            Ok(())
+        }
+
+        query GET_CONTROLLED_INSTALL_STATUS[_, _args: ()] {
+            Ok(0) // progress
+        }
+
+        mutation DELETE_CONTROLLED[_, _major_version: u8] { Ok(()) }
+    }
 }
 
 #[derive(Type, Serialize)]
-struct Java {
+struct Javas(HashMap<u8, FEAvailableJavasByMajor>);
+
+#[derive(Type, Serialize)]
+struct FEAvailableJavasByMajor {
     default_id: String,
-    java: Vec<JavaDetails>,
+    javas: Vec<FEJavaComponent>,
 }
 
 #[derive(Type, Serialize)]
-struct JavaDetails {
-    id: String,
+struct FEJavaComponent {
+    path: String,
     version: String,
-    path: PathBuf,
     #[serde(rename = "type")]
-    _type: JavaType,
+    _type: FEJavaComponentType,
 }
 
 #[derive(Type, Serialize)]
-struct Javas(HashMap<u8, Java>);
+enum FEJavaComponentType {
+    Local,
+    Managed,
+}
 
 #[derive(Type, Deserialize)]
 struct SetupArgs {
@@ -46,63 +68,4 @@ enum AutoSetupTypes {
 struct SetDefaultArgs {
     major_version: u8,
     id: String,
-}
-
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
-    router! {
-        query GET_AVAILABLE[_, _args: ()] {
-            let mut javas = HashMap::new();
-            let mut java8 = Java {
-                default_id: "vseuitruihsruthurt".to_string(),
-                java: Vec::new(),
-            };
-            java8.java.push(JavaDetails {
-                id: "vseuitruihsruthurt".to_string(),
-                version: "1.8.0_51".to_string(),
-                path: PathBuf::from("C:\\Program Files\\Java\\jre1.8.0_51"),
-                _type: JavaType::Local,
-            });
-            java8.java.push(JavaDetails {
-                id: "vxeuwwruihhrtthurt".to_string(),
-                version: "1.8.0_55".to_string(),
-                path: PathBuf::from("C:\\Program Files\\Java\\jre1.8.0_55"),
-                _type: JavaType::Local,
-            });
-            javas.insert(8, java8);
-
-            let mut java11 = Java {
-                default_id: "vseuitruihsruthurt12".to_string(),
-                java: Vec::new(),
-            };
-            java11.java.push(JavaDetails {
-                id: "vseuitruihsruthurt12".to_string(),
-                version: "11.0.1".to_string(),
-                path: PathBuf::from("C:\\Program Files\\Java\\jre1.8.0_51"),
-                _type: JavaType::Local,
-            });
-            java11.java.push(JavaDetails {
-                id: "vseuitruihsruuuuuugg".to_string(),
-                version: "11.0.1".to_string(),
-                path: PathBuf::from("C:\\Some Path\\\\AppData\\gdlauncher\\Java\\jre1.8.0_51"),
-                _type: JavaType::Controlled,
-            });
-
-            javas.insert(11, java11);
-
-            Ok(Javas(javas))
-        }
-
-        mutation SET_DEFAULT[_, _args: SetDefaultArgs] { Ok(()) }
-
-        mutation SETUP_CONTROLLED[_, _args: SetupArgs] {
-            // invalidate_query!("java.autoSetupjavaProgress");
-            Ok(())
-        }
-
-        query GET_CONTROLLED_INSTALL_STATUS[_, _args: ()] {
-            Ok(0) // progress
-        }
-
-        mutation DELETE_CONTROLLED[_, _major_version: u8] { Ok(()) }
-    }
 }

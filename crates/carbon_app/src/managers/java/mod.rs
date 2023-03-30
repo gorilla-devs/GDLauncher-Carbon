@@ -1,80 +1,102 @@
 use serde::{Deserialize, Serialize};
 
+use self::parser::{parse_java_version, JavaArch, JavaVersion};
+
 use super::ManagerRef;
 
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::format,
+    path::PathBuf,
+};
 
 mod auto_setup;
 mod constants;
 mod discovery;
+mod parser;
 mod utils;
 
 pub(crate) struct JavaManager {}
 
 impl JavaManager {
-    pub fn new(runtime_path: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
 
-impl ManagerRef<'_, JavaManager> {}
+impl ManagerRef<'_, JavaManager> {
+    pub async fn get_available_javas(self) -> anyhow::Result<HashMap<u8, JavaComponent>> {
+        let db = &self.app.prisma_client;
+        let all_javas = db
+            .java()
+            .find_many(vec![])
+            .exec()
+            .await?
+            .into_iter()
+            .map(JavaComponent::from)
+            .map(|java| (java.version.major, java))
+            .collect();
+
+        Ok(all_javas)
+    }
+
+    pub async fn get_default_javas(self) -> anyhow::Result<HashMap<u8, String>> {
+        let db = &self.app.prisma_client;
+        let all_javas = db
+            .default_java()
+            .find_many(vec![])
+            .exec()
+            .await?
+            .into_iter()
+            .map(|j| (j.major as u8, j.path))
+            .collect();
+
+        Ok(all_javas)
+    }
+}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct JavaComponent {
     pub path: String,
     pub arch: JavaArch,
     /// Indicates whether the component has manually been added by the user
-    pub is_custom: bool,
+    #[serde(rename = "type")]
+    pub _type: JavaComponentType,
     pub version: JavaVersion,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
-pub enum JavaArch {
-    Amd64,
-    X86,
-    Aarch64,
-}
-
-impl<'a> From<&JavaArch> for &'a str {
-    fn from(arch: &JavaArch) -> &'a str {
-        match arch {
-            JavaArch::Amd64 => "amd64",
-            JavaArch::X86 => "x86",
-            JavaArch::Aarch64 => "aarch64",
-        }
-    }
-}
-
-impl<'a> From<&'a str> for JavaArch {
-    fn from(s: &'a str) -> Self {
-        match s {
-            "amd64" => JavaArch::Amd64,
-            "x86" => JavaArch::X86,
-            "aarch64" => JavaArch::Aarch64,
-            _ => panic!("Unknown JavaArch: {s}"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
-pub struct JavaVersion {
-    pub major: u8,
-    pub minor: Option<u8>,
-    pub patch: Option<String>,
-    pub update_number: Option<String>,
-    pub prerelease: Option<String>,
-    pub build_metadata: Option<String>,
-}
-
-impl JavaVersion {
-    fn from_major(major: u8) -> Self {
+impl From<crate::db::java::Data> for JavaComponent {
+    fn from(java: crate::db::java::Data) -> Self {
         Self {
-            major,
-            minor: None,
-            patch: None,
-            update_number: None,
-            prerelease: None,
-            build_metadata: None,
+            path: java.path,
+            arch: JavaArch::from(&*java.arch),
+            _type: JavaComponentType::from(&*java.r#type),
+            version: JavaVersion::from(&*java.full_version),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+pub enum JavaComponentType {
+    Local,
+    Managed,
+}
+
+impl From<&str> for JavaComponentType {
+    fn from(s: &str) -> Self {
+        match s {
+            "Local" => Self::Local,
+            "Managed" => Self::Managed,
+            _ => unreachable!("Uh oh, this shouldn't happen"),
+        }
+    }
+}
+
+impl From<JavaComponentType> for &str {
+    fn from(t: JavaComponentType) -> Self {
+        match t {
+            JavaComponentType::Local => "Local",
+            JavaComponentType::Managed => "Managed",
         }
     }
 }

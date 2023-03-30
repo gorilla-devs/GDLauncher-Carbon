@@ -1,7 +1,7 @@
 use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
-    db::{app_configuration, PrismaClient},
+    db::app_configuration,
 };
 use anyhow::anyhow;
 use std::path::PathBuf;
