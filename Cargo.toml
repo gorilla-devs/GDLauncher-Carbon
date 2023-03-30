@@ -30,12 +30,12 @@ libc = "0.2"
 log = "0.4.17"
 mockall = "0.11.3"
 ntest = "0.9.0"
-prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = [
+prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
   "migrations",
 ], default_features = false }
-prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "1d1cedd", features = [
+prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
   "migrations",
@@ -64,3 +64,5 @@ winreg = "0.10.1"
 zip = "0.6.3"
 tempdir = "0.3.7"
 sentry = "0.30.0"
+syn = "2.0.11"
+quote = "1.0.26"

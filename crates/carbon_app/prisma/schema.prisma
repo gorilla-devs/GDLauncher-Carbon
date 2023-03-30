@@ -9,12 +9,19 @@ generator client {
 }
 
 model AppConfiguration {
-  id                 Int     @id @default(0)
-  theme              String  @default("main")
-  reducedMotion      Boolean @default(false)
-  discordIntegration Boolean @default(true)
-  releaseChannel     String  @default("stable")
-  activeAccountUuid  String?
+  id                  Int     @id @default(0)
+  theme               String  @default("main")
+  reducedMotion       Boolean @default(false)
+  language            String  @default("en")
+  discordIntegration  Boolean @default(true)
+  releaseChannel      String  @default("stable")
+  activeAccountUuid   String?
+  concurrentDownloads Int     @default(8)
+  showNews            Boolean @default(true)
+  startupResolution   String  @default("854x480")
+  javaCustomArgs      String  @default("")
+  xmx                 Int     @default(1024)
+  xms                 Int     @default(1024)
 }
 
 model Account {

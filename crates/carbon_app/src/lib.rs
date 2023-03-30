@@ -47,7 +47,7 @@ pub async fn init() {
 
 async fn get_available_port() -> Option<u16> {
     for port in 1025..65535 {
-        let conn = TcpListener::bind(format!("127.0.0.1:{}", port)).await;
+        let conn = TcpListener::bind(format!("127.0.0.1:{port}")).await;
         match conn {
             Ok(_) => return Some(port),
             Err(_) => continue,

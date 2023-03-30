@@ -16,7 +16,7 @@ use crate::{
     db::PrismaClient,
     managers::{
         account::{FullAccount, FullAccountType},
-        configuration::runtime_path::{InstancePath, RuntimePath},
+        settings::runtime_path::{InstancePath, RuntimePath},
     },
 };
 
@@ -456,7 +456,7 @@ mod tests {
     async fn test_extract_natives() {
         let app = crate::setup_managers_for_test().await;
 
-        let runtime_path = &app.configuration_manager().runtime_path;
+        let runtime_path = &app.settings_manager().runtime_path;
 
         let manifest = MinecraftManifest::fetch().await.unwrap();
         let version = manifest

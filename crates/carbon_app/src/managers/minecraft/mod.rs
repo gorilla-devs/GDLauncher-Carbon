@@ -33,7 +33,7 @@ impl ManagerRef<'_, MinecraftManager> {
         mc_version: String,
     ) -> anyhow::Result<Vec<Downloadable>> {
         let db_client = self.app.prisma_client.clone();
-        let runtime_path = &self.app.configuration_manager().runtime_path;
+        let runtime_path = &self.app.settings_manager().runtime_path;
 
         let manifest =
             manifest::get_meta(self.app.reqwest_client.clone(), db_client.clone()).await?;
