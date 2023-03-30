@@ -68,7 +68,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
-        use db::account::WhereParam::Uuid;
+        use db::account::{SetParam, UniqueWhereParam};
         use db::app_configuration::SetParam::SetActiveAccountUuid;
 
         if let Some(uuid) = uuid.clone() {
@@ -76,7 +76,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .app
                 .prisma_client
                 .account()
-                .find_first(vec![Uuid(StringFilter::Equals(uuid.clone()))])
+                .find_unique(UniqueWhereParam::UuidEquals(uuid.clone()))
                 .exec()
                 .await?;
 
@@ -85,12 +85,22 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 account_entry.is_some(),
                 SetActiveUuidError::AccountDoesNotExist(uuid)
             );
+
+            self.app
+                .prisma_client
+                .account()
+                .update(
+                    UniqueWhereParam::UuidEquals(uuid),
+                    vec![SetParam::SetLastUsed(Utc::now().into())],
+                )
+                .exec()
+                .await?;
         }
 
         self.app
             .configuration_manager()
             .configuration()
-            .set(SetActiveAccountUuid(uuid))
+            .set(SetActiveAccountUuid(uuid.clone()))
             .await?;
 
         self.app.invalidate(GET_ACTIVE_UUID, None);
