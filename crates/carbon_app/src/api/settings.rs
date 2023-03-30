@@ -57,13 +57,26 @@ impl From<crate::db::app_configuration::Data> for FESettings {
 
 #[derive(Type, Deserialize)]
 pub struct FESettingsUpdate {
+    #[specta(optional)]
     pub theme: Option<String>,
+    #[specta(optional)]
     pub language: Option<String>,
+    #[specta(optional)]
     pub reduced_motion: Option<bool>,
+    #[specta(optional)]
     pub discord_integration: Option<bool>,
+    #[specta(optional)]
     pub release_channel: Option<String>,
+    #[specta(optional)]
     pub concurrent_downloads: Option<i32>,
+    #[specta(optional)]
     pub show_news: Option<bool>,
+    #[specta(optional)]
     pub xmx: Option<i32>,
+    #[specta(optional)]
     pub xms: Option<i32>,
+    #[specta(optional)]
+    pub startup_resolution: Option<String>,
+    #[specta(optional)]
+    pub java_custom_args: Option<String>,
 }
