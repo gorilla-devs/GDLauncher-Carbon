@@ -3304,9 +3304,8 @@ dependencies = [
 [[package]]
 name = "rspc"
 version = "0.1.2"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46#7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46"
+source = "git+https://github.com/oscartbeaumont/rspc?rev=60a4fa93187c20bc5cb565cc6ee30b2f0903840e#60a4fa93187c20bc5cb565cc6ee30b2f0903840e"
 dependencies = [
- "async-stream",
  "futures",
  "httpz",
  "serde",
@@ -3745,8 +3744,9 @@ dependencies = [
 
 [[package]]
 name = "specta"
-version = "0.0.6"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46#7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4be6d92bb3d2a34fd5da2463089b44e67d6e83eedff074a82ba0b3e830dbff7c"
 dependencies = [
  "chrono",
  "document-features",
@@ -3756,12 +3756,15 @@ dependencies = [
  "serde",
  "serde_json",
  "specta-macros",
+ "thiserror",
+ "tokio",
 ]
 
 [[package]]
 name = "specta-macros"
-version = "0.0.6"
-source = "git+https://github.com/oscartbeaumont/rspc?rev=7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46#7e6d9e84a0a343b3dd3cbca3ce326b58deeb3a46"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "123bd8f0d65f556dce3d0e84346b759ad9701c49700cd9aa12c522bd0310d90b"
 dependencies = [
  "Inflector",
  "itertools",

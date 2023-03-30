@@ -29,9 +29,9 @@ pub struct TaskStatus {
 #[derive(Type, Serialize, Clone)]
 pub struct TaskProgress {
     /// current progress in `unit`s
-    current: u64,
+    current: u32,
     /// total progress in `unit`s. None if unknown.
-    total: Option<u64>,
+    total: Option<u32>,
     unit: ProgressUnit,
 }
 
