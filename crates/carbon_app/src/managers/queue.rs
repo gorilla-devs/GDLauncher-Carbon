@@ -26,7 +26,8 @@ impl VisualTaskManager {
 }
 
 impl ManagerRef<'_, VisualTaskManager> {
-    pub async fn spawn_task(self, task: VisualTask) {
+    pub async fn spawn_task(self, task: &VisualTask) {
+        let task = task.clone();
         static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
 
         // Note: the id also keeps tasks in order.
@@ -41,7 +42,10 @@ impl ManagerRef<'_, VisualTaskManager> {
         tokio::task::spawn(async move {
             // Invalidate when changed until dropped.
             // On drop remove the task from the list.
-            while let Ok(_) = notify.changed().await {
+            while let Ok(()) = notify.changed().await {
+                if let NotifyState::Drop = *notify.borrow() {
+                    break;
+                }
                 app.invalidate(GET_TASKS, None);
             }
 
@@ -68,29 +72,41 @@ impl ManagerRef<'_, VisualTaskManager> {
     }
 }
 
+#[derive(Clone)]
 pub struct VisualTask {
-    data: RwLock<TaskData>,
-    notify_rx: watch::Receiver<()>,
-    notify_tx: Arc<watch::Sender<()>>,
-    subtasks: Vec<watch::Receiver<SubtaskData>>,
+    data: Arc<RwLock<TaskData>>,
+    notify_rx: watch::Receiver<NotifyState>,
+    notify_tx: Arc<watch::Sender<NotifyState>>,
+    subtasks: Arc<RwLock<Vec<watch::Receiver<SubtaskData>>>>,
+}
+
+enum NotifyState {
+    Update,
+    Drop,
+}
+
+impl Drop for VisualTask {
+    fn drop(&mut self) {
+        let _ = self.notify_tx.send(NotifyState::Drop);
+    }
 }
 
 impl VisualTask {
     pub fn new(name: String) -> Self {
-        let (notify_tx, notify_rx) = watch::channel(());
+        let (notify_tx, notify_rx) = watch::channel(NotifyState::Update);
 
         Self {
-            data: RwLock::new(TaskData {
+            data: Arc::new(RwLock::new(TaskData {
                 name,
                 indeterminate: true,
-            }),
+            })),
             notify_rx,
             notify_tx: Arc::new(notify_tx),
-            subtasks: Vec::new(),
+            subtasks: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
-    pub fn subtask(&mut self, name: String) -> Subtask {
+    pub async fn subtask(&self, name: String) -> Subtask {
         let (watch_tx, watch_rx) = watch::channel(SubtaskData {
             name,
             weight: 1.0,
@@ -98,7 +114,7 @@ impl VisualTask {
             progress: Progress::Opaque(false),
         });
 
-        self.subtasks.push(watch_rx);
+        self.subtasks.write().await.push(watch_rx);
 
         Subtask {
             notify: self.notify_tx.clone(),
@@ -111,14 +127,14 @@ impl VisualTask {
     }
 
     // Get the current task progress as a float from 0.0 to 1.0
-    pub fn progress_float(&self) -> f32 {
-        let total_weight = self
-            .subtasks
+    pub async fn progress_float(&self) -> f32 {
+        let subtasks = self.subtasks.read().await;
+        let total_weight = subtasks
             .iter()
             .map(|task| task.borrow().weight)
             .sum::<f32>();
 
-        self.subtasks
+        subtasks
             .iter()
             .map(|task| {
                 let task = task.borrow();
@@ -128,8 +144,10 @@ impl VisualTask {
             .sum()
     }
 
-    pub fn downloaded_bytes(&self) -> (u32, u32) {
+    pub async fn downloaded_bytes(&self) -> (u32, u32) {
         self.subtasks
+            .read()
+            .await
             .iter()
             .map(|task| match task.borrow().progress {
                 Progress::Download { downloaded, total } => (downloaded, total),
@@ -144,18 +162,20 @@ impl VisualTask {
             (data.name.clone(), data.indeterminate)
         };
 
-        let (downloaded, download_total) = self.downloaded_bytes();
+        let (downloaded, download_total) = self.downloaded_bytes().await;
 
         domain::Task {
             name,
             progress: match indeterminate {
                 true => domain::Progress::Indeterminate,
-                false => domain::Progress::Known(self.progress_float()),
+                false => domain::Progress::Known(self.progress_float().await),
             },
             downloaded,
             download_total,
             active_subtasks: self
                 .subtasks
+                .read()
+                .await
                 .iter()
                 .map(|t| t.borrow())
                 .filter(|t| t.started)
@@ -170,14 +190,14 @@ impl VisualTask {
 }
 
 pub struct Subtask {
-    notify: Arc<watch::Sender<()>>,
+    notify: Arc<watch::Sender<NotifyState>>,
     data: watch::Sender<SubtaskData>,
 }
 
 impl Subtask {
     pub fn update(&self, f: impl FnOnce(&mut SubtaskData)) {
         self.data.send_modify(f);
-        let _ = self.notify.send(());
+        let _ = self.notify.send(NotifyState::Update);
     }
 
     // convenience functions
@@ -265,5 +285,54 @@ impl From<Progress> for domain::SubtaskProgress {
             Progress::Item { current, total } => Self::Item { current, total },
             Progress::Opaque(_) => Self::Opaque,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::managers::queue::VisualTask;
+    use carbon_domain::queue as domain;
+
+    #[tokio::test]
+    async fn test() {
+        let app = crate::setup_managers_for_test().await;
+
+        let task = VisualTask::new(String::from("test"));
+        app.task_manager().spawn_task(&task).await;
+
+        let subtask = task.subtask(String::from("subtask")).await;
+
+        subtask.start_task();
+
+        let mut tasks = vec![domain::Task {
+            name: String::from("test"),
+            progress: domain::Progress::Indeterminate,
+            downloaded: 0,
+            download_total: 0,
+            active_subtasks: vec![domain::Subtask {
+                name: String::from("subtask"),
+                progress: domain::SubtaskProgress::Opaque,
+            }],
+        }];
+
+        assert_eq!(tasks, app.task_manager().get_tasks().await);
+
+        task.edit(|data| data.indeterminate = false).await;
+        tasks[0].progress = domain::Progress::Known(0.0);
+        assert_eq!(tasks, app.task_manager().get_tasks().await);
+
+        subtask.update_items(1, 2);
+        tasks[0].progress = domain::Progress::Known(0.5);
+        tasks[0].active_subtasks[0].progress = domain::SubtaskProgress::Item {
+            current: 1,
+            total: 2,
+        };
+        assert_eq!(tasks, app.task_manager().get_tasks().await);
+
+        drop(task);
+        tasks.clear();
+        // give the queue time to poll
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        assert_eq!(tasks, app.task_manager().get_tasks().await);
     }
 }
