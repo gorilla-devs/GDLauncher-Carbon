@@ -1,15 +1,16 @@
-use crate::{
-    error::JavaError,
+use anyhow::bail;
+use std::path::PathBuf;
+use tokio::process::Command;
+
+use super::{
     utils::{
         locate_java_check_class, parse_java_arch, parse_java_version, JAVA_CHECK_APP_NAME,
         PATH_SEPARATOR,
     },
     JavaComponent,
 };
-use std::path::PathBuf;
-use tokio::process::Command;
 
-async fn load_java_paths_from_env() -> Result<Vec<PathBuf>, JavaError> {
+async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH")?;
     let paths = env_path.split(PATH_SEPARATOR).collect::<Vec<&str>>();
     let mut java_paths = Vec::new();
@@ -286,10 +287,13 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     result
 }
 
-pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent, JavaError> {
+pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> anyhow::Result<JavaComponent> {
     let java_checker_path = locate_java_check_class().await?;
     if java_bin_path.to_string_lossy() != "java" && !java_bin_path.exists() {
-        return Err(JavaError::JavaBinaryInvalidOrNotFound);
+        bail!(
+            "Java binary not found at {}",
+            java_bin_path.to_string_lossy()
+        );
     }
 
     // Run java
@@ -301,8 +305,7 @@ pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaCompone
                 .expect("This should never fail"),
         )
         .output()
-        .await
-        .map_err(JavaError::CannotRunJavaInfoDetectProcess)?;
+        .await?;
 
     let output = String::from_utf8(output.stdout)?;
     let java_version = parse_java_version(&output)?;

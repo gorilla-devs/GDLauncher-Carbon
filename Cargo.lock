@@ -396,7 +396,6 @@ dependencies = [
  "axum",
  "carbon_compression",
  "carbon_domain",
- "carbon_java_manager",
  "carbon_macro",
  "carbon_net",
  "chrono",
@@ -467,26 +466,6 @@ dependencies = [
  "trash",
  "uuid",
  "zip",
-]
-
-[[package]]
-name = "carbon_java_manager"
-version = "0.0.0"
-dependencies = [
- "async-trait",
- "carbon_compression",
- "carbon_net",
- "chrono",
- "futures",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sha2 0.10.6",
- "thiserror",
- "tokio",
- "tracing",
- "winreg",
 ]
 
 [[package]]

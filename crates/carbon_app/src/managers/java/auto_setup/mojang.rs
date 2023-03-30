@@ -1,5 +1,5 @@
 use super::{JavaAuto, JavaMeta, JavaProgress};
-use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError};
+use crate::managers::java::constants::JAVA_RUNTIMES_FOLDER;
 use chrono::{DateTime, FixedOffset};
 use futures::TryFutureExt;
 use std::{
@@ -53,7 +53,7 @@ impl JavaAuto for MojangRuntime {
         base_path: &Path,
         // TODO: implement progress reporting
         _progress_report: Sender<JavaProgress>,
-    ) -> Result<(), JavaError> {
+    ) -> anyhow::Result<()> {
         let mojang_assets = self
             .get_runtime_assets(&base_path.join(JAVA_RUNTIMES_FOLDER))
             .await?;
@@ -91,7 +91,7 @@ impl JavaAuto for MojangRuntime {
         Ok(())
     }
 
-    async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError> {
+    async fn get_runtime_assets(&self, runtime_path: &Path) -> anyhow::Result<JavaMeta> {
         let java_os = match std::env::consts::OS {
             "linux" => "linux",
             "windows" => "windows",
@@ -108,14 +108,9 @@ impl JavaAuto for MojangRuntime {
 
         let url = "https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json".to_string();
 
-        let res = reqwest::get(url)
-            .await
-            .map_err(JavaError::CannotRetrieveMojangJDKAssets)?;
+        let res = reqwest::get(url).await?;
 
-        let mojang_meta = res
-            .json::<MojangMeta>()
-            .map_err(JavaError::CannotParseMojangJDKMeta)
-            .await?;
+        let mojang_meta = res.json::<MojangMeta>().await?;
 
         let runtime_meta = match java_os {
             "linux" => {
@@ -141,7 +136,9 @@ impl JavaAuto for MojangRuntime {
             }
             _ => unreachable!("Unsupported OS"),
         }
-        .ok_or(JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+        .ok_or(anyhow::anyhow!(
+            "No Java runtime found for your OS and architecture"
+        ))?;
 
         let runtime_list = match self.version {
             RuntimeEdition::Alpha => runtime_meta.java_runtime_alpha,
@@ -151,23 +148,16 @@ impl JavaAuto for MojangRuntime {
             RuntimeEdition::MinecraftExe => runtime_meta.minecraft_java_exe,
         };
 
-        let runtime = runtime_list
-            .first()
-            .ok_or(JavaError::NoJavaMojangJDKAvailableForOSArch)?;
+        let runtime = runtime_list.first().ok_or(anyhow::anyhow!(
+            "No Java runtime found for your OS and architecture"
+        ))?;
 
-        let res = reqwest::get(&runtime.manifest.url)
-            .await
-            .map_err(JavaError::CannotRetrieveMojangJDKRuntimeMeta)?;
+        let res = reqwest::get(&runtime.manifest.url).await?;
 
-        let runtime_meta = res
-            .json::<MojangRuntimeJDKMeta>()
-            .map_err(JavaError::CannotParseMojangJDKRuntimeMeta)
-            .await?;
+        let runtime_meta = res.json::<MojangRuntimeJDKMeta>().await?;
 
         let mut assets = JavaMeta {
-            last_updated: chrono::DateTime::parse_from_rfc3339(&runtime.version.released).map_err(
-                |_| JavaError::JavaUpdateDateFromMetaInvalid(runtime.version.released.clone()),
-            )?,
+            last_updated: chrono::DateTime::parse_from_rfc3339(&runtime.version.released)?,
             extract_folder_name: "jre.bundle".to_string(),
             download: vec![],
         };
@@ -190,7 +180,7 @@ impl JavaAuto for MojangRuntime {
         Ok(assets)
     }
 
-    fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
+    fn locate_binary(&self, base_path: &Path) -> anyhow::Result<PathBuf> {
         let path = match std::env::consts::OS {
             "linux" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
@@ -219,7 +209,7 @@ impl JavaAuto for MojangRuntime {
         Ok(path)
     }
 
-    async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError> {
+    async fn check_for_updates(&self, runtime_path: &Path) -> anyhow::Result<bool> {
         let mojang_assets = self.get_runtime_assets(runtime_path).await?;
 
         let updated_at = mojang_assets.last_updated.timestamp();
@@ -227,7 +217,7 @@ impl JavaAuto for MojangRuntime {
         if updated_at
             > self
                 .release_date
-                .ok_or(JavaError::NoReleaseDateProvidedForJavaComponent)?
+                .ok_or(anyhow::anyhow!("No release date found for this runtime"))?
                 .timestamp()
         {
             return Ok(false);
@@ -236,7 +226,7 @@ impl JavaAuto for MojangRuntime {
         Ok(true)
     }
 
-    async fn update(&mut self) -> Result<(), JavaError> {
+    async fn update(&mut self) -> anyhow::Result<()> {
         todo!()
     }
 }

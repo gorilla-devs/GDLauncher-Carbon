@@ -15,6 +15,7 @@ use self::queue::TaskQueue;
 
 pub mod account;
 pub mod download;
+mod java;
 mod minecraft;
 mod prisma_client;
 pub mod queue;

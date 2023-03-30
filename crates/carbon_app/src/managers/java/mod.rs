@@ -1,16 +1,23 @@
-// allow dead code during development to keep warning outputs meaningful
-#![allow(dead_code)]
+use serde::{Deserialize, Serialize};
+
+use super::ManagerRef;
 
 use std::path::PathBuf;
-
-use error::JavaError;
-use serde::{Deserialize, Serialize};
 
 mod auto_setup;
 mod constants;
 mod discovery;
-mod error;
 mod utils;
+
+pub(crate) struct JavaManager {}
+
+impl JavaManager {
+    pub fn new(runtime_path: PathBuf) -> Self {
+        Self {}
+    }
+}
+
+impl ManagerRef<'_, JavaManager> {}
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct JavaComponent {
@@ -72,7 +79,7 @@ impl JavaVersion {
     }
 }
 
-pub async fn detect_available_javas() -> Result<Vec<JavaComponent>, JavaError> {
+pub async fn detect_available_javas() -> anyhow::Result<Vec<JavaComponent>> {
     let mut all_javas = discovery::find_java_paths().await;
     all_javas.push(PathBuf::from("java"));
     let mut available_javas = vec![];
