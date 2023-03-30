@@ -640,7 +640,7 @@ export const AccountsDropdown = (props: Props) => {
                   <div
                     class="text-sm cursor-pointer i-ri:close-fill hover:text-red"
                     onClick={() => {
-                      if (enrollmentInProgress() && loadingAuthorization()) {
+                      if (enrollmentInProgress()) {
                         accountEnrollCancelMutation.mutate(null);
                       }
                     }}
@@ -652,7 +652,7 @@ export const AccountsDropdown = (props: Props) => {
           <div
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
-              if (enrollmentInProgress() && loadingAuthorization()) {
+              if (enrollmentInProgress()) {
                 accountEnrollCancelMutation.mutate(null);
               }
               deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
