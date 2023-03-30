@@ -110,6 +110,26 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
+        if let Some(startup_resolution) = incoming_settings.startup_resolution {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetStartupResolution(
+                    startup_resolution,
+                )],
+            ));
+            something_changed = true;
+        }
+
+        if let Some(java_custom_args) = incoming_settings.java_custom_args {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetJavaCustomArgs(
+                    java_custom_args,
+                )],
+            ));
+            something_changed = true;
+        }
+
         if something_changed {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);
