@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createResource, on } from "solid-js";
+import { For, Show, createEffect, createResource } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -50,17 +50,10 @@ const AppNavbar = () => {
 
   createEffect(() => {
     const mappedAccounts = routeData.accounts.data?.map((account) => {
-      const headSkin = rspc.createQuery(() => [
-        "account.getHead",
-        account.uuid,
-      ]);
-
       const accountStatusQuery = rspc.createQuery(() => [
         "account.getAccountStatus",
         account.uuid,
       ]);
-
-      if (!headSkin) return;
 
       return {
         label: {
@@ -76,7 +69,9 @@ const AppNavbar = () => {
       };
     });
 
-    if (mappedAccounts) setAccounts(mappedAccounts);
+    if (mappedAccounts) {
+      setAccounts(mappedAccounts);
+    }
   });
 
   return (
