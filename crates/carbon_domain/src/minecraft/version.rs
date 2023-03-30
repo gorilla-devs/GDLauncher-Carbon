@@ -9,8 +9,12 @@ pub struct Libraries {
     libraries: Vec<Library>,
 }
 impl Libraries {
-    pub fn get_libraries(&self) -> &Vec<Library> {
-        &self.libraries
+    pub fn get_allowed_libraries(&self) -> Vec<Library> {
+        let libs = &self.libraries;
+
+        let results = libs.iter().filter(|l| l.is_allowed());
+
+        results.cloned().collect()
     }
 }
 
@@ -211,9 +215,7 @@ pub struct VersionDownloadsMappingsClass {
 
 impl IntoDownloadable for VersionDownloadsMappingsClass {
     fn into_downloadable(self, base_path: &std::path::Path) -> carbon_net::Downloadable {
-        let jar_path = base_path
-            .join("clients")
-            .join(format!("{}.jar", &self.sha1));
+        let jar_path = base_path.join(format!("{}.jar", &self.sha1));
 
         carbon_net::Downloadable::new(self.url, jar_path)
             .with_checksum(Some(carbon_net::Checksum::Sha1(self.sha1)))

@@ -26,15 +26,20 @@ pub async fn init() {
 
     println!("Starting Carbon App");
 
-    let _guard = sentry::init((
-        env!("SENTRY_DSN"),
-        sentry::ClientOptions {
-            release: Some(APP_VERSION.into()),
-            ..Default::default()
-        },
-    ));
+    if !cfg!(debug_assertions) {
+        println!("Initializing Sentry");
+        let _guard = sentry::init((
+            env!("SENTRY_DSN"),
+            sentry::ClientOptions {
+                release: Some(APP_VERSION.into()),
+                ..Default::default()
+            },
+        ));
+    }
 
+    println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
+    println!("Scanning ports");
     let port = get_available_port().await.unwrap();
 
     start_router(runtime_path, port).await;
@@ -42,8 +47,10 @@ pub async fn init() {
 
 async fn get_available_port() -> Option<u16> {
     for port in 1025..65535 {
-        if (TcpListener::bind(("[::]:", port))).await.is_ok() {
-            return Some(port);
+        let conn = TcpListener::bind(format!("127.0.0.1:{}", port)).await;
+        match conn {
+            Ok(_) => return Some(port),
+            Err(_) => continue,
         }
     }
 
@@ -51,6 +58,7 @@ async fn get_available_port() -> Option<u16> {
 }
 
 async fn start_router(runtime_path: PathBuf, port: u16) {
+    println!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -107,7 +115,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> App {
-    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_dir = tempdir::TempDir::new_in(env!("CARGO_MANIFEST_DIR"), "carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
