@@ -11,6 +11,8 @@ const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
   const language = () => routeData.data.data?.language || "en";
   const showNews = () => routeData.data.data?.show_news;
+  const potatoPcMode = () => routeData.data.data?.reduced_motion;
+  // const concurrentDownload = () => routeData.data.data?.concurrent_downloads;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
@@ -204,7 +206,14 @@ const General = () => {
               }}
             />
           </p>
-          <Switch checked={false} />
+          <Switch
+            checked={potatoPcMode()}
+            onChange={(e) => {
+              settingsMutation.mutate({
+                reduced_motion: e.currentTarget.checked,
+              });
+            }}
+          />
         </div>
       </div>
       <Button rounded={false} variant="secondary" textColor="text-red">
