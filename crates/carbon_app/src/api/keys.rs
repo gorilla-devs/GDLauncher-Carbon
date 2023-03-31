@@ -67,7 +67,7 @@ keys! {
         UPDATE_INSTANCE_JAVA_ARGS     = "updateInstanceJavaArgs";
     }
 
-    queue {
+    vtask {
         GET_TASKS                     = "getTasks";
     }
 

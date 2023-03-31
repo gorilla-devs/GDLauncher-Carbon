@@ -1,7 +1,7 @@
 use rspc::{RouterBuilderLike, Type};
 use serde::Serialize;
 
-use crate::api::keys::queue::*;
+use crate::api::keys::vtask::*;
 use crate::managers::App;
 use carbon_domain::vtask as domain;
 
