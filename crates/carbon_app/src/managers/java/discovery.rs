@@ -2,6 +2,8 @@ use anyhow::bail;
 use std::path::PathBuf;
 use tokio::process::Command;
 
+use crate::domain::java::JavaComponentType;
+
 use super::{
     parser::{parse_cmd_output_java_arch, parse_cmd_output_java_version},
     utils::{locate_java_check_class, JAVA_CHECK_APP_NAME, PATH_SEPARATOR},
@@ -313,6 +315,6 @@ pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> anyhow::Result<Jav
         path: java_bin_path.to_string_lossy().to_string(),
         version: java_version,
         arch: java_arch,
-        _type: super::JavaComponentType::Local,
+        _type: JavaComponentType::Local,
     })
 }

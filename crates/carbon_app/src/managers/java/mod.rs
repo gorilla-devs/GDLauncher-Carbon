@@ -1,17 +1,8 @@
-use serde::{Deserialize, Serialize};
-
-use self::parser::{JavaArch, JavaVersion};
-
 use super::ManagerRef;
-
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::format,
-    path::PathBuf,
-};
+use crate::domain::java::{JavaComponent, JavaVersion};
+use std::path::PathBuf;
 
 mod auto_setup;
-mod constants;
 mod discovery;
 mod parser;
 mod utils;
@@ -55,16 +46,6 @@ impl ManagerRef<'_, JavaManager> {
     // }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
-pub struct JavaComponent {
-    pub path: String,
-    pub arch: JavaArch,
-    /// Indicates whether the component has manually been added by the user
-    #[serde(rename = "type")]
-    pub _type: JavaComponentType,
-    pub version: JavaVersion,
-}
-
 // impl From<crate::db::java::Data> for JavaComponent {
 //     fn from(java: crate::db::java::Data) -> Self {
 //         Self {
@@ -75,31 +56,6 @@ pub struct JavaComponent {
 //         }
 //     }
 // }
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
-pub enum JavaComponentType {
-    Local,
-    Managed,
-}
-
-impl From<&str> for JavaComponentType {
-    fn from(s: &str) -> Self {
-        match s {
-            "Local" => Self::Local,
-            "Managed" => Self::Managed,
-            _ => unreachable!("Uh oh, this shouldn't happen"),
-        }
-    }
-}
-
-impl From<JavaComponentType> for &str {
-    fn from(t: JavaComponentType) -> Self {
-        match t {
-            JavaComponentType::Local => "Local",
-            JavaComponentType::Managed => "Managed",
-        }
-    }
-}
 
 pub async fn detect_available_javas() -> anyhow::Result<Vec<JavaComponent>> {
     let mut all_javas = discovery::find_java_paths().await;
