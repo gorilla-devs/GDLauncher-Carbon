@@ -3,8 +3,21 @@ import { Button, Dropdown, Input, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_logo.svg";
 import GDLauncherText from "/assets/images/GDLauncher_text.svg";
 import { Trans } from "@gd/i18n";
+import { queryClient, rspc } from "@/utils/rspcClient";
+import SettingsData from "./settings.general.data";
+import { useRouteData } from "@solidjs/router";
 
 const General = () => {
+  const routeData: ReturnType<typeof SettingsData> = useRouteData();
+  const language = () => routeData.data.data?.language || "en";
+  const showNews = () => routeData.data.data?.show_news;
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      queryClient.setQueryData(["settings.getSettings"], newSettings);
+    },
+  });
+
   return (
     <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
@@ -35,11 +48,14 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value="en"
+            value={language()}
             options={[
               { label: "english", key: "eng" },
               { label: "italian", key: "it" },
             ]}
+            onChange={(lang) => {
+              settingsMutation.mutate({ language: lang.key });
+            }}
           />
         </div>
       </div>
@@ -117,6 +133,34 @@ const General = () => {
             />
           </p>
           <Switch checked={true} />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans
+            key="settings_show_news_title"
+            options={{
+              defaultValue: "Show news",
+            }}
+          />
+        </h5>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 max-w-96 m-0">
+            <Trans
+              key="settings_show_news_text"
+              options={{
+                defaultValue: "Show or hide the news",
+              }}
+            />
+          </p>
+          <Switch
+            checked={showNews()}
+            onChange={(e) => {
+              settingsMutation.mutate({
+                show_news: e.currentTarget.checked,
+              });
+            }}
+          />
         </div>
       </div>
       <div class="mb-6">

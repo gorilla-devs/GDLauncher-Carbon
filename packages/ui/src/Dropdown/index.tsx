@@ -78,6 +78,7 @@ const Dropdown = (props: Props) => {
           "rounded-full": props.rounded,
           rounded: !props.rounded,
           "bg-shade-7": !props.bg,
+          "rounded-md": !props.btnDropdown,
         }}
       >
         <Show when={!props.btnDropdown}>
