@@ -13,14 +13,14 @@ use tokio::sync::broadcast::{self, error::RecvError};
 use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
-use self::queue::VisualTaskManager;
+use self::vtask::VisualTaskManager;
 
 pub mod account;
 mod configuration;
 pub mod download;
 mod minecraft;
 mod prisma_client;
-pub mod queue;
+pub mod vtask;
 pub mod reqwest_cached_client;
 
 pub type App = Arc<AppInner>;

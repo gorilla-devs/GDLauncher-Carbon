@@ -11,7 +11,7 @@ use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
-use carbon_domain::queue as domain;
+use carbon_domain::vtask as domain;
 
 pub struct VisualTaskManager {
     tasks: RwLock<HashMap<usize, VisualTask>>,
@@ -290,8 +290,8 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::managers::queue::VisualTask;
-    use carbon_domain::queue as domain;
+    use crate::managers::vtask::VisualTask;
+    use carbon_domain::vtask as domain;
 
     #[tokio::test]
     async fn test() {
