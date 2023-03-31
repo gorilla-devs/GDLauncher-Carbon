@@ -345,8 +345,12 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   createEffect(() => {
-    if (routeData.status.isSuccess && !routeData.status.data) {
+    if (routeData.status.isSuccess && !routeData.status.data && expired()) {
       setEnrollmentInProgress(false);
+      setLoadingAuthorization(false);
+      setLoginDeviceCode(null);
+      setAddAccountStarting(false);
+      setExpired(false);
     }
 
     handleStatus(routeData.status, {
@@ -354,16 +358,24 @@ export const AccountsDropdown = (props: Props) => {
         setEnrollmentInProgress(true);
         setLoginDeviceCode(info);
       },
-      onFail() {
+      onFail(error) {
         setEnrollmentInProgress(false);
         setLoadingAuthorization(false);
         setLoginDeviceCode(null);
         setAddAccountStarting(false);
+        setExpired(false);
+        accountEnrollCancelMutation.mutate(null);
+        if (error)
+          addNotification(
+            "somethign went wrong while adding an account",
+            "error"
+          );
       },
       onError(error) {
         setLoginDeviceCode(null);
         setEnrollmentInProgress(false);
         setAddAccountStarting(false);
+        setExpired(false);
         if (error) addNotification(error?.message, "error");
       },
       onComplete() {
@@ -374,6 +386,7 @@ export const AccountsDropdown = (props: Props) => {
         setLoginDeviceCode(null);
         setAddAccountStarting(false);
         setEnrollmentInProgress(false);
+        setExpired(false);
       },
     });
   });
@@ -580,7 +593,10 @@ export const AccountsDropdown = (props: Props) => {
                       if (!loadingAuthorization()) {
                         if (!enrollmentInProgress()) {
                           accountEnrollBeginMutation.mutate(null);
-                        } else accountEnrollCancelMutation.mutate(null);
+                        } else {
+                          accountEnrollCancelMutation.mutate(null);
+                          accountEnrollBeginMutation.mutate(null);
+                        }
                         setLoadingAuthorization(true);
                       }
                     }}
