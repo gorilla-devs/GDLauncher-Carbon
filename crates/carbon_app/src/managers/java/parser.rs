@@ -30,25 +30,10 @@ impl<'a> From<&'a str> for JavaArch {
     }
 }
 
-pub fn parse_java_arch(arch_string: &str) -> anyhow::Result<JavaArch> {
-    // I spent way too much time on this regex
-    let regex = Regex::new(r#"^(?P<arch>[[:alnum:]]*)"#)?;
-
-    if let Some(captures) = regex.captures(arch_string) {
-        match captures.name("arch") {
-            Some(arch) => {
-                return Ok(arch.as_str().into());
-            }
-            None => bail!("Not a valid arch. Cannot parse: {}", arch_string),
-        }
-    }
-    bail!("Could not parse java arch from output: {}", arch_string);
-}
-
 pub fn parse_cmd_output_java_arch(cmd_output: &str) -> anyhow::Result<JavaArch> {
     for line in cmd_output.lines() {
         if line.starts_with("java.arch=") {
-            return parse_java_arch(line.replace("java.arch=", "").trim());
+            return Ok(JavaArch::from(line.replace("java.arch=", "").trim()));
         }
     }
 
@@ -80,12 +65,10 @@ impl From<JavaVersion> for String {
             v.major,
             v.minor.unwrap_or(0),
             v.patch.unwrap_or_default(),
-            v.update_number
-                .map(|u| format!("_{}", u))
-                .unwrap_or_default(),
-            v.prerelease.map(|p| format!("-{}", p)).unwrap_or_default(),
+            v.update_number.map(|u| format!("_{u}")).unwrap_or_default(),
+            v.prerelease.map(|p| format!("-{p}")).unwrap_or_default(),
             v.build_metadata
-                .map(|b| format!("+{}", b))
+                .map(|b| format!("+{b}"))
                 .unwrap_or_default()
         )
     }
@@ -171,4 +154,198 @@ fn parse_java_version(version_string: &str) -> anyhow::Result<JavaVersion> {
     }
 
     bail!("Could not parse java version in string: {}", version_string);
+}
+
+#[cfg(test)]
+mod test {
+    use crate::managers::java::{
+        parser::JavaVersion,
+        utils::{locate_java_check_class, JAVA_CHECK_APP_NAME},
+    };
+
+    #[test]
+    fn test_parse_cmd_output_java_version() {
+        struct TestCase {
+            output: &'static str,
+            expected: Option<JavaVersion>,
+        }
+
+        let expected = [
+            TestCase {
+                output: "java.version=19.0.1",
+                expected: Some(JavaVersion {
+                    major: 19,
+                    minor: Some(0),
+                    patch: Some("1".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "os.arch=amd64",
+                expected: None,
+            },
+            TestCase {
+                output: "java.version=",
+                expected: None,
+            },
+        ];
+
+        for test_case in expected.iter() {
+            let actual = super::parse_cmd_output_java_version(test_case.output).ok();
+            assert_eq!(actual, test_case.expected);
+        }
+    }
+
+    #[test]
+    fn test_parse_java_version() {
+        struct TestCase {
+            output: &'static str,
+            expected: Option<JavaVersion>,
+        }
+
+        let expected = [
+            TestCase {
+                output: "19.0.1",
+                expected: Some(JavaVersion {
+                    major: 19,
+                    minor: Some(0),
+                    patch: Some("1".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "amd64",
+                expected: None,
+            },
+            TestCase {
+                output: "1.8.0_352-b08",
+                expected: Some(JavaVersion {
+                    major: 1,
+                    minor: Some(8),
+                    patch: Some("0".to_owned()),
+                    update_number: Some("352".to_owned()),
+                    prerelease: Some("b08".to_owned()),
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "19.0.1+10",
+                expected: Some(JavaVersion {
+                    major: 19,
+                    minor: Some(0),
+                    patch: Some("1".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: Some("10".to_owned()),
+                }),
+            },
+            TestCase {
+                output: "1.4.0_03-b04",
+                expected: Some(JavaVersion {
+                    major: 1,
+                    minor: Some(4),
+                    patch: Some("0".to_owned()),
+                    update_number: Some("03".to_owned()),
+                    prerelease: Some("b04".to_owned()),
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "17.0.6-beta+2-202211152348",
+                expected: Some(JavaVersion {
+                    major: 17,
+                    minor: Some(0),
+                    patch: Some("6".to_owned()),
+                    update_number: None,
+                    prerelease: Some("beta".to_owned()),
+                    build_metadata: Some("2-202211152348".to_owned()),
+                }),
+            },
+            TestCase {
+                output: "1.8.0_362-beta-202211161809-b03+152",
+                expected: Some(JavaVersion {
+                    major: 1,
+                    minor: Some(8),
+                    patch: Some("0".to_owned()),
+                    update_number: Some("362".to_owned()),
+                    prerelease: Some("beta-202211161809-b03".to_owned()),
+                    build_metadata: Some("152".to_owned()),
+                }),
+            },
+            TestCase {
+                output: "18.0.2.1+1",
+                expected: Some(JavaVersion {
+                    major: 18,
+                    minor: Some(0),
+                    patch: Some("2.1".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: Some("1".to_owned()),
+                }),
+            },
+            TestCase {
+                output: "17.0.5+8",
+                expected: Some(JavaVersion {
+                    major: 17,
+                    minor: Some(0),
+                    patch: Some("5".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: Some("8".to_owned()),
+                }),
+            },
+            TestCase {
+                output: "17.0.5+8-LTS",
+                expected: Some(JavaVersion {
+                    major: 17,
+                    minor: Some(0),
+                    patch: Some("5".to_owned()),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: Some("8-LTS".to_owned()),
+                }),
+            },
+        ];
+
+        for test_case in expected.iter() {
+            let actual = super::parse_java_version(test_case.output).ok();
+            assert_eq!(actual, test_case.expected);
+        }
+    }
+
+    #[test]
+    fn test_parse_cmd_output_java_arch() {
+        struct TestCase {
+            output: &'static str,
+            expected: Option<super::JavaArch>,
+        }
+
+        let expected = [
+            TestCase {
+                output: "java.arch=amd64",
+                expected: Some(super::JavaArch::Amd64),
+            },
+            TestCase {
+                output: "java.arch=x86",
+                expected: Some(super::JavaArch::X86),
+            },
+            TestCase {
+                output: "java.arch=aarch64",
+                expected: Some(super::JavaArch::Aarch64),
+            },
+            TestCase {
+                output: "java.version=19.0.1",
+                expected: None,
+            },
+        ];
+
+        for test_case in expected.iter() {
+            let actual = super::parse_cmd_output_java_arch(test_case.output).ok();
+            assert_eq!(actual, test_case.expected);
+        }
+    }
 }

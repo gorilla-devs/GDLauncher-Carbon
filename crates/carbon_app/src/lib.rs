@@ -11,12 +11,12 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
-pub(crate) mod db;
-pub mod managers;
-
 mod app_version;
+pub(crate) mod db;
+pub mod domain;
 mod error;
 pub mod generate_rspc_ts_bindings;
+pub mod managers;
 // mod pprocess_keepalive;
 mod runtime_path_override;
 
@@ -96,7 +96,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
             interval.tick().await;
             let res = reqwest_client
-                .get(format!("http://localhost:{port}/health"))
+                .get(format!("http://127.0.0.1:{port}/health"))
                 .send()
                 .await;
 
