@@ -67,7 +67,7 @@ type EnrollStatusResult = Extract<
   { key: "account.getAccountStatus" }
 >["result"];
 
-const parseStatus = (status: EnrollStatusResult | undefined) => {
+const mapStatus = (status: EnrollStatusResult | undefined) => {
   return (
     <Switch
       fallback={
@@ -133,6 +133,15 @@ const parseStatus = (status: EnrollStatusResult | undefined) => {
             }}
           />
         </div>
+      </Match>
+    </Switch>
+  );
+};
+const mapTypeToIcon = (type: string) => {
+  return (
+    <Switch>
+      <Match when={type === "Microsoft"}>
+        <div class="i-ri:microsoft-fill" />
       </Match>
     </Switch>
   );
@@ -344,13 +353,17 @@ export const AccountsDropdown = (props: Props) => {
     },
   });
 
+  const reset = () => {
+    setEnrollmentInProgress(false);
+    setLoadingAuthorization(false);
+    setLoginDeviceCode(null);
+    setAddAccountStarting(false);
+    setExpired(false);
+  };
+
   createEffect(() => {
     if (routeData.status.isSuccess && !routeData.status.data && expired()) {
-      setEnrollmentInProgress(false);
-      setLoadingAuthorization(false);
-      setLoginDeviceCode(null);
-      setAddAccountStarting(false);
-      setExpired(false);
+      reset();
     }
 
     handleStatus(routeData.status, {
@@ -359,11 +372,7 @@ export const AccountsDropdown = (props: Props) => {
         setLoginDeviceCode(info);
       },
       onFail(error) {
-        setEnrollmentInProgress(false);
-        setLoadingAuthorization(false);
-        setLoginDeviceCode(null);
-        setAddAccountStarting(false);
-        setExpired(false);
+        reset();
         accountEnrollCancelMutation.mutate(null);
         if (error)
           addNotification(
@@ -372,10 +381,7 @@ export const AccountsDropdown = (props: Props) => {
           );
       },
       onError(error) {
-        setLoginDeviceCode(null);
-        setEnrollmentInProgress(false);
-        setAddAccountStarting(false);
-        setExpired(false);
+        reset();
         if (error) addNotification(error?.message, "error");
       },
       onComplete() {
@@ -383,10 +389,7 @@ export const AccountsDropdown = (props: Props) => {
         if (enrollmentInProgress()) {
           accountEnrollFinalizeMutation.mutate(null);
         }
-        setLoginDeviceCode(null);
-        setAddAccountStarting(false);
-        setEnrollmentInProgress(false);
-        setExpired(false);
+        reset();
       },
     });
   });
@@ -403,7 +406,7 @@ export const AccountsDropdown = (props: Props) => {
         {props.label}
       </p>
       <button
-        class="flex items-center box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg w-44"
+        class="flex items-center box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg w-auto"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -428,7 +431,7 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="justify-center w-full text-ellipsis overflow-hidden m-0 align-middle leading-loose max-w-20"
+            class="justify-center w-full text-ellipsis overflow-hidden m-0 align-middle leading-loose"
             classList={{
               "text-shade-0 hover:text-white group-hover:text-white":
                 !props.disabled,
@@ -470,7 +473,10 @@ export const AccountsDropdown = (props: Props) => {
             />
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
-              <p class="m-0 text-xs">{(activeAccount() as Label)?.type}</p>
+              <div class="flex gap-1">
+                {mapTypeToIcon((activeAccount() as Label)?.type)}
+                <p class="m-0 text-xs">{(activeAccount() as Label)?.type}</p>
+              </div>
             </div>
           </div>
           <div class="flex items-center gap-3">
@@ -516,7 +522,7 @@ export const AccountsDropdown = (props: Props) => {
                         {(option.label as Label).name}
                       </h5>
                       <div class="m-0">
-                        {parseStatus((option.label as Label).status)}
+                        {mapStatus((option.label as Label).status)}
                       </div>
                     </div>
                   </div>

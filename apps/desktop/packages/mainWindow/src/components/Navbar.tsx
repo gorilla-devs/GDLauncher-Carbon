@@ -134,7 +134,7 @@ const AppNavbar = () => {
               </TabList>
             </Tabs>
           </ul>
-          <div class="ml-4">
+          <div class="ml-4 min-w-52 flex justify-end">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}
