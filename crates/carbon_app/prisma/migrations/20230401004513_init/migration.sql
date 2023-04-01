@@ -30,7 +30,10 @@ CREATE TABLE "HTTPCache" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "url" TEXT NOT NULL,
     "data" BLOB NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "expiresAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastModified" TEXT,
+    "etag" TEXT,
+    "varyHeaders" TEXT NOT NULL
 );
 
 -- CreateTable

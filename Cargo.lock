@@ -412,12 +412,14 @@ dependencies = [
  "prisma-client-rust",
  "regex",
  "reqwest",
+ "reqwest-middleware",
  "rspc",
  "sentry",
  "serde",
  "serde_json",
  "strum",
  "strum_macros",
+ "task-local-extensions",
  "tempdir",
  "thiserror",
  "tokio",
@@ -3944,11 +3946,11 @@ dependencies = [
 
 [[package]]
 name = "task-local-extensions"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4167afbec18ae012de40f8cf1b9bf48420abb390678c34821caa07d924941cc4"
+checksum = "ba323866e5d033818e3240feeb9f7db2c4296674e4d9e16b97b7bf8f490434e8"
 dependencies = [
- "tokio",
+ "pin-utils",
 ]
 
 [[package]]
