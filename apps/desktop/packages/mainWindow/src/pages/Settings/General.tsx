@@ -12,6 +12,7 @@ const General = () => {
   const language = () => routeData.data.data?.language || "en";
   const showNews = () => routeData.data.data?.show_news;
   const potatoPcMode = () => routeData.data.data?.reduced_motion;
+  const releaseChannel = () => routeData.data.data?.release_channel || "stable";
   // const concurrentDownload = () => routeData.data.data?.concurrent_downloads;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
@@ -57,6 +58,70 @@ const General = () => {
             ]}
             onChange={(lang) => {
               settingsMutation.mutate({ language: lang.key });
+            }}
+          />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans
+            key="settings_release_channel"
+            options={{
+              defaultValue: "Release Channel",
+            }}
+          />
+        </h5>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 m-0 max-w-96">
+            <Trans
+              key="select_release_channel"
+              options={{
+                defaultValue: "Select the preferred release channel",
+              }}
+            />
+          </p>
+          <Dropdown
+            value={releaseChannel()}
+            options={[
+              { label: "Stable", key: "stable" },
+              { label: "beta", key: "beta" },
+              { label: "alpha", key: "alpha" },
+            ]}
+            onChange={(channel) => {
+              settingsMutation.mutate({ release_channel: channel.key });
+            }}
+          />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans
+            key="settings_concurrent_downloads"
+            options={{
+              defaultValue: "Concurrent Downloads",
+            }}
+          />
+        </h5>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 m-0 max-w-96">
+            <Trans
+              key="select_concurrent_downloads"
+              options={{
+                defaultValue:
+                  "Select the number of concurrent downloads. If you have slow connection, select at most 3",
+              }}
+            />
+          </p>
+          <Dropdown
+            value={releaseChannel()}
+            options={Array.from({ length: 20 }, (_, i) => ({
+              label: (i + 1).toString(),
+              key: (i + 1).toString(),
+            }))}
+            onChange={(downloads) => {
+              settingsMutation.mutate({
+                concurrent_downloads: parseInt(downloads.key, 10),
+              });
             }}
           />
         </div>

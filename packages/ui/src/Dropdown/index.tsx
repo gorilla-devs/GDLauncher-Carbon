@@ -1,5 +1,6 @@
 import { createSignal, For, Show, JSX } from "solid-js";
 import { Button } from "../Button";
+import "./style.css";
 
 export type Option = {
   label: string;
@@ -110,7 +111,7 @@ const Dropdown = (props: Props) => {
       </button>
 
       <ul
-        class={`absolute text-shade-0 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20`}
+        class="absolute max-h-40 scrollbarHide overflow-y-auto scrollbar-none text-shade-0 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
