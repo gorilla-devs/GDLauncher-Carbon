@@ -13,7 +13,9 @@ const General = () => {
   const showNews = () => routeData.data.data?.show_news;
   const potatoPcMode = () => routeData.data.data?.reduced_motion;
   const releaseChannel = () => routeData.data.data?.release_channel || "stable";
-  // const concurrentDownload = () => routeData.data.data?.concurrent_downloads;
+  const concurrentDownload = () =>
+    routeData.data.data?.concurrent_downloads || "1";
+  const discordIntegration = () => routeData.data.data?.discord_integration;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
@@ -34,7 +36,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="language"
+            key="settings_language_title"
             options={{
               defaultValue: "Language",
             }}
@@ -43,7 +45,7 @@ const General = () => {
         <div class="flex w-full justify-between">
           <p class="text-shade-3 m-0 max-w-96">
             <Trans
-              key="choose_a_language"
+              key="settings_language_title_text"
               options={{
                 defaultValue:
                   "Choose a language that is convenient for you and the launcher will be restarted",
@@ -65,7 +67,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="settings_release_channel"
+            key="settings_release_channel_title"
             options={{
               defaultValue: "Release Channel",
             }}
@@ -74,7 +76,7 @@ const General = () => {
         <div class="flex w-full justify-between">
           <p class="text-shade-3 m-0 max-w-96">
             <Trans
-              key="select_release_channel"
+              key="settings_release_channel_text"
               options={{
                 defaultValue: "Select the preferred release channel",
               }}
@@ -96,7 +98,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="settings_concurrent_downloads"
+            key="settings_concurrent_downloads_title"
             options={{
               defaultValue: "Concurrent Downloads",
             }}
@@ -105,7 +107,7 @@ const General = () => {
         <div class="flex w-full justify-between">
           <p class="text-shade-3 m-0 max-w-96">
             <Trans
-              key="select_concurrent_downloads"
+              key="settings_concurrent_downloads_text"
               options={{
                 defaultValue:
                   "Select the number of concurrent downloads. If you have slow connection, select at most 3",
@@ -113,7 +115,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={releaseChannel()}
+            value={concurrentDownload()?.toString()}
             options={Array.from({ length: 20 }, (_, i) => ({
               label: (i + 1).toString(),
               key: (i + 1).toString(),
@@ -129,7 +131,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="game_resolution"
+            key="settings_game_resolution_title"
             options={{
               defaultValue: "Game Resolution",
             }}
@@ -155,7 +157,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="instance_sorting"
+            key="settings_instance_sorting_title"
             options={{
               defaultValue: "Instance Sorting",
             }}
@@ -164,7 +166,7 @@ const General = () => {
         <div class="flex w-full justify-between">
           <p class="text-shade-3 max-w-96 m-0">
             <Trans
-              key="select_instance_sorting_method"
+              key="settings_instance_sorting_text"
               options={{
                 defaultValue:
                   "Select the method in which instances should be sorted.",
@@ -180,7 +182,7 @@ const General = () => {
           />
         </div>
       </div>
-      <div class="mb-6">
+      {/* <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
             key="expert_user_mod"
@@ -201,7 +203,7 @@ const General = () => {
           </p>
           <Switch checked={true} />
         </div>
-      </div>
+      </div> */}
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
@@ -233,6 +235,35 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
+            key="settings_discord_integration_title"
+            options={{
+              defaultValue: "Discord Integration",
+            }}
+          />
+        </h5>
+        <div class="flex w-full justify-between">
+          <p class="text-shade-3 max-w-96 m-0">
+            <Trans
+              key="settings_discord_integration_text"
+              options={{
+                defaultValue:
+                  "Enable or disable discord integration. This display what are you playing in discord",
+              }}
+            />
+          </p>
+          <Switch
+            checked={discordIntegration()}
+            onChange={(e) => {
+              settingsMutation.mutate({
+                discord_integration: e.currentTarget.checked,
+              });
+            }}
+          />
+        </div>
+      </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans
             key="settings_hide_launcher_playing_title"
             options={{
               defaultValue: "Hide launcher while playing",
@@ -255,7 +286,7 @@ const General = () => {
       <div class="mb-6">
         <h5 class="mt-0 mb-2">
           <Trans
-            key="settings_potatp_mode_title"
+            key="settings_potato_mode_title"
             options={{
               defaultValue: "Potato PC mode",
             }}
@@ -264,7 +295,7 @@ const General = () => {
         <div class="flex w-full justify-between">
           <p class="text-shade-3 max-w-96 m-0">
             <Trans
-              key="settings_potatp_mode_text"
+              key="settings_potato_mode_text"
               options={{
                 defaultValue:
                   "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
