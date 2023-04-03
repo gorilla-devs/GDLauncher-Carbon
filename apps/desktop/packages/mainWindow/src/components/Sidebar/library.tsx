@@ -83,9 +83,7 @@ const Sidebar = () => {
           </Collapsable>
         </Show>
         <Show when={!isSidebarOpened()}>
-          <div
-            class={`${Style.scrollbarHide} h-full w-full max-h-[calc(100vh-60px-28px-80px-80px)] overflow-auto flex flex-col gap-4 items-center mt-6`}
-          >
+          <div class="scrollbar-hide h-full w-full max-h-[calc(100vh-60px-28px-80px-80px)] overflow-auto flex flex-col gap-4 items-center mt-6">
             <Tile
               // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}

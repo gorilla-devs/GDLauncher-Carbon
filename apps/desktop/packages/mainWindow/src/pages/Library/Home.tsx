@@ -2,7 +2,6 @@ import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect } from "solid-js";
-import "./index.css";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
