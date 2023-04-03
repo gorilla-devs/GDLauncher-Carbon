@@ -4,7 +4,7 @@ use crate::domain::java::{JavaArch, JavaVersion};
 
 pub fn parse_cmd_output_java_version(cmd_output: &str) -> anyhow::Result<JavaVersion> {
     for line in cmd_output.lines() {
-        if line.starts_with("java.version=") {
+        if line.trim().starts_with("java.version=") {
             return JavaVersion::try_from(line.replace("java.version=", "").trim());
         }
     }
@@ -14,12 +14,12 @@ pub fn parse_cmd_output_java_version(cmd_output: &str) -> anyhow::Result<JavaVer
 
 pub fn parse_cmd_output_java_arch(cmd_output: &str) -> anyhow::Result<JavaArch> {
     for line in cmd_output.lines() {
-        if line.starts_with("java.arch=") {
-            return Ok(JavaArch::from(line.replace("java.arch=", "").trim()));
+        if line.trim().starts_with("os.arch=") {
+            return Ok(JavaArch::from(line.replace("os.arch=", "").trim()));
         }
     }
 
-    bail!("Could not find java version in output: {}", cmd_output);
+    bail!("Could not find java arch in output: {}", cmd_output);
 }
 
 #[cfg(test)]

@@ -2,12 +2,18 @@ use anyhow::bail;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+// TODO: This does not handle the case where the same path still exists between executions but changes the version
+pub struct Java {
+    pub component: JavaComponent,
+    pub is_available: bool,
+}
+
 pub enum JavaMajorVer {
     Version8,
     Version17,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct JavaComponent {
     pub path: String,
     pub arch: JavaArch,
@@ -17,10 +23,11 @@ pub struct JavaComponent {
     pub version: JavaVersion,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum JavaComponentType {
     Local,
     Managed,
+    Custom,
 }
 
 impl From<&str> for JavaComponentType {
@@ -33,24 +40,26 @@ impl From<&str> for JavaComponentType {
     }
 }
 
-impl From<JavaComponentType> for &str {
+impl From<JavaComponentType> for String {
     fn from(t: JavaComponentType) -> Self {
         match t {
             JavaComponentType::Local => "local",
             JavaComponentType::Managed => "managed",
+            JavaComponentType::Custom => "custom",
         }
+        .to_string()
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum JavaArch {
     Amd64,
     X86,
     Aarch64,
 }
 
-impl<'a> From<&JavaArch> for &'a str {
-    fn from(arch: &JavaArch) -> &'a str {
+impl<'a> From<JavaArch> for &'a str {
+    fn from(arch: JavaArch) -> Self {
         match arch {
             JavaArch::Amd64 => "amd64",
             JavaArch::X86 => "x86",
@@ -70,7 +79,7 @@ impl<'a> From<&'a str> for JavaArch {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct JavaVersion {
     pub major: u8,
     pub minor: Option<u8>,

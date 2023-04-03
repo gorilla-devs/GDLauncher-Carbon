@@ -24,19 +24,19 @@ model AppConfiguration {
   xms                 Int     @default(1024)
 }
 
+// Can't really use relations between java and defaultJava because external instances could refer to java as well
 model Java {
-  path        String       @id @unique
+  path        String  @id @unique
   major       Int
   fullVersion String
   type        String
   arch        String
-  defaultJava DefaultJava?
+  isValid     Boolean @default(false)
 }
 
 model DefaultJava {
-  path     String @id
-  major    Int    @unique
-  javaPath Java   @relation(fields: [path], references: [path])
+  path  String @id
+  major Int    @unique
 }
 
 model Account {

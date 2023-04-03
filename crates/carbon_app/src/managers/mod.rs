@@ -79,6 +79,7 @@ mod app {
             });
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
+            let _ = java::JavaManager::scan_and_sync(Arc::downgrade(&app)).await;
 
             app
         }
