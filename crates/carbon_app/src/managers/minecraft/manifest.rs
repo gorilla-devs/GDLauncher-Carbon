@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 use prisma_client_rust::QueryError;
-use rspc::ErrorCode;
 use thiserror::Error;
 
 use crate::db::PrismaClient;

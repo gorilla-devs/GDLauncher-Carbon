@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use carbon_domain::minecraft::manifest::ManifestVersion;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
-use rspc::ErrorCode;
-use thiserror::Error;
 
 use super::ManagerRef;
 
@@ -65,7 +63,6 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let assets = assets::get_meta(
             self.app.reqwest_client.clone(),
-            db_client.clone(),
             version.asset_index,
             runtime_path.get_assets().get_indexes_path(),
         )
@@ -80,6 +77,7 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::borrow::Borrow;
 

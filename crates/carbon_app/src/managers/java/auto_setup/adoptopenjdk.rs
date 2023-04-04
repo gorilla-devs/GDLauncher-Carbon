@@ -1,7 +1,6 @@
 use anyhow::bail;
 use carbon_net::Downloadable;
 use chrono::{DateTime, FixedOffset};
-use futures::TryFutureExt;
 use std::path::{Path, PathBuf};
 use tokio::sync::watch::{channel, Sender};
 

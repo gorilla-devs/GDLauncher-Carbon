@@ -1,14 +1,8 @@
 use self::{discovery::Discovery, java_checker::JavaChecker};
 
-use super::{AppInner, ManagerRef};
-use crate::{
-    db::{read_filters::StringFilter, PrismaClient},
-    domain::java::{JavaComponent, JavaComponentType, JavaVersion},
-};
-use std::{
-    path::PathBuf,
-    sync::{Arc, Weak},
-};
+use super::ManagerRef;
+use crate::{db::PrismaClient, domain::java::JavaVersion};
+use std::sync::Arc;
 
 mod auto_setup;
 mod constants;

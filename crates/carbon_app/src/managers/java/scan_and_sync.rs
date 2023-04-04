@@ -1,12 +1,8 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::{Arc, Weak},
-};
+use std::{path::PathBuf, sync::Arc};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
     domain::java::{JavaComponent, JavaComponentType},
-    managers::AppInner,
 };
 
 use super::{discovery::Discovery, java_checker::JavaChecker};
@@ -89,7 +85,7 @@ where
                 }
             }
             // If it isn't valid, check whether it's in the DB
-            Err(e) => {
+            Err(_) => {
                 let java = get_java_component_from_db(db, local_java.display().to_string()).await?;
                 // If it is in the db, update it to invalid
                 if java.is_some() {

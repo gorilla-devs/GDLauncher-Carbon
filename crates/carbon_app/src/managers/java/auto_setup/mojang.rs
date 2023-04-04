@@ -1,7 +1,6 @@
 use super::{JavaAuto, JavaMeta, JavaProgress};
 use crate::managers::java::constants::JAVA_RUNTIMES_FOLDER;
 use chrono::{DateTime, FixedOffset};
-use futures::TryFutureExt;
 use std::{
     borrow::BorrowMut,
     collections::HashMap,
