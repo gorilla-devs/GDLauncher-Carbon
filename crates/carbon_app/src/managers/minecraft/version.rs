@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use carbon_domain::{
     maven::MavenCoordinates,
@@ -12,12 +12,9 @@ use regex::{Captures, Regex};
 use strum_macros::EnumIter;
 use thiserror::Error;
 
-use crate::{
-    db::PrismaClient,
-    managers::{
-        account::{FullAccount, FullAccountType},
-        settings::runtime_path::{InstancePath, RuntimePath},
-    },
+use crate::managers::{
+    account::{FullAccount, FullAccountType},
+    settings::runtime_path::{InstancePath, RuntimePath},
 };
 
 #[derive(Debug, Error)]

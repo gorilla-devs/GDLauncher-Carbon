@@ -1,10 +1,6 @@
-use std::sync::Arc;
-
 use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
-
-use crate::db::PrismaClient;
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
