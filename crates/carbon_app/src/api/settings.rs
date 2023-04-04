@@ -56,6 +56,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
 }
 
 #[derive(Type, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
     #[specta(optional)]
     pub theme: Option<String>,
