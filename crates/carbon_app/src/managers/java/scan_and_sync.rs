@@ -70,7 +70,7 @@ where
     for local_java in &local_javas {
         // Verify whether the java is valid
         let java_bin_info = java_checker
-            .get_bin_info(&local_java, JavaComponentType::Local)
+            .get_bin_info(local_java, JavaComponentType::Local)
             .await;
         match java_bin_info {
             // If it is valid, check whether it's in the DB
