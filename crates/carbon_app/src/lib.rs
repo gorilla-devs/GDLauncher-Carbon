@@ -74,7 +74,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
     let _ = crate::managers::java::JavaManager::scan_and_sync(
-        Arc::downgrade(&app),
+        &app.prisma_client,
         &RealDiscovery,
         &RealJavaChecker,
     )

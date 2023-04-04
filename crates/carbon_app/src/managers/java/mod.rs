@@ -26,7 +26,7 @@ impl JavaManager {
     }
 
     pub async fn scan_and_sync<T, G>(
-        app: Weak<AppInner>,
+        db: &Arc<PrismaClient>,
         discovery: &T,
         java_checker: &G,
     ) -> anyhow::Result<()>
@@ -34,10 +34,8 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
-        let db = app.upgrade().unwrap().prisma_client.clone();
-
-        scan_and_sync::scan_and_sync_local(&db, discovery, java_checker).await?;
-        scan_and_sync::scan_and_sync_custom(&db, java_checker).await?;
+        scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
 
         Ok(())
     }

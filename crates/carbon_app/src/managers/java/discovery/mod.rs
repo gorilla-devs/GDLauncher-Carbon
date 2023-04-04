@@ -15,3 +15,16 @@ impl Discovery for RealDiscovery {
         finder::find_java_paths().await
     }
 }
+
+pub struct MockDiscovery;
+
+#[async_trait::async_trait]
+impl Discovery for MockDiscovery {
+    async fn find_java_paths(&self) -> Vec<PathBuf> {
+        vec![
+            PathBuf::from("/usr/bin/java"),
+            PathBuf::from("/opt/java/bin/java"),
+            PathBuf::from("/opt/homebrew/opt/openjdk/bin/java"),
+        ]
+    }
+}

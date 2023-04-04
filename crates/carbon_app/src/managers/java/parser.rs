@@ -75,7 +75,7 @@ mod test {
             },
             TestCase {
                 output: "java.arch=x86",
-                expected: Some(super::JavaArch::X86),
+                expected: Some(super::JavaArch::X86_64),
             },
             TestCase {
                 output: "java.arch=aarch64",

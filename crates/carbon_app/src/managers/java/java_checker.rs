@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::bail;
 use tokio::process::Command;
 
-use crate::domain::java::{JavaComponent, JavaComponentType};
+use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaVersion};
 
 use super::{
     parser::{parse_cmd_output_java_arch, parse_cmd_output_java_version},
@@ -57,5 +57,43 @@ impl JavaChecker for RealJavaChecker {
             arch: java_arch,
             _type,
         })
+    }
+}
+
+pub struct MockJavaChecker;
+
+#[async_trait::async_trait]
+impl JavaChecker for MockJavaChecker {
+    async fn get_bin_info(
+        &self,
+        _path: &Path,
+        _type: JavaComponentType,
+    ) -> anyhow::Result<JavaComponent> {
+        Ok(JavaComponent {
+            path: _path.to_string_lossy().to_string(),
+            version: JavaVersion {
+                major: 19,
+                minor: Some(0),
+                patch: Some("1".to_owned()),
+                update_number: None,
+                prerelease: None,
+                build_metadata: Some("10".to_owned()),
+            },
+            arch: JavaArch::X86_64,
+            _type: JavaComponentType::Local,
+        })
+    }
+}
+
+pub struct MockJavaCheckerInvalid;
+
+#[async_trait::async_trait]
+impl JavaChecker for MockJavaCheckerInvalid {
+    async fn get_bin_info(
+        &self,
+        _path: &Path,
+        _type: JavaComponentType,
+    ) -> anyhow::Result<JavaComponent> {
+        bail!("Expected failure");
     }
 }
