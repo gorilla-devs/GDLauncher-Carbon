@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use anyhow::bail;
 use tokio::process::Command;
@@ -14,7 +14,7 @@ use super::{
 pub trait JavaChecker {
     async fn get_bin_info(
         &self,
-        path: &PathBuf,
+        path: &Path,
         _type: JavaComponentType,
     ) -> anyhow::Result<JavaComponent>;
 }
@@ -25,7 +25,7 @@ pub struct RealJavaChecker;
 impl JavaChecker for RealJavaChecker {
     async fn get_bin_info(
         &self,
-        java_bin_path: &PathBuf,
+        java_bin_path: &Path,
         _type: JavaComponentType,
     ) -> anyhow::Result<JavaComponent> {
         let java_checker_path = locate_java_check_class().await?;

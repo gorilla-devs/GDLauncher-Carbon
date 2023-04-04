@@ -3,7 +3,10 @@
 
 use crate::{
     app_version::APP_VERSION,
-    managers::{App, AppInner},
+    managers::{
+        java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+        App, AppInner,
+    },
 };
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
@@ -70,6 +73,12 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
+    let _ = crate::managers::java::JavaManager::scan_and_sync(
+        Arc::downgrade(&app),
+        &RealDiscovery,
+        &RealJavaChecker,
+    )
+    .await;
 
     let app1 = app.clone();
     let app = axum::Router::new()
