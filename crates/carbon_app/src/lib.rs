@@ -18,8 +18,9 @@ mod app_version;
 mod error;
 pub mod generate_rspc_ts_bindings;
 // mod pprocess_keepalive;
-mod runtime_path_override;
+mod once_send;
 mod reqwest_cache;
+mod runtime_path_override;
 
 #[tokio::main]
 pub async fn init() {
