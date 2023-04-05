@@ -6,14 +6,13 @@ use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-pub mod keys;
-pub mod router;
-
 mod account;
 mod java;
+pub mod keys;
 mod mc;
-mod queue;
+pub mod router;
 pub mod settings;
+mod vtask;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
@@ -33,7 +32,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
-        .yolo_merge(keys::queue::GROUP_PREFIX, queue::mount())
+        .yolo_merge(keys::vtask::GROUP_PREFIX, vtask::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
