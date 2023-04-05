@@ -73,12 +73,13 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
-    let _ = crate::managers::java::JavaManager::scan_and_sync(
+    crate::managers::java::JavaManager::scan_and_sync(
         &app.prisma_client,
         &RealDiscovery,
         &RealJavaChecker,
     )
-    .await;
+    .await
+    .unwrap();
 
     let app1 = app.clone();
     let app = axum::Router::new()

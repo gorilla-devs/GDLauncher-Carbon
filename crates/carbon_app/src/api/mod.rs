@@ -10,7 +10,7 @@ pub mod keys;
 pub mod router;
 
 mod account;
-// mod java;
+mod java;
 mod mc;
 mod queue;
 pub mod settings;
@@ -31,7 +31,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
     rspc::Router::<App>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
-        // .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
+        .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
         .yolo_merge(keys::queue::GROUP_PREFIX, queue::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())

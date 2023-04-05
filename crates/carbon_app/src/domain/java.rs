@@ -5,7 +5,17 @@ use serde::{Deserialize, Serialize};
 // TODO: This does not handle the case where the same path still exists between executions but changes the version
 pub struct Java {
     pub component: JavaComponent,
-    pub is_available: bool,
+    pub is_valid: bool,
+}
+
+impl From<crate::db::java::Data> for Java {
+    fn from(value: crate::db::java::Data) -> Self {
+        let is_valid = value.is_valid;
+        Self {
+            component: JavaComponent::from(value),
+            is_valid,
+        }
+    }
 }
 
 pub enum JavaMajorVer {
@@ -21,6 +31,17 @@ pub struct JavaComponent {
     #[serde(rename = "type")]
     pub _type: JavaComponentType,
     pub version: JavaVersion,
+}
+
+impl From<crate::db::java::Data> for JavaComponent {
+    fn from(value: crate::db::java::Data) -> Self {
+        Self {
+            path: value.path,
+            arch: JavaArch::from(&*value.arch),
+            _type: JavaComponentType::from(&*value.r#type),
+            version: JavaVersion::try_from(&*value.full_version).unwrap(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]

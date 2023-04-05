@@ -1,8 +1,11 @@
 use self::{discovery::Discovery, java_checker::JavaChecker};
 
 use super::ManagerRef;
-use crate::{db::PrismaClient, domain::java::JavaVersion};
-use std::sync::Arc;
+use crate::{
+    db::PrismaClient,
+    domain::java::{Java, JavaVersion},
+};
+use std::{collections::HashMap, sync::Arc};
 
 mod auto_setup;
 mod constants;
@@ -36,43 +39,32 @@ impl JavaManager {
 }
 
 impl ManagerRef<'_, JavaManager> {
-    // pub async fn get_available_javas(self) -> anyhow::Result<HashMap<u8, JavaComponent>> {
-    //     let db = &self.app.prisma_client;
-    //     let all_javas = db
-    //         .java()
-    //         .find_many(vec![])
-    //         .exec()
-    //         .await?
-    //         .into_iter()
-    //         .map(JavaComponent::from)
-    //         .map(|java| (java.version.major, java))
-    //         .collect();
+    pub async fn get_available_javas(self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
+        let db = &self.app.prisma_client;
+        let all_javas = db.java().find_many(vec![]).exec().await?;
 
-    //     Ok(all_javas)
-    // }
+        let mut result = HashMap::new();
 
-    // pub async fn get_default_javas(self) -> anyhow::Result<HashMap<u8, String>> {
-    //     let db = &self.app.prisma_client;
-    //     let all_javas = db
-    //         .default_java()
-    //         .find_many(vec![])
-    //         .exec()
-    //         .await?
-    //         .into_iter()
-    //         .map(|j| (j.major as u8, j.path))
-    //         .collect();
+        for java in all_javas {
+            let major_version = java.major as u8;
+            let javas = result.entry(major_version).or_insert_with(Vec::new);
+            javas.push(Java::from(java));
+        }
 
-    //     Ok(all_javas)
-    // }
+        Ok(result)
+    }
+
+    pub async fn get_default_javas(self) -> anyhow::Result<HashMap<u8, String>> {
+        let db = &self.app.prisma_client;
+        let all_javas = db
+            .default_java()
+            .find_many(vec![])
+            .exec()
+            .await?
+            .into_iter()
+            .map(|j| (j.major as u8, j.path))
+            .collect();
+
+        Ok(all_javas)
+    }
 }
-
-// impl From<crate::db::java::Data> for JavaComponent {
-//     fn from(java: crate::db::java::Data) -> Self {
-//         Self {
-//             path: java.path,
-//             arch: JavaArch::from(&*java.arch),
-//             _type: JavaComponentType::from(&*java.r#type),
-//             version: JavaVersion::from(&*java.full_version),
-//         }
-//     }
-// }
