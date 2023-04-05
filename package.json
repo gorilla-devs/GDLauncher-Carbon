@@ -6,7 +6,6 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "preinstall": "npx -y only-allow pnpm",
     "prebuild": "npm i -g pnpm@8.1.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i && pnpm build-web",
     "codegen": "pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev --filter=!@gd/web",
