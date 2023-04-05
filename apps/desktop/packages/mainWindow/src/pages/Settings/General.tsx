@@ -6,21 +6,30 @@ import { Trans } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import SettingsData from "./settings.general.data";
 import { useRouteData } from "@solidjs/router";
+import { createEffect } from "solid-js";
+import { createStore } from "solid-js/store";
+import { FESettings } from "@gd/core_module/bindings";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
-  const language = () => routeData.data.data?.language || "en";
-  const showNews = () => routeData.data.data?.show_news;
-  const potatoPcMode = () => routeData.data.data?.reduced_motion;
-  const releaseChannel = () => routeData.data.data?.release_channel || "stable";
-  const concurrentDownload = () =>
-    routeData.data.data?.concurrent_downloads || "1";
-  const discordIntegration = () => routeData.data.data?.discord_integration;
+
+  const [settings, setSettings] = createStore<FESettings>(
+    // @ts-ignore
+    routeData?.data?.data || {}
+  );
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
     },
+  });
+
+  createEffect(() => {
+    if (routeData.data.data) setSettings(routeData.data.data);
+  });
+
+  createEffect(() => {
+    console.log("releaseChannel STORE", settings.release_channel);
   });
 
   return (
@@ -53,7 +62,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={language()}
+            value={settings.language || "en"}
             options={[
               { label: "english", key: "eng" },
               { label: "italian", key: "it" },
@@ -83,7 +92,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={releaseChannel()}
+            value={settings.release_channel || "stable"}
             options={[
               { label: "Stable", key: "stable" },
               { label: "beta", key: "beta" },
@@ -115,7 +124,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={concurrentDownload()?.toString()}
+            value={(settings.concurrent_downloads || "1").toString()}
             options={Array.from({ length: 20 }, (_, i) => ({
               label: (i + 1).toString(),
               key: (i + 1).toString(),
@@ -223,7 +232,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={showNews()}
+            checked={settings.show_news}
             onChange={(e) => {
               settingsMutation.mutate({
                 show_news: e.currentTarget.checked,
@@ -252,7 +261,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={discordIntegration()}
+            checked={settings.discord_integration}
             onChange={(e) => {
               settingsMutation.mutate({
                 discord_integration: e.currentTarget.checked,
@@ -303,7 +312,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={potatoPcMode()}
+            checked={settings.reduced_motion}
             onChange={(e) => {
               settingsMutation.mutate({
                 reduced_motion: e.currentTarget.checked,
