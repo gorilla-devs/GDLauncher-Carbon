@@ -19,8 +19,8 @@ pub mod java;
 mod minecraft;
 mod prisma_client;
 pub mod reqwest_cached_client;
-pub mod vtask;
 mod settings;
+pub mod vtask;
 
 pub type App = Arc<AppInner>;
 
