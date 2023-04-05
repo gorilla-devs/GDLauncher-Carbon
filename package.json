@@ -34,7 +34,8 @@
     "cross-env": "^7.0.3"
   },
   "engines": {
-    "pnpm": ">=8.0.0",
+    "pnpm": "8.1.1",
     "node": ">=16.17.0"
-  }
+  },
+  "packageManager": "pnpm@8.1.1"
 }
