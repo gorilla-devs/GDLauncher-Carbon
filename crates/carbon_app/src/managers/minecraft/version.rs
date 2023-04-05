@@ -12,9 +12,9 @@ use regex::{Captures, Regex};
 use strum_macros::EnumIter;
 use thiserror::Error;
 
-use crate::managers::{
-    account::{FullAccount, FullAccountType},
-    settings::runtime_path::{InstancePath, RuntimePath},
+use crate::{
+    domain::runtime_path::{InstancePath, RuntimePath},
+    managers::account::{FullAccount, FullAccountType},
 };
 
 #[derive(Debug, Error)]

@@ -29,10 +29,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 }
 
 #[derive(Type, Serialize)]
-struct Javas(HashMap<u8, FEAvailableJavasByMajor>);
+struct Javas(HashMap<u8, FEAvailableJavas>);
 
 #[derive(Type, Serialize)]
-struct FEAvailableJavasByMajor {
+struct FEAvailableJavas {
     default_id: String,
     javas: Vec<FEJavaComponent>,
 }

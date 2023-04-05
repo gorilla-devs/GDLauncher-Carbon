@@ -2,11 +2,10 @@ use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
     db::app_configuration,
+    domain::runtime_path,
 };
 use anyhow::anyhow;
 use std::path::PathBuf;
-
-pub mod runtime_path;
 
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
