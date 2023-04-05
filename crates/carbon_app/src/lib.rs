@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use rspc::RouterBuilderLike;
-use std::{ops::Deref, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
