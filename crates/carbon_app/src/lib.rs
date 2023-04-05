@@ -1,6 +1,3 @@
-// allow dead code during development to keep warning outputs meaningful
-#![allow(dead_code)]
-
 use crate::{
     app_version::APP_VERSION,
     managers::{
@@ -130,7 +127,7 @@ struct TestEnv {
 }
 
 #[cfg(test)]
-impl Deref for TestEnv {
+impl std::ops::Deref for TestEnv {
     type Target = App;
 
     fn deref(&self) -> &Self::Target {
