@@ -1,22 +1,22 @@
-// allow dead code during development to keep warning outputs meaningful
-#![allow(dead_code)]
-
 use crate::{
     app_version::APP_VERSION,
-    managers::{App, AppInner},
+    managers::{
+        java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+        App, AppInner,
+    },
 };
 use rspc::RouterBuilderLike;
-use std::{ops::Deref, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
 pub mod api;
-pub(crate) mod db;
-pub mod managers;
-
 mod app_version;
+pub(crate) mod db;
+pub mod domain;
 mod error;
 pub mod generate_rspc_ts_bindings;
+pub mod managers;
 // mod pprocess_keepalive;
 mod runtime_path_override;
 
@@ -47,7 +47,7 @@ pub async fn init() {
 
 async fn get_available_port() -> Option<u16> {
     for port in 1025..65535 {
-        let conn = TcpListener::bind(format!("127.0.0.1:{}", port)).await;
+        let conn = TcpListener::bind(format!("127.0.0.1:{port}")).await;
         match conn {
             Ok(_) => return Some(port),
             Err(_) => continue,
@@ -70,6 +70,13 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
+    crate::managers::java::JavaManager::scan_and_sync(
+        &app.prisma_client,
+        &RealDiscovery,
+        &RealJavaChecker,
+    )
+    .await
+    .unwrap();
 
     let app1 = app.clone();
     let app = axum::Router::new()
@@ -96,7 +103,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
 
             interval.tick().await;
             let res = reqwest_client
-                .get(format!("http://localhost:{port}/health"))
+                .get(format!("http://127.0.0.1:{port}/health"))
                 .send()
                 .await;
 
@@ -120,7 +127,7 @@ struct TestEnv {
 }
 
 #[cfg(test)]
-impl Deref for TestEnv {
+impl std::ops::Deref for TestEnv {
     type Target = App;
 
     fn deref(&self) -> &Self::Target {

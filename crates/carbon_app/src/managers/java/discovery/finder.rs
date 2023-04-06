@@ -1,15 +1,8 @@
-use crate::{
-    error::JavaError,
-    utils::{
-        locate_java_check_class, parse_java_arch, parse_java_version, JAVA_CHECK_APP_NAME,
-        PATH_SEPARATOR,
-    },
-    JavaComponent,
-};
 use std::path::PathBuf;
-use tokio::process::Command;
 
-async fn load_java_paths_from_env() -> Result<Vec<PathBuf>, JavaError> {
+use crate::managers::java::utils::PATH_SEPARATOR;
+
+async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH")?;
     let paths = env_path.split(PATH_SEPARATOR).collect::<Vec<&str>>();
     let mut java_paths = Vec::new();
@@ -24,7 +17,7 @@ async fn load_java_paths_from_env() -> Result<Vec<PathBuf>, JavaError> {
 }
 
 #[cfg(target_os = "macos")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
     javas.extend(search_java_binary_in_path(
         PathBuf::from("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java")
@@ -136,7 +129,7 @@ fn read_registry_key(
 }
 
 #[cfg(target_os = "windows")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
 
     // Load from env
@@ -227,7 +220,7 @@ pub async fn find_java_paths() -> Vec<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-pub async fn find_java_paths() -> Vec<PathBuf> {
+pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     let folders = [
         "/usr/java",
         "/usr/lib/jvm",
@@ -284,34 +277,4 @@ async fn scan_java_dirs(dir_path: &str) -> Vec<PathBuf> {
     }
 
     result
-}
-
-pub async fn gather_java_bin_info(java_bin_path: &PathBuf) -> Result<JavaComponent, JavaError> {
-    let java_checker_path = locate_java_check_class().await?;
-    if java_bin_path.to_string_lossy() != "java" && !java_bin_path.exists() {
-        return Err(JavaError::JavaBinaryInvalidOrNotFound);
-    }
-
-    // Run java
-    let output = Command::new(java_bin_path)
-        .current_dir(java_checker_path.parent().expect("This should never fail"))
-        .arg(
-            JAVA_CHECK_APP_NAME
-                .strip_suffix(".class")
-                .expect("This should never fail"),
-        )
-        .output()
-        .await
-        .map_err(JavaError::CannotRunJavaInfoDetectProcess)?;
-
-    let output = String::from_utf8(output.stdout)?;
-    let java_version = parse_java_version(&output)?;
-    let java_arch = parse_java_arch(&output)?;
-
-    Ok(JavaComponent {
-        path: java_bin_path.to_string_lossy().to_string(),
-        version: java_version,
-        arch: java_arch,
-        is_custom: false,
-    })
 }
