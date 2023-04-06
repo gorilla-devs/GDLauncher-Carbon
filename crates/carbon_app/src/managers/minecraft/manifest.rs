@@ -1,11 +1,6 @@
-use std::sync::Arc;
-
 use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 use prisma_client_rust::QueryError;
-use rspc::ErrorCode;
 use thiserror::Error;
-
-use crate::db::PrismaClient;
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
@@ -16,10 +11,7 @@ pub enum ManifestError {
 }
 
 // get should abstract the complexity of fetching it from either the network or the db
-pub async fn get_meta(
-    reqwest_client: reqwest::Client,
-    db: Arc<PrismaClient>,
-) -> anyhow::Result<Vec<ManifestVersion>> {
+pub async fn get_meta(reqwest_client: reqwest::Client) -> anyhow::Result<Vec<ManifestVersion>> {
     let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
     let new_manifest = reqwest_client
         .get(server_url)

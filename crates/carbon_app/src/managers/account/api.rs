@@ -307,7 +307,7 @@ impl XboxAuth {
                 #[derive(Deserialize)]
                 struct XstsError {
                     #[serde(rename = "XErr")]
-                    xerr: u64,
+                    xerr: u32,
                 }
 
                 let xsts_err = response
@@ -337,7 +337,7 @@ pub enum XboxError {
     ChildAccount,
 
     #[error("xbox returned an unknown error code: {0}")]
-    Unknown(u64),
+    Unknown(u32),
 }
 
 #[derive(Error, Debug, Clone)]
@@ -351,7 +351,7 @@ pub enum XboxAuthError {
 
 impl XboxError {
     // error code from an XErr code returned by the XSTS auth endpoint
-    fn from_xerr(xerr: u64) -> Self {
+    fn from_xerr(xerr: u32) -> Self {
         match xerr {
             2148916233 => Self::NoAccount,
             2148916235 => Self::XboxServicesBanned,
