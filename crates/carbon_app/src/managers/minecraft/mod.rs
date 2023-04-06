@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use carbon_domain::minecraft::manifest::ManifestVersion;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
-use rspc::ErrorCode;
-use thiserror::Error;
 
 use super::ManagerRef;
 

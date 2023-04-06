@@ -29,7 +29,7 @@ pub enum VersionError {
 }
 
 pub async fn get_meta(
-    reqwest_client: reqwest::Client,
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
     db: Arc<PrismaClient>,
     manifest_version_meta: ManifestVersion,
     clients_path: PathBuf,

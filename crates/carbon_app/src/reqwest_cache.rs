@@ -1,7 +1,5 @@
-use std::mem::MaybeUninit;
-
-use reqwest::{Request, Response, Client};
-use reqwest_middleware::{Middleware, Next, Result, ClientWithMiddleware, ClientBuilder};
+use reqwest::{Client, Request, Response};
+use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
 use task_local_extensions::Extensions;
 
 use crate::managers::UnsafeAppRef;
@@ -27,7 +25,8 @@ impl Middleware for CacheMiddleware {
         next: Next<'_>,
     ) -> Result<Response> {
         // SAFETY: Requests cannot be made before the appref is initialized
-        let app = unsafe { self.app.upgrade() };
-        todo!()
+        let _app = unsafe { self.app.upgrade() };
+
+        next.run(req, extensions).await
     }
 }

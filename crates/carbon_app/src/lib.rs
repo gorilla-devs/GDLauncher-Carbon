@@ -6,7 +6,7 @@ use crate::{
     managers::{App, AppInner},
 };
 use rspc::RouterBuilderLike;
-use std::{ops::Deref, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -122,7 +122,7 @@ struct TestEnv {
 }
 
 #[cfg(test)]
-impl Deref for TestEnv {
+impl std::ops::Deref for TestEnv {
     type Target = App;
 
     fn deref(&self) -> &Self::Target {

@@ -5,7 +5,7 @@ use crate::db::PrismaClient;
 use crate::managers::configuration::ConfigurationManager;
 use rspc::RouterBuilderLike;
 use std::cell::UnsafeCell;
-use std::mem::{MaybeUninit, ManuallyDrop};
+use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -167,7 +167,9 @@ impl UnsafeAppRef {
     // SAFETY:
     // This type must me initialized before it is used.
     pub unsafe fn upgrade(&self) -> App {
-        let arc = self.0.upgrade()
+        let arc = self
+            .0
+            .upgrade()
             .expect("App was dropped before its final usage");
 
         let inner = Arc::into_raw(arc);
