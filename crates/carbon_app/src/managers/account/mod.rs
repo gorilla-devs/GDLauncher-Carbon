@@ -58,13 +58,7 @@ impl AccountManager {
 
 impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn get_active_uuid(self) -> anyhow::Result<Option<String>> {
-        Ok(self
-            .app
-            .configuration_manager()
-            .configuration()
-            .get()
-            .await?
-            .active_account_uuid)
+        Ok(self.app.settings_manager().get().await?.active_account_uuid)
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
@@ -98,9 +92,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
 
         self.app
-            .configuration_manager()
-            .configuration()
-            .set(SetActiveAccountUuid(uuid.clone()))
+            .settings_manager()
+            .set(SetActiveAccountUuid(uuid))
             .await?;
 
         self.app.invalidate(GET_ACTIVE_UUID, None);
@@ -370,13 +363,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
-        let active_account = self
-            .app
-            .configuration_manager()
-            .configuration()
-            .get()
-            .await?
-            .active_account_uuid;
+        let active_account = self.app.settings_manager().get().await?.active_account_uuid;
 
         if let Some(active_account) = active_account {
             if active_account == uuid {

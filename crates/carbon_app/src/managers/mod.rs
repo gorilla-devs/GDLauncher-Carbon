@@ -1,9 +1,7 @@
-use crate::api::keys::{app::*, Key};
-use crate::api::router::router;
+use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::managers::configuration::ConfigurationManager;
-use rspc::RouterBuilderLike;
+use crate::managers::settings::SettingsManager;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -16,11 +14,12 @@ use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
-mod configuration;
 pub mod download;
+pub mod java;
 mod minecraft;
 mod prisma_client;
 pub mod reqwest_cached_client;
+mod settings;
 pub mod vtask;
 
 pub type App = Arc<AppInner>;
@@ -32,11 +31,12 @@ pub enum AppError {
 }
 
 mod app {
-    use super::*;
+    use super::{java::JavaManager, *};
 
     pub struct AppInner {
         //instances: Instances,
-        configuration_manager: ConfigurationManager,
+        settings_manager: SettingsManager,
+        java_manager: JavaManager,
         minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
@@ -67,7 +67,8 @@ mod app {
                 .unwrap();
 
             let app = Arc::new(AppInner {
-                configuration_manager: ConfigurationManager::new(runtime_path),
+                settings_manager: SettingsManager::new(runtime_path),
+                java_manager: JavaManager::new(),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
                 download_manager: DownloadManager::new(),
@@ -82,7 +83,8 @@ mod app {
             app
         }
 
-        manager_getter!(configuration_manager: ConfigurationManager);
+        manager_getter!(settings_manager: SettingsManager);
+        manager_getter!(java_manager: JavaManager);
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
@@ -135,22 +137,6 @@ impl AppRef {
         self.0
             .upgrade()
             .expect("App was dropped before its final usage")
-    }
-}
-
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
-    router! {
-        query GET_THEME[app, _args: ()] {
-            app.configuration_manager()
-                .get_theme()
-                .await
-        }
-
-        mutation SET_THEME[app, new_theme: String] {
-            app.configuration_manager()
-                .set_theme(new_theme.clone())
-                .await
-        }
     }
 }
 
