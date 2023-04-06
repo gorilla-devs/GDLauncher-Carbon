@@ -1,15 +1,7 @@
 import { AdsBanner } from "@/components/AdBanner";
-import { useModal } from "@/managers/ModalsManager";
 import { Outlet } from "@solidjs/router";
-import { onMount } from "solid-js";
 
 function withAdsLayout() {
-  const modalsManager = useModal();
-
-  onMount(() => {
-    modalsManager?.openModal({ name: "onBoarding" });
-  });
-
   return (
     <div class="flex justify-end h-[calc(100vh-60px-28px)]">
       <Outlet />
