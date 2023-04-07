@@ -16,6 +16,7 @@ use self::vtask::VisualTaskManager;
 pub mod account;
 pub mod download;
 pub mod java;
+mod metrics;
 mod minecraft;
 mod prisma_client;
 pub mod reqwest_cached_client;

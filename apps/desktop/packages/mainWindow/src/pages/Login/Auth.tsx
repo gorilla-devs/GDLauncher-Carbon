@@ -37,7 +37,7 @@ const Auth = (props: Props) => {
 
   const handleClick = async () => {
     setClicked(true);
-    accountEnrollBeginMutation.mutate(null);
+    accountEnrollBeginMutation.mutate();
   };
 
   createEffect(() => {
