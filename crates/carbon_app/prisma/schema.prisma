@@ -9,39 +9,57 @@ generator client {
 }
 
 model AppConfiguration {
-  id                 Int     @id @default(0)
-  theme              String  @default("main")
-  reducedMotion      Boolean @default(false)
-  discordIntegration Boolean @default(true)
-  releaseChannel     String  @default("stable")
-  activeAccountUuid  String?
+  id                  Int     @id @unique @default(0)
+  theme               String  @default("main")
+  reducedMotion       Boolean @default(false)
+  language            String  @default("en")
+  discordIntegration  Boolean @default(true)
+  releaseChannel      String  @default("stable")
+  activeAccountUuid   String?
+  concurrentDownloads Int     @default(8)
+  showNews            Boolean @default(true)
+  startupResolution   String  @default("854x480")
+  javaCustomArgs      String  @default("")
+  xmx                 Int     @default(1024)
+  xms                 Int     @default(1024)
+}
+
+// Can't really use relations between java and defaultJava because external instances could refer to java as well
+model Java {
+  path        String  @id @unique
+  major       Int
+  fullVersion String
+  type        String
+  arch        String
+  isValid     Boolean @default(false)
+}
+
+model DefaultJava {
+  path  String @id
+  major Int    @unique
 }
 
 model Account {
   uuid           String    @id
   username       String
+  // presence signifies a microsoft account
   accessToken    String?
   tokenExpires   DateTime?
   msRefreshToken String?
+  lastUsed       DateTime
+  skinId         String?
 }
 
-model MinecraftManifest {
-  id          String @unique
-  type        String
-  url         String
-  time        String
-  releaseTime String
-  sha1        String @unique
+model Skin {
+  id   String @id
+  skin Bytes
 }
 
-model MinecraftVersion {
-  id   String @unique
-  json Bytes
-}
-
-model MinecraftAssets {
-  assetsIdSha1 String @unique
-  json         Bytes
+model HTTPCache {
+  id        String   @id
+  url       String
+  data      Bytes
+  createdAt DateTime @default(now())
 }
 
 model ActiveDownloads {

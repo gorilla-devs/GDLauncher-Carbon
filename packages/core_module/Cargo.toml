@@ -3,13 +3,8 @@ edition = "2021"
 name = "core_module"
 version = "0.1.0"
 
-[lib]
-crate-type = ["cdylib"]
-
 [dependencies]
-napi = { workspace = true, default-features = false }
 carbon_app = { path = "../../crates/carbon_app" }
 
 [build-dependencies]
 carbon_app = { path = "../../crates/carbon_app" }
-napi-build = "2.0.1"

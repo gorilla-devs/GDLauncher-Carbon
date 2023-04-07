@@ -1,10 +1,10 @@
+use anyhow::bail;
 use carbon_net::Downloadable;
 use chrono::{DateTime, FixedOffset};
-use futures::TryFutureExt;
 use std::path::{Path, PathBuf};
 use tokio::sync::watch::{channel, Sender};
 
-use crate::{constants::JAVA_RUNTIMES_FOLDER, error::JavaError, JavaVersion};
+use crate::managers::java::{constants::JAVA_RUNTIMES_FOLDER, JavaVersion};
 
 use super::{JavaAuto, JavaMeta, JavaProgress};
 
@@ -31,35 +31,29 @@ impl JavaAuto for AdoptOpenJDK {
         base_path: &Path,
         // TODO: implement progress reporting
         _progress_report: Sender<JavaProgress>,
-    ) -> Result<(), JavaError> {
+    ) -> anyhow::Result<()> {
         let runtime = base_path.join(JAVA_RUNTIMES_FOLDER).join("openjdk");
         let meta = self.get_runtime_assets(&runtime).await?;
 
         self.release_date = Some(meta.last_updated);
         self.extract_folder_name = Some(meta.extract_folder_name);
 
-        tokio::fs::create_dir_all(&runtime)
-            .await
-            .map_err(JavaError::CannotCreateJavaOpenJDKRuntimeDirectory)?;
+        tokio::fs::create_dir_all(&runtime).await?;
 
         let (tx, _) = channel(carbon_net::Progress::default());
 
         let download = &meta.download[0];
         let download_path = &download.path.clone();
 
-        carbon_net::download_file(download, tx)
-            .await
-            .map_err(|_| JavaError::CannotDownloadJavaOpenJDK)?;
+        carbon_net::download_file(download, tx).await?;
         carbon_compression::decompress(&download_path, &runtime).await?;
 
-        tokio::fs::remove_file(&download_path)
-            .await
-            .map_err(JavaError::CannotDeletePreviouslyDownloadedJavaOpenJDKFile)?;
+        tokio::fs::remove_file(&download_path).await?;
 
         Ok(())
     }
 
-    async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError> {
+    async fn get_runtime_assets(&self, runtime_path: &Path) -> anyhow::Result<JavaMeta> {
         let java_os = match std::env::consts::OS {
             "linux" => "linux",
             "windows" => "windows",
@@ -77,28 +71,21 @@ impl JavaAuto for AdoptOpenJDK {
         let version = match self.version.major {
             8 => "8",
             17 => "17",
-            _ => return Err(JavaError::JavaAutoSetupVersionNotSupported),
+            _ => bail!("Unsupported Java version"),
         };
 
         let url = format!(
             "https://api.adoptopenjdk.net/v3/assets/latest/{version}/hotspot?architecture={java_arch}&image_type=jre&jvm_impl=hotspot&os={java_os}&page=0&page_size=1&project=jdk&sort_method=DEFAULT&sort_order=DESC"
         );
 
-        let json_res = reqwest::get(url)
-            .await
-            .map_err(JavaError::CannotRetrieveOpenJDKAssets)?
-            .json::<Vec<Asset>>()
-            .map_err(JavaError::CannotParseAdoptOpenJDKMeta)
-            .await?;
+        let json_res = reqwest::get(url).await?.json::<Vec<Asset>>().await?;
 
         let asset = json_res
             .first()
-            .ok_or(JavaError::NoAdoptOpenJDKMetaValidVersion)?;
+            .ok_or(anyhow::anyhow!("No assets found for AdoptOpenJDK"))?;
 
         let meta = JavaMeta {
-            last_updated: chrono::DateTime::parse_from_rfc3339(&asset.binary.updated_at).map_err(
-                |_| JavaError::JavaUpdateDateFromMetaInvalid(asset.binary.updated_at.clone()),
-            )?,
+            last_updated: chrono::DateTime::parse_from_rfc3339(&asset.binary.updated_at)?,
             extract_folder_name: format!(
                 "{}-{}-{}",
                 asset.binary.project, asset.version.openjdk_version, asset.binary.image_type
@@ -112,7 +99,7 @@ impl JavaAuto for AdoptOpenJDK {
         Ok(meta)
     }
 
-    fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError> {
+    fn locate_binary(&self, base_path: &Path) -> anyhow::Result<PathBuf> {
         let path = match std::env::consts::OS {
             "linux" => base_path
                 .join(JAVA_RUNTIMES_FOLDER)
@@ -140,13 +127,13 @@ impl JavaAuto for AdoptOpenJDK {
         Ok(path)
     }
 
-    async fn check_for_updates(&self, base_path: &Path) -> Result<bool, JavaError> {
+    async fn check_for_updates(&self, base_path: &Path) -> anyhow::Result<bool> {
         let meta: JavaMeta = self.get_runtime_assets(base_path).await?;
 
         if meta.last_updated.timestamp()
             > self
                 .release_date
-                .ok_or(JavaError::NoReleaseDateProvidedForJavaComponent)?
+                .ok_or(anyhow::anyhow!("No release date found for AdoptOpenJDK"))?
                 .timestamp()
         {
             return Ok(false);
@@ -155,7 +142,7 @@ impl JavaAuto for AdoptOpenJDK {
         Ok(true)
     }
 
-    async fn update(&mut self) -> Result<(), JavaError> {
+    async fn update(&mut self) -> anyhow::Result<()> {
         todo!()
     }
 }

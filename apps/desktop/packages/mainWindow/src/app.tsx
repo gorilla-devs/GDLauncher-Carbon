@@ -1,17 +1,22 @@
-import { Component, Show, Suspense } from "solid-js";
+import { Show, Suspense } from "solid-js";
 import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
-import { createInvalidateQuery } from "./utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { useGDNavigate } from "./managers/NavigationManager";
 
-const App: Component = () => {
+type Props = {
+  createInvalidateQuery: () => void;
+};
+
+const App = (props: Props) => {
   const Route = useRoutes(routes);
   const navigate = useGDNavigate();
 
-  createInvalidateQuery();
+  // eslint-disable-next-line solid/reactivity
+  props.createInvalidateQuery();
+
   initThemes();
 
   return (
