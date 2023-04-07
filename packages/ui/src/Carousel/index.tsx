@@ -15,10 +15,11 @@ export interface Props {
 }
 
 const Carousel = (props: Props) => {
-  const [startX, setStartX] = createSignal(0);
+  const [prevPageX, setPrevPageX] = createSignal(0);
+  const [prevScrollLeft, setPrevScrollLeft] = createSignal(0);
   const [scrollLeft, setScrollLeft] = createSignal(0);
-  const [isDown, setIsDown] = createSignal(false);
-  const [isDragging, setIsDragging] = createSignal(false);
+  const [isMouseDown, setIsMouseDown] = createSignal(false);
+
   let horizontalSlider: HTMLDivElement | undefined;
   let scrollWrapper: HTMLDivElement | undefined;
 
@@ -29,26 +30,26 @@ const Carousel = (props: Props) => {
 
   const mousedown = (e: MouseEvent) => {
     if (horizontalSlider) {
-      setIsDown(true);
+      setIsMouseDown(true);
       horizontalSlider?.classList.add("snap-none");
       horizontalSlider?.classList.remove(
         "snap-x",
         "snap-mandatory",
         "scroll-smooth"
       );
-      setStartX(e.pageX - horizontalSlider?.offsetLeft);
-      setScrollLeft(horizontalSlider.scrollLeft);
+      setPrevPageX(e.pageX);
+      setPrevScrollLeft(horizontalSlider.scrollLeft);
     }
   };
 
   const mouseleave = () => {
     if (horizontalSlider) {
-      setIsDown(false);
-      setIsDragging(false);
+      setIsMouseDown(false);
+      const nonClickableElement = document.querySelector(".non-clickable");
 
-      const slide = document.querySelector(".slide.non-clickable");
-
-      slide?.classList.remove("non-clickable");
+      if (nonClickableElement) {
+        nonClickableElement.classList.remove("non-clickable");
+      }
 
       horizontalSlider?.classList.remove("snap-none");
       horizontalSlider?.classList.add(
@@ -61,22 +62,11 @@ const Carousel = (props: Props) => {
 
   const mousemove = (e: MouseEvent) => {
     if (horizontalSlider) {
-      if (!isDown()) return;
+      if (!isMouseDown()) return;
       e.preventDefault();
-      setIsDragging(true);
-
-      const slide = document.querySelector(".slide");
-
-      slide?.classList.add("non-clickable");
-
-      const x = e.pageX - horizontalSlider.offsetLeft;
-      const walk = (x - startX()) * 3;
-      horizontalSlider.scrollLeft = scrollLeft() - walk;
+      const positionDiff = e.pageX - prevPageX();
+      horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff;
     }
-  };
-
-  const preventClick = (e: Event) => {
-    e.preventDefault();
   };
 
   createEffect(() => {
@@ -88,24 +78,12 @@ const Carousel = (props: Props) => {
     }
   });
 
-  createEffect(() => {
-    const nonClickableElement = document.querySelector(".slide.non-clickable");
-    if (nonClickableElement) {
-      nonClickableElement.addEventListener("click", preventClick);
-    }
-  });
-
   onCleanup(() => {
     if (horizontalSlider) {
       horizontalSlider.removeEventListener("mousedown", mousedown);
       horizontalSlider.removeEventListener("mouseleave", mouseleave);
       horizontalSlider.removeEventListener("mouseup", mouseleave);
       horizontalSlider.removeEventListener("mousemove", mousemove);
-    }
-
-    const nonClickableElement = document.querySelector(".slide.non-clickable");
-    if (nonClickableElement) {
-      nonClickableElement.addEventListener("click", preventClick);
     }
   });
 
@@ -134,9 +112,12 @@ const Carousel = (props: Props) => {
 
   const mappedChildren = children(() => props.children);
   createEffect(() => {
-    (mappedChildren() as JSX.Element[])?.forEach((item) =>
-      (item as HTMLElement).classList.add("slide")
-    );
+    (mappedChildren() as JSX.Element[])?.forEach((item) => {
+      (item as HTMLElement).classList.add("slide");
+      (item as HTMLElement).onmouseover = () => {
+        (item as HTMLElement).classList.add("pointer-events-none");
+      };
+    });
   });
 
   return (
