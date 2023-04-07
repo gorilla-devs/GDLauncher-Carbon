@@ -15,6 +15,7 @@ export interface Props {
 }
 
 const Carousel = (props: Props) => {
+  const [positionDiff, setPositionDiff] = createSignal(0);
   const [prevPageX, setPrevPageX] = createSignal(0);
   const [prevScrollLeft, setPrevScrollLeft] = createSignal(0);
   const [scrollLeft, setScrollLeft] = createSignal(0);
@@ -24,19 +25,32 @@ const Carousel = (props: Props) => {
   let scrollWrapper: HTMLDivElement | undefined;
 
   onMount(() => {
+    // let scrollWitdh =
+    // horizontalSlider?.scrollWidth - horizontalSlider?.clientWidth;
     const beginning = horizontalSlider?.scrollLeft;
     if (beginning) setScrollLeft(beginning);
   });
 
+  const autoSlide = () => {
+    setPositionDiff((prev) => Math.abs(prev));
+    const firstImage = horizontalSlider?.querySelectorAll(".slide")[0];
+    if (firstImage && horizontalSlider) {
+      const firstImageWidth = firstImage.clientWidth + 16;
+      const diff = firstImageWidth - positionDiff();
+
+      if (horizontalSlider.scrollLeft > prevScrollLeft()) {
+        return (horizontalSlider.scrollLeft +=
+          positionDiff() > firstImageWidth / 3 ? diff : -positionDiff());
+      } else
+        return (horizontalSlider.scrollLeft -=
+          positionDiff() > firstImageWidth / 3 ? diff : -positionDiff());
+    }
+  };
+
   const mousedown = (e: MouseEvent) => {
     if (horizontalSlider) {
       setIsMouseDown(true);
-      horizontalSlider?.classList.add("snap-none");
-      horizontalSlider?.classList.remove(
-        "snap-x",
-        "snap-mandatory",
-        "scroll-smooth"
-      );
+
       setPrevPageX(e.pageX);
       setPrevScrollLeft(horizontalSlider.scrollLeft);
     }
@@ -51,12 +65,8 @@ const Carousel = (props: Props) => {
         nonClickableElement.classList.remove("non-clickable");
       }
 
-      horizontalSlider?.classList.remove("snap-none");
-      horizontalSlider?.classList.add(
-        "snap-x",
-        "snap-mandatory",
-        "scroll-smooth"
-      );
+      horizontalSlider?.classList.add("scroll-smooth");
+      autoSlide();
     }
   };
 
@@ -64,8 +74,9 @@ const Carousel = (props: Props) => {
     if (horizontalSlider) {
       if (!isMouseDown()) return;
       e.preventDefault();
-      const positionDiff = e.pageX - prevPageX();
-      horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff;
+      horizontalSlider?.classList.remove("scroll-smooth");
+      setPositionDiff(e.pageX - prevPageX());
+      horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff();
     }
   };
 
@@ -143,7 +154,7 @@ const Carousel = (props: Props) => {
         <div
           ref={horizontalSlider}
           id="horizontal-slider"
-          class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
+          class="w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
           {mappedChildren}
         </div>
