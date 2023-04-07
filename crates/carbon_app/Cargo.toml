@@ -32,22 +32,19 @@ jsonwebtoken = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
-carbon_java_manager = { path = "../carbon_java_manager" }
 carbon_compression = { path = "../carbon_compression" }
 carbon_domain = { path = "../carbon_domain" }
 carbon_net = { path = "../carbon_net" }
 uuid = { workspace = true }
 prisma-client-rust = { workspace = true, features = [
-    "sqlite-create-many",
-    "sqlite",
-    "migrations",
+  "sqlite-create-many",
+  "sqlite",
+  "migrations",
 ], default_features = false }
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
-image = { workspace = true, features = [
-  "png"
-], default-features = false }
+image = { workspace = true, features = ["png"], default-features = false }
 task-local-extensions = { workspace = true }
 # libc = { workspace = true }
 

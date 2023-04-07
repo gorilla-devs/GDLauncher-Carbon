@@ -18,23 +18,18 @@ impl MinecraftManager {
 
 impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        manifest::get_meta(
-            self.app.reqwest_client.clone(),
-            self.app.prisma_client.clone(),
-        )
-        .await
-        .unwrap()
+        manifest::get_meta(self.app.reqwest_client.clone())
+            .await
+            .unwrap()
     }
 
     pub async fn get_game_download_files_list(
         self,
         mc_version: String,
     ) -> anyhow::Result<Vec<Downloadable>> {
-        let db_client = self.app.prisma_client.clone();
-        let runtime_path = &self.app.configuration_manager().runtime_path;
+        let runtime_path = &self.app.settings_manager().runtime_path;
 
-        let manifest =
-            manifest::get_meta(self.app.reqwest_client.clone(), db_client.clone()).await?;
+        let manifest = manifest::get_meta(self.app.reqwest_client.clone()).await?;
 
         let manifest_version = manifest
             .iter()
@@ -43,7 +38,6 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let version = version::get_meta(
             self.app.reqwest_client.clone(),
-            db_client.clone(),
             manifest_version.clone(),
             runtime_path.get_versions().get_clients_path(),
         )
@@ -63,7 +57,6 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let assets = assets::get_meta(
             self.app.reqwest_client.clone(),
-            db_client.clone(),
             version.asset_index,
             runtime_path.get_assets().get_indexes_path(),
         )
@@ -78,6 +71,7 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use std::borrow::Borrow;
 

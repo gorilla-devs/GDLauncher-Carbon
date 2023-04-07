@@ -1,4 +1,3 @@
-use crate::error::JavaError;
 use carbon_net::Downloadable;
 use chrono::{DateTime, FixedOffset};
 use std::path::{Path, PathBuf};
@@ -26,9 +25,9 @@ trait JavaAuto {
         &mut self,
         base_path: &Path,
         progress_report: Sender<JavaProgress>,
-    ) -> Result<(), JavaError>;
-    async fn get_runtime_assets(&self, runtime_path: &Path) -> Result<JavaMeta, JavaError>;
-    fn locate_binary(&self, base_path: &Path) -> Result<PathBuf, JavaError>;
-    async fn check_for_updates(&self, runtime_path: &Path) -> Result<bool, JavaError>;
-    async fn update(&mut self) -> Result<(), JavaError>;
+    ) -> anyhow::Result<()>;
+    async fn get_runtime_assets(&self, runtime_path: &Path) -> anyhow::Result<JavaMeta>;
+    fn locate_binary(&self, base_path: &Path) -> anyhow::Result<PathBuf>;
+    async fn check_for_updates(&self, runtime_path: &Path) -> anyhow::Result<bool>;
+    async fn update(&mut self) -> anyhow::Result<()>;
 }

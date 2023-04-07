@@ -79,7 +79,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager()
+            .settings_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
@@ -113,7 +113,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager()
+            .settings_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
@@ -174,7 +174,7 @@ impl ManagerRef<'_, DownloadManager> {
 
         let path = self
             .app
-            .configuration_manager()
+            .settings_manager()
             .runtime_path
             .get_download()
             .to_pathbuf()
@@ -507,18 +507,14 @@ mod test {
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app
-            .configuration_manager()
-            .runtime_path
-            .get_temp()
-            .to_path();
+        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
         app.download_manager()
             .download(
                 String::from("https://gdlauncher.com"),
-                &app.configuration_manager()
+                &app.settings_manager()
                     .runtime_path
                     .get_temp()
                     .to_path()
@@ -534,11 +530,7 @@ mod test {
     async fn attempt_download_twice() {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app
-            .configuration_manager()
-            .runtime_path
-            .get_temp()
-            .to_path();
+        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
@@ -560,11 +552,7 @@ mod test {
     async fn attempt_download_after_cancel() -> Result<(), DownloadStartError> {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app
-            .configuration_manager()
-            .runtime_path
-            .get_temp()
-            .to_path();
+        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
@@ -583,11 +571,7 @@ mod test {
     async fn attempt_cancel_download() {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app
-            .configuration_manager()
-            .runtime_path
-            .get_temp()
-            .to_path();
+        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 

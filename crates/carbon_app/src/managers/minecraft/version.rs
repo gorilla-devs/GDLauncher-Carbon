@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use carbon_domain::{
     maven::MavenCoordinates,
@@ -13,11 +13,8 @@ use strum_macros::EnumIter;
 use thiserror::Error;
 
 use crate::{
-    db::PrismaClient,
-    managers::{
-        account::{FullAccount, FullAccountType},
-        configuration::runtime_path::{InstancePath, RuntimePath},
-    },
+    domain::runtime_path::{InstancePath, RuntimePath},
+    managers::account::{FullAccount, FullAccountType},
 };
 
 #[derive(Debug, Error)]
@@ -30,7 +27,6 @@ pub enum VersionError {
 
 pub async fn get_meta(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
-    db: Arc<PrismaClient>,
     manifest_version_meta: ManifestVersion,
     clients_path: PathBuf,
 ) -> anyhow::Result<Version> {
@@ -456,7 +452,7 @@ mod tests {
     async fn test_extract_natives() {
         let app = crate::setup_managers_for_test().await;
 
-        let runtime_path = &app.configuration_manager().runtime_path;
+        let runtime_path = &app.settings_manager().runtime_path;
 
         let manifest = MinecraftManifest::fetch().await.unwrap();
         let version = manifest

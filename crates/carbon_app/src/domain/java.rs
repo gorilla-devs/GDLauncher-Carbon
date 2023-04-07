@@ -1,44 +1,124 @@
+use anyhow::bail;
 use regex::Regex;
-use std::path::PathBuf;
-use tokio::io::AsyncWriteExt;
+use serde::{Deserialize, Serialize};
 
-use crate::{error::JavaError, JavaArch};
-
-use super::JavaVersion;
-
-#[cfg(target_os = "windows")]
-pub static PATH_SEPARATOR: &str = ";";
-
-#[cfg(not(target_os = "windows"))]
-pub static PATH_SEPARATOR: &str = ":";
-
-const JAVA_CHECK_APP: &[u8; 1013] = include_bytes!("JavaCheck.class");
-pub const JAVA_CHECK_APP_NAME: &str = "JavaCheck.class";
-
-pub async fn locate_java_check_class() -> Result<PathBuf, JavaError> {
-    let temp_dir = std::env::temp_dir();
-    let java_check_path = temp_dir.join(JAVA_CHECK_APP_NAME);
-    if !java_check_path.exists() {
-        let mut file = tokio::fs::File::create(&java_check_path)
-            .await
-            .map_err(JavaError::CannotWriteJavaDetectFileToDisk)?;
-
-        file.write_all(JAVA_CHECK_APP)
-            .await
-            .map_err(JavaError::CannotWriteJavaDetectFileToDisk)?;
-    }
-
-    Ok(java_check_path)
+// TODO: This does not handle the case where the same path still exists between executions but changes the version
+pub struct Java {
+    pub component: JavaComponent,
+    pub is_valid: bool,
 }
 
-pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JavaError> {
-    for line in cmd_output.lines() {
-        // I spent way too much time on this regex
+impl From<crate::db::java::Data> for Java {
+    fn from(value: crate::db::java::Data) -> Self {
+        let is_valid = value.is_valid;
+        Self {
+            component: JavaComponent::from(value),
+            is_valid,
+        }
+    }
+}
+
+pub enum JavaMajorVer {
+    Version8,
+    Version17,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+pub struct JavaComponent {
+    pub path: String,
+    pub arch: JavaArch,
+    /// Indicates whether the component has manually been added by the user
+    #[serde(rename = "type")]
+    pub _type: JavaComponentType,
+    pub version: JavaVersion,
+}
+
+impl From<crate::db::java::Data> for JavaComponent {
+    fn from(value: crate::db::java::Data) -> Self {
+        Self {
+            path: value.path,
+            arch: JavaArch::from(&*value.arch),
+            _type: JavaComponentType::from(&*value.r#type),
+            version: JavaVersion::try_from(&*value.full_version).unwrap(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+pub enum JavaComponentType {
+    Local,
+    Managed,
+    Custom,
+}
+
+impl From<&str> for JavaComponentType {
+    fn from(s: &str) -> Self {
+        match &*s.to_lowercase() {
+            "local" => Self::Local,
+            "managed" => Self::Managed,
+            _ => unreachable!("Uh oh, this shouldn't happen"),
+        }
+    }
+}
+
+impl From<JavaComponentType> for String {
+    fn from(t: JavaComponentType) -> Self {
+        match t {
+            JavaComponentType::Local => "local",
+            JavaComponentType::Managed => "managed",
+            JavaComponentType::Custom => "custom",
+        }
+        .to_string()
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+pub enum JavaArch {
+    Amd64,
+    X86_64,
+    Aarch64,
+}
+
+impl<'a> From<JavaArch> for &'a str {
+    fn from(arch: JavaArch) -> Self {
+        match arch {
+            JavaArch::Amd64 => "amd64",
+            JavaArch::X86_64 => "x86_64",
+            JavaArch::Aarch64 => "aarch64",
+        }
+    }
+}
+
+impl<'a> From<&'a str> for JavaArch {
+    fn from(s: &'a str) -> Self {
+        match s.to_lowercase().as_str() {
+            "amd64" => JavaArch::Amd64,
+            "x86_64" => JavaArch::X86_64,
+            "aarch64" => JavaArch::Aarch64,
+            _ => panic!("Unknown JavaArch: {s}"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+pub struct JavaVersion {
+    pub major: u8,
+    pub minor: Option<u8>,
+    pub patch: Option<String>,
+    pub update_number: Option<String>,
+    pub prerelease: Option<String>,
+    pub build_metadata: Option<String>,
+}
+
+impl TryFrom<&str> for JavaVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(version_string: &str) -> Result<Self, Self::Error> {
         let regex = Regex::new(
-            r#"^java.version=(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?)(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
+            r#"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?)(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
         )?;
 
-        if let Some(captures) = regex.captures(line) {
+        if let Some(captures) = regex.captures(version_string) {
             let mut version = JavaVersion {
                 major: 0,
                 minor: None,
@@ -87,30 +167,43 @@ pub fn parse_java_version(cmd_output: &str) -> Result<JavaVersion, JavaError> {
             }
             return Ok(version);
         }
+
+        bail!("Could not parse java version in string: {}", version_string);
     }
-    Err(JavaError::ParseVersionError)
 }
 
-pub fn parse_java_arch(cmd_output: &str) -> Result<JavaArch, JavaError> {
-    for line in cmd_output.lines() {
-        // I spent way too much time on this regex
-        let regex = Regex::new(r#"^java.arch=(?P<arch>[[:alnum:]]*)"#)?;
+impl From<JavaVersion> for String {
+    fn from(v: JavaVersion) -> Self {
+        format!(
+            "{}.{}.{}{}{}{}",
+            v.major,
+            v.minor.unwrap_or(0),
+            v.patch.unwrap_or_default(),
+            v.update_number.map(|u| format!("_{u}")).unwrap_or_default(),
+            v.prerelease.map(|p| format!("-{p}")).unwrap_or_default(),
+            v.build_metadata
+                .map(|b| format!("+{b}"))
+                .unwrap_or_default()
+        )
+    }
+}
 
-        if let Some(captures) = regex.captures(line) {
-            match captures.name("arch") {
-                Some(arch) => {
-                    return Ok(arch.as_str().into());
-                }
-                None => return Err(JavaError::NoArchInJavaOutput),
-            }
+impl JavaVersion {
+    pub fn from_major(major: u8) -> Self {
+        Self {
+            major,
+            minor: None,
+            patch: None,
+            update_number: None,
+            prerelease: None,
+            build_metadata: None,
         }
     }
-    Err(JavaError::NoArchInJavaOutput)
 }
-/*
+
 #[cfg(test)]
 mod test {
-    use crate::JavaVersion;
+    use crate::domain::java::JavaVersion;
 
     #[test]
     fn test_parse_java_version() {
@@ -121,7 +214,7 @@ mod test {
 
         let expected = [
             TestCase {
-                output: "java.version=19.0.1",
+                output: "19.0.1",
                 expected: Some(JavaVersion {
                     major: 19,
                     minor: Some(0),
@@ -132,11 +225,11 @@ mod test {
                 }),
             },
             TestCase {
-                output: "os.arch=amd64",
+                output: "amd64",
                 expected: None,
             },
             TestCase {
-                output: "java.version=1.8.0_352-b08",
+                output: "1.8.0_352-b08",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(8),
@@ -147,7 +240,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=19.0.1+10",
+                output: "19.0.1+10",
                 expected: Some(JavaVersion {
                     major: 19,
                     minor: Some(0),
@@ -158,7 +251,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=1.4.0_03-b04",
+                output: "1.4.0_03-b04",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(4),
@@ -169,7 +262,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=17.0.6-beta+2-202211152348",
+                output: "17.0.6-beta+2-202211152348",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),
@@ -180,7 +273,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=1.8.0_362-beta-202211161809-b03+152",
+                output: "1.8.0_362-beta-202211161809-b03+152",
                 expected: Some(JavaVersion {
                     major: 1,
                     minor: Some(8),
@@ -191,7 +284,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=18.0.2.1+1",
+                output: "18.0.2.1+1",
                 expected: Some(JavaVersion {
                     major: 18,
                     minor: Some(0),
@@ -202,7 +295,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=17.0.5+8",
+                output: "17.0.5+8",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),
@@ -213,7 +306,7 @@ mod test {
                 }),
             },
             TestCase {
-                output: "java.version=17.0.5+8-LTS",
+                output: "17.0.5+8-LTS",
                 expected: Some(JavaVersion {
                     major: 17,
                     minor: Some(0),
@@ -226,68 +319,8 @@ mod test {
         ];
 
         for test_case in expected.iter() {
-            let actual = super::parse_java_version(test_case.output).ok();
+            let actual = JavaVersion::try_from(test_case.output).ok();
             assert_eq!(actual, test_case.expected);
         }
-    }
-
-    #[test]
-    fn test_parse_java_arch() {
-        struct TestCase {
-            output: &'static str,
-            expected: Option<super::JavaArch>,
-        }
-
-        let expected = [
-            TestCase {
-                output: "java.arch=amd64",
-                expected: Some(super::JavaArch::Amd64),
-            },
-            TestCase {
-                output: "java.arch=x86",
-                expected: Some(super::JavaArch::X86),
-            },
-            TestCase {
-                output: "java.arch=aarch64",
-                expected: Some(super::JavaArch::Aarch64),
-            },
-            TestCase {
-                output: "java.version=19.0.1",
-                expected: None,
-            },
-        ];
-
-        for test_case in expected.iter() {
-            let actual = super::parse_java_arch(test_case.output).ok();
-            assert_eq!(actual, test_case.expected);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_locate_java_check_class_and_execute() {
-        let temp_dir = std::env::temp_dir();
-        let java_check_path_env = temp_dir.join(super::JAVA_CHECK_APP_NAME);
-        let _ = std::fs::remove_file(&java_check_path_env);
-
-        let java_check_path = super::locate_java_check_class().await.unwrap();
-        assert!(
-            java_check_path == java_check_path_env,
-            "Java check path is unexpected"
-        );
-        assert!(java_check_path.exists(), "Java check path does not exist");
-
-        let proc = tokio::process::Command::new("java")
-            .current_dir(temp_dir)
-            .arg(super::JAVA_CHECK_APP_NAME.strip_suffix(".class").unwrap())
-            .output()
-            .await
-            .unwrap();
-
-        assert!(
-            proc.status.code() == Some(0),
-            "Java check exit code is not 0"
-        );
-        let _ = std::fs::remove_file(&java_check_path_env);
     }
 }
-*/

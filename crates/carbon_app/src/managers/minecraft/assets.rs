@@ -1,10 +1,8 @@
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 use carbon_domain::minecraft::{assets::AssetIndex, version::VersionAssetIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
-
-use crate::db::PrismaClient;
 
 #[derive(Error, Debug)]
 pub enum AssetsError {
@@ -16,7 +14,6 @@ pub enum AssetsError {
 
 pub async fn get_meta(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
-    db: Arc<PrismaClient>,
     version_asset_index: VersionAssetIndex,
     asset_indexes_path: PathBuf,
 ) -> anyhow::Result<AssetIndex> {
