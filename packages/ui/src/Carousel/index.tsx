@@ -52,11 +52,17 @@ const Carousel = (props: Props) => {
     setPrevScrollLeft(horizontalSlider.scrollLeft);
   };
 
-  const mouseleave = () => {
+  const mouseup = () => {
     setIsMouseDown(false);
     horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
     horizontalSlider?.classList.add("scroll-smooth");
     autoSlide();
+  };
+
+  const mouseleave = () => {
+    setIsMouseDown(false);
+    horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
+    horizontalSlider?.classList.add("scroll-smooth");
   };
 
   const mousemove = (e: MouseEvent) => {
@@ -70,15 +76,15 @@ const Carousel = (props: Props) => {
 
   createEffect(() => {
     horizontalSlider.addEventListener("mousedown", mousedown);
-    // horizontalSlider.addEventListener("mouseleave", mouseleave);
-    horizontalSlider.addEventListener("mouseup", mouseleave);
+    horizontalSlider.addEventListener("mouseleave", mouseleave);
+    horizontalSlider.addEventListener("mouseup", mouseup);
     horizontalSlider.addEventListener("mousemove", mousemove);
   });
 
   onCleanup(() => {
     horizontalSlider.removeEventListener("mousedown", mousedown);
-    // horizontalSlider.removeEventListener("mouseleave", mouseleave);
-    horizontalSlider.removeEventListener("mouseup", mouseleave);
+    horizontalSlider.removeEventListener("mouseleave", mouseleave);
+    horizontalSlider.removeEventListener("mouseup", mouseup);
     horizontalSlider.removeEventListener("mousemove", mousemove);
   });
 
