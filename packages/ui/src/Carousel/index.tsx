@@ -1,4 +1,11 @@
-import { createEffect, createSignal, onMount, JSX, onCleanup } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  onMount,
+  JSX,
+  onCleanup,
+  children,
+} from "solid-js";
 import "./index.css";
 
 export interface Props {
@@ -11,6 +18,7 @@ const Carousel = (props: Props) => {
   const [startX, setStartX] = createSignal(0);
   const [scrollLeft, setScrollLeft] = createSignal(0);
   const [isDown, setIsDown] = createSignal(false);
+  const [isDragging, setIsDragging] = createSignal(false);
   let horizontalSlider: HTMLDivElement | undefined;
   let scrollWrapper: HTMLDivElement | undefined;
 
@@ -36,6 +44,12 @@ const Carousel = (props: Props) => {
   const mouseleave = () => {
     if (horizontalSlider) {
       setIsDown(false);
+      setIsDragging(false);
+
+      const slide = document.querySelector(".slide.non-clickable");
+
+      slide?.classList.remove("non-clickable");
+
       horizontalSlider?.classList.remove("snap-none");
       horizontalSlider?.classList.add(
         "snap-x",
@@ -44,15 +58,25 @@ const Carousel = (props: Props) => {
       );
     }
   };
+
   const mousemove = (e: MouseEvent) => {
     if (horizontalSlider) {
       if (!isDown()) return;
       e.preventDefault();
+      setIsDragging(true);
+
+      const slide = document.querySelector(".slide");
+
+      slide?.classList.add("non-clickable");
 
       const x = e.pageX - horizontalSlider.offsetLeft;
       const walk = (x - startX()) * 3;
       horizontalSlider.scrollLeft = scrollLeft() - walk;
     }
+  };
+
+  const preventClick = (e: Event) => {
+    e.preventDefault();
   };
 
   createEffect(() => {
@@ -64,12 +88,24 @@ const Carousel = (props: Props) => {
     }
   });
 
+  createEffect(() => {
+    const nonClickableElement = document.querySelector(".slide.non-clickable");
+    if (nonClickableElement) {
+      nonClickableElement.addEventListener("click", preventClick);
+    }
+  });
+
   onCleanup(() => {
     if (horizontalSlider) {
       horizontalSlider.removeEventListener("mousedown", mousedown);
       horizontalSlider.removeEventListener("mouseleave", mouseleave);
       horizontalSlider.removeEventListener("mouseup", mouseleave);
       horizontalSlider.removeEventListener("mousemove", mousemove);
+    }
+
+    const nonClickableElement = document.querySelector(".slide.non-clickable");
+    if (nonClickableElement) {
+      nonClickableElement.addEventListener("click", preventClick);
     }
   });
 
@@ -96,6 +132,13 @@ const Carousel = (props: Props) => {
     }
   };
 
+  const mappedChildren = children(() => props.children);
+  createEffect(() => {
+    (mappedChildren() as JSX.Element[])?.forEach((item) =>
+      (item as HTMLElement).classList.add("slide")
+    );
+  });
+
   return (
     <div class="flex flex-col w-full">
       <div class="flex justify-between items-center h-9 w-full">
@@ -121,7 +164,7 @@ const Carousel = (props: Props) => {
           id="horizontal-slider"
           class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
         >
-          {props.children}
+          {mappedChildren}
         </div>
       </div>
     </div>
