@@ -6,6 +6,9 @@ pub mod instance;
 pub mod maven;
 pub mod minecraft;
 mod minecraft_mod;
+mod minecraft_package;
+pub mod modloader;
+pub mod vtask;
 
 #[macro_export]
 macro_rules! try_path_fmt {

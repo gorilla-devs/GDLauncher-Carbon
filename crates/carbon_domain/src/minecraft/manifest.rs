@@ -8,12 +8,10 @@ pub struct MinecraftManifest {
 
 impl MinecraftManifest {
     pub async fn fetch() -> Result<Self, reqwest::Error> {
-        Ok(
-            reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
-                .await?
-                .json::<MinecraftManifest>()
-                .await?,
-        )
+        reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
+            .await?
+            .json::<MinecraftManifest>()
+            .await
     }
 }
 
@@ -37,10 +35,10 @@ pub struct ManifestVersion {
 
 impl ManifestVersion {
     pub async fn fetch(&self) -> Result<super::version::Version, reqwest::Error> {
-        Ok(reqwest::get(&self.url)
+        reqwest::get(&self.url)
             .await?
             .json::<super::version::Version>()
-            .await?)
+            .await
     }
 }
 

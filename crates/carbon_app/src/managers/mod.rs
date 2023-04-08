@@ -1,10 +1,7 @@
-use crate::api::keys::{app::*, Key};
-use crate::api::router::router;
+use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::error;
-use crate::managers::configuration::ConfigurationManager;
-use rspc::RouterBuilderLike;
+use crate::managers::settings::SettingsManager;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -15,15 +12,17 @@ use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
-use self::queue::TaskQueue;
+use self::vtask::VisualTaskManager;
 
 pub mod account;
-mod configuration;
 pub mod download;
 pub mod instance;
+pub mod java;
 mod minecraft;
 mod prisma_client;
-pub mod queue;
+pub mod reqwest_cached_client;
+mod settings;
+pub mod vtask;
 
 pub type App = Arc<AppInner>;
 
@@ -34,11 +33,12 @@ pub enum AppError {
 }
 
 mod app {
-    use super::*;
+    use super::{java::JavaManager, *};
 
     pub struct AppInner {
         //instances: Instances,
-        configuration_manager: ConfigurationManager,
+        settings_manager: SettingsManager,
+        java_manager: JavaManager,
         minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
@@ -46,7 +46,7 @@ mod app {
         instance_manager: InstanceManager,
         pub(crate) reqwest_client: reqwest::Client,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub(crate) task_queue: TaskQueue,
+        pub(crate) task_manager: VisualTaskManager,
     }
 
     macro_rules! manager_getter {
@@ -69,23 +69,30 @@ mod app {
                 .await
                 .unwrap();
 
-            Arc::new(AppInner {
-                configuration_manager: ConfigurationManager::new(runtime_path),
+            let app = Arc::new(AppInner {
+                settings_manager: SettingsManager::new(runtime_path),
+                java_manager: JavaManager::new(),
                 minecraft_manager: MinecraftManager::new(),
                 account_manager: AccountManager::new(),
                 download_manager: DownloadManager::new(),
                 instance_manager: InstanceManager::new(),
                 invalidation_channel,
-                reqwest_client: reqwest::Client::new(),
+                reqwest_client: reqwest_cached_client::new(),
                 prisma_client: Arc::new(db_client),
-                task_queue: TaskQueue::new(2 /* todo: download slots */),
-            })
+                task_manager: VisualTaskManager::new(),
+            });
+
+            account::AccountRefreshService::start(Arc::downgrade(&app));
+
+            app
         }
 
-        manager_getter!(configuration_manager: ConfigurationManager);
+        manager_getter!(settings_manager: SettingsManager);
+        manager_getter!(java_manager: JavaManager);
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
+        manager_getter!(task_manager: VisualTaskManager);
         manager_getter!(instance_manager: InstanceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
@@ -135,25 +142,6 @@ impl AppRef {
         self.0
             .upgrade()
             .expect("App was dropped before its final usage")
-    }
-}
-
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
-    router! {
-        query GET_THEME[app, _args: ()] {
-            app.configuration_manager()
-                .get_theme()
-                .await
-                .map_err(error::into_rspc)
-        }
-
-        mutation SET_THEME[app, new_theme: String] {
-            app.configuration_manager()
-                .set_theme(new_theme.clone())
-                .await
-                .map_err(error::into_rspc)?;
-            Ok(())
-        }
     }
 }
 

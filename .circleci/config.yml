@@ -7,21 +7,20 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.67.0-browsers
+      - image: cimg/rust:1.68.2-browsers
     resource_class: large
   website:
     docker:
-      - image: cimg/rust:1.67.0-node
+      - image: cimg/rust:1.68.2-node
     resource_class: small
   mac:
     macos:
-      xcode: "14.1.0"
-    resource_class: medium
+      xcode: "14.2.0"
+    resource_class: macos.x86.medium.gen2
   macm1:
     macos:
-      xcode: "14.1.0"
-    resource_class: medium
-  windows: win/default
+      xcode: "14.2.0"
+    resource_class: macos.m1.large.gen1
 
 jobs:
   buildMac:
@@ -38,10 +37,11 @@ jobs:
               - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
                 source "$HOME/.cargo/env"
             - run: |
                 node -v
+
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
@@ -66,6 +66,17 @@ jobs:
                 command: pnpm test
                 environment:
                   RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  branch: release
+                steps:
+                  - run:
+                      name: "Upload debug info to sentry"
+                      command: |
+                        cd ./target/x86_64-apple-darwin/release
+                        npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
+                        npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
+                        npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -76,11 +87,12 @@ jobs:
               - equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
                 source "$HOME/.cargo/env"
-
+                rustup target add aarch64-apple-darwin
             - run: |
                 node -v
+
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
@@ -105,6 +117,17 @@ jobs:
                 command: pnpm test
                 environment:
                   RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  branch: release
+                steps:
+                  - run:
+                      name: "Upload debug info to sentry"
+                      command: |
+                        cd ./target/aarch64-apple-darwin/release
+                        npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
+                        npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
+                        npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
             - run: cd apps && cd desktop && pnpm clean
             - store_artifacts:
                 path: ./apps/desktop/release
@@ -132,7 +155,7 @@ jobs:
           command: |
             $ProgressPreference = 'Continue'
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
-            & C:\rustup-init.exe -y --no-modify-path
+            & C:\rustup-init.exe -y --no-modify-path --default-toolchain=1.68.2
             $env:path += ";$env:userprofile\.cargo\bin"
 
             rustc -Vv
@@ -186,6 +209,20 @@ jobs:
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
             RUSTFLAGS: -D warnings
+      - when:
+          condition:
+            branch: release
+          steps:
+            - run:
+                name: "Upload debug info to sentry"
+                shell: bash.exe
+                command: |
+                  export PATH="$HOME/.cargo/bin:$PATH"
+                  npm install -g @sentry/cli
+                  cd ./target/x86_64-pc-windows-msvc/release
+                  sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+                  sentry-cli difutil check core_module.pdb
+                  sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
       - run:
           command: cd apps && cd desktop && pnpm clean
           shell: bash.exe
@@ -210,6 +247,7 @@ jobs:
       - checkout
       - run: |
           node -v
+
           cargo --version
       - run: |
           echo "" > crates/carbon_app/src/db.rs
@@ -245,6 +283,7 @@ jobs:
       - checkout
       - run: |
           node -v
+
           cargo --version
       - run: |
           echo "" > crates/carbon_app/src/db.rs
@@ -269,6 +308,14 @@ jobs:
           command: pnpm test
           environment:
             RUSTFLAGS: -D warnings
+      # - run:
+      #     name: "Upload debug info to sentry"
+      #     command: |
+      #       npm install -g @sentry/cli
+      #       cd ./target/x86_64-unknown-linux-gnu/release
+      #       sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+      #       sentry-cli difutil check core_module.pdb
+      #       sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release
@@ -280,7 +327,7 @@ workflows:
           filters:
             branches:
               ignore:
-                - master
+                - release
                 - develop
   master-develop-builds:
     jobs:
@@ -288,7 +335,7 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop
           matrix:
             parameters:
@@ -297,11 +344,11 @@ workflows:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop
       - buildLinux:
           filters:
             branches:
               only:
-                - master
+                - release
                 - develop
