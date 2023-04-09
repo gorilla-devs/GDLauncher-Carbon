@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use carbon_domain::{
+use crate::domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
@@ -388,7 +388,7 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use carbon_domain::minecraft::manifest::MinecraftManifest;
+    use crate::domain::minecraft::manifest::MinecraftManifest;
     use carbon_net::Progress;
     use chrono::Utc;
 

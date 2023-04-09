@@ -177,8 +177,8 @@ pub struct ManifestVersion {
     pub type_: Type,
 }
 
-impl From<carbon_domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
-    fn from(value: carbon_domain::minecraft::manifest::ManifestVersion) -> Self {
+impl From<crate::domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
+    fn from(value: crate::domain::minecraft::manifest::ManifestVersion) -> Self {
         ManifestVersion {
             id: value.id,
             type_: value.type_.into(),
@@ -198,8 +198,8 @@ pub enum Type {
     Snapshot,
 }
 
-impl From<carbon_domain::minecraft::manifest::Type> for Type {
-    fn from(value: carbon_domain::minecraft::manifest::Type) -> Self {
+impl From<crate::domain::minecraft::manifest::Type> for Type {
+    fn from(value: crate::domain::minecraft::manifest::Type) -> Self {
         value.into()
     }
 }

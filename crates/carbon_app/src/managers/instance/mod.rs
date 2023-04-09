@@ -46,7 +46,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let instance_path = self
             .app
-            .configuration_manager()
+            .settings_manager()
             .runtime_path
             .get_instances()
             .to_path();
@@ -400,8 +400,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             let groupid = self
                 .app
-                .configuration_manager()
-                .configuration()
+                .settings_manager()
                 .get()
                 .await?
                 .default_instance_group;

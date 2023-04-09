@@ -6,6 +6,12 @@ pub struct MinecraftManifest {
     pub versions: Vec<ManifestVersion>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Latest {
+    pub release: String,
+    pub snapshot: String,
+}
+
 impl MinecraftManifest {
     pub async fn fetch() -> Result<Self, reqwest::Error> {
         reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
@@ -13,12 +19,6 @@ impl MinecraftManifest {
             .json::<MinecraftManifest>()
             .await
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Latest {
-    pub release: String,
-    pub snapshot: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

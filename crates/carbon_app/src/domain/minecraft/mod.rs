@@ -4,7 +4,7 @@ pub mod version;
 
 #[cfg(test)]
 mod test {
-    use crate::minecraft::manifest::MinecraftManifest;
+    use crate::domain::minecraft::manifest::MinecraftManifest;
 
     #[tokio::test]
     async fn test_live_manifest_versions_format() {

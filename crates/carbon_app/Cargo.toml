@@ -44,6 +44,7 @@ strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
 image = { workspace = true, features = ["png"], default-features = false }
+daedalus = { version = "0.1.19" }
 # libc = { workspace = true }
 
 # [target.'cfg(windows)'.dependencies]
