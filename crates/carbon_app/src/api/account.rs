@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::api::keys::account::*;
 use crate::api::router::router;
+use crate::domain::account as domain;
 use crate::error;
 use crate::error::request::FERequestError;
 use crate::managers::account::api::{
@@ -15,7 +16,6 @@ use crate::managers::account::api::{
     XboxAuthError, XboxError,
 };
 use crate::managers::{account, App, AppInner};
-use carbon_domain::account as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

@@ -17,7 +17,7 @@ use db::instance::Data as CachedInstance;
 
 use super::ManagerRef;
 
-use carbon_domain::instance as domain;
+use crate::domain::instance as domain;
 use domain::schema;
 
 pub struct InstanceManager {

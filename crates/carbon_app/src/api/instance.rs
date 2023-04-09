@@ -8,8 +8,8 @@ use crate::{error::anyhow_into_rspc, managers::instance::InstanceMoveTarget};
 use super::keys::instance::*;
 use super::router::router;
 
+use crate::domain::instance as domain;
 use crate::managers::instance::{GroupId, InstanceId};
-use carbon_domain::instance as domain;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
