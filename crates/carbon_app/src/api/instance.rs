@@ -17,21 +17,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .list_groups()
                 .await
-                .map_err(anyhow_into_rspc)
         }
 
         mutation CREATE_GROUP[app, name: String] {
             app.instance_manager()
                 .create_group(name)
                 .await
-                .map_err(anyhow_into_rspc)
         }
 
         mutation DELETE_GROUP[app, id: i32] {
             app.instance_manager()
                 .delete_group(GroupId(id))
                 .await
-                .map_err(anyhow_into_rspc)
         }
 
         mutation MOVE_GROUP[app, move_data: MoveGroup] {
@@ -41,7 +38,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     move_data.before.map(GroupId)
                 )
                 .await
-                .map_err(anyhow_into_rspc)
         }
 
         mutation MOVE_INSTANCE[app, move_instance: MoveInstance] {
@@ -56,7 +52,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     }
                 )
                 .await
-                .map_err(anyhow_into_rspc)
         }
 
         query INSTANCE_DETAILS[app, id: i32] {
@@ -64,7 +59,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .instance_details(InstanceId(id))
                 .await
                 .map(InstanceDetails::from)
-                .map_err(anyhow_into_rspc)
         }
     }
 }

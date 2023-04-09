@@ -408,7 +408,7 @@ mod tests {
     #[tokio::test]
     async fn test_generate_startup_command() {
         let app = setup_managers_for_test().await;
-        let runtime_path = app.settings_manager().runtime_path;
+        let runtime_path = &app.settings_manager().runtime_path;
         let manifest = get_manifest_meta(reqwest::Client::new()).await.unwrap();
 
         let version = manifest.into_iter().find(|v| v.id == "1.16.5").unwrap();
