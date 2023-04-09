@@ -12,15 +12,6 @@ pub struct Latest {
     pub snapshot: String,
 }
 
-impl MinecraftManifest {
-    pub async fn fetch() -> Result<Self, reqwest::Error> {
-        reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
-            .await?
-            .json::<MinecraftManifest>()
-            .await
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ManifestVersion {
     pub id: String,
@@ -31,15 +22,6 @@ pub struct ManifestVersion {
     #[serde(rename = "releaseTime")]
     pub release_time: String,
     pub sha1: String,
-}
-
-impl ManifestVersion {
-    pub async fn fetch(&self) -> Result<super::version::Version, reqwest::Error> {
-        reqwest::get(&self.url)
-            .await?
-            .json::<super::version::Version>()
-            .await
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
