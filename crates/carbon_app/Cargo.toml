@@ -46,6 +46,9 @@ strum = { workspace = true }
 regex = { workspace = true }
 image = { workspace = true, features = ["png"], default-features = false }
 task-local-extensions = { workspace = true }
+hyper = { workspace = true }
+http = { workspace = true }
+httpdate = { workspace = true }
 # libc = { workspace = true }
 
 # [target.'cfg(windows)'.dependencies]

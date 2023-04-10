@@ -50,13 +50,12 @@ CREATE TABLE "Skin" (
 
 -- CreateTable
 CREATE TABLE "HTTPCache" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "url" TEXT NOT NULL,
+    "url" TEXT NOT NULL PRIMARY KEY,
+    "status_code" INTEGER NOT NULL,
     "data" BLOB NOT NULL,
-    "expiresAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
     "lastModified" TEXT,
-    "etag" TEXT,
-    "varyHeaders" TEXT NOT NULL
+    "etag" TEXT
 );
 
 -- CreateTable

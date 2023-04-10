@@ -218,7 +218,7 @@ impl ManagerRef<'_, DownloadManager> {
                         url: &str,
                         start_loc: u64,
                     ) -> anyhow::Result<Response> {
-                        let mut builder = client.get(url);
+                        let mut builder = client.get(url).header("avoid-caching", "");
 
                         if start_loc != 0 {
                             builder = builder.header("Range", format!("bytes={start_loc}-"));
