@@ -14,6 +14,11 @@ declare global {
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
+    checkUpdate: () => void;
+    installUpdate: () => void;
+    updateAvailable: (
+      cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
+    ) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
     coreModuleLoaded: Promise<void>;

@@ -14,6 +14,7 @@ import {
 } from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
+import { autoUpdater } from "electron-updater";
 import "./preloadListeners";
 
 if ((app as any).overwolf) {
@@ -137,6 +138,38 @@ async function createWindow() {
   ipcMain.handle("getAdSize", async () => {
     return getAdSize().adSize;
   });
+
+  // if (app.isPackaged) {
+
+  let allowUnstableReleases = false;
+
+  autoUpdater.autoDownload = false;
+  // autoUpdater.allowDowngrade =
+  //   !allowUnstableReleases && app.getVersion().includes("beta");
+  autoUpdater.allowPrerelease = allowUnstableReleases;
+  autoUpdater.setFeedURL({
+    owner: "gorilla-devs",
+    repo: "GDLauncher",
+    provider: "github",
+  });
+
+  ipcMain.handle("checkUpdate", async () => {
+    autoUpdater.checkForUpdates();
+  });
+
+  ipcMain.handle("installUpdate", async () => {
+    // INSTALL THE UPDATE
+    autoUpdater.quitAndInstall(true, false);
+  });
+
+  autoUpdater.on("update-available", () => {
+    autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("update-downloaded", () => {
+    win?.webContents.send("updateAvailable");
+  });
+  // }
 
   attachTitlebarToWindow(win);
 

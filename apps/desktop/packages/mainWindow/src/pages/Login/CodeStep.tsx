@@ -138,7 +138,7 @@ const CodeStep = (props: Props) => {
             disabled={expired()}
             value={userCode() || ""}
             onClick={() => {
-              navigator.clipboard.writeText(userCode() || "");
+              window.copyToClipboard(userCode() || "");
               addNotification("The link has been copied");
             }}
           />
