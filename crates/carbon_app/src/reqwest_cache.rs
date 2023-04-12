@@ -43,13 +43,19 @@ impl Middleware for CacheMiddleware {
         // SAFETY: Requests cannot be made before the appref is initialized
         let app = unsafe { self.app.upgrade() };
 
-        fn build_cached(status: i32, body: Vec<u8>) -> std::result::Result<Response, ()> {
-            Ok(http::Response::builder()
-                .status(StatusCode::from_u16(status.try_into().map_err(|_| ())?).map_err(|_| ())?)
-                .header("Cached", "true")
-                .body(body)
-                .map_err(|_| ())?
-                .into())
+        fn build_cached(
+            status: i32,
+            body: Vec<u8>,
+            cached: bool,
+        ) -> std::result::Result<Response, ()> {
+            let mut response = http::Response::builder()
+                .status(StatusCode::from_u16(status.try_into().map_err(|_| ())?).map_err(|_| ())?);
+
+            if cached {
+                response = response.header("Cached", "true");
+            }
+
+            Ok(response.body(body).map_err(|_| ())?.into())
         }
 
         let method = req.method().clone();
@@ -72,7 +78,7 @@ impl Middleware for CacheMiddleware {
             if expires > Utc::now() {
                 let cached =
                     mem::replace(&mut cached, None).expect("cached was just asserted to be Some");
-                if let Ok(response) = build_cached(cached.status_code, cached.data) {
+                if let Ok(response) = build_cached(cached.status_code, cached.data, true) {
                     return Ok(response);
                 }
             }
@@ -86,7 +92,7 @@ impl Middleware for CacheMiddleware {
             if let Some(cached) = cached {
                 if let (Some(cached_etag), Some(etag)) = (cached.etag, headers.get("etag")) {
                     if Some(&cached_etag as &str) == etag.to_str().ok() {
-                        match build_cached(cached.status_code, cached.data) {
+                        match build_cached(cached.status_code, cached.data, true) {
                             Ok(response) => return Ok(response),
                             Err(_) => break 'use_cache,
                         }
@@ -97,7 +103,7 @@ impl Middleware for CacheMiddleware {
                     (cached.last_modified, headers.get("last-modified"))
                 {
                     if Some(&cached_last_modified as &str) == last_modified.to_str().ok() {
-                        match build_cached(cached.status_code, cached.data) {
+                        match build_cached(cached.status_code, cached.data, true) {
                             Ok(response) => return Ok(response),
                             Err(_) => break 'use_cache,
                         }
@@ -167,21 +173,25 @@ impl Middleware for CacheMiddleware {
 
                 let _ = app
                     .prisma_client
-                    .http_cache()
-                    .create(
-                        url,
-                        status,
-                        body.to_vec(),
-                        vec![
-                            SetParam::SetExpiresAt(expires.map(Into::into)),
-                            SetParam::SetLastModified(last_modified),
-                            SetParam::SetEtag(etag),
-                        ],
-                    )
-                    .exec()
+                    ._batch((
+                        app.prisma_client
+                            .http_cache()
+                            // will not fail when not found
+                            .delete_many(vec![WhereParam::Url(StringFilter::Equals(url.clone()))]),
+                        app.prisma_client.http_cache().create(
+                            url,
+                            status,
+                            body.to_vec(),
+                            vec![
+                                SetParam::SetExpiresAt(expires.map(Into::into)),
+                                SetParam::SetLastModified(last_modified),
+                                SetParam::SetEtag(etag),
+                            ],
+                        ),
+                    ))
                     .await;
 
-                match build_cached(status, body.to_vec()) {
+                match build_cached(status, body.to_vec(), false) {
                     Ok(response) => return Ok(response),
                     Err(_) => {
                         return Err(reqwest_middleware::Error::Middleware(anyhow!(
@@ -193,5 +203,114 @@ impl Middleware for CacheMiddleware {
         }
 
         Ok(response)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::SystemTime;
+
+    use axum::{http::header, routing::get, Router};
+    use chrono::{Duration, Utc};
+
+    macro_rules! launch_server {
+        [$address:literal; $($headers:expr),*] => {
+            let server = Router::new()
+                .route("/", get(|| async { ([$($headers),*], "test") }));
+
+            tokio::spawn(async {
+                axum::Server::bind(&concat!("0.0.0.0:", $address).parse().unwrap())
+                    .serve(server.into_make_service())
+                    .await
+                    .unwrap();
+            });
+
+            // let the server start
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    macro_rules! request_cached {
+        ($app:expr, $address:literal) => {
+            $app.reqwest_client
+                .get(concat!("http://0.0.0.0:", $address, "/"))
+                .send()
+                .await
+                .unwrap()
+                .headers()
+                .get("Cached")
+                .is_some()
+        };
+    }
+
+    #[tokio::test]
+    async fn test_expires() {
+        let app = crate::setup_managers_for_test().await;
+
+        launch_server![3000; (
+            header::EXPIRES,
+            httpdate::fmt_http_date(SystemTime::from(
+                Utc::now() + Duration::seconds(1)
+            ))
+        )];
+
+        assert!(!request_cached!(app, 3000));
+        assert!(request_cached!(app, 3000));
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(!request_cached!(app, 3000));
+    }
+
+    #[tokio::test]
+    async fn test_max_age() {
+        let app = crate::setup_managers_for_test().await;
+
+        launch_server![3001; (
+            header::CACHE_CONTROL,
+            "max-age=1"
+        )];
+
+        assert!(!request_cached!(app, 3001));
+        assert!(request_cached!(app, 3001));
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(!request_cached!(app, 3001));
+    }
+
+    #[tokio::test]
+    async fn test_no_store() {
+        let app = crate::setup_managers_for_test().await;
+
+        launch_server![3002; (
+            header::CACHE_CONTROL,
+            "no-store"
+        )];
+
+        assert!(!request_cached!(app, 3002));
+        assert!(!request_cached!(app, 3002));
+    }
+
+    #[tokio::test]
+    async fn test_etag() {
+        let app = crate::setup_managers_for_test().await;
+
+        launch_server![3003; (
+            header::ETAG,
+            "test_etag"
+        )];
+
+        assert!(!request_cached!(app, 3003));
+        assert!(request_cached!(app, 3003));
+    }
+
+    #[tokio::test]
+    async fn test_last_modified() {
+        let app = crate::setup_managers_for_test().await;
+
+        launch_server![3004; (
+            header::LAST_MODIFIED,
+            "test_last_modified"
+        )];
+
+        assert!(!request_cached!(app, 3004));
+        assert!(request_cached!(app, 3004));
     }
 }
