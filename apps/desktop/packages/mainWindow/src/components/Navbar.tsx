@@ -62,7 +62,7 @@ const AppNavbar = () => {
             account.uuid
           }`,
           uuid: account.uuid,
-          type: account.type_,
+          type: account.type,
           status: accountStatusQuery.data,
         },
         key: account?.uuid,
@@ -134,7 +134,7 @@ const AppNavbar = () => {
               </TabList>
             </Tabs>
           </ul>
-          <div class="ml-4 min-w-52 flex justify-end">
+          <div class="flex ml-4 min-w-52 justify-end">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

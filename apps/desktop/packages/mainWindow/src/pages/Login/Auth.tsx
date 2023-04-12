@@ -44,10 +44,10 @@ const Auth = (props: Props) => {
   const handleClick = async () => {
     setClicked(true);
     if (!routeData.status.data || !enrollmentInProgress()) {
-      accountEnrollBeginMutation.mutate(null);
+      accountEnrollBeginMutation.mutate(undefined);
     } else {
-      accountEnrollCancelMutation.mutate(null);
-      accountEnrollBeginMutation.mutate(null);
+      accountEnrollCancelMutation.mutate(undefined);
+      accountEnrollBeginMutation.mutate(undefined);
     }
   };
 
@@ -63,21 +63,21 @@ const Auth = (props: Props) => {
         setEnrollmentInProgress(true);
         setError(null);
         props.setDeviceCodeObject({
-          userCode: info.user_code,
-          link: info.verification_uri,
-          expiresAt: info.expires_at,
+          userCode: info.userCode,
+          link: info.verificationUri,
+          expiresAt: info.expiresAt,
         });
         props.setStep(1);
       },
       onFail() {
         setEnrollmentInProgress(false);
         setError("something went wrong while logging in");
-        accountEnrollCancelMutation.mutate(null);
+        accountEnrollCancelMutation.mutate(undefined);
       },
       onComplete() {
         setError(null);
         if (enrollmentInProgress()) {
-          accountEnrollFinalizeMutation.mutate(null);
+          accountEnrollFinalizeMutation.mutate(undefined);
         }
         navigate("/library");
         setEnrollmentInProgress(false);

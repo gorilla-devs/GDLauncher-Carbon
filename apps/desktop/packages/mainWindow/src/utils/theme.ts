@@ -9,14 +9,14 @@ enum _Theme {
 }
 
 const initThemes = () => {
-  let theme = rspc.createQuery(() => ["app.getTheme", null]);
-
+  let theme = rspc.createQuery(() => ["settings.getSettings"]);
+  const themeName = () => theme.data?.theme;
   createEffect(() => {
-    if (!theme.data) {
+    if (!themeName()) {
       applyTheme(mainTheme);
       return;
     }
-    switch (theme.data) {
+    switch (themeName()) {
       case _Theme._Default: {
         applyTheme(mainTheme);
         break;

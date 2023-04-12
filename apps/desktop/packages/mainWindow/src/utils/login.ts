@@ -29,16 +29,16 @@ export const handleStatus = (
   if (routeData.isSuccess) {
     const data = routeData.data;
     if (typeof data === "string") return;
-    if (data && "PollingCode" in data) {
-      const info = data.PollingCode;
+    if (data && "pollingCode" in data) {
+      const info = data.pollingCode;
       if (info) {
         callbacks?.onPolling?.(info);
       }
-    } else if (data && "Failed" in data) {
-      const error = data.Failed;
+    } else if (data && "failed" in data) {
+      const error = data.failed;
       callbacks?.onFail?.(error);
-    } else if (data && "Complete" in data) {
-      const complete = data.Complete;
+    } else if (data && "complete" in data) {
+      const complete = data.complete;
       callbacks?.onComplete?.(complete);
     }
   } else if (routeData.isError) callbacks?.onError?.(routeData.error);

@@ -70,15 +70,15 @@ mod test {
 
         let expected = [
             TestCase {
-                output: "java.arch=amd64",
+                output: "os.arch=amd64",
                 expected: Some(super::JavaArch::Amd64),
             },
             TestCase {
-                output: "java.arch=x86",
-                expected: Some(super::JavaArch::X86_64),
+                output: "os.arch=x86",
+                expected: Some(super::JavaArch::X86),
             },
             TestCase {
-                output: "java.arch=aarch64",
+                output: "os.arch=aarch64",
                 expected: Some(super::JavaArch::Aarch64),
             },
             TestCase {

@@ -84,7 +84,7 @@ const mapStatus = (status: EnrollStatusResult | undefined) => {
         </div>
       }
     >
-      <Match when={status === "Invalid"}>
+      <Match when={status === "invalid"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 rounded-full text-yellow i-ri:alert-fill" />
           <p class="m-0 text-xs">
@@ -97,7 +97,7 @@ const mapStatus = (status: EnrollStatusResult | undefined) => {
           </p>
         </div>
       </Match>
-      <Match when={status === "Ok"}>
+      <Match when={status === "ok"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 rounded-full bg-green" />
           <p class="m-0 text-xs">
@@ -110,7 +110,7 @@ const mapStatus = (status: EnrollStatusResult | undefined) => {
           </p>
         </div>
       </Match>
-      <Match when={status === "Expired"}>
+      <Match when={status === "expired"}>
         <div class="flex gap-2 items-center">
           <div class="w-3 h-3 rounded-full bg-red" />
           <p class="m-0 text-xs">
@@ -123,7 +123,7 @@ const mapStatus = (status: EnrollStatusResult | undefined) => {
           </p>
         </div>
       </Match>
-      <Match when={status === "Refreshing"}>
+      <Match when={status === "refreshing"}>
         <div class="flex flex gap-2 items-center">
           <div class="i-ri:refresh-line" />
           <Trans
@@ -161,7 +161,7 @@ export const AccountsDropdown = (props: Props) => {
   const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
   const [expired, setExpired] = createSignal(false);
-  const expiresAt = () => loginDeviceCode()?.expires_at;
+  const expiresAt = () => loginDeviceCode()?.expiresAt;
   const expiresAtFormat = () => strToMs(expiresAt() || "");
   const expiresAtMs = () => expiresAtFormat() - Date.now();
   const minutes = () => msToMinutes(expiresAtMs());
@@ -194,7 +194,7 @@ export const AccountsDropdown = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
-      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
     } else {
@@ -265,7 +265,8 @@ export const AccountsDropdown = (props: Props) => {
         setAddAccountStarting(true);
       },
       onError(error) {
-        if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
+        if (enrollmentInProgress())
+          accountEnrollCancelMutation.mutate(undefined);
         setAddAccountStarting(false);
         addNotification(error.message, "error");
       },
@@ -373,7 +374,7 @@ export const AccountsDropdown = (props: Props) => {
       },
       onFail(error) {
         reset();
-        accountEnrollCancelMutation.mutate(null);
+        accountEnrollCancelMutation.mutate(undefined);
         if (error)
           addNotification(
             "somethign went wrong while adding an account",
@@ -387,7 +388,7 @@ export const AccountsDropdown = (props: Props) => {
       onComplete() {
         setLoadingAuthorization(false);
         if (enrollmentInProgress()) {
-          accountEnrollFinalizeMutation.mutate(null);
+          accountEnrollFinalizeMutation.mutate(undefined);
         }
         reset();
       },
@@ -431,7 +432,7 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="justify-center w-full text-ellipsis overflow-hidden m-0 align-middle leading-loose"
+            class="m-0 justify-center w-full text-ellipsis overflow-hidden align-middle leading-loose"
             classList={{
               "text-shade-0 hover:text-white group-hover:text-white":
                 !props.disabled,
@@ -453,7 +454,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="rounded-md px-4 absolute right-0 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 w-auto z-40 min-w-80 pt-3"
+        class="rounded-md px-4 w-auto absolute right-0 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 z-40 min-w-80 pt-3"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -598,10 +599,10 @@ export const AccountsDropdown = (props: Props) => {
                     onClick={() => {
                       if (!loadingAuthorization()) {
                         if (!enrollmentInProgress()) {
-                          accountEnrollBeginMutation.mutate(null);
+                          accountEnrollBeginMutation.mutate(undefined);
                         } else {
-                          accountEnrollCancelMutation.mutate(null);
-                          accountEnrollBeginMutation.mutate(null);
+                          accountEnrollCancelMutation.mutate(undefined);
+                          accountEnrollBeginMutation.mutate(undefined);
                         }
                         setLoadingAuthorization(true);
                       }
@@ -626,10 +627,10 @@ export const AccountsDropdown = (props: Props) => {
                   <div
                     class="w-5 h-5 rounded-full flex items-center cursor-pointer justify-center"
                     onClick={() => {
-                      if (loginDeviceCode()?.verification_uri) {
+                      if (loginDeviceCode()?.verificationUri) {
                         setLoadingAuthorization(true);
                         window.openExternalLink(
-                          (loginDeviceCode() as DeviceCode).verification_uri
+                          (loginDeviceCode() as DeviceCode).verificationUri
                         );
                       }
                     }}
@@ -639,14 +640,14 @@ export const AccountsDropdown = (props: Props) => {
 
                   <div class="flex gap-1 items-center text-xs">
                     <span class="font-bold text-white">
-                      {loginDeviceCode()?.user_code}
+                      {loginDeviceCode()?.userCode}
                     </span>
                     <div
                       class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
                       onClick={() => {
-                        if (loginDeviceCode()?.user_code) {
+                        if (loginDeviceCode()?.userCode) {
                           navigator.clipboard.writeText(
-                            (loginDeviceCode() as DeviceCode).user_code
+                            (loginDeviceCode() as DeviceCode).userCode
                           );
                         }
                         addNotification("The code has been copied");
@@ -663,7 +664,7 @@ export const AccountsDropdown = (props: Props) => {
                     class="text-sm cursor-pointer i-ri:close-fill hover:text-red"
                     onClick={() => {
                       if (enrollmentInProgress()) {
-                        accountEnrollCancelMutation.mutate(null);
+                        accountEnrollCancelMutation.mutate(undefined);
                       }
                     }}
                   />
@@ -675,7 +676,7 @@ export const AccountsDropdown = (props: Props) => {
             class="flex gap-3 py-2 items-center cursor-pointer color-red"
             onClick={() => {
               if (enrollmentInProgress()) {
-                accountEnrollCancelMutation.mutate(null);
+                accountEnrollCancelMutation.mutate(undefined);
               }
               deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
             }}

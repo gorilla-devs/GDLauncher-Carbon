@@ -105,7 +105,7 @@ const CodeStep = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
 
   const handleRefersh = async () => {
-    accountEnrollBeginMutation.mutate(null);
+    accountEnrollBeginMutation.mutate(undefined);
   };
 
   const updateExpireTime = () => {
@@ -130,9 +130,9 @@ const CodeStep = (props: Props) => {
       onPolling: (info) => {
         setEnrollmentInProgress(true);
         props.setDeviceCodeObject({
-          userCode: info.user_code,
-          link: info.verification_uri,
-          expiresAt: info.expires_at,
+          userCode: info.userCode,
+          link: info.verificationUri,
+          expiresAt: info.expiresAt,
         });
         setExpired(false);
         setError(null);
@@ -142,7 +142,7 @@ const CodeStep = (props: Props) => {
         setError("something went wrong while logging in");
       },
       onComplete(account) {
-        finalizeMutation.mutate(null);
+        finalizeMutation.mutate(undefined);
         // if (finalizeMutation.isSuccess) {
         setActiveUUIDMutation.mutate(account.uuid);
         // }
@@ -152,7 +152,7 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
-      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(null);
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
       setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);

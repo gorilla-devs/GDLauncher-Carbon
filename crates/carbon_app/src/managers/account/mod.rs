@@ -56,7 +56,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
-        use db::account::{SetParam, UniqueWhereParam};
+        use db::account::WhereParam::Uuid;
         use db::app_configuration::SetParam::SetActiveAccountUuid;
 
         if let Some(uuid) = uuid.clone() {
@@ -64,7 +64,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .app
                 .prisma_client
                 .account()
-                .find_unique(UniqueWhereParam::UuidEquals(uuid.clone()))
+                .find_first(vec![Uuid(StringFilter::Equals(uuid.clone()))])
                 .exec()
                 .await?;
 
@@ -73,16 +73,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 account_entry.is_some(),
                 SetActiveUuidError::AccountDoesNotExist(uuid)
             );
-
-            self.app
-                .prisma_client
-                .account()
-                .update(
-                    UniqueWhereParam::UuidEquals(uuid),
-                    vec![SetParam::SetLastUsed(Utc::now().into())],
-                )
-                .exec()
-                .await?;
         }
 
         self.app
@@ -386,30 +376,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         match result {
             Ok(_) => {
-                let active_account = self
-                    .app
-                    .configuration_manager()
-                    .configuration()
-                    .get()
-                    .await?
-                    .active_account_uuid;
-
-                if let Some(active_account) = active_account {
-                    if active_account == uuid {
-                        let next_account = self
-                            .app
-                            .prisma_client
-                            .account()
-                            .find_first(Vec::new())
-                            .order_by(OrderByParam::LastUsed(Direction::Desc))
-                            .exec()
-                            .await?
-                            .map(|data| data.uuid);
-
-                        self.set_active_uuid(next_account).await?;
-                    }
-                }
-
                 self.app.invalidate(GET_ACCOUNTS, None);
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 

@@ -55,7 +55,7 @@ const Instance = () => {
 
   return (
     <div
-      class="relative h-full bg-shade-8 max-h-full overflow-auto overflow-x-hidden"
+      class="relative h-full bg-shade-8 overflow-auto max-h-full overflow-x-hidden"
       style={{
         "scrollbar-gutter": "stable",
       }}
@@ -82,13 +82,13 @@ const Instance = () => {
       }}
     >
       <div
-        class="relative flex flex-col justify-between transition-all ease-in-out h-52 items-stretch"
+        class="relative flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
         ref={(el) => {
           containerRef = el;
         }}
       >
         <div
-          class="h-full absolute top-0 left-0 right-0 bg-fixed bg-cover bg-center bg-no-repeat"
+          class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
           style={{
             "background-image": `url("${headerMockImage}")`,
             "background-position": "right-5rem",
@@ -103,7 +103,7 @@ const Instance = () => {
             innerContainerRef = el;
           }}
         >
-          <div class="sticky z-10 top-5 left-5 w-fit">
+          <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -127,8 +127,8 @@ const Instance = () => {
           >
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
-                <div class="flex flex-col gap-4 justify-end w-full lg:flex-row">
-                  <div class="h-16 w-16 rounded-xl bg-shade-8">
+                <div class="flex flex-col gap-4 w-full justify-end lg:flex-row">
+                  <div class="bg-shade-8 h-16 w-16 rounded-xl">
                     {/* <img /> */}
                   </div>
                   <div class="flex flex-1 flex-col max-w-185">
@@ -164,7 +164,7 @@ const Instance = () => {
                       </div>
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
-                      <div class="flex items-start flex-col gap-1 lg:flex-row text-shade-0 lg:items-center lg:gap-0">
+                      <div class="flex flex-col lg:flex-row text-shade-0 items-start gap-1 lg:items-center lg:gap-0">
                         <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-shade-5">
                           Forge 1.19.2
                         </div>
@@ -184,7 +184,7 @@ const Instance = () => {
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                         >
-                          <div class="i-ri:more-2-fill text-xl" />
+                          <div class="text-xl i-ri:more-2-fill" />
                         </div>
                         <div
                           class="rounded-full w-8 h-8 flex justify-center items-center"
@@ -217,7 +217,7 @@ const Instance = () => {
           refStickyContainer = el;
         }}
       >
-        <div class="flex items-start w-full transition-opacity ease-in-out duration-300">
+        <div class="flex items-start w-full ease-in-out transition-opacity duration-300">
           <div class="w-fit justify-center items-center transition duration-100 ease-in-out h-fit mr-4">
             <Button
               onClick={() => navigate("/library")}
@@ -280,7 +280,7 @@ const Instance = () => {
         </div>
       </div>
       <div class="bg-shade-8 min-h-2xl">
-        <div class="p-6 flex justify-center">
+        <div class="flex justify-center p-6">
           <div class="bg-shade-8 max-w-full w-185">
             <div class="sticky z-20 flex flex-col bg-shade-8 mb-4 top-20">
               <Tabs index={selectedIndex()}>

@@ -18,10 +18,10 @@ queueMicrotask(() => {
 
 render(() => {
   const [coreModuleLoaded] = createResource(async () => {
-    let port = await window.coreModuleLoaded;
+    let port = await window.getCoreModuleStatus();
     console.log("PORT", port);
     window.clearLoading();
-    return "1025";
+    return port;
   });
 
   const [i18nInstance] = createResource(async () => {
