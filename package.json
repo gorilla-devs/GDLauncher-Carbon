@@ -6,7 +6,7 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "prebuild": "npm i -g pnpm@8.1.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i && pnpm build-web",
+    "init": "npm i -g pnpm@8.1.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "codegen": "pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev --filter=!@gd/web",
     "watch:core": "cargo run -p core_module",
