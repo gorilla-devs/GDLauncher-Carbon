@@ -15,7 +15,7 @@ use crate::{
     managers::UnsafeAppRef,
 };
 
-pub fn new(app: UnsafeAppRef) -> ClientWithMiddleware {
+pub fn new_client(app: UnsafeAppRef) -> ClientWithMiddleware {
     let client = Client::builder().build().unwrap();
 
     ClientBuilder::new(client)
@@ -208,18 +208,23 @@ impl Middleware for CacheMiddleware {
 
 #[cfg(test)]
 mod test {
-    use std::time::SystemTime;
+    use std::{net::TcpListener, time::SystemTime};
 
     use axum::{http::header, routing::get, Router};
     use chrono::{Duration, Utc};
 
+    use crate::managers::App;
+
     macro_rules! launch_server {
-        [$address:literal; $($headers:expr),*] => {
+        [$($headers:expr),*] => {{
+            let tcp_listener = TcpListener::bind("0.0.0.0:0").unwrap();
+            let port = tcp_listener.local_addr().unwrap().port();
+
             let server = Router::new()
                 .route("/", get(|| async { ([$($headers),*], "test") }));
 
             tokio::spawn(async {
-                axum::Server::bind(&concat!("0.0.0.0:", $address).parse().unwrap())
+                axum::Server::from_tcp(tcp_listener).unwrap()
                     .serve(server.into_make_service())
                     .await
                     .unwrap();
@@ -227,90 +232,76 @@ mod test {
 
             // let the server start
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        }
+
+            port
+        }}
     }
 
-    macro_rules! request_cached {
-        ($app:expr, $address:literal) => {
-            $app.reqwest_client
-                .get(concat!("http://0.0.0.0:", $address, "/"))
-                .send()
-                .await
-                .unwrap()
-                .headers()
-                .get("Cached")
-                .is_some()
-        };
+    async fn request_cached(app: &App, port: u16) -> bool {
+        app.reqwest_client
+            .get(format!("http://0.0.0.0:{port}/"))
+            .send()
+            .await
+            .unwrap()
+            .headers()
+            .get("Cached")
+            .is_some()
     }
 
     #[tokio::test]
     async fn test_expires() {
         let app = crate::setup_managers_for_test().await;
 
-        launch_server![3000; (
+        let port = launch_server![(
             header::EXPIRES,
-            httpdate::fmt_http_date(SystemTime::from(
-                Utc::now() + Duration::seconds(1)
-            ))
+            httpdate::fmt_http_date(SystemTime::from(Utc::now() + Duration::seconds(1)))
         )];
 
-        assert!(!request_cached!(app, 3000));
-        assert!(request_cached!(app, 3000));
+        assert!(!request_cached(&app, port).await);
+        assert!(request_cached(&app, port).await);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        assert!(!request_cached!(app, 3000));
+        assert!(!request_cached(&app, port).await);
     }
 
     #[tokio::test]
     async fn test_max_age() {
         let app = crate::setup_managers_for_test().await;
 
-        launch_server![3001; (
-            header::CACHE_CONTROL,
-            "max-age=1"
-        )];
+        let port = launch_server![(header::CACHE_CONTROL, "max-age=1")];
 
-        assert!(!request_cached!(app, 3001));
-        assert!(request_cached!(app, 3001));
+        assert!(!request_cached(&app, port).await);
+        assert!(request_cached(&app, port).await);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-        assert!(!request_cached!(app, 3001));
+        assert!(!request_cached(&app, port).await);
     }
 
     #[tokio::test]
     async fn test_no_store() {
         let app = crate::setup_managers_for_test().await;
 
-        launch_server![3002; (
-            header::CACHE_CONTROL,
-            "no-store"
-        )];
+        let port = launch_server![(header::CACHE_CONTROL, "no-store")];
 
-        assert!(!request_cached!(app, 3002));
-        assert!(!request_cached!(app, 3002));
+        assert!(!request_cached(&app, port).await);
+        assert!(!request_cached(&app, port).await);
     }
 
     #[tokio::test]
     async fn test_etag() {
         let app = crate::setup_managers_for_test().await;
 
-        launch_server![3003; (
-            header::ETAG,
-            "test_etag"
-        )];
+        let port = launch_server![(header::ETAG, "test_etag")];
 
-        assert!(!request_cached!(app, 3003));
-        assert!(request_cached!(app, 3003));
+        assert!(!request_cached(&app, port).await);
+        assert!(request_cached(&app, port).await);
     }
 
     #[tokio::test]
     async fn test_last_modified() {
         let app = crate::setup_managers_for_test().await;
 
-        launch_server![3004; (
-            header::LAST_MODIFIED,
-            "test_last_modified"
-        )];
+        let port = launch_server![(header::LAST_MODIFIED, "test_last_modified")];
 
-        assert!(!request_cached!(app, 3004));
-        assert!(request_cached!(app, 3004));
+        assert!(!request_cached(&app, port).await);
+        assert!(request_cached(&app, port).await);
     }
 }
