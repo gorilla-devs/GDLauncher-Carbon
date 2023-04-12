@@ -161,3 +161,12 @@ impl From<RequestError> for FERequestError {
         }
     }
 }
+
+pub fn censor_error(error: reqwest_middleware::Error) -> reqwest_middleware::Error {
+    match error {
+        reqwest_middleware::Error::Reqwest(e) => {
+            reqwest_middleware::Error::Reqwest(e.without_url())
+        }
+        e => e,
+    }
+}
