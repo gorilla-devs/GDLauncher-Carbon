@@ -88,7 +88,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={settings.release_channel || "stable"}
+            value={settings.releaseChannel || "stable"}
             options={[
               { label: "Stable", key: "stable" },
               { label: "beta", key: "beta" },
@@ -120,7 +120,7 @@ const General = () => {
             />
           </p>
           <Dropdown
-            value={(settings.concurrent_downloads || "1").toString()}
+            value={(settings.concurrentDownloads || "1").toString()}
             options={Array.from({ length: 20 }, (_, i) => ({
               label: (i + 1).toString(),
               key: (i + 1).toString(),
@@ -228,7 +228,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={settings.show_news}
+            checked={settings.showNews}
             onChange={(e) => {
               settingsMutation.mutate({
                 showNews: e.currentTarget.checked,
@@ -257,7 +257,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={settings.discord_integration}
+            checked={settings.discordIntegration}
             onChange={(e) => {
               settingsMutation.mutate({
                 discordIntegration: e.currentTarget.checked,
@@ -308,7 +308,7 @@ const General = () => {
             />
           </p>
           <Switch
-            checked={settings.reduced_motion}
+            checked={settings.reducedMotion}
             onChange={(e) => {
               settingsMutation.mutate({
                 reducedMotion: e.currentTarget.checked,

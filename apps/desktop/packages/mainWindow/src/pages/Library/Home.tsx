@@ -71,7 +71,7 @@ const Home = () => {
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const showNew = () => routeData.settings.data?.show_news;
+  const showNews = () => routeData.settings.data?.showNews;
 
   createEffect(() => {
     routeData.news.then((newss) => {
@@ -83,7 +83,7 @@ const Home = () => {
     <div class="p-6">
       <div>
         <Show when={news.length > 0}>
-          {showNew() && (
+          {showNews() && (
             <News
               slides={news}
               onClick={(news) => {
