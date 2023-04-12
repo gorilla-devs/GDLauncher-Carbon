@@ -69,9 +69,9 @@ const CodeStep = (props: Props) => {
         onPolling: (info) => {
           setLoading(true);
           props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
+            userCode: info.userCode,
+            link: info.verificationUri,
+            expiresAt: info.expiresAt,
           });
           setExpired(false);
           setError(null);

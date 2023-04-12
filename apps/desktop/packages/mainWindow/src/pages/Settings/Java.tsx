@@ -22,7 +22,7 @@ const Java = () => {
   createEffect(() => {
     Object.entries(javas()).forEach((java) => {
       const javaObj = java[1];
-      const defaultId = javaObj.default_id;
+      const defaultId = javaObj.defaultId;
       setDefaultJavasIds((prev) => [...prev, defaultId]);
     });
   });
@@ -130,7 +130,7 @@ const Java = () => {
                           class="cursor-pointer"
                           onChange={() => {
                             setDefaultJavaMutation.mutate({
-                              major_version: parseInt(javas[0], 10),
+                              majorVersion: parseInt(javas[0], 10),
                               id: j?.path,
                             });
                           }}

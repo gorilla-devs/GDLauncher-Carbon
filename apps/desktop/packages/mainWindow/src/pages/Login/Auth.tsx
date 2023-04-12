@@ -46,9 +46,9 @@ const Auth = (props: Props) => {
         onPolling: (info) => {
           setError(null);
           props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
+            userCode: info.userCode,
+            link: info.verificationUri,
+            expiresAt: info.expiresAt,
           });
           props.setStep(1);
         },
