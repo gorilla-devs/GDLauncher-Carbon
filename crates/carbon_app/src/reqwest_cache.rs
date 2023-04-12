@@ -206,111 +206,111 @@ impl Middleware for CacheMiddleware {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use std::time::SystemTime;
+#[cfg(test)]
+mod test {
+    use std::time::SystemTime;
 
-//     use axum::{http::header, routing::get, Router};
-//     use chrono::{Duration, Utc};
+    use axum::{http::header, routing::get, Router};
+    use chrono::{Duration, Utc};
 
-//     macro_rules! launch_server {
-//         [$address:literal; $($headers:expr),*] => {
-//             let server = Router::new()
-//                 .route("/", get(|| async { ([$($headers),*], "test") }));
+    macro_rules! launch_server {
+        [$address:literal; $($headers:expr),*] => {
+            let server = Router::new()
+                .route("/", get(|| async { ([$($headers),*], "test") }));
 
-//             tokio::spawn(async {
-//                 axum::Server::bind(&concat!("0.0.0.0:", $address).parse().unwrap())
-//                     .serve(server.into_make_service())
-//                     .await
-//                     .unwrap();
-//             });
+            tokio::spawn(async {
+                axum::Server::bind(&concat!("0.0.0.0:", $address).parse().unwrap())
+                    .serve(server.into_make_service())
+                    .await
+                    .unwrap();
+            });
 
-//             // let the server start
-//             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-//         }
-//     }
+            // let the server start
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    }
 
-//     macro_rules! request_cached {
-//         ($app:expr, $address:literal) => {
-//             $app.reqwest_client
-//                 .get(concat!("http://0.0.0.0:", $address, "/"))
-//                 .send()
-//                 .await
-//                 .unwrap()
-//                 .headers()
-//                 .get("Cached")
-//                 .is_some()
-//         };
-//     }
+    macro_rules! request_cached {
+        ($app:expr, $address:literal) => {
+            $app.reqwest_client
+                .get(concat!("http://0.0.0.0:", $address, "/"))
+                .send()
+                .await
+                .unwrap()
+                .headers()
+                .get("Cached")
+                .is_some()
+        };
+    }
 
-//     #[tokio::test]
-//     async fn test_expires() {
-//         let app = crate::setup_managers_for_test().await;
+    #[tokio::test]
+    async fn test_expires() {
+        let app = crate::setup_managers_for_test().await;
 
-//         launch_server![3000; (
-//             header::EXPIRES,
-//             httpdate::fmt_http_date(SystemTime::from(
-//                 Utc::now() + Duration::seconds(1)
-//             ))
-//         )];
+        launch_server![3000; (
+            header::EXPIRES,
+            httpdate::fmt_http_date(SystemTime::from(
+                Utc::now() + Duration::seconds(1)
+            ))
+        )];
 
-//         assert!(!request_cached!(app, 3000));
-//         assert!(request_cached!(app, 3000));
-//         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-//         assert!(!request_cached!(app, 3000));
-//     }
+        assert!(!request_cached!(app, 3000));
+        assert!(request_cached!(app, 3000));
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(!request_cached!(app, 3000));
+    }
 
-//     #[tokio::test]
-//     async fn test_max_age() {
-//         let app = crate::setup_managers_for_test().await;
+    #[tokio::test]
+    async fn test_max_age() {
+        let app = crate::setup_managers_for_test().await;
 
-//         launch_server![3001; (
-//             header::CACHE_CONTROL,
-//             "max-age=1"
-//         )];
+        launch_server![3001; (
+            header::CACHE_CONTROL,
+            "max-age=1"
+        )];
 
-//         assert!(!request_cached!(app, 3001));
-//         assert!(request_cached!(app, 3001));
-//         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-//         assert!(!request_cached!(app, 3001));
-//     }
+        assert!(!request_cached!(app, 3001));
+        assert!(request_cached!(app, 3001));
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        assert!(!request_cached!(app, 3001));
+    }
 
-//     #[tokio::test]
-//     async fn test_no_store() {
-//         let app = crate::setup_managers_for_test().await;
+    #[tokio::test]
+    async fn test_no_store() {
+        let app = crate::setup_managers_for_test().await;
 
-//         launch_server![3002; (
-//             header::CACHE_CONTROL,
-//             "no-store"
-//         )];
+        launch_server![3002; (
+            header::CACHE_CONTROL,
+            "no-store"
+        )];
 
-//         assert!(!request_cached!(app, 3002));
-//         assert!(!request_cached!(app, 3002));
-//     }
+        assert!(!request_cached!(app, 3002));
+        assert!(!request_cached!(app, 3002));
+    }
 
-//     #[tokio::test]
-//     async fn test_etag() {
-//         let app = crate::setup_managers_for_test().await;
+    #[tokio::test]
+    async fn test_etag() {
+        let app = crate::setup_managers_for_test().await;
 
-//         launch_server![3003; (
-//             header::ETAG,
-//             "test_etag"
-//         )];
+        launch_server![3003; (
+            header::ETAG,
+            "test_etag"
+        )];
 
-//         assert!(!request_cached!(app, 3003));
-//         assert!(request_cached!(app, 3003));
-//     }
+        assert!(!request_cached!(app, 3003));
+        assert!(request_cached!(app, 3003));
+    }
 
-//     #[tokio::test]
-//     async fn test_last_modified() {
-//         let app = crate::setup_managers_for_test().await;
+    #[tokio::test]
+    async fn test_last_modified() {
+        let app = crate::setup_managers_for_test().await;
 
-//         launch_server![3004; (
-//             header::LAST_MODIFIED,
-//             "test_last_modified"
-//         )];
+        launch_server![3004; (
+            header::LAST_MODIFIED,
+            "test_last_modified"
+        )];
 
-//         assert!(!request_cached!(app, 3004));
-//         assert!(request_cached!(app, 3004));
-//     }
-// }
+        assert!(!request_cached!(app, 3004));
+        assert!(request_cached!(app, 3004));
+    }
+}
