@@ -44,8 +44,8 @@ const AppNavbar = () => {
   const routeData = useRouteData<typeof fetchData>();
 
   const [port] = createResource(async () => {
-    // let port = await window.coreModuleLoaded;
-    return "1025";
+    let port = await window.getCoreModuleStatus();
+    return port;
   });
 
   createEffect(() => {
