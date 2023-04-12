@@ -21,7 +21,6 @@ pub mod download;
 pub mod java;
 mod minecraft;
 mod prisma_client;
-pub mod queue;
 pub mod reqwest_cached_client;
 mod settings;
 pub mod vtask;
@@ -46,7 +45,7 @@ mod app {
         download_manager: DownloadManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub(crate) task_queue: TaskQueue,
+        pub(crate) task_manager: VisualTaskManager,
     }
 
     macro_rules! manager_getter {
@@ -105,6 +104,7 @@ mod app {
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
+        manager_getter!(task_manager: VisualTaskManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self

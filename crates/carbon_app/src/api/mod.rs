@@ -6,11 +6,9 @@ use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-pub mod keys;
-pub mod router;
-
 mod account;
 mod java;
+pub mod keys;
 mod mc;
 pub mod router;
 pub mod settings;

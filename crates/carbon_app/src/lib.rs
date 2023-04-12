@@ -153,7 +153,11 @@ async fn setup_managers_for_test() -> TestEnv {
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
-    AppInner::new(invalidation_sender, temp_path).await
+
+    TestEnv {
+        tmpdir: temp_path.clone(),
+        app: AppInner::new(invalidation_sender, temp_path).await,
+    }
 }
 
 #[cfg(test)]
