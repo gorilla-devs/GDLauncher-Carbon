@@ -21,6 +21,8 @@ mod error;
 pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
+mod once_send;
+mod reqwest_cache;
 mod runtime_path_override;
 
 #[tokio::main]
