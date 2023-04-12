@@ -3,9 +3,8 @@
 use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Instance {
     pub name: String,
     pub icon: InstanceIcon,
@@ -16,61 +15,51 @@ pub struct Instance {
     pub notes: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug)]
 pub enum InstanceIcon {
     Default,
     RelativePath(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "platform")]
+#[derive(Debug)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct CurseforgeModpack {
     pub project_id: String,
     pub file_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct GameConfig {
     pub version: GameVersion,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
-    pub memory: Option<MemoryRange>,
+    pub memory: Option<(u64, u64)>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug)]
 pub enum GameVersion {
     Standard(StandardVersion),
     Custom(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct StandardVersion {
     pub release: String,
     pub modloaders: HashSet<ModLoader>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ModLoader {
-    #[serde(rename = "type")]
     pub type_: ModLoaderType,
     pub version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ModLoaderType {
     Forge,
     Fabric,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct MemoryRange {
-    pub min_mb: u64,
-    pub max_mb: u64,
 }

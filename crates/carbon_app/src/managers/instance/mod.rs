@@ -18,7 +18,9 @@ use db::instance::Data as CachedInstance;
 use super::ManagerRef;
 
 use crate::domain::instance as domain;
-use domain::schema;
+use domain::info;
+
+mod schema;
 
 pub struct InstanceManager {
     instances: RwLock<HashMap<InstanceId, Instance>>,
@@ -109,7 +111,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         };
 
-        match serde_json::from_str::<schema::Instance>(&config_text) {
+        match schema::parse_instance_config(&config_text) {
             Ok(config) => {
                 let group = if let Some(cached) = cached {
                     self.app
@@ -592,25 +594,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(domain::InstanceDetails {
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
-                schema::GameVersion::Standard(version) => version.release.clone(),
-                schema::GameVersion::Custom(custom) => custom.clone(),
+                info::GameVersion::Standard(version) => version.release.clone(),
+                info::GameVersion::Custom(custom) => custom.clone(),
             },
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
             instance_start_time: instance.instance_start_time,
             modloaders: match &instance.config.game_configuration.version {
-                schema::GameVersion::Standard(version) => version
+                info::GameVersion::Standard(version) => version
                     .modloaders
                     .iter()
                     .map(|loader| domain::ModLoader {
                         version: loader.version.clone(),
                         type_: match loader.type_ {
-                            schema::ModLoaderType::Forge => domain::ModLoaderType::Forge,
-                            schema::ModLoaderType::Fabric => domain::ModLoaderType::Fabirc,
+                            info::ModLoaderType::Forge => domain::ModLoaderType::Forge,
+                            info::ModLoaderType::Fabric => domain::ModLoaderType::Fabirc,
                         },
                     })
                     .collect::<Vec<_>>(),
-                schema::GameVersion::Custom(_) => Vec::new(), // todo
+                info::GameVersion::Custom(_) => Vec::new(), // todo
             },
             notes: instance.config.notes.clone(),
         })
@@ -742,7 +744,7 @@ pub enum Late<T> {
 }
 
 pub struct InstanceData {
-    config: schema::Instance,
+    config: info::Instance,
     instance_start_time: Option<DateTime<Utc>>,
     mods: Late<Vec<Mod>>,
 }

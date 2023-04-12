@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-pub mod schema;
+pub mod info;
 
 pub struct InstanceDetails {
     pub name: String,
