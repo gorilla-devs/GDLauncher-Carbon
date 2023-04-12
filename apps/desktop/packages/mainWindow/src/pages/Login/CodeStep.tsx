@@ -62,16 +62,16 @@ const CodeStep = (props: Props) => {
   const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
 
   const handleRefersh = async () => {
-    accountEnrollCancelMutation.mutate(null);
-    accountEnrollBeginMutation.mutate(null);
+    accountEnrollCancelMutation.mutate(undefined);
+    accountEnrollBeginMutation.mutate(undefined);
     if (routeData.isSuccess) {
       handleStatus(routeData, {
         onPolling: (info) => {
           setLoading(true);
           props.setDeviceCodeObject({
-            userCode: info.user_code,
-            link: info.verification_uri,
-            expiresAt: info.expires_at,
+            userCode: info.userCode,
+            link: info.verificationUri,
+            expiresAt: info.expiresAt,
           });
           setExpired(false);
           setError(null);
@@ -100,7 +100,7 @@ const CodeStep = (props: Props) => {
       handleStatus(routeData, {
         onComplete(_accountEntry) {
           setLoading(false);
-          finalizeMutation.mutate(null);
+          finalizeMutation.mutate(undefined);
           navigate("/library");
         },
       });

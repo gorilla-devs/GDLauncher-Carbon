@@ -1,6 +1,7 @@
 import { Theme } from "./index";
 
 const poisonGreen: Theme = {
+  accent: "hsla(211, 61%, 53%, 1)",
   primary: "red",
   "primary-hover": "hsla(211, 61%, 53%, 1)",
   shade0: "#F1F9E7",
