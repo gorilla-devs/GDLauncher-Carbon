@@ -47,7 +47,7 @@ jobs:
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                npm run init
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
@@ -97,7 +97,7 @@ jobs:
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                npm run init
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
@@ -231,7 +231,7 @@ jobs:
       - checkout
       - run: |
           node -v
-          npm run init
+          npm run sudo-init
           chmod -R a+x node_modules
       # - run: pnpm test
       - run: pnpm build-web
@@ -249,7 +249,7 @@ jobs:
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          npm run init
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
@@ -284,7 +284,7 @@ jobs:
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          npm run init
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
