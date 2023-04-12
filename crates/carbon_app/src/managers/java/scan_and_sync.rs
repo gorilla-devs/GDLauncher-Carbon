@@ -178,7 +178,7 @@ mod test {
             path: "/usr/bin/java2".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86_64,
+            arch: JavaArch::X86,
         };
         add_java_component_to_db(db, component_to_remove)
             .await
@@ -188,7 +188,7 @@ mod test {
             path: "/usr/bin/java".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86_64,
+            arch: JavaArch::X86,
         };
 
         add_java_component_to_db(db, component_to_keep)
@@ -218,7 +218,7 @@ mod test {
             path: "/usr/bin/java".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86_64,
+            arch: JavaArch::X86,
         };
 
         add_java_component_to_db(db, component_to_add)
@@ -248,7 +248,7 @@ mod test {
             path: "/my/custom/path".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Custom,
-            arch: JavaArch::X86_64,
+            arch: JavaArch::X86,
         };
 
         add_java_component_to_db(db, component_to_add)

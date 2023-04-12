@@ -1,6 +1,4 @@
 import { createEffect, createSignal, onMount, JSX, onCleanup } from "solid-js";
-import "./index.css";
-
 export interface Props {
   children?: JSX.Element;
   class?: string;
@@ -115,11 +113,15 @@ const Carousel = (props: Props) => {
           </div>
         </div>
       </div>
-      <div ref={scrollWrapper} id="scroll-wrapper" class="w-full flex gap-4">
+      <div
+        ref={scrollWrapper}
+        id="scroll-wrapper"
+        class="w-full flex gap-4 scrollbar-hide"
+      >
         <div
           ref={horizontalSlider}
           id="horizontal-slider"
-          class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
+          class="scrollbar-hide w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
         >
           {props.children}
         </div>

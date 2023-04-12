@@ -21,7 +21,7 @@ export default function initRspc(port: number) {
 
   const createInvalidateQuery = () => {
     const context = rspc.useContext();
-    client.subscription(["invalidateQuery", null], {
+    client.subscription(["invalidateQuery"], {
       onData: (invalidateOperation) => {
         const key = [invalidateOperation!.key];
         if (invalidateOperation.args !== null) {

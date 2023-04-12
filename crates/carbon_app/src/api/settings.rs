@@ -27,6 +27,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FESettings {
     theme: String,
     language: String,
