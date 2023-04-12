@@ -94,7 +94,7 @@ const Dropdown = (props: Props) => {
           "text-shade-5": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
-          "bg-shade-7": !props.bg,
+          "bg-shade-7": !props.bgColorClass,
           "rounded-md": !props.btnDropdown,
         }}
       >
