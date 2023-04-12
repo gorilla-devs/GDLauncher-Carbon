@@ -57,10 +57,12 @@ model Skin {
 }
 
 model HTTPCache {
-  id        String   @id
-  url       String
-  data      Bytes
-  createdAt DateTime @default(now())
+  url          String @id
+  status_code  Int
+  data         Bytes
+  expiresAt    DateTime? @default(now())
+  lastModified String?
+  etag         String?
 }
 
 model ActiveDownloads {

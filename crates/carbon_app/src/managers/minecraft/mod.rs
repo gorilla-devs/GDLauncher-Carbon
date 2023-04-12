@@ -23,7 +23,7 @@ impl MinecraftManager {
 
 impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        manifest::get_manifest_meta(self.app.reqwest_client.clone())
+        manifest::get_meta(self.app.reqwest_client.clone())
             .await
             .unwrap()
     }
@@ -34,14 +34,14 @@ impl ManagerRef<'_, MinecraftManager> {
     ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
-        let manifest = manifest::get_manifest_meta(self.app.reqwest_client.clone()).await?;
+        let manifest = manifest::get_meta(self.app.reqwest_client.clone()).await?;
 
         let manifest_version = manifest
             .iter()
             .find(|v| v.id == mc_version)
             .ok_or(anyhow!("Minecraft version not found"))?;
 
-        let version = version::get_version_meta(
+        let version = version::get_meta(
             self.app.reqwest_client.clone(),
             manifest_version.clone(),
             runtime_path.get_versions().get_clients_path(),

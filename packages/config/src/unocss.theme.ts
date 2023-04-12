@@ -2,6 +2,7 @@ type shade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 type Theme = {
   // Colors
+  accent: string;
   primary: string;
   "primary-hover": string;
   shade: {
@@ -17,6 +18,7 @@ type Theme = {
 
 const theme = {
   colors: {
+    accent: "var(--accent)",
     primary: "var(--primary)",
     "primary-hover": "var(--primary-hover)",
     shade: {

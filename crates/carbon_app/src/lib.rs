@@ -21,6 +21,7 @@ mod error;
 pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
+mod once_send;
 mod runtime_path_override;
 
 #[tokio::main]
@@ -43,7 +44,11 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let port = get_available_port().await.unwrap();
+    let port = if cfg!(debug_assertions) {
+        4650
+    } else {
+        get_available_port().await.unwrap()
+    };
 
     start_router(runtime_path, port).await;
 }
@@ -160,16 +165,23 @@ async fn setup_managers_for_test() -> TestEnv {
 
 #[cfg(test)]
 mod test {
+    use crate::get_available_port;
+
     #[tokio::test]
     async fn test_router() {
+        let port = get_available_port().await.unwrap();
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
-        let server = tokio::spawn(async {
-            super::start_router(temp_dir.into_path(), 4000).await;
+        let server = tokio::spawn(async move {
+            super::start_router(temp_dir.into_path(), port).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let client = reqwest::Client::new();
-        let resp = client.get("http://localhost:4000").send().await.unwrap();
+        let resp = client
+            .get(format!("http://localhost:{port}"))
+            .send()
+            .await
+            .unwrap();
         let resp_code = resp.status();
         let resp_body = resp.text().await.unwrap();
 

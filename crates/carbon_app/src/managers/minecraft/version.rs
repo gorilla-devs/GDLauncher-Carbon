@@ -25,8 +25,8 @@ pub enum VersionError {
     QueryError(#[from] QueryError),
 }
 
-pub async fn get_version_meta(
-    reqwest_client: reqwest::Client,
+pub async fn get_meta(
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
     clients_path: PathBuf,
 ) -> anyhow::Result<Version> {
@@ -390,7 +390,7 @@ mod tests {
     use super::*;
     use crate::{
         domain::minecraft::manifest::MinecraftManifest,
-        managers::minecraft::manifest::get_manifest_meta, setup_managers_for_test,
+        managers::minecraft::manifest, setup_managers_for_test,
     };
     use carbon_net::Progress;
     use chrono::Utc;
@@ -409,12 +409,12 @@ mod tests {
     async fn test_generate_startup_command() {
         let app = setup_managers_for_test().await;
         let runtime_path = &app.settings_manager().runtime_path;
-        let manifest = get_manifest_meta(reqwest::Client::new()).await.unwrap();
+        let manifest = manifest::get_meta(app.reqwest_client.clone()).await.unwrap();
 
         let version = manifest.into_iter().find(|v| v.id == "1.16.5").unwrap();
 
-        let version = get_version_meta(
-            reqwest::Client::new(),
+        let version = get_meta(
+            app.reqwest_client.clone(),
             version,
             runtime_path.get_versions().get_clients_path().to_path_buf(),
         )
@@ -459,11 +459,11 @@ mod tests {
 
         let runtime_path = &app.settings_manager().runtime_path;
 
-        let manifest = get_manifest_meta(reqwest::Client::new()).await.unwrap();
+        let manifest = manifest::get_meta(app.reqwest_client.clone()).await.unwrap();
         let version = manifest.into_iter().find(|v| v.id == "1.16.5").unwrap();
 
-        let version = get_version_meta(
-            reqwest::Client::new(),
+        let version = get_meta(
+            app.reqwest_client.clone(),
             version,
             runtime_path.get_versions().get_clients_path().to_path_buf(),
         )

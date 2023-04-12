@@ -1,14 +1,16 @@
 use std::time::Duration;
 
+use anyhow::{anyhow, bail};
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
+use reqwest_middleware::ClientWithMiddleware;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
-use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
+use crate::error::request::{censor_error, RequestContext, RequestError, RequestErrorDetails};
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
@@ -22,7 +24,7 @@ pub struct DeviceCode {
 }
 
 impl DeviceCode {
-    pub async fn request_code(client: &Client) -> Result<Self, DeviceCodeRequestError> {
+    pub async fn request_code(client: &ClientWithMiddleware) -> anyhow::Result<Self> {
         #[derive(Deserialize)]
         struct DeviceCodeResponse {
             user_code: String,
@@ -45,12 +47,12 @@ impl DeviceCode {
             .header("content-length", "0")
             .send()
             .await
-            .map_err(RequestError::from_error_censored)?
+            .map_err(censor_error)?
             .error_for_status()
-            .map_err(RequestError::from_error_censored)?
+            .map_err(reqwest::Error::without_url)?
             .json::<DeviceCodeResponse>()
             .await
-            .map_err(RequestError::from_error_censored)?;
+            .map_err(reqwest::Error::without_url)?;
 
         Ok(Self {
             user_code: response.user_code,
@@ -61,7 +63,10 @@ impl DeviceCode {
         })
     }
 
-    pub async fn poll_ms_auth(&self, client: &Client) -> Result<MsAuth, DeviceCodePollError> {
+    pub async fn poll_ms_auth(
+        &self,
+        client: &ClientWithMiddleware,
+    ) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>> {
         loop {
             tokio::time::sleep(self.polling_interval).await;
 
@@ -77,8 +82,7 @@ impl DeviceCode {
                     ("device_code", &self.device_code),
                 ])
                 .send()
-                .await
-                .map_err(RequestError::from_error)?;
+                .await?;
 
             match response.status() {
                 StatusCode::BAD_REQUEST => {
@@ -93,16 +97,16 @@ impl DeviceCode {
                         .map_err(RequestError::from_error)?
                         .error;
 
-                    return match &error as &str {
+                    match &error as &str {
                         "authorization_pending" => continue,
-                        "expired_token" => Err(DeviceCodePollError::CodeExpired)?,
-                        _ => Err(DeviceCodePollError::Request(RequestError {
+                        "expired_token" => return Ok(Err(DeviceCodeExpiredError)),
+                        _ => bail!(RequestError {
                             context: RequestContext::none(),
                             error: RequestErrorDetails::UnexpectedStatus {
                                 status: StatusCode::BAD_REQUEST,
                                 details: Some(error),
                             },
-                        })),
+                        }),
                     };
                 }
                 StatusCode::OK => {
@@ -119,34 +123,22 @@ impl DeviceCode {
                         .await
                         .map_err(RequestError::from_error)?;
 
-                    break Ok(MsAuth {
+                    break Ok(Ok(MsAuth {
                         access_token: response.access_token,
                         //id_token: response.id_token,
                         refresh_token: response.refresh_token,
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
-                    });
+                    }));
                 }
-                _ => Err(DeviceCodePollError::Request(RequestError::from_status(
-                    &response,
-                )))?,
+                _ => bail!(RequestError::from_status(&response,)),
             }
         }
     }
 }
 
-#[derive(Error, Debug, Clone)]
-pub enum DeviceCodeRequestError {
-    #[error("{0}")]
-    Request(#[from] RequestError),
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum DeviceCodePollError {
-    #[error("request error: {0}")]
-    Request(#[from] RequestError),
-    #[error("device code expired")]
-    CodeExpired,
-}
+#[derive(Error, Debug)]
+#[error("pending device code expired")]
+pub struct DeviceCodeExpiredError;
 
 #[derive(Debug, Clone)]
 pub struct MsAuth {
@@ -159,7 +151,10 @@ pub struct MsAuth {
 impl MsAuth {
     /// Refresh the auth token, returning a new token if the current one
     /// has expired.
-    pub async fn refresh(client: &Client, refresh_token: &str) -> Result<Self, MsAuthRefreshError> {
+    pub async fn refresh(
+        client: &ClientWithMiddleware,
+        refresh_token: &str,
+    ) -> anyhow::Result<Self> {
         #[derive(Deserialize)]
         struct RefreshResponse {
             access_token: String,
@@ -180,13 +175,10 @@ impl MsAuth {
                 ),
             ])
             .send()
-            .await
-            .map_err(RequestError::from_error)?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
+            .await?
+            .error_for_status()?
             .json::<RefreshResponse>()
-            .await
-            .map_err(RequestError::from_error)?;
+            .await?;
 
         Ok(Self {
             access_token: response.access_token,
@@ -196,20 +188,17 @@ impl MsAuth {
     }
 }
 
-#[derive(Error, Debug, Clone)]
-pub enum MsAuthRefreshError {
-    #[error("request error: {0}")]
-    Request(#[from] RequestError),
-}
-
-struct XboxAuth {
+pub struct XboxAuth {
     xsts_token: String,
     userhash: String,
 }
 
 impl XboxAuth {
     /// Obtain an Xbox account from a MS account (without refreshing it)
-    pub async fn from_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, XboxAuthError> {
+    pub async fn from_ms(
+        ms_auth: &MsAuth,
+        client: &ClientWithMiddleware,
+    ) -> anyhow::Result<Result<Self, XboxError>> {
         let xbl_token = {
             #[derive(Deserialize)]
             struct XblToken {
@@ -232,13 +221,10 @@ impl XboxAuth {
                 .header("Accept", "application/json")
                 .json(&json)
                 .send()
-                .await
-                .map_err(RequestError::from_error)?
-                .error_for_status()
-                .map_err(RequestError::from_error)?
+                .await?
+                .error_for_status()?
                 .json::<XblToken>()
-                .await
-                .map_err(RequestError::from_error)?;
+                .await?;
 
             response.token
         };
@@ -259,8 +245,7 @@ impl XboxAuth {
             .header("Content-Type", "application/json")
             .json(&json)
             .send()
-            .await
-            .map_err(RequestError::from_error)?;
+            .await?;
 
         match response.status() {
             StatusCode::OK => {
@@ -282,26 +267,23 @@ impl XboxAuth {
                     uhs: String,
                 }
 
-                let response = response
-                    .json::<XstsToken>()
-                    .await
-                    .map_err(RequestError::from_error)?;
+                let response = response.json::<XstsToken>().await?;
 
-                Ok(Self {
+                Ok(Ok(Self {
                     xsts_token: response.token,
                     userhash: response
                         .display_claims
                         .xui
                         .get(0)
                         .ok_or_else(|| {
-                            XboxAuthError::Request(RequestError {
+                            anyhow!(RequestError {
                                 context: RequestContext::none(),
                                 error: RequestErrorDetails::MalformedResponse,
                             })
                         })?
                         .uhs
                         .clone(),
-                })
+                }))
             }
             StatusCode::UNAUTHORIZED => {
                 #[derive(Deserialize)]
@@ -310,19 +292,17 @@ impl XboxAuth {
                     xerr: u32,
                 }
 
-                let xsts_err = response
-                    .json::<XstsError>()
-                    .await
-                    .map_err(RequestError::from_error)?;
+                let xsts_err = response.json::<XstsError>().await?;
 
-                Err(XboxAuthError::Xbox(XboxError::from_xerr(xsts_err.xerr)))
+                Ok(Err(XboxError::from_xerr(xsts_err.xerr)))
             }
-            _ => Err(XboxAuthError::Request(RequestError::from_status(&response))),
+            _ => Err(anyhow!(RequestError::from_status(&response))),
         }
     }
 }
 
 #[derive(Error, Debug, Clone, Copy, Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum XboxError {
     #[error("no xbox account is associated with this microsoft account")]
     NoAccount,
@@ -338,15 +318,6 @@ pub enum XboxError {
 
     #[error("xbox returned an unknown error code: {0}")]
     Unknown(u32),
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum XboxAuthError {
-    #[error("xbox error: {0}")]
-    Xbox(#[from] XboxError),
-
-    #[error("request error: {0}")]
-    Request(#[from] RequestError),
 }
 
 impl XboxError {
@@ -370,9 +341,10 @@ pub struct McAuth {
 
 impl McAuth {
     /// Authenticate with a MS account (without refreshing it)
-    pub async fn auth_ms(ms_auth: &MsAuth, client: &Client) -> Result<Self, McAuthError> {
-        let xbox_auth = XboxAuth::from_ms(ms_auth, client).await?;
-
+    pub async fn auth_ms(
+        xbox_auth: XboxAuth,
+        client: &ClientWithMiddleware,
+    ) -> anyhow::Result<Self> {
         let json = json!({
             "identityToken": format!("XBL3.0 x={};{}", xbox_auth.userhash, xbox_auth.xsts_token)
         });
@@ -388,13 +360,10 @@ impl McAuth {
             .header("Accept", "application/json")
             .json(&json)
             .send()
-            .await
-            .map_err(RequestError::from_error)?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
+            .await?
+            .error_for_status()?
             .json::<McAuthResponse>()
-            .await
-            .map_err(RequestError::from_error)?;
+            .await?;
 
         Ok(Self {
             access_token: response.access_token,
@@ -404,8 +373,8 @@ impl McAuth {
 
     pub async fn get_entitlement(
         &self,
-        client: &Client,
-    ) -> Result<McEntitlement, McEntitlementCheckError> {
+        client: &ClientWithMiddleware,
+    ) -> anyhow::Result<Result<McEntitlement, McEntitlementMissingError>> {
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -415,13 +384,10 @@ impl McAuth {
             .get("https://api.minecraftservices.com/entitlements/mcstore")
             .bearer_auth(&self.access_token)
             .send()
-            .await
-            .map_err(RequestError::from_error)?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
+            .await?
+            .error_for_status()?
             .json::<EntitlementResponse>()
-            .await
-            .map_err(RequestError::from_error)?;
+            .await?;
 
         #[derive(Debug, Deserialize)]
         struct SignedEntitlements {
@@ -447,18 +413,16 @@ impl McAuth {
             Err(e) => {
                 let error = match e.kind() {
                     ErrorKind::InvalidSignature | ErrorKind::ImmatureSignature => {
-                        McEntitlementCheckError::Entitlement(McEntitlementError::InvalidSignature)
+                        McEntitlementError::InvalidSignature
                     }
                     ErrorKind::InvalidToken | ErrorKind::MissingRequiredClaim(_) => {
-                        McEntitlementCheckError::Entitlement(McEntitlementError::InvalidData)
+                        McEntitlementError::InvalidData
                     }
-                    ErrorKind::MissingAlgorithm => {
-                        McEntitlementCheckError::Entitlement(McEntitlementError::Outdated)
-                    }
-                    _ => McEntitlementCheckError::Entitlement(McEntitlementError::Jwt(e)),
+                    ErrorKind::MissingAlgorithm => McEntitlementError::Outdated,
+                    _ => McEntitlementError::Jwt(e),
                 };
 
-                return Err(error);
+                bail!(error);
             }
         };
 
@@ -471,35 +435,25 @@ impl McAuth {
             .any(|SignedEntitlement { name }| name == "product_minecraft");
 
         match owns_game {
-            true => Ok(McEntitlement::Owned),
-            false => Err(McEntitlementCheckError::Entitlement(
-                McEntitlementError::NoEntitlement,
-            ))?,
+            true => Ok(Ok(McEntitlement::Owned)),
+            false => Ok(Err(McEntitlementMissingError)),
         }
-    }
-
-    pub async fn populate(&self, client: &Client) -> Result<McAccount, McAccountPopulateError> {
-        Ok(McAccount {
-            auth: self.clone(),
-            entitlement: self.get_entitlement(client).await?,
-            profile: get_profile(client, &self.access_token).await?,
-        })
     }
 }
 
 pub async fn get_profile(
-    client: &Client,
+    client: &ClientWithMiddleware,
     access_token: &str,
-) -> Result<McProfile, McProfileRequestError> {
+) -> anyhow::Result<Result<McProfile, GetProfileError>> {
     let response = client
         .get("https://api.minecraftservices.com/minecraft/profile")
         .bearer_auth(access_token)
         .send()
-        .await
-        .map_err(RequestError::from_error)?;
+        .await?;
 
     match response.status() {
-        StatusCode::NOT_FOUND => Err(McProfileRequestError::Profile(McProfileError::NoProfile))?,
+        StatusCode::UNAUTHORIZED => Ok(Err(GetProfileError::AuthTokenInvalid)),
+        StatusCode::NOT_FOUND => Ok(Err(GetProfileError::GameProfileMissing)),
         StatusCode::OK => {
             #[derive(Debug, Deserialize)]
             struct McProfileResponse {
@@ -529,25 +483,14 @@ pub async fn get_profile(
                     url: skin.url,
                 });
 
-            Ok(McProfile {
+            Ok(Ok(McProfile {
                 uuid: response.id,
                 username: response.name,
                 skin,
-            })
+            }))
         }
-        _ => Err(McProfileRequestError::Request(RequestError::from_status(
-            &response,
-        )))?,
+        _ => bail!(RequestError::from_status(&response)),
     }
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum McAuthError {
-    #[error("request error: {0}")]
-    Request(#[from] RequestError),
-
-    #[error("xbox auth error: {0}")]
-    Xbox(#[from] XboxAuthError),
 }
 
 #[derive(Debug, Clone)]
@@ -563,6 +506,18 @@ impl McEntitlement {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum GetProfileError {
+    #[error("missing game profile")]
+    GameProfileMissing,
+    #[error("authentication token invalid")]
+    AuthTokenInvalid,
+}
+
+#[derive(Error, Debug)]
+#[error("no game entitlement")]
+pub struct McEntitlementMissingError;
+
 #[derive(Error, Debug, Clone)]
 pub enum McEntitlementError {
     #[error("response data was not valid")]
@@ -576,9 +531,6 @@ pub enum McEntitlementError {
 
     #[error("JWT error: {0}")]
     Jwt(jsonwebtoken::errors::Error),
-
-    #[error("no game entitlement")]
-    NoEntitlement,
 }
 
 #[derive(Error, Debug, Clone)]
@@ -597,21 +549,6 @@ pub struct McProfile {
     pub skin: Option<McSkin>,
 }
 
-#[derive(Error, Debug, Clone)]
-pub enum McProfileError {
-    #[error("no profile found")]
-    NoProfile,
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum McProfileRequestError {
-    #[error("reqwest error: {0}")]
-    Request(#[from] RequestError),
-
-    #[error("profile error: {0}")]
-    Profile(#[from] McProfileError),
-}
-
 #[derive(Debug, Clone)]
 pub struct McSkin {
     pub id: String,
@@ -623,15 +560,6 @@ pub struct McAccount {
     pub auth: McAuth,
     pub entitlement: McEntitlement,
     pub profile: McProfile,
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum McAccountPopulateError {
-    #[error("entitlement check error: {0}")]
-    Entitlement(#[from] McEntitlementCheckError),
-
-    #[error("game profile error: {0}")]
-    Profile(#[from] McProfileRequestError),
 }
 
 #[derive(Debug, Clone)]

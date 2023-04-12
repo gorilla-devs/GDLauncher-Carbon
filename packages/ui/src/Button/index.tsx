@@ -77,7 +77,7 @@ const getVariant = (
     primary: {
       ...commonStyle,
       "bg-primary": true,
-      "hover:bg-primary-hover": !isDisabled,
+      "hover:bg-accent": !isDisabled,
       "bg-shade-8": isDisabled,
       "text-shade-5": isDisabled,
       "border-0": true,

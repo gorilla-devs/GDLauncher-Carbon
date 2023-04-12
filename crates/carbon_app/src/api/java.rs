@@ -40,15 +40,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Javas(HashMap<u8, FEAvailableJavas>);
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FEAvailableJavas {
     default_id: String,
     javas: Vec<FEJavaComponent>,
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FEJavaComponent {
     path: String,
     version: String,
@@ -69,6 +72,7 @@ impl From<Java> for FEJavaComponent {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 enum FEJavaComponentType {
     Local,
     Managed,
@@ -86,6 +90,7 @@ impl From<JavaComponentType> for FEJavaComponentType {
 }
 
 #[derive(Type, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SetupArgs {
     major_version: u8,
     #[serde(rename = "type")]
@@ -93,12 +98,14 @@ struct SetupArgs {
 }
 
 #[derive(Type, Deserialize)]
+#[serde(rename_all = "camelCase")]
 enum AutoSetupTypes {
     AdoptOpenJDK,
     MojangJDK,
 }
 
 #[derive(Type, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SetDefaultArgs {
     major_version: u8,
     id: String,

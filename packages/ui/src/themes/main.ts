@@ -1,6 +1,7 @@
 import { Theme } from "./index";
 
 const mainTheme: Theme = {
+  accent: "hsla(211, 61%, 53%, 1)",
   primary: "hsla(211, 61%, 43%, 1)",
   "primary-hover": "hsla(211, 61%, 53%, 1)",
   shade0: "hsla(224, 16%, 64%, 1)",

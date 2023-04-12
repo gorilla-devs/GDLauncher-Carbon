@@ -25,6 +25,7 @@ tower-http = { workspace = true, default-features = false, features = ["cors"] }
 rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
+reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
 jsonwebtoken = { workspace = true }
@@ -45,6 +46,10 @@ strum = { workspace = true }
 regex = { workspace = true }
 image = { workspace = true, features = ["png"], default-features = false }
 daedalus = { version = "0.1.19" }
+task-local-extensions = { workspace = true }
+hyper = { workspace = true }
+http = { workspace = true }
+httpdate = { workspace = true }
 # libc = { workspace = true }
 
 # [target.'cfg(windows)'.dependencies]
