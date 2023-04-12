@@ -13,7 +13,7 @@ pub enum AssetsError {
 }
 
 pub async fn get_meta(
-    reqwest_client: reqwest::Client,
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
     version_asset_index: VersionAssetIndex,
     asset_indexes_path: PathBuf,
 ) -> anyhow::Result<AssetIndex> {
