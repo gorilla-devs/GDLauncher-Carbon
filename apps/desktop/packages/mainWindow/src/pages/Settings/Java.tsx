@@ -131,12 +131,12 @@ const Java = () => {
                           onChange={() => {
                             setDefaultJavaMutation.mutate({
                               major_version: parseInt(javas[0], 10),
-                              id: "j?.id",
+                              id: j?.path,
                             });
                           }}
                         >
                           <Show
-                            when={defaultJavasIds().includes("j?.id")}
+                            when={defaultJavasIds().includes(j?.path)}
                             fallback={
                               <div class="text-shade-5 text-xl i-ri:star-line" />
                             }

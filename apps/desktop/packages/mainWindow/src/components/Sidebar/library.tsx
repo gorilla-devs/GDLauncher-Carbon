@@ -3,7 +3,6 @@ import SiderbarWrapper from "./wrapper";
 import { Show, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
-import Style from "./style.module.scss";
 import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans } from "@gd/i18n";
@@ -83,7 +82,7 @@ const Sidebar = () => {
           </Collapsable>
         </Show>
         <Show when={!isSidebarOpened()}>
-          <div class="scrollbar-hide h-full w-full max-h-[calc(100vh-60px-28px-80px-80px)] overflow-auto flex flex-col gap-4 items-center mt-6">
+          <div class="h-full w-full overflow-auto flex flex-col gap-4 items-center scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
             <Tile
               // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
