@@ -168,7 +168,7 @@ mod test {
     async fn test_router() {
         let port = get_available_port().await.unwrap();
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
-        let server = tokio::spawn(async {
+        let server = tokio::spawn(async move {
             super::start_router(temp_dir.into_path(), port).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
