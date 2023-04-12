@@ -49,6 +49,8 @@ impl ManagerRef<'_, SkinManager> {
                     Some(token) => super::api::get_profile(&self.app.reqwest_client, token)
                         .await
                         .ok()
+                        .map(Result::ok)
+                        .flatten()
                         .map(|profile| profile.skin)
                         // use the default if there is no skin or an error occured.
                         .flatten()

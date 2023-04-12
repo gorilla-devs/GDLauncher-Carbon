@@ -26,7 +26,7 @@ pub enum VersionError {
 }
 
 pub async fn get_meta(
-    reqwest_client: reqwest::Client,
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
     clients_path: PathBuf,
 ) -> anyhow::Result<Version> {

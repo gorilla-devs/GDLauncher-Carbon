@@ -1,8 +1,7 @@
 use crate::{
     api::keys::account::*,
     db::{self, read_filters::StringFilter},
-    error::request::{RequestError, RequestErrorDetails},
-    managers::account::enroll::InvalidateCtx,
+    managers::account::{api::GetProfileError, enroll::InvalidateCtx},
 };
 use anyhow::ensure;
 use async_trait::async_trait;
@@ -11,7 +10,6 @@ use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
-use reqwest::StatusCode;
 use std::{
     collections::HashMap,
     mem,
@@ -24,12 +22,8 @@ use tokio::sync::{Mutex, RwLock};
 
 use anyhow::{anyhow, bail};
 
-pub use self::enroll::EnrollmentError;
-use self::{
-    api::{DeviceCode, McProfileRequestError},
-    enroll::{EnrollmentStatus, EnrollmentTask},
-    skin::SkinManager,
-};
+pub use self::enroll::{EnrollmentError, EnrollmentStatus};
+use self::{enroll::EnrollmentTask, skin::SkinManager};
 
 use super::{AppInner, AppRef, ManagerRef};
 
@@ -307,9 +301,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 let mut refreshing = account_manager.currently_refreshing.write().await;
                 // this should never happen
                 let enrollment = refreshing.get(&self.account.uuid).expect("account refresh invalidator recieved an invalidation without an active enrollemt");
-                let status = enrollment.status.read().await.clone();
+                let status = enrollment.status.read().await;
 
-                match status {
+                match &*status {
                     EnrollmentStatus::Complete(account) => {
                         account_manager
                             .add_account(account.clone().into())
@@ -317,6 +311,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             .expect(
                             "db error, this can't be handled in the account invalidator right now",
                         );
+                        drop(status);
                         refreshing.remove(&self.account.uuid);
                     }
                     EnrollmentStatus::Failed(_) => {
@@ -465,12 +460,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
     }
 
-    pub async fn get_enrollment_status(self) -> Option<FEEnrollmentStatus> {
+    pub async fn get_enrollment_status<T>(
+        self,
+        f: impl FnOnce(&EnrollmentStatus) -> T,
+    ) -> Option<T> {
         match &*self.active_enrollment.read().await {
             None => None,
-            Some(enrollment) => Some(FEEnrollmentStatus::from_enrollment_status(
-                &*enrollment.status.read().await,
-            )),
+            Some(enrollment) => Some(f(&*enrollment.status.read().await)),
         }
     }
 
@@ -533,15 +529,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
         drop(refresh_lock);
 
         let profile = match profile {
-            Ok(x) => x,
-            Err(McProfileRequestError::Request(RequestError {
-                error:
-                    RequestErrorDetails::UnexpectedStatus {
-                        status: StatusCode::UNAUTHORIZED,
-                        ..
-                    },
-                ..
-            })) => {
+            Ok(Ok(x)) => x,
+            Ok(Err(GetProfileError::AuthTokenInvalid)) => {
                 // the account was expired prematurely
                 self.app
                     .prisma_client
@@ -555,6 +544,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
                 return Ok(());
+            }
+            Ok(Err(GetProfileError::GameProfileMissing)) => {
+                bail!(GetProfileError::GameProfileMissing)
             }
             Err(e) => bail!(e),
         };
@@ -882,31 +874,4 @@ impl From<api::FullAccount> for FullAccount {
 pub enum FullAccountLoadError {
     #[error("attempted to parse microsoft account DB entry(uuid {0}), but was missing refresh token expiration timestamp")]
     MissingExpiration(String),
-}
-
-// Temporary until enroll errors are fixed
-pub enum FEEnrollmentStatus {
-    RequestingCode,
-    PollingCode(DeviceCode),
-    QueryAccount,
-    Complete(Account),
-    Failed(EnrollmentError),
-}
-
-impl FEEnrollmentStatus {
-    fn from_enrollment_status(status: &EnrollmentStatus) -> FEEnrollmentStatus {
-        match status {
-            EnrollmentStatus::RequestingCode => Self::RequestingCode,
-            EnrollmentStatus::PollingCode(code) => Self::PollingCode(code.clone()),
-            EnrollmentStatus::McLogin | EnrollmentStatus::PopulateAccount => Self::QueryAccount,
-            EnrollmentStatus::Complete(account) => FEEnrollmentStatus::Complete(Account {
-                username: account.mc.profile.username.clone(),
-                uuid: account.mc.profile.uuid.clone(),
-                last_used: Utc::now(),
-                type_: AccountType::Microsoft,
-                skin_id: account.mc.profile.skin.as_ref().map(|skin| skin.id.clone()),
-            }),
-            EnrollmentStatus::Failed(err) => FEEnrollmentStatus::Failed(err.clone()),
-        }
-    }
 }
