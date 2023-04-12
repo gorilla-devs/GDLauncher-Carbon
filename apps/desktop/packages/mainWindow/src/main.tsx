@@ -21,7 +21,7 @@ render(() => {
     let port = await window.coreModuleLoaded;
     console.log("PORT", port);
     window.clearLoading();
-    return "1025";
+    return port;
   });
 
   const [i18nInstance] = createResource(async () => {

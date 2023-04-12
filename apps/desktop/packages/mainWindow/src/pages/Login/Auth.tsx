@@ -37,7 +37,7 @@ const Auth = (props: Props) => {
 
   const handleClick = async () => {
     setClicked(true);
-    accountEnrollBeginMutation.mutate(null);
+    accountEnrollBeginMutation.mutate(undefined);
   };
 
   createEffect(() => {
@@ -57,7 +57,7 @@ const Auth = (props: Props) => {
         },
         onComplete() {
           setError(null);
-          accountEnrollFinalizeMutation.mutate(null);
+          accountEnrollFinalizeMutation.mutate(undefined);
           navigate("/library");
         },
       });

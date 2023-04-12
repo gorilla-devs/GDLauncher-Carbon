@@ -28,10 +28,6 @@ const General = () => {
     if (routeData.data.data) setSettings(routeData.data.data);
   });
 
-  createEffect(() => {
-    console.log("releaseChannel STORE", settings.release_channel);
-  });
-
   return (
     <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
@@ -99,7 +95,7 @@ const General = () => {
               { label: "alpha", key: "alpha" },
             ]}
             onChange={(channel) => {
-              settingsMutation.mutate({ release_channel: channel.key });
+              settingsMutation.mutate({ releaseChannel: channel.key });
             }}
           />
         </div>
@@ -131,7 +127,7 @@ const General = () => {
             }))}
             onChange={(downloads) => {
               settingsMutation.mutate({
-                concurrent_downloads: parseInt(downloads.key, 10),
+                concurrentDownloads: parseInt(downloads.key, 10),
               });
             }}
           />
@@ -235,7 +231,7 @@ const General = () => {
             checked={settings.show_news}
             onChange={(e) => {
               settingsMutation.mutate({
-                show_news: e.currentTarget.checked,
+                showNews: e.currentTarget.checked,
               });
             }}
           />
@@ -264,7 +260,7 @@ const General = () => {
             checked={settings.discord_integration}
             onChange={(e) => {
               settingsMutation.mutate({
-                discord_integration: e.currentTarget.checked,
+                discordIntegration: e.currentTarget.checked,
               });
             }}
           />
@@ -315,7 +311,7 @@ const General = () => {
             checked={settings.reduced_motion}
             onChange={(e) => {
               settingsMutation.mutate({
-                reduced_motion: e.currentTarget.checked,
+                reducedMotion: e.currentTarget.checked,
               });
             }}
           />

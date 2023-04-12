@@ -13,7 +13,7 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const navigate = useGDNavigate();
 
-  let mutation = rspc.createMutation(["java.setDefault"], {
+  let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
       queryClient.setQueryData(["java.setDefault", null], newTheme);
     },
@@ -109,7 +109,7 @@ const Java = () => {
               <div class="flex flex-col justify-start">
                 <h5 class="mt-0 mb-4 text-shade-5">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
-                  <For each={javas[1].java}>
+                  <For each={javas[1].javas}>
                     {(j) => (
                       <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
                         <p class="m-0">
@@ -125,18 +125,18 @@ const Java = () => {
                           {j?.path}
                         </p>
                         <p class="m-0">{j?.type}</p>
-
+                        {/* TODO fix id logic */}
                         <div
                           class="cursor-pointer"
                           onChange={() => {
-                            mutation.mutate({
+                            setDefaultJavaMutation.mutate({
                               major_version: parseInt(javas[0], 10),
-                              id: j?.id,
+                              id: "j?.id",
                             });
                           }}
                         >
                           <Show
-                            when={defaultJavasIds().includes(j?.id)}
+                            when={defaultJavasIds().includes("j?.id")}
                             fallback={
                               <div class="text-shade-5 text-xl i-ri:star-line" />
                             }
