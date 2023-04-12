@@ -14,14 +14,13 @@ use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
-use crate::reqwest_cache;
 
 pub mod account;
+mod cache_manager;
 pub mod download;
 pub mod java;
 mod minecraft;
 mod prisma_client;
-pub mod reqwest_cached_client;
 mod settings;
 pub mod vtask;
 
@@ -72,7 +71,7 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let reqwest = reqwest_cache::new(unsaferef);
+            let reqwest = cache_manager::new_client(unsaferef);
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
