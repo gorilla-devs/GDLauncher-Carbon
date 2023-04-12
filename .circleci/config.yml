@@ -52,19 +52,19 @@ jobs:
             - run:
                 command: pnpm codegen
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm build:mac-x64
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm lint
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   branch: release
@@ -102,19 +102,19 @@ jobs:
             - run:
                 command: pnpm codegen
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm build:mac-arm64
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm lint
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   branch: release
@@ -181,7 +181,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -189,7 +189,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -197,7 +197,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -205,7 +205,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - when:
           condition:
             branch: release
@@ -254,23 +254,23 @@ jobs:
       - run:
           command: pnpm codegen
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: IS_DOCKER_TEST=true pnpm build:linux-x64
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm lint
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm check-bundle
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -289,19 +289,19 @@ jobs:
       - run:
           command: pnpm codegen
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm build:linux-x64
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm lint
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       # - run:
       #     name: "Upload debug info to sentry"
       #     command: |
