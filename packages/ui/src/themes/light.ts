@@ -1,6 +1,7 @@
 import { Theme } from "./index";
 
 const lightTheme: Theme = {
+  accent: "hsla(211, 61%, 53%, 1)",
   primary: "red",
   "primary-hover": "hsla(211, 61%, 53%, 1)",
 

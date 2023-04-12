@@ -9,11 +9,26 @@ import {
   Suspense,
   useContext,
 } from "solid-js";
-import { createStore } from "solid-js/store";
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
 
-const defaultModals = {
+export type ModalProps = {
+  title: string;
+  noHeader?: boolean;
+};
+
+type Hash = {
+  [name: string]: {
+    component: ((_props: ModalProps) => JSX.Element) & {
+      preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
+    };
+
+    title?: string;
+    noHeader?: boolean;
+  };
+};
+
+const defaultModals: Hash = {
   privacyPolicy: {
     component: lazy(() => import("./modals/Privacypolicy")),
     title: "Privacy Policy",
@@ -38,25 +53,13 @@ const defaultModals = {
     component: lazy(() => import("./modals/LogViewer")),
     title: "Logs",
   },
+  onBoarding: {
+    component: lazy(() => import("./modals/OnBoarding")),
+    noHeader: true,
+  },
 };
 
-export type ModalProps = {
-  title: string;
-  noHeader?: boolean;
-};
-
-type Hash = {
-  [name: string]: {
-    component: ((_props: ModalProps) => JSX.Element) & {
-      preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
-    };
-
-    title: string;
-    noHeader?: boolean;
-  };
-};
-
-type Modalskeys = keyof typeof defaultModals;
+type Modalskeys = string;
 
 type OpenModal = { name: Modalskeys; url?: string };
 
@@ -79,12 +82,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const [_searchParams, setSearchParams] = useSearchParams();
 
   const modalTypeIndex = () => mParam() || "";
-  const noHeader = () => modals[modalTypeIndex()]?.noHeader || false;
-  const ModalComponent: any = () => modals[modalTypeIndex()]?.component;
+  const noHeader = () => defaultModals[modalTypeIndex()]?.noHeader || false;
 
-  const title = () => modals[modalTypeIndex()]?.title;
+  const ModalComponent: any = () => defaultModals[modalTypeIndex()]?.component;
 
-  const [modals] = createStore<Hash>(defaultModals);
+  const title = () => defaultModals[modalTypeIndex()]?.title;
 
   const manager = {
     openModal: (modal: OpenModal) => {
