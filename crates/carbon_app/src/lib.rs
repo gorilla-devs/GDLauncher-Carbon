@@ -45,7 +45,11 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let port = get_available_port().await.unwrap();
+    let port = if cfg!(debug_assertions) {
+        4650
+    } else {
+        get_available_port().await.unwrap()
+    };
 
     start_router(runtime_path, port).await;
 }

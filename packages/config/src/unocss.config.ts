@@ -2,6 +2,7 @@ import presetIcons from "@unocss/preset-icons";
 import presetWind from "@unocss/preset-wind";
 import { presetAttributify } from "unocss";
 import { theme } from "./unocss.theme.js";
+import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 // import gdlIcons from "./unocss.icons.js";
 
 const unocssConfig = {
@@ -9,6 +10,7 @@ const unocssConfig = {
   presets: [
     presetAttributify(),
     presetWind(),
+    presetScrollbarHide(),
     presetIcons({
       // collections: {
       //   gdl: gdlIcons,
