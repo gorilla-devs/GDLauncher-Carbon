@@ -7,12 +7,19 @@ const isDev = import.meta.env.MODE === "development";
 const binaryName =
   os.platform() === "win32" ? "core_module.exe" : "core_module";
 
-const loadCoreModule = () =>
+type CoreModule = () => Promise<number>;
+
+const loadCoreModule: CoreModule = () =>
   new Promise((resolve, reject) => {
     if (isDev) {
-      resolve(0);
+      resolve(4650);
       return;
     }
+
+    setTimeout(() => {
+      reject(new Error("Core module failed to start in time"));
+    }, 10000);
+
     const coreModulePath = path.resolve(
       __dirname,
       "../../../../resources",
@@ -44,7 +51,6 @@ const loadCoreModule = () =>
 
     coreModule.on("exit", (code) => {
       console.log(`[CORE] Exit with code: ${code}`);
-      resolve(0);
 
       if (code !== 0) {
         reject(new Error(`Core module exited with code ${code}`));

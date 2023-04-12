@@ -164,11 +164,11 @@ async function createWindow() {
     }
   });
 
-  win.on("ready-to-show", () => {
-    ipcMain.handle("getCoreModuleStatus", async () => {
-      return coreModule;
-    });
+  ipcMain.handle("getCoreModuleStatus", async () => {
+    return coreModule;
+  });
 
+  win.on("ready-to-show", () => {
     coreModule.finally(() => {
       win?.show();
     });
