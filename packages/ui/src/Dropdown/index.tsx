@@ -25,14 +25,28 @@ export type Props = {
   label?: string;
   onChange?: (_option: Option) => void;
   class?: string;
+  containerClass?: string;
   id?: string;
-  bg?: string;
+  bgColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
 };
-export interface DropDownButtonProps extends Props {
+export interface DropDownButtonProps {
   children: JSX.Element;
+  options: Option[];
+  value: string;
+  error?: boolean;
+  disabled?: boolean;
+  rounded?: boolean;
+  label?: string;
+  onChange?: (_value: string) => void;
+  class?: string;
+  id?: string;
+  bgColorClass?: string;
+  btnDropdown?: boolean;
+  icon?: JSX.Element;
+  placeholder?: string;
 }
 
 const Dropdown = (props: Props) => {
@@ -57,7 +71,10 @@ const Dropdown = (props: Props) => {
   };
 
   return (
-    <div class="inline-block relative" id={props.id}>
+    <div
+      class={`inline-block relative ${props.containerClass || ""}`}
+      id={props.id}
+    >
       <Show when={!props.rounded && props.label}>
         <p
           class="mt-0 mb-2 font-bold"
@@ -70,7 +87,7 @@ const Dropdown = (props: Props) => {
         </p>
       </Show>
       <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bg}`}
+        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -87,7 +104,7 @@ const Dropdown = (props: Props) => {
           "text-shade-5": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
-          "bg-shade-7": !props.bg,
+          "bg-shade-7": !props.bgColorClass,
           "rounded-md": !props.btnDropdown,
         }}
       >
@@ -179,24 +196,21 @@ const Dropdown = (props: Props) => {
 };
 
 const DropDownButton = (props: DropDownButtonProps) => {
-  const [selectedValue, setSelectedValue] = createSignal<string>("");
-
-  const handleChange = (option: OptionDropDown) => {
-    setSelectedValue(option.label);
+  const handleChange = (option: Option) => {
+    props.onChange?.(option.label);
   };
 
   return (
     <div class="flex">
       <Button class="rounded-r-0 pr-0 flex gap-1">
         <span>{props.children}</span>
-        <span class="text-white font-light text-xs">{selectedValue()}</span>
       </Button>
       <Dropdown
         btnDropdown
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bg="bg-primary"
+        bgColorClass="bg-primary"
         value={props.value}
         onChange={(option) => handleChange(option as OptionDropDown)}
       />

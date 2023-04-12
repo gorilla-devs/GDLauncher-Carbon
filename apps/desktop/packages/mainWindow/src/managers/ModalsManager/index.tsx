@@ -49,6 +49,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/AcceptableUsePolicy")),
     title: "Acceptable Use Policy",
   },
+  instanceCreation: {
+    component: lazy(() => import("./modals/InstanceCreation")),
+    title: "New Instance",
+  },
   logViewer: {
     component: lazy(() => import("./modals/LogViewer")),
     title: "Logs",

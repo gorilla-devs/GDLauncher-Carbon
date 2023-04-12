@@ -7,6 +7,7 @@ export interface Props {
   disabled?: boolean;
   class?: string;
   inputClass?: string;
+  inputColor?: string;
   icon?: Element | any;
   onInput?: (_e: InputEvent) => void;
 }
@@ -15,7 +16,7 @@ function Input(props: Props) {
   return (
     <>
       <div
-        class={`h-10 bg-shade-6  gap-2 box-border transition-all duration-100 ease-in-out ${
+        class={`h-10 gap-2 box-border transition-all duration-100 ease-in-out ${
           props.class || ""
         }`}
         classList={{
@@ -28,10 +29,10 @@ function Input(props: Props) {
           <span class="text-shade-5">{props.icon}</span>
         </Show>
         <input
-          class={`bg-shade-6 border-1 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-shade-5 ${
+          class={`border-0 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-shade-5 ${
             props.inputClass || ""
-          }
-           outline-transparent
+          } ${props.inputColor}
+           outline-none focus-viible:outline-none
           `}
           classList={{
             "bg-shade-7 focus-visible:outline-none focus-visible:border-0":
@@ -41,6 +42,7 @@ function Input(props: Props) {
             "text-shade-7": props.disabled,
             "text-white": !props.disabled,
             "border-status-red": !!props.error,
+            "bg-shade-6": !props.inputColor,
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
