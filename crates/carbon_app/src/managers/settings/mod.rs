@@ -1,12 +1,11 @@
 use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
-    db::{app_configuration, PrismaClient},
+    db::app_configuration,
+    domain::runtime_path,
 };
 use anyhow::anyhow;
 use std::path::PathBuf;
-
-pub mod runtime_path;
 
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
@@ -56,11 +55,11 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
-        if let Some(discord_ingration) = incoming_settings.discord_integration {
+        if let Some(discord_integration) = incoming_settings.discord_integration {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::UniqueWhereParam::IdEquals(0),
                 vec![app_configuration::SetParam::SetDiscordIntegration(
-                    discord_ingration,
+                    discord_integration,
                 )],
             ));
             something_changed = true;

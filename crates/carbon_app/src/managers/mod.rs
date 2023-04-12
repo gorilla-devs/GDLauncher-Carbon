@@ -2,6 +2,8 @@ use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
 use crate::managers::settings::SettingsManager;
+use std::cell::UnsafeCell;
+use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -11,15 +13,18 @@ use tokio::sync::broadcast::{self, error::RecvError};
 use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
-use self::queue::TaskQueue;
+use self::vtask::VisualTaskManager;
+use crate::reqwest_cache;
 
 pub mod account;
 pub mod download;
+pub mod java;
 mod minecraft;
 mod prisma_client;
 pub mod queue;
 pub mod reqwest_cached_client;
 mod settings;
+pub mod vtask;
 
 pub type App = Arc<AppInner>;
 
@@ -30,16 +35,16 @@ pub enum AppError {
 }
 
 mod app {
-    use super::*;
+    use super::{java::JavaManager, *};
 
     pub struct AppInner {
-        //instances: Instances,
         settings_manager: SettingsManager,
+        java_manager: JavaManager,
         minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
-        pub(crate) reqwest_client: reqwest::Client,
+        pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_queue: TaskQueue,
     }
@@ -64,16 +69,31 @@ mod app {
                 .await
                 .unwrap();
 
-            let app = Arc::new(AppInner {
-                settings_manager: SettingsManager::new(runtime_path),
-                minecraft_manager: MinecraftManager::new(),
-                account_manager: AccountManager::new(),
-                download_manager: DownloadManager::new(),
-                invalidation_channel,
-                reqwest_client: reqwest_cached_client::new(),
-                prisma_client: Arc::new(db_client),
-                task_queue: TaskQueue::new(2 /* todo: download slots */),
-            });
+            let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
+            let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
+
+            // SAFETY: cannot be used until after the ref is initialized.
+            let reqwest = reqwest_cache::new(unsaferef);
+
+            let app = unsafe {
+                let inner = Arc::into_raw(app);
+
+                (*inner).get().write(MaybeUninit::new(AppInner {
+                    settings_manager: SettingsManager::new(runtime_path),
+                    java_manager: JavaManager::new(),
+                    minecraft_manager: MinecraftManager::new(),
+                    account_manager: AccountManager::new(),
+                    download_manager: DownloadManager::new(),
+                    invalidation_channel,
+                    reqwest_client: reqwest,
+                    prisma_client: Arc::new(db_client),
+                    task_manager: VisualTaskManager::new(),
+                }));
+
+                // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
+                // change the repr of their contained type.
+                Arc::from_raw(inner.cast::<AppInner>())
+            };
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
@@ -81,6 +101,7 @@ mod app {
         }
 
         manager_getter!(settings_manager: SettingsManager);
+        manager_getter!(java_manager: JavaManager);
         manager_getter!(minecraft_manager: MinecraftManager);
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
@@ -132,6 +153,31 @@ impl AppRef {
         self.0
             .upgrade()
             .expect("App was dropped before its final usage")
+    }
+}
+
+// Unsafe, possibly uninitialized weak ref to AppInner
+//
+// SAFETY:
+// This type (both MaybeUninits) must be initialized before it is used or dropped.
+pub struct UnsafeAppRef(Weak<UnsafeCell<MaybeUninit<AppInner>>>);
+
+unsafe impl Send for UnsafeAppRef {}
+unsafe impl Sync for UnsafeAppRef {}
+
+impl UnsafeAppRef {
+    // SAFETY:
+    // This type must me initialized before it is used.
+    pub unsafe fn upgrade(&self) -> App {
+        let arc = self
+            .0
+            .upgrade()
+            .expect("App was dropped before its final usage");
+
+        let inner = Arc::into_raw(arc);
+        // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
+        // change the repr of their contained type.
+        Arc::from_raw(inner.cast::<AppInner>())
     }
 }
 

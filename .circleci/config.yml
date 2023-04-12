@@ -7,21 +7,20 @@ orbs:
 executors:
   linux:
     docker:
-      - image: cimg/rust:1.67.0-browsers
+      - image: cimg/rust:1.68.2-browsers
     resource_class: large
   website:
     docker:
-      - image: cimg/rust:1.67.0-node
+      - image: cimg/rust:1.68.2-node
     resource_class: small
   mac:
     macos:
-      xcode: "14.1.0"
-    resource_class: medium
+      xcode: "14.2.0"
+    resource_class: macos.x86.medium.gen2
   macm1:
     macos:
-      xcode: "14.1.0"
-    resource_class: medium
-  windows: win/default
+      xcode: "14.2.0"
+    resource_class: macos.x86.medium.gen2
 
 jobs:
   buildMac:
@@ -38,17 +37,17 @@ jobs:
               - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
                 source "$HOME/.cargo/env"
             - run: |
                 node -v
+
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                sudo npm i -g pnpm
-                pnpm i
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
@@ -87,18 +86,18 @@ jobs:
               - equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
                 source "$HOME/.cargo/env"
                 rustup target add aarch64-apple-darwin
             - run: |
                 node -v
+
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                sudo npm i -g pnpm
-                pnpm i
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
@@ -154,7 +153,7 @@ jobs:
           command: |
             $ProgressPreference = 'Continue'
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
-            & C:\rustup-init.exe -y --no-modify-path
+            & C:\rustup-init.exe -y --no-modify-path --default-toolchain=1.68.2
             $env:path += ";$env:userprofile\.cargo\bin"
 
             rustc -Vv
@@ -170,8 +169,7 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            npm i -g pnpm
-            pnpm i
+            npm run init
           shell: bash.exe
       - run:
           command: chmod -R a+x node_modules
@@ -233,8 +231,7 @@ jobs:
       - checkout
       - run: |
           node -v
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       # - run: pnpm test
       - run: pnpm build-web
@@ -246,13 +243,13 @@ jobs:
       - checkout
       - run: |
           node -v
+
           cargo --version
       - run: |
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
@@ -281,13 +278,13 @@ jobs:
       - checkout
       - run: |
           node -v
+
           cargo --version
       - run: |
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen

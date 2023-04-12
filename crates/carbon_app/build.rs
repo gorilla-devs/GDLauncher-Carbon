@@ -21,15 +21,12 @@ fn main() {
     let version = version_json["version"].as_str().unwrap();
     let channel = version_json["channel"].as_str().unwrap();
 
-    println!(
-        "cargo:rustc-env=APP_VERSION={}{}+{}",
-        version, channel, git_hash
-    );
+    println!("cargo:rustc-env=APP_VERSION={version}{channel}+{git_hash}");
 
     if parent_env_path.exists() {
         for file in dotenvy::from_filename_iter(parent_env_path).unwrap() {
             let (key, value) = file.unwrap();
-            println!("cargo:rustc-env={}={}", key, value);
+            println!("cargo:rustc-env={key}={value}");
         }
     }
 }
