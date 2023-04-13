@@ -21,10 +21,10 @@ const Steps = (props: Props) => {
           {(step, i) => (
             <>
               <div
-                class="relative bg-primary w-6 h-6 rounded-full flex justify-center items-center"
+                class="relative bg-primary-500 w-6 h-6 rounded-full flex justify-center items-center"
                 classList={{
                   "text-sm": typeof step === "string",
-                  "bg-primary": i() <= mergedProps.currentStep,
+                  "bg-primary-500": i() <= mergedProps.currentStep,
                   "bg-darkSlate-500": i() > mergedProps.currentStep,
                 }}
               >
@@ -47,7 +47,7 @@ const Steps = (props: Props) => {
                 <div
                   class="flex-auto border-t-2 border-y-0 border-b-0"
                   classList={{
-                    "border-solid border-primary":
+                    "border-solid border-primary-500":
                       i() < mergedProps.currentStep,
                     "border-dashed border-darkSlate-500":
                       i() >= mergedProps.currentStep,

@@ -65,7 +65,7 @@ const Instance = () => {
           containerRef.classList.remove("h-52");
           containerRef.classList.add("h-0");
 
-          bgRef.classList.add("bg-shade-9");
+          bgRef.classList.add("bg-darkSlate-900");
 
           refStickyContainer.classList.remove("h-0", "opacity-0");
           refStickyContainer.classList.add("h-20", "sticky", "top-0");
@@ -74,7 +74,7 @@ const Instance = () => {
           containerRef.classList.add("h-52");
           containerRef.classList.remove("h-0");
 
-          bgRef.classList.remove("bg-shade-9");
+          bgRef.classList.remove("bg-darkSlate-900");
 
           refStickyContainer.classList.add("h-0", "opacity-0");
           refStickyContainer.classList.remove("h-20", "sticky", "top-0");
@@ -212,7 +212,7 @@ const Instance = () => {
         </div>
       </div>
       <div
-        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out bg-shade-9 h-0 opacity-0 px-4 transition-height duration-200"
+        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out bg-darkSlate-900 h-0 opacity-0 px-4 transition-height duration-200"
         ref={(el) => {
           refStickyContainer = el;
         }}

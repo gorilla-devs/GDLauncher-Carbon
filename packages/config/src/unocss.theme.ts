@@ -3,8 +3,6 @@ type shade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 type Theme = {
   // Colors
   accent: string;
-  primary: string;
-  "primary-hover": string;
   darkSlate: {
     [key in shade]: string;
   };
@@ -17,21 +15,23 @@ type Theme = {
   darkGray: {
     [key in shade]: string;
   };
-  blue: {
+  primary: {
     [key in shade]: string;
   };
-  "blue-hover": string;
-  red: string;
-  "red-hover": string;
-  yellow: string;
-  "yellow-hover": string;
+  red: {
+    [key in shade]: string;
+  };
+  yellow: {
+    [key in shade]: string;
+  };
+  green: {
+    [key in shade]: string;
+  };
 };
 
 const theme = {
   colors: {
     accent: "var(--accent)",
-    primary: "var(--primary)",
-    "primary-hover": "var(--primary-hover)",
     darkSlate: {
       50: "var(--darkSlate-50)",
       100: "var(--darkSlate-100)",
@@ -80,23 +80,54 @@ const theme = {
       800: "var(--lightGray-800)",
       900: "var(--lightGray-900)",
     },
-    blue: {
-      50: "var(--blue-50)",
-      100: "var(--blue-100)",
-      200: "var(--blue-200)",
-      300: "var(--blue-300)",
-      400: "var(--blue-400)",
-      500: "var(--blue-500)",
-      600: "var(--blue-600)",
-      700: "var(--blue-700)",
-      800: "var(--blue-800)",
-      900: "var(--blue-900)",
+    primary: {
+      50: "var(--primary-50)",
+      100: "var(--primary-100)",
+      200: "var(--primary-200)",
+      300: "var(--primary-300)",
+      400: "var(--primary-400)",
+      500: "var(--primary-500)",
+      600: "var(--primary-600)",
+      700: "var(--primary-700)",
+      800: "var(--primary-800)",
+      900: "var(--primary-900)",
     },
-    "blue-hover": "var(--primary-hover)",
-    red: "var(--red)",
-    "red-hover": "var(--red-hover)",
-    yellow: "var(--yellow)",
-    "yellow-hover": "var(--yellow-hover)",
+    red: {
+      50: "var(--red-50)",
+      100: "var(--red-100)",
+      200: "var(--red-200)",
+      300: "var(--red-300)",
+      400: "var(--red-400)",
+      500: "var(--red-500)",
+      600: "var(--red-600)",
+      700: "var(--red-700)",
+      800: "var(--red-800)",
+      900: "var(--red-900)",
+    },
+    yellow: {
+      50: "var(--yellow-50)",
+      100: "var(--yellow-100)",
+      200: "var(--yellow-200)",
+      300: "var(--yellow-300)",
+      400: "var(--yellow-400)",
+      500: "var(--yellow-500)",
+      600: "var(--yellow-600)",
+      700: "var(--yellow-700)",
+      800: "var(--yellow-800)",
+      900: "var(--yellow-900)",
+    },
+    green: {
+      50: "var(--green-50)",
+      100: "var(--green-100)",
+      200: "var(--green-200)",
+      300: "var(--green-300)",
+      400: "var(--green-400)",
+      500: "var(--green-500)",
+      600: "var(--green-600)",
+      700: "var(--green-700)",
+      800: "var(--green-800)",
+      900: "var(--green-900)",
+    },
     // TODO: Move satisfies to the entire theme when possible
   } satisfies Theme,
   animation: {

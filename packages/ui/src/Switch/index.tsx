@@ -10,10 +10,10 @@ function Switch(props: Props) {
         classList={{
           "before:bg-darkSlate-800": true,
           "peer-checked:before:bg-white": true,
-          "peer-checked:bg-primary": true,
+          "peer-checked:bg-primary-500": true,
           "bg-darkSlate-500": true,
           "peer-disabled:before:bg-darkSlate-50": true,
-          "peer-disabled:bg-shade-9": true,
+          "peer-disabled:bg-darkSlate-900": true,
         }}
       />
     </label>

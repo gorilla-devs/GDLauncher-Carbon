@@ -150,7 +150,7 @@ export default function Browser() {
         <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
-              <div class="flex justify-center items-center h-22 w-22 bg-shade-9 rounded-xl">
+              <div class="flex justify-center items-center h-22 w-22 bg-darkSlate-900 rounded-xl">
                 <img class="h-14" src={LogoDark} />
               </div>
               <div class="flex flex-col justify-around">

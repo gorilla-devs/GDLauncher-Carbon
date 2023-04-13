@@ -111,7 +111,7 @@ const Java = () => {
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].javas}>
                     {(j) => (
-                      <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
+                      <div class="flex justify-between py-5 px-6 bg-darkSlate-900 rounded-md">
                         <p class="m-0">
                           <Trans
                             key="java"

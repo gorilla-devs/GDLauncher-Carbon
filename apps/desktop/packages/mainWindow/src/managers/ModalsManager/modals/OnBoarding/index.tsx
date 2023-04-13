@@ -55,7 +55,7 @@ const OnBoarding = (props: ModalProps) => {
             />
           </Button>
 
-          <div class="flex items-center gap-2 text-accent cursor-pointer hover:text-primary transition ease-in-out">
+          <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
             <div class="i-ri:download-2-line text-2xl" />
             <Trans
               key="import_instance_or_zip"

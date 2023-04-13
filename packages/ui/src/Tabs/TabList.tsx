@@ -71,7 +71,7 @@ const TabList = (props: Props) => {
       class="flex relative items-center h-auto w-full"
       classList={{
         "bg-darkSlate-800": tabsContext?.variant === "underline",
-        "bg-shade-9": tabsContext?.variant === "block",
+        "bg-darkSlate-900": tabsContext?.variant === "block",
       }}
     >
       <Switch>
@@ -91,7 +91,7 @@ const TabList = (props: Props) => {
             {props.children}
             <Show when={tabs()[currentIndex()] && !isIgnored()}>
               <div
-                class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
+                class="absolute bottom-1 h-1 bg-primary-500 transition-all duration-100 ease-in-out"
                 classList={{
                   "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
                   "left-0": tabsContext?.orientation === "horizontal",

@@ -41,15 +41,15 @@ const Tile = (props: Props) => {
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="absolute right-0 duration-100 ease-in-out bg-primary opacity-10 transition top-0 left-0 bottom-0" />
-            <div class="absolute right-0 top-0 bottom-0 bg-primary w-1" />
+            <div class="absolute right-0 duration-100 ease-in-out opacity-10 transition top-0 left-0 bottom-0 bg-primary-500" />
+            <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
 
           <div class="absolute gap-2 duration-100 ease-in-out right-5 hidden group-hover:flex transition-all">
             <div class="flex justify-center items-center cursor-pointer h-7 w-7 bg-darkSlate-500 rounded-full">
               <div class="text-white i-ri:more-2-fill text-lg" />
             </div>
-            <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center cursor-pointer">
+            <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
               <div class="text-white text-lg i-ri:play-fill" />
             </div>
           </div>

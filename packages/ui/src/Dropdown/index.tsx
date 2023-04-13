@@ -127,7 +127,7 @@ const Dropdown = (props: Props) => {
       </button>
 
       <ul
-        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20"
+        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -175,7 +175,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bgColorClass="bg-primary"
+        bgColorClass="bg-primary-500"
         value={props.value}
         onChange={(option) => handleChange(option)}
       />

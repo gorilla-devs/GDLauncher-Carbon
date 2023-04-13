@@ -15,7 +15,7 @@ export const Tag = (props: Props) => {
       class="flex gap-2 items-center px-3 py-2 bg-darkSlate-700 rounded-md max-h-8 box-border"
       classList={{
         "bg-darkSlate-700": mergedProps.type === "default",
-        "bg-shade-9": mergedProps.type === "fixed",
+        "bg-darkSlate-900": mergedProps.type === "fixed",
       }}
     >
       <img class="w-4 h-4" src={props.img} alt={`icon_${props.name}`} />

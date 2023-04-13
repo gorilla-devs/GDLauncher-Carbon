@@ -8,7 +8,7 @@ export const AdsBanner = () => {
         height: `${adSize.height}px`,
         width: `${adSize.width}px`,
       }}
-      class="bg-red"
+      class="bg-red-500"
     />
   );
 };

@@ -9,7 +9,7 @@ export const LoadingBar = (props: Props) => {
         props.class || ""
       }`}
     >
-      <div class="w-full h-full origin-[0%_50%] animate-loadingbar bg-primary" />
+      <div class="w-full h-full origin-[0%_50%] animate-loadingbar bg-primary-500" />
     </div>
   );
 };
