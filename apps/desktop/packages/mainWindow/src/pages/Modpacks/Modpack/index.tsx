@@ -65,7 +65,7 @@ const Modpack = (props: Props) => {
             value="1.16.2"
           >
             <Trans
-              key="download"
+              key="instance.download_modpacks"
               options={{
                 defaultValue: "Download",
               }}

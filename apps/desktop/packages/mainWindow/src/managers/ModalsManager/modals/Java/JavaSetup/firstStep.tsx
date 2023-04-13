@@ -54,7 +54,7 @@ const FirstStep = (props: StepsProps) => {
             }}
           >
             <Trans
-              key="automatic_setup"
+              key="java.automatic_setup"
               options={{
                 defaultValue: "Automatic setup",
               }}
