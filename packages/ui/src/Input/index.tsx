@@ -41,7 +41,7 @@ function Input(props: Props) {
               !props.icon,
             "text-darkSlate-700": props.disabled,
             "text-white": !props.disabled,
-            "border-status-red": !!props.error,
+            "border-red-500": !!props.error,
             "bg-darkSlate-600": !props.inputColor,
           }}
           placeholder={props.placeholder}
@@ -51,7 +51,7 @@ function Input(props: Props) {
       </div>
 
       <Show when={props.error}>
-        <div class="text-status-red text-left">{props.error}</div>
+        <div class="text-red-500 text-left">{props.error}</div>
       </Show>
     </>
   );

@@ -175,7 +175,7 @@ const CodeStep = (props: Props) => {
         </Show>
       </div>
       <Show when={error()}>
-        <p class="text-red m-0">{error()}</p>
+        <p class="text-red-500 m-0">{error()}</p>
       </Show>
       <Show when={loading()}>
         <span class="mb-4 text-xs absolute text-darkSlate-100 bottom-1">

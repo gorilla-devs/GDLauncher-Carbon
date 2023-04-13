@@ -18,26 +18,26 @@ type Props = {
 const getColor = (stable: string) => {
   switch (stable) {
     case "stable":
-      return "text-green";
+      return "text-green-500";
     case "beta":
-      return "text-yellow";
+      return "text-yellow-500";
     case "alpha":
-      return "text-red";
+      return "text-red-500";
     default:
-      return "text-green";
+      return "text-green-500";
   }
 };
 
 const Active = () => {
   return (
-    <div class="flex items-center gap-2 cursor-pointer text-green">
+    <div class="flex items-center gap-2 cursor-pointer text-green-500">
       <Trans
         key="active_version"
         options={{
           defaultValue: "Active",
         }}
       />
-      <div class="text-green text-2xl i-ri:check-fill" />
+      <div class="text-green-500 text-2xl i-ri:check-fill" />
     </div>
   );
 };

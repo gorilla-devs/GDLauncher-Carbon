@@ -89,7 +89,7 @@ const Dropdown = (props: Props) => {
         }}
         classList={{
           "border-0": !props.error,
-          "border-1 border-status-red": props.error,
+          "border-1 border-red-500": props.error,
           "text-darkSlate-50 hover:text-white": !props.disabled && !props.error,
           "text-darkSlate-500": props.error,
           "rounded-full": props.rounded,

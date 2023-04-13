@@ -83,7 +83,7 @@ const Auth = (props: Props) => {
           {t("sign_in_with_microsoft_text")}
         </p>
         <Show when={error()}>
-          <p class="m-0 text-red">{error()}</p>
+          <p class="m-0 text-red-500">{error()}</p>
         </Show>
         <ul class="flex text-sm list-none gap-3 p-0 mb-8 underline">
           <li

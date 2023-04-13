@@ -141,7 +141,7 @@ const Java = () => {
                               <div class="text-darkSlate-500 text-xl i-ri:star-line" />
                             }
                           >
-                            <div class="text-xl i-ri:star-fill text-yellow" />
+                            <div class="text-xl i-ri:star-fill text-yellow-500" />
                           </Show>
                         </div>
                       </div>

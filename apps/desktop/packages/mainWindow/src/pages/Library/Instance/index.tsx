@@ -147,7 +147,7 @@ const Instance = () => {
                       </h1>
                       <div class="flex gap-2">
                         <div
-                          class="text-2xl cursor-pointer transition ease-in-out text-darkSlate-50 i-ri:delete-bin-7-fill duration-50 hover:text-red"
+                          class="text-2xl cursor-pointer transition ease-in-out text-darkSlate-50 i-ri:delete-bin-7-fill duration-50 hover:text-red-500"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -156,7 +156,7 @@ const Instance = () => {
                           }}
                         />
                         <div
-                          class="cursor-pointer transition ease-in-out duration-50 text-darkSlate-50 i-ri:check-fill text-3xl hover:text-green"
+                          class="cursor-pointer transition ease-in-out duration-50 text-darkSlate-50 i-ri:check-fill text-3xl hover:text-green-500"
                           classList={{
                             hidden: !editableName(),
                           }}
