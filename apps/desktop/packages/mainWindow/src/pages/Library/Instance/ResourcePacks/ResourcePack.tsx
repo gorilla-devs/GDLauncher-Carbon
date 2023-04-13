@@ -23,7 +23,7 @@ const ResourcePack = (props: Props) => {
             <div class="flex flex-col">
               {props.resourcePack.title}
               <div class="flex gap-2">
-                <p class="m-0 text-shade-5 text-sm">
+                <p class="m-0 text-darkSlate-500 text-sm">
                   {props.resourcePack.resourcePackVersion}
                 </p>
               </div>

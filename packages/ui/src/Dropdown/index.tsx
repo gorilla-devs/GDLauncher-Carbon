@@ -70,7 +70,7 @@ const Dropdown = (props: Props) => {
           class="mt-0 mb-2 font-bold"
           classList={{
             "text-white": !props.disabled,
-            "text-shade-0": props.disabled,
+            "text-darkSlate-50": props.disabled,
           }}
         >
           {props.label}
@@ -90,11 +90,11 @@ const Dropdown = (props: Props) => {
         classList={{
           "border-0": !props.error,
           "border-1 border-status-red": props.error,
-          "text-shade-0 hover:text-white": !props.disabled && !props.error,
-          "text-shade-5": props.error,
+          "text-darkSlate-50 hover:text-white": !props.disabled && !props.error,
+          "text-darkSlate-500": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
-          "bg-shade-7": !props.bgColorClass,
+          "bg-darkSlate-700": !props.bgColorClass,
           "rounded-md": !props.btnDropdown,
         }}
       >
@@ -105,9 +105,9 @@ const Dropdown = (props: Props) => {
           <span
             classList={{
               "text-white": props.error,
-              "text-shade-0 hover:text-white group-hover:text-white":
+              "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled && !props.error,
-              "text-shade-5": props.disabled,
+              "text-darkSlate-500": props.disabled,
             }}
           >
             {selectedValue()}
@@ -118,16 +118,16 @@ const Dropdown = (props: Props) => {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-shade-0 group-hover:text-white":
+            "text-darkSlate-50 group-hover:text-white":
               !props.disabled && !props.error && !props.btnDropdown,
             "text-white": props.error || props.btnDropdown,
-            "text-shade-5": props.disabled,
+            "text-darkSlate-500": props.disabled,
           }}
         />
       </button>
 
       <ul
-        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-shade-0 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20"
+        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -144,7 +144,7 @@ const Dropdown = (props: Props) => {
         <For each={props.options}>
           {(option) => (
             <li
-              class="first:rounded-t last:rounded-b bg-shade-7 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-shade-0 no-underline"
+              class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
               onClick={() => {
                 setSelectedValue(option.label);
                 props.onChange?.(option);

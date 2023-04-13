@@ -28,7 +28,7 @@ const Java = () => {
   });
 
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
+    <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="java"
@@ -100,14 +100,14 @@ const Java = () => {
               navigate("?m=addJava");
             }}
           >
-            <div class="text-shade-5 text-xl i-ri:add-fill" />
+            <div class="text-darkSlate-500 text-xl i-ri:add-fill" />
           </Button>
         </div>
-        <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
+        <div class="flex flex-col gap-4 border-2 border-solid border-darkSlate-700 p-4">
           <For each={Object.entries(javas())}>
             {(javas) => (
               <div class="flex flex-col justify-start">
-                <h5 class="mt-0 mb-4 text-shade-5">{javas[0]}</h5>
+                <h5 class="mt-0 mb-4 text-darkSlate-500">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].javas}>
                     {(j) => (
@@ -138,7 +138,7 @@ const Java = () => {
                           <Show
                             when={defaultJavasIds().includes(j?.path)}
                             fallback={
-                              <div class="text-shade-5 text-xl i-ri:star-line" />
+                              <div class="text-darkSlate-500 text-xl i-ri:star-line" />
                             }
                           >
                             <div class="text-xl i-ri:star-fill text-yellow" />

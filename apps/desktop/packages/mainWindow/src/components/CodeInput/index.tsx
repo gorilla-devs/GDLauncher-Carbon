@@ -7,7 +7,7 @@ interface Props {
 
 export const DeviceCode = (props: Props) => {
   return (
-    <div class="h-13 bg-shade-8 flex justify-center items-center text-white font-bold gap-2 rounded-md opacity-100 w-47 font-ubuntu">
+    <div class="h-13 bg-darkSlate-800 flex justify-center items-center text-white font-bold gap-2 rounded-md opacity-100 w-47 font-ubuntu">
       <span
         class="text-2xl font-normal"
         style={{
@@ -17,7 +17,7 @@ export const DeviceCode = (props: Props) => {
         {props.value}
       </span>
       <span
-        class="cursor-pointer text-shade-0 i-ri:file-copy-fill"
+        class="cursor-pointer text-darkSlate-50 i-ri:file-copy-fill"
         style={{
           color: props.disabled ? "#404759" : "#8A8B8F",
         }}

@@ -8,11 +8,11 @@ function Switch(props: Props) {
       <span
         class="absolute cursor-pointer top-0 left-0 right-0 bottom-0 transition-all duration-100 ease-in-out rounded-full before:absolute before:content-[] before:w-4	before:h-4 before:left-0.5 before:bottom-0.5 before:rounded-full peer-checked:before:translate-x-5 before:transition-all before:ease-in-out before:duration-100"
         classList={{
-          "before:bg-shade-8": true,
+          "before:bg-darkSlate-800": true,
           "peer-checked:before:bg-white": true,
           "peer-checked:bg-primary": true,
-          "bg-shade-5": true,
-          "peer-disabled:before:bg-shade-0": true,
+          "bg-darkSlate-500": true,
+          "peer-disabled:before:bg-darkSlate-50": true,
           "peer-disabled:bg-shade-9": true,
         }}
       />

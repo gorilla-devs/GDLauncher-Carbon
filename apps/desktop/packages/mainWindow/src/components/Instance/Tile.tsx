@@ -29,7 +29,7 @@ const Tile = (props: Props) => {
         >
           <div class="rounded-2xl h-38 w-38 bg-green-600" />
           <h4 class="my-2">{props.title}</h4>
-          <div class="flex text-shade-0 justify-between">
+          <div class="flex text-darkSlate-50 justify-between">
             <p class="m-0">{props.modloader}</p>
             <p class="m-0">{props.version}</p>
           </div>
@@ -46,7 +46,7 @@ const Tile = (props: Props) => {
           </Show>
 
           <div class="absolute gap-2 duration-100 ease-in-out right-5 hidden group-hover:flex transition-all">
-            <div class="flex justify-center items-center cursor-pointer h-7 w-7 bg-shade-5 rounded-full">
+            <div class="flex justify-center items-center cursor-pointer h-7 w-7 bg-darkSlate-500 rounded-full">
               <div class="text-white i-ri:more-2-fill text-lg" />
             </div>
             <div class="h-7 w-7 bg-primary rounded-full flex justify-center items-center cursor-pointer">
@@ -72,13 +72,13 @@ const Tile = (props: Props) => {
             <h4
               class="m-0"
               classList={{
-                "text-shade-0": mergedProps.isLoading,
+                "text-darkSlate-50": mergedProps.isLoading,
                 "text-white": !mergedProps.isLoading,
               }}
             >
               {props.title}
             </h4>
-            <div class="flex justify-between text-shade-0">
+            <div class="flex justify-between text-darkSlate-50">
               <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
               <p class="m-0">{props.modloader}</p>
               <p class="m-0">{props.version}</p>

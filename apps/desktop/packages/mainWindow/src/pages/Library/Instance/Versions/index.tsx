@@ -93,7 +93,7 @@ const NoVersions = () => {
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="no_resourcepacks_text"
             options={{

@@ -25,7 +25,7 @@ const Steps = (props: Props) => {
                 classList={{
                   "text-sm": typeof step === "string",
                   "bg-primary": i() <= mergedProps.currentStep,
-                  "bg-shade-5": i() > mergedProps.currentStep,
+                  "bg-darkSlate-500": i() > mergedProps.currentStep,
                 }}
               >
                 <Switch>
@@ -49,7 +49,7 @@ const Steps = (props: Props) => {
                   classList={{
                     "border-solid border-primary":
                       i() < mergedProps.currentStep,
-                    "border-dashed border-shade-5":
+                    "border-dashed border-darkSlate-500":
                       i() >= mergedProps.currentStep,
                   }}
                 />

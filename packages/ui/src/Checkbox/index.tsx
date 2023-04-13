@@ -15,8 +15,8 @@ function Checkbox(props: Props) {
       class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border"
       classList={{
         "bg-primary": checked(),
-        "bg-shade-5": !checked(),
-        "bg-shade-8": props.disabled,
+        "bg-darkSlate-500": !checked(),
+        "bg-darkSlate-800": props.disabled,
       }}
       onClick={() => {
         if (!props.disabled) {

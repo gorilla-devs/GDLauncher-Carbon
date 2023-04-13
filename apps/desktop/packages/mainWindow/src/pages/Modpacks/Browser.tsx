@@ -82,7 +82,7 @@ const NoModpacks = () => {
     <div class="h-full w-full flex justify-center items-center min-h-90">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="no_modpacks_text"
             options={{
@@ -100,16 +100,16 @@ export default function Browser() {
   const modalsContext = useModal();
   return (
     <div class="relative w-full box-border">
-      <div class="sticky top-0 left-0 right-0 flex flex-col bg-shade-8 z-10 px-5 pt-5">
+      <div class="sticky top-0 left-0 right-0 flex flex-col bg-darkSlate-800 z-10 px-5 pt-5">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full rounded-full text-shade-0"
+            class="w-full rounded-full text-darkSlate-50"
             inputClass=""
           />
           <div class="flex gap-3 items-center">
-            <p class="text-shade-0">
+            <p class="text-darkSlate-50">
               <Trans
                 key="sort_by"
                 options={{
@@ -142,12 +142,12 @@ export default function Browser() {
             />
           </Button>
         </div>
-        <div class="flex justify-between text-shade-0 z-10 mb-6 max-w-150">
+        <div class="flex justify-between text-darkSlate-50 z-10 mb-6 max-w-150">
           <Tags />
         </div>
       </div>
       <div class="overflow-y-hidden px-5 pb-5 flex flex-col gap-2">
-        <div class="p-5 flex flex-col gap-4 bg-shade-7 rounded-xl">
+        <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
               <div class="flex justify-center items-center h-22 w-22 bg-shade-9 rounded-xl">
@@ -162,7 +162,7 @@ export default function Browser() {
                     }}
                   />
                 </h2>
-                <p class="m-0 text-shade-0">
+                <p class="m-0 text-darkSlate-50">
                   <Trans
                     key="create_new_instance_text"
                     options={{
@@ -182,7 +182,7 @@ export default function Browser() {
                 ]}
                 icon={<div class="i-ri:price-tag-3-fill" />}
                 rounded
-                bgColorClass="bg-shade-4"
+                bgColorClass="bg-darkSlate-400"
                 value="1.16.2"
               />
               <Button

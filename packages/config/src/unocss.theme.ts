@@ -1,14 +1,25 @@
-type shade = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type shade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
 
 type Theme = {
   // Colors
   accent: string;
   primary: string;
   "primary-hover": string;
-  shade: {
+  darkSlate: {
     [key in shade]: string;
   };
-  blue: string;
+  lightSlate: {
+    [key in shade]: string;
+  };
+  lightGray: {
+    [key in shade]: string;
+  };
+  darkGray: {
+    [key in shade]: string;
+  };
+  blue: {
+    [key in shade]: string;
+  };
   "blue-hover": string;
   red: string;
   "red-hover": string;
@@ -21,19 +32,66 @@ const theme = {
     accent: "var(--accent)",
     primary: "var(--primary)",
     "primary-hover": "var(--primary-hover)",
-    shade: {
-      0: "var(--shade0)",
-      1: "var(--shade1)",
-      2: "var(--shade2)",
-      3: "var(--shade3)",
-      4: "var(--shade4)",
-      5: "var(--shade5)",
-      6: "var(--shade6)",
-      7: "var(--shade7)",
-      8: "var(--shade8)",
-      9: "var(--shade9)",
+    darkSlate: {
+      50: "var(--darkSlate-50)",
+      100: "var(--darkSlate-100)",
+      200: "var(--darkSlate-200)",
+      300: "var(--darkSlate-300)",
+      400: "var(--darkSlate-400)",
+      500: "var(--darkSlate-500)",
+      600: "var(--darkSlate-600)",
+      700: "var(--darkSlate-700)",
+      800: "var(--darkSlate-800)",
+      900: "var(--darkSlate-900)",
     },
-    blue: "var(--primary)",
+    lightSlate: {
+      50: "var(--lightSlate-50)",
+      100: "var(--lightSlate-100)",
+      200: "var(--lightSlate-200)",
+      300: "var(--lightSlate-300)",
+      400: "var(--lightSlate-400)",
+      500: "var(--lightSlate-500)",
+      600: "var(--lightSlate-600)",
+      700: "var(--lightSlate-700)",
+      800: "var(--lightSlate-800)",
+      900: "var(--lightSlate-900)",
+    },
+    darkGray: {
+      50: "var(--darkGray-50)",
+      100: "var(--darkGray-100)",
+      200: "var(--darkGray-200)",
+      300: "var(--darkGray-300)",
+      400: "var(--darkGray-400)",
+      500: "var(--darkGray-500)",
+      600: "var(--darkGray-600)",
+      700: "var(--darkGray-700)",
+      800: "var(--darkGray-800)",
+      900: "var(--darkGray-900)",
+    },
+    lightGray: {
+      50: "var(--lightGray-50)",
+      100: "var(--lightGray-100)",
+      200: "var(--lightGray-200)",
+      300: "var(--lightGray-300)",
+      400: "var(--lightGray-400)",
+      500: "var(--lightGray-500)",
+      600: "var(--lightGray-600)",
+      700: "var(--lightGray-700)",
+      800: "var(--lightGray-800)",
+      900: "var(--lightGray-900)",
+    },
+    blue: {
+      50: "var(--blue-50)",
+      100: "var(--blue-100)",
+      200: "var(--blue-200)",
+      300: "var(--blue-300)",
+      400: "var(--blue-400)",
+      500: "var(--blue-500)",
+      600: "var(--blue-600)",
+      700: "var(--blue-700)",
+      800: "var(--blue-800)",
+      900: "var(--blue-900)",
+    },
     "blue-hover": "var(--primary-hover)",
     red: "var(--red)",
     "red-hover": "var(--red-hover)",

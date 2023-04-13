@@ -27,12 +27,12 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 bg-shade-7 rounded-full"
+                class="flex justify-center items-center group w-10 h-10 bg-darkSlate-700 rounded-full"
                 onClick={() => {
                   toggleSidebar();
                 }}
               >
-                <div class="transition duration-100 ease-in-out text-shade-5 i-ri:search-line group-hover:text-shade-0" />
+                <div class="transition duration-100 ease-in-out text-darkSlate-500 i-ri:search-line group-hover:text-darkSlate-50" />
               </div>
             }
           >
@@ -164,7 +164,7 @@ const Sidebar = () => {
             />
           </div>
         </Show>
-        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-shade-8 py-5">
+        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
             variant="outline"
             onClick={() => navigate(`/modpacks`)}

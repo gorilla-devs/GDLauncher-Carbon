@@ -166,7 +166,7 @@ function Slider(props: Props) {
                 }}
               />
               <p
-                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-shade-5 w-10"
+                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-darkSlate-500 w-10"
                 style={{
                   position: "absolute",
                   left: `${calcOffset(parseInt(value, 10))}%`,
@@ -185,7 +185,7 @@ function Slider(props: Props) {
           ref={(el) => {
             handleRef = el;
           }}
-          class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
+          class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
           style={{
             position: "absolute",
             left: `${calcOffset(currentValue())}%`,

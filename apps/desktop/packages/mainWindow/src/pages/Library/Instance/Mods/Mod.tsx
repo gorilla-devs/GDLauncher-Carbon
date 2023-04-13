@@ -28,7 +28,7 @@ const Mod = (props: Props) => {
                   class="w-4 h-4"
                   src={getModloaderIcon(props.mod.modloader)}
                 />
-                <p class="m-0 text-shade-5 text-sm">
+                <p class="m-0 text-darkSlate-500 text-sm">
                   {`${props.mod.modloader} ${props.mod.mcversion}`}
                 </p>
               </div>

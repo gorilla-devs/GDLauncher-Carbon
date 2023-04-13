@@ -68,7 +68,7 @@ const Auth = (props: Props) => {
     <div>
       <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
         <img class="w-40" src={Logo} />
-        <p class="text-shade-0">{__APP_VERSION__}</p>
+        <p class="text-darkSlate-50">{__APP_VERSION__}</p>
       </div>
       <div class="flex flex-col justify-center items-center text-center">
         <Button
@@ -79,7 +79,7 @@ const Auth = (props: Props) => {
         >
           {t("sign_in_with_microsoft") || ""}
         </Button>
-        <p class="text-shade-0 max-w-90 text-sm">
+        <p class="text-darkSlate-50 max-w-90 text-sm">
           {t("sign_in_with_microsoft_text")}
         </p>
         <Show when={error()}>

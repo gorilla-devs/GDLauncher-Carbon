@@ -19,7 +19,7 @@ const OnBoarding = (props: ModalProps) => {
         </div>
         <div class="absolute top-5 right-5">
           <div
-            class="i-ri:close-fill text-2xl text-shade-0 cursor-pointer"
+            class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
             onClick={() => modalsContext?.closeModal()}
           />
         </div>
@@ -32,7 +32,7 @@ const OnBoarding = (props: ModalProps) => {
               }}
             />
           </h2>
-          <p class="text-center text-shade-0 leading-6 mb-8">
+          <p class="text-center text-darkSlate-50 leading-6 mb-8">
             <Trans
               key="welcome_gdlauncher_text"
               options={{

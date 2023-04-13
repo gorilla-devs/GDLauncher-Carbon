@@ -51,13 +51,13 @@ const Version = (props: Props) => {
             <div class="flex flex-col">
               <p class="mt-0 mb-2">{props.version.title}</p>
               <div class="flex gap-2">
-                <div class="m-0 text-sm flex items-center gap-2 text-shade-3">
+                <div class="m-0 text-sm flex items-center gap-2 text-darkSlate-300">
                   {props.version.modloader} {props.version.mcversion}
-                  <div class="h-2 w-px bg-shade-3" />
-                  <p class="m-0 text-shade-3 text-md">
+                  <div class="h-2 w-px bg-darkSlate-300" />
+                  <p class="m-0 text-darkSlate-300 text-md">
                     {format(new Date(props.version.date), "dd-MM-yyyy")}
                   </p>
-                  <div class="h-2 w-px bg-shade-3" />
+                  <div class="h-2 w-px bg-darkSlate-300" />
                   <span class={getColor(props.version.stable)}>
                     {props.version.stable}
                   </span>
@@ -67,14 +67,14 @@ const Version = (props: Props) => {
           </div>
         </div>
         <Show when={!props.version.isActive} fallback={<Active />}>
-          <div class="group text-shade-3 transition ease-in-out flex items-center gap-2 cursor-pointer hover:text-shade-1">
+          <div class="group text-darkSlate-300 transition ease-in-out flex items-center gap-2 cursor-pointer hover:text-darkSlate-100">
             <Trans
               key="switch_version"
               options={{
                 defaultValue: "Switch Version",
               }}
             />
-            <div class="text-shade-3 text-2xl i-ri:download-2-line group-hover:text-shade-1" />
+            <div class="text-darkSlate-300 text-2xl i-ri:download-2-line group-hover:text-darkSlate-100" />
           </div>
         </Show>
       </div>
