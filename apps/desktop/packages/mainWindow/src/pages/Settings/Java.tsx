@@ -4,14 +4,14 @@ import { Button, Input, Slider } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
-import { useGDNavigate } from "@/managers/NavigationManager";
+import { useModal } from "@/managers/ModalsManager";
 
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
   const javas = () => javasData()?.data || [];
-  const navigate = useGDNavigate();
+  const modalsContext = useModal();
 
   let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -97,7 +97,7 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate("?m=addJava");
+              modalsContext?.openModal({ name: "addJava" });
             }}
           >
             <div class="text-shade-5 text-xl i-ri:add-fill" />

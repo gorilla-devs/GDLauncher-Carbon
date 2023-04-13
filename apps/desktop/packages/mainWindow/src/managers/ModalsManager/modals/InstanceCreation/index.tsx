@@ -78,7 +78,7 @@ const InstanceCreation = (props: ModalProps) => {
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans
-              key="create_instance_modal_cancel"
+              key="instance_modal_instance_creation_cancel"
               options={{
                 defaultValue: "Cancel",
               }}
@@ -89,7 +89,7 @@ const InstanceCreation = (props: ModalProps) => {
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans
-              key="create_instance_modal_create"
+              key="instance_modal_instance_creation_create"
               options={{
                 defaultValue: "Create",
               }}

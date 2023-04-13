@@ -35,7 +35,7 @@ const AddJava = (props: ModalProps) => {
           <div class="flex w-full justify-end">
             <Button rounded={false} loading={true} percentage={0}>
               <Trans
-                key="install_java"
+                key="java.install"
                 options={{
                   defaultValue: "Install",
                 }}
