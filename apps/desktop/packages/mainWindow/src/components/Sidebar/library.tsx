@@ -5,12 +5,14 @@ import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
   const navigate = useGDNavigate();
   const location = useLocation();
+
+  const [t] = useTransContext();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
@@ -37,7 +39,7 @@ const Sidebar = () => {
             }
           >
             <Input
-              placeholder="Type Here"
+              placeholder={t("general.type_here")}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
             />
@@ -176,7 +178,7 @@ const Sidebar = () => {
           >
             <Show when={isSidebarOpened()} fallback={"+"}>
               <Trans
-                key="add_instance"
+                key="sidebar.plus_add_instance"
                 options={{
                   defaultValue: "+ Add Instance",
                 }}

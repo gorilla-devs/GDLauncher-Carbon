@@ -2,7 +2,7 @@ import { Show } from "solid-js";
 
 export interface Props {
   value?: string | number;
-  placeholder?: string | number | null;
+  placeholder?: string;
   error?: string;
   disabled?: boolean;
   class?: string;
