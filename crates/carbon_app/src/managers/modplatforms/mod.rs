@@ -24,7 +24,6 @@ fn get_client() -> reqwest_middleware::ClientWithMiddleware {
 }
 
 impl ManagerRef<'_, ModplatformsManager> {
-    //
     pub async fn some_api_request(&self) -> anyhow::Result<()> {
         let client = get_client();
         let response = client
