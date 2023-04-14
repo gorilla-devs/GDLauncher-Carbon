@@ -14,14 +14,14 @@ use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
-use crate::reqwest_cache;
 
 pub mod account;
+mod cache_manager;
 pub mod download;
 pub mod java;
 mod minecraft;
+mod modplatforms;
 mod prisma_client;
-pub mod reqwest_cached_client;
 mod settings;
 pub mod vtask;
 
@@ -34,7 +34,7 @@ pub enum AppError {
 }
 
 mod app {
-    use super::{java::JavaManager, *};
+    use super::{java::JavaManager, modplatforms::ModplatformsManager, *};
 
     pub struct AppInner {
         settings_manager: SettingsManager,
@@ -43,6 +43,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_manager: VisualTaskManager,
@@ -72,7 +73,7 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let reqwest = reqwest_cache::new(unsaferef);
+            let reqwest = cache_manager::new_client(unsaferef);
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
@@ -82,6 +83,7 @@ mod app {
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
+                    modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
@@ -99,6 +101,7 @@ mod app {
             app
         }
 
+        manager_getter!(modplatforms_manager: ModplatformsManager);
         manager_getter!(settings_manager: SettingsManager);
         manager_getter!(java_manager: JavaManager);
         manager_getter!(minecraft_manager: MinecraftManager);

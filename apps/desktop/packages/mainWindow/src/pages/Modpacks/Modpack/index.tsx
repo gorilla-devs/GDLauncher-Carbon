@@ -49,25 +49,12 @@ const Modpack = (props: Props) => {
       <div class="flex justify-between items-center gap-3">
         <div class="flex gap-2">
           <For each={props.modpack.tags}>
-            {(tag) => (
-              <Tag name={EventTarget.name} img={tag.img} type="fixed" />
-            )}
+            {(tag) => <Tag name={tag.name} img={tag.img} type="fixed" />}
           </For>
         </div>
         <div class="flex gap-3">
-          <Dropdown
-            options={[
-              { label: "1.16.5", key: "1.16.5" },
-              { label: "1.16.4", key: "1.16.4" },
-              { label: "1.16.3", key: "1.16.3" },
-              { label: "1.16.2", key: "1.16.2" },
-            ]}
-            icon={<div class="i-ri:price-tag-3-fill" />}
-            rounded
-            bg="bg-shade-4"
-            value="1.16.2"
-          />
           <Dropdown.button
+            onChange={() => {}}
             options={[
               { label: "1.16.5", key: "1.16.5" },
               { label: "1.16.4", key: "1.16.4" },

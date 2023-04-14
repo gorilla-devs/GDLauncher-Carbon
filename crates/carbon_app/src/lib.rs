@@ -22,7 +22,6 @@ pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
 mod once_send;
-mod reqwest_cache;
 mod runtime_path_override;
 
 #[tokio::main]
@@ -45,24 +44,28 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let port = get_available_port().await.unwrap();
+    let listener = if cfg!(debug_assertions) {
+        TcpListener::bind("127.0.0.1:4650").await.unwrap()
+    } else {
+        get_available_port().await
+    };
 
-    start_router(runtime_path, port).await;
+    start_router(runtime_path, listener).await;
 }
 
-async fn get_available_port() -> Option<u16> {
+async fn get_available_port() -> TcpListener {
     for port in 1025..65535 {
         let conn = TcpListener::bind(format!("127.0.0.1:{port}")).await;
         match conn {
-            Ok(_) => return Some(port),
+            Ok(listener) => return listener,
             Err(_) => continue,
         }
     }
 
-    None
+    panic!("No available port found");
 }
 
-async fn start_router(runtime_path: PathBuf, port: u16) {
+async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     println!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
@@ -90,9 +93,7 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
         .layer(cors)
         .with_state(app1);
 
-    let addr = format!("[::]:{port}")
-        .parse::<std::net::SocketAddr>()
-        .unwrap(); // This listens on IPv6 and IPv4
+    let port = listener.local_addr().unwrap().port();
 
     // As soon as the server is ready, notify via stdout
     tokio::spawn(async move {
@@ -119,7 +120,10 @@ async fn start_router(runtime_path: PathBuf, port: u16) {
         }
     });
 
-    axum::Server::bind(&addr)
+    let std_tcp_listener = listener.into_std().unwrap();
+
+    axum::Server::from_tcp(std_tcp_listener)
+        .unwrap()
         .serve(app.into_make_service())
         .await
         .unwrap();
@@ -162,16 +166,24 @@ async fn setup_managers_for_test() -> TestEnv {
 
 #[cfg(test)]
 mod test {
+    use crate::get_available_port;
+
     #[tokio::test]
     async fn test_router() {
+        let tcp_listener = get_available_port().await;
+        let port = &tcp_listener.local_addr().unwrap().port();
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
-        let server = tokio::spawn(async {
-            super::start_router(temp_dir.into_path(), 4000).await;
+        let server = tokio::spawn(async move {
+            super::start_router(temp_dir.into_path(), tcp_listener).await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
         let client = reqwest::Client::new();
-        let resp = client.get("http://localhost:4000").send().await.unwrap();
+        let resp = client
+            .get(format!("http://127.0.0.1:{port}",))
+            .send()
+            .await
+            .unwrap();
         let resp_code = resp.status();
         let resp_body = resp.text().await.unwrap();
 

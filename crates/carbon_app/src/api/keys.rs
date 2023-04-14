@@ -75,4 +75,8 @@ keys! {
         GET_SETTINGS                     = "getSettings";
         SET_SETTINGS                     = "setSettings";
     }
+
+    modplatforms {
+        TEST_QUERY                      = "testQuery";
+    }
 }

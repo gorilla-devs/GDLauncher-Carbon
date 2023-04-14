@@ -91,6 +91,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct AccountEntry {
     username: String,
     uuid: String,
@@ -99,12 +100,14 @@ struct AccountEntry {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 enum AccountType {
     Microsoft,
     Offline,
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 enum AccountStatus {
     Ok,
     Expired,
@@ -113,12 +116,14 @@ enum AccountStatus {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct StatusFlags {
     banned_from_multiplayer: bool,
     xbox_disabled_multiplayer: bool,
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
@@ -128,6 +133,7 @@ enum EnrollmentStatus {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct DeviceCode {
     user_code: String,
     verification_uri: String,
@@ -135,6 +141,7 @@ struct DeviceCode {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 enum EnrollmentError {
     DeviceCodeExpired,
     /// signing in with xbox has returned an error

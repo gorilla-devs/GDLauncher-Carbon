@@ -302,6 +302,7 @@ impl XboxAuth {
 }
 
 #[derive(Error, Debug, Clone, Copy, Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum XboxError {
     #[error("no xbox account is associated with this microsoft account")]
     NoAccount,
