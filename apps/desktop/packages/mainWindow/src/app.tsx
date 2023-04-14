@@ -1,6 +1,8 @@
 import { Show, Suspense } from "solid-js";
 import { useBeforeLeave, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
+import AppNavbar from "./components/Navbar";
+import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { useGDNavigate } from "./managers/NavigationManager";
 import { rspc } from "./utils/rspcClient";
@@ -11,9 +13,11 @@ type Props = {
 
 const App = (props: Props) => {
   const Route = useRoutes(routes);
+  const navigate = useGDNavigate();
 
   // eslint-disable-next-line solid/reactivity
   props.createInvalidateQuery();
+
   initThemes();
 
   let data = rspc.createQuery(() => ["account.getActiveUuid"]);
