@@ -145,7 +145,7 @@ const CodeStep = (props: Props) => {
           <Show when={expired()}>
             <p class="mt-2 mb-0 text-[#E54B4B]">
               <Trans
-                key="code_expired_message"
+                key="login.code_expired_message"
                 options={{
                   defaultValue: "The code has been expired",
                 }}
@@ -157,7 +157,7 @@ const CodeStep = (props: Props) => {
           <p class="mb-0 text-darkSlate-50 mt-4">
             <span class="text-white mr-2">{countDown()}</span>
             <Trans
-              key="before_expiring"
+              key="login.before_expiring"
               options={{
                 defaultValue: "before the code expires",
               }}
@@ -165,7 +165,7 @@ const CodeStep = (props: Props) => {
           </p>
           <p class="text-darkSlate-50 mb-0">
             <Trans
-              key="enter_code_in_browser"
+              key="login.enter_code_in_browser"
               options={{
                 defaultValue:
                   "Enter the specified code on the browser page to complete the authorization",
@@ -180,7 +180,7 @@ const CodeStep = (props: Props) => {
       <Show when={loading()}>
         <span class="mb-4 text-xs absolute text-darkSlate-100 bottom-1">
           <Trans
-            key="waiting_login_code_msg"
+            key="login.waiting_login_code_msg"
             options={{
               defaultValue: "Waiting authorization...",
             }}
@@ -199,7 +199,7 @@ const CodeStep = (props: Props) => {
           }}
         >
           <Trans
-            key="open_in_browser"
+            key="login.open_in_browser"
             options={{
               defaultValue: "Open in browser",
             }}
@@ -215,7 +215,7 @@ const CodeStep = (props: Props) => {
           <span class="i-ri:refresh-line" />
           <h3 class="m-0">
             <Trans
-              key="refresh"
+              key="login.refresh"
               options={{
                 defaultValue: "refresh",
               }}

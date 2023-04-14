@@ -23,7 +23,7 @@ const Appearance = () => {
       <div class="bg-darkSlate-800 w-full h-auto flex flex-col py-5 px-6 box-border">
         <h2 class="m-0 mb-7 text-4">
           <Trans
-            key="appearance"
+            key="settings.appearance"
             options={{
               defaultValue: "Appearance",
             }}
@@ -49,7 +49,7 @@ const Appearance = () => {
               </Show>
               <p class="m-0 text-darkSlate-50">
                 <Trans
-                  key="default"
+                  key="settings.theme_default"
                   options={{
                     defaultValue: "default",
                   }}
@@ -76,7 +76,7 @@ const Appearance = () => {
               </Show>
               <p class="m-0 text-darkSlate-50">
                 <Trans
-                  key="light"
+                  key="settings.theme_light"
                   options={{
                     defaultValue: "light",
                   }}

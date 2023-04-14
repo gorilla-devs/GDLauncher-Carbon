@@ -32,7 +32,7 @@ const Active = () => {
   return (
     <div class="flex items-center gap-2 cursor-pointer text-green-500">
       <Trans
-        key="active_version"
+        key="instance.active_version"
         options={{
           defaultValue: "Active",
         }}
@@ -69,7 +69,7 @@ const Version = (props: Props) => {
         <Show when={!props.version.isActive} fallback={<Active />}>
           <div class="group text-darkSlate-300 transition ease-in-out flex items-center gap-2 cursor-pointer hover:text-darkSlate-100">
             <Trans
-              key="switch_version"
+              key="instance.switch_version"
               options={{
                 defaultValue: "Switch Version",
               }}

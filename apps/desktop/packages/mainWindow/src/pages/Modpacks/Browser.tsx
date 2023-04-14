@@ -1,4 +1,4 @@
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import BG from "/assets/images/rlccraft_img.png";
@@ -84,10 +84,9 @@ const NoModpacks = () => {
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="no_modpacks_text"
+            key="instance.no_modpacks_text"
             options={{
-              defaultValue:
-                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+              defaultValue: "At the moment there is no modpacks.",
             }}
           />
         </p>
@@ -98,6 +97,7 @@ const NoModpacks = () => {
 
 export default function Browser() {
   const modalsContext = useModal();
+  const [t] = useTransContext();
   return (
     <div class="relative w-full box-border">
       <div class="sticky top-0 left-0 right-0 flex flex-col bg-darkSlate-800 z-10 px-5 pt-5">
@@ -111,7 +111,7 @@ export default function Browser() {
           <div class="flex gap-3 items-center">
             <p class="text-darkSlate-50">
               <Trans
-                key="sort_by"
+                key="instance.sort_by"
                 options={{
                   defaultValue: "Sort by:",
                 }}
@@ -119,11 +119,14 @@ export default function Browser() {
             </p>
             <Dropdown
               options={[
-                { label: "Popular", key: "popular" },
-                { label: "Featured", key: "featured" },
-                { label: "Author", key: "author" },
-                { label: "Name", key: "name" },
-                { label: "Total downloads", key: "downloads" },
+                { label: t("instance.sort_by_popular"), key: "popular" },
+                { label: t("instance.sort_by_featured"), key: "featured" },
+                { label: t("instance.sort_by_author"), key: "author" },
+                { label: t("instance.sort_by_name"), key: "name" },
+                {
+                  label: t("instance.sort_by_total_downloads"),
+                  key: "downloads",
+                },
               ]}
               value={"popular"}
               rounded
@@ -135,7 +138,7 @@ export default function Browser() {
             icon={<div class="text-lg i-ri:download-2-fill" />}
           >
             <Trans
-              key="import"
+              key="instance.import"
               options={{
                 defaultValue: "Import",
               }}
@@ -156,7 +159,7 @@ export default function Browser() {
               <div class="flex flex-col justify-around">
                 <h2 class="m-0">
                   <Trans
-                    key="create_new_instance_title"
+                    key="instance.create_new_instance_title"
                     options={{
                       defaultValue: "New instance",
                     }}
@@ -164,7 +167,7 @@ export default function Browser() {
                 </h2>
                 <p class="m-0 text-darkSlate-50">
                   <Trans
-                    key="create_new_instance_text"
+                    key="instance.create_new_instance_text"
                     options={{
                       defaultValue: "Create your own empty instance",
                     }}
@@ -192,7 +195,7 @@ export default function Browser() {
                 }
               >
                 <Trans
-                  key="create_instance_btn"
+                  key="instance.create_instance_btn"
                   options={{
                     defaultValue: "Create",
                   }}

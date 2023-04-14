@@ -111,9 +111,9 @@ const Instance = () => {
               variant="transparent"
             >
               <Trans
-                key="back"
+                key="instance.step_back"
                 options={{
-                  defaultValue: "back",
+                  defaultValue: "Back",
                 }}
               />
             </Button>
@@ -196,7 +196,7 @@ const Instance = () => {
                         </div>
                         <Button uppercase variant="glow" size="small">
                           <Trans
-                            key="play"
+                            key="instance.play"
                             options={{
                               defaultValue: "play",
                             }}
@@ -226,9 +226,9 @@ const Instance = () => {
               variant="transparent"
             >
               <Trans
-                key="back"
+                key="instance.step_back"
                 options={{
-                  defaultValue: "back",
+                  defaultValue: "Back",
                 }}
               />
             </Button>
@@ -268,7 +268,7 @@ const Instance = () => {
                 </div>
                 <Button uppercase variant="glow" size="small">
                   <Trans
-                    key="play"
+                    key="instance.play"
                     options={{
                       defaultValue: "play",
                     }}

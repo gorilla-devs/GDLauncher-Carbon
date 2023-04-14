@@ -1,16 +1,18 @@
 import { Button, Dropdown, Input, TextArea } from "@gd/ui";
 import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 
 const InstanceCreation = (props: ModalProps) => {
+  const [t] = useTransContext();
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="h-130 w-110 flex flex-col justify-between">
         <div>
           <h5 class="mt-0 mb-2">
             <Trans
-              key="instance_name"
+              key="instance.instance_name"
               options={{
                 defaultValue: "Instance name",
               }}
@@ -21,7 +23,7 @@ const InstanceCreation = (props: ModalProps) => {
         <div>
           <h5 class="mt-0 mb-2">
             <Trans
-              key="instance_description"
+              key="instance.instance_description"
               options={{
                 defaultValue: "Description",
               }}
@@ -32,7 +34,7 @@ const InstanceCreation = (props: ModalProps) => {
         <div>
           <h5 class="mt-0 mb-2">
             <Trans
-              key="instance_loader"
+              key="instance.instance_loader"
               options={{
                 defaultValue: "Loader",
               }}
@@ -40,9 +42,9 @@ const InstanceCreation = (props: ModalProps) => {
           </h5>
           <Dropdown
             options={[
-              { label: "vanilla", key: "vanilla" },
-              { label: "forge", key: "forge" },
-              { label: "fabric", key: "fabric" },
+              { label: t("instance.vanilla"), key: "vanilla" },
+              { label: t("instance.forge"), key: "forge" },
+              { label: t("instance.fabric"), key: "fabric" },
             ]}
             bgColorClass="bg-darkSlate-800"
             containerClass="w-full"
@@ -53,7 +55,7 @@ const InstanceCreation = (props: ModalProps) => {
         <div>
           <h5 class="mt-0 mb-2">
             <Trans
-              key="instance_version"
+              key="instance.instance_version"
               options={{
                 defaultValue: "Version",
               }}
@@ -78,7 +80,7 @@ const InstanceCreation = (props: ModalProps) => {
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans
-              key="create_instance_modal_cancel"
+              key="instance.instance_modal_instance_creation_cancel"
               options={{
                 defaultValue: "Cancel",
               }}
@@ -89,7 +91,7 @@ const InstanceCreation = (props: ModalProps) => {
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans
-              key="create_instance_modal_create"
+              key="instance.instance_modal_instance_creation_create"
               options={{
                 defaultValue: "Create",
               }}

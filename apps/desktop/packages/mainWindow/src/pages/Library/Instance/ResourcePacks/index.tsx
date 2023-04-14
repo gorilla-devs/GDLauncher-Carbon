@@ -1,6 +1,6 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import ResourcePack from "./ResourcePack";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 
@@ -128,7 +128,7 @@ const NoResourcePacks = () => {
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="no_resourcepacks_text"
+            key="instance.no_resource_packs_text"
             options={{
               defaultValue:
                 "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
@@ -137,7 +137,7 @@ const NoResourcePacks = () => {
         </p>
         <Button variant="outline" size="medium">
           <Trans
-            key="add_pack"
+            key="instance.add_resource_pack"
             options={{
               defaultValue: "+ Add pack",
             }}
@@ -149,6 +149,7 @@ const NoResourcePacks = () => {
 };
 
 const ResourcePacks = () => {
+  const [t] = useTransContext();
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
@@ -162,7 +163,7 @@ const ResourcePacks = () => {
           <div class="flex gap-3 items-center">
             <p class="text-darkSlate-50">
               <Trans
-                key="sort_by"
+                key="instance.sort_by"
                 options={{
                   defaultValue: "Sort by:",
                 }}
@@ -170,8 +171,8 @@ const ResourcePacks = () => {
             </p>
             <Dropdown
               options={[
-                { label: "A to Z", key: "asc" },
-                { label: "Z to A", key: "desc" },
+                { label: t("instance.sort_by_asc"), key: "asc" },
+                { label: t("instance.sort_by_desc"), key: "desc" },
               ]}
               value={"asc"}
               rounded
@@ -179,7 +180,7 @@ const ResourcePacks = () => {
           </div>
           <Button variant="outline" size="medium">
             <Trans
-              key="add_pack"
+              key="instance.add_resource_pack_pack"
               options={{
                 defaultValue: "+ Add ResourcePack",
               }}
@@ -191,7 +192,7 @@ const ResourcePacks = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
               <Trans
-                key="select_all"
+                key="instance.select_all_resource_pack"
                 options={{
                   defaultValue: "Select All",
                 }}
@@ -200,7 +201,7 @@ const ResourcePacks = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:folder-open-fill text-2xl" />
               <Trans
-                key="open_folder"
+                key="instance.open_resource_packs_folder"
                 options={{
                   defaultValue: "Open folder",
                 }}
@@ -209,7 +210,7 @@ const ResourcePacks = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:forbid-line text-2xl" />
               <Trans
-                key="disable"
+                key="instance.disable_resource_pack"
                 options={{
                   defaultValue: "disable",
                 }}
@@ -218,7 +219,7 @@ const ResourcePacks = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans
-                key="delete"
+                key="instance.delete_resource_pack"
                 options={{
                   defaultValue: "delete",
                 }}
@@ -228,7 +229,7 @@ const ResourcePacks = () => {
           <div>
             {resourcePacks.length}
             <Trans
-              key="resource_packs"
+              key="instance.resource_packs"
               options={{
                 defaultValue: "Resource packs",
               }}

@@ -11,7 +11,7 @@ const ManualStep = (props: StepsProps) => {
             <div class="text-darkSlate-500 i-ri:folder-open-fill text-xl w-6" />
             <p class="m-0 text-darkSlate-500">
               <Trans
-                key="select_java_zip"
+                key="java.select_java_zip"
                 options={{
                   defaultValue: "Select java {{version}} zip",
                   version: 8,
@@ -22,10 +22,10 @@ const ManualStep = (props: StepsProps) => {
         </div>
         <p class="text-darkSlate-500 text-center">
           <Trans
-            key="select_required_java_text"
+            key="java.select_required_java_text"
             options={{
               defaultValue:
-                "Select the required paths to java. Java 8 udes for all the versions < 1.17",
+                "Select the required paths to java. Java 8 is used for all the versions < 1.17",
             }}
           />
         </p>
@@ -40,7 +40,7 @@ const ManualStep = (props: StepsProps) => {
             }}
           >
             <Trans
-              key="back"
+              key="java.step_back"
               options={{
                 defaultValue: "Back",
               }}
@@ -55,7 +55,7 @@ const ManualStep = (props: StepsProps) => {
             }}
           >
             <Trans
-              key="setup"
+              key="java.setup"
               options={{
                 defaultValue: "Setup",
               }}

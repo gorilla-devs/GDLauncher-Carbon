@@ -20,7 +20,7 @@ const Tags = () => {
       </div>
       <Button variant="secondary" textColor="text-red-500" rounded={false}>
         <Trans
-          key="clear_filters"
+          key="instance.clear_filters_modpacks"
           options={{
             defaultValue: "Clear filters",
           }}

@@ -1,15 +1,16 @@
 /* eslint-disable i18next/no-literal-string */
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Slider, Switch } from "@gd/ui";
 
 const Settings = () => {
+  const [t] = useTransContext();
   return (
     <div class="pt-10">
       <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
             <Trans
-              key="java_memory_title"
+              key="java.java_memory_title"
               options={{
                 defaultValue: "Java Memory",
               }}
@@ -38,7 +39,7 @@ const Settings = () => {
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
             <Trans
-              key="game_resolution"
+              key="java.game_resolution"
               options={{
                 defaultValue: "Game Resolution",
               }}
@@ -54,7 +55,7 @@ const Settings = () => {
           </div>
           <Dropdown
             value="en"
-            placeholder="presets"
+            placeholder={t("settings.resolution_presets") || ""}
             options={[
               { label: "800x600", key: "800x600" },
               { label: "1024x768", key: "1024x768" },
@@ -67,7 +68,7 @@ const Settings = () => {
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
             <Trans
-              key="java_arguments_title"
+              key="java.java_arguments_title"
               options={{
                 defaultValue: "Java Arguments",
               }}
@@ -79,7 +80,7 @@ const Settings = () => {
           <Input class="w-full" />
           <Button rounded={false} variant="secondary" class="h-10">
             <Trans
-              key="reset_java_args"
+              key="java.reset_java_args"
               options={{
                 defaultValue: "Reset",
               }}
