@@ -20,29 +20,29 @@ function Input(props: Props) {
           props.class || ""
         }`}
         classList={{
-          "bg-shade-7 rounded-full px-4 flex items-center max-w-max":
+          "bg-darkSlate-700 rounded-full px-4 flex items-center max-w-max":
             props.icon,
           "rounded-md": !props.icon,
         }}
       >
         <Show when={props.icon}>
-          <span class="text-shade-5">{props.icon}</span>
+          <span class="text-darkSlate-500">{props.icon}</span>
         </Show>
         <input
-          class={`border-0 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-shade-5 ${
+          class={`border-0 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-500 ${
             props.inputClass || ""
           } ${props.inputColor}
            outline-none focus-viible:outline-none
           `}
           classList={{
-            "bg-shade-7 focus-visible:outline-none focus-visible:border-0":
+            "bg-darkSlate-700 focus-visible:outline-none focus-visible:border-0":
               props.icon,
-            "px-4 focus-visible:outline-shade-5 hover:border-shade-5 active:border-shade-5":
+            "px-4 focus-visible:outline-darkSlate-500 hover:border-darkSlate-500 active:border-darkSlate-500":
               !props.icon,
-            "text-shade-7": props.disabled,
+            "text-darkSlate-700": props.disabled,
             "text-white": !props.disabled,
-            "border-status-red": !!props.error,
-            "bg-shade-6": !props.inputColor,
+            "border-red-500": !!props.error,
+            "bg-darkSlate-600": !props.inputColor,
           }}
           placeholder={props.placeholder}
           value={props.value || ""}
@@ -51,7 +51,7 @@ function Input(props: Props) {
       </div>
 
       <Show when={props.error}>
-        <div class="text-status-red text-left">{props.error}</div>
+        <div class="text-red-500 text-left">{props.error}</div>
       </Show>
     </>
   );

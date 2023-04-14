@@ -70,14 +70,14 @@ const TabList = (props: Props) => {
     <div
       class="flex relative items-center h-auto w-full"
       classList={{
-        "bg-shade-8": tabsContext?.variant === "underline",
-        "bg-shade-9": tabsContext?.variant === "block",
+        "bg-darkSlate-800": tabsContext?.variant === "underline",
+        "bg-darkSlate-900": tabsContext?.variant === "block",
       }}
     >
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
-            class="flex border-b-shade-8 border-b-1 box-border overflow-auto w-full"
+            class="flex border-b-darkSlate-800 border-b-1 box-border overflow-auto w-full"
             classList={{
               "gap-6": tabsContext?.orientation !== undefined,
               "flex-row": tabsContext?.orientation === "horizontal",
@@ -91,7 +91,7 @@ const TabList = (props: Props) => {
             {props.children}
             <Show when={tabs()[currentIndex()] && !isIgnored()}>
               <div
-                class="absolute bottom-1 h-1 bg-primary transition-all duration-100 ease-in-out"
+                class="absolute bottom-1 h-1 bg-primary-500 transition-all duration-100 ease-in-out"
                 classList={{
                   "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
                   "left-0": tabsContext?.orientation === "horizontal",

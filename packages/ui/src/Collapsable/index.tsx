@@ -17,12 +17,12 @@ const Collapsable = (props: Props) => {
         }}
       >
         <div
-          class="text-2xl transition ease-in-out i-ri:arrow-down-s-line text-shade-1"
+          class="text-2xl transition ease-in-out i-ri:arrow-down-s-line text-darkSlate-100"
           classList={{
             "-rotate-180": !opened(),
           }}
         />
-        <p class="m-0 text-shade-1 flex items-center">{props.title}</p>
+        <p class="m-0 text-darkSlate-100 flex items-center">{props.title}</p>
       </div>
       <div
         class="overflow-hidden"

@@ -154,7 +154,7 @@ const CodeStep = (props: Props) => {
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="mb-0 text-shade-0 mt-4">
+          <p class="mb-0 text-darkSlate-50 mt-4">
             <span class="text-white mr-2">{countDown()}</span>
             <Trans
               key="login.before_expiring"
@@ -163,7 +163,7 @@ const CodeStep = (props: Props) => {
               }}
             />
           </p>
-          <p class="text-shade-0 mb-0">
+          <p class="text-darkSlate-50 mb-0">
             <Trans
               key="login.enter_code_in_browser"
               options={{
@@ -175,10 +175,10 @@ const CodeStep = (props: Props) => {
         </Show>
       </div>
       <Show when={error()}>
-        <p class="text-red m-0">{error()}</p>
+        <p class="text-red-500 m-0">{error()}</p>
       </Show>
       <Show when={loading()}>
-        <span class="mb-4 text-xs absolute text-shade-1 bottom-1">
+        <span class="mb-4 text-xs absolute text-darkSlate-100 bottom-1">
           <Trans
             key="login.waiting_login_code_msg"
             options={{

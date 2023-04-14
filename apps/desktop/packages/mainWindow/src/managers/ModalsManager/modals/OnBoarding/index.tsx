@@ -19,7 +19,7 @@ const OnBoarding = (props: ModalProps) => {
         </div>
         <div class="absolute top-5 right-5">
           <div
-            class="i-ri:close-fill text-2xl text-shade-0 cursor-pointer"
+            class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
             onClick={() => modalsContext?.closeModal()}
           />
         </div>
@@ -32,7 +32,7 @@ const OnBoarding = (props: ModalProps) => {
               }}
             />
           </h2>
-          <p class="text-center text-shade-0 leading-6 mb-8">
+          <p class="text-center text-darkSlate-50 leading-6 mb-8">
             <Trans
               key="onboarding.welcome_gdlauncher_text"
               options={{
@@ -55,7 +55,7 @@ const OnBoarding = (props: ModalProps) => {
             />
           </Button>
 
-          <div class="flex items-center gap-2 text-accent cursor-pointer hover:text-primary transition ease-in-out">
+          <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
             <div class="i-ri:download-2-line text-2xl" />
             <Trans
               key="onboarding.import_instance_or_zip"

@@ -18,7 +18,7 @@ const InstanceCreation = (props: ModalProps) => {
               }}
             />
           </h5>
-          <Input value="New instance" inputColor="bg-shade-8" />
+          <Input value="New instance" inputColor="bg-darkSlate-800" />
         </div>
         <div>
           <h5 class="mt-0 mb-2">
@@ -46,7 +46,7 @@ const InstanceCreation = (props: ModalProps) => {
               { label: t("instance.forge"), key: "forge" },
               { label: t("instance.fabric"), key: "fabric" },
             ]}
-            bgColorClass="bg-shade-8"
+            bgColorClass="bg-darkSlate-800"
             containerClass="w-full"
             class="w-full"
             value="vanilla"
@@ -68,7 +68,7 @@ const InstanceCreation = (props: ModalProps) => {
               { label: "1.16.3", key: "1.16.3" },
               { label: "1.16.2", key: "1.16.2" },
             ]}
-            bgColorClass="bg-shade-8"
+            bgColorClass="bg-darkSlate-800"
             containerClass="w-full"
             class="w-full"
             value="1.16.2"

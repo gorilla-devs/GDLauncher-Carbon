@@ -30,7 +30,7 @@ const General = () => {
   });
 
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
+    <div class="bg-darkSlate-800 w-full h-auto flex flex-col py-5 px-6 box-border">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="settings.general"
@@ -49,7 +49,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 m-0 max-w-96">
+          <p class="text-darkSlate-300 m-0 max-w-96">
             <Trans
               key="settings.choose_a_language_text"
               options={{
@@ -80,7 +80,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 m-0 max-w-96">
+          <p class="text-darkSlate-300 m-0 max-w-96">
             <Trans
               key="settings.release_channel_text"
               options={{
@@ -111,7 +111,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 m-0 max-w-96">
+          <p class="text-darkSlate-300 m-0 max-w-96">
             <Trans
               key="settings.concurrent_downloads_text"
               options={{
@@ -178,7 +178,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings.instance_sorting_text"
               options={{
@@ -206,7 +206,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings_more_control"
               options={{
@@ -228,7 +228,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings.show_news_text"
               options={{
@@ -256,7 +256,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings.discord_integration_text"
               options={{
@@ -285,7 +285,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings.hide_launcher_playing_text"
               options={{
@@ -307,7 +307,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-shade-3 max-w-96 m-0">
+          <p class="text-darkSlate-300 max-w-96 m-0">
             <Trans
               key="settings.potato_mode_text"
               options={{
@@ -326,7 +326,7 @@ const General = () => {
           />
         </div>
       </div>
-      <Button rounded={false} variant="secondary" textColor="text-red">
+      <Button rounded={false} variant="secondary" textColor="text-red-500">
         <Trans
           key="settings.reset"
           options={{
@@ -342,7 +342,7 @@ const General = () => {
             <p class="mb-0 mt-2">v.1.1.26</p>
           </div>
         </div>
-        <p class="text-shade-5 m-0">
+        <p class="text-darkSlate-500 m-0">
           <Trans
             key="settings.last_version"
             options={{

@@ -75,9 +75,9 @@ const NotificationsProvider = (props: Props) => {
                 "bottom-auto": notification.position !== "bottom",
                 "top-12": notification.position === "top",
                 "top-auto": notification.position !== "top",
-                "bg-red": notification.type === "error",
-                "bg-yellow": notification.type === "warning",
-                "bg-green": notification.type === "success",
+                "bg-red-500": notification.type === "error",
+                "bg-yellow-500": notification.type === "warning",
+                "bg-green-500": notification.type === "success",
               }}
             >
               {notification.name}

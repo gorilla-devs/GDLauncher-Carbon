@@ -19,7 +19,7 @@ const FirstStep = (props: StepsProps) => {
             />
           </h3>
         </div>
-        <p class="m-0 text-center text-shade-3">
+        <p class="m-0 text-center text-darkSlate-300">
           <Trans
             key="java.missing_java_text"
             options={{

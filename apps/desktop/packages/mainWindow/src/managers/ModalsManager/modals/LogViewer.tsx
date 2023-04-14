@@ -44,7 +44,7 @@ const LogViewer = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 overflow-hidden">
-        <div class="bg-shade-8 max-h-full">
+        <div class="bg-darkSlate-800 max-h-full">
           <Tabs variant="traditional">
             <div class="flex items-center max-h-full">
               <TabList>
@@ -74,13 +74,13 @@ const LogViewer = (props: ModalProps) => {
                 </Tab>
               </TabList>
               <div class="flex gap-4 px-5">
-                <div class="cursor-pointer text-shade-0 i-ri:upload-2-line" />
-                <div class="text-shade-0 cursor-pointer i-ri:file-copy-fill" />
+                <div class="cursor-pointer text-darkSlate-50 i-ri:upload-2-line" />
+                <div class="text-darkSlate-50 cursor-pointer i-ri:file-copy-fill" />
               </div>
             </div>
-            <div class="bg-shade-7 overflow-y-auto max-h-130">
+            <div class="bg-darkSlate-700 overflow-y-auto max-h-130">
               <TabPanel>
-                <div class="overflow-y-auto divide-y divide-shade-5">
+                <div class="overflow-y-auto divide-y divide-darkSlate-500">
                   <For each={logs}>
                     {(log) => (
                       <div class="flex flex-col justify-center items-center">
