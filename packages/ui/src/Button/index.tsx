@@ -107,7 +107,7 @@ const getVariant = (
       ...commonStyle,
       "shadow-md": !isDisabled,
       "shadow-primary-500": !isDisabled,
-      "bg-primary": !isDisabled,
+      "bg-primary-500": !isDisabled,
       "hover:shadow-lg": !isDisabled,
       "hover:bg-primary-hover": !isDisabled,
       "bg-darkSlate-500": isDisabled,
