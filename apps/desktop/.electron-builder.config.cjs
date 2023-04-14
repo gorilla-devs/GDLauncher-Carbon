@@ -9,8 +9,9 @@ console.log(
   isDockerBuild
 );
 
-let os = process.argv[5].replace(/-/g, "");
 let arch = process.argv[4].replace(/-/g, "");
+let os = process.argv[5].replace(/-/g, "");
+let profile = process.argv[7].replace(/-/g, "");
 
 let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
 
@@ -35,7 +36,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: `../../target/${targetTriple}/release/${coreModuleBinName}`,
+      from: `../../target/${targetTriple}/${profile}/${coreModuleBinName}`,
       to: coreModuleBinName,
     },
     {
