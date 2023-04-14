@@ -49,6 +49,7 @@ task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
+iridium = { git = "https://github.com/gorilla-devs/iridium", hash = "60c70da5733e372270a09d707e27d3102d40fdee", optional = true }
 # libc = { workspace = true }
 
 # [target.'cfg(windows)'.dependencies]
@@ -62,3 +63,6 @@ ntest = { workspace = true }
 [build-dependencies]
 serde_json = { workspace = true }
 dotenvy = { workspace = true }
+
+[features]
+iridium_lib = ["iridium"]
