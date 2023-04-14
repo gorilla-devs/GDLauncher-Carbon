@@ -99,7 +99,6 @@ const Auth = (props: Props) => {
             onClick={() => {
               modalsContext?.openModal({
                 name: "termsAndConditions",
-                url: "/library/DDAEDF",
               });
             }}
           >
