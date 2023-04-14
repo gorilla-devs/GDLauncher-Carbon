@@ -1,10 +1,11 @@
 import { Show, Suspense } from "solid-js";
-import { useRoutes } from "@solidjs/router";
+import { useBeforeLeave, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import AppNavbar from "./components/Navbar";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { useGDNavigate } from "./managers/NavigationManager";
+import { rspc } from "./utils/rspcClient";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -18,6 +19,11 @@ const App = (props: Props) => {
   props.createInvalidateQuery();
 
   initThemes();
+
+  let data = rspc.createQuery(() => ["account.getActiveUuid"]);
+  useBeforeLeave(() => {
+    if (!data.data) navigate("/");
+  });
 
   return (
     <div class="w-screen relative">
