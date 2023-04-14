@@ -1,6 +1,6 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
@@ -128,7 +128,7 @@ const NoMods = () => {
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-shade-0 max-w-100">
           <Trans
-            key="no_mods_text"
+            key="instance.no_mods_text"
             options={{
               defaultValue:
                 "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
@@ -137,7 +137,7 @@ const NoMods = () => {
         </p>
         <Button variant="outline" size="medium">
           <Trans
-            key="add_pack"
+            key="instance.add_pack"
             options={{
               defaultValue: "+ Add pack",
             }}
@@ -149,6 +149,7 @@ const NoMods = () => {
 };
 
 const Mods = () => {
+  const [t] = useTransContext();
   return (
     <div>
       <div class="flex flex-col bg-shade-8 z-10 transition-all duration-100 ease-in-out pt-10 sticky top-30">
@@ -162,7 +163,7 @@ const Mods = () => {
           <div class="flex gap-3 items-center">
             <p class="text-shade-0">
               <Trans
-                key="sort_by"
+                key="instance.sort_by"
                 options={{
                   defaultValue: "Sort by:",
                 }}
@@ -170,8 +171,8 @@ const Mods = () => {
             </p>
             <Dropdown
               options={[
-                { label: "A to Z", key: "asc" },
-                { label: "Z to A", key: "desc" },
+                { label: t("instance.sort_by_asc"), key: "asc" },
+                { label: t("instance.sort_by_desc"), key: "desc" },
               ]}
               value={"asc"}
               rounded
@@ -179,7 +180,7 @@ const Mods = () => {
           </div>
           <Button variant="outline" size="medium">
             <Trans
-              key="add_mod"
+              key="instance.add_mod"
               options={{
                 defaultValue: "+ Add Mod",
               }}
@@ -191,7 +192,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
               <Trans
-                key="select_all"
+                key="instance.select_all_mods"
                 options={{
                   defaultValue: "Select All",
                 }}
@@ -200,7 +201,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white">
               <span class="text-2xl i-ri:folder-open-fill" />
               <Trans
-                key="open_folder"
+                key="instance.open_mods_folder"
                 options={{
                   defaultValue: "Open folder",
                 }}
@@ -209,7 +210,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="text-2xl i-ri:forbid-line" />
               <Trans
-                key="disable"
+                key="instance.disable_mod"
                 options={{
                   defaultValue: "disable",
                 }}
@@ -218,7 +219,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="text-2xl i-ri:delete-bin-2-fill" />
               <Trans
-                key="delete"
+                key="instance.delete_mod"
                 options={{
                   defaultValue: "delete",
                 }}
@@ -228,7 +229,7 @@ const Mods = () => {
           <div>
             {mods.length}
             <Trans
-              key="mods"
+              key="instance.mods"
               options={{
                 defaultValue: "Mods",
               }}

@@ -35,7 +35,7 @@ const App = (props: Props) => {
             }}
           >
             <Trans
-              key="login"
+              key="login.login"
               options={{
                 defaultValue: "login",
               }}
@@ -48,7 +48,7 @@ const App = (props: Props) => {
             }}
           >
             <Trans
-              key="logout"
+              key="login.logout"
               options={{
                 defaultValue: "logout",
               }}

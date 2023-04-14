@@ -4,14 +4,14 @@ import { Button, Input, Slider } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
-import { useGDNavigate } from "@/managers/NavigationManager";
+import { useModal } from "@/managers/ModalsManager";
 
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
   const javas = () => javasData()?.data || [];
-  const navigate = useGDNavigate();
+  const modalsContext = useModal();
 
   let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -31,7 +31,7 @@ const Java = () => {
     <div class="bg-shade-8 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
-          key="java"
+          key="java.java"
           options={{
             defaultValue: "Java",
           }}
@@ -41,7 +41,7 @@ const Java = () => {
       <div class="mb-6">
         <h5 class="m-0 mb-4">
           <Trans
-            key="java_memory_title"
+            key="java.java_memory_title"
             options={{
               defaultValue: "Java Memory",
             }}
@@ -65,7 +65,7 @@ const Java = () => {
       <div class="mb-6">
         <h5 class="m-0 mb-4">
           <Trans
-            key="java_arguments_title"
+            key="java.java_arguments_title"
             options={{
               defaultValue: "Java Arguments",
             }}
@@ -75,7 +75,7 @@ const Java = () => {
           <Input class="w-full" />
           <Button rounded={false} variant="secondary" class="h-10">
             <Trans
-              key="reset_java_args"
+              key="java.reset_java_args"
               options={{
                 defaultValue: "Reset",
               }}
@@ -87,7 +87,7 @@ const Java = () => {
         <div class="flex justify-between mb-4">
           <h5 class="m-0 flex items-center">
             <Trans
-              key="all_versions"
+              key="java.all_versions"
               options={{
                 defaultValue: "All versions",
               }}
@@ -97,7 +97,7 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate("?m=addJava");
+              modalsContext?.openModal({ name: "addJava" });
             }}
           >
             <div class="text-shade-5 text-xl i-ri:add-fill" />
@@ -114,7 +114,7 @@ const Java = () => {
                       <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
                         <p class="m-0">
                           <Trans
-                            key="java"
+                            key="java.java"
                             options={{
                               defaultValue: "Java",
                             }}

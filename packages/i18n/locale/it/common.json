@@ -1,5 +1,6 @@
 {
   "hello": "ciao",
   "world": "mondo",
-  "welcome": "benvenuto"
+  "welcome": "benvenuto",
+  "add_instance": "+ Add Instance"
 }

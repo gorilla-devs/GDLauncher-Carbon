@@ -5,12 +5,14 @@ import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
   const navigate = useGDNavigate();
   const location = useLocation();
+
+  const [t] = useTransContext();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
@@ -27,7 +29,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 bg-shade-7 rounded-full"
+                class="flex justify-center items-center h-10 group w-10 bg-shade-7 rounded-full"
                 onClick={() => {
                   toggleSidebar();
                 }}
@@ -37,7 +39,7 @@ const Sidebar = () => {
             }
           >
             <Input
-              placeholder="Type Here"
+              placeholder={t("general.type_here") || ""}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
             />
@@ -82,7 +84,7 @@ const Sidebar = () => {
           </Collapsable>
         </Show>
         <Show when={!isSidebarOpened()}>
-          <div class="h-full w-full overflow-auto flex flex-col gap-4 items-center scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
+          <div class="h-full w-full flex gap-4 items-center overflow-auto flex-col scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
             <Tile
               // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
@@ -164,7 +166,7 @@ const Sidebar = () => {
             />
           </div>
         </Show>
-        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-shade-8 py-5">
+        <div class="absolute right-0 w-full flex justify-center left-0 bottom-0 bg-shade-8 py-5">
           <Button
             variant="outline"
             onClick={() => navigate(`/modpacks`)}
@@ -176,7 +178,7 @@ const Sidebar = () => {
           >
             <Show when={isSidebarOpened()} fallback={"+"}>
               <Trans
-                key="add_instance"
+                key="sidebar.plus_add_instance"
                 options={{
                   defaultValue: "+ Add Instance",
                 }}
