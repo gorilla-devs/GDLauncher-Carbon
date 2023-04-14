@@ -26,7 +26,7 @@ const OnBoarding = (props: ModalProps) => {
         <div class="flex flex-col">
           <h2 class="text-center font-normal text-sm">
             <Trans
-              key="welcome_gdlauncher_title"
+              key="onboarding.welcome_gdlauncher_title"
               options={{
                 defaultValue: "Welcome to GDLauncher",
               }}
@@ -34,7 +34,7 @@ const OnBoarding = (props: ModalProps) => {
           </h2>
           <p class="text-center text-shade-0 leading-6 mb-8">
             <Trans
-              key="welcome_gdlauncher_text"
+              key="onboarding.welcome_gdlauncher_text"
               options={{
                 defaultValue:
                   "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
@@ -48,7 +48,7 @@ const OnBoarding = (props: ModalProps) => {
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans
-              key="add_instance"
+              key="onboarding.add_instance"
               options={{
                 defaultValue: "+ Add Instance",
               }}
@@ -58,7 +58,7 @@ const OnBoarding = (props: ModalProps) => {
           <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-accent hover:text-primary">
             <div class="text-2xl i-ri:download-2-line" />
             <Trans
-              key="import_instance_or_zip"
+              key="onboarding.import_instance_or_zip"
               options={{
                 defaultValue: "Import instance / Zip",
               }}

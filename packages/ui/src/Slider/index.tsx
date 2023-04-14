@@ -147,7 +147,7 @@ function Slider(props: Props) {
     <div class="h-10 flex items-center w-full max-w-full box-border mb-10">
       <div class="relative w-full">
         <For each={Object.entries(props.marks)}>
-          {([value, label]) => (
+          {([value, label], i) => (
             <>
               <div
                 class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
@@ -169,7 +169,11 @@ function Slider(props: Props) {
                 class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-shade-5 w-10"
                 style={{
                   position: "absolute",
-                  left: `${calcOffset(parseInt(value, 10))}%`,
+                  left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                    i() === Object.entries(props.marks).length - 1
+                      ? "10px"
+                      : "0px"
+                  })`,
                   top: "10px",
                 }}
               >

@@ -1,7 +1,7 @@
 import { useNavigate, useRouteData } from "@solidjs/router";
 import { createEffect, createSignal, Setter, Show } from "solid-js";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
-import { useTransContext } from "@gd/i18n";
+import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
@@ -15,7 +15,6 @@ type Props = {
 };
 
 const Auth = (props: Props) => {
-  const [t] = useTransContext();
   const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
   const [clicked, setClicked] = createSignal(false);
@@ -98,10 +97,21 @@ const Auth = (props: Props) => {
           size="large"
           onClick={() => handleClick()}
         >
-          {t("sign_in_with_microsoft") || ""}
+          <Trans
+            key="login.sign_in_with_microsoft"
+            options={{
+              defaultValue: "Sign in with microsoft",
+            }}
+          />
         </Button>
-        <p class="text-shade-0 text-sm max-w-90">
-          {t("sign_in_with_microsoft_text")}
+        <p class="text-shade-0 max-w-90 text-sm">
+          <Trans
+            key="login.sign_in_with_microsoft_text"
+            options={{
+              defaultValue:
+                "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
+            }}
+          />
         </p>
         <Show when={error()}>
           <p class="m-0 text-red">{error()}</p>
@@ -113,7 +123,12 @@ const Auth = (props: Props) => {
               modalsContext?.openModal({ name: "privacyPolicy" });
             }}
           >
-            {t("privacy_policy")}
+            <Trans
+              key="login.privacy_policy"
+              options={{
+                defaultValue: "Privacy Policy",
+              }}
+            />
           </li>
           <li
             class="cursor-pointer"
@@ -123,7 +138,12 @@ const Auth = (props: Props) => {
               });
             }}
           >
-            {t("terms_and_conditions")}
+            <Trans
+              key="login.terms_and_conditions"
+              options={{
+                defaultValue: "Terms and Conditions",
+              }}
+            />
           </li>
           <li
             class="cursor-pointer"
@@ -131,7 +151,12 @@ const Auth = (props: Props) => {
               modalsContext?.openModal({ name: "acceptableUsePolicy" })
             }
           >
-            {t("acceptable_use_policy")}
+            <Trans
+              key="login.acceptable_use_policy"
+              options={{
+                defaultValue: "Acceptable Use Policy",
+              }}
+            />
           </li>
         </ul>
       </div>

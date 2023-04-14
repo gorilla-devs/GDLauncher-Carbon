@@ -16,7 +16,7 @@ const Overview = () => {
       <div class="flex flex-col items-start justify-between gap-2 p-5 bg-shade-7 rounded-xl box-border w-full w-59">
         <div class="text-shade-0 uppercase">
           <Trans
-            key="notes"
+            key="instance.notes"
             options={{
               defaultValue: "notes",
             }}
