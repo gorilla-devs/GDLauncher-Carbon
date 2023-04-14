@@ -11,7 +11,7 @@ const Modpack = () => {
       {/* <div>Modpack {params.id}</div> */}
       <button onClick={() => navigate("/modpacks")}>
         <Trans
-          key="back"
+          key="instance.step_back"
           options={{
             defaultValue: "back",
           }}

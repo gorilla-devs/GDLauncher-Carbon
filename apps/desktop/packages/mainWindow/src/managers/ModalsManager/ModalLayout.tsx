@@ -9,6 +9,7 @@ interface Props extends ModalProps {
   class?: string;
   preventClose?: boolean;
   noPadding?: boolean;
+  overflowHiddenDisabled?: boolean;
 }
 
 const ModalLayout = (props: Props) => {
@@ -20,7 +21,7 @@ const ModalLayout = (props: Props) => {
   return (
     <div class="w-screen h-screen">
       <div
-        class="h-screen w-screen absolute text-white ease-in-out duration-100 will-change-auto transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center"
+        class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
         classList={{
           "opacity-100": modalsContext?.isVisible(),
           "opacity-0": !modalsContext?.isVisible(),
@@ -38,19 +39,20 @@ const ModalLayout = (props: Props) => {
           }}
         >
           <div
-            class={`flex flex-col h-fit w-fit bg-shade-7 rounded-2xl transition-scale ease-in-out origin-center duration-100 overflow-hidden ${
+            class={`flex flex-col h-fit w-fit bg-darkSlate-700 rounded-2xl transition-scale ease-in-out origin-center duration-100 ${
               props.class ?? ""
             }`}
             classList={{
+              "overflow-hidden": !props.overflowHiddenDisabled,
               "scale-100": modalsContext?.isVisible(),
               "scale-0": !modalsContext?.isVisible(),
             }}
           >
             <Show when={!props.noHeader}>
-              <div class="bg-shade-8 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">
+              <div class="bg-darkSlate-800 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">
                 <h3>{props.title}</h3>
                 <div
-                  class="cursor-pointer text-shade-5 h-5 w-5 i-ri:close-fill"
+                  class="cursor-pointer text-darkSlate-500 h-5 w-5 i-ri:close-fill"
                   onClick={() => {
                     if (!props.preventClose) {
                       navigate(location.pathname);

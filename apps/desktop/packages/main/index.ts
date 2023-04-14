@@ -14,6 +14,7 @@ import {
 } from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
+import loadCoreModule from "./core_module_loader";
 import { autoUpdater } from "electron-updater";
 import "./preloadListeners";
 
@@ -31,6 +32,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
 }
+
+const coreModule = loadCoreModule();
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -194,8 +197,15 @@ async function createWindow() {
     }
   });
 
+  ipcMain.handle("getCoreModuleStatus", async () => {
+    return coreModule;
+  });
+
   win.on("ready-to-show", () => {
-    win?.show();
+    coreModule.finally(() => {
+      win?.show();
+    });
+
     if (import.meta.env.DEV) {
       win?.webContents.openDevTools();
     }

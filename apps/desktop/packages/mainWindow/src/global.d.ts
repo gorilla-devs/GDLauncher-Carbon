@@ -21,7 +21,7 @@ declare global {
     ) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
-    coreModuleLoaded: Promise<void>;
+    getCoreModuleStatus: () => Promise<void>;
   }
 }
 

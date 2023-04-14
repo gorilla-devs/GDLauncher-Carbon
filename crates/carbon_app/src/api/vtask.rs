@@ -19,6 +19,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Task {
     name: String,
     progress: Progress,
@@ -28,18 +29,21 @@ pub struct Task {
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Progress {
     Indeterminate,
     Known(f32),
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Subtask {
     name: String,
     progress: SubtaskProgress,
 }
 
 #[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum SubtaskProgress {
     Download { downloaded: u32, total: u32 },
     Item { current: u32, total: u32 },

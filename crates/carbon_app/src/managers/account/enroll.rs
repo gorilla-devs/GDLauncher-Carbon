@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use super::api::{
-    DeviceCode, DeviceCodePollError, DeviceCodeRequestError, FullAccount, McAccountPopulateError,
-    McAuth, McAuthError, MsAuth, MsAuthRefreshError,
+    get_profile, DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount,
+    McAuth, McEntitlementMissingError, MsAuth, XboxAuth, XboxError,
 };
+use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
 use thiserror::Error;
@@ -15,21 +16,21 @@ pub struct EnrollmentTask {
     abort: AbortHandle,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum EnrollmentStatus {
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
     PopulateAccount,
     Complete(FullAccount),
-    Failed(EnrollmentError),
+    Failed(anyhow::Result<EnrollmentError>),
 }
 
 impl EnrollmentTask {
     /// Begin account enrollment. `invalidate_fn` will be called
     /// whenever the task's status updates.
     pub fn begin(
-        client: reqwest::Client,
+        client: reqwest_middleware::ClientWithMiddleware,
         invalidate: impl InvalidateCtx + Send + Sync + 'static,
     ) -> Self {
         let status = Arc::new(RwLock::new(EnrollmentStatus::RequestingCode));
@@ -47,18 +48,26 @@ impl EnrollmentTask {
 
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
-                let ms_auth = device_code.poll_ms_auth(&client).await?;
+                let ms_auth = device_code.poll_ms_auth(&client).await??;
+
+                update_status(EnrollmentStatus::McLogin).await;
+
+                // authenticate with XBox
+                let xbox_auth = XboxAuth::from_ms(&ms_auth, &client).await??;
 
                 // authenticate with MC
-                update_status(EnrollmentStatus::McLogin).await;
-                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
+                let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
 
                 update_status(EnrollmentStatus::PopulateAccount).await;
-                let populated = mc_auth.populate(&client).await?;
+                let account = McAccount {
+                    entitlement: mc_auth.get_entitlement(&client).await??,
+                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    auth: mc_auth,
+                };
 
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
-                    mc: populated,
+                    mc: account,
                 }))
                 .await;
 
@@ -67,7 +76,12 @@ impl EnrollmentTask {
 
             match task().await {
                 Ok(()) => {}
-                Err(e) => update_status(EnrollmentStatus::Failed(e)).await,
+                Err(EnrollmentErrorOrAnyhow::EnrollmentError(e)) => {
+                    update_status(EnrollmentStatus::Failed(Ok(e))).await
+                }
+                Err(EnrollmentErrorOrAnyhow::Anyhow(e)) => {
+                    update_status(EnrollmentStatus::Failed(Err(e))).await
+                }
             };
         };
 
@@ -81,7 +95,7 @@ impl EnrollmentTask {
     }
 
     pub fn refresh(
-        client: reqwest::Client,
+        client: reqwest_middleware::ClientWithMiddleware,
         refresh_token: String,
         invalidate: impl InvalidateCtx + Send + Sync + 'static,
     ) -> Self {
@@ -98,16 +112,24 @@ impl EnrollmentTask {
                 // attempt to refresh token
                 let ms_auth = MsAuth::refresh(&client, &refresh_token).await?;
 
-                // authenticate with MC
                 update_status(EnrollmentStatus::McLogin).await;
-                let mc_auth = McAuth::auth_ms(&ms_auth, &client).await?;
+
+                // authenticate with XBox
+                let xbox_auth = XboxAuth::from_ms(&ms_auth, &client).await??;
+
+                // authenticate with MC
+                let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
 
                 update_status(EnrollmentStatus::PopulateAccount).await;
-                let populated = mc_auth.populate(&client).await?;
+                let account = McAccount {
+                    entitlement: mc_auth.get_entitlement(&client).await??,
+                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    auth: mc_auth,
+                };
 
                 update_status(EnrollmentStatus::Complete(FullAccount {
                     ms: ms_auth,
-                    mc: populated,
+                    mc: account,
                 }))
                 .await;
 
@@ -116,7 +138,12 @@ impl EnrollmentTask {
 
             match task().await {
                 Ok(()) => {}
-                Err(e) => update_status(EnrollmentStatus::Failed(e)).await,
+                Err(EnrollmentErrorOrAnyhow::EnrollmentError(e)) => {
+                    update_status(EnrollmentStatus::Failed(Ok(e))).await
+                }
+                Err(EnrollmentErrorOrAnyhow::Anyhow(e)) => {
+                    update_status(EnrollmentStatus::Failed(Err(e))).await
+                }
             };
         };
 
@@ -143,20 +170,56 @@ pub trait InvalidateCtx {
 
 #[derive(Error, Debug, Clone)]
 pub enum EnrollmentError {
-    #[error("device code request: {0}")]
-    DeviceCodeRequest(#[from] DeviceCodeRequestError),
+    #[error("device code expired")]
+    DeviceCodeExpired,
+    #[error("xbox error: {0}")]
+    XboxError(#[from] XboxError),
+    #[error("game entitlement missing")]
+    EntitlementMissing,
+    #[error("game profile missing")]
+    GameProfileMissing,
+}
 
-    #[error("device code poll: {0}")]
-    DeviceCodePoll(#[from] DeviceCodePollError),
+pub enum EnrollmentErrorOrAnyhow {
+    EnrollmentError(EnrollmentError),
+    Anyhow(anyhow::Error),
+}
 
-    #[error("ms auth refresh: {0}")]
-    MsRefresh(#[from] MsAuthRefreshError),
+impl From<DeviceCodeExpiredError> for EnrollmentErrorOrAnyhow {
+    fn from(_: DeviceCodeExpiredError) -> Self {
+        Self::EnrollmentError(EnrollmentError::DeviceCodeExpired)
+    }
+}
 
-    #[error("mc auth: {0}")]
-    McAuth(#[from] McAuthError),
+impl From<XboxError> for EnrollmentErrorOrAnyhow {
+    fn from(value: XboxError) -> Self {
+        Self::EnrollmentError(EnrollmentError::XboxError(value))
+    }
+}
 
-    #[error("account populate: {0}")]
-    AccountPopulate(#[from] McAccountPopulateError),
+impl From<McEntitlementMissingError> for EnrollmentErrorOrAnyhow {
+    fn from(_: McEntitlementMissingError) -> Self {
+        Self::EnrollmentError(EnrollmentError::EntitlementMissing)
+    }
+}
+
+impl From<GetProfileError> for EnrollmentErrorOrAnyhow {
+    fn from(value: GetProfileError) -> Self {
+        match value {
+            GetProfileError::GameProfileMissing => {
+                Self::EnrollmentError(EnrollmentError::GameProfileMissing)
+            }
+            GetProfileError::AuthTokenInvalid => {
+                Self::Anyhow(anyhow!(GetProfileError::AuthTokenInvalid))
+            }
+        }
+    }
+}
+
+impl From<anyhow::Error> for EnrollmentErrorOrAnyhow {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Anyhow(value)
+    }
 }
 
 /*

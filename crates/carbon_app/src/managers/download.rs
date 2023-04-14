@@ -6,8 +6,10 @@ use std::{
     str::FromStr,
 };
 
+use anyhow::bail;
 use prisma_client_rust::QueryError;
-use reqwest::{Client, Response};
+use reqwest::Response;
+use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
 use tokio::{
     fs::OpenOptions,
@@ -19,6 +21,7 @@ use uuid::Uuid;
 use crate::{
     db::read_filters::StringFilter,
     error::request::{RequestContext, RequestError, RequestErrorDetails},
+    once_send::OnceSend,
 };
 
 use super::ManagerRef;
@@ -45,12 +48,13 @@ impl ManagerRef<'_, DownloadManager> {
         let mut handle = self.start_download(url).await?;
 
         while handle.status_channel.changed().await.is_ok() {
-            let status = handle.status_channel.borrow().clone();
-            match status {
+            let status = handle.status_channel.borrow();
+            match &*status {
                 None => {}
-                Some(DownloadStatus::Failed(e)) => return Err(DownloadError::Active(e)),
-                Some(DownloadStatus::Status { downloaded, total }) => updater(downloaded, total),
+                Some(DownloadStatus::Failed(e)) => return Err(DownloadError::Active(e.take().expect("failed download status was replaced twice, which should be impossible due to immediate return"))),
+                Some(DownloadStatus::Status { downloaded, total }) => updater(*downloaded, *total),
                 Some(DownloadStatus::Complete) => {
+                    drop(status);
                     self.complete_download(handle, path).await?;
                     return Ok(());
                 }
@@ -210,17 +214,17 @@ impl ManagerRef<'_, DownloadManager> {
                     let mut start_loc = file.metadata().await?.len();
 
                     async fn init_request(
-                        client: &Client,
+                        client: &ClientWithMiddleware,
                         url: &str,
                         start_loc: u64,
-                    ) -> Result<Response, ActiveDownloadError> {
-                        let mut builder = client.get(url);
+                    ) -> anyhow::Result<Response> {
+                        let mut builder = client.get(url).header("avoid-caching", "");
 
                         if start_loc != 0 {
                             builder = builder.header("Range", format!("bytes={start_loc}-"));
                         }
 
-                        let response = builder.send().await.map_err(RequestError::from_error)?;
+                        let response = builder.send().await?;
 
                         let _ = response
                             .error_for_status_ref()
@@ -265,10 +269,10 @@ impl ManagerRef<'_, DownloadManager> {
                                     }
                                 }
                                 Err(()) => {
-                                    return Err(ActiveDownloadError::Request(RequestError {
+                                    bail!(RequestError {
                                         context: RequestContext::from_response(&response),
                                         error: RequestErrorDetails::MalformedResponse,
-                                    }))
+                                    });
                                 }
                             }
                         }
@@ -337,7 +341,7 @@ impl ManagerRef<'_, DownloadManager> {
             match r {
                 Ok(()) => {}
                 Err(e) => {
-                    let _ = status_send.send(Some(DownloadStatus::Failed(e)));
+                    let _ = status_send.send(Some(DownloadStatus::Failed(OnceSend::new(e))));
                 }
             }
         };
@@ -415,9 +419,8 @@ impl Drop for DownloadHandle {
     }
 }
 
-#[derive(Clone)]
 pub enum DownloadStatus {
-    Failed(ActiveDownloadError),
+    Failed(OnceSend<anyhow::Error>),
     Status { downloaded: u64, total: Option<u64> },
     Complete,
 }
@@ -484,7 +487,7 @@ pub enum DownloadError {
     Start(#[from] DownloadStartError),
 
     #[error("while downloading: {0}")]
-    Active(#[from] ActiveDownloadError),
+    Active(#[from] anyhow::Error),
 
     #[error("on completion: {0}")]
     Complete(#[from] DownloadCompleteError),

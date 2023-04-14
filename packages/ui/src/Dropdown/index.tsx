@@ -15,14 +15,28 @@ export type Props = {
   label?: string;
   onChange?: (_option: Option) => void;
   class?: string;
+  containerClass?: string;
   id?: string;
-  bg?: string;
+  bgColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
 };
-export interface DropDownButtonProps extends Props {
+export interface DropDownButtonProps {
   children: JSX.Element;
+  options: Option[];
+  value: string;
+  error?: boolean;
+  disabled?: boolean;
+  rounded?: boolean;
+  label?: string;
+  onChange?: (_value: string) => void;
+  class?: string;
+  id?: string;
+  bgColorClass?: string;
+  btnDropdown?: boolean;
+  icon?: JSX.Element;
+  placeholder?: string;
 }
 
 const Dropdown = (props: Props) => {
@@ -47,20 +61,23 @@ const Dropdown = (props: Props) => {
   };
 
   return (
-    <div class="inline-block relative" id={props.id}>
+    <div
+      class={`inline-block relative ${props.containerClass || ""}`}
+      id={props.id}
+    >
       <Show when={!props.rounded && props.label}>
         <p
           class="mt-0 mb-2 font-bold"
           classList={{
             "text-white": !props.disabled,
-            "text-shade-0": props.disabled,
+            "text-darkSlate-50": props.disabled,
           }}
         >
           {props.label}
         </p>
       </Show>
       <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bg}`}
+        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -72,12 +89,13 @@ const Dropdown = (props: Props) => {
         }}
         classList={{
           "border-0": !props.error,
-          "border-1 border-status-red": props.error,
-          "text-shade-0 hover:text-white": !props.disabled && !props.error,
-          "text-shade-5": props.error,
+          "border-1 border-red-500": props.error,
+          "text-darkSlate-50 hover:text-white": !props.disabled && !props.error,
+          "text-darkSlate-500": props.error,
           "rounded-full": props.rounded,
           rounded: !props.rounded,
-          "bg-shade-7": !props.bg,
+          "bg-darkSlate-700": !props.bgColorClass,
+          "rounded-md": !props.btnDropdown,
         }}
       >
         <Show when={!props.btnDropdown}>
@@ -87,9 +105,9 @@ const Dropdown = (props: Props) => {
           <span
             classList={{
               "text-white": props.error,
-              "text-shade-0 hover:text-white group-hover:text-white":
+              "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled && !props.error,
-              "text-shade-5": props.disabled,
+              "text-darkSlate-500": props.disabled,
             }}
           >
             {selectedValue()}
@@ -100,16 +118,16 @@ const Dropdown = (props: Props) => {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-shade-0 group-hover:text-white":
+            "text-darkSlate-50 group-hover:text-white":
               !props.disabled && !props.error && !props.btnDropdown,
             "text-white": props.error || props.btnDropdown,
-            "text-shade-5": props.disabled,
+            "text-darkSlate-500": props.disabled,
           }}
         />
       </button>
 
       <ul
-        class={`absolute text-shade-0 pt-1 z-20 shadow-md shadow-shade-9 list-none m-0 p-0 w-full z-20`}
+        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -126,7 +144,7 @@ const Dropdown = (props: Props) => {
         <For each={props.options}>
           {(option) => (
             <li
-              class="first:rounded-t last:rounded-b bg-shade-7 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-shade-0 no-underline"
+              class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
               onClick={() => {
                 setSelectedValue(option.label);
                 props.onChange?.(option);
@@ -143,24 +161,21 @@ const Dropdown = (props: Props) => {
 };
 
 const DropDownButton = (props: DropDownButtonProps) => {
-  const [selectedValue, setSelectedValue] = createSignal("");
-
   const handleChange = (option: Option) => {
-    setSelectedValue(option.label);
+    props.onChange?.(option.label);
   };
 
   return (
     <div class="flex">
       <Button class="rounded-r-0 pr-0 flex gap-1">
         <span>{props.children}</span>
-        <span class="text-white font-light text-xs">{selectedValue()}</span>
       </Button>
       <Dropdown
         btnDropdown
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bg="bg-primary"
+        bgColorClass="bg-primary-500"
         value={props.value}
         onChange={(option) => handleChange(option)}
       />

@@ -79,7 +79,7 @@ impl JavaChecker for MockJavaChecker {
                 prerelease: None,
                 build_metadata: Some("10".to_owned()),
             },
-            arch: JavaArch::X86_64,
+            arch: JavaArch::X86,
             _type: JavaComponentType::Local,
         })
     }

@@ -13,7 +13,7 @@ export default function Login() {
         style={{
           "mix-blend-mode": "hard-light",
         }}
-        class="absolute left-0 right-0 bg-shade-8 top-0 bottom-0 opacity-80"
+        class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
       />
       <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
         <Dropdown

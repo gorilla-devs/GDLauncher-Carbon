@@ -147,7 +147,7 @@ function Slider(props: Props) {
     <div class="h-10 flex items-center w-full max-w-full box-border mb-10">
       <div class="relative w-full">
         <For each={Object.entries(props.marks)}>
-          {([value, label]) => (
+          {([value, label], i) => (
             <>
               <div
                 class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
@@ -157,19 +157,23 @@ function Slider(props: Props) {
                   "margin-left": -(16 / 2) + "px",
                 }}
                 classList={{
-                  "bg-shade-9 border-shade-9":
+                  "bg-darkSlate-900 border-darkSlate-900":
                     calcOffset(parseInt(value, 10)) >=
                     calcOffset(currentValue()),
-                  "bg-primary border-primary":
+                  "bg-primary-500 border-primary-500":
                     calcOffset(parseInt(value, 10)) <=
                     calcOffset(currentValue()),
                 }}
               />
               <p
-                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-shade-5 w-10"
+                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-darkSlate-500 w-10"
                 style={{
                   position: "absolute",
-                  left: `${calcOffset(parseInt(value, 10))}%`,
+                  left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                    i() === Object.entries(props.marks).length - 1
+                      ? "10px"
+                      : "0px"
+                  })`,
                   top: "10px",
                 }}
               >
@@ -185,7 +189,7 @@ function Slider(props: Props) {
           ref={(el) => {
             handleRef = el;
           }}
-          class="w-4 h-4 bg-shade-8 rounded-full border-4 border-solid border-primary -top-2 cursor-move z-10"
+          class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-move z-10"
           style={{
             position: "absolute",
             left: `${calcOffset(currentValue())}%`,
@@ -193,7 +197,7 @@ function Slider(props: Props) {
           }}
         />
         <div
-          class=" h-2 bg-primary rounded-full"
+          class=" h-2 bg-primary-500 rounded-full"
           style={{
             position: "absolute",
             width: `${calcOffset(currentValue())}%`,
@@ -203,7 +207,7 @@ function Slider(props: Props) {
           ref={(el) => {
             sliderRef = el;
           }}
-          class="w-full h-2 bg-shade-9 rounded-full"
+          class="w-full h-2 bg-darkSlate-900 rounded-full"
         />
       </div>
     </div>

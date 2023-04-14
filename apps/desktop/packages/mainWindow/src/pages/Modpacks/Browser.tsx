@@ -1,4 +1,4 @@
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import BG from "/assets/images/rlccraft_img.png";
@@ -6,6 +6,8 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
 import CurseforgeIcon from "/assets/images/icons/curseforge.png";
+import LogoDark from "/assets/images/logo-dark.svg";
+import { useModal } from "@/managers/ModalsManager";
 
 const modpacks = [
   {
@@ -80,12 +82,11 @@ const NoModpacks = () => {
     <div class="h-full w-full flex justify-center items-center min-h-90">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="no_modpacks_text"
+            key="instance.no_modpacks_text"
             options={{
-              defaultValue:
-                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+              defaultValue: "At the moment there is no modpacks.",
             }}
           />
         </p>
@@ -95,20 +96,22 @@ const NoModpacks = () => {
 };
 
 export default function Browser() {
+  const modalsContext = useModal();
+  const [t] = useTransContext();
   return (
     <div class="relative w-full box-border">
-      <div class="sticky top-0 left-0 right-0 flex flex-col bg-shade-8 z-10 px-5 pt-5">
+      <div class="sticky top-0 left-0 right-0 flex flex-col bg-darkSlate-800 z-10 px-5 pt-5">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full rounded-full text-shade-0"
+            class="w-full rounded-full text-darkSlate-50"
             inputClass=""
           />
           <div class="flex gap-3 items-center">
-            <p class="text-shade-0">
+            <p class="text-darkSlate-50">
               <Trans
-                key="sort_by"
+                key="instance.sort_by"
                 options={{
                   defaultValue: "Sort by:",
                 }}
@@ -116,11 +119,14 @@ export default function Browser() {
             </p>
             <Dropdown
               options={[
-                { label: "Popular", key: "popular" },
-                { label: "Featured", key: "featured" },
-                { label: "Author", key: "author" },
-                { label: "Name", key: "name" },
-                { label: "Total downloads", key: "downloads" },
+                { label: t("instance.sort_by_popular"), key: "popular" },
+                { label: t("instance.sort_by_featured"), key: "featured" },
+                { label: t("instance.sort_by_author"), key: "author" },
+                { label: t("instance.sort_by_name"), key: "name" },
+                {
+                  label: t("instance.sort_by_total_downloads"),
+                  key: "downloads",
+                },
               ]}
               value={"popular"}
               rounded
@@ -132,18 +138,72 @@ export default function Browser() {
             icon={<div class="text-lg i-ri:download-2-fill" />}
           >
             <Trans
-              key="import"
+              key="instance.import"
               options={{
                 defaultValue: "Import",
               }}
             />
           </Button>
         </div>
-        <div class="flex justify-between text-shade-0 z-10 mb-6 max-w-150">
+        <div class="flex justify-between text-darkSlate-50 z-10 mb-6 max-w-150">
           <Tags />
         </div>
       </div>
       <div class="overflow-y-hidden px-5 pb-5 flex flex-col gap-2">
+        <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl">
+          <div class="flex justify-between items-center">
+            <span class="flex gap-4">
+              <div class="flex justify-center items-center h-22 w-22 bg-darkSlate-900 rounded-xl">
+                <img class="h-14" src={LogoDark} />
+              </div>
+              <div class="flex flex-col justify-around">
+                <h2 class="m-0">
+                  <Trans
+                    key="instance.create_new_instance_title"
+                    options={{
+                      defaultValue: "New instance",
+                    }}
+                  />
+                </h2>
+                <p class="m-0 text-darkSlate-50">
+                  <Trans
+                    key="instance.create_new_instance_text"
+                    options={{
+                      defaultValue: "Create your own empty instance",
+                    }}
+                  />
+                </p>
+              </div>
+            </span>
+            <div class="flex gap-3">
+              <Dropdown
+                options={[
+                  { label: "1.16.5", key: "1.16.5" },
+                  { label: "1.16.4", key: "1.16.4" },
+                  { label: "1.16.3", key: "1.16.3" },
+                  { label: "1.16.2", key: "1.16.2" },
+                ]}
+                icon={<div class="i-ri:price-tag-3-fill" />}
+                rounded
+                bgColorClass="bg-darkSlate-400"
+                value="1.16.2"
+              />
+              <Button
+                variant="primary"
+                onClick={() =>
+                  modalsContext?.openModal({ name: "instanceCreation" })
+                }
+              >
+                <Trans
+                  key="instance.create_instance_btn"
+                  options={{
+                    defaultValue: "Create",
+                  }}
+                />
+              </Button>
+            </div>
+          </div>
+        </div>
         <Show when={modpacks.length > 0} fallback={<NoModpacks />}>
           <For each={modpacks}>{(props) => <Modpack modpack={props} />}</For>
         </Show>

@@ -11,7 +11,9 @@ pub enum ManifestError {
 }
 
 // get should abstract the complexity of fetching it from either the network or the db
-pub async fn get_meta(reqwest_client: reqwest::Client) -> anyhow::Result<Vec<ManifestVersion>> {
+pub async fn get_meta(
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+) -> anyhow::Result<Vec<ManifestVersion>> {
     let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
     let new_manifest = reqwest_client
         .get(server_url)
