@@ -88,7 +88,7 @@ const Auth = (props: Props) => {
     <div>
       <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
         <img class="w-40" src={Logo} />
-        <p class="text-shade-0">{__APP_VERSION__}</p>
+        <p class="text-darkSlate-50">{__APP_VERSION__}</p>
       </div>
       <div class="flex flex-col justify-center items-center text-center">
         <Button
@@ -104,7 +104,7 @@ const Auth = (props: Props) => {
             }}
           />
         </Button>
-        <p class="text-shade-0 max-w-90 text-sm">
+        <p class="text-darkSlate-50 max-w-90 text-sm">
           <Trans
             key="login.sign_in_with_microsoft_text"
             options={{
@@ -114,7 +114,7 @@ const Auth = (props: Props) => {
           />
         </p>
         <Show when={error()}>
-          <p class="m-0 text-red">{error()}</p>
+          <p class="m-0 text-red-500">{error()}</p>
         </Show>
         <ul class="flex text-sm list-none gap-3 p-0 mb-8 underline">
           <li

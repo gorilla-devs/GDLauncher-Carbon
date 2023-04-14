@@ -76,8 +76,8 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-shade-8 flex items-center text-white px-5 h-15">
-        <div class="flex w-full items-center">
+      <nav class="bg-dark-slate-800 flex items-center text-white px-5 h-15">
+        <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
               src={GDLauncherWideLogo}
@@ -117,19 +117,20 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div class="cursor-pointer text-shade-0 text-2xl i-ri:terminal-box-fill" />
+                    <div class="cursor-pointer text-dark-slate-50 text-2xl i-ri:terminal-box-fill" />
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>
                       <div
-                        class="text-shade-0 text-2xl cursor-pointer i-ri:settings-3-fill"
+                        class="text-dark-slate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
                         classList={{
-                          "bg-primary": !!isSettings() || !!isSettingsNested(),
+                          "bg-primary-500":
+                            !!isSettings() || !!isSettingsNested(),
                         }}
                       />
                     </Tab>
                   </Link>
-                  <div class="text-shade-0 text-2xl cursor-pointer i-ri:notification-2-fill" />
+                  <div class="text-dark-slate-50 text-2xl cursor-pointer i-ri:notification-2-fill" />
                 </div>
               </TabList>
             </Tabs>

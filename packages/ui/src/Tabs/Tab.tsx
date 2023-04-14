@@ -78,7 +78,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
-            class={`cursor-pointer bg-shade-8 font-500 capitalize ${
+            class={`cursor-pointer bg-darkSlate-800 font-500 capitalize ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{
@@ -93,7 +93,7 @@ const Tab = (_props: Props) => {
                 tabsContext?.orientation === "vertical" &&
                 !tabsContext?.paddingX,
               "text-white": tabsContext?.isSelectedIndex(index()),
-              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
+              "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}
@@ -101,7 +101,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "block"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{
@@ -118,7 +118,7 @@ const Tab = (_props: Props) => {
                 tabsContext?.orientation === "vertical" &&
                 !tabsContext?.paddingY,
               "text-white": tabsContext?.isSelectedIndex(index()),
-              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
+              "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}
@@ -126,14 +126,14 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-shade-8 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{
               "px-2": !tabsContext?.paddingX,
               "text-white": tabsContext?.isSelectedIndex(index()),
-              "text-shade-0": !tabsContext?.isSelectedIndex(index()),
-              "bg-shade-7": tabsContext?.isSelectedIndex(index()),
+              "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
+              "bg-darkSlate-700": tabsContext?.isSelectedIndex(index()),
             }}
           >
             {props.children}

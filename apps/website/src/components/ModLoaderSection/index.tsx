@@ -129,7 +129,9 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             <h2 class="pb-3">Vanilla</h2>
             <div
               class={`w-full h-2 ${
-                type() === sectionType.vanilla ? "bg-yellow-400" : "bg-blue-600"
+                type() === sectionType.vanilla
+                  ? "bg-yellow-400"
+                  : "bg-primary-600"
               }`}
             />
           </div>
@@ -142,7 +144,9 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             <h2 class="pb-3">Forge</h2>
             <div
               class={`w-full h-2 ${
-                type() === sectionType.forge ? "bg-yellow-400" : "bg-blue-600"
+                type() === sectionType.forge
+                  ? "bg-yellow-400"
+                  : "bg-primary-600"
               }`}
             />
           </div>
@@ -155,7 +159,9 @@ const ModLoaderSection: Component<{ pathname: string }> = ({ pathname }) => {
             <h2 class="pb-3">Fabric</h2>
             <div
               class={`w-full h-2 ${
-                type() === sectionType.fabric ? "bg-yellow-400" : "bg-blue-600"
+                type() === sectionType.fabric
+                  ? "bg-yellow-400"
+                  : "bg-primary-600"
               }`}
             />
           </div>

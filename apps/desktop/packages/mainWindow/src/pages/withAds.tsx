@@ -10,7 +10,7 @@ function withAdsLayout() {
         <main class="relative flex-1 overflow-hidden">
           <div class="flex justify-end h-[calc(100vh-60px-28px)]">
             <Outlet />
-            <div class="flex justify-start flex-col gap-4 px-5 pt-5 bg-shade-8 flex-initial">
+            <div class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 flex-initial">
               <AdsBanner />
               <div class="w-full h-16 bg-blue" />
             </div>

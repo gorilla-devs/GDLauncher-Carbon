@@ -19,11 +19,11 @@ const SiderbarWrapper = (props: Props) => {
       classList={{
         "p-5": !props.noPadding,
       }}
-      class="h-full bg-shade-8 relative text-white box-border overflow-hidden"
+      class="h-full bg-darkSlate-800 relative text-white box-border overflow-hidden"
     >
       <Show when={mergedProps.collapsable}>
         <div
-          class="bg-shade-7 absolute right-0 w-4 h-10 flex justify-center items-center cursor-pointer top-10 rounded-l-md"
+          class="bg-darkSlate-700 absolute right-0 w-4 h-10 flex justify-center items-center cursor-pointer top-10 rounded-l-md"
           onClick={() => {
             if (mergedProps.collapsable) {
               if (props?.onCollapse) {
@@ -35,10 +35,10 @@ const SiderbarWrapper = (props: Props) => {
           <Show
             when={!isSidebarOpened()}
             fallback={
-              <span class="text-shade-5 i-ri:arrow-left-s-line text-3xl" />
+              <span class="text-darkSlate-500 i-ri:arrow-left-s-line text-3xl" />
             }
           >
-            <span class="text-shade-5 text-3xl i-ri:arrow-right-s-line" />
+            <span class="text-darkSlate-500 text-3xl i-ri:arrow-right-s-line" />
           </Show>
         </div>
       </Show>

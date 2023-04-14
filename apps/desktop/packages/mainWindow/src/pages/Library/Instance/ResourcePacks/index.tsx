@@ -126,7 +126,7 @@ const NoResourcePacks = () => {
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="instance.no_resource_packs_text"
             options={{
@@ -152,16 +152,16 @@ const ResourcePacks = () => {
   const [t] = useTransContext();
   return (
     <div>
-      <div class="flex flex-col bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
+      <div class="flex flex-col bg-darkSlate-800 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full rounded-full text-shade-0"
+            class="w-full rounded-full text-darkSlate-50"
             inputClass=""
           />
           <div class="flex gap-3 items-center">
-            <p class="text-shade-0">
+            <p class="text-darkSlate-50">
               <Trans
                 key="instance.sort_by"
                 options={{
@@ -187,7 +187,7 @@ const ResourcePacks = () => {
             />
           </Button>
         </div>
-        <div class="flex justify-between text-shade-0 mb-6 z-10">
+        <div class="flex justify-between text-darkSlate-50 mb-6 z-10">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />

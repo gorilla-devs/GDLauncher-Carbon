@@ -71,8 +71,8 @@ const mapStatus = (status: EnrollStatusResult | undefined) => {
   return (
     <Switch
       fallback={
-        <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full text-yellow i-ri:alert-fill" />
+        <div class="flex items-center gap-2">
+          <div class="rounded-full w-3 h-3 text-yellow i-ri:alert-fill" />
           <p class="m-0 text-xs">
             <Trans
               key="account_invalid"
@@ -401,13 +401,13 @@ export const AccountsDropdown = (props: Props) => {
         class="mt-0 mb-2 font-bold"
         classList={{
           "text-white": !props.disabled,
-          "text-shade-0": props.disabled,
+          "text-darkSlate-50": props.disabled,
         }}
       >
         {props.label}
       </p>
       <button
-        class="flex items-center box-border group justify-between py-2 px-4 min-h-10 box-border font-semibold inline-flex rounded-lg w-auto"
+        class="flex items-center box-border group box-border justify-between py-2 px-4 min-h-10 font-semibold inline-flex rounded-lg w-auto"
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -419,9 +419,9 @@ export const AccountsDropdown = (props: Props) => {
         }}
         classList={{
           "border-0": true,
-          "text-shade-0 hover:text-white": !props.disabled,
+          "text-darkSlate-50 hover:text-white": !props.disabled,
           rounded: true,
-          "bg-shade-7": true,
+          "bg-darkSlate-700": true,
         }}
       >
         <div class="flex gap-2 items-center">
@@ -432,11 +432,11 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="m-0 justify-center w-full text-ellipsis overflow-hidden align-middle leading-loose"
+            class="m-0 justify-center w-full overflow-hidden text-ellipsis align-middle leading-loose"
             classList={{
-              "text-shade-0 hover:text-white group-hover:text-white":
+              "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled,
-              "text-shade-5": props.disabled,
+              "text-darkSlate-500": props.disabled,
             }}
           >
             {(activeAccount() as Label)?.name}
@@ -448,13 +448,13 @@ export const AccountsDropdown = (props: Props) => {
             menuOpened() ? "rotate-180" : "rotate-0"
           }`}
           classList={{
-            "text-shade-0 group-hover:text-white": !props.disabled,
-            "text-shade-5": props.disabled,
+            "text-darkSlate-50 group-hover:text-white": !props.disabled,
+            "text-darkSlate-500": props.disabled,
           }}
         />
       </button>
       <div
-        class="rounded-md px-4 w-auto absolute right-0 flex-col text-shade-0 bg-shade-9 pb-2 mt-1 z-40 min-w-80 pt-3"
+        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 bg-darkSlate-900 pb-2 mt-1 z-40 min-w-80 pt-3"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -470,7 +470,7 @@ export const AccountsDropdown = (props: Props) => {
           <div class="flex w-full mb-4">
             <img
               src={(activeAccount() as Label)?.icon}
-              class="rounded-md h-10 mr-2 w-10"
+              class="rounded-md h-10 w-10 mr-2"
             />
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
@@ -494,7 +494,7 @@ export const AccountsDropdown = (props: Props) => {
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
               <div
-                class="text-shade-0 cursor-pointer i-ri:file-copy-fill text-sm hover:text-white transition ease-in-out"
+                class="text-darkSlate-50 cursor-pointer transition ease-in-out i-ri:file-copy-fill text-sm hover:text-white"
                 onClick={() => {
                   navigator.clipboard.writeText(
                     (activeAccount() as Label)?.uuid
@@ -506,13 +506,13 @@ export const AccountsDropdown = (props: Props) => {
           </div>
         </div>
         <Show when={filteredOptions().length > 0}>
-          <hr class="w-full border-shade-0 opacity-20 mb-0" />
+          <hr class="w-full border-darkSlate-50 opacity-20 mb-0" />
         </Show>
-        <ul class="text-shade-0 m-0 w-full shadow-md shadow-shade-9 list-none p-0">
+        <ul class="text-darkSlate-50 m-0 w-full list-none p-0 shadow-md shadow-darkSlate-900">
           <For each={filteredOptions()}>
             {(option) => {
               return (
-                <li class="text-shade-0 flex items-center justify-between min-h-10 first:rounded-t last:rounded-b block whitespace-no-wrap no-underline my-2">
+                <li class="text-darkSlate-50 flex items-center justify-between min-h-10 no-underline first:rounded-t last:rounded-b block whitespace-no-wrap my-2">
                   <div class="flex gap-2">
                     <img
                       src={(option.label as Label)?.icon}
@@ -558,7 +558,7 @@ export const AccountsDropdown = (props: Props) => {
             }}
           </For>
         </ul>
-        <hr class="w-full border-shade-0 opacity-20 mt-0" />
+        <hr class="w-full border-darkSlate-50 opacity-20 mt-0" />
         <div class="flex flex-col">
           <div
             class="flex py-2 justify-between group gap-3"
@@ -577,15 +577,15 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-shade-0 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
+                  class="text-darkSlate-50 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
                   classList={{
-                    "text-shade-5": !!enrollmentInProgress(),
+                    "text-darkSlate-500": !!enrollmentInProgress(),
                     "group-hover:text-white": !enrollmentInProgress(),
                     "cursor-not-allowed": !!enrollmentInProgress(),
                   }}
                 />
                 <span
-                  class="text-shade-0 transition ease-in-out select-none"
+                  class="text-darkSlate-50 transition ease-in-out select-none"
                   classList={{
                     "cursor-not-allowed": !!enrollmentInProgress(),
                   }}
@@ -593,7 +593,7 @@ export const AccountsDropdown = (props: Props) => {
                   <p
                     class="m-0"
                     classList={{
-                      "text-shade-5": !!enrollmentInProgress(),
+                      "text-darkSlate-500": !!enrollmentInProgress(),
                       "group-hover:text-white": !enrollmentInProgress(),
                     }}
                     onClick={() => {
@@ -643,7 +643,7 @@ export const AccountsDropdown = (props: Props) => {
                       {loginDeviceCode()?.userCode}
                     </span>
                     <div
-                      class="cursor-pointer text-shade-0 i-ri:file-copy-fill hover:text-white transition ease-in-out"
+                      class="cursor-pointer text-darkSlate-50 i-ri:file-copy-fill hover:text-white transition ease-in-out"
                       onClick={() => {
                         if (loginDeviceCode()?.userCode) {
                           navigator.clipboard.writeText(

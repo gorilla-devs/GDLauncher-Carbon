@@ -18,7 +18,7 @@ const Tags = () => {
       <div class="flex flex-1 gap-2 max-w-full overflow-x-auto">
         <For each={tags}>{(tag) => <Tag name={tag.name} img={tag.img} />}</For>
       </div>
-      <Button variant="secondary" textColor="text-red" rounded={false}>
+      <Button variant="secondary" textColor="text-red-500" rounded={false}>
         <Trans
           key="instance.clear_filters_modpacks"
           options={{
