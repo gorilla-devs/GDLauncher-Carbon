@@ -48,8 +48,8 @@ mod test {
         let client = get_client();
 
         let response = client
-            .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
-            // .get("https://api.gdlauncher.com/cf/mods/520914")
+            // .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
+            .get("https://api.gdlauncher.com/cf/mods/520914")
             .send()
             .await
             .unwrap();
