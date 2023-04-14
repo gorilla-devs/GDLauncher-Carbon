@@ -74,7 +74,7 @@ impl From<JavaComponentType> for String {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub enum JavaArch {
-    Amd64,
+    X64,
     X86,
     Aarch64,
 }
@@ -82,7 +82,7 @@ pub enum JavaArch {
 impl<'a> From<JavaArch> for &'a str {
     fn from(arch: JavaArch) -> Self {
         match arch {
-            JavaArch::Amd64 => "amd64",
+            JavaArch::X64 => "x64",
             JavaArch::X86 => "x86",
             JavaArch::Aarch64 => "aarch64",
         }
@@ -92,7 +92,9 @@ impl<'a> From<JavaArch> for &'a str {
 impl<'a> From<&'a str> for JavaArch {
     fn from(s: &'a str) -> Self {
         match s.to_lowercase().as_str() {
-            "amd64" => JavaArch::Amd64,
+            "amd64" => JavaArch::X64,
+            "x64" => JavaArch::X64,
+            "x86_64" => JavaArch::X64,
             "x86" => JavaArch::X86,
             "aarch64" => JavaArch::Aarch64,
             _ => panic!("Unknown JavaArch: {s}"),
