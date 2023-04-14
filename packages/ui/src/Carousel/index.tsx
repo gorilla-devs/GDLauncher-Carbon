@@ -6,7 +6,6 @@ import {
   children,
   onMount,
 } from "solid-js";
-import "./index.css";
 
 export interface Props {
   children?: JSX.Element;
