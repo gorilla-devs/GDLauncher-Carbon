@@ -11,29 +11,19 @@ impl ModplatformsManager {
 }
 
 #[cfg(feature = "iridium_lib")]
-fn get_client() -> reqwest::Client {
-    let cert = iridium::retrieve_certificate();
-
-    let identity = Identity::from_pem(&cert).unwrap();
-    let certificate = Certificate::from_pem(&cert).unwrap();
-
-    reqwest::Client::builder()
-        .tls_built_in_root_certs(false)
-        .use_rustls_tls()
-        .identity(identity)
-        .add_root_certificate(certificate)
-        .https_only(true)
-        .build()
-        .unwrap()
+#[inline(always)]
+fn get_client() -> reqwest_middleware::ClientWithMiddleware {
+    iridium::get_client()
 }
 
 #[cfg(not(feature = "iridium_lib"))]
-fn get_client() -> reqwest::Client {
-    reqwest::Client::new()
+#[inline(always)]
+fn get_client() -> reqwest_middleware::ClientWithMiddleware {
+    let client = reqwest::Client::builder().build().unwrap();
+    reqwest_middleware::ClientBuilder::new(client).build()
 }
 
 impl ManagerRef<'_, ModplatformsManager> {
-    //
     pub async fn some_api_request(&self) -> anyhow::Result<()> {
         let client = get_client();
         let response = client
@@ -44,5 +34,26 @@ impl ManagerRef<'_, ModplatformsManager> {
         println!("{:?}", response);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::setup_managers_for_test;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_client() {
+        let client = get_client();
+
+        let response = client
+            // .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
+            .get("https://api.gdlauncher.com/cf/mods/520914")
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), 200);
     }
 }
