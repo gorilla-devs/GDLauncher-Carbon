@@ -103,7 +103,7 @@ const Instance = () => {
             innerContainerRef = el;
           }}
         >
-          <div class="z-10 sticky top-5 left-5 w-fit">
+          <div class="z-10 top-5 sticky left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -164,7 +164,7 @@ const Instance = () => {
                       </div>
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
-                      <div class="flex flex-col lg:flex-row text-darkSlate-50 items-start gap-1 lg:items-center lg:gap-0">
+                      <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                         <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                           Forge 1.19.2
                         </div>
@@ -212,7 +212,7 @@ const Instance = () => {
         </div>
       </div>
       <div
-        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out bg-darkSlate-900 h-0 opacity-0 px-4 transition-height duration-200"
+        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out bg-darkSlate-900 px-4 h-0 opacity-0 transition-height duration-200"
         ref={(el) => {
           refStickyContainer = el;
         }}

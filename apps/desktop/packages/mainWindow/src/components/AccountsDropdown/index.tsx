@@ -432,7 +432,7 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="m-0 justify-center w-full overflow-hidden text-ellipsis align-middle leading-loose"
+            class="m-0 justify-center overflow-hidden w-full text-ellipsis align-middle leading-loose"
             classList={{
               "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled,
@@ -454,7 +454,7 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
-        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 bg-darkSlate-900 pb-2 mt-1 z-40 min-w-80 pt-3"
+        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-40 min-w-80 pt-3 bg-darkSlate-900"
         onMouseOut={() => {
           setFocusIn(false);
         }}

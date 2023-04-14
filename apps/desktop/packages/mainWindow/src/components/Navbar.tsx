@@ -76,7 +76,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="bg-dark-slate-800 flex items-center text-white px-5 h-15">
+      <nav class="flex items-center text-white bg-dark-slate-800 px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -117,7 +117,7 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div class="cursor-pointer text-dark-slate-50 text-2xl i-ri:terminal-box-fill" />
+                    <div class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill" />
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>
