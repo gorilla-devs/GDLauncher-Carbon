@@ -46,6 +46,7 @@ const Carousel = (props: Props) => {
 
   const mousedown = (e: MouseEvent) => {
     setIsMouseDown(true);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
     horizontalSlider?.classList.add("cursor-grab");
     setPrevPageX(e.pageX);
     setPrevScrollLeft(horizontalSlider.scrollLeft);
@@ -53,6 +54,7 @@ const Carousel = (props: Props) => {
 
   const mouseup = () => {
     setIsMouseDown(false);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
     horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
     horizontalSlider?.classList.add("scroll-smooth");
     autoSlide();
@@ -60,6 +62,7 @@ const Carousel = (props: Props) => {
 
   const mouseleave = () => {
     setIsMouseDown(false);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
     horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
     horizontalSlider?.classList.add("scroll-smooth");
   };
@@ -73,11 +76,16 @@ const Carousel = (props: Props) => {
     horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff();
   };
 
+  const wheel = () => {
+    horizontalSlider.classList.add("snap-x", "snap-mandatory");
+  };
+
   createEffect(() => {
     horizontalSlider.addEventListener("mousedown", mousedown);
     horizontalSlider.addEventListener("mouseleave", mouseleave);
     horizontalSlider.addEventListener("mouseup", mouseup);
     horizontalSlider.addEventListener("mousemove", mousemove);
+    horizontalSlider.addEventListener("wheel", wheel);
   });
 
   onCleanup(() => {
@@ -85,6 +93,7 @@ const Carousel = (props: Props) => {
     horizontalSlider.removeEventListener("mouseleave", mouseleave);
     horizontalSlider.removeEventListener("mouseup", mouseup);
     horizontalSlider.removeEventListener("mousemove", mousemove);
+    horizontalSlider.removeEventListener("wheel", wheel);
   });
 
   const showHideArrows = () => {
@@ -148,7 +157,7 @@ const Carousel = (props: Props) => {
   const mappedChildren = children(() => props.children);
   createEffect(() => {
     (mappedChildren() as JSX.Element[])?.forEach((item) => {
-      (item as HTMLElement).classList.add("slide");
+      (item as HTMLElement).classList.add("slide", "snap-start");
       (item as HTMLElement).onmouseover = () => {
         (item as HTMLElement).classList.add("pointer-events-none");
       };
@@ -186,7 +195,8 @@ const Carousel = (props: Props) => {
             horizontalSlider = el;
           }}
           id="horizontal-slider"
-          class="w-full flex gap-4 overflow-x-hidden scroll-smooth"
+          // class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
+          class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
           {mappedChildren}
         </div>
