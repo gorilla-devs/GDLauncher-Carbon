@@ -191,17 +191,19 @@ export default function Browser() {
                 value="1.16.2"
               />
               <Button
-                variant="primary"
+                variant="glow"
                 onClick={() =>
                   modalsContext?.openModal({ name: "instanceCreation" })
                 }
               >
-                <Trans
-                  key="instance.create_instance_btn"
-                  options={{
-                    defaultValue: "Create",
-                  }}
-                />
+                <span class="uppercase">
+                  <Trans
+                    key="instance.create_instance_btn"
+                    options={{
+                      defaultValue: "Create",
+                    }}
+                  />
+                </span>
               </Button>
             </div>
           </div>
