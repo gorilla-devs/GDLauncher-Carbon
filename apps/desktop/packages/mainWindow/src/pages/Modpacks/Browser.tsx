@@ -135,7 +135,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="text-lg i-ri:download-2-fill" />}
+            icon={<div class="i-ri:download-2-fill rounded-full text-md" />}
           >
             <Trans
               key="instance.import"
@@ -156,23 +156,25 @@ export default function Browser() {
               <div class="flex justify-center items-center h-22 w-22 bg-darkSlate-900 rounded-xl">
                 <img class="h-14" src={LogoDark} />
               </div>
-              <div class="flex flex-col justify-around">
-                <h2 class="m-0">
-                  <Trans
-                    key="instance.create_new_instance_title"
-                    options={{
-                      defaultValue: "New instance",
-                    }}
-                  />
-                </h2>
-                <p class="m-0 text-darkSlate-50">
-                  <Trans
-                    key="instance.create_new_instance_text"
-                    options={{
-                      defaultValue: "Create your own empty instance",
-                    }}
-                  />
-                </p>
+              <div class="flex flex-col justify-center">
+                <div class="flex flex-col gap-2">
+                  <h2 class="m-0">
+                    <Trans
+                      key="instance.create_new_instance_title"
+                      options={{
+                        defaultValue: "New instance",
+                      }}
+                    />
+                  </h2>
+                  <p class="m-0 text-darkSlate-50">
+                    <Trans
+                      key="instance.create_new_instance_text"
+                      options={{
+                        defaultValue: "Create your own empty instance",
+                      }}
+                    />
+                  </p>
+                </div>
               </div>
             </span>
             <div class="flex gap-3">
