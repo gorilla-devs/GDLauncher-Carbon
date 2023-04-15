@@ -20,10 +20,10 @@ const Appearance = () => {
 
   return (
     <LoadingError routeData={routeData}>
-      <div class="bg-shade-8 w-full h-auto flex flex-col py-5 px-6 box-border">
+      <div class="bg-darkSlate-800 w-full h-auto flex flex-col py-5 px-6 box-border">
         <h2 class="m-0 mb-7 text-4">
           <Trans
-            key="appearance"
+            key="settings.appearance"
             options={{
               defaultValue: "Appearance",
             }}
@@ -45,11 +45,11 @@ const Appearance = () => {
             />
             <div class="flex gap-2 items-center w-full box-border justify-start px-2 py-1">
               <Show when={themeName() === "default"}>
-                <div class="i-ri:check-fill text-shade-0" />
+                <div class="i-ri:check-fill text-darkSlate-50" />
               </Show>
-              <p class="m-0 text-shade-0">
+              <p class="m-0 text-darkSlate-50">
                 <Trans
-                  key="default"
+                  key="settings.theme_default"
                   options={{
                     defaultValue: "default",
                   }}
@@ -72,11 +72,11 @@ const Appearance = () => {
             />
             <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
               <Show when={themeName() === "light"}>
-                <div class="i-ri:check-fill text-shade-0" />
+                <div class="i-ri:check-fill text-darkSlate-50" />
               </Show>
-              <p class="m-0 text-shade-0">
+              <p class="m-0 text-darkSlate-50">
                 <Trans
-                  key="light"
+                  key="settings.theme_light"
                   options={{
                     defaultValue: "light",
                   }}
@@ -99,9 +99,9 @@ const Appearance = () => {
             />
             <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
               <Show when={themeName() === "poison-green"}>
-                <div class="i-ri:check-fill text-shade-0" />
+                <div class="i-ri:check-fill text-darkSlate-50" />
               </Show>
-              <p class="m-0 text-shade-0">
+              <p class="m-0 text-darkSlate-50">
                 <Trans
                   key="poison-green"
                   options={{

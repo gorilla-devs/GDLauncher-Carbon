@@ -2,7 +2,7 @@ import { createSignal } from "solid-js";
 
 export const [lastInstanceOpened, setLastInstanceOpened] = createSignal("");
 
-export const libraryPathRegex = /^\/library(\/\w+)?\/?$/;
+export const libraryPathRegex = /^\/library\/(\w+)(\/\w+)*\/?$/;
 
 export const getInstanceIdFromPath = (path: string) => {
   const instaceUrlRegex = path.match(libraryPathRegex);

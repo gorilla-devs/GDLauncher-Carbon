@@ -4,14 +4,14 @@ import { Button, Input, Slider } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
-import { useGDNavigate } from "@/managers/NavigationManager";
+import { useModal } from "@/managers/ModalsManager";
 
 const Java = () => {
   const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
   const javasData = () => routeData?.data;
   const javas = () => javasData()?.data || [];
-  const navigate = useGDNavigate();
+  const modalsContext = useModal();
 
   let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
     onMutate: (newTheme) => {
@@ -28,10 +28,10 @@ const Java = () => {
   });
 
   return (
-    <div class="bg-shade-8 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
+    <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
-          key="java"
+          key="java.java"
           options={{
             defaultValue: "Java",
           }}
@@ -41,7 +41,7 @@ const Java = () => {
       <div class="mb-6">
         <h5 class="m-0 mb-4">
           <Trans
-            key="java_memory_title"
+            key="java.java_memory_title"
             options={{
               defaultValue: "Java Memory",
             }}
@@ -65,7 +65,7 @@ const Java = () => {
       <div class="mb-6">
         <h5 class="m-0 mb-4">
           <Trans
-            key="java_arguments_title"
+            key="java.java_arguments_title"
             options={{
               defaultValue: "Java Arguments",
             }}
@@ -75,7 +75,7 @@ const Java = () => {
           <Input class="w-full" />
           <Button rounded={false} variant="secondary" class="h-10">
             <Trans
-              key="reset_java_args"
+              key="java.reset_java_args"
               options={{
                 defaultValue: "Reset",
               }}
@@ -87,7 +87,7 @@ const Java = () => {
         <div class="flex justify-between mb-4">
           <h5 class="m-0 flex items-center">
             <Trans
-              key="all_versions"
+              key="java.all_versions"
               options={{
                 defaultValue: "All versions",
               }}
@@ -97,24 +97,24 @@ const Java = () => {
             rounded={false}
             variant="secondary"
             onClick={() => {
-              navigate("?m=addJava");
+              modalsContext?.openModal({ name: "addJava" });
             }}
           >
-            <div class="text-shade-5 text-xl i-ri:add-fill" />
+            <div class="text-darkSlate-500 text-xl i-ri:add-fill" />
           </Button>
         </div>
-        <div class="flex flex-col gap-4 border-2 border-solid border-shade-7 p-4">
+        <div class="flex flex-col gap-4 border-2 border-solid border-darkSlate-700 p-4">
           <For each={Object.entries(javas())}>
             {(javas) => (
               <div class="flex flex-col justify-start">
-                <h5 class="mt-0 mb-4 text-shade-5">{javas[0]}</h5>
+                <h5 class="mt-0 mb-4 text-darkSlate-500">{javas[0]}</h5>
                 <div class="flex flex-col gap-4">
                   <For each={javas[1].javas}>
                     {(j) => (
-                      <div class="flex justify-between py-5 px-6 bg-shade-9 rounded-md">
+                      <div class="flex justify-between py-5 px-6 bg-darkSlate-900 rounded-md">
                         <p class="m-0">
                           <Trans
-                            key="java"
+                            key="java.java"
                             options={{
                               defaultValue: "Java",
                             }}
@@ -138,10 +138,10 @@ const Java = () => {
                           <Show
                             when={defaultJavasIds().includes(j?.path)}
                             fallback={
-                              <div class="text-shade-5 text-xl i-ri:star-line" />
+                              <div class="text-darkSlate-500 text-xl i-ri:star-line" />
                             }
                           >
-                            <div class="text-xl i-ri:star-fill text-yellow" />
+                            <div class="text-xl i-ri:star-fill text-yellow-500" />
                           </Show>
                         </div>
                       </div>

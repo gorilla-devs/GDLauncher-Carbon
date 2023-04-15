@@ -43,9 +43,9 @@ const NoMods = () => {
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={pictureImage} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="no_screenshots_text"
+            key="instance.no_screenshots_text"
             options={{
               defaultValue:
                 "You don't have any screenshots related to this modpack at the moment, to take a screenshot press the print screen key during the game",
@@ -116,13 +116,13 @@ const Screenshots = () => {
 
   return (
     <div>
-      <div class="flex flex-col sticky top-30 bg-shade-8 z-10 pt-10 transition-all duration-100 ease-in-out">
-        <div class="flex justify-between text-shade-0 z-10 mb-5">
+      <div class="flex flex-col sticky top-30 bg-darkSlate-800 z-10 pt-10 transition-all duration-100 ease-in-out">
+        <div class="flex justify-between text-darkSlate-50 z-10 mb-5">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />
               <Trans
-                key="select_all"
+                key="instance.select_all_screenshots"
                 options={{
                   defaultValue: "Select All",
                 }}
@@ -131,7 +131,7 @@ const Screenshots = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:folder-open-fill text-2xl" />
               <Trans
-                key="open_folder"
+                key="instance.open_screenshots_folder"
                 options={{
                   defaultValue: "Open folder",
                 }}
@@ -140,7 +140,7 @@ const Screenshots = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:forbid-line text-2xl" />
               <Trans
-                key="disable"
+                key="instance.disable_screenshot"
                 options={{
                   defaultValue: "disable",
                 }}
@@ -149,7 +149,7 @@ const Screenshots = () => {
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
               <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans
-                key="delete"
+                key="instance.delete_screenshot"
                 options={{
                   defaultValue: "delete",
                 }}
@@ -159,7 +159,7 @@ const Screenshots = () => {
           <div class="flex gap-2">
             <p class="m-0">{screenshots.length}</p>
             <Trans
-              key="screenshots"
+              key="instance.screenshots"
               options={{
                 defaultValue: "Screenshots",
               }}
@@ -179,10 +179,10 @@ const Screenshots = () => {
                       <div class="flex flex-col">
                         <img class="w-60 h-32" src={screenshot.img} />
                         <div class="flex justify-between items-center mt-2">
-                          <p class="m-0 text-shade-0 text-md">
+                          <p class="m-0 text-darkSlate-50 text-md">
                             {format(new Date(screenshot.date), "dd-MM-yyyy")}
                           </p>
-                          <div class="i-ri:more-2-fill text-shade-0" />
+                          <div class="i-ri:more-2-fill text-darkSlate-50" />
                         </div>
                       </div>
                     )}
