@@ -305,7 +305,7 @@ jobs:
           command: pnpm test
           environment:
             # RUSTFLAGS: -D warnings
-       - run:
+      - run:
           name: "Upload debug info to sentry"
           command: |
             npm install -g @sentry/cli
