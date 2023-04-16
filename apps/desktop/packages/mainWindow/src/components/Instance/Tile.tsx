@@ -90,7 +90,7 @@ const Tile = (props: Props) => {
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="absolute right-0 duration-100 ease-in-out opacity-10 transition top-0 left-0 bottom-0 bg-primary-500" />
+            <div class="absolute right-0 ease-in-out transition duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500" />
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
 

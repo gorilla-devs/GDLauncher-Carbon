@@ -13,11 +13,11 @@ const OnBoarding = (props: ModalProps) => {
       title={props?.title}
       overflowHiddenDisabled={true}
     >
-      <div class="w-120 pt-20 h-90 flex flex-col items-center justify-around">
+      <div class="flex flex-col items-center justify-around w-120 pt-20 h-90">
         <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
           <img class="w-40" src={Logo} />
         </div>
-        <div class="absolute top-5 right-5">
+        <div class="absolute right-5 top-5">
           <div
             class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
             onClick={() => modalsContext?.closeModal()}
@@ -56,7 +56,7 @@ const OnBoarding = (props: ModalProps) => {
           </Button>
 
           <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
-            <div class="i-ri:download-2-line text-2xl" />
+            <div class="text-2xl i-ri:download-2-line" />
             <Trans
               key="onboarding.import_instance_or_zip"
               options={{
