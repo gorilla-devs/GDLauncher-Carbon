@@ -20,6 +20,12 @@ const Carousel = (props: Props) => {
   const [isMouseDown, setIsMouseDown] = createSignal(false);
 
   let horizontalSlider: HTMLDivElement;
+  let scrollRightArrowContainer: HTMLSpanElement;
+  let scrollLeftArrowContainer: HTMLSpanElement;
+  let scrollLeftArrow: HTMLDivElement;
+  let scrollRightArrow: HTMLDivElement;
+  let scrollLeftArrowIcon: HTMLElement;
+  let scrollRightArrowIcon: HTMLElement;
 
   const autoSlide = () => {
     if (
@@ -34,13 +40,43 @@ const Carousel = (props: Props) => {
       const firstImageWidth = firstImage.clientWidth + 16;
       const diff = firstImageWidth - positionDiff();
 
-      console.log("AAA", horizontalSlider.scrollLeft > prevScrollLeft());
       if (horizontalSlider.scrollLeft > prevScrollLeft()) {
         return (horizontalSlider.scrollLeft +=
           positionDiff() > firstImageWidth / 3 ? diff : -positionDiff());
       }
       horizontalSlider.scrollLeft -=
         positionDiff() > firstImageWidth / 3 ? diff : -positionDiff();
+    }
+  };
+
+  const showHideArrows = () => {
+    let scrollWitdh =
+      horizontalSlider.scrollWidth - horizontalSlider.clientWidth;
+
+    if (horizontalSlider.scrollLeft === 0) {
+      (scrollLeftArrowContainer as HTMLElement).classList.remove(
+        "cursor-pointer"
+      );
+      (scrollLeftArrow as HTMLElement).classList.add("pointer-events-none");
+      scrollLeftArrowIcon?.classList.add("text-darkSlate-500");
+    } else {
+      (scrollLeftArrowContainer as HTMLElement).classList.add("cursor-pointer");
+      (scrollLeftArrow as HTMLElement).classList.remove("pointer-events-none");
+      scrollLeftArrowIcon?.classList.remove("text-darkSlate-500");
+    }
+
+    if (horizontalSlider.scrollLeft === scrollWitdh) {
+      (scrollRightArrowContainer as HTMLElement).classList.remove(
+        "cursor-pointer"
+      );
+      (scrollRightArrow as HTMLElement).classList.add("pointer-events-none");
+      scrollRightArrowIcon?.classList.add("text-darkSlate-500");
+    } else {
+      (scrollRightArrowContainer as HTMLElement).classList.add(
+        "cursor-pointer"
+      );
+      (scrollRightArrow as HTMLElement).classList.remove("pointer-events-none");
+      scrollRightArrowIcon?.classList.remove("text-darkSlate-500");
     }
   };
 
@@ -78,6 +114,7 @@ const Carousel = (props: Props) => {
 
   const wheel = () => {
     horizontalSlider.classList.add("snap-x", "snap-mandatory");
+    showHideArrows();
   };
 
   createEffect(() => {
@@ -95,41 +132,6 @@ const Carousel = (props: Props) => {
     horizontalSlider.removeEventListener("mousemove", mousemove);
     horizontalSlider.removeEventListener("wheel", wheel);
   });
-
-  const showHideArrows = () => {
-    let scrollWitdh =
-      horizontalSlider.scrollWidth - horizontalSlider.clientWidth;
-
-    const leftArrowContainer = document.getElementById(
-      "scroll-left-arrow-container"
-    );
-    const rightArrowContainer = document.getElementById(
-      "scroll-right-arrow-container"
-    );
-
-    const leftArrow = document.getElementById("scroll-left-arrow");
-    const rightArrow = document.getElementById("scroll-right-arrow");
-
-    if (horizontalSlider.scrollLeft === 0) {
-      (leftArrowContainer as HTMLElement).classList.add("cursor-not-allowed");
-      (leftArrow as HTMLElement).classList.add("pointer-events-none");
-    } else {
-      (leftArrowContainer as HTMLElement).classList.remove(
-        "cursor-not-allowed"
-      );
-      (leftArrow as HTMLElement).classList.remove("pointer-events-none");
-    }
-
-    if (horizontalSlider.scrollLeft === scrollWitdh) {
-      (rightArrowContainer as HTMLElement).classList.add("cursor-not-allowed");
-      (rightArrow as HTMLElement).classList.add("pointer-events-none");
-    } else {
-      (rightArrowContainer as HTMLElement).classList.remove(
-        "cursor-not-allowed"
-      );
-      (rightArrow as HTMLElement).classList.remove("pointer-events-none");
-    }
-  };
 
   onMount(() => {
     showHideArrows();
@@ -150,7 +152,7 @@ const Carousel = (props: Props) => {
 
       setTimeout(() => {
         showHideArrows();
-      }, 60);
+      }, 100);
     }
   };
 
@@ -169,33 +171,53 @@ const Carousel = (props: Props) => {
       <div class="flex justify-between items-center h-9 w-full">
         <h3 class="uppercase">{props.title}</h3>
         <div class="h-full flex gap-4">
-          <span id="scroll-left-arrow-container">
+          <span
+            ref={(el) => {
+              scrollLeftArrowContainer = el;
+            }}
+          >
             <div
-              id="scroll-left-arrow"
-              class="h-6 w-6 bg-shade-9 rounded-full flex justify-center items-center"
+              ref={(el) => {
+                scrollLeftArrow = el;
+              }}
+              class="h-6 w-6 bg-darkSlate-700 rounded-full flex justify-center items-center cursor-pointer"
               onClick={() => handleScroll("left")}
             >
-              <i class="i-ri:arrow-drop-left-line text-4xl" />
+              <i
+                class="i-ri:arrow-drop-left-line text-4xl"
+                ref={(el) => {
+                  scrollLeftArrowIcon = el;
+                }}
+              />
             </div>
           </span>
-          <span id="scroll-right-arrow-container">
+          <span
+            ref={(el) => {
+              scrollRightArrowContainer = el;
+            }}
+          >
             <div
-              id="scroll-right-arrow"
-              class="h-6 w-6 bg-shade-9 rounded-full flex justify-center items-center"
+              ref={(el) => {
+                scrollRightArrow = el;
+              }}
+              class="h-6 w-6 bg-darkSlate-700 rounded-full flex justify-center items-center cursor-pointer"
               onClick={() => handleScroll("right")}
             >
-              <i class="i-ri:arrow-drop-right-line text-4xl" />
+              <i
+                class="i-ri:arrow-drop-right-line text-4xl"
+                ref={(el) => {
+                  scrollRightArrowIcon = el;
+                }}
+              />
             </div>
           </span>
         </div>
       </div>
-      <div id="scroll-wrapper" class="w-full flex gap-4">
+      <div class="w-full flex gap-4">
         <div
           ref={(el) => {
             horizontalSlider = el;
           }}
-          id="horizontal-slider"
-          // class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
           class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
           {mappedChildren}
