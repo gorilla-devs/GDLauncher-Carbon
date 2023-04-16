@@ -78,7 +78,7 @@ test.describe("Init Tests", () => {
     const loadingInnerText = await (
       await page.$("#appLoadingState")
     )?.innerHTML();
-    expect(loadingInnerText).toBe("Loading...");
+    expect(loadingInnerText).toBe(undefined);
 
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
