@@ -2,23 +2,31 @@ import { Button, LoadingBar } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import DoorImage from "/assets/images/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { parseTwoDigitNumber } from "@/utils/helpers";
+import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { DeviceCodeObjectType } from ".";
+import { Procedures } from "@gd/core_module";
 interface Props {
-  deviceCodeObject: any | null;
-  setDeviceCodeObject: Setter<any>;
+  deviceCodeObject: DeviceCodeObjectType | null;
+  setDeviceCodeObject: Setter<DeviceCodeObjectType>;
 }
+
+type ActiveUUID = Extract<
+  Procedures["queries"],
+  { key: "account.setActiveUuid" }
+>["result"];
 
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const navigate = useGDNavigate();
+  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
 
   const accountEnrollCancelMutation = rspc.createMutation(
@@ -39,15 +47,52 @@ const CodeStep = (props: Props) => {
     }
   );
 
+  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
+
+  const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
+    onMutate: async (
+      uuid
+    ): Promise<{ previousActiveUUID: ActiveUUID } | undefined> => {
+      await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
+
+      const previousActiveUUID: ActiveUUID | undefined =
+        queryClient.getQueryData(["account.setActiveUuid"]);
+
+      queryClient.setQueryData(["account.setActiveUuid", null], uuid);
+
+      if (previousActiveUUID) return { previousActiveUUID };
+    },
+    onError: (
+      error,
+      _variables,
+      context: { previousActiveUUID: ActiveUUID } | undefined
+    ) => {
+      addNotification(error.message, "error");
+
+      if (context?.previousActiveUUID) {
+        queryClient.setQueryData(
+          ["account.setActiveUuid"],
+          context.previousActiveUUID
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
+    },
+    onSuccess() {
+      navigate("/library");
+      setEnrollmentInProgress(false);
+    },
+  });
+
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
   const deviceCodeLink = () => props.deviceCodeObject?.link;
   const expiresAt = () => props.deviceCodeObject?.expiresAt;
-  const expiresAtFormat = () => new Date(expiresAt())?.getTime();
+  const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
-  const minutes = () =>
-    Math.floor((expiresAtMs() % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = () => Math.floor((expiresAtMs() % (1000 * 60)) / 1000);
+  const minutes = () => msToMinutes(expiresAtMs());
+  const seconds = () => msToSeconds(expiresAtMs());
   const [countDown, setCountDown] = createSignal(
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
@@ -59,29 +104,8 @@ const CodeStep = (props: Props) => {
   };
   const [loading, setLoading] = createSignal(false);
 
-  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
-
   const handleRefersh = async () => {
-    accountEnrollCancelMutation.mutate(undefined);
     accountEnrollBeginMutation.mutate(undefined);
-    if (routeData.isSuccess) {
-      handleStatus(routeData, {
-        onPolling: (info) => {
-          setLoading(true);
-          props.setDeviceCodeObject({
-            userCode: info.userCode,
-            link: info.verificationUri,
-            expiresAt: info.expiresAt,
-          });
-          setExpired(false);
-          setError(null);
-        },
-        onFail() {
-          setLoading(false);
-          setError("something went wrong while logging in");
-        },
-      });
-    }
   };
 
   const updateExpireTime = () => {
@@ -96,19 +120,39 @@ const CodeStep = (props: Props) => {
   let interval: ReturnType<typeof setTimeout>;
 
   createEffect(() => {
-    if (routeData.isSuccess) {
-      handleStatus(routeData, {
-        onComplete(_accountEntry) {
-          setLoading(false);
-          finalizeMutation.mutate(undefined);
-          navigate("/library");
-        },
-      });
+    if (routeData.status.isSuccess && !routeData.status.data) {
+      setEnrollmentInProgress(false);
+    } else {
+      setEnrollmentInProgress(true);
     }
+
+    handleStatus(routeData.status, {
+      onPolling: (info) => {
+        setEnrollmentInProgress(true);
+        props.setDeviceCodeObject({
+          userCode: info.userCode,
+          link: info.verificationUri,
+          expiresAt: info.expiresAt,
+        });
+        setExpired(false);
+        setError(null);
+      },
+      onFail() {
+        setEnrollmentInProgress(false);
+        setError("something went wrong while logging in");
+      },
+      onComplete(account) {
+        finalizeMutation.mutate(undefined);
+        // if (finalizeMutation.isSuccess) {
+        setActiveUUIDMutation.mutate(account.uuid);
+        // }
+      },
+    });
   });
 
   createEffect(() => {
     if (expired()) {
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
       setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
@@ -127,7 +171,7 @@ const CodeStep = (props: Props) => {
 
   onCleanup(() => clearInterval(interval));
 
-  const [addNotification] = createNotification();
+  const addNotification = createNotification();
 
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
@@ -143,7 +187,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="mt-2 mb-0 text-[#E54B4B]">
+            <p class="mb-0 mt-2 text-[#E54B4B]">
               <Trans
                 key="login.code_expired_message"
                 options={{
@@ -182,11 +226,11 @@ const CodeStep = (props: Props) => {
           <Trans
             key="login.waiting_login_code_msg"
             options={{
-              defaultValue: "Waiting authorization...",
+              defaultValue: "Waiting for authorization...",
             }}
           />
         </span>
-        <div class="w-full absolute bottom-0 overflow-hidden">
+        <div class="w-full absolute overflow-hidden bottom-0">
           <LoadingBar class="" />
         </div>
       </Show>

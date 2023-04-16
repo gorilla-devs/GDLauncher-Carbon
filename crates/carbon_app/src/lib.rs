@@ -30,16 +30,17 @@ pub async fn init() {
 
     println!("Starting Carbon App");
 
-    if !cfg!(debug_assertions) {
+    #[cfg(not(debug_assertions))]
+    let _guard = {
         println!("Initializing Sentry");
-        let _guard = sentry::init((
+        sentry::init((
             env!("SENTRY_DSN"),
             sentry::ClientOptions {
                 release: Some(APP_VERSION.into()),
                 ..Default::default()
             },
-        ));
-    }
+        ))
+    };
 
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;

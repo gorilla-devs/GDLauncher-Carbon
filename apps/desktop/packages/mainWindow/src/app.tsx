@@ -1,7 +1,6 @@
 import { Show, Suspense } from "solid-js";
 import { useBeforeLeave, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
-import AppNavbar from "./components/Navbar";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { useGDNavigate } from "./managers/NavigationManager";
@@ -56,7 +55,6 @@ const App = (props: Props) => {
           </div>
         </div>
       </Show>
-      <AppNavbar />
       <div class="flex w-screen h-auto z-10">
         <main class="relative overflow-hidden flex-1">
           <Suspense fallback={<></>}>

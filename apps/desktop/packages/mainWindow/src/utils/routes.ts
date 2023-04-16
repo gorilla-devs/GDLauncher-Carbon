@@ -1,6 +1,7 @@
 import { createSignal } from "solid-js";
 
 export const [lastInstanceOpened, setLastInstanceOpened] = createSignal("");
+export const [loggedOut, setLoggedOut] = createSignal(false);
 
 export const libraryPathRegex = /^\/library\/(\w+)(\/\w+)*\/?$/;
 

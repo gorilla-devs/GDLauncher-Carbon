@@ -8,7 +8,7 @@ const InstanceCreation = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="h-130 w-110 flex flex-col justify-between">
+      <div class="h-130 flex flex-col justify-between w-110">
         <div>
           <h5 class="mt-0 mb-2">
             <Trans

@@ -254,12 +254,12 @@ mod test {
 
         let port = launch_server![(
             header::EXPIRES,
-            httpdate::fmt_http_date(SystemTime::from(Utc::now() + Duration::seconds(1)))
+            httpdate::fmt_http_date(SystemTime::from(Utc::now() + Duration::seconds(2)))
         )];
 
         assert!(!request_cached(&app, port).await);
         assert!(request_cached(&app, port).await);
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         assert!(!request_cached(&app, port).await);
     }
 
