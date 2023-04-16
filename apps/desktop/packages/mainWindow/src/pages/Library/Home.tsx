@@ -1,7 +1,7 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
@@ -70,6 +70,7 @@ const Home = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
+  const [isNewsVisible, setIsNewVisible] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const showNews = () => routeData.settings.data?.showNews;
 
@@ -79,18 +80,20 @@ const Home = () => {
     });
   });
 
+  createEffect(() => {
+    setIsNewVisible(!!showNews());
+  });
+
   return (
     <div class="p-6">
       <div>
-        <Show when={news.length > 0}>
-          {showNews() && (
-            <News
-              slides={news}
-              onClick={(news) => {
-                window.openExternalLink(news.url || "");
-              }}
-            />
-          )}
+        <Show when={news.length > 0 && isNewsVisible()}>
+          <News
+            slides={news}
+            onClick={(news) => {
+              window.openExternalLink(news.url || "");
+            }}
+          />
         </Show>
         <div class="mt-4">
           <Carousel title={t("recent_played")}>
