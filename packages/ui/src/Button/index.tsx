@@ -93,7 +93,7 @@ const getVariant = (
     },
     outline: {
       ...commonStyle,
-      "border-2": true,
+      "border-1": true,
       "text-white": !isDisabled,
       "text-darkSlate-500": isDisabled,
       "border-white": !isDisabled,
@@ -105,11 +105,8 @@ const getVariant = (
     },
     glow: {
       ...commonStyle,
-      "shadow-md": !isDisabled,
-      "shadow-primary-500": !isDisabled,
       "bg-primary-500": !isDisabled,
-      "hover:shadow-lg": !isDisabled,
-      "hover:bg-primary-hover": !isDisabled,
+      "drop-shadow-[0_0px_12px_var(--primary-500)]": !isDisabled,
       "bg-darkSlate-500": isDisabled,
       "text-darkSlate-50": isDisabled,
       "border-0": true,
