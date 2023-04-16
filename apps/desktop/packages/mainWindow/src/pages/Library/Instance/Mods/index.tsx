@@ -153,7 +153,7 @@ const Mods = () => {
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out pt-10 sticky top-30">
-        <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
+        <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
