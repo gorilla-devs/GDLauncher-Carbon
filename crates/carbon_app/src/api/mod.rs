@@ -11,6 +11,7 @@ mod instance;
 mod java;
 pub mod keys;
 mod mc;
+mod modplatforms;
 pub mod router;
 pub mod settings;
 mod vtask;

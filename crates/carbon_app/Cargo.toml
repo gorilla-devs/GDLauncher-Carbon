@@ -50,9 +50,11 @@ task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
+iridium = { git = "ssh://git@github.com/gorilla-devs/iridium.git", hash = "60c70da5733e372270a09d707e27d3102d40fdee", optional = true }
 # libc = { workspace = true }
 
-# [target.'cfg(windows)'.dependencies]
+[target.'cfg(windows)'.dependencies]
+winreg = { workspace = true }
 # winapi = { version = "0.3.9" }
 
 
@@ -63,3 +65,6 @@ ntest = { workspace = true }
 [build-dependencies]
 serde_json = { workspace = true }
 dotenvy = { workspace = true }
+
+[features]
+iridium_lib = ["iridium"]

@@ -4,7 +4,10 @@ name = "core_module"
 version = "0.1.0"
 
 [dependencies]
-carbon_app = { path = "../../crates/carbon_app" }
+carbon_app = { path = "../../crates/carbon_app", features = ["iridium_lib"] }
 
 [build-dependencies]
 carbon_app = { path = "../../crates/carbon_app" }
+
+[features]
+iridium_lib = ["carbon_app/iridium_lib"]

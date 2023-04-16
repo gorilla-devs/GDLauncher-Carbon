@@ -66,7 +66,7 @@ const News = (props: CarouselProps) => {
               />
               <div class="absolute bottom-10 left-5 flex flex-col">
                 <h2 class="mb-0">{slide.title}</h2>
-                <p class="mt-2 text-shade-0">{slide.description}</p>
+                <p class="mt-2 text-darkSlate-50">{slide.description}</p>
               </div>
             </div>
           )}
@@ -165,16 +165,16 @@ const News = (props: CarouselProps) => {
   };
 
   return (
-    <div class="h-80 bg-shade-9 rounded-lg relative overflow-hidden relative">
+    <div class="h-80 bg-darkSlate-900 rounded-lg relative overflow-hidden relative">
       <Show when={mergedProps.showArrows}>
         <div
-          class="h-7 w-7 bg-shade-8 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
+          class="h-7 w-7 bg-darkSlate-800 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
           onClick={() => changeSlide("left")}
         >
           <div class="i-ri:arrow-drop-left-line text-3xl text-white" />
         </div>
         <div
-          class="h-7 w-7 bg-shade-8 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          class="h-7 w-7 bg-darkSlate-800 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
           onClick={() => changeSlide("right")}
         >
           <div class="i-ri:arrow-drop-right-line text-3xl text-white" />
