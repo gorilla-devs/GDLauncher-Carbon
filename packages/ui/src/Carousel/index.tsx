@@ -145,14 +145,10 @@ const Carousel = (props: Props) => {
       const firstImageWidth = firstImage.clientWidth + 16;
 
       if (isLeft) {
-        horizontalSlider.scrollLeft += -firstImageWidth;
+        horizontalSlider.scrollLeft -= firstImageWidth;
       } else {
         horizontalSlider.scrollLeft += firstImageWidth;
       }
-
-      setTimeout(() => {
-        showHideArrows();
-      }, 100);
     }
   };
 
@@ -217,6 +213,9 @@ const Carousel = (props: Props) => {
         <div
           ref={(el) => {
             horizontalSlider = el;
+          }}
+          onScroll={() => {
+            showHideArrows();
           }}
           class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
