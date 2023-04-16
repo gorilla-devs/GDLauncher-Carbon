@@ -5168,7 +5168,7 @@ dependencies = [
  "flate2",
  "hmac",
  "pbkdf2",
- "sha1",
+ "sha1 0.10.5",
  "time 0.3.20",
  "zstd",
 ]
