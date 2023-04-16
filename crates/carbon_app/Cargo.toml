@@ -45,7 +45,6 @@ strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
 image = { workspace = true, features = ["png"], default-features = false }
-daedalus = { version = "0.1.19" }
 task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 http = { workspace = true }
