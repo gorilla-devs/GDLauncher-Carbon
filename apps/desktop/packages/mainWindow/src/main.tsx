@@ -17,12 +17,20 @@ queueMicrotask(() => {
 });
 
 render(() => {
+  let allowedToClear = false;
   const [coreModuleLoaded] = createResource(async () => {
     let port = await window.getCoreModuleStatus();
-    console.log("PORT", port);
-    window.clearLoading();
+    if (allowedToClear) window.clearLoading();
     return port;
   });
+
+  setTimeout(() => {
+    if (coreModuleLoaded() as unknown as number) {
+      window.clearLoading();
+    } else {
+      allowedToClear = true;
+    }
+  }, 500);
 
   const [i18nInstance] = createResource(async () => {
     const DEFAULT_LANG = "en";
@@ -48,7 +56,7 @@ render(() => {
       }
     >
       <InnerApp
-        port={coreModuleLoaded()!}
+        port={coreModuleLoaded() as unknown as number}
         i18nInstance={i18nInstance() as unknown as typeof i18n}
       />
     </Show>
