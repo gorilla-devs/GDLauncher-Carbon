@@ -30,7 +30,7 @@ jobs:
     executor: <<parameters.os>>
     steps:
       - checkout
-      - post: git submodule init
+      - run: git submodule init
       # MACOS
       - when:
           condition:
@@ -139,7 +139,7 @@ jobs:
       size: large
     steps:
       - checkout
-      - post: git submodule init
+      - run: git submodule init
       - run:
           name: Install NVM
           shell: powershell.exe
@@ -246,7 +246,7 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      - post: git submodule init
+      - run: git submodule init
       - run: |
           node -v
 
@@ -282,7 +282,7 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      - post: git submodule init
+      - run: git submodule init
       - run: |
           node -v
 
