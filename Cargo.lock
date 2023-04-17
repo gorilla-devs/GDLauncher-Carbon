@@ -1679,7 +1679,6 @@ checksum = "12b6ee2129af8d4fb011108c73d99a1b83a85977f23b82460c0ae2e25bb4b57f"
 [[package]]
 name = "iridium"
 version = "0.1.0"
-source = "git+ssh://git@github.com/gorilla-devs/iridium.git#60c70da5733e372270a09d707e27d3102d40fdee"
 dependencies = [
  "base64 0.21.0",
  "goldberg",

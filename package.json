@@ -8,7 +8,7 @@
   "scripts": {
     "init": "npm i -g pnpm@8.1.1 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "sudo-init": "sudo npm i -g pnpm@8.1.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
-    "codegen": "pnpm prisma:generate && pnpm rspc-bindings:generate",
+    "codegen": "node iridium_patchfix.js && pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev --filter=!@gd/web",
     "watch:core": "cargo run -p core_module",
     "prepare-release:linux-x64": "cd target/x86_64-unknown-linux-gnu/production && cp ./core_module ./core_module.debug && strip -S ./core_module",
