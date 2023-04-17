@@ -65,9 +65,17 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
-                .await
-                .unwrap();
+            let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
+                Ok(client) => client,
+                Err(prisma_client::DatabaseError::MigrationError(err)) => {
+                    println!("Database migration failed: {}", err);
+                    std::process::exit(1);
+                }
+                Err(err) => {
+                    println!("Database connection failed: {}", err);
+                    std::process::exit(1);
+                }
+            };
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));

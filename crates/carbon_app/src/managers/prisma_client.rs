@@ -12,12 +12,10 @@ pub enum DatabaseError {
 }
 
 pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
-    let db_client = db::new_client_with_url(&format!(
-        "file:{}",
-        runtime_path.join("gdl_conf.db").to_str().unwrap()
-    ))
-    .await
-    .map_err(DatabaseError::ClientError)?;
+    let db_path = runtime_path.join("gdl_conf.db");
+    let db_client = db::new_client_with_url(&format!("file:{}", db_path.to_str().unwrap()))
+        .await
+        .map_err(DatabaseError::ClientError)?;
 
     let try_migrate = db_client._migrate_deploy().await;
 
