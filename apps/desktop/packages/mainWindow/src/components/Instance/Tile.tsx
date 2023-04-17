@@ -24,7 +24,7 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="group flex justify-center cursor-pointer flex-col items-start z-50"
+          class="select-none group flex justify-center cursor-pointer flex-col items-start z-50"
           onClick={(e) => {
             e.preventDefault();
             props?.onClick?.(e);
@@ -71,7 +71,7 @@ const Tile = (props: Props) => {
             </Show>
           </div>
           <h4
-            class="mt-2 mb-0 text-ellipsis"
+            class="mt-2 text-ellipsis overflow-hidden mb-1"
             classList={{
               "text-white": !props.isLoading,
               "text-lightGray-900": props.isLoading,
@@ -79,7 +79,7 @@ const Tile = (props: Props) => {
           >
             {props.title}
           </h4>
-          <div class="flex text-lightGray-900 justify-between">
+          <div class="flex gap-2 text-lightGray-900 justify-between">
             <span class="flex gap-2">
               <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
               <p class="m-0">{props.modloader}</p>
@@ -90,7 +90,7 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="relative w-full flex items-center gap-4 box-border group h-14 px-3 cursor-pointer"
+          class="select-none erelative w-full flex items-center gap-4 box-border group h-14 px-3 cursor-pointer"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
@@ -100,10 +100,20 @@ const Tile = (props: Props) => {
 
           <div class="absolute gap-2 duration-100 ease-in-out right-5 hidden group-hover:flex transition-all">
             <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
-              <div class="text-white i-ri:more-2-fill text-lg" />
+              <div
+                class="text-white i-ri:more-2-fill text-lg"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
             </div>
             <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
-              <div class="text-white text-lg i-ri:play-fill" />
+              <div
+                class="text-white text-lg i-ri:play-fill"
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              />
             </div>
           </div>
 
