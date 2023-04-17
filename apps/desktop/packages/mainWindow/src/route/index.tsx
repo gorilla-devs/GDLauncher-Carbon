@@ -5,6 +5,7 @@ import HomeData from "@/pages/home.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
+import LibraryData from "@/pages/Library/library.data";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -21,9 +22,7 @@ export const routes: RouteDefinition[] = [
       {
         path: "/library",
         component: lazy(() => import("@/pages/Library")),
-        data: () => {
-          console.log("Fetching all instances...");
-        },
+        data: LibraryData,
         children: [
           {
             path: "/",

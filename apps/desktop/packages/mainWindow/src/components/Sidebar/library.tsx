@@ -1,26 +1,51 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { Show, createEffect } from "solid-js";
-import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
+import { For, Show, createEffect } from "solid-js";
+import { ModloaderType, isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
-import { useLocation } from "@solidjs/router";
+import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import fetchData from "@/pages/Library/library.data";
+import { createStore, produce } from "solid-js/store";
+import { Instance } from "@gd/core_module/bindings";
+
+export interface InstancesStore {
+  [modloader: string]: Instance[];
+}
 
 const Sidebar = () => {
+  const [instances, setInstances] = createStore<InstancesStore>({});
   const navigate = useGDNavigate();
   const location = useLocation();
 
   const [t] = useTransContext();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
   });
 
-  // TODO: adapt to real data
+  createEffect(() => {
+    if (routeData.instances.data) {
+      routeData.instances.data.forEach((instance) => {
+        setInstances(
+          produce((prev) => {
+            prev[instance.modloader] = [
+              ...(prev[instance.modloader] || []),
+              instance,
+            ];
+            return prev;
+          })
+        );
+        console.log("INSTANCES", instances);
+      });
+    }
+  });
+
   return (
     <SiderbarWrapper noPadding>
       <div class="h-full w-full box-border pt-5 pb-5">
@@ -45,125 +70,30 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Show when={isSidebarOpened()}>
-          <Collapsable title="VANILLA">
-            <Tile
-              isLoading={true}
-              percentage={50}
-              title={"Instance"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar"
-            />
-            <Tile
-              onClick={() => navigate(`/library/ABDFEAD`)}
-              selected={instanceId() === "ABDFEAD"}
-              title={"Instance ABDFEAD"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar"
-            />
-          </Collapsable>
-          <Collapsable title="FAVOURITED">
-            <Tile
-              onClick={() => navigate(`/library/DDAEDF`)}
-              selected={instanceId() === "DDAEDF"}
-              title={"Instance DDAEDF"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar"
-            />
-          </Collapsable>
-          <Collapsable title="CURSEFORGE">
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar"
-            />
-          </Collapsable>
-        </Show>
-        <Show when={!isSidebarOpened()}>
-          <div class="h-full w-full flex gap-4 items-center overflow-auto flex-col scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
-            <Tile
-              // onClick={() => navigate(`/library/${instance.id}`)}
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
-            <Tile
-              title={"InstanceName"}
-              modloader={"forge"}
-              version={"1.19.2"}
-              variant="sidebar-small"
-            />
+        <Show when={Object.entries(instances).length > 0}>
+          <div class="mt-4">
+            <For each={Object.entries(instances)}>
+              {([key, values]) => (
+                <Collapsable
+                  title={key}
+                  size={isSidebarOpened() ? "standard" : "small"}
+                >
+                  <For each={values}>
+                    {(instance) => (
+                      <Tile
+                        onClick={() => navigate(`/library/${instance.id}`)}
+                        title={instance.name}
+                        modloader={instance.modloader as ModloaderType}
+                        version={instance.mc_version}
+                        variant={
+                          isSidebarOpened() ? "sidebar" : "sidebar-small"
+                        }
+                      />
+                    )}
+                  </For>
+                </Collapsable>
+              )}
+            </For>
           </div>
         </Show>
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
