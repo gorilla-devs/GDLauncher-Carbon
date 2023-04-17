@@ -1,6 +1,7 @@
+/* eslint-disable i18next/no-literal-string */
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createResource, Show } from "solid-js";
+import { createResource, ErrorBoundary, Show } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -73,18 +74,34 @@ const InnerApp = (props: InnerAppProps) => {
   let { client, createInvalidateQuery } = initRspc(props.port);
 
   return (
-    <rspc.Provider client={client as any} queryClient={queryClient}>
-      <Router source={hashIntegration()}>
-        <NavigationManager>
-          <TransProvider instance={props.i18nInstance}>
-            <NotificationsProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={createInvalidateQuery} />
-              </ModalProvider>
-            </NotificationsProvider>
-          </TransProvider>
-        </NavigationManager>
-      </Router>
-    </rspc.Provider>
+    <ErrorBoundary
+      fallback={(err) => {
+        console.log("ERR", err);
+        return (
+          <div class="relative w-screen h-screen z-100 flex justify-center items-center">
+            <div class="flex flex-col">
+              <h1 class="m-0">Error</h1>
+              <p>{err.message}</p>
+              <p>{err.stack}</p>
+              {err.message}
+            </div>
+          </div>
+        );
+      }}
+    >
+      <rspc.Provider client={client as any} queryClient={queryClient}>
+        <Router source={hashIntegration()}>
+          <NavigationManager>
+            <TransProvider instance={props.i18nInstance}>
+              <NotificationsProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={createInvalidateQuery} />
+                </ModalProvider>
+              </NotificationsProvider>
+            </TransProvider>
+          </NavigationManager>
+        </Router>
+      </rspc.Provider>
+    </ErrorBoundary>
   );
 };
