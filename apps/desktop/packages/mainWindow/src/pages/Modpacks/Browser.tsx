@@ -79,8 +79,8 @@ const modpacks = [
 
 const NoModpacks = () => {
   return (
-    <div class="h-full w-full flex justify-center items-center min-h-90">
-      <div class="flex flex-col justify-center items-center text-center">
+    <div class="w-full flex h-full justify-center items-center min-h-90">
+      <div class="flex justify-center items-center flex-col text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
@@ -99,16 +99,16 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   return (
-    <div class="relative w-full box-border">
-      <div class="sticky top-0 left-0 right-0 flex flex-col bg-darkSlate-800 z-10 px-5 pt-5">
-        <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
+    <div class="w-full relative box-border">
+      <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
+        <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full rounded-full text-darkSlate-50"
+            class="w-full text-darkSlate-50 rounded-full max-w-none flex-1"
             inputClass=""
           />
-          <div class="flex gap-3 items-center">
+          <div class="flex items-center gap-3">
             <p class="text-darkSlate-50">
               <Trans
                 key="instance.sort_by"
@@ -135,7 +135,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="i-ri:download-2-fill rounded-full text-md" />}
+            icon={<div class="rounded-full i-ri:download-2-fill text-md" />}
           >
             <Trans
               key="instance.import"
@@ -149,11 +149,11 @@ export default function Browser() {
           <Tags />
         </div>
       </div>
-      <div class="px-5 pb-5 flex flex-col gap-2 overflow-y-hidden">
+      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
-              <div class="flex justify-center items-center bg-darkSlate-900 rounded-xl h-22 w-22">
+              <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
                 <img class="h-14" src={LogoDark} />
               </div>
               <div class="flex flex-col justify-center">
