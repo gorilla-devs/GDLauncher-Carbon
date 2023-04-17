@@ -4,7 +4,7 @@ name = "core_module"
 version = "0.1.0"
 
 [dependencies]
-carbon_app = { path = "../../crates/carbon_app", features = ["iridium_lib"] }
+carbon_app = { path = "../../crates/carbon_app", default-features = false }
 
 [build-dependencies]
 carbon_app = { path = "../../crates/carbon_app" }
