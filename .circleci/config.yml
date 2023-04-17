@@ -30,7 +30,7 @@ jobs:
     executor: <<parameters.os>>
     steps:
       - checkout
-      - run: git submodule init
+      - run: git submodule update --init --recursive
       # MACOS
       - when:
           condition:
@@ -139,7 +139,7 @@ jobs:
       size: large
     steps:
       - checkout
-      - run: git submodule init
+      - run: git submodule update --init --recursive
       - run:
           name: Install NVM
           shell: powershell.exe
@@ -246,7 +246,7 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      - run: git submodule init
+      - run: git submodule update --init --recursive
       - run: |
           node -v
 
@@ -282,7 +282,7 @@ jobs:
     executor: "linux"
     steps:
       - checkout
-      - run: git submodule init
+      - run: git submodule update --init --recursive
       - run: |
           node -v
 

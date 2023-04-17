@@ -5,8 +5,8 @@ const { spawn } = require("child_process");
 
 const iridium_path = path.join(__dirname, "crates", "iridium");
 
-if (!fs.existsSync(iridium_path)) {
-  const cargo = spawn("cargo", ["new", "--lib", "iridium"], {
+if (!fs.readdirSync(iridium_path).length) {
+  const cargo = spawn("cargo", ["init", "--lib", "iridium"], {
     cwd: path.join(__dirname, "crates"),
   });
 
