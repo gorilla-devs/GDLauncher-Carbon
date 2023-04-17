@@ -141,9 +141,11 @@ const Tile = (props: Props) => {
             >
               {props.title}
             </h4>
-            <div class="flex justify-between text-darkSlate-50">
-              <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
-              <p class="m-0">{props.modloader}</p>
+            <div class="flex gap-4 text-darkSlate-50">
+              <span class="flex gap-2">
+                <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
+                <p class="m-0">{props.modloader}</p>
+              </span>
               <p class="m-0">{props.version}</p>
             </div>
           </div>

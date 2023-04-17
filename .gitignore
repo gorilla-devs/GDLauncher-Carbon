@@ -65,6 +65,7 @@ package-lock.json
 
 # next.js build output
 .next
+./crates/iridium
 
 # ----
 dist
