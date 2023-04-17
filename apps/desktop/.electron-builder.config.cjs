@@ -9,8 +9,9 @@ console.log(
   isDockerBuild
 );
 
-let os = process.argv[5].replace(/-/g, "");
 let arch = process.argv[4].replace(/-/g, "");
+let os = process.argv[5].replace(/-/g, "");
+let profile = process.argv[7].replace(/-/g, "");
 
 let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
 
@@ -35,7 +36,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: `../../target/${targetTriple}/release/${coreModuleBinName}`,
+      from: `../../target/${targetTriple}/${profile}/${coreModuleBinName}`,
       to: coreModuleBinName,
     },
     {
@@ -52,8 +53,7 @@ module.exports = {
     },
   ],
   win: {
-    // target: ["dir", "zip", "nsis"],
-    target: ["dir"],
+    target: ["dir", "zip", "nsis"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -63,14 +63,13 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    // target: ["dir", "zip", "dmg"],
-    target: ["dir"],
+    target: ["dir", "zip", "dmg"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: isDockerBuild ? ["dir"] : ["dir"],
+    target: isDockerBuild ? ["dir"] : ["dir", "zip"],
     artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
   },
   afterAllArtifactBuild: () => {

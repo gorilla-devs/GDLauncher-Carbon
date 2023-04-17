@@ -3,10 +3,14 @@ members = ["packages/core_module", "crates/*"]
 resolver = "2"
 
 [profile.release]
-# debug = 2
-# codegen-units = 1
-# lto = true
-# opt-level = "s"
+split-debuginfo = "unpacked"
+
+[profile.production]
+inherits = "release"
+debug = 2
+codegen-units = 1
+lto = true
+opt-level = "s"
 split-debuginfo = "unpacked"
 
 [workspace.dependencies]
@@ -23,6 +27,9 @@ dotenvy = "0.15.6"
 env_logger = "0.10.0"
 flate2 = "1.0.25"
 futures = "0.3.25"
+http = "0.2.9"
+httpdate = "1.0.2"
+hyper = "0.14.25"
 image = { version = "0.24.5", features = ["png"], default-features = false }
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
@@ -41,7 +48,7 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
   "migrations",
 ], default_features = false }
 regex = "1.7.0"
-reqwest = "0.11.13"
+reqwest = { version = "0.11.13", features = ["rustls-tls", "json"] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
@@ -53,6 +60,7 @@ tar = "0.4.38"
 strum_macros = "0.24.3"
 strum = "0.24.0"
 thiserror = "1.0.38"
+task-local-extensions = "0.1.4"
 tokio = "1.25.0"
 tokio-stream = "0.1.11"
 tower-http = "0.3.4"

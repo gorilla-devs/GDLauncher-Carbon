@@ -93,9 +93,9 @@ const NoVersions = () => {
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
         <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-shade-0 max-w-100">
+        <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="no_resourcepacks_text"
+            key="instance.no_resource_packs_text"
             options={{
               defaultValue:
                 "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
@@ -104,7 +104,7 @@ const NoVersions = () => {
         </p>
         <Button variant="outline" size="medium">
           <Trans
-            key="add_pack"
+            key="instance.add_pack"
             options={{
               defaultValue: "+ Add pack",
             }}

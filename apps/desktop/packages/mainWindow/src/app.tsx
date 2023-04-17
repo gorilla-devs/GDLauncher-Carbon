@@ -1,10 +1,10 @@
 import { Show, Suspense } from "solid-js";
-import { useRoutes } from "@solidjs/router";
+import { useBeforeLeave, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
-import AppNavbar from "./components/Navbar";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { useGDNavigate } from "./managers/NavigationManager";
+import { rspc } from "./utils/rspcClient";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -19,6 +19,11 @@ const App = (props: Props) => {
 
   initThemes();
 
+  let data = rspc.createQuery(() => ["account.getActiveUuid"]);
+  useBeforeLeave(() => {
+    if (!data.data) navigate("/");
+  });
+
   return (
     <div class="w-screen relative">
       <Show when={process.env.NODE_ENV === "development"}>
@@ -29,7 +34,7 @@ const App = (props: Props) => {
             }}
           >
             <Trans
-              key="login"
+              key="login.login"
               options={{
                 defaultValue: "login",
               }}
@@ -42,7 +47,7 @@ const App = (props: Props) => {
             }}
           >
             <Trans
-              key="logout"
+              key="login.logout"
               options={{
                 defaultValue: "logout",
               }}
@@ -50,7 +55,6 @@ const App = (props: Props) => {
           </div>
         </div>
       </Show>
-      <AppNavbar />
       <div class="flex w-screen h-auto z-10">
         <main class="relative overflow-hidden flex-1">
           <Suspense fallback={<></>}>

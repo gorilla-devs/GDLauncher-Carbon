@@ -23,6 +23,7 @@
     "eslint-config-prettier": "^8.6.0",
     "eslint-plugin-prettier": "^4.2.1",
     "typescript": "^4.9.4",
-    "unocss": "^0.48.3"
+    "unocss": "^0.48.3",
+    "unocss-preset-scrollbar-hide": "^1.0.1"
   }
 }

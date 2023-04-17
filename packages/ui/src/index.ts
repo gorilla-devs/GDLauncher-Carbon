@@ -14,6 +14,9 @@ export { Spinner } from "./Spinner";
 export { Collapsable } from "./Collapsable";
 export { Tag } from "./Tag";
 export { LoadingBar } from "./Loadingbar";
+export { Steps } from "./Steps";
+export { Radio } from "./Radio";
+export { TextArea } from "./TextArea";
 export {
   NotificationsProvider,
   createNotification,

@@ -1,12 +1,12 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
-import "./index.css";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import fetchData from "../home.data";
 
 type MockInstance = {
   title: string;
@@ -70,18 +70,24 @@ const Home = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
-  const routeDataNews: Promise<any> = useRouteData();
+  const [isNewsVisible, setIsNewVisible] = createSignal(false);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const showNews = () => routeData.settings.data?.showNews;
 
   createEffect(() => {
-    routeDataNews.then((newss) => {
+    routeData.news.then((newss) => {
       setNews(newss);
     });
+  });
+
+  createEffect(() => {
+    setIsNewVisible(!!showNews());
   });
 
   return (
     <div class="p-6">
       <div>
-        <Show when={news.length > 0}>
+        <Show when={news.length > 0 && isNewsVisible()}>
           <News
             slides={news}
             onClick={(news) => {

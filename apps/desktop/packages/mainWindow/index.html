@@ -11,9 +11,9 @@
       http-equiv="Content-Security-Policy"
       content="
         script-src 'self' 'unsafe-inline';
-        img-src 'self' data: https:;
+        img-src 'self' data: https: http://localhost:*;
         default-src 'unsafe-inline' 'self';
-        connect-src 'self' ws://localhost:* https://www.minecraft.net
+        connect-src 'self' ws://localhost:* https://www.minecraft.net http://localhost:*
       "
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -55,6 +55,10 @@
       body {
         background: #1d2028;
         color: white;
+      }
+
+      img {
+        -webkit-user-drag: none;
       }
 
       #root {

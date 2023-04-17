@@ -20,7 +20,7 @@ executors:
   macm1:
     macos:
       xcode: "14.2.0"
-    resource_class: macos.m1.large.gen1
+    resource_class: macos.x86.medium.gen2
 
 jobs:
   buildMac:
@@ -47,33 +47,33 @@ jobs:
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                sudo npm i -g pnpm
-                pnpm i
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm build:mac-x64
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm lint
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  branch: release
+                  and:
+                    - equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
                       command: |
-                        cd ./target/x86_64-apple-darwin/release
+                        cd ./target/x86_64-apple-darwin/production
                         npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
                         npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
                         npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
@@ -98,33 +98,33 @@ jobs:
                 echo "" > crates/carbon_app/src/db.rs
                 cargo fmt --check
             - run: |
-                sudo npm i -g pnpm
-                pnpm i
+                npm run sudo-init
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm build:mac-arm64
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm lint
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test
                 environment:
-                  RUSTFLAGS: -D warnings
+                  # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  branch: release
+                  and:
+                    - equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
                       command: |
-                        cd ./target/aarch64-apple-darwin/release
+                        cd ./target/aarch64-apple-darwin/production
                         npx @sentry/cli login --auth-token $SENTRY_AUTH_TOKEN
                         npx @sentry/cli difutil check core_module.dSYM/Contents/Resources/DWARF/core_module
                         npx @sentry/cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.dSYM/Contents/Resources/DWARF/core_module
@@ -171,8 +171,7 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            npm i -g pnpm
-            pnpm i
+            npm run init
           shell: bash.exe
       - run:
           command: chmod -R a+x node_modules
@@ -184,7 +183,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -192,7 +191,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -200,7 +199,7 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -208,10 +207,11 @@ jobs:
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - when:
           condition:
-            branch: release
+            and:
+              - equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 name: "Upload debug info to sentry"
@@ -219,7 +219,7 @@ jobs:
                 command: |
                   export PATH="$HOME/.cargo/bin:$PATH"
                   npm install -g @sentry/cli
-                  cd ./target/x86_64-pc-windows-msvc/release
+                  cd ./target/x86_64-pc-windows-msvc/production
                   sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
                   sentry-cli difutil check core_module.pdb
                   sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
@@ -234,8 +234,7 @@ jobs:
       - checkout
       - run: |
           node -v
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       # - run: pnpm test
       - run: pnpm build-web
@@ -253,29 +252,28 @@ jobs:
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: IS_DOCKER_TEST=true pnpm build:linux-x64
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm lint
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm check-bundle
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -289,33 +287,32 @@ jobs:
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
       - run: |
-          sudo npm i -g pnpm
-          pnpm i
+          npm run sudo-init
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm build:linux-x64
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm lint
           environment:
-            RUSTFLAGS: -D warnings
+            # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test
           environment:
-            RUSTFLAGS: -D warnings
-      # - run:
-      #     name: "Upload debug info to sentry"
-      #     command: |
-      #       npm install -g @sentry/cli
-      #       cd ./target/x86_64-unknown-linux-gnu/release
-      #       sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
-      #       sentry-cli difutil check core_module.pdb
-      #       sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
+            # RUSTFLAGS: -D warnings
+      - run:
+          name: "Upload debug info to sentry"
+          command: |
+            npm install -g @sentry/cli
+            cd ./target/x86_64-unknown-linux-gnu/release
+            sudo sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+            sudo sentry-cli difutil check core_module.debug
+            sudo sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.debug
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release

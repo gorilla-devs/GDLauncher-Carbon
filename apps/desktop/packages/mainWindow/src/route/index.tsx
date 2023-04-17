@@ -1,11 +1,12 @@
 import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
-import NewsData from "@/pages/news.data";
-import SettingsAppearanceData from "@/pages/Settings/settings.appearance.data";
+import HomeData from "@/pages/home.data";
+import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
-
+import AppData from "@/pages/app.data";
 /* Defining the routes for the application. */
+
 export const routes: RouteDefinition[] = [
   {
     path: "/",
@@ -15,6 +16,7 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/withAds")),
+    data: AppData,
     children: [
       {
         path: "/library",
@@ -26,7 +28,7 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: lazy(() => import("@/pages/Library/Home")),
-            data: NewsData,
+            data: HomeData,
           },
           {
             path: "/:id",
@@ -107,6 +109,7 @@ export const routes: RouteDefinition[] = [
       {
         path: "/settings",
         component: lazy(() => import("@/pages/Settings")),
+        data: SettingsGeneralData,
         children: [
           {
             path: "/",
@@ -115,7 +118,6 @@ export const routes: RouteDefinition[] = [
           {
             path: "/appearance",
             component: lazy(() => import("@/pages/Settings/Appearance")),
-            data: SettingsAppearanceData,
           },
           {
             path: "/java",

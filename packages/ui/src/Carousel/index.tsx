@@ -1,5 +1,11 @@
-import { createEffect, createSignal, onMount, JSX, onCleanup } from "solid-js";
-import "./index.css";
+import {
+  createEffect,
+  createSignal,
+  JSX,
+  onCleanup,
+  children,
+  onMount,
+} from "solid-js";
 
 export interface Props {
   children?: JSX.Element;
@@ -8,120 +14,212 @@ export interface Props {
 }
 
 const Carousel = (props: Props) => {
-  const [startX, setStartX] = createSignal(0);
-  const [scrollLeft, setScrollLeft] = createSignal(0);
-  const [isDown, setIsDown] = createSignal(false);
-  let horizontalSlider: HTMLDivElement | undefined;
-  let scrollWrapper: HTMLDivElement | undefined;
+  const [positionDiff, setPositionDiff] = createSignal(0);
+  const [prevPageX, setPrevPageX] = createSignal(0);
+  const [prevScrollLeft, setPrevScrollLeft] = createSignal(0);
+  const [isMouseDown, setIsMouseDown] = createSignal(false);
 
-  onMount(() => {
-    const beginning = horizontalSlider?.scrollLeft;
-    if (beginning) setScrollLeft(beginning);
-  });
+  let horizontalSlider: HTMLDivElement;
+  let scrollRightArrowContainer: HTMLSpanElement;
+  let scrollLeftArrowContainer: HTMLSpanElement;
+  let scrollLeftArrow: HTMLDivElement;
+  let scrollRightArrow: HTMLDivElement;
+  let scrollLeftArrowIcon: HTMLElement;
+  let scrollRightArrowIcon: HTMLElement;
+
+  const autoSlide = () => {
+    if (
+      horizontalSlider.scrollLeft ==
+      horizontalSlider.scrollWidth - horizontalSlider.clientWidth
+    )
+      return;
+
+    setPositionDiff((prev) => Math.abs(prev));
+    const firstImage = horizontalSlider?.querySelectorAll(".slide")[0];
+    if (firstImage) {
+      const firstImageWidth = firstImage.clientWidth + 16;
+      const diff = firstImageWidth - positionDiff();
+
+      if (horizontalSlider.scrollLeft > prevScrollLeft()) {
+        return (horizontalSlider.scrollLeft +=
+          positionDiff() > firstImageWidth / 3 ? diff : -positionDiff());
+      }
+      horizontalSlider.scrollLeft -=
+        positionDiff() > firstImageWidth / 3 ? diff : -positionDiff();
+    }
+  };
+
+  const showHideArrows = () => {
+    let scrollWitdh =
+      horizontalSlider.scrollWidth - horizontalSlider.clientWidth;
+
+    if (horizontalSlider.scrollLeft === 0) {
+      (scrollLeftArrowContainer as HTMLElement).classList.remove(
+        "cursor-pointer"
+      );
+      (scrollLeftArrow as HTMLElement).classList.add("pointer-events-none");
+      scrollLeftArrowIcon?.classList.add("text-darkSlate-500");
+    } else {
+      (scrollLeftArrowContainer as HTMLElement).classList.add("cursor-pointer");
+      (scrollLeftArrow as HTMLElement).classList.remove("pointer-events-none");
+      scrollLeftArrowIcon?.classList.remove("text-darkSlate-500");
+    }
+
+    if (horizontalSlider.scrollLeft === scrollWitdh) {
+      (scrollRightArrowContainer as HTMLElement).classList.remove(
+        "cursor-pointer"
+      );
+      (scrollRightArrow as HTMLElement).classList.add("pointer-events-none");
+      scrollRightArrowIcon?.classList.add("text-darkSlate-500");
+    } else {
+      (scrollRightArrowContainer as HTMLElement).classList.add(
+        "cursor-pointer"
+      );
+      (scrollRightArrow as HTMLElement).classList.remove("pointer-events-none");
+      scrollRightArrowIcon?.classList.remove("text-darkSlate-500");
+    }
+  };
 
   const mousedown = (e: MouseEvent) => {
-    if (horizontalSlider) {
-      setIsDown(true);
-      horizontalSlider?.classList.add("snap-none");
-      horizontalSlider?.classList.remove(
-        "snap-x",
-        "snap-mandatory",
-        "scroll-smooth"
-      );
-      setStartX(e.pageX - horizontalSlider?.offsetLeft);
-      setScrollLeft(horizontalSlider.scrollLeft);
-    }
+    setIsMouseDown(true);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
+    horizontalSlider?.classList.add("cursor-grab");
+    setPrevPageX(e.pageX);
+    setPrevScrollLeft(horizontalSlider.scrollLeft);
+  };
+
+  const mouseup = () => {
+    setIsMouseDown(false);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
+    horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
+    horizontalSlider?.classList.add("scroll-smooth");
+    autoSlide();
   };
 
   const mouseleave = () => {
-    if (horizontalSlider) {
-      setIsDown(false);
-      horizontalSlider?.classList.remove("snap-none");
-      horizontalSlider?.classList.add(
-        "snap-x",
-        "snap-mandatory",
-        "scroll-smooth"
-      );
-    }
+    setIsMouseDown(false);
+    horizontalSlider.classList.remove("snap-x", "snap-mandatory");
+    horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
+    horizontalSlider?.classList.add("scroll-smooth");
   };
-  const mousemove = (e: MouseEvent) => {
-    if (horizontalSlider) {
-      if (!isDown()) return;
-      e.preventDefault();
 
-      const x = e.pageX - horizontalSlider.offsetLeft;
-      const walk = (x - startX()) * 3;
-      horizontalSlider.scrollLeft = scrollLeft() - walk;
-    }
+  const mousemove = (e: MouseEvent) => {
+    if (!isMouseDown()) return;
+    e.preventDefault();
+    horizontalSlider?.classList.remove("scroll-smooth", "cursor-grab");
+    horizontalSlider?.classList.add("cursor-grabbing");
+    setPositionDiff(e.pageX - prevPageX());
+    horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff();
+  };
+
+  const wheel = () => {
+    horizontalSlider.classList.add("snap-x", "snap-mandatory");
+    showHideArrows();
   };
 
   createEffect(() => {
-    if (horizontalSlider) {
-      horizontalSlider.addEventListener("mousedown", mousedown);
-      horizontalSlider.addEventListener("mouseleave", mouseleave);
-      horizontalSlider.addEventListener("mouseup", mouseleave);
-      horizontalSlider.addEventListener("mousemove", mousemove);
-    }
+    horizontalSlider.addEventListener("mousedown", mousedown);
+    horizontalSlider.addEventListener("mouseleave", mouseleave);
+    horizontalSlider.addEventListener("mouseup", mouseup);
+    horizontalSlider.addEventListener("mousemove", mousemove);
+    horizontalSlider.addEventListener("wheel", wheel);
   });
 
   onCleanup(() => {
-    if (horizontalSlider) {
-      horizontalSlider.removeEventListener("mousedown", mousedown);
-      horizontalSlider.removeEventListener("mouseleave", mouseleave);
-      horizontalSlider.removeEventListener("mouseup", mouseleave);
-      horizontalSlider.removeEventListener("mousemove", mousemove);
-    }
+    horizontalSlider.removeEventListener("mousedown", mousedown);
+    horizontalSlider.removeEventListener("mouseleave", mouseleave);
+    horizontalSlider.removeEventListener("mouseup", mouseup);
+    horizontalSlider.removeEventListener("mousemove", mousemove);
+    horizontalSlider.removeEventListener("wheel", wheel);
+  });
+
+  onMount(() => {
+    showHideArrows();
   });
 
   const handleScroll = (direction: string) => {
     const isLeft = direction === "left";
 
-    const scrollWidth = horizontalSlider?.scrollWidth || 0;
-    const scrollLeftt = horizontalSlider?.scrollLeft || 0;
-    const width = scrollWrapper?.getBoundingClientRect()?.width || 0;
-    const offset = 10;
-    const isEnd = scrollWidth - scrollLeftt - width < offset;
-    const isStart = scrollLeft() === 0;
+    const firstImage = horizontalSlider.querySelectorAll(".slide")[0];
+    if (firstImage) {
+      const firstImageWidth = firstImage.clientWidth + 16;
 
-    if (isLeft) {
-      if (isStart) return;
-      setScrollLeft((prev) => prev - 168);
-    } else {
-      if (isEnd) return;
-      setScrollLeft((prev) => prev + 168);
-    }
-
-    if (horizontalSlider) {
-      horizontalSlider.scrollLeft = scrollLeft();
+      if (isLeft) {
+        horizontalSlider.scrollLeft -= firstImageWidth;
+      } else {
+        horizontalSlider.scrollLeft += firstImageWidth;
+      }
     }
   };
+
+  const mappedChildren = children(() => props.children);
+  createEffect(() => {
+    (mappedChildren() as JSX.Element[])?.forEach((item) => {
+      (item as HTMLElement).classList.add("slide", "snap-start");
+      (item as HTMLElement).onmouseover = () => {
+        (item as HTMLElement).classList.add("pointer-events-none");
+      };
+    });
+  });
 
   return (
     <div class="flex flex-col w-full">
       <div class="flex justify-between items-center h-9 w-full">
         <h3 class="uppercase">{props.title}</h3>
         <div class="h-full flex gap-4">
-          <div
-            class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
-            onClick={() => handleScroll("left")}
+          <span
+            ref={(el) => {
+              scrollLeftArrowContainer = el;
+            }}
           >
-            <div class="i-ri:arrow-drop-left-line text-4xl" />
-          </div>
-          <div
-            class="h-6 w-6 bg-black-semiblack rounded-full flex justify-center items-center"
-            onClick={() => handleScroll("rigth")}
+            <div
+              ref={(el) => {
+                scrollLeftArrow = el;
+              }}
+              class="h-6 w-6 bg-darkSlate-700 rounded-full flex justify-center items-center cursor-pointer"
+              onClick={() => handleScroll("left")}
+            >
+              <i
+                class="i-ri:arrow-drop-left-line text-4xl"
+                ref={(el) => {
+                  scrollLeftArrowIcon = el;
+                }}
+              />
+            </div>
+          </span>
+          <span
+            ref={(el) => {
+              scrollRightArrowContainer = el;
+            }}
           >
-            <div class="i-ri:arrow-drop-right-line text-4xl" />
-          </div>
+            <div
+              ref={(el) => {
+                scrollRightArrow = el;
+              }}
+              class="h-6 w-6 bg-darkSlate-700 rounded-full flex justify-center items-center cursor-pointer"
+              onClick={() => handleScroll("right")}
+            >
+              <i
+                class="i-ri:arrow-drop-right-line text-4xl"
+                ref={(el) => {
+                  scrollRightArrowIcon = el;
+                }}
+              />
+            </div>
+          </span>
         </div>
       </div>
-      <div ref={scrollWrapper} id="scroll-wrapper" class="w-full flex gap-4">
+      <div class="w-full flex gap-4">
         <div
-          ref={horizontalSlider}
-          id="horizontal-slider"
-          class="w-full flex gap-4 snap-x snap-mandatory overflow-x-scroll scroll-smooth"
+          ref={(el) => {
+            horizontalSlider = el;
+          }}
+          onScroll={() => {
+            showHideArrows();
+          }}
+          class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
-          {props.children}
+          {mappedChildren}
         </div>
       </div>
     </div>

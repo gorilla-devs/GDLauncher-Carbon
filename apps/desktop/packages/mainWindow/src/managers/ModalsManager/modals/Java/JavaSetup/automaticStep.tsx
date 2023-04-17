@@ -6,12 +6,12 @@ const percentage = 40;
 
 const AutomaticStep = () => {
   return (
-    <div class="flex flex-col items-center w-110 h-50 justify-around">
+    <div class="flex flex-col items-center w-110 justify-around h-50">
       <div class="flex flex-col items-center">
         <img src={JavaLogo} class="h-16 w-16" />
         <h3>
           <Trans
-            key="java_missing"
+            key="java.java_missing"
             options={{
               defaultValue: "Java {{version}} missing",
               version: 8,
@@ -23,7 +23,7 @@ const AutomaticStep = () => {
       <p class="mb-0">
         {`${percentage}%`}
         <Trans
-          key="automatic_download_progress"
+          key="java.automatic_download_progress"
           options={{
             defaultValue: "Downloaded",
           }}
