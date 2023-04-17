@@ -105,7 +105,7 @@ export default function Browser() {
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full text-darkSlate-50 rounded-full max-w-none flex-1"
+            class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             inputClass=""
           />
           <div class="flex items-center gap-3">
@@ -135,7 +135,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="rounded-full i-ri:download-2-fill text-md" />}
+            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
           >
             <Trans
               key="instance.import"

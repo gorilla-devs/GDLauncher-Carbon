@@ -24,7 +24,7 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="select-none group flex justify-center cursor-pointer flex-col items-start z-50"
+          class="select-none group flex justify-center cursor-pointer flex-col z-50 items-start"
           onClick={(e) => {
             e.preventDefault();
             props?.onClick?.(e);
@@ -32,12 +32,12 @@ const Tile = (props: Props) => {
         >
           <div class="relative rounded-2xl h-38 w-38 bg-green-600">
             <div
-              class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 ease-in-out hidden transition-all"
+              class="absolute ease-in-out top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 hidden transition-all"
               classList={{
                 "group-hover:flex": !props.isLoading,
               }}
             >
-              <div class="h-12 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer w-12">
+              <div class="rounded-full flex justify-center items-center cursor-pointer h-12 bg-primary-500 w-12">
                 <div
                   class="text-white text-2xl i-ri:play-fill"
                   onClick={(e) => {
@@ -47,12 +47,12 @@ const Tile = (props: Props) => {
               </div>
             </div>
             <div
-              class="absolute top-2 right-2 duration-100 ease-in-out hidden transition-all"
+              class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
               classList={{
                 "group-hover:flex": !props.isLoading,
               }}
             >
-              <div class="flex justify-center items-center cursor-pointer h-7 w-7 bg-darkSlate-500 rounded-full">
+              <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
                 <div
                   class="text-white i-ri:more-2-fill text-lg"
                   onClick={(e) => {
@@ -71,7 +71,7 @@ const Tile = (props: Props) => {
             </Show>
           </div>
           <h4
-            class="mt-2 text-ellipsis overflow-hidden mb-1"
+            class="text-ellipsis overflow-hidden mt-2 mb-1"
             classList={{
               "text-white": !props.isLoading,
               "text-lightGray-900": props.isLoading,
@@ -79,7 +79,7 @@ const Tile = (props: Props) => {
           >
             {props.title}
           </h4>
-          <div class="flex gap-2 text-lightGray-900 justify-between">
+          <div class="flex gap-2 justify-between text-lightGray-900">
             <span class="flex gap-2">
               <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
               <p class="m-0">{props.modloader}</p>
@@ -90,7 +90,7 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="select-none erelative w-full flex items-center gap-4 box-border group h-14 px-3 cursor-pointer"
+          class="select-none w-full flex items-center gap-4 box-border group cursor-pointer erelative h-14 px-3"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
@@ -98,7 +98,7 @@ const Tile = (props: Props) => {
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
 
-          <div class="absolute gap-2 duration-100 ease-in-out right-5 hidden group-hover:flex transition-all">
+          <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
             <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
               <div
                 class="text-white i-ri:more-2-fill text-lg"

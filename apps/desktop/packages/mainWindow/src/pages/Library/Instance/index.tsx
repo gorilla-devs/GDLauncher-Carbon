@@ -172,7 +172,7 @@ const Instance = () => {
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                        <div class="p-0 m-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2">
+                        <div class="p-0 m-0 flex gap-2 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                           <span>{instanceDetails.data?.modloader}</span>
                           <span>{instanceDetails.data?.modloader_version}</span>
                         </div>
