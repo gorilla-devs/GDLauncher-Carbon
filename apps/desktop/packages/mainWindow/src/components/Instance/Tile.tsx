@@ -24,10 +24,13 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="flex justify-center cursor-pointer flex-col items-start snap-start"
-          onClick={(e) => props?.onClick?.(e)}
+          class="group flex justify-center cursor-pointer flex-col items-start z-50"
+          onClick={(e) => {
+            e.preventDefault();
+            props?.onClick?.(e);
+          }}
         >
-          <div class="group relative rounded-2xl h-38 w-38 bg-green-600">
+          <div class="relative rounded-2xl h-38 w-38 bg-green-600">
             <div
               class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 ease-in-out hidden transition-all"
               classList={{
@@ -37,7 +40,9 @@ const Tile = (props: Props) => {
               <div class="h-12 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer w-12">
                 <div
                   class="text-white text-2xl i-ri:play-fill"
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
                 />
               </div>
             </div>
@@ -50,7 +55,9 @@ const Tile = (props: Props) => {
               <div class="flex justify-center items-center cursor-pointer h-7 w-7 bg-darkSlate-500 rounded-full">
                 <div
                   class="text-white i-ri:more-2-fill text-lg"
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
                 />
               </div>
             </div>

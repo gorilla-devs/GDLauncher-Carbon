@@ -1,7 +1,6 @@
 import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
-import HomeData from "@/pages/home.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
@@ -27,7 +26,6 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: lazy(() => import("@/pages/Library/Home")),
-            data: HomeData,
           },
           {
             path: "/:id",

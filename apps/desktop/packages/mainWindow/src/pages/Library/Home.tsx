@@ -6,7 +6,8 @@ import { useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import fetchData from "../home.data";
+import fetchData from "../Library/library.data";
+import { Instance } from "@gd/core_module/bindings";
 
 type MockInstance = {
   title: string;
@@ -70,9 +71,17 @@ const Home = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
+  const [instances, setInstances] = createStore<Instance[]>([]);
   const [isNewsVisible, setIsNewVisible] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const showNews = () => routeData.settings.data?.showNews;
+
+  createEffect(() => {
+    if (routeData.instances.data) {
+      routeData.instances.data.forEach((instance) => {
+        setInstances((prev) => [...prev, instance]);
+      });
+    }
+  });
 
   createEffect(() => {
     routeData.news.then((newss) => {
@@ -81,7 +90,7 @@ const Home = () => {
   });
 
   createEffect(() => {
-    setIsNewVisible(!!showNews());
+    setIsNewVisible(!!routeData.settings.data?.showNews);
   });
 
   return (
@@ -95,7 +104,7 @@ const Home = () => {
             }}
           />
         </Show>
-        <div class="mt-4">
+        {/* <div class="mt-4">
           <Carousel title={t("recent_played")}>
             <For each={mockCarousel}>
               {(instance) => (
@@ -110,24 +119,24 @@ const Home = () => {
               )}
             </For>
           </Carousel>
-        </div>
-        <div class="mt-4">
-          <Carousel title={t("your_instances")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
+        </div> */}
+        <Show when={instances.length > 0}>
+          <div class="mt-4">
+            <Carousel title={t("your_instances")}>
+              <For each={instances}>
+                {(instance) => (
                   <Tile
                     onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
+                    title={instance.name}
+                    modloader={instance.modloader as ModloaderType}
+                    version={instance.mc_version}
                   />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div>
-        <div class="mt-4">
+                )}
+              </For>
+            </Carousel>
+          </div>
+        </Show>
+        {/* <div class="mt-4">
           <Carousel title={t("popular_modpacks")}>
             <For each={mockCarousel}>
               {(instance) => (
@@ -142,7 +151,7 @@ const Home = () => {
               )}
             </For>
           </Carousel>
-        </div>
+        </div> */}
       </div>
     </div>
   );

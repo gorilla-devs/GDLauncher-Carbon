@@ -41,7 +41,6 @@ const Sidebar = () => {
             return prev;
           })
         );
-        console.log("INSTANCES", instances);
       });
     }
   });
