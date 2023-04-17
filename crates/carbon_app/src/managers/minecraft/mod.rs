@@ -90,7 +90,7 @@ mod tests {
 
     //     let app = crate::setup_managers_for_test().await;
 
-    //     let runtime_path = &app.configuration_manager().runtime_path;
+    //     let runtime_path = &app.app.settings_manager().runtime_path;
 
     //     let manifest = MinecraftManifest::fetch().await.unwrap();
 
@@ -147,17 +147,20 @@ mod tests {
     //         generate_startup_command(full_account, 2048, 2048, runtime_path, version, instance_id)
     //             .await;
 
+    //     for c in command.iter() {
+    //         println!("Command: {}", c);
+    //     }
+
     //     let mut command_exec = tokio::process::Command::new("java");
 
-    //     println!("Command: {:#?}", command);
+    //     let child = command_exec.args(command);
 
-    //     let mut child = command_exec
-    //         .args(command.split_ascii_whitespace())
-    //         .spawn()
-    //         .unwrap();
+    //     println!("Command: {:#?}", child);
 
-    //     let status = child.wait().await.unwrap();
+    //     let mut child = child.spawn().unwrap();
 
-    //     assert!(status.success());
+    //     let _ = child.wait().await;
+
+    //     // assert!(status.success());
     // }
 }

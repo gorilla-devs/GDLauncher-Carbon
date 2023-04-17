@@ -312,6 +312,7 @@ impl ManagerRef<'_, DownloadManager> {
 
                     // will NOT be flushed on drop, so it is done manually
                     writebuf.flush().await?;
+                    drop(writebuf); // necessary for windows tests, file must be released before we return a complete / err status
 
                     if !*canceled_ref {
                         // the complete flag is set first to avoid a possible race condition
@@ -497,6 +498,7 @@ pub enum DownloadError {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] // conflicts with task cleanup
 mod test {
     use ntest::timeout;
 

@@ -305,14 +305,14 @@ jobs:
           command: pnpm test
           environment:
             # RUSTFLAGS: -D warnings
-      # - run:
-      #     name: "Upload debug info to sentry"
-      #     command: |
-      #       npm install -g @sentry/cli
-      #       cd ./target/x86_64-unknown-linux-gnu/release
-      #       sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
-      #       sentry-cli difutil check core_module.pdb
-      #       sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.pdb
+      - run:
+          name: "Upload debug info to sentry"
+          command: |
+            npm install -g @sentry/cli
+            cd ./target/x86_64-unknown-linux-gnu/release
+            sudo sentry-cli login --auth-token $SENTRY_AUTH_TOKEN
+            sudo sentry-cli difutil check core_module.debug
+            sudo sentry-cli upload-dif --org gorilladevs-inc --project gdlauncher-app-core core_module.debug
       - run: cd apps && cd desktop && pnpm clean
       - store_artifacts:
           path: ./apps/desktop/release

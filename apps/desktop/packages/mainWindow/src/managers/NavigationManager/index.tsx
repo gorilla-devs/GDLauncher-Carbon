@@ -5,7 +5,7 @@ import {
   setLastInstanceOpened,
 } from "@/utils/routes";
 import { useNavigate } from "@solidjs/router";
-import { JSX, createContext, useContext } from "solid-js";
+import { JSX, createContext, createSignal, useContext } from "solid-js";
 
 type NavigateOptions = {
   getLastInstance?: boolean;
@@ -15,6 +15,8 @@ type Context = (_path: string, _options?: NavigateOptions) => void;
 
 const NavigationContext = createContext<Context>();
 
+export const [lastPathVisited, setLastPathVisited] = createSignal("/");
+
 export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
   const manager = (path: string, options?: NavigateOptions) => {
@@ -23,8 +25,13 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
       const instanceId = getInstanceIdFromPath(path);
       if (instanceId) setLastInstanceOpened(instanceId);
 
-      navigate(`/library/${lastInstanceOpened()}/${parameters || ""}`);
-    } else navigate(path);
+      const route = `/library/${lastInstanceOpened()}/${parameters || ""}`;
+      setLastPathVisited(route);
+      navigate(route);
+    } else {
+      setLastPathVisited(path);
+      navigate(path);
+    }
   };
 
   return (

@@ -101,7 +101,7 @@ export default function Browser() {
   return (
     <div class="relative w-full box-border">
       <div class="sticky top-0 left-0 right-0 flex flex-col bg-darkSlate-800 z-10 px-5 pt-5">
-        <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
+        <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
@@ -135,7 +135,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="text-lg i-ri:download-2-fill" />}
+            icon={<div class="i-ri:download-2-fill rounded-full text-md" />}
           >
             <Trans
               key="instance.import"
@@ -149,30 +149,32 @@ export default function Browser() {
           <Tags />
         </div>
       </div>
-      <div class="overflow-y-hidden px-5 pb-5 flex flex-col gap-2">
-        <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl">
+      <div class="px-5 pb-5 flex flex-col gap-2 overflow-y-hidden">
+        <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
-              <div class="flex justify-center items-center h-22 w-22 bg-darkSlate-900 rounded-xl">
+              <div class="flex justify-center items-center bg-darkSlate-900 rounded-xl h-22 w-22">
                 <img class="h-14" src={LogoDark} />
               </div>
-              <div class="flex flex-col justify-around">
-                <h2 class="m-0">
-                  <Trans
-                    key="instance.create_new_instance_title"
-                    options={{
-                      defaultValue: "New instance",
-                    }}
-                  />
-                </h2>
-                <p class="m-0 text-darkSlate-50">
-                  <Trans
-                    key="instance.create_new_instance_text"
-                    options={{
-                      defaultValue: "Create your own empty instance",
-                    }}
-                  />
-                </p>
+              <div class="flex flex-col justify-center">
+                <div class="flex flex-col gap-2">
+                  <h2 class="m-0">
+                    <Trans
+                      key="instance.create_new_instance_title"
+                      options={{
+                        defaultValue: "New instance",
+                      }}
+                    />
+                  </h2>
+                  <p class="m-0 text-darkSlate-50">
+                    <Trans
+                      key="instance.create_new_instance_text"
+                      options={{
+                        defaultValue: "Create your own empty instance",
+                      }}
+                    />
+                  </p>
+                </div>
               </div>
             </span>
             <div class="flex gap-3">
@@ -189,17 +191,19 @@ export default function Browser() {
                 value="1.16.2"
               />
               <Button
-                variant="primary"
+                variant="glow"
                 onClick={() =>
                   modalsContext?.openModal({ name: "instanceCreation" })
                 }
               >
-                <Trans
-                  key="instance.create_instance_btn"
-                  options={{
-                    defaultValue: "Create",
-                  }}
-                />
+                <span class="uppercase">
+                  <Trans
+                    key="instance.create_instance_btn"
+                    options={{
+                      defaultValue: "Create",
+                    }}
+                  />
+                </span>
               </Button>
             </div>
           </div>

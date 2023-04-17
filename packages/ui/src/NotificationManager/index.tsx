@@ -7,9 +7,11 @@ import {
   useContext,
 } from "solid-js";
 
+type NotificationType = "success" | "warning" | "error";
+
 type Notification = {
   name: string;
-  type?: string;
+  type?: NotificationType;
   position?: string;
 };
 
@@ -25,7 +27,11 @@ const NotificationsProvider = (props: Props) => {
     ReturnType<typeof setTimeout>[]
   >([]);
 
-  const addNotification = (name: string, type?: string, position?: string) => {
+  const addNotification = (
+    name: string,
+    type?: NotificationType,
+    position?: string
+  ) => {
     setNotifications((prev) => [
       ...prev,
       {
@@ -53,7 +59,7 @@ const NotificationsProvider = (props: Props) => {
     }
   });
 
-  const value = [addNotification];
+  const value = addNotification;
 
   return (
     <>
@@ -91,12 +97,11 @@ const NotificationsProvider = (props: Props) => {
 };
 
 const createNotification = () => {
-  return (
-    (useContext(NotificationContext) as [
-      // eslint-disable-next-line no-unused-vars
-      (name: string, type?: string, position?: string) => void
-    ]) || []
-  );
+  return useContext(NotificationContext) as (
+    _name: string,
+    _type?: string,
+    _position?: string
+  ) => void;
 };
 
 export { NotificationsProvider, createNotification };

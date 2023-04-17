@@ -4,8 +4,9 @@ import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import HomeData from "@/pages/home.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
-
+import AppData from "@/pages/app.data";
 /* Defining the routes for the application. */
+
 export const routes: RouteDefinition[] = [
   {
     path: "/",
@@ -15,6 +16,7 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/withAds")),
+    data: AppData,
     children: [
       {
         path: "/library",
