@@ -68,7 +68,10 @@ mod app {
             let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
                 Ok(client) => client,
                 Err(prisma_client::DatabaseError::MigrationError(err)) => {
-                    println!("Database migration failed: {}", err);
+                    println!(
+                        "[_GDL_DB_MIGRATION_FAILED_]: Database migration failed: {}",
+                        err
+                    );
                     std::process::exit(1);
                 }
                 Err(err) => {

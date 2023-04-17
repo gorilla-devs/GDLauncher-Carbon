@@ -50,7 +50,7 @@ const loadCoreModule: CoreModule = () =>
         type: "info",
         message: dataString,
       });
-      if (dataString.startsWith("_STATUS_: ")) {
+      if (dataString.startsWith("[_GDL_STATUS_]: ")) {
         let port = dataString.split("|")[1];
         resolve(port);
       }

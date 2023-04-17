@@ -52,6 +52,8 @@ pub async fn init() {
         get_available_port().await
     };
 
+    println!("Port found: {}", listener.local_addr().unwrap().port());
+
     start_router(runtime_path, listener).await;
 }
 
@@ -116,7 +118,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
-                println!("_STATUS_: READY|{port}");
+                println!("[_GDL_STATUS_]: READY|{port}");
                 break;
             }
         }
