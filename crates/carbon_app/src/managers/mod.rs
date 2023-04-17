@@ -35,7 +35,7 @@ pub enum AppError {
 }
 
 mod app {
-    use super::{java::JavaManager, modplatforms::ModplatformsManager, *};
+    use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
 
     pub struct AppInner {
         settings_manager: SettingsManager,
@@ -44,6 +44,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
@@ -86,6 +87,7 @@ mod app {
                     account_manager: AccountManager::new(),
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
+                    metrics_manager: MetricsManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
                     prisma_client: Arc::new(db_client),
@@ -102,6 +104,7 @@ mod app {
             app
         }
 
+        manager_getter!(metrics_manager: MetricsManager);
         manager_getter!(modplatforms_manager: ModplatformsManager);
         manager_getter!(settings_manager: SettingsManager);
         manager_getter!(java_manager: JavaManager);
