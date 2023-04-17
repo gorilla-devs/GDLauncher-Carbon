@@ -6,6 +6,8 @@ import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
 import { For, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { rspc } from "@/utils/rspcClient";
+import { convertMinutesToHumanTime } from "@/utils/helpers";
 
 type InstancePage = {
   label: string;
@@ -52,6 +54,11 @@ const Instance = () => {
   let bgRef: HTMLDivElement;
   let innerContainerRef: HTMLDivElement;
   let refStickyContainer: HTMLDivElement;
+
+  const instanceDetails = rspc.createQuery(() => [
+    "mc.getInstanceDetails",
+    params.id,
+  ]);
 
   return (
     <div
@@ -131,7 +138,7 @@ const Instance = () => {
                   <div class="bg-darkSlate-800 h-16 w-16 rounded-xl">
                     {/* <img /> */}
                   </div>
-                  <div class="flex flex-1 flex-col max-w-185">
+                  <div class="flex flex-col max-w-185 flex-1">
                     <div class="flex gap-4 items-center">
                       <h1
                         class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
@@ -143,7 +150,7 @@ const Instance = () => {
                           setEditableName(false);
                         }}
                       >
-                        {params.id}
+                        {instanceDetails.data?.name}
                       </h1>
                       <div class="flex gap-2">
                         <div
@@ -165,12 +172,21 @@ const Instance = () => {
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                        <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
-                          Forge 1.19.2
+                        <div class="p-0 m-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2">
+                          <span>{instanceDetails.data?.modloader}</span>
+                          <span>{instanceDetails.data?.modloader_version}</span>
                         </div>
                         <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
                           <div class="i-ri:time-fill" />
-                          1d ago
+                          <span>
+                            {convertMinutesToHumanTime(
+                              parseInt(
+                                (instanceDetails.data?.last_played ||
+                                  "0") as string,
+                                10
+                              )
+                            )}
+                          </span>
                         </div>
                         <div class="p-0 lg:px-4 flex gap-2 items-center">
                           <div class="i-ri:user-fill" />
@@ -218,7 +234,7 @@ const Instance = () => {
         }}
       >
         <div class="flex items-start w-full ease-in-out transition-opacity duration-300">
-          <div class="w-fit justify-center items-center transition duration-100 ease-in-out h-fit mr-4">
+          <div class="w-fit justify-center items-center transition ease-in-out duration-100 h-fit mr-4">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}

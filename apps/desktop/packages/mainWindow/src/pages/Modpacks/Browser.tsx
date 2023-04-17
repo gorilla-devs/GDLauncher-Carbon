@@ -79,7 +79,7 @@ const modpacks = [
 
 const NoModpacks = () => {
   return (
-    <div class="w-full flex h-full justify-center items-center min-h-90">
+    <div class="flex justify-center items-center w-full h-full min-h-90">
       <div class="flex justify-center items-center flex-col text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
@@ -100,8 +100,8 @@ export default function Browser() {
   const [t] = useTransContext();
   return (
     <div class="w-full relative box-border">
-      <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
-        <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
+      <div class="flex flex-col left-0 right-0 sticky top-0 bg-darkSlate-800 z-10 px-5 pt-5">
+        <div class="flex items-center gap-3 justify-between pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}

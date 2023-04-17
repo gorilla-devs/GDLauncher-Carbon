@@ -9,64 +9,6 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "../Library/library.data";
 import { Instance } from "@gd/core_module/bindings";
 
-type MockInstance = {
-  title: string;
-  modloader: ModloaderType;
-  mcVersion: string;
-  id: string;
-};
-
-const mockCarousel: MockInstance[] = [
-  {
-    title: "Minecraft forge 1",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "ABDFEAD",
-  },
-  {
-    title: "Minecraft forge 2",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "DDAEDF",
-  },
-  {
-    title: "Minecraft forge 3",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HDHEJA",
-  },
-  {
-    title: "Minecraft forge 4",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HUSER",
-  },
-  {
-    title: "Minecraft forge 5",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "PDODK",
-  },
-  {
-    title: "Minecraft forge 6",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AKFBI",
-  },
-  {
-    title: "Minecraft forge 7",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AHUUIO",
-  },
-  {
-    title: "Minecraft forge 8",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HFHDJ",
-  },
-];
-
 const Home = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
