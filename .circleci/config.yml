@@ -230,18 +230,6 @@ jobs:
           shell: bash.exe
       - store_artifacts:
           path: ./apps/desktop/release
-  buildWebsite:
-    executor: "website"
-    steps:
-      - checkout
-      - run: |
-          node -v
-          npm run sudo-init
-          chmod -R a+x node_modules
-      # - run: pnpm test
-      - run: pnpm build-web
-      # - run: pnpm lint-web
-      # - run: pnpm check-bundle-web
   testDocker:
     executor: "linux"
     steps:
