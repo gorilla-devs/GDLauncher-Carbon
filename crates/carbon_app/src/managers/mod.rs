@@ -44,7 +44,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
-        metrics_manager: MetricsManager,
+        pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,

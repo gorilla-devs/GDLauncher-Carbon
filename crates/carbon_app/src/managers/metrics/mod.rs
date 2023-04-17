@@ -4,7 +4,7 @@ use super::ManagerRef;
 
 mod sender;
 
-pub(super) struct MetricsManager;
+pub(crate) struct MetricsManager;
 
 impl MetricsManager {
     pub fn new() -> Self {
