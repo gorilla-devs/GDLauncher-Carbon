@@ -94,7 +94,7 @@ const Home = () => {
   });
 
   return (
-    <div class="p-6">
+    <div class="p-6 pb-0">
       <div>
         <Show when={news.length > 0 && isNewsVisible()}>
           <News
