@@ -311,7 +311,6 @@ jobs:
 workflows:
   every-commit:
     jobs:
-      - buildWebsite
       - testDocker:
           filters:
             branches:
