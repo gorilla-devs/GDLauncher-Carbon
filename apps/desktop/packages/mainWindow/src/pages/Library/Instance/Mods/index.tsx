@@ -1,125 +1,10 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
-import { ModloaderType } from "@/utils/sidebar";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
-
-type ModType = {
-  title: string;
-  enabled: boolean;
-  modloader: ModloaderType;
-  mcversion: string;
-  modloaderVersion: string;
-};
-
-const mods: ModType[] = [
-  {
-    title: "Mods1",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods2",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods3",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods4",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods5",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods6",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods7",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods8",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods9",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods8",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods9",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods8",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods9",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods8",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-  {
-    title: "Mods9",
-    enabled: true,
-    modloader: "forge",
-    mcversion: "1.19.2",
-    modloaderVersion: "2.1.3",
-  },
-];
+import { useParams } from "@solidjs/router";
+import { rspc } from "@/utils/rspcClient";
 
 const NoMods = () => {
   return (
@@ -150,9 +35,16 @@ const NoMods = () => {
 
 const Mods = () => {
   const [t] = useTransContext();
+  const params = useParams();
+
+  const instanceDetails = rspc.createQuery(() => [
+    "mc.getInstanceDetails",
+    params.id,
+  ]);
+
   return (
     <div>
-      <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out pt-10 sticky top-30">
+      <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky pt-10 top-30">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -227,7 +119,7 @@ const Mods = () => {
             </div>
           </div>
           <div>
-            {mods.length}
+            {instanceDetails.data?.mods.length}
             <Trans
               key="instance.mods"
               options={{
@@ -238,8 +130,15 @@ const Mods = () => {
         </div>
       </div>
       <div class="h-full overflow-y-hidden">
-        <Show when={mods.length > 0} fallback={<NoMods />}>
-          <For each={mods}>{(props) => <Mod mod={props} />}</For>
+        <Show
+          when={
+            instanceDetails.data?.mods && instanceDetails.data?.mods.length > 0
+          }
+          fallback={<NoMods />}
+        >
+          <For each={instanceDetails.data?.mods}>
+            {(props) => <Mod mod={props} />}
+          </For>
         </Show>
       </div>
     </div>

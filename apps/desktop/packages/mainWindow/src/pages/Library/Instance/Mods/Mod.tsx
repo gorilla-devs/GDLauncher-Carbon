@@ -1,13 +1,6 @@
-import { ModloaderType, getModloaderIcon } from "@/utils/sidebar";
+import { getModloaderIcon } from "@/utils/sidebar";
+import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
-
-type ModType = {
-  title: string;
-  enabled: boolean;
-  modloader: ModloaderType;
-  mcversion: string;
-  modloaderVersion: string;
-};
 
 type Props = {
   mod: ModType;
@@ -22,14 +15,18 @@ const Mod = (props: Props) => {
           <div class="flex items-center gap-2">
             <div class="h-10 w-10 bg-green-500 rounded-xl" />
             <div class="flex flex-col">
-              {props.mod.title}
+              {props.mod.name}
               <div class="flex gap-2">
-                <img
+                {/* <img
                   class="w-4 h-4"
                   src={getModloaderIcon(props.mod.modloader)}
-                />
-                <p class="m-0 text-darkSlate-500 text-sm">
+                /> */}
+                <img class="w-4 h-4" src={getModloaderIcon("forge")} />
+                {/* <p class="m-0 text-darkSlate-500 text-sm">
                   {`${props.mod.modloader} ${props.mod.mcversion}`}
+                </p> */}
+                <p class="m-0 text-darkSlate-500 text-sm">
+                  {`${"forge"} ${"2.1.3"}`}
                 </p>
               </div>
             </div>
