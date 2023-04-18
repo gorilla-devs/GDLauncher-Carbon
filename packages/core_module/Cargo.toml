@@ -14,4 +14,4 @@ carbon_app = { path = "../../crates/carbon_app" }
 
 [features]
 default = []
-iridium_lib = ["carbon_app/iridium_lib"]
+production = ["carbon_app/production"]

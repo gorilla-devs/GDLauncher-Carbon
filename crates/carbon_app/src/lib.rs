@@ -31,7 +31,7 @@ pub async fn init() {
 
     println!("Starting Carbon App");
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(feature = "production")]
     let _guard = {
         println!("Initializing Sentry");
         sentry::init((
@@ -46,7 +46,7 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let listener = if cfg!(debug_assertions) {
+    let listener = if cfg!(feature = "production") {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
         get_available_port().await

@@ -139,7 +139,7 @@ mod app {
 
 impl Drop for AppInner {
     fn drop(&mut self) {
-        #[cfg(not(debug_assertions))]
+        #[cfg(feature = "production")]
         {
             let close_event = Event {
                 name: EventName::AppClosed,

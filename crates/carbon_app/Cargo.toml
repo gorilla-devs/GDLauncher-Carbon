@@ -66,4 +66,4 @@ serde_json = { workspace = true }
 dotenvy = { workspace = true }
 
 [features]
-iridium_lib = ["iridium"]
+production = ["iridium"]
