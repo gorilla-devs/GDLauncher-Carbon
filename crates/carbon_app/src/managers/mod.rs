@@ -139,21 +139,24 @@ mod app {
 
 impl Drop for AppInner {
     fn drop(&mut self) {
-        let close_event = Event {
-            name: EventName::AppClosed,
-            properties: HashMap::new(),
-        };
+        #[cfg(not(debug_assertions))]
+        {
+            let close_event = Event {
+                name: EventName::AppClosed,
+                properties: HashMap::new(),
+            };
 
-        let client = get_client();
+            let client = get_client();
 
-        Handle::current().block_on(async move {
-            println!("Collecting metric for app close");
-            let res = self.metrics_manager.track_event(client, close_event).await;
-            match res {
-                Ok(_) => println!("Successfully collected metric for app close"),
-                Err(e) => println!("Error collecting metric for app close: {e}"),
-            }
-        });
+            Handle::current().block_on(async move {
+                println!("Collecting metric for app close");
+                let res = self.metrics_manager.track_event(client, close_event).await;
+                match res {
+                    Ok(_) => println!("Successfully collected metric for app close"),
+                    Err(e) => println!("Error collecting metric for app close: {e}"),
+                }
+            });
+        }
     }
 }
 
