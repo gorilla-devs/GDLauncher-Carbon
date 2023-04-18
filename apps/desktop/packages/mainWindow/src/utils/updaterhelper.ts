@@ -2,12 +2,11 @@ import { createSignal } from "solid-js";
 
 export const [updateAvailable, setUpdateAvailable] = createSignal(false);
 
-const init = async () => {
+export const checkForUpdates = () => {
+  window.checkUpdate();
   window.updateAvailable(() => {
     setUpdateAvailable(true);
   });
 };
-
-init();
 
 export default updateAvailable;

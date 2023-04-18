@@ -147,8 +147,8 @@ async function createWindow() {
   let allowUnstableReleases = false;
 
   autoUpdater.autoDownload = false;
-  // autoUpdater.allowDowngrade =
-  //   !allowUnstableReleases && app.getVersion().includes("beta");
+  autoUpdater.allowDowngrade =
+    !allowUnstableReleases && app.getVersion().includes("beta");
   autoUpdater.allowPrerelease = allowUnstableReleases;
   autoUpdater.setFeedURL({
     owner: "gorilla-devs",
@@ -171,6 +171,12 @@ async function createWindow() {
 
   autoUpdater.on("update-downloaded", () => {
     win?.webContents.send("updateAvailable");
+  });
+
+  ipcMain.handle("releaseChannel", async (_, releaseChannel) => {
+    if (releaseChannel === "beta" || releaseChannel === "alpha") {
+      allowUnstableReleases = true;
+    }
   });
   // }
 
@@ -204,6 +210,7 @@ async function createWindow() {
   win.on("ready-to-show", () => {
     coreModule.finally(() => {
       win?.show();
+      autoUpdater.checkForUpdates();
     });
 
     if (import.meta.env.DEV) {
