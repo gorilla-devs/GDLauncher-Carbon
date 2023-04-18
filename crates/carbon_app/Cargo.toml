@@ -50,6 +50,8 @@ hyper = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
 iridium = { git = "ssh://git@github.com/gorilla-devs/iridium.git", hash = "60c70da5733e372270a09d707e27d3102d40fdee", optional = true }
+tempdir = { workspace = true }
+trash = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
@@ -58,7 +60,6 @@ winreg = { workspace = true }
 
 
 [dev-dependencies]
-tempdir = { workspace = true }
 ntest = { workspace = true }
 
 [build-dependencies]

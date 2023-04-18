@@ -5,11 +5,16 @@ use std::collections::HashSet;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Instance {
     pub name: String,
+    #[serde(default)]
     pub icon: InstanceIcon,
+    #[serde(default = "Utc::now")]
     pub last_played: DateTime<Utc>,
+    #[serde(default)]
     pub seconds_played: u64,
+    #[serde(default)]
     pub modpack: Option<Modpack>,
     pub game_configuration: GameConfig,
+    #[serde(default)]
     pub notes: String,
 }
 
@@ -18,6 +23,12 @@ pub struct Instance {
 pub enum InstanceIcon {
     Default,
     RelativePath(String),
+}
+
+impl Default for InstanceIcon {
+    fn default() -> Self {
+        Self::Default
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,9 +46,16 @@ pub struct CurseforgeModpack {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameConfig {
     pub version: GameVersion,
+    #[serde(default = "default_global_java_args")]
     pub global_java_args: bool,
+    #[serde(default)]
     pub extra_java_args: Option<String>,
+    #[serde(default)]
     pub memory: Option<MemoryRange>,
+}
+
+fn default_global_java_args() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,6 +68,7 @@ pub enum GameVersion {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StandardVersion {
     pub release: String,
+    #[serde(default)]
     pub modloaders: HashSet<ModLoader>,
 }
 

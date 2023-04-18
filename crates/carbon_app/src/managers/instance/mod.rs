@@ -1,6 +1,9 @@
+use std::ffi::OsStr;
+use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
+use crate::domain::instance::info::InstanceIcon;
 use anyhow::anyhow;
 use anyhow::bail;
 use chrono::DateTime;
@@ -25,6 +28,8 @@ mod schema;
 pub struct InstanceManager {
     instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
+    // seperate lock to prevent a deadlock with the index lock
+    path_lock: Mutex<()>,
 }
 
 impl InstanceManager {
@@ -32,6 +37,7 @@ impl InstanceManager {
         Self {
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
+            path_lock: Mutex::new(()),
         }
     }
 }
@@ -485,7 +491,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Add an instance to the database without checking if it exists.
-    pub async fn add_instance(
+    async fn add_instance(
         self,
         name: String,
         shortpath: String,
@@ -509,6 +515,269 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         Ok(InstanceId(instance.id))
+    }
+
+    /// Remove an instance from the database without checking if it exists.
+    async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
+        use db::instance::UniqueWhereParam;
+
+        self.app
+            .prisma_client
+            .instance()
+            .delete(UniqueWhereParam::IdEquals(*instance))
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+
+    async fn next_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
+        if name.is_empty() {
+            bail!("Attempted to find an instance directory name for an unnamed instance");
+        }
+
+        #[rustfmt::skip]
+        const ILLEGAL_CHARS: &[char] = &[
+            // linux / windows / macos
+            '/',
+            // macos / windows
+            ':',
+            // ntfs
+            '\\', '<', '>', '*', '|', '"', '?',
+            // FAT
+            '^',
+        ];
+
+        #[rustfmt::skip]
+        const ILLEGAL_NAMES: &[&str] = &[
+            // windows
+            "con", "prn", "aux", "clock$", "nul",
+            "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+            "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+        ];
+
+        // trim whitespace (including windows does not end with ' ' requirement)
+        let name = name.trim();
+        // max 28 character name. this gives us 3 digets for numbers to use as discriminators
+        let name = &name[0..usize::min(name.len(), 28)];
+
+        // sanitize any illegal filenames
+        let mut name = match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
+            true => format!("_{name}"),
+            false => name.to_string(),
+        };
+
+        // stop us from making hidden files on macos/linux ('~' disallowed for sanity)
+        if name.starts_with('.') || name.starts_with('~') {
+            name.replace_range(0..1, "_");
+        }
+
+        // '.' disallowed when ending filenames on windows ('~' disallowed for sanity)
+        if name.ends_with('.') || name.ends_with('~') {
+            name.replace_range(name.len() - 1..name.len(), "_");
+        }
+
+        let mut sanitized_name = name
+            .chars()
+            .map(|c| match ILLEGAL_CHARS.contains(&c) {
+                true => '_',
+                false => c,
+            })
+            .collect::<String>();
+
+        let mut instance_path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path();
+
+        // cant conflict with anything if it dosen't exist
+        if !instance_path.exists() {
+            instance_path.push(&sanitized_name);
+            return Ok((sanitized_name, instance_path));
+        }
+
+        if !instance_path.is_dir() {
+            bail!("GDL instances path is not a directory. Please move the file blocking it.")
+        }
+
+        let base_length = sanitized_name.len();
+
+        for i in 1..1000 {
+            // at this point sanitized_name can't be '..' or '.' or have any other escapes in it
+            instance_path.push(&sanitized_name);
+
+            if !instance_path.exists() {
+                return Ok((sanitized_name, instance_path));
+            }
+
+            instance_path.pop();
+
+            sanitized_name.truncate(base_length);
+            sanitized_name.push_str(&i.to_string());
+        }
+
+        bail!("unable to sanitize instance name")
+    }
+
+    pub async fn create_instance(
+        self,
+        group: GroupId,
+        name: String,
+        icon: Option<PathBuf>,
+        version: InstanceVersionSouce,
+    ) -> anyhow::Result<InstanceId> {
+        let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
+        tokio::fs::create_dir(tmpdir.path().join("instance")).await?;
+
+        let icon = match icon {
+            Some(icon) => {
+                let extension = match icon.extension() {
+                    Some(ext) => ext,
+                    None => OsStr::new(""),
+                };
+
+                let icon_name = PathBuf::from("icon")
+                    .with_extension(extension)
+                    .to_string_lossy()
+                    .to_string();
+                tokio::fs::copy(icon, tmpdir.path().join(&icon_name)).await?;
+
+                InstanceIcon::RelativePath(icon_name)
+            }
+            None => InstanceIcon::Default,
+        };
+
+        let (modpack, version) = match version {
+            InstanceVersionSouce::Version(version) => (None, version),
+        };
+
+        let info = info::Instance {
+            name: name.clone(),
+            icon,
+            last_played: Utc::now(),
+            seconds_played: 0,
+            modpack,
+            game_configuration: info::GameConfig {
+                version,
+                global_java_args: true,
+                extra_java_args: None,
+                memory: None,
+            },
+            notes: String::new(),
+        };
+
+        let json = schema::make_instance_config(info)?;
+        tokio::fs::write(tmpdir.path().join("instance.json"), json).await?;
+
+        let _lock = self.path_lock.lock().await;
+        let (shortpath, path) = self.next_folder(&name).await?;
+
+        tokio::fs::create_dir_all(
+            self.app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .to_path(),
+        )
+        .await?;
+
+        tokio::fs::rename(&tmpdir, path).await?;
+        drop(ManuallyDrop::new(tmpdir)); // prevent tmpdir cleanup
+
+        self.add_instance(name, shortpath, group).await
+    }
+
+    pub async fn update_instance(
+        self,
+        instance: InstanceId,
+        name: Option<String>,
+        icon: Option<Option<PathBuf>>,
+        // version not yet supported due to mod version concerns
+    ) -> anyhow::Result<()> {
+        let mut instances = self.instances.write().await;
+        let mut instance = instances
+            .get_mut(&instance)
+            .ok_or_else(|| anyhow!("instance id invalid"))?;
+
+        let Instance { name: iname, shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
+            bail!("update_instance called on invalid instance")
+        };
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path()
+            .join(shortpath as &str);
+
+        let mut info = data.config.clone();
+
+        if let Some(icon) = icon {
+            let icon = match icon {
+                Some(icon) => {
+                    let extension = match icon.extension() {
+                        Some(ext) => ext,
+                        None => OsStr::new(""),
+                    };
+
+                    let tmp_name = path.join("_icon").with_extension(extension);
+                    tokio::fs::copy(&icon, &tmp_name).await?;
+                    let icon_name = PathBuf::from("_icon")
+                        .with_extension(extension)
+                        .to_string_lossy()
+                        .to_string();
+                    tokio::fs::rename(tmp_name, path.join(&icon_name)).await?;
+
+                    InstanceIcon::RelativePath(icon_name)
+                }
+                None => InstanceIcon::Default,
+            };
+
+            info.icon = icon;
+        }
+
+        if let Some(name) = name.clone() {
+            info.name = name;
+        }
+
+        let json = schema::make_instance_config(info.clone())?;
+        tokio::fs::write(path.join("instance.json"), json).await?;
+        *iname = info.name.clone();
+        data.config = info;
+
+        if let Some(name) = name {
+            let _lock = self.path_lock.lock().await;
+            let (new_shortpath, new_path) = self.next_folder(&name).await?;
+            tokio::fs::rename(path, new_path).await?;
+            *shortpath = new_shortpath;
+        }
+
+        Ok(())
+    }
+
+    pub async fn delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let mut instances = self.instances.write().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or_else(|| anyhow!("instance id invalid"))?;
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path()
+            .join(&instance.shortpath as &str);
+
+        tokio::task::spawn_blocking(|| trash::delete(path)).await??;
+        instances.remove(&instance_id);
+        drop(instances);
+        self.remove_instance(instance_id).await?;
+
+        Ok(())
     }
 
     /// Delete an instance group and move all contained instances into the default group.
@@ -754,6 +1023,10 @@ pub struct Mod {
     // todo
 }
 
+pub enum InstanceVersionSouce {
+    Version(info::GameVersion),
+    //Modpack(info::Modpack),
+}
 #[cfg(test)]
 mod test {
     use prisma_client_rust::Direction;

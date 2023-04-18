@@ -18,3 +18,7 @@ pub fn parse_instance_config(config: &str) -> Result<info::Instance, serde_json:
         InstanceConfig::V1(config) => config.into(),
     })
 }
+
+pub fn make_instance_config(info: info::Instance) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(&InstanceConfig::V1(info.into()))
+}
