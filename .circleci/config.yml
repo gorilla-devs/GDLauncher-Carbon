@@ -34,15 +34,13 @@ jobs:
       # MACOS
       - when:
           condition:
-            and:
-              - equal: ["mac", <<parameters.os>>]
+            equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
                 source "$HOME/.cargo/env"
             - run: |
                 node -v
-
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
@@ -89,8 +87,7 @@ jobs:
       # MACOS M1
       - when:
           condition:
-            and:
-              - equal: ["macm1", <<parameters.os>>]
+            equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
@@ -98,7 +95,6 @@ jobs:
                 rustup target add aarch64-apple-darwin
             - run: |
                 node -v
-
                 cargo --version
             - run: |
                 echo "" > crates/carbon_app/src/db.rs
