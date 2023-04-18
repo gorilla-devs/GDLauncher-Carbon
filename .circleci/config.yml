@@ -35,7 +35,7 @@ jobs:
       - when:
           condition:
             and:
-              equal: ["mac", <<parameters.os>>]
+              - equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
@@ -52,8 +52,8 @@ jobs:
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   equal: ["release", << pipeline.git.branch >>]
@@ -66,12 +66,12 @@ jobs:
                   - run: pnpm build:mac-x64
             - run:
                 command: pnpm lint
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test -- --features iridium_lib -- --include-ignored
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   equal: ["release", << pipeline.git.branch >>]
@@ -90,7 +90,7 @@ jobs:
       - when:
           condition:
             and:
-              equal: ["macm1", <<parameters.os>>]
+              - equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
@@ -108,8 +108,8 @@ jobs:
                 chmod -R a+x node_modules
             - run:
                 command: pnpm codegen
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   equal: ["release", << pipeline.git.branch >>]
@@ -122,12 +122,12 @@ jobs:
                   - run: pnpm build:mac-arm64
             - run:
                 command: pnpm lint
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - run:
                 command: pnpm test -- --features iridium_lib -- --include-ignored
-                environment:
-                  # RUSTFLAGS: -D warnings
+                # environment:
+                # RUSTFLAGS: -D warnings
             - when:
                 condition:
                   equal: ["release", << pipeline.git.branch >>]
@@ -272,24 +272,24 @@ jobs:
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           command: IS_DOCKER_TEST=true pnpm build:linux-x64
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           command: pnpm lint
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test -- --features iridium_lib -- --include-ignored
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           command: pnpm check-bundle
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run: cd apps && cd desktop && pnpm clean
   buildLinux:
     executor: "linux"
@@ -308,8 +308,8 @@ jobs:
           chmod -R a+x node_modules
       - run:
           command: pnpm codegen
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - when:
           condition:
             equal: ["release", << pipeline.git.branch >>]
@@ -322,12 +322,12 @@ jobs:
             - run: pnpm build:linux-x64
       - run:
           command: pnpm lint
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           command: pnpm test -- --features iridium_lib -- --include-ignored
-          environment:
-            # RUSTFLAGS: -D warnings
+          # environment:
+          # RUSTFLAGS: -D warnings
       - run:
           name: "Upload debug info to sentry"
           command: |
