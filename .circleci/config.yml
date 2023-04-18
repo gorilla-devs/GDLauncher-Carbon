@@ -59,10 +59,9 @@ jobs:
                   equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-x64-prod
-            - when:
+            - unless:
                 condition:
-                  not:
-                    equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-x64
             - run:
@@ -116,10 +115,9 @@ jobs:
                   equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-arm64-prod
-            - when:
+            - unless:
                 condition:
-                  not:
-                    equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-arm64
             - run:
@@ -210,10 +208,9 @@ jobs:
                 environment:
                   CARGO_NET_GIT_FETCH_WITH_CLI: "true"
                   # RUSTFLAGS: -D warnings
-      - when:
+      - unless:
           condition:
-            not:
-              equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 command: |
@@ -318,10 +315,9 @@ jobs:
             equal: ["release", << pipeline.git.branch >>]
           steps:
             - run: pnpm build:linux-x64-prod
-      - when:
+      - unless:
           condition:
-            not:
-              equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run: pnpm build:linux-x64
       - run:
