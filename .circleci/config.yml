@@ -54,22 +54,28 @@ jobs:
                 command: pnpm codegen
                 environment:
                   # RUSTFLAGS: -D warnings
-            - run:
-                command: pnpm build:mac-x64
-                environment:
-                  # RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  - equal: ["release", << pipeline.git.branch >>]
+                steps:
+                  - run: pnpm build:mac-x64-prod
+            - when:
+                condition:
+                  - not:
+                      - equal: ["release", << pipeline.git.branch >>]
+                steps:
+                  - run: pnpm build:mac-x64
             - run:
                 command: pnpm lint
                 environment:
                   # RUSTFLAGS: -D warnings
             - run:
-                command: pnpm test
+                command: pnpm test -- --features iridium_lib -- --include-ignored
                 environment:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  and:
-                    - equal: ["release", << pipeline.git.branch >>]
+                  - equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
@@ -105,22 +111,28 @@ jobs:
                 command: pnpm codegen
                 environment:
                   # RUSTFLAGS: -D warnings
-            - run:
-                command: pnpm build:mac-arm64
-                environment:
-                  # RUSTFLAGS: -D warnings
+            - when:
+                condition:
+                  - equal: ["release", << pipeline.git.branch >>]
+                steps:
+                  - run: pnpm build:mac-arm64-prod
+            - when:
+                condition:
+                  - not:
+                      - equal: ["release", << pipeline.git.branch >>]
+                steps:
+                  - run: pnpm build:mac-arm64
             - run:
                 command: pnpm lint
                 environment:
                   # RUSTFLAGS: -D warnings
             - run:
-                command: pnpm test
+                command: pnpm test -- --features iridium_lib -- --include-ignored
                 environment:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  and:
-                    - equal: ["release", << pipeline.git.branch >>]
+                  - equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
@@ -186,14 +198,31 @@ jobs:
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
             # RUSTFLAGS: -D warnings
-      - run:
-          command: |
-            export PATH="$HOME/.cargo/bin:$PATH"
-            pnpm build:win-x64
-          shell: bash.exe
-          environment:
-            CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-            # RUSTFLAGS: -D warnings
+      - when:
+          condition:
+            - equal: ["release", << pipeline.git.branch >>]
+          steps:
+            - run:
+                command: |
+                  export PATH="$HOME/.cargo/bin:$PATH"
+                  pnpm build:win-x64-prod
+                shell: bash.exe
+                environment:
+                  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+                  # RUSTFLAGS: -D warnings
+      - when:
+          condition:
+            - not:
+                - equal: ["release", << pipeline.git.branch >>]
+          steps:
+            - run:
+                command: |
+                  export PATH="$HOME/.cargo/bin:$PATH"
+                  pnpm build:win-x64
+                shell: bash.exe
+                environment:
+                  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+                  # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -205,15 +234,14 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            pnpm test
+            pnpm test -- --features iridium_lib -- --include-ignored
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            and:
-              - equal: ["release", << pipeline.git.branch >>]
+            - equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 name: "Upload debug info to sentry"
@@ -258,7 +286,7 @@ jobs:
           environment:
             # RUSTFLAGS: -D warnings
       - run:
-          command: pnpm test
+          command: pnpm test -- --features iridium_lib -- --include-ignored
           environment:
             # RUSTFLAGS: -D warnings
       - run:
@@ -294,7 +322,7 @@ jobs:
           environment:
             # RUSTFLAGS: -D warnings
       - run:
-          command: pnpm test
+          command: pnpm test -- --features iridium_lib -- --include-ignored
           environment:
             # RUSTFLAGS: -D warnings
       - run:

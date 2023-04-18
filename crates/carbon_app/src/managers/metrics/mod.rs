@@ -1,6 +1,6 @@
 use crate::domain::metrics::{Event, Pageview};
 
-use super::ManagerRef;
+use super::{ManagerRef, GDL_API_BASE};
 
 mod sender;
 
@@ -13,7 +13,10 @@ impl MetricsManager {
 }
 
 impl ManagerRef<'_, MetricsManager> {
-    pub async fn track_pageview(&self, page: Pageview) {}
-    pub async fn track_event(&self, event: Event) {}
-    async fn send_keepalive(&self) {}
+    pub async fn track_pageview(&self, page: Pageview) {
+        let endpoint = format!("{}/v1/metrics/pageview", GDL_API_BASE);
+    }
+    pub async fn track_event(&self, event: Event) {
+        let endpoint = format!("{}/v1/metrics/event", GDL_API_BASE);
+    }
 }

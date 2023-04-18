@@ -64,3 +64,20 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
         .nest("/mc", mc::mount_axum_router())
         .nest("/account", account::mount_axum_router())
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    #[ignore]
+    #[allow(clippy::assertions_on_constants)]
+    fn verify_iridium_feature() {
+        #[cfg(feature = "iridium_lib")]
+        {
+            assert!(true);
+        }
+        #[cfg(not(feature = "iridium_lib"))]
+        {
+            assert!(false);
+        }
+    }
+}

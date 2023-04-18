@@ -34,6 +34,8 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
+const GDL_API_BASE: &str = "https://api.gdlauncher.com";
+
 mod app {
     use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
 

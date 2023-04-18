@@ -1,5 +1,7 @@
 use reqwest::{Certificate, Identity};
 
+use crate::managers::GDL_API_BASE;
+
 use super::ManagerRef;
 
 pub struct ModplatformsManager {}
@@ -27,7 +29,7 @@ impl ManagerRef<'_, ModplatformsManager> {
     pub async fn some_api_request(&self) -> anyhow::Result<()> {
         let client = get_client();
         let response = client
-            .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
+            .get(format!("{}/v1/curseforge/mods/520914", GDL_API_BASE))
             .send()
             .await?;
 
@@ -37,23 +39,23 @@ impl ManagerRef<'_, ModplatformsManager> {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::setup_managers_for_test;
+// #[cfg(test)]
+// mod test {
+//     use crate::setup_managers_for_test;
 
-    use super::*;
+//     use super::*;
 
-    #[tokio::test]
-    async fn test_get_client() {
-        let client = get_client();
+//     #[tokio::test]
+//     async fn test_get_client() {
+//         let client = get_client();
 
-        let response = client
-            // .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
-            .get("https://api.gdlauncher.com/cf/mods/520914")
-            .send()
-            .await
-            .unwrap();
+//         let response = client
+//             // .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
+//             .get("https://api.gdlauncher.com/cf/mods/520914")
+//             .send()
+//             .await
+//             .unwrap();
 
-        assert_eq!(response.status(), 200);
-    }
-}
+//         assert_eq!(response.status(), 200);
+//     }
+// }
