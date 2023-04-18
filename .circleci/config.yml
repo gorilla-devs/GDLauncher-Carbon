@@ -56,15 +56,15 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
-                  - run: pnpm build:mac-x64-prod
+                  run: pnpm build:mac-x64-prod
             - when:
                 condition:
-                  - not:
-                      equal: ["release", << pipeline.git.branch >>]
+                  not:
+                    equal: ["release", << pipeline.git.branch >>]
                 steps:
-                  - run: pnpm build:mac-x64
+                  run: pnpm build:mac-x64
             - run:
                 command: pnpm lint
                 environment:
@@ -113,15 +113,15 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
-                  - run: pnpm build:mac-arm64-prod
+                  run: pnpm build:mac-arm64-prod
             - when:
                 condition:
-                  - not:
-                      equal: ["release", << pipeline.git.branch >>]
+                  not:
+                    equal: ["release", << pipeline.git.branch >>]
                 steps:
-                  - run: pnpm build:mac-arm64
+                  run: pnpm build:mac-arm64
             - run:
                 command: pnpm lint
                 environment:
@@ -200,29 +200,29 @@ jobs:
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
-            - run:
-                command: |
-                  export PATH="$HOME/.cargo/bin:$PATH"
-                  pnpm build:win-x64-prod
-                shell: bash.exe
-                environment:
-                  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-                  # RUSTFLAGS: -D warnings
+            run:
+              command: |
+                export PATH="$HOME/.cargo/bin:$PATH"
+                pnpm build:win-x64-prod
+              shell: bash.exe
+              environment:
+                CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+                # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - not:
-                equal: ["release", << pipeline.git.branch >>]
+            not:
+              equal: ["release", << pipeline.git.branch >>]
           steps:
-            - run:
-                command: |
-                  export PATH="$HOME/.cargo/bin:$PATH"
-                  pnpm build:win-x64
-                shell: bash.exe
-                environment:
-                  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-                  # RUSTFLAGS: -D warnings
+            run:
+              command: |
+                export PATH="$HOME/.cargo/bin:$PATH"
+                pnpm build:win-x64
+              shell: bash.exe
+              environment:
+                CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+                # RUSTFLAGS: -D warnings
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
@@ -315,15 +315,15 @@ jobs:
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
-            - run: pnpm build:linux-x64-prod
+            run: pnpm build:linux-x64-prod
       - when:
           condition:
-            - not:
-                equal: ["release", << pipeline.git.branch >>]
+            not:
+              equal: ["release", << pipeline.git.branch >>]
           steps:
-            - run: pnpm build:linux-x64
+            run: pnpm build:linux-x64
       - run:
           command: pnpm lint
           environment:
