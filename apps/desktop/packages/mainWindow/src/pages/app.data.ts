@@ -7,17 +7,14 @@ export type Accounts = {
   type_: AccountType;
 };
 
-type ReleaseChannels = "stable" | "beta" | "alpha";
-
 const fetchData = () => {
-  const settings = rspc.createQuery(() => ["settings.getSettings"]);
   const accounts = rspc.createQuery(() => ["account.getAccounts"]);
   const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
   const status = rspc.createQuery(() => ["account.enroll.getStatus"]);
 
-  if (settings.data?.releaseChannel) {
-    window.releaseChannel(settings.data.releaseChannel);
-  }
+  // if (settings.data?.releaseChannel) {
+  //   window.releaseChannel(settings.data.releaseChannel);
+  // }
 
   return { accounts, activeUuid, status };
 };

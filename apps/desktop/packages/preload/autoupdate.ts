@@ -12,8 +12,8 @@ contextBridge.exposeInMainWorld("updateAvailable", async (cb: any) =>
   ipcRenderer.on("updateAvailable", cb)
 );
 
-contextBridge.exposeInMainWorld(
-  "releaseChannel",
-  async (releaseChannel: "stable" | "beta" | "alpha") =>
-    ipcRenderer.invoke("releaseChannel", releaseChannel)
-);
+// contextBridge.exposeInMainWorld(
+//   "releaseChannel",
+//   async (releaseChannel: string) =>
+//     ipcRenderer.invoke("releaseChannel", releaseChannel)
+// );
