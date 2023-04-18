@@ -70,9 +70,12 @@ keys! {
     instance {
         GET_GROUPS                    = "getGroups";
         CREATE_GROUP                  = "createGroup";
+        CREATE_INSTANCE               = "createInstance";
         DELETE_GROUP                  = "deleteGroup";
+        DELETE_INSTANCE               = "deleteInstance";
         MOVE_GROUP                    = "moveGroup";
         MOVE_INSTANCE                 = "moveInstance";
+        UPDATE_INSTANCE               = "updateInstance";
         INSTANCE_DETAILS              = "getInstanceDetails";
     }
 

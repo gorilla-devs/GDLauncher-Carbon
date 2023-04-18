@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use std::path::PathBuf;
+
 use chrono::{DateTime, Utc};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -9,7 +12,7 @@ use super::keys::instance::*;
 use super::router::router;
 
 use crate::domain::instance as domain;
-use crate::managers::instance::{GroupId, InstanceId};
+use crate::managers::instance::{self as manager, GroupId, InstanceId};
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -25,9 +28,26 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation CREATE_INSTANCE[app, details: CreateInstance] {
+            app.instance_manager()
+                .create_instance(
+                    GroupId(details.group),
+                    details.name,
+                    details.icon.map(PathBuf::from),
+                    details.version.into()
+                )
+                .await
+        }
+
         mutation DELETE_GROUP[app, id: i32] {
             app.instance_manager()
                 .delete_group(GroupId(id))
+                .await
+        }
+
+        mutation DELETE_INSTANCE[app, id: i32] {
+            app.instance_manager()
+                .delete_instance(InstanceId(id))
                 .await
         }
 
@@ -54,6 +74,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
+            app.instance_manager()
+                .update_instance(
+                    InstanceId(details.instance),
+                    details.name,
+                    details.icon.map(|i| i.map(PathBuf::from))
+                )
+                .await
+        }
+
         query INSTANCE_DETAILS[app, id: i32] {
             app.instance_manager()
                 .instance_details(InstanceId(id))
@@ -61,6 +91,40 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(InstanceDetails::from)
         }
     }
+}
+
+#[derive(Type, Deserialize)]
+struct CreateInstance {
+    group: i32,
+    name: String,
+    icon: Option<String>,
+    version: CreateInstanceVersion,
+}
+
+#[derive(Type, Deserialize)]
+struct UpdateInstance {
+    instance: i32,
+    name: Option<String>,
+    icon: Option<Option<String>>,
+    // version
+}
+
+#[derive(Type, Deserialize)]
+enum CreateInstanceVersion {
+    Version(GameVersion),
+    // Modpack
+}
+
+#[derive(Type, Deserialize)]
+enum GameVersion {
+    Standard(StandardVersion),
+    // Custom(json)
+}
+
+#[derive(Type, Deserialize)]
+struct StandardVersion {
+    release: String,
+    modloaders: HashSet<ModLoader>,
 }
 
 #[derive(Type, Deserialize)]
@@ -92,13 +156,13 @@ pub struct InstanceDetails {
     pub notes: String,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ModLoader {
     pub type_: ModLoaderType,
     pub version: String,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModLoaderType {
     Forge,
     Fabirc,
@@ -132,6 +196,49 @@ impl From<domain::ModLoaderType> for ModLoaderType {
         match value {
             domain::ModLoaderType::Forge => Self::Forge,
             domain::ModLoaderType::Fabirc => Self::Fabirc,
+        }
+    }
+}
+
+impl From<CreateInstanceVersion> for manager::InstanceVersionSouce {
+    fn from(value: CreateInstanceVersion) -> Self {
+        match value {
+            CreateInstanceVersion::Version(v) => Self::Version(v.into()),
+        }
+    }
+}
+
+impl From<GameVersion> for domain::info::GameVersion {
+    fn from(value: GameVersion) -> Self {
+        match value {
+            GameVersion::Standard(v) => Self::Standard(v.into()),
+        }
+    }
+}
+
+impl From<StandardVersion> for domain::info::StandardVersion {
+    fn from(value: StandardVersion) -> Self {
+        Self {
+            release: value.release,
+            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<ModLoader> for domain::info::ModLoader {
+    fn from(value: ModLoader) -> Self {
+        Self {
+            type_: value.type_.into(),
+            version: value.version,
+        }
+    }
+}
+
+impl From<ModLoaderType> for domain::info::ModLoaderType {
+    fn from(value: ModLoaderType) -> Self {
+        match value {
+            ModLoaderType::Forge => Self::Forge,
+            ModLoaderType::Fabirc => Self::Fabric,
         }
     }
 }
