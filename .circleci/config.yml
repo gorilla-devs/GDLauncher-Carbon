@@ -317,13 +317,13 @@ jobs:
           condition:
             equal: ["release", << pipeline.git.branch >>]
           steps:
-            run: pnpm build:linux-x64-prod
+            - run: pnpm build:linux-x64-prod
       - when:
           condition:
             not:
               equal: ["release", << pipeline.git.branch >>]
           steps:
-            run: pnpm build:linux-x64
+            - run: pnpm build:linux-x64
       - run:
           command: pnpm lint
           environment:
