@@ -7,39 +7,46 @@ use std::collections::HashMap;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        mutation SEND_EVENT[app, event: Event] {
-            app.metrics_manager().track_event(event.into()).await;
+        mutation SEND_EVENT[app, event: FEEvent] {
+            app.metrics_manager().track_event(event.into()).await?;
             Ok(())
          }
-        mutation SEND_PAGEVIEW[app, pageview: Pageview] {
-            app.metrics_manager().track_pageview(pageview.into()).await;
+        mutation SEND_PAGEVIEW[app, pageview: FEPageview] {
+            app.metrics_manager().track_pageview(pageview.into()).await?;
             Ok(())
          }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-pub struct Event {
-    pub name: String,
+pub enum FEEventName {
+    AppClosed,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct FEEvent {
+    pub name: FEEventName,
     pub properties: HashMap<String, String>,
 }
 
-impl From<Event> for crate::domain::metrics::Event {
-    fn from(event: Event) -> Self {
+impl From<FEEvent> for crate::domain::metrics::Event {
+    fn from(event: FEEvent) -> Self {
         Self {
-            name: event.name,
+            name: match event.name {
+                FEEventName::AppClosed => crate::domain::metrics::EventName::AppClosed,
+            },
             properties: event.properties,
         }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-pub struct Pageview {
+pub struct FEPageview {
     pub path: String,
 }
 
-impl From<Pageview> for crate::domain::metrics::Pageview {
-    fn from(pageview: Pageview) -> Self {
+impl From<FEPageview> for crate::domain::metrics::Pageview {
+    fn from(pageview: FEPageview) -> Self {
         Self {
             path: pageview.path,
         }

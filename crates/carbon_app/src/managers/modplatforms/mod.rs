@@ -1,6 +1,6 @@
 use reqwest::{Certificate, Identity};
 
-use crate::managers::GDL_API_BASE;
+use crate::{iridium_client::get_client, managers::GDL_API_BASE};
 
 use super::ManagerRef;
 
@@ -10,19 +10,6 @@ impl ModplatformsManager {
     pub fn new() -> Self {
         Self {}
     }
-}
-
-#[cfg(feature = "iridium_lib")]
-#[inline(always)]
-fn get_client() -> reqwest_middleware::ClientWithMiddleware {
-    iridium::get_client()
-}
-
-#[cfg(not(feature = "iridium_lib"))]
-#[inline(always)]
-fn get_client() -> reqwest_middleware::ClientWithMiddleware {
-    let client = reqwest::Client::builder().build().unwrap();
-    reqwest_middleware::ClientBuilder::new(client).build()
 }
 
 impl ManagerRef<'_, ModplatformsManager> {

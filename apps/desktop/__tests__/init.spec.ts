@@ -76,6 +76,10 @@ test.describe("Init Tests", () => {
     let loadingInnerText = await (
       await page.$("#appLoadingState")
     )?.innerHTML();
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    loadingInnerText = await (await page.$("#appLoadingState"))?.innerHTML();
     expect(loadingInnerText).toBe("Loading...");
 
     await new Promise((resolve) => setTimeout(resolve, 2000));

@@ -21,6 +21,7 @@ mod error;
 pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
+mod iridium_client;
 mod once_send;
 mod runtime_path_override;
 

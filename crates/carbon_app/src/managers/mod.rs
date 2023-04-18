@@ -1,13 +1,17 @@
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
+use crate::domain::metrics::{Event, EventName};
+use crate::iridium_client::get_client;
 use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
+use tokio::runtime::Handle;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
@@ -130,6 +134,26 @@ mod app {
         pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
             self.invalidation_channel.subscribe().recv().await
         }
+    }
+}
+
+impl Drop for AppInner {
+    fn drop(&mut self) {
+        let close_event = Event {
+            name: EventName::AppClosed,
+            properties: HashMap::new(),
+        };
+
+        let client = get_client();
+
+        Handle::current().block_on(async move {
+            println!("Collecting metric for app close");
+            let res = self.metrics_manager.track_event(client, close_event).await;
+            match res {
+                Ok(_) => println!("Successfully collected metric for app close"),
+                Err(e) => println!("Error collecting metric for app close: {e}"),
+            }
+        });
     }
 }
 
