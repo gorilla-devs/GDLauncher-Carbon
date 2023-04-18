@@ -26,7 +26,7 @@
     "build:mac-x64-prod": "cargo build -p core_module --profile=production --features iridium_lib --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && turbo run build -- --x64 --mac -- --production",
     "build:mac-arm64-prod": "cargo build -p core_module --profile=production --features iridium_lib --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --arm64 --mac -- --production",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
-    "test": "pnpm test && cargo test",
+    "test": "turbo run test && cargo test",
     "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "lint-desktop": "turbo run lint --filter @gd/desktop",
     "rspc-bindings:generate": "cargo test -p core_module generate_rspc_ts_bindings -- --exact",
