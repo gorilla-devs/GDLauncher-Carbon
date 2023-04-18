@@ -2,6 +2,7 @@
 name = "carbon_net"
 version = "0.1.0"
 edition = "2021"
+author = "GorillaDevs Inc."
 
 [lib]
 crate-type = ["lib"]

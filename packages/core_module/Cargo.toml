@@ -2,6 +2,7 @@
 edition = "2021"
 name = "core_module"
 version = "0.1.0"
+author = "GorillaDevs Inc."
 
 [dependencies]
 carbon_app = { path = "../../crates/carbon_app" }
