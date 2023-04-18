@@ -35,7 +35,7 @@ jobs:
       - when:
           condition:
             and:
-              - equal: ["mac", <<parameters.os>>]
+              equal: ["mac", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
@@ -56,12 +56,12 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-x64-prod
             - unless:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-x64
             - run:
@@ -74,7 +74,7 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
@@ -90,7 +90,7 @@ jobs:
       - when:
           condition:
             and:
-              - equal: ["macm1", <<parameters.os>>]
+              equal: ["macm1", <<parameters.os>>]
           steps:
             - run: |
                 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain=1.68.2
@@ -112,12 +112,12 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-arm64-prod
             - unless:
                 condition:
-                  - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-arm64
             - run:
@@ -130,7 +130,7 @@ jobs:
                   # RUSTFLAGS: -D warnings
             - when:
                 condition:
-                  - - equal: ["release", << pipeline.git.branch >>]
+                  equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run:
                       name: "Upload debug info to sentry"
@@ -198,7 +198,7 @@ jobs:
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 command: |
@@ -210,7 +210,7 @@ jobs:
                   # RUSTFLAGS: -D warnings
       - unless:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 command: |
@@ -238,7 +238,7 @@ jobs:
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 name: "Upload debug info to sentry"
@@ -312,12 +312,12 @@ jobs:
             # RUSTFLAGS: -D warnings
       - when:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run: pnpm build:linux-x64-prod
       - unless:
           condition:
-            - equal: ["release", << pipeline.git.branch >>]
+            equal: ["release", << pipeline.git.branch >>]
           steps:
             - run: pnpm build:linux-x64
       - run:
