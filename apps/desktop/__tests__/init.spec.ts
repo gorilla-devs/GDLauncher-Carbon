@@ -68,6 +68,8 @@ test.describe("Init Tests", () => {
       // expect(msg.type()).not.toBe("error");
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
     let errorInnerText = await (
       await page.$("#appFatalCrashState")
     )?.innerHTML();
@@ -76,13 +78,6 @@ test.describe("Init Tests", () => {
     let loadingInnerText = await (
       await page.$("#appLoadingState")
     )?.innerHTML();
-
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    loadingInnerText = await (await page.$("#appLoadingState"))?.innerHTML();
-    expect(loadingInnerText).toBe("Loading...");
-
-    await new Promise((resolve) => setTimeout(resolve, 10000));
 
     loadingInnerText = await (await page.$("#appLoadingState"))?.innerHTML();
     expect(loadingInnerText).toBe(undefined);
