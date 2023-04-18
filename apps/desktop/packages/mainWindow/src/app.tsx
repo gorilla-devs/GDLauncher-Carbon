@@ -19,10 +19,10 @@ const App = (props: Props) => {
 
   initThemes();
 
-  let data = rspc.createQuery(() => ["account.getActiveUuid"]);
-  useBeforeLeave(() => {
-    if (!data.data) navigate("/");
-  });
+  // let data = rspc.createQuery(() => ["account.getActiveUuid"]);
+  // useBeforeLeave(() => {
+  //   if (!data.data) navigate("/");
+  // });
 
   return (
     <div class="w-screen relative">
