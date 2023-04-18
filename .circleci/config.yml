@@ -62,7 +62,7 @@ jobs:
             - when:
                 condition:
                   - not:
-                      - equal: ["release", << pipeline.git.branch >>]
+                      equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-x64
             - run:
@@ -119,7 +119,7 @@ jobs:
             - when:
                 condition:
                   - not:
-                      - equal: ["release", << pipeline.git.branch >>]
+                      equal: ["release", << pipeline.git.branch >>]
                 steps:
                   - run: pnpm build:mac-arm64
             - run:
@@ -213,7 +213,7 @@ jobs:
       - when:
           condition:
             - not:
-                - equal: ["release", << pipeline.git.branch >>]
+                equal: ["release", << pipeline.git.branch >>]
           steps:
             - run:
                 command: |
@@ -313,10 +313,17 @@ jobs:
           command: pnpm codegen
           environment:
             # RUSTFLAGS: -D warnings
-      - run:
-          command: pnpm build:linux-x64
-          environment:
-            # RUSTFLAGS: -D warnings
+      - when:
+          condition:
+            - equal: ["release", << pipeline.git.branch >>]
+          steps:
+            - run: pnpm build:linux-x64-prod
+      - when:
+          condition:
+            - not:
+                equal: ["release", << pipeline.git.branch >>]
+          steps:
+            - run: pnpm build:linux-x64
       - run:
           command: pnpm lint
           environment:
