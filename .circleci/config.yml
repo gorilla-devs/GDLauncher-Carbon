@@ -8,11 +8,7 @@ executors:
   linux:
     docker:
       - image: cimg/rust:1.68.2-browsers
-    resource_class: large
-  website:
-    docker:
-      - image: cimg/rust:1.68.2-node
-    resource_class: small
+    resource_class: xlarge
   mac:
     macos:
       xcode: "14.2.0"
