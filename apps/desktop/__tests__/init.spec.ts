@@ -96,12 +96,12 @@ test.describe("Init Tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const errorInnerText = await (
-      await page.locator("#appFatalCrashState")
+      await page.$("#appFatalCrashState")
     )?.innerHTML();
     expect(errorInnerText).toBe(undefined);
 
     const loadingInnerText = await (
-      await page.locator("#appLoadingState")
+      await page.$("#appLoadingState")
     )?.innerHTML();
     expect(loadingInnerText).toBe(undefined);
 
