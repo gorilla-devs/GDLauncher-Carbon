@@ -71,11 +71,11 @@ mod test {
     #[ignore]
     #[allow(clippy::assertions_on_constants)]
     fn verify_iridium_feature() {
-        #[cfg(feature = "iridium_lib")]
+        #[cfg(feature = "production")]
         {
             assert!(true);
         }
-        #[cfg(not(feature = "iridium_lib"))]
+        #[cfg(not(feature = "production"))]
         {
             assert!(false);
         }

@@ -67,7 +67,7 @@ jobs:
                 # environment:
                 # RUSTFLAGS: -D warnings
             - run:
-                command: pnpm test -- --features iridium_lib -- --include-ignored
+                command: pnpm test -- --features production -- --include-ignored
                 # environment:
                 # RUSTFLAGS: -D warnings
             - when:
@@ -121,7 +121,7 @@ jobs:
                 # environment:
                 # RUSTFLAGS: -D warnings
             - run:
-                command: pnpm test -- --features iridium_lib -- --include-ignored
+                command: pnpm test -- --features production -- --include-ignored
                 # environment:
                 # RUSTFLAGS: -D warnings
             - when:
@@ -227,7 +227,7 @@ jobs:
       - run:
           command: |
             export PATH="$HOME/.cargo/bin:$PATH"
-            pnpm test -- --features iridium_lib -- --include-ignored
+            pnpm test -- --features production -- --include-ignored
           shell: bash.exe
           environment:
             CARGO_NET_GIT_FETCH_WITH_CLI: "true"
@@ -279,7 +279,7 @@ jobs:
           # environment:
           # RUSTFLAGS: -D warnings
       - run:
-          command: pnpm test -- --features iridium_lib -- --include-ignored
+          command: pnpm test -- --features production -- --include-ignored
           # environment:
           # RUSTFLAGS: -D warnings
       - run:
@@ -321,7 +321,7 @@ jobs:
           # environment:
           # RUSTFLAGS: -D warnings
       - run:
-          command: pnpm test -- --features iridium_lib -- --include-ignored
+          command: pnpm test -- --features production -- --include-ignored
           # environment:
           # RUSTFLAGS: -D warnings
       - run:
