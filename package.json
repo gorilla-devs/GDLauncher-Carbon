@@ -33,12 +33,14 @@
     "prisma:studio": "npx prisma studio --schema ./crates/carbon_app/prisma/schema.prisma",
     "prisma:generate": "cargo run -p prisma-cli -- generate --schema=./crates/carbon_app/prisma/schema.prisma",
     "prisma:migrate": "cargo run -p prisma-cli -- migrate dev --schema=./crates/carbon_app/prisma/schema.prisma",
-    "prisma:reset": "cargo run -p prisma-cli -- migrate reset --force --schema=./crates/carbon_app/prisma/schema.prisma"
+    "prisma:reset": "cargo run -p prisma-cli -- migrate reset --force --schema=./crates/carbon_app/prisma/schema.prisma",
+    "sentry-cli": "sentry-cli"
   },
   "devDependencies": {
+    "@sentry/cli": "^2.17.3",
     "bundlewatch": "^0.3.3",
-    "turbo": "^1.7.0",
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "turbo": "^1.7.0"
   },
   "engines": {
     "pnpm": "8.1.1",
