@@ -1,3 +1,7 @@
+// Intentionally putting this on top to catch any potential error in dependencies as well
+
+process.on("uncaughtException", handleUncaughtException);
+
 import {
   app,
   BrowserWindow,
@@ -8,15 +12,14 @@ import {
   screen,
   ipcMain,
 } from "electron";
-import {
-  setupTitlebar,
-  attachTitlebarToWindow,
-} from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
-import loadCoreModule from "./core_module_loader";
+import "./cli";
 import { autoUpdater } from "electron-updater";
+import coreModule from "./core_module_loader";
 import "./preloadListeners";
+import getAdSize from "./adSize";
+import handleUncaughtException from "./handleUncaughtException";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
@@ -28,13 +31,6 @@ if (release().startsWith("6.1")) app.disableHardwareAcceleration();
 // Set application name for Windows 10+ notifications
 if (process.platform === "win32") app.setAppUserModelId(app.getName());
 
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-  process.exit(0);
-}
-
-const coreModule = loadCoreModule();
-
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient("gdlauncher", process.execPath, [
@@ -45,66 +41,10 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-setupTitlebar();
-
 let win: BrowserWindow | null = null;
 
 const menu = Menu.buildFromTemplate([]);
 Menu.setApplicationMenu(menu);
-
-function getAdSize() {
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
-
-  if (width <= 800 || height <= 600) {
-    // Smaller ads (160/600)
-    return {
-      minWidth: 760,
-      minHeight: 500,
-      width: 760,
-      height: 500,
-      adSize: {
-        width: 160,
-        height: 600,
-      },
-    };
-  } else if (width < 1000 || height < 800) {
-    // Smaller ads (160/600)
-    return {
-      minWidth: 800,
-      minHeight: 600,
-      width: 800,
-      height: 600,
-      adSize: {
-        width: 160,
-        height: 600,
-      },
-    };
-  } else if (width < 1500 || height < 870) {
-    // Smaller ads (160/600)
-    return {
-      minWidth: 1160,
-      minHeight: 670,
-      width: 1160,
-      height: 670,
-      adSize: {
-        width: 160,
-        height: 600,
-      },
-    };
-  } else {
-    return {
-      minWidth: 1280,
-      minHeight: 740,
-      width: 1560,
-      height: 740,
-      adSize: {
-        width: 300,
-        height: 250,
-      },
-    };
-  }
-}
 
 async function createWindow() {
   const { minWidth, minHeight, width, height } = getAdSize();
@@ -115,12 +55,14 @@ async function createWindow() {
     height,
     minWidth,
     width,
-    titleBarStyle: "hidden",
-    frame: false,
+    titleBarStyle: "default",
+    frame: true,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
+      nodeIntegration: false,
+      contextIsolation: true,
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
@@ -178,14 +120,10 @@ async function createWindow() {
       allowUnstableReleases = true;
     }
   });
-  }
-
-  attachTitlebarToWindow(win);
 
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
-    // 🚧 Use ['ENV_NAME'] avoid vite:define plugin
     const url = `http://${import.meta.env.VITE_DEV_SERVER_HOST}:${
       import.meta.env.VITE_DEV_MAIN_WINDOW_PORT
     }`;
@@ -201,10 +139,6 @@ async function createWindow() {
       console.log("Opening dev tools");
       win?.webContents.openDevTools();
     }
-  });
-
-  ipcMain.handle("getCoreModuleStatus", async () => {
-    return coreModule;
   });
 
   win.on("ready-to-show", () => {

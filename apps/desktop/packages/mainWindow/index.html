@@ -67,8 +67,7 @@
         will-change: transform; */
       }
 
-      #appLoadingState,
-      #appFatalCrashState {
+      .appFatalCrash {
         position: fixed;
         top: 0;
         left: 0;
@@ -112,7 +111,7 @@
       "
     ></div>
     <div id="root"></div>
-    <div id="appLoadingState">Loading...</div>
+    <div id="appFatalCrash"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

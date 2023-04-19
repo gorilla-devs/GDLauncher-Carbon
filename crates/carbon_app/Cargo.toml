@@ -2,6 +2,7 @@
 name = "carbon_app"
 version = "0.0.0"
 edition = "2021"
+author = "GorillaDevs Inc."
 
 [lib]
 crate-type = ["lib"]
@@ -66,4 +67,4 @@ serde_json = { workspace = true }
 dotenvy = { workspace = true }
 
 [features]
-iridium_lib = ["iridium"]
+production = ["iridium"]

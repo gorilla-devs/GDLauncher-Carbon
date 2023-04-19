@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createResource, onMount } from "solid-js";
+import { For, Show, createEffect, onMount } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -9,7 +9,7 @@ import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
-import { rspc } from "@/utils/rspcClient";
+import { port, rspc } from "@/utils/rspcClient";
 import updateAvailable, { checkForUpdates } from "@/utils/updaterhelper";
 
 type EnrollStatusResult = Extract<
@@ -44,11 +44,6 @@ const AppNavbar = () => {
 
   const routeData = useRouteData<typeof fetchData>();
 
-  const [port] = createResource(async () => {
-    let port = await window.getCoreModuleStatus();
-    return port;
-  });
-
   createEffect(() => {
     const mappedAccounts = routeData.accounts.data?.map((account) => {
       const accountStatusQuery = rspc.createQuery(() => [
@@ -59,9 +54,7 @@ const AppNavbar = () => {
       return {
         label: {
           name: account?.username,
-          icon: `http://localhost:${port()}/account/headImage?uuid=${
-            account.uuid
-          }`,
+          icon: `http://localhost:${port}/account/headImage?uuid=${account.uuid}`,
           uuid: account.uuid,
           type: account.type,
           status: accountStatusQuery.data,

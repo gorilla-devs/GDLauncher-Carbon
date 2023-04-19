@@ -1,18 +1,11 @@
 import { contextBridge } from "electron";
-import { Titlebar, Color } from "custom-electron-titlebar";
 import { domReady } from "./utils";
 
 let oDiv: HTMLDivElement;
 function useLoading() {
   return {
-    updateLoading(loaded: number, total: number) {
-      oDiv!.innerHTML = `<div>Loaded ${loaded} / ${total} modules</div>`;
-    },
-    async clearLoading() {
-      oDiv.remove();
-    },
     fatalError(error: string, moduleName?: string) {
-      oDiv.id = "appFatalCrashState";
+      oDiv.classList.add("appFatalCrash");
       if (moduleName) {
         const errorText = `<div style="margin-top: 1.5rem; font-size: 1.3rem; font-weight: 400;">${error}</div>`;
         oDiv.innerHTML = `<div><div>Couldn't load module "${moduleName}"</div>${errorText}</div>`;
@@ -23,19 +16,12 @@ function useLoading() {
   };
 }
 
-const { clearLoading, fatalError, updateLoading } = useLoading();
+const { fatalError } = useLoading();
 
 (async () => {
   await domReady();
-  oDiv = document.querySelector("#appLoadingState")!;
-  new Titlebar({
-    containerOverflow: "visible",
-    backgroundColor: Color.fromHex("#15181E"),
-    icon: " ",
-  });
+  oDiv = document.querySelector("#appFatalCrash")!;
 })();
 
 // --------- Expose some API to the Renderer process. ---------
-contextBridge.exposeInMainWorld("updateLoading", updateLoading);
-contextBridge.exposeInMainWorld("clearLoading", clearLoading);
 contextBridge.exposeInMainWorld("fatalError", fatalError);

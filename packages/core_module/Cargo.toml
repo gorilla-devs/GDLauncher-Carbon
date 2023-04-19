@@ -2,6 +2,7 @@
 edition = "2021"
 name = "core_module"
 version = "0.1.0"
+author = "GorillaDevs Inc."
 
 [dependencies]
 carbon_app = { path = "../../crates/carbon_app" }
@@ -14,4 +15,4 @@ carbon_app = { path = "../../crates/carbon_app" }
 
 [features]
 default = []
-iridium_lib = ["carbon_app/iridium_lib"]
+production = ["carbon_app/production"]

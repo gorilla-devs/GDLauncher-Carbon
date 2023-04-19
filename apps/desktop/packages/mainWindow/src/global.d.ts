@@ -5,9 +5,7 @@ import { BoundsSize } from "./utils/adhelper";
 
 declare global {
   interface Window {
-    clearLoading: () => void;
     fatalError: (error: string, moduleName?: string) => void;
-    updateLoading: (loaded: number, total: number) => void;
     ipcRenderer: import("electron").IpcRenderer;
     report: any;
     getAdSize: () => Promise<BoundsSize>;
@@ -22,7 +20,7 @@ declare global {
     releaseChannel: (releaseChannel: string) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
-    getCoreModuleStatus: () => Promise<void>;
+    getCoreModulePort: () => Promise<number>;
   }
 }
 
