@@ -96,12 +96,12 @@ test.describe("Init Tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
     const errorInnerText = await (
-      await page.waitForSelector("#appFatalCrashState")
+      await page.locator("#appFatalCrashState")
     )?.innerHTML();
     expect(errorInnerText).toBe(undefined);
 
     const loadingInnerText = await (
-      await page.waitForSelector("#appLoadingState")
+      await page.locator("#appLoadingState")
     )?.innerHTML();
     expect(loadingInnerText).toBe(undefined);
 
@@ -121,4 +121,6 @@ test.describe("Init Tests", () => {
     const currentUrl = await page.url();
     expect(getActualUrl(currentUrl)).toBe("/");
   });
+
+  // Also test missing core_module
 });
