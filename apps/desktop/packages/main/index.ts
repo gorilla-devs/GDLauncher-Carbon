@@ -16,7 +16,7 @@ import {
 } from "electron";
 import { release } from "os";
 import { join, resolve } from "path";
-import loadCoreModule from "./core_module_loader";
+import coreModule from "./core_module_loader";
 import "./preloadListeners";
 
 if ((app as any).overwolf) {
@@ -29,12 +29,11 @@ if (release().startsWith("6.1")) app.disableHardwareAcceleration();
 // Set application name for Windows 10+ notifications
 if (process.platform === "win32") app.setAppUserModelId(app.getName());
 
+// Allow for testing
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
 }
-
-const coreModule = loadCoreModule();
 
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
@@ -160,10 +159,6 @@ async function createWindow() {
       console.log("Opening dev tools");
       win?.webContents.openDevTools();
     }
-  });
-
-  ipcMain.handle("getCoreModuleStatus", async () => {
-    return coreModule;
   });
 
   win.on("ready-to-show", () => {

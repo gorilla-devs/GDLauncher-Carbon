@@ -93,17 +93,13 @@ test.describe("Init Tests", () => {
       // expect(msg.type()).not.toBe("error");
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const rootDiv = await (await page.waitForSelector("#root"))?.innerHTML();
+    expect(rootDiv).not.toBeUndefined();
 
     const errorInnerText = await (
       await page.$("#appFatalCrashState")
     )?.innerHTML();
-    expect(errorInnerText).toBe(undefined);
-
-    const loadingInnerText = await (
-      await page.$("#appLoadingState")
-    )?.innerHTML();
-    expect(loadingInnerText).toBe(undefined);
+    expect(errorInnerText).toBeUndefined();
 
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");

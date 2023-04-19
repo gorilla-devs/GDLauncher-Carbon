@@ -1,6 +1,7 @@
 import path from "path";
 import os from "os";
 import { spawn } from "child_process";
+import { ipcMain } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
 
@@ -72,4 +73,10 @@ const loadCoreModule: CoreModule = () =>
     });
   });
 
-export default loadCoreModule;
+const coreModule = loadCoreModule();
+
+ipcMain.handle("getCoreModulePort", async () => {
+  return coreModule;
+});
+
+export default coreModule;
