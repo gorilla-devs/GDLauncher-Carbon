@@ -68,6 +68,7 @@ keys! {
     }
 
     instance {
+        DEFAULT_GROUP                 = "getDefaultGroup";
         GET_GROUPS                    = "getGroups";
         CREATE_GROUP                  = "createGroup";
         CREATE_INSTANCE               = "createInstance";

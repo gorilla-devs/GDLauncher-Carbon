@@ -20,6 +20,12 @@ use crate::managers::instance::{self as manager, GroupId, InstanceId};
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
+        query DEFAULT_GROUP[app, _: ()] {
+            Ok(*app.instance_manager()
+                .get_default_group()
+                .await?)
+        }
+
         query GET_GROUPS[app, _: ()] {
             app.instance_manager()
                 .list_groups()
