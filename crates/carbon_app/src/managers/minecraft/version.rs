@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use carbon_domain::{
+use crate::domain::{
     maven::MavenCoordinates,
     minecraft::{
         manifest::ManifestVersion,
@@ -391,7 +391,10 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use carbon_domain::minecraft::manifest::MinecraftManifest;
+    use crate::{
+        domain::minecraft::manifest::MinecraftManifest, managers::minecraft::manifest,
+        setup_managers_for_test,
+    };
     use carbon_net::Progress;
     use chrono::Utc;
 
@@ -407,16 +410,21 @@ mod tests {
     // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
-        let manifest = MinecraftManifest::fetch().await.unwrap();
-
-        let version = manifest
-            .versions
-            .into_iter()
-            .find(|v| v.id == "1.16.5")
-            .unwrap()
-            .fetch()
+        let app = setup_managers_for_test().await;
+        let runtime_path = &app.settings_manager().runtime_path;
+        let manifest = manifest::get_meta(app.reqwest_client.clone())
             .await
             .unwrap();
+
+        let version = manifest.into_iter().find(|v| v.id == "1.16.5").unwrap();
+
+        let version = get_meta(
+            app.reqwest_client.clone(),
+            version,
+            runtime_path.get_versions().get_clients_path().to_path_buf(),
+        )
+        .await
+        .unwrap();
 
         let full_account = FullAccount {
             username: "test".to_owned(),
@@ -426,7 +434,6 @@ mod tests {
         };
 
         // Mock RuntimePath to have a stable path
-        let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
 
         let instance_id = "something";
 
@@ -457,15 +464,18 @@ mod tests {
 
         let runtime_path = &app.settings_manager().runtime_path;
 
-        let manifest = MinecraftManifest::fetch().await.unwrap();
-        let version = manifest
-            .versions
-            .into_iter()
-            .find(|v| v.id == "1.16.5")
-            .unwrap()
-            .fetch()
+        let manifest = manifest::get_meta(app.reqwest_client.clone())
             .await
             .unwrap();
+        let version = manifest.into_iter().find(|v| v.id == "1.16.5").unwrap();
+
+        let version = get_meta(
+            app.reqwest_client.clone(),
+            version,
+            runtime_path.get_versions().get_clients_path().to_path_buf(),
+        )
+        .await
+        .unwrap();
 
         let libraries = version.libraries.get_allowed_libraries();
 

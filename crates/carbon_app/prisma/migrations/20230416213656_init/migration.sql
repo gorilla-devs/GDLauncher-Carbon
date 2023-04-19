@@ -12,7 +12,8 @@ CREATE TABLE "AppConfiguration" (
     "startupResolution" TEXT NOT NULL DEFAULT '854x480',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
     "xmx" INTEGER NOT NULL DEFAULT 1024,
-    "xms" INTEGER NOT NULL DEFAULT 1024
+    "xms" INTEGER NOT NULL DEFAULT 1024,
+    "defaultInstanceGroup" INTEGER
 );
 
 -- CreateTable
@@ -64,6 +65,23 @@ CREATE TABLE "ActiveDownloads" (
     "file_id" TEXT NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "Instance" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "shortpath" TEXT NOT NULL,
+    "index" INTEGER NOT NULL,
+    "groupId" INTEGER NOT NULL,
+    CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InstanceGroup" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "groupIndex" INTEGER NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "AppConfiguration_id_key" ON "AppConfiguration"("id");
 
@@ -75,3 +93,6 @@ CREATE UNIQUE INDEX "DefaultJava_major_key" ON "DefaultJava"("major");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");

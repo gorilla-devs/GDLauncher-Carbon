@@ -429,6 +429,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-test",
+ "trash",
  "uuid",
  "winreg",
 ]

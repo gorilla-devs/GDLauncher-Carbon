@@ -1,12 +1,17 @@
 use anyhow::anyhow;
-use carbon_domain::minecraft::manifest::ManifestVersion;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
+
+use crate::domain::minecraft::manifest::ManifestVersion;
 
 use super::ManagerRef;
 
 mod assets;
 mod manifest;
 mod version;
+
+pub const MC_MANIFEST_META_URL: &str = "https://meta.modrinth.com/minecraft/v0/manifest.json";
+pub const FORGE_MANIFEST_META_URL: &str = "https://meta.modrinth.com/forge/v0/manifest.json";
+pub const FABRIC_MANIFEST_META_URL: &str = "https://meta.modrinth.com/fabric/v0/manifest.json";
 
 pub(crate) struct MinecraftManager {}
 
@@ -85,7 +90,7 @@ mod tests {
     // #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     // async fn test_download_minecraft() {
     //     use crate::managers::minecraft::version::extract_natives;
-    //     use carbon_domain::minecraft::manifest::MinecraftManifest;
+    //     use crate::domain::minecraft::manifest::MinecraftManifest;
     //     use carbon_net::Progress;
 
     //     let app = crate::setup_managers_for_test().await;

@@ -50,6 +50,8 @@ hyper = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
 iridium = { path = "../iridium", optional = true }
+tempdir = { workspace = true }
+trash = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
@@ -58,7 +60,6 @@ winreg = { workspace = true }
 
 
 [dev-dependencies]
-tempdir = { workspace = true }
 ntest = { workspace = true }
 
 [build-dependencies]

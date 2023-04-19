@@ -12,12 +12,14 @@ use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
+use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
 mod cache_manager;
 pub mod download;
+pub mod instance;
 pub mod java;
 mod minecraft;
 mod modplatforms;
@@ -43,6 +45,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        instance_manager: InstanceManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
@@ -85,6 +88,7 @@ mod app {
                     account_manager: AccountManager::new(),
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
+                    instance_manager: InstanceManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
                     prisma_client: Arc::new(db_client),
@@ -98,6 +102,12 @@ mod app {
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
+            let app2 = app.clone();
+            tokio::spawn(async move {
+                // ignore scanning errors instead of taking down the launcher
+                let _ = app2.clone().instance_manager().scan_instances().await;
+            });
+
             app
         }
 
@@ -108,6 +118,7 @@ mod app {
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
+        manager_getter!(instance_manager: InstanceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
@@ -130,7 +141,7 @@ mod app {
 pub use app::AppInner;
 
 pub struct ManagerRef<'a, T> {
-    manager: &'a T,
+    pub manager: &'a T,
     pub app: &'a Arc<AppInner>,
 }
 

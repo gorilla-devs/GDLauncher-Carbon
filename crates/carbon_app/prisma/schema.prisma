@@ -22,6 +22,7 @@ model AppConfiguration {
   javaCustomArgs      String  @default("")
   xmx                 Int     @default(1024)
   xms                 Int     @default(1024)
+  defaultInstanceGroup Int?
 }
 
 // Can't really use relations between java and defaultJava because external instances could refer to java as well
@@ -67,4 +68,20 @@ model HTTPCache {
 model ActiveDownloads {
   url     String @id
   file_id String @unique
+}
+
+model Instance {
+  id        Int            @id @default(autoincrement())
+  name      String
+  shortpath String         @unique
+  index     Int
+  group     InstanceGroup  @relation(fields: [groupId], references: [id])
+  groupId   Int
+}
+
+model InstanceGroup {
+  id         Int        @id @default(autoincrement())
+  name       String
+  groupIndex Int
+  instances  Instance[]
 }

@@ -16,7 +16,7 @@ pub struct CauseSegment {
     pub debug: String,
 }
 
-type AxumError = (axum::http::StatusCode, String);
+pub type AxumError = (axum::http::StatusCode, String);
 
 impl FeError {
     pub fn from_anyhow(error: &anyhow::Error) -> Self {
@@ -71,4 +71,11 @@ impl From<anyhow::Error> for FeError {
     fn from(value: anyhow::Error) -> Self {
         FeError::from_anyhow(&value)
     }
+}
+
+pub fn anyhow_into_rspc(value: anyhow::Error) -> rspc::Error {
+    rspc::Error::new(
+        rspc::ErrorCode::InternalServerError,
+        format!("backend error: {value:#?}"),
+    )
 }
