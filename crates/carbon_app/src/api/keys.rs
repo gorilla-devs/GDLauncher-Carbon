@@ -70,6 +70,7 @@ keys! {
     instance {
         DEFAULT_GROUP                 = "getDefaultGroup";
         GET_GROUPS                    = "getGroups";
+        GET_INSTANCES_UNGROUPED       = "getInstancesUngrouped";
         CREATE_GROUP                  = "createGroup";
         CREATE_INSTANCE               = "createInstance";
         DELETE_GROUP                  = "deleteGroup";

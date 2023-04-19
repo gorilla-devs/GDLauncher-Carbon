@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use http::StatusCode;
+use http::{HeaderMap, HeaderValue, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -27,9 +28,29 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query GET_GROUPS[app, _: ()] {
-            app.instance_manager()
+            Ok(app.instance_manager()
                 .list_groups()
-                .await
+                .await?
+                .into_iter()
+                .map(ListGroup::from)
+                .collect::<Vec<_>>())
+        }
+
+        query GET_INSTANCES_UNGROUPED[app, _: ()] {
+            Ok(app.instance_manager()
+                .list_groups()
+                .await?
+                .into_iter()
+                .flat_map(|group| {
+                    group.instances
+                        .into_iter()
+                        .map(|instance| UngroupedInstance {
+                            favorite: group.name == "localize➽favorite",
+                            instance: instance.into(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>())
         }
 
         mutation CREATE_GROUP[app, name: String] {
@@ -120,12 +141,82 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
                 Ok::<_, AxumError>(match icon {
-                    Some(icon) => (StatusCode::OK, icon),
-                    None => (StatusCode::NOT_FOUND, Vec::new()),
+                    Some((name, icon)) => {
+                        let mut headers = HeaderMap::new();
+                        headers.insert(
+                            "filename",
+                            name.parse::<HeaderValue>()
+                                .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
+                        );
+
+                        (StatusCode::OK, headers, icon)
+                    }
+                    None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
                 })
             },
         ),
     )
+}
+
+#[derive(Type, Serialize)]
+struct ListGroup {
+    id: i32,
+    name: String,
+    instances: Vec<ListInstance>,
+}
+
+#[derive(Type, Serialize)]
+struct ListInstance {
+    id: i32,
+    name: String,
+    status: ListInstanceStatus,
+}
+
+#[derive(Type, Serialize)]
+struct UngroupedInstance {
+    favorite: bool,
+    #[serde(flatten)]
+    instance: ListInstance,
+}
+
+#[derive(Type, Serialize)]
+enum ListInstanceStatus {
+    Valid(ValidListInstance),
+    Invalid(InvalidListInstance),
+}
+
+#[derive(Type, Serialize)]
+struct ValidListInstance {
+    mc_version: String,
+    modloader: Option<ModLoaderType>,
+    modpack_platform: Option<ModpackPlatform>,
+}
+
+#[derive(Type, Serialize)]
+enum ModpackPlatform {
+    Curseforge,
+}
+
+#[derive(Type, Serialize)]
+enum InvalidListInstance {
+    JsonMissing,
+    JsonError(ConfigurationParseError),
+    Other(String),
+}
+
+#[derive(Type, Serialize)]
+struct ConfigurationParseError {
+    type_: ConfigurationParseErrorType,
+    message: String,
+    line: u32,
+    config_text: String,
+}
+
+#[derive(Type, Serialize)]
+enum ConfigurationParseErrorType {
+    Syntax,
+    Data,
+    Eof,
 }
 
 #[derive(Type, Deserialize)]
@@ -217,6 +308,14 @@ impl From<domain::InstanceDetails> for InstanceDetails {
     }
 }
 
+impl From<domain::info::ModpackPlatform> for ModpackPlatform {
+    fn from(value: domain::info::ModpackPlatform) -> Self {
+        match value {
+            domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
+        }
+    }
+}
+
 impl From<domain::ModLoader> for ModLoader {
     fn from(value: domain::ModLoader) -> Self {
         Self {
@@ -274,6 +373,89 @@ impl From<ModLoaderType> for domain::info::ModLoaderType {
         match value {
             ModLoaderType::Forge => Self::Forge,
             ModLoaderType::Fabirc => Self::Fabric,
+        }
+    }
+}
+
+impl From<domain::info::ModLoaderType> for ModLoaderType {
+    fn from(value: domain::info::ModLoaderType) -> Self {
+        match value {
+            domain::info::ModLoaderType::Forge => Self::Forge,
+            domain::info::ModLoaderType::Fabric => Self::Fabirc,
+        }
+    }
+}
+
+impl From<manager::ListGroup> for ListGroup {
+    fn from(value: manager::ListGroup) -> Self {
+        Self {
+            id: *value.id,
+            name: value.name,
+            instances: value.instances.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<manager::ListInstance> for ListInstance {
+    fn from(value: manager::ListInstance) -> Self {
+        Self {
+            id: *value.id,
+            name: value.name,
+            status: value.status.into(),
+        }
+    }
+}
+
+impl From<manager::ListInstanceStatus> for ListInstanceStatus {
+    fn from(value: manager::ListInstanceStatus) -> Self {
+        match value {
+            manager::ListInstanceStatus::Valid(status) => Self::Valid(status.into()),
+            manager::ListInstanceStatus::Invalid(status) => Self::Invalid(status.into()),
+        }
+    }
+}
+
+impl From<manager::ValidListInstance> for ValidListInstance {
+    fn from(value: manager::ValidListInstance) -> Self {
+        Self {
+            mc_version: value.mc_version,
+            modloader: value.modloader.map(Into::into),
+            modpack_platform: value.modpack_platform.map(Into::into),
+        }
+    }
+}
+
+impl From<manager::InvalidListInstance> for InvalidListInstance {
+    fn from(value: manager::InvalidListInstance) -> Self {
+        use manager::InvalidListInstance as manager;
+
+        match value {
+            manager::JsonMissing => Self::JsonMissing,
+            manager::JsonError(e) => Self::JsonError(e.into()),
+            manager::Other(e) => Self::Other(e),
+        }
+    }
+}
+
+impl From<manager::ConfigurationParseError> for ConfigurationParseError {
+    fn from(value: manager::ConfigurationParseError) -> Self {
+        Self {
+            type_: value.type_.into(),
+            message: value.message,
+            line: value.line,
+            config_text: value.config_text,
+        }
+    }
+}
+
+impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType {
+    fn from(value: manager::ConfigurationParseErrorType) -> Self {
+        use manager::ConfigurationParseErrorType as manager;
+
+        match value {
+            manager::Syntax => Self::Syntax,
+            manager::Data => Self::Data,
+            manager::Eof => Self::Eof,
         }
     }
 }
