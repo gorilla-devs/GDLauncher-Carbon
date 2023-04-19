@@ -969,7 +969,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
-    pub async fn instance_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<(String, Vec<u8>)>> {
+    pub async fn instance_icon(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<(String, Vec<u8>)>> {
         let instances = self.instances.read().await;
 
         let instance = instances

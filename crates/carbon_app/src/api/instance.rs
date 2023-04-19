@@ -5,7 +5,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use http::{StatusCode, HeaderMap, HeaderValue};
+use http::{HeaderMap, HeaderValue, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -146,11 +146,11 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         headers.insert(
                             "filename",
                             name.parse::<HeaderValue>()
-                                .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?
+                                .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
                         );
 
                         (StatusCode::OK, headers, icon)
-                    },
+                    }
                     None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
                 })
             },
