@@ -1,5 +1,5 @@
 import { app } from "electron";
-import * as Sentry from "@sentry/electron";
+import * as Sentry from "@sentry/electron/main";
 import handleUncaughtException from "./handleUncaughtException";
 
 const args = process.argv.slice(1);
