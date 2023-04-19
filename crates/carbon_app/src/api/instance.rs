@@ -109,8 +109,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .update_instance(
                     InstanceId(details.instance),
-                    details.name,
-                    details.icon.map(|i| i.map(PathBuf::from))
+                    details.name.into(),
+                    details.icon.into_option().map(|i| i.map(PathBuf::from))
                 )
                 .await
         }
@@ -230,9 +230,30 @@ struct CreateInstance {
 #[derive(Type, Deserialize)]
 struct UpdateInstance {
     instance: i32,
-    name: Option<String>,
-    icon: Option<Option<String>>,
+    name: Update<String>,
+    icon: Update<Option<String>>,
     // version
+}
+
+#[derive(Type, Deserialize)]
+enum Update<T> {
+    Changed(T),
+    Unchanged,
+}
+
+impl<T> Update<T> {
+    fn into_option(self) -> Option<T> {
+        self.into()
+    }
+}
+
+impl<T> Into<Option<T>> for Update<T> {
+    fn into(self) -> Option<T> {
+        match self {
+            Self::Unchanged => None,
+            Self::Changed(v) => Some(v),
+        }
+    }
 }
 
 #[derive(Type, Deserialize)]
