@@ -10,6 +10,11 @@ import fs from "fs";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
 import { getActualUrl } from "./tests_helpers.js";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 let electronApp: ElectronApplication;
 
@@ -24,7 +29,7 @@ const isArm64 = () => {
 };
 
 const getRootPath = () => {
-  let basePath = `./release/`;
+  let basePath = path.resolve(__dirname, "../", "release");
 
   if (process.platform === "win32") {
     basePath = path.join(basePath, "win-unpacked");
@@ -57,6 +62,7 @@ const isCoreModulePresent = () => {
   let rootPath = getRootPath();
 
   if (process.platform === "win32") {
+    console.log(path.join(rootPath, "resources", "core_module.exe"));
     return fs.existsSync(path.join(rootPath, "resources", "core_module.exe"));
   } else if (process.platform === "linux") {
     return fs.existsSync(path.join(rootPath, "resources", "core_module"));

@@ -4,6 +4,9 @@ importers:
 
   .:
     devDependencies:
+      '@sentry/cli':
+        specifier: ^2.17.3
+        version: 2.17.3
       bundlewatch:
         specifier: ^0.3.3
         version: 0.3.3
@@ -4075,6 +4078,22 @@ packages:
       '@sentry/types': 7.46.0
       '@sentry/utils': 7.46.0
       tslib: 1.14.1
+    dev: true
+
+  /@sentry/cli@2.17.3:
+    resolution: {integrity: sha512-/ROsfPcNcmj//Hc3k/g3Q7OFEEJdFCzFFSaaWoUV7k1o1i3+LxV+gCntJ28Og08z8MTSmDiC8kqqdYpuaFqJQg==}
+    engines: {node: '>= 10'}
+    hasBin: true
+    requiresBuild: true
+    dependencies:
+      https-proxy-agent: 5.0.1
+      node-fetch: 2.6.7
+      progress: 2.0.3
+      proxy-from-env: 1.1.0
+      which: 2.0.2
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
     dev: true
 
   /@sentry/core@7.46.0:
@@ -14215,6 +14234,10 @@ packages:
     dependencies:
       forwarded: 0.2.0
       ipaddr.js: 1.9.1
+    dev: true
+
+  /proxy-from-env@1.1.0:
+    resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
     dev: true
 
   /prr@1.0.1:
