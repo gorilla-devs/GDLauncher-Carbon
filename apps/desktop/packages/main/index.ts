@@ -16,6 +16,7 @@ import {
 } from "electron";
 import { release } from "os";
 import { join, resolve } from "path";
+import "./cli";
 import coreModule from "./core_module_loader";
 import "./preloadListeners";
 
