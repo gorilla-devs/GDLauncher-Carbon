@@ -50,11 +50,11 @@ const getBinaryPath = async () => {
   let rootPath = getRootPath();
 
   if (process.platform === "win32") {
-    return path.join(rootPath, "GDLauncher Carbon.exe");
+    return path.join(rootPath, "GDLauncher.exe");
   } else if (process.platform === "linux") {
     return path.join(rootPath, "@gddesktop");
   } else if (process.platform === "darwin") {
-    return path.join(rootPath, "Contents", "MacOS", "GDLauncher Carbon");
+    return path.join(rootPath, "Contents", "MacOS", "GDLauncher");
   }
 };
 
