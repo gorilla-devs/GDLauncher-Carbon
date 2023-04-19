@@ -50,11 +50,11 @@ const getBinaryPath = async () => {
   let rootPath = getRootPath();
 
   if (process.platform === "win32") {
-    return path.join(rootPath, "GDLauncher Carbon.exe");
+    return path.join(rootPath, "GDLauncher.exe");
   } else if (process.platform === "linux") {
     return path.join(rootPath, "@gddesktop");
   } else if (process.platform === "darwin") {
-    return path.join(rootPath, "Contents", "MacOS", "GDLauncher Carbon");
+    return path.join(rootPath, "Contents", "MacOS", "GDLauncher");
   }
 };
 
@@ -62,14 +62,22 @@ const isCoreModulePresent = () => {
   let rootPath = getRootPath();
 
   if (process.platform === "win32") {
-    console.log(path.join(rootPath, "resources", "core_module.exe"));
-    return fs.existsSync(path.join(rootPath, "resources", "core_module.exe"));
+    const core_path = path.join(rootPath, "resources", "core_module.exe");
+    console.log("Core module path:", core_path);
+    return fs.existsSync(core_path);
   } else if (process.platform === "linux") {
-    return fs.existsSync(path.join(rootPath, "resources", "core_module"));
+    const core_path = path.join(rootPath, "resources", "core_module");
+    console.log("Core module path:", core_path);
+    return fs.existsSync(core_path);
   } else if (process.platform === "darwin") {
-    return fs.existsSync(
-      path.join(rootPath, "Contents", "Resources", "core_module")
+    const core_path = path.join(
+      rootPath,
+      "Contents",
+      "Resources",
+      "core_module"
     );
+    console.log("Core module path:", core_path);
+    return fs.existsSync(core_path);
   }
 };
 
