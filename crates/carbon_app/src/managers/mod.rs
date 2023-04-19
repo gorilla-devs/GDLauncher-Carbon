@@ -1,13 +1,17 @@
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
+use crate::domain::metrics::{Event, EventName};
+use crate::iridium_client::get_client;
 use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
+use tokio::runtime::Handle;
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
@@ -19,6 +23,7 @@ pub mod account;
 mod cache_manager;
 pub mod download;
 pub mod java;
+mod metrics;
 mod minecraft;
 mod modplatforms;
 mod prisma_client;
@@ -33,8 +38,10 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
+const GDL_API_BASE: &str = "https://api.gdlauncher.com";
+
 mod app {
-    use super::{java::JavaManager, modplatforms::ModplatformsManager, *};
+    use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
 
     pub struct AppInner {
         settings_manager: SettingsManager,
@@ -43,6 +50,7 @@ mod app {
         account_manager: AccountManager,
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
@@ -85,6 +93,7 @@ mod app {
                     account_manager: AccountManager::new(),
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
+                    metrics_manager: MetricsManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
                     prisma_client: Arc::new(db_client),
@@ -101,6 +110,7 @@ mod app {
             app
         }
 
+        manager_getter!(metrics_manager: MetricsManager);
         manager_getter!(modplatforms_manager: ModplatformsManager);
         manager_getter!(settings_manager: SettingsManager);
         manager_getter!(java_manager: JavaManager);
@@ -123,6 +133,30 @@ mod app {
 
         pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
             self.invalidation_channel.subscribe().recv().await
+        }
+    }
+}
+
+impl Drop for AppInner {
+    fn drop(&mut self) {
+        #[cfg(feature = "production")]
+        #[cfg(not(test))]
+        {
+            let close_event = Event {
+                name: EventName::AppClosed,
+                properties: HashMap::new(),
+            };
+
+            let client = get_client();
+
+            Handle::current().block_on(async move {
+                println!("Collecting metric for app close");
+                let res = self.metrics_manager.track_event(client, close_event).await;
+                match res {
+                    Ok(_) => println!("Successfully collected metric for app close"),
+                    Err(e) => println!("Error collecting metric for app close: {e}"),
+                }
+            });
         }
     }
 }

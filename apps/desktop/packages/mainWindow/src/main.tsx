@@ -17,20 +17,16 @@ queueMicrotask(() => {
 });
 
 render(() => {
-  let allowedToClear = false;
   const [coreModuleLoaded] = createResource(async () => {
-    let port = await window.getCoreModuleStatus();
-    if (allowedToClear) window.clearLoading();
+    let port;
+    try {
+      port = await window.getCoreModulePort();
+    } catch (e) {
+      window.fatalError(e as string, "CoreModule");
+      throw e;
+    }
     return port;
   });
-
-  setTimeout(() => {
-    if (coreModuleLoaded() as unknown as number) {
-      window.clearLoading();
-    } else {
-      allowedToClear = true;
-    }
-  }, 500);
 
   const [i18nInstance] = createResource(async () => {
     const DEFAULT_LANG = "en";

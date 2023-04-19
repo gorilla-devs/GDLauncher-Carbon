@@ -1,25 +1,25 @@
-/// Creates an RSPC router.
-///
-/// Router entries use the form
-///
-/// `<rspc function name> <endpoint key>[<app>, <args>: <args type (optional)>] { ... }`
-///
-/// # Notes
-/// See [keys](crate::api::keys) for endpoint keys
-///
-/// # Examples
-///
-/// ```ignore
-/// router! {
-///     query QUERY_KEY[app, args: MyArgsType] {
-///         todo!()
-///     }
-///
-///     mutation MUTATION_KEY[app, args: MyArgsType] {
-///         todo!()
-///     }
-/// }
-/// ```
+// / Creates an RSPC router.
+// /
+// / Router entries use the form
+// /
+// / `<rspc function name> <endpoint key>[<app>, <args>: <args type (optional)>] { ... }`
+// /
+// / # Notes
+// / See [keys](crate::api::keys) for endpoint keys
+// /
+// / # Examples
+// /
+// / ```ignore
+// / router! {
+// /     query QUERY_KEY[app, args: MyArgsType] {
+// /         todo!()
+// /     }
+// /
+// /     mutation MUTATION_KEY[app, args: MyArgsType] {
+// /         todo!()
+// /     }
+// / }
+// / ```
 macro_rules! router {
     {$($type:ident $(($rtmarker:tt))? $endpoint:path [$app:tt, $args:tt: $args_ty:ty] $block:block)*} => {{
         let mut router = ::rspc::Router::<$crate::managers::App>::new();
