@@ -363,6 +363,10 @@ export const AccountsDropdown = (props: Props) => {
   };
 
   createEffect(() => {
+    if (routeData.accounts.data?.length === 0) navigate("/");
+  });
+
+  createEffect(() => {
     if (routeData.status.isSuccess && !routeData.status.data && expired()) {
       reset();
     }

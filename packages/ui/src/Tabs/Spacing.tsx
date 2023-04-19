@@ -31,7 +31,7 @@ const Spacing = (props: Props) => {
         );
       });
     });
-    observer.observe(ref!);
+    observer?.observe(ref!);
   });
 
   onCleanup(() => {

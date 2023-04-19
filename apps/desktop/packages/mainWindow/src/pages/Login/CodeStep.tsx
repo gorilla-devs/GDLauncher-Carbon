@@ -16,6 +16,7 @@ import { Procedures } from "@gd/core_module";
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
+  setStep: Setter<number>;
 }
 
 type ActiveUUID = Extract<
@@ -140,6 +141,7 @@ const CodeStep = (props: Props) => {
       onFail() {
         setEnrollmentInProgress(false);
         setError("something went wrong while logging in");
+        props.setStep(0);
       },
       onComplete(account) {
         finalizeMutation.mutate(undefined);
