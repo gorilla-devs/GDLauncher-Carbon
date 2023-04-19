@@ -138,7 +138,7 @@ jobs:
     working_directory: ./
     executor:
       name: win/default
-      size: large
+      size: medium
     steps:
       - checkout
       - run: git submodule update --init --recursive
