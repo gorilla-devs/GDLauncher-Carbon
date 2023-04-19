@@ -1,3 +1,9 @@
+// Intentionally putting this on top to catch any potential error in dependencies as well
+process.on("uncaughtException", function (error) {
+  console.log("Uncaught Exception: " + error);
+  process.exit(1);
+});
+
 import {
   app,
   BrowserWindow,

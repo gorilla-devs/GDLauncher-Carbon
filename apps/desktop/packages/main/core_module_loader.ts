@@ -16,10 +16,6 @@ const loadCoreModule: CoreModule = () =>
       return;
     }
 
-    setTimeout(() => {
-      reject(new Error("Core module failed to start in time"));
-    }, 10000);
-
     const coreModulePath = path.resolve(
       __dirname,
       "../../../../resources",
@@ -27,20 +23,36 @@ const loadCoreModule: CoreModule = () =>
     );
 
     console.log(`[CORE] Spawning core module: ${coreModulePath}`);
+    let coreModule;
 
-    const coreModule = spawn(coreModulePath, [], {
-      shell: false,
-      detached: false,
-      env: {
-        RUST_BACKTRACE: "full",
-      },
+    try {
+      coreModule = spawn(coreModulePath, [], {
+        shell: false,
+        detached: false,
+        env: {
+          RUST_BACKTRACE: "full",
+        },
+      });
+    } catch (err) {
+      console.error(`[CORE] Spawn error: ${err}`);
+      return reject(err);
+    }
+
+    coreModule.on("error", function (err) {
+      console.error(`[CORE] Spawn error: ${err}`);
+      reject(err);
     });
 
     coreModule.stdout.on("data", (data) => {
       let dataString = data.toString();
-      if (dataString.startsWith("_STATUS_: ")) {
-        let port = dataString.split("|")[1];
-        resolve(port);
+      let rows = dataString.split(/\r?\n|\r|\n/g);
+
+      for (let row of rows) {
+        if (row.startsWith("_STATUS_: ")) {
+          let port = row.split("|")[1];
+          console.log(`[CORE] Port: ${port}`);
+          resolve(port);
+        }
       }
       console.log(`[CORE] Message: ${dataString}`);
     });
