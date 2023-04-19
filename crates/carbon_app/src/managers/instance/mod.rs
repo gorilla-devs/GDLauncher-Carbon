@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
@@ -970,7 +969,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
-    pub async fn instance_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<Vec<u8>>> {
+    pub async fn instance_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<(String, Vec<u8>)>> {
         let instances = self.instances.read().await;
 
         let instance = instances
@@ -984,7 +983,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(path) => {
                 let Ok(icon) = tokio::fs::read(path).await else { return Ok(None) };
 
-                Ok(Some(icon))
+                Ok(Some((path.clone(), icon)))
             }
         }
     }

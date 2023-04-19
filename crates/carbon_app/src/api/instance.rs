@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::anyhow;
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use http::StatusCode;
+use http::{StatusCode, HeaderMap, HeaderValue};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -140,8 +141,17 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
                 Ok::<_, AxumError>(match icon {
-                    Some(icon) => (StatusCode::OK, icon),
-                    None => (StatusCode::NOT_FOUND, Vec::new()),
+                    Some((name, icon)) => {
+                        let mut headers = HeaderMap::new();
+                        headers.insert(
+                            "filename",
+                            name.parse::<HeaderValue>()
+                                .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?
+                        );
+
+                        (StatusCode::OK, headers, icon)
+                    },
+                    None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
                 })
             },
         ),
