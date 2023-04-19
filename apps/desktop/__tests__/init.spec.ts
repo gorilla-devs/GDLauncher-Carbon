@@ -23,31 +23,56 @@ const isArm64 = () => {
   return arm64;
 };
 
-const getBinaryPath = async () => {
+const getRootPath = () => {
   let basePath = `./release/`;
 
   if (process.platform === "win32") {
-    basePath = path.join(basePath, "win-unpacked", "GDLauncher Carbon.exe");
+    basePath = path.join(basePath, "win-unpacked");
   } else if (process.platform === "linux") {
-    basePath = path.join(basePath, "linux-unpacked", "@gddesktop");
+    basePath = path.join(basePath, "linux-unpacked");
   } else if (process.platform === "darwin") {
     basePath = path.join(
       basePath,
       isArm64() ? "mac-arm64" : "mac",
-      "GDLauncher Carbon.app",
-      "Contents",
-      "MacOS",
-      "GDLauncher Carbon"
+      "GDLauncher Carbon.app"
     );
   }
 
   return basePath;
 };
 
+const getBinaryPath = async () => {
+  let rootPath = getRootPath();
+
+  if (process.platform === "win32") {
+    return path.join(rootPath, "GDLauncher Carbon.exe");
+  } else if (process.platform === "linux") {
+    return path.join(rootPath, "@gddesktop");
+  } else if (process.platform === "darwin") {
+    return path.join(rootPath, "Contents", "MacOS", "GDLauncher Carbon");
+  }
+};
+
+const isCoreModulePresent = () => {
+  let rootPath = getRootPath();
+
+  if (process.platform === "win32") {
+    return fs.existsSync(path.join(rootPath, "resources", "core_module.exe"));
+  } else if (process.platform === "linux") {
+    return fs.existsSync(path.join(rootPath, "resources", "core_module"));
+  } else if (process.platform === "darwin") {
+    return fs.existsSync(
+      path.join(rootPath, "Contents", "Resources", "core_module")
+    );
+  }
+};
+
 test.describe("Init Tests", () => {
   test.skip(() => isArm64(), "Only x64 is supported on macOS CI");
 
   test.beforeAll(async () => {
+    expect(isCoreModulePresent()).toBeTruthy();
+
     // set the CI environment variable to true
     process.env.CI = "e2e";
     electronApp = await electron.launch({
@@ -68,20 +93,13 @@ test.describe("Init Tests", () => {
       // expect(msg.type()).not.toBe("error");
     });
 
+    const rootDiv = await (await page.waitForSelector("#root"))?.innerHTML();
+    expect(rootDiv).not.toBeUndefined();
+
     const errorInnerText = await (
       await page.$("#appFatalCrashState")
     )?.innerHTML();
-    expect(errorInnerText).toBe(undefined);
-
-    let loadingInnerText = await (
-      await page.$("#appLoadingState")
-    )?.innerHTML();
-    expect(loadingInnerText).toBe("Loading...");
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    loadingInnerText = await (await page.$("#appLoadingState"))?.innerHTML();
-    expect(loadingInnerText).toBe(undefined);
+    expect(errorInnerText).toBeUndefined();
 
     const title = await page.title();
     expect(title).toBe("GDLauncher Carbon");
@@ -99,4 +117,6 @@ test.describe("Init Tests", () => {
     const currentUrl = await page.url();
     expect(getActualUrl(currentUrl)).toBe("/");
   });
+
+  // Also test missing core_module
 });

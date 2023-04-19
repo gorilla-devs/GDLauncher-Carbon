@@ -21,7 +21,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
 
     let try_migrate = db_client._migrate_deploy().await;
 
-    #[cfg(debug_assertions)]
+    #[cfg(not(feature = "production"))]
     {
         if try_migrate.is_err() {
             db_client
@@ -32,7 +32,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
                 .unwrap();
         }
     }
-    #[cfg(not(debug_assertions))]
+    #[cfg(feature = "production")]
     {
         try_migrate.map_err(DatabaseError::MigrationError)?;
     }

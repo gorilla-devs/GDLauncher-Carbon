@@ -68,12 +68,17 @@ keys! {
     }
 
     vtask {
-        GET_TASKS                     = "getTasks";
+        GET_TASKS                        = "getTasks";
     }
 
     settings {
         GET_SETTINGS                     = "getSettings";
         SET_SETTINGS                     = "setSettings";
+    }
+
+    metrics {
+        SEND_EVENT                       = "sendEvent";
+        SEND_PAGEVIEW                    = "sendPageview";
     }
 
     modplatforms {

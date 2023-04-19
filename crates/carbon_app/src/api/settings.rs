@@ -56,6 +56,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
     }
 }
 
+// When updating this, make sure to also update set_settings
 #[derive(Type, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
