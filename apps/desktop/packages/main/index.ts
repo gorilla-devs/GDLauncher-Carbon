@@ -173,12 +173,12 @@ async function createWindow() {
     win?.webContents.send("updateAvailable");
   });
 
-  // ipcMain.handle("releaseChannel", async (_, releaseChannel) => {
-  //   if (releaseChannel === "beta" || releaseChannel === "alpha") {
-  //     allowUnstableReleases = true;
-  //   }
-  // });
-  // }
+  ipcMain.on("releaseChannel", async (_, releaseChannel) => {
+    if (releaseChannel === "beta" || releaseChannel === "alpha") {
+      allowUnstableReleases = true;
+    }
+  });
+  }
 
   attachTitlebarToWindow(win);
 

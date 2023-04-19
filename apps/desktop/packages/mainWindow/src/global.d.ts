@@ -19,7 +19,7 @@ declare global {
     updateAvailable: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
-    // releaseChannel: (releaseChannel: string) => void;
+    releaseChannel: (releaseChannel: string) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
     getCoreModuleStatus: () => Promise<void>;
