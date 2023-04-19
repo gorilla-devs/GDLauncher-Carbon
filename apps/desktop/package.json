@@ -29,6 +29,7 @@
     "@playwright/test": "^1.29.1",
     "@rspc/client": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
     "@rspc/solid": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
+    "@sentry/electron": "^4.4.0",
     "@solidjs/router": "^0.6.0",
     "@tanstack/solid-query": "^4.22.0",
     "@typescript-eslint/parser": "^5.48.0",

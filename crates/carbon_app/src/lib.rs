@@ -32,10 +32,11 @@ pub async fn init() {
     println!("Starting Carbon App");
 
     #[cfg(feature = "production")]
+    #[cfg(not(test))]
     let _guard = {
         println!("Initializing Sentry");
         sentry::init((
-            env!("SENTRY_DSN"),
+            env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
                 release: Some(APP_VERSION.into()),
                 ..Default::default()
@@ -146,12 +147,12 @@ impl std::ops::Deref for TestEnv {
     }
 }
 
-// #[cfg(test)]
-// impl Drop for TestEnv {
-//     fn drop(&mut self) {
-//         std::fs::remove_dir_all(&self.tmpdir).unwrap();
-//     }
-// }
+#[cfg(test)]
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        std::fs::remove_dir_all(&self.tmpdir).unwrap();
+    }
+}
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {
