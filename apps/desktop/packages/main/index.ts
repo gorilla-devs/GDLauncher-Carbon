@@ -14,10 +14,6 @@ import {
   screen,
   ipcMain,
 } from "electron";
-import {
-  setupTitlebar,
-  attachTitlebarToWindow,
-} from "custom-electron-titlebar/main";
 import { release } from "os";
 import { join, resolve } from "path";
 import loadCoreModule from "./core_module_loader";
@@ -49,8 +45,6 @@ if (process.defaultApp) {
 } else {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
-
-setupTitlebar();
 
 let win: BrowserWindow | null = null;
 
@@ -120,8 +114,8 @@ async function createWindow() {
     height,
     minWidth,
     width,
-    titleBarStyle: "hidden",
-    frame: false,
+    titleBarStyle: "default",
+    frame: true,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -146,8 +140,6 @@ async function createWindow() {
   ipcMain.handle("getAdSize", async () => {
     return getAdSize().adSize;
   });
-
-  attachTitlebarToWindow(win);
 
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));

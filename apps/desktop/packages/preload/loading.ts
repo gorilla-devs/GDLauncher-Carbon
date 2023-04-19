@@ -1,5 +1,4 @@
 import { contextBridge } from "electron";
-import { Titlebar, Color } from "custom-electron-titlebar";
 import { domReady } from "./utils";
 
 let oDiv: HTMLDivElement;
@@ -28,11 +27,6 @@ const { clearLoading, fatalError, updateLoading } = useLoading();
 (async () => {
   await domReady();
   oDiv = document.querySelector("#appLoadingState")!;
-  new Titlebar({
-    containerOverflow: "visible",
-    backgroundColor: Color.fromHex("#15181E"),
-    icon: " ",
-  });
 })();
 
 // --------- Expose some API to the Renderer process. ---------
