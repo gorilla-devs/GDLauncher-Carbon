@@ -39,10 +39,6 @@ module.exports = {
       from: `../../target/${targetTriple}/${profile}/${coreModuleBinName}`,
       to: coreModuleBinName,
     },
-    {
-      from: "./JavaCheck.class",
-      to: "JavaCheck.class",
-    },
   ],
   npmRebuild: false,
   protocols: [
