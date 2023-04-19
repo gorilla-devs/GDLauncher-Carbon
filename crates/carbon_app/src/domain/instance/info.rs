@@ -26,6 +26,11 @@ pub enum Modpack {
     Curseforge(CurseforgeModpack),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ModpackPlatform {
+    Curseforge,
+}
+
 #[derive(Debug, Clone)]
 pub struct CurseforgeModpack {
     pub project_id: String,
@@ -58,8 +63,16 @@ pub struct ModLoader {
     pub version: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ModLoaderType {
     Forge,
     Fabric,
+}
+
+impl Modpack {
+    pub fn as_platform(&self) -> ModpackPlatform {
+        match self {
+            Self::Curseforge(_) => ModpackPlatform::Curseforge,
+        }
+    }
 }

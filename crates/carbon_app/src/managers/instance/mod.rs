@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
-use crate::domain::instance::info::InstanceIcon;
+use crate::db::read_filters::StringFilter;
+use crate::domain::instance::info::{GameVersion, InstanceIcon};
 use anyhow::anyhow;
 use anyhow::bail;
 use chrono::DateTime;
@@ -184,16 +186,58 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(groups
             .into_iter()
             .map(|group| ListGroup {
-                id: group.id,
+                id: GroupId(group.id),
                 name: group.name,
                 instances: group
                     .instances
                     .expect("instance groups were requested with group list yet are not present")
                     .into_iter()
-                    .filter(|instance| active_instances.contains_key(&InstanceId(instance.id)))
-                    .map(|instance| ListInstance {
-                        id: instance.id,
+                    .filter_map(
+                        |instance| match active_instances.get(&InstanceId(instance.id)) {
+                            Some(data) => Some((instance, &data.type_)),
+                            None => None,
+                        },
+                    )
+                    .map(|(instance, status)| ListInstance {
+                        id: InstanceId(instance.id),
                         name: instance.name,
+                        status: match status {
+                            InstanceType::Valid(status) => {
+                                ListInstanceStatus::Valid(ValidListInstance {
+                                    mc_version: match &status.config.game_configuration.version {
+                                        GameVersion::Standard(version) => version.release.clone(),
+                                        GameVersion::Custom(name) => name.clone(),
+                                    },
+                                    modloader: match &status.config.game_configuration.version {
+                                        GameVersion::Standard(version) => {
+                                            match version.modloaders.iter().next() {
+                                                Some(modloader) => Some(modloader.type_),
+                                                None => None,
+                                            }
+                                        }
+                                        GameVersion::Custom(_) => None,
+                                    },
+                                    modpack_platform: status
+                                        .config
+                                        .modpack
+                                        .as_ref()
+                                        .map(info::Modpack::as_platform),
+                                })
+                            }
+                            InstanceType::Invalid(status) => {
+                                ListInstanceStatus::Invalid(match status {
+                                    InvalidConfiguration::NoFile => {
+                                        InvalidListInstance::JsonMissing
+                                    }
+                                    InvalidConfiguration::Invalid(error) => {
+                                        InvalidListInstance::JsonError(error.clone())
+                                    }
+                                    InvalidConfiguration::IoError(error) => {
+                                        InvalidListInstance::Other(error.clone())
+                                    }
+                                })
+                            }
+                        },
                     })
                     .collect::<Vec<_>>(),
             })
@@ -465,7 +509,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn create_group(self, name: String) -> anyhow::Result<GroupId> {
+        use db::instance_group::WhereParam;
         let index = self.next_group_index().await?;
+
+        let group = self
+            .app
+            .prisma_client
+            .instance_group()
+            .find_first(vec![WhereParam::Name(StringFilter::Equals(name.clone()))])
+            .exec()
+            .await?;
+
+        if let Some(group) = group {
+            return Ok(GroupId(group.id));
+        }
 
         let group = self
             .app
@@ -969,17 +1026,38 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Type, Serialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ListGroup {
-    id: i32,
-    name: String,
-    instances: Vec<ListInstance>,
+    pub id: GroupId,
+    pub name: String,
+    pub instances: Vec<ListInstance>,
 }
 
-#[derive(Debug, PartialEq, Eq, Type, Serialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ListInstance {
-    id: i32,
-    name: String,
+    pub id: InstanceId,
+    pub name: String,
+    pub status: ListInstanceStatus,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ListInstanceStatus {
+    Valid(ValidListInstance),
+    Invalid(InvalidListInstance),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ValidListInstance {
+    pub mc_version: String,
+    pub modloader: Option<info::ModLoaderType>,
+    pub modpack_platform: Option<info::ModpackPlatform>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum InvalidListInstance {
+    JsonMissing,
+    JsonError(ConfigurationParseError),
+    Other(String),
 }
 
 /// Lock used to prevent race conditions when modifying group or instance indexes
@@ -1030,23 +1108,22 @@ enum InstanceType {
     Invalid(InvalidConfiguration),
 }
 
-#[derive(Type, Serialize)]
 enum InvalidConfiguration {
     NoFile,
     Invalid(ConfigurationParseError),
     IoError(String),
 }
 
-#[derive(Type, Serialize)]
-struct ConfigurationParseError {
-    type_: ConfigurationParseErrorType,
-    message: String,
-    line: u32,
-    config_text: String,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConfigurationParseError {
+    pub type_: ConfigurationParseErrorType,
+    pub message: String,
+    pub line: u32,
+    pub config_text: String,
 }
 
-#[derive(Type, Serialize)]
-enum ConfigurationParseErrorType {
+#[derive(Debug, Clone, PartialEq, Eq, Type, Serialize)]
+pub enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
@@ -1084,7 +1161,10 @@ mod test {
     use crate::{
         db::{self, read_filters::IntFilter, PrismaClient},
         domain::instance::info,
-        managers::instance::{GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance},
+        managers::instance::{
+            GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
+            ValidListInstance,
+        },
     };
 
     use super::InstanceVersionSouce;
@@ -1463,8 +1543,13 @@ mod test {
             id: default_group.id,
             name: default_group.name.clone(),
             instances: vec![ListInstance {
-                id: *instance_id,
+                id: instance_id,
                 name: String::from("test"),
+                status: ListInstanceStatus::Valid(ValidListInstance {
+                    mc_version: String::from("1.7.10"),
+                    modloader: None,
+                    modpack_platform: None,
+                }),
             }],
         }];
 
