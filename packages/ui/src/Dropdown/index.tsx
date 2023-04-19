@@ -93,9 +93,8 @@ const Dropdown = (props: Props) => {
           "text-darkSlate-50 hover:text-white": !props.disabled && !props.error,
           "text-darkSlate-500": props.error,
           "rounded-full": props.rounded,
-          rounded: !props.rounded,
           "bg-darkSlate-700": !props.bgColorClass,
-          "rounded-md": !props.btnDropdown,
+          "rounded-md": !props.btnDropdown && !props.rounded,
         }}
       >
         <Show when={!props.btnDropdown}>

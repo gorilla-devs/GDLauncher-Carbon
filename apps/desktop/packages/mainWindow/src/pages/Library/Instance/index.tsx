@@ -194,7 +194,7 @@ const Instance = () => {
                         >
                           <div class="text-xl i-ri:star-s-fill" />
                         </div>
-                        <Button uppercase variant="glow" size="small">
+                        <Button uppercase variant="glow" size="large">
                           <Trans
                             key="instance.play"
                             options={{
