@@ -75,8 +75,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .iter()
                 .find(|instance| instance.shortpath == shortpath);
 
-            let Some(_instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
+            let Some(instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
+            let InstanceType::Valid(data) = &instance.type_ else { continue };
+
+            let instance_id = match cached {
+                Some(cached) => InstanceId(cached.id),
+                None => {
+                    self.add_instance(
+                        data.config.name.clone(),
+                        instance.shortpath.clone(),
+                        self.get_default_group().await?,
+                    )
+                    .await?
+                }
+            };
+
+            self.instances.write().await.insert(instance_id, instance);
         }
+
+        self.app.invalidate(GET_GROUPS, None);
 
         Ok(())
     }
@@ -91,24 +108,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         path: PathBuf,
         cached: Option<&CachedInstance>,
     ) -> anyhow::Result<Option<Instance>> {
-        use db::instance::{SetParam, UniqueWhereParam};
-
-        let config_path = path.join("config.json");
+        let config_path = path.join("instance.json");
 
         let config_text = match tokio::fs::read_to_string(config_path).await {
             Ok(x) => x,
             Err(e) => {
                 // if we aren't already tracking this instance just ignore it.
-                if let Some(cached) = cached {
+                if cached.is_some() {
                     let invalid_type = match e.kind() {
                         io::ErrorKind::NotFound => InvalidConfiguration::NoFile,
                         _ => InvalidConfiguration::IoError(e.to_string()),
                     };
 
                     return Ok(Some(Instance {
-                        name: cached.name.clone(),
                         shortpath: shortpath.clone(),
-                        group: GroupId(cached.group_id),
                         type_: InstanceType::Invalid(invalid_type),
                     }));
                 } else {
@@ -119,25 +132,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
-                let group = if let Some(cached) = cached {
-                    self.app
-                        .prisma_client
-                        .instance()
-                        .update(
-                            UniqueWhereParam::ShortpathEquals(shortpath.clone()),
-                            vec![SetParam::SetName(config.name.clone())],
-                        )
-                        .exec()
-                        .await?;
-
-                    GroupId(cached.group_id)
-                } else {
-                    let group = self.get_default_group().await?;
-                    self.add_instance(shortpath.clone(), shortpath.clone(), group)
-                        .await?;
-                    group
-                };
-
                 let instance = InstanceData {
                     config,
                     instance_start_time: None,
@@ -145,9 +139,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 };
 
                 Ok(Some(Instance {
-                    name: instance.config.name.clone(),
                     shortpath: shortpath.clone(),
-                    group,
                     type_: InstanceType::Valid(instance),
                 }))
             }
@@ -165,9 +157,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 });
 
                 Ok(Some(Instance {
-                    name: shortpath.to_string(),
                     shortpath,
-                    group: self.get_default_group().await?,
                     type_: InstanceType::Invalid(error),
                 }))
             }
@@ -491,6 +481,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Add an instance to the database without checking if it exists.
+    /// Does not invalidate.
     async fn add_instance(
         self,
         name: String,
@@ -518,6 +509,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     /// Remove an instance from the database without checking if it exists.
+    /// Does not invalidate.
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
         use db::instance::UniqueWhereParam;
 
@@ -668,7 +660,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             notes: String::new(),
         };
 
-        let json = schema::make_instance_config(info)?;
+        let json = schema::make_instance_config(info.clone())?;
         tokio::fs::write(tmpdir.path().join("instance.json"), json).await?;
 
         let _lock = self.path_lock.lock().await;
@@ -686,22 +678,40 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         tokio::fs::rename(&tmpdir, path).await?;
         drop(ManuallyDrop::new(tmpdir)); // prevent tmpdir cleanup
 
-        self.add_instance(name, shortpath, group).await
+        let id = self.add_instance(name, shortpath.clone(), group).await?;
+
+        self.instances.write().await.insert(
+            id,
+            Instance {
+                shortpath,
+                type_: InstanceType::Valid(InstanceData {
+                    config: info,
+                    instance_start_time: None,
+                    mods: Late::Loading,
+                }),
+            },
+        );
+
+        self.app.invalidate(GET_GROUPS, None);
+
+        Ok(id)
     }
 
     pub async fn update_instance(
         self,
-        instance: InstanceId,
+        instance_id: InstanceId,
         name: Option<String>,
         icon: Option<Option<PathBuf>>,
         // version not yet supported due to mod version concerns
     ) -> anyhow::Result<()> {
+        use db::instance::{SetParam, UniqueWhereParam};
+
         let mut instances = self.instances.write().await;
         let mut instance = instances
-            .get_mut(&instance)
+            .get_mut(&instance_id)
             .ok_or_else(|| anyhow!("instance id invalid"))?;
 
-        let Instance { name: iname, shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
+        let Instance { shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
             bail!("update_instance called on invalid instance")
         };
 
@@ -745,15 +755,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let json = schema::make_instance_config(info.clone())?;
         tokio::fs::write(path.join("instance.json"), json).await?;
-        *iname = info.name.clone();
         data.config = info;
 
         if let Some(name) = name {
             let _lock = self.path_lock.lock().await;
             let (new_shortpath, new_path) = self.next_folder(&name).await?;
             tokio::fs::rename(path, new_path).await?;
-            *shortpath = new_shortpath;
+            *shortpath = new_shortpath.clone();
+
+            self.app
+                .prisma_client
+                .instance()
+                .update(
+                    UniqueWhereParam::IdEquals(*instance_id),
+                    vec![
+                        SetParam::SetName(name),
+                        SetParam::SetShortpath(new_shortpath),
+                    ],
+                )
+                .exec()
+                .await?;
         }
+
+        self.app.invalidate(GET_GROUPS, None);
 
         Ok(())
     }
@@ -776,6 +800,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instances.remove(&instance_id);
         drop(instances);
         self.remove_instance(instance_id).await?;
+
+        self.app.invalidate(GET_GROUPS, None);
 
         Ok(())
     }
@@ -887,6 +913,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
+    pub async fn instance_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+
+        let instance = instances
+            .get(&instance_id)
+            .ok_or_else(|| anyhow!("instance_details called with invalid instance id"))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else { return Ok(None) };
+
+        match &data.config.icon {
+            InstanceIcon::Default => Ok(None),
+            InstanceIcon::RelativePath(path) => {
+                let Ok(icon) = tokio::fs::read(path).await else { return Ok(None) };
+
+                Ok(Some(icon))
+            }
+        }
+    }
+
     async fn next_group_index(self) -> anyhow::Result<IdLock<'s, i32>> {
         let guard = self.manager.index_lock.lock().await;
 
@@ -924,14 +969,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 }
 
-#[derive(Type, Serialize)]
+#[derive(Debug, PartialEq, Eq, Type, Serialize)]
 pub struct ListGroup {
     id: i32,
     name: String,
     instances: Vec<ListInstance>,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Debug, PartialEq, Eq, Type, Serialize)]
 pub struct ListInstance {
     id: i32,
     name: String,
@@ -973,9 +1018,9 @@ pub enum InstanceMoveTarget {
 }
 
 struct Instance {
-    name: String,
+    //name: String,
     shortpath: String,
-    group: GroupId,
+    //group: GroupId,
     // todo: icon
     type_: InstanceType,
 }
@@ -1007,17 +1052,20 @@ enum ConfigurationParseErrorType {
     Eof,
 }
 
+#[derive(Debug)]
 pub enum Late<T> {
     Loading,
     Ready(T),
 }
 
+#[derive(Debug)]
 pub struct InstanceData {
     config: info::Instance,
     instance_start_time: Option<DateTime<Utc>>,
     mods: Late<Vec<Mod>>,
 }
 
+#[derive(Debug)]
 pub struct Mod {
     name: String,
     // todo
@@ -1029,12 +1077,17 @@ pub enum InstanceVersionSouce {
 }
 #[cfg(test)]
 mod test {
+    use std::{collections::HashSet, time::Duration};
+
     use prisma_client_rust::Direction;
 
     use crate::{
         db::{self, read_filters::IntFilter, PrismaClient},
-        managers::instance::{GroupId, InstanceId, InstanceMoveTarget},
+        domain::instance::info,
+        managers::instance::{GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance},
     };
+
+    use super::InstanceVersionSouce;
 
     #[tokio::test]
     async fn move_groups() -> anyhow::Result<()> {
@@ -1381,6 +1434,85 @@ mod test {
 
         // assert the default group was not created while deleting the new group
         assert_eq!(group_count, 0);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn instance_crud() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        // create
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("test"),
+                None,
+                InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
+                    release: String::from("1.7.10"),
+                    modloaders: HashSet::new(),
+                })),
+            )
+            .await?;
+
+        let mut list = app.instance_manager().list_groups().await?;
+        let mut expected = vec![ListGroup {
+            id: default_group.id,
+            name: default_group.name.clone(),
+            instances: vec![ListInstance {
+                id: *instance_id,
+                name: String::from("test"),
+            }],
+        }];
+
+        assert_eq!(list, expected);
+
+        // check that it was persisted
+        app.restart_in_place().await;
+
+        // wait for instance scan
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        list = app.instance_manager().list_groups().await?;
+        assert_eq!(list, expected);
+
+        // update
+        app.instance_manager()
+            .update_instance(instance_id, Some(String::from("test2")), None)
+            .await?;
+
+        expected[0].instances[0].name = String::from("test2");
+
+        list = app.instance_manager().list_groups().await?;
+        assert_eq!(list, expected);
+
+        // check that it was persisted
+        app.restart_in_place().await;
+
+        // wait for instance scan
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        list = app.instance_manager().list_groups().await?;
+        assert_eq!(list, expected);
+
+        // delete
+        app.instance_manager().delete_instance(instance_id).await?;
+        expected[0].instances.clear();
+
+        list = app.instance_manager().list_groups().await?;
+        assert_eq!(list, expected);
+
+        // check that it was persisted
+        app.restart_in_place().await;
+
+        // wait for instance scan
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        list = app.instance_manager().list_groups().await?;
+        assert_eq!(list, expected);
 
         Ok(())
     }

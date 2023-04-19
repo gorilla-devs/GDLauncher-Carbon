@@ -1,12 +1,16 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::sync::Arc;
 
+use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
+use http::StatusCode;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+use crate::error::{AxumError, FeError};
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::App;
+use crate::managers::{App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
@@ -91,6 +95,31 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(InstanceDetails::from)
         }
     }
+}
+
+pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
+    #[derive(Deserialize)]
+    struct InstanceIconQuery {
+        id: i32,
+    }
+
+    axum::Router::new().route(
+        "/instanceIcon",
+        axum::routing::get(
+            |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
+                let icon = app
+                    .instance_manager()
+                    .instance_icon(InstanceId(query.id))
+                    .await
+                    .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                Ok::<_, AxumError>(match icon {
+                    Some(icon) => (StatusCode::OK, icon),
+                    None => (StatusCode::NOT_FOUND, Vec::new()),
+                })
+            },
+        ),
+    )
 }
 
 #[derive(Type, Deserialize)]

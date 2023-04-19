@@ -16,7 +16,7 @@ pub struct CauseSegment {
     pub debug: String,
 }
 
-type AxumError = (axum::http::StatusCode, String);
+pub type AxumError = (axum::http::StatusCode, String);
 
 impl FeError {
     pub fn from_anyhow(error: &anyhow::Error) -> Self {

@@ -102,6 +102,12 @@ mod app {
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
+            let app2 = app.clone();
+            tokio::spawn(async move {
+                // ignore scanning errors instead of taking down the launcher
+                let _ = app2.clone().instance_manager().scan_instances().await;
+            });
+
             app
         }
 
