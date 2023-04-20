@@ -11,8 +11,6 @@ export const toggleSidebar = () => {
 
 const getModloaderIcon = (modloader: ModLoaderType) => {
   switch (modloader) {
-    case "Vanilla":
-      return vanillaIcon;
     case "Forge":
       return forgeIcon;
     case "Fabric":

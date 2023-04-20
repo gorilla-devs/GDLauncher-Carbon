@@ -10,22 +10,21 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, produce } from "solid-js/store";
 import {
-  InvalidListInstance,
-  UngroupedInstance,
-  ValidListInstance,
-} from "@gd/core_module/bindings";
-import {
   InvalidInstanceType,
   ValidInstanceType,
   isListInstanceValid,
 } from "@/utils/instances";
+import { blobToBase64 } from "@/utils/helpers";
 
 export interface InstancesStore {
+  favorites: (InvalidInstanceType | ValidInstanceType)[];
   [modloader: string]: (InvalidInstanceType | ValidInstanceType)[];
 }
 
 const Sidebar = () => {
-  const [instances, setInstances] = createStore<InstancesStore>({});
+  const [instances, setInstances] = createStore<InstancesStore>({
+    favorites: [],
+  });
   const navigate = useGDNavigate();
   const location = useLocation();
 
@@ -40,37 +39,54 @@ const Sidebar = () => {
 
   createEffect(() => {
     if (routeData.instancesUngrouped.data) {
-      routeData.instancesUngrouped.data.forEach((instance) => {
-        const validInstance = isListInstanceValid(instance.status)
-          ? instance.status.Valid
-          : null;
-        const InvalidInstance = !isListInstanceValid(instance.status)
-          ? instance.status.Invalid
-          : null;
-        const modloader = validInstance?.modloader;
-
-        if (validInstance && modloader) {
-          const mappedInstance: InvalidInstanceType | ValidInstanceType = {
-            id: instance.id,
-            name: instance.name,
-            favorite: instance.favorite,
-            ...(validInstance && { mc_version: validInstance.mc_version }),
-            ...(validInstance && {
-              modpack_platform: validInstance.modpack_platform,
-            }),
-            ...(validInstance && { img: "" }),
-            ...(validInstance && { modloader }),
-            ...(InvalidInstance && { error: InvalidInstance }),
+      Promise.all(
+        routeData.instancesUngrouped.data.map(async (instance) => {
+          const fetchImage = async (id: number) => {
+            return await fetch(
+              `http://localhost:${4650}/instance/instanceIcon?id=${id}`
+            );
           };
 
-          setInstances(
-            produce((prev) => {
-              prev[modloader] = [...(prev[modloader] || []), mappedInstance];
-              return prev;
-            })
-          );
-        }
-      });
+          const validInstance = isListInstanceValid(instance.status)
+            ? instance.status.Valid
+            : null;
+          const InvalidInstance = !isListInstanceValid(instance.status)
+            ? instance.status.Invalid
+            : null;
+          const modloader = validInstance?.modloader;
+
+          const image = await fetchImage(instance.id);
+
+          const blob = await image.blob();
+          const b64 = (await blobToBase64(blob)) as string;
+
+          if (validInstance && modloader) {
+            const mappedInstance: InvalidInstanceType | ValidInstanceType = {
+              id: instance.id,
+              name: instance.name,
+              favorite: instance.favorite,
+              ...(validInstance && { mc_version: validInstance.mc_version }),
+              ...(validInstance && {
+                modpack_platform: validInstance.modpack_platform,
+              }),
+              ...(validInstance && { img: b64 }),
+              ...(validInstance && { modloader }),
+              ...(InvalidInstance && { error: InvalidInstance }),
+            };
+
+            setInstances(
+              produce((prev) => {
+                prev["favorites"] = [
+                  ...(prev["favorites"] || []),
+                  ...(mappedInstance.favorite ? [mappedInstance] : []),
+                ];
+                prev[modloader] = [...(prev[modloader] || []), mappedInstance];
+                return prev;
+              })
+            );
+          }
+        })
+      );
     }
   });
 
@@ -99,8 +115,12 @@ const Sidebar = () => {
           </Show>
         </div>
         <Show when={Object.entries(instances).length > 0}>
-          <div class="mt-4">
-            <For each={Object.entries(instances)}>
+          <div class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]">
+            <For
+              each={Object.entries(instances).filter(
+                (group) => group[1].length > 0
+              )}
+            >
               {([key, values]) => (
                 <Collapsable
                   title={key}
@@ -121,7 +141,7 @@ const Sidebar = () => {
                         variant={
                           isSidebarOpened() ? "sidebar" : "sidebar-small"
                         }
-                        img={"mc_version" in instance ? instance?.img : null}
+                        img={"img" in instance ? instance?.img : null}
                       />
                     )}
                   </For>

@@ -20,6 +20,17 @@ const Instance = () => {
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
 
+  const moveInstancepMutation = rspc.createMutation(["instance.moveInstance"]);
+
+  const createGroupMutation = rspc.createMutation(["instance.createGroup"], {
+    onSuccess(groupId) {
+      // moveInstancepMutation.mutate({
+      //   instance: parseInt(params.id, 10),
+      //   target: {},
+      // });
+    },
+  });
+
   const instancePages = () => [
     {
       label: "Overview",
@@ -203,10 +214,13 @@ const Instance = () => {
                           <div class="text-xl i-ri:more-2-fill" />
                         </div>
                         <div
-                          class="rounded-full w-8 h-8 flex justify-center items-center"
+                          class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
+                          onClick={() =>
+                            createGroupMutation.mutate("localize>favorites")
+                          }
                         >
                           <div class="text-xl i-ri:star-s-fill" />
                         </div>
@@ -275,12 +289,17 @@ const Instance = () => {
                   <div class="i-ri:more-2-fill text-xl" />
                 </div>
                 <div
-                  class="rounded-full w-8 h-8 flex justify-center items-center"
+                  class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                   style={{
                     background: "rgba(255, 255, 255, 0.1)",
                   }}
                 >
-                  <div class="i-ri:star-s-fill text-xl" />
+                  <div
+                    class="i-ri:star-s-fill text-xl"
+                    onClick={() =>
+                      createGroupMutation.mutate("localize>favorites")
+                    }
+                  />
                 </div>
                 <Button uppercase variant="glow" size="small">
                   <Trans

@@ -34,10 +34,12 @@ const Tile = (props: Props) => {
           }}
         >
           <div
-            class="relative rounded-2xl h-38 w-38"
+            class="relative rounded-2xl h-38 w-38 bg-cover bg-center"
             classList={{
               "bg-green-600": !props.img,
-              [`bg-[url("${props.img}.png")]`]: !!props.img,
+            }}
+            style={{
+              "background-image": `url("${props.img as string}")`,
             }}
           >
             <div
@@ -140,9 +142,13 @@ const Tile = (props: Props) => {
             />
           </Show>
           <div
-            class="h-10 bg-green-600 rounded-lg w-10"
+            class="h-10 rounded-lg w-10 bg-cover bg-center"
+            style={{
+              "background-image": `url("${props.img as string}")`,
+            }}
             classList={{
               grayscale: props.isLoading,
+              "bg-green-600": !props.img,
             }}
           />
           <div class="flex flex-col">
@@ -175,7 +181,16 @@ const Tile = (props: Props) => {
           onClick={(e) => props?.onClick?.(e)}
           class="h-14 px-3 flex justify-center items-center relative"
         >
-          <div class="group h-10 w-10 bg-green-600 rounded-lg flex justify-center items-center">
+          <div
+            class="group h-10 w-10 bg-green-600 rounded-lg flex justify-center items-center bg-cover bg-center"
+            style={{
+              "background-image": `url("${props.img as string}")`,
+            }}
+            classList={{
+              grayscale: props.isLoading,
+              "bg-green-600": !props.img,
+            }}
+          >
             <div
               class="gap-2 duration-100 ease-in-out right-5 hidden transition-all"
               classList={{

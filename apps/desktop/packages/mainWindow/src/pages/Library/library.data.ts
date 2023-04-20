@@ -7,7 +7,6 @@ const fetchData = () => {
   const instancesUngrouped = rspc.createQuery(() => [
     "instance.getInstancesUngrouped",
   ]);
-  console.log("DEFAULT", instancesUngrouped);
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
 
   return { groups, news, settings, instancesUngrouped };

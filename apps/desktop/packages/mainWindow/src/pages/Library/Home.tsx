@@ -12,12 +12,12 @@ import { useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "../Library/library.data";
-import { rspc } from "@/utils/rspcClient";
 import {
   InvalidInstanceType,
   ValidInstanceType,
   isListInstanceValid,
 } from "@/utils/instances";
+import { blobToBase64 } from "@/utils/helpers";
 
 const Home = () => {
   const navigate = useGDNavigate();
@@ -34,38 +34,7 @@ const Home = () => {
     return port;
   });
 
-  // const mutation = rspc.createMutation(["instance.createInstance"], {
-  //   onSuccess(data, variables, context) {
-  //     console.log("SUCCESS");
-  //   },
-  //   onError(data, variables, context) {
-  //     console.log("ERROR");
-  //   },
-  // });
-
-  // createEffect(() => {
-  //   console.log("DEFAULT GROUP", routeData.defaultGroup.data);
-  //   if (routeData.defaultGroup.data) {
-  //     mutation.mutate({
-  //       group: routeData.defaultGroup.data,
-  //       name: "INSTANCE 2",
-  //       icon: "/Users/ladvace/Desktop/memoji.png",
-  //       version: {
-  //         Version: {
-  //           Standard: {
-  //             release: "stable",
-  //             modloaders: [{ type_: "Forge", version: "1.12" }],
-  //           },
-  //         },
-  //       },
-  //     });
-  //   }
-  // });
-
   createEffect(() => {
-    // const instances = routeData.groups.data?.find(
-    //   (group) => group.id === 1
-    // )?.instances;
     if (routeData.instancesUngrouped.data && port()) {
       Promise.all(
         routeData.instancesUngrouped.data.map(async (instance) => {
@@ -77,8 +46,6 @@ const Home = () => {
 
           const image = await fetchImage(instance.id);
 
-          console.log("IMG", image, image.status);
-
           const validInstance = isListInstanceValid(instance.status)
             ? instance.status.Valid
             : null;
@@ -88,6 +55,9 @@ const Home = () => {
             : null;
 
           const modloader = validInstance?.modloader;
+
+          const blob = await image.blob();
+          const b64 = (await blobToBase64(blob)) as string;
 
           const mappedInstance: InvalidInstanceType | ValidInstanceType = {
             id: instance.id,
@@ -101,9 +71,9 @@ const Home = () => {
               img:
                 image.status === 204
                   ? ""
-                  : `http://localhost:${port()}/instance/instanceIcon?id=${
-                      instance.id
-                    }`,
+                  : `data:image/png;base64, ${b64.substring(
+                      b64.indexOf(",") + 1
+                    )}`,
             }),
             ...(validInstance && { modloader }),
             ...(InvalidInstance && { error: InvalidInstance }),
@@ -112,14 +82,9 @@ const Home = () => {
           return mappedInstance;
         })
       ).then((mappedInstances) => {
-        console.log("MAPPED", mappedInstances);
         setInstances(mappedInstances);
       });
     }
-  });
-
-  createEffect(() => {
-    console.log("AAA", instances);
   });
 
   createEffect(() => {
@@ -174,7 +139,7 @@ const Home = () => {
                       "mc_version" in instance ? instance?.mc_version : null
                     }
                     invalid={"error" in instance}
-                    img={"mc_version" in instance ? instance?.img : null}
+                    img={"img" in instance ? instance?.img : null}
                   />
                 )}
               </For>
