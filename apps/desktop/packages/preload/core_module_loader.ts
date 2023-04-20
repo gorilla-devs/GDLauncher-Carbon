@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("getCoreModuleStatus", async () =>
-  ipcRenderer.invoke("getCoreModuleStatus")
+contextBridge.exposeInMainWorld("getCoreModulePort", async () =>
+  ipcRenderer.invoke("getCoreModulePort")
 );

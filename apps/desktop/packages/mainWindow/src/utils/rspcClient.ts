@@ -6,9 +6,12 @@ import type { Procedures } from "@gd/core_module";
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient();
 
-export default function initRspc(port: number) {
+export let port: number | null = null;
+
+export default function initRspc(_port: number) {
+  port = _port;
   const wsClient = createWSClient({
-    url: `ws://localhost:${port}/rspc/ws`,
+    url: `ws://localhost:${_port}/rspc/ws`,
   });
 
   const client = createClient<Procedures>({

@@ -200,7 +200,14 @@ pub enum Type {
 
 impl From<crate::domain::minecraft::manifest::Type> for Type {
     fn from(value: crate::domain::minecraft::manifest::Type) -> Self {
-        value.into()
+        use crate::domain::minecraft::manifest::Type as domain;
+
+        match value {
+            domain::OldAlpha => Self::OldAlpha,
+            domain::OldBeta => Self::OldBeta,
+            domain::Release => Self::Release,
+            domain::Snapshot => Self::Snapshot,
+        }
     }
 }
 
