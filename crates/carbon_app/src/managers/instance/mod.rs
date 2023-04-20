@@ -984,7 +984,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         match &data.config.icon {
             InstanceIcon::Default => Ok(None),
             InstanceIcon::RelativePath(icon_path) => {
-                let path = self.app.settings_manager().runtime_path.get_instances().to_path().join(instance.shortpath).join(icon_path);
+                let path = self.app.settings_manager().runtime_path.get_instances().to_path().join(&instance.shortpath).join(icon_path);
                 let icon = tokio::fs::read(path).await?;
 
                 Ok(Some((icon_path.clone(), icon)))
