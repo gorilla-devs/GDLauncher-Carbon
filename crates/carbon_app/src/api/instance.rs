@@ -312,7 +312,7 @@ pub struct ModLoader {
 #[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModLoaderType {
     Forge,
-    Fabirc,
+    Fabric,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -350,7 +350,7 @@ impl From<domain::ModLoaderType> for ModLoaderType {
     fn from(value: domain::ModLoaderType) -> Self {
         match value {
             domain::ModLoaderType::Forge => Self::Forge,
-            domain::ModLoaderType::Fabirc => Self::Fabirc,
+            domain::ModLoaderType::Fabirc => Self::Fabric,
         }
     }
 }
@@ -393,7 +393,7 @@ impl From<ModLoaderType> for domain::info::ModLoaderType {
     fn from(value: ModLoaderType) -> Self {
         match value {
             ModLoaderType::Forge => Self::Forge,
-            ModLoaderType::Fabirc => Self::Fabric,
+            ModLoaderType::Fabric => Self::Fabric,
         }
     }
 }
@@ -402,7 +402,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         match value {
             domain::info::ModLoaderType::Forge => Self::Forge,
-            domain::info::ModLoaderType::Fabric => Self::Fabirc,
+            domain::info::ModLoaderType::Fabric => Self::Fabric,
         }
     }
 }
