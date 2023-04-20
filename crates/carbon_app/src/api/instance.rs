@@ -17,7 +17,7 @@ use super::keys::instance::*;
 use super::router::router;
 
 use crate::domain::instance as domain;
-use crate::managers::instance::{self as manager, GroupId, InstanceId};
+use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -62,7 +62,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
             app.instance_manager()
                 .create_instance(
-                    GroupId(details.group),
+                    details.group.into(),
                     details.name,
                     details.icon.map(PathBuf::from),
                     details.version.into()
@@ -70,23 +70,23 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        mutation DELETE_GROUP[app, id: i32] {
+        mutation DELETE_GROUP[app, id: GroupId] {
             app.instance_manager()
-                .delete_group(GroupId(id))
+                .delete_group(id.into())
                 .await
         }
 
-        mutation DELETE_INSTANCE[app, id: i32] {
+        mutation DELETE_INSTANCE[app, id: InstanceId] {
             app.instance_manager()
-                .delete_instance(InstanceId(id))
+                .delete_instance(id.into())
                 .await
         }
 
         mutation MOVE_GROUP[app, move_data: MoveGroup] {
             app.instance_manager()
                 .move_group(
-                    GroupId(move_data.group),
-                    move_data.before.map(GroupId)
+                    move_data.group.into(),
+                    move_data.before.map(Into::into)
                 )
                 .await
         }
@@ -94,12 +94,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation MOVE_INSTANCE[app, move_instance: MoveInstance] {
             app.instance_manager()
                 .move_instance(
-                    InstanceId(move_instance.instance),
+                    move_instance.instance.into(),
                     match move_instance.target {
                         MoveInstanceTarget::BeforeInstance(instance)
-                            => InstanceMoveTarget::Before(InstanceId(instance)),
+                            => InstanceMoveTarget::Before(instance.into()),
+                        MoveInstanceTarget::BeginningOfGroup(group)
+                            => InstanceMoveTarget::BeginningOfGroup(group.into()),
                         MoveInstanceTarget::EndOfGroup(group)
-                            => InstanceMoveTarget::EndOfGroup(GroupId(group)),
+                            => InstanceMoveTarget::EndOfGroup(group.into()),
                     }
                 )
                 .await
@@ -108,16 +110,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
                 .update_instance(
-                    InstanceId(details.instance),
+                    details.instance.into(),
                     details.name.into(),
                     details.icon.into_option().map(|i| i.map(PathBuf::from))
                 )
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: i32] {
+        query INSTANCE_DETAILS[app, id: InstanceId] {
             app.instance_manager()
-                .instance_details(InstanceId(id))
+                .instance_details(id.into())
                 .await
                 .map(InstanceDetails::from)
         }
@@ -136,7 +138,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
                 let icon = app
                     .instance_manager()
-                    .instance_icon(InstanceId(query.id))
+                    .instance_icon(manager::InstanceId(query.id))
                     .await
                     .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
@@ -157,17 +159,46 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         ),
     )
 }
+#[derive(Type, Serialize, Deserialize)]
+struct GroupId(i32);
+
+#[derive(Type, Serialize, Deserialize)]
+struct InstanceId(i32);
+
+impl From<manager::GroupId> for GroupId {
+    fn from(value: manager::GroupId) -> Self {
+        Self(*value)
+    }
+}
+
+impl From<manager::InstanceId> for InstanceId {
+    fn from(value: manager::InstanceId) -> Self {
+        Self(*value)
+    }
+}
+
+impl From<GroupId> for manager::GroupId {
+    fn from(value: GroupId) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<InstanceId> for manager::InstanceId {
+    fn from(value: InstanceId) -> Self {
+        Self(value.0)
+    }
+}
 
 #[derive(Type, Serialize)]
 struct ListGroup {
-    id: i32,
+    id: GroupId,
     name: String,
     instances: Vec<ListInstance>,
 }
 
 #[derive(Type, Serialize)]
 struct ListInstance {
-    id: i32,
+    id: InstanceId,
     name: String,
     status: ListInstanceStatus,
 }
@@ -221,7 +252,7 @@ enum ConfigurationParseErrorType {
 
 #[derive(Type, Deserialize)]
 struct CreateInstance {
-    group: i32,
+    group: GroupId,
     name: String,
     icon: Option<String>,
     version: CreateInstanceVersion,
@@ -229,7 +260,7 @@ struct CreateInstance {
 
 #[derive(Type, Deserialize)]
 struct UpdateInstance {
-    instance: i32,
+    instance: InstanceId,
     name: Update<String>,
     icon: Update<Option<String>>,
     // version
@@ -276,20 +307,21 @@ struct StandardVersion {
 
 #[derive(Type, Deserialize)]
 struct MoveGroup {
-    group: i32,
-    before: Option<i32>,
+    group: GroupId,
+    before: Option<GroupId>,
 }
 
 #[derive(Type, Deserialize)]
 struct MoveInstance {
-    instance: i32,
+    instance: InstanceId,
     target: MoveInstanceTarget,
 }
 
 #[derive(Type, Deserialize)]
 enum MoveInstanceTarget {
-    BeforeInstance(i32),
-    EndOfGroup(i32),
+    BeforeInstance(InstanceId),
+    BeginningOfGroup(GroupId),
+    EndOfGroup(GroupId),
 }
 
 #[derive(Type, Serialize)]
@@ -410,7 +442,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
 impl From<manager::ListGroup> for ListGroup {
     fn from(value: manager::ListGroup) -> Self {
         Self {
-            id: *value.id,
+            id: value.id.into(),
             name: value.name,
             instances: value.instances.into_iter().map(Into::into).collect(),
         }
@@ -420,7 +452,7 @@ impl From<manager::ListGroup> for ListGroup {
 impl From<manager::ListInstance> for ListInstance {
     fn from(value: manager::ListInstance) -> Self {
         Self {
-            id: *value.id,
+            id: value.id.into(),
             name: value.name,
             status: value.status.into(),
         }
