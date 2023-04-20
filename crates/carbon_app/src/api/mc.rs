@@ -47,9 +47,9 @@ struct UpdateInstanceArgs {
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
-            let res = app.minecraft_manager().get_minecraft_versions().await;
+            let res = app.minecraft_manager().get_minecraft_manifest().await?.versions;
 
-            Ok(res.into_iter().map(Into::into).collect::<Vec<ManifestVersion>>())
+            Ok(res.into_iter().map(ManifestVersion::from).collect::<Vec<_>>())
         }
 
         query GET_INSTANCES[_, _args: ()] {
@@ -174,11 +174,11 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 pub struct ManifestVersion {
     pub id: String,
     #[serde(rename = "type")]
-    pub type_: Type,
+    pub type_: McType,
 }
 
-impl From<carbon_domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
-    fn from(value: carbon_domain::minecraft::manifest::ManifestVersion) -> Self {
+impl From<crate::domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
+    fn from(value: crate::domain::minecraft::manifest::ManifestVersion) -> Self {
         ManifestVersion {
             id: value.id,
             type_: value.type_.into(),
@@ -187,7 +187,7 @@ impl From<carbon_domain::minecraft::manifest::ManifestVersion> for ManifestVersi
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, Clone)]
-pub enum Type {
+pub enum McType {
     #[serde(rename = "old_alpha")]
     OldAlpha,
     #[serde(rename = "old_beta")]
@@ -198,9 +198,9 @@ pub enum Type {
     Snapshot,
 }
 
-impl From<carbon_domain::minecraft::manifest::Type> for Type {
-    fn from(value: carbon_domain::minecraft::manifest::Type) -> Self {
-        use carbon_domain::minecraft::manifest::Type as domain;
+impl From<crate::domain::minecraft::manifest::McType> for McType {
+    fn from(value: crate::domain::minecraft::manifest::McType) -> Self {
+        use crate::domain::minecraft::manifest::McType as domain;
 
         match value {
             domain::OldAlpha => Self::OldAlpha,
@@ -211,13 +211,13 @@ impl From<carbon_domain::minecraft::manifest::Type> for Type {
     }
 }
 
-impl From<Type> for String {
-    fn from(type_: Type) -> Self {
+impl From<McType> for String {
+    fn from(type_: McType) -> Self {
         match type_ {
-            Type::OldAlpha => "old_alpha".to_string(),
-            Type::OldBeta => "old_beta".to_string(),
-            Type::Release => "release".to_string(),
-            Type::Snapshot => "snapshot".to_string(),
+            McType::OldAlpha => "old_alpha".to_string(),
+            McType::OldBeta => "old_beta".to_string(),
+            McType::Release => "release".to_string(),
+            McType::Snapshot => "snapshot".to_string(),
         }
     }
 }

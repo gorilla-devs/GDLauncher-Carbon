@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
-use carbon_domain::minecraft::{assets::AssetIndex, version::VersionAssetIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
+
+use crate::domain::minecraft::{assets::AssetIndex, version::VersionAssetIndex};
 
 #[derive(Error, Debug)]
 pub enum AssetsError {

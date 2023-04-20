@@ -2,13 +2,7 @@
 #![allow(dead_code)]
 
 pub mod account;
-pub mod app;
-pub mod instance;
-pub mod maven;
-pub mod minecraft;
 mod minecraft_mod;
-mod minecraft_package;
-pub mod modloader;
 pub mod vtask;
 
 #[macro_export]
