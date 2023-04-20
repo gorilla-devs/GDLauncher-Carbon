@@ -1,16 +1,19 @@
-import { ModloaderType, getModloaderIcon } from "@/utils/sidebar";
+import { getModloaderIcon } from "@/utils/sidebar";
+import { ModLoaderType } from "@gd/core_module/bindings";
 import { Match, Show, Switch, mergeProps } from "solid-js";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   title: string;
-  modloader: ModloaderType;
+  modloader: ModLoaderType | null;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
-  version: string;
+  version: string | null;
+  img: string | null;
   variant?: Variant;
+  invalid?: boolean;
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -30,7 +33,13 @@ const Tile = (props: Props) => {
             props?.onClick?.(e);
           }}
         >
-          <div class="relative rounded-2xl h-38 w-38 bg-green-600">
+          <div
+            class="relative rounded-2xl h-38 w-38"
+            classList={{
+              "bg-green-600": !props.img,
+              [`bg-[url("${props.img}.png")]`]: !!props.img,
+            }}
+          >
             <div
               class="absolute ease-in-out top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 hidden transition-all"
               classList={{
@@ -81,7 +90,12 @@ const Tile = (props: Props) => {
           </h4>
           <div class="flex gap-2 justify-between text-lightGray-900">
             <span class="flex gap-2">
-              <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
+              <Show when={!props.invalid}>
+                <img
+                  class="w-4 h-4"
+                  src={getModloaderIcon(props.modloader as ModLoaderType)}
+                />
+              </Show>
               <p class="m-0">{props.modloader}</p>
             </span>
             <p class="m-0">{props.version}</p>
@@ -143,7 +157,12 @@ const Tile = (props: Props) => {
             </h4>
             <div class="flex gap-4 text-darkSlate-50">
               <span class="flex gap-2">
-                <img class="w-4 h-4" src={getModloaderIcon(props.modloader)} />
+                <Show when={!props.invalid}>
+                  <img
+                    class="w-4 h-4"
+                    src={getModloaderIcon(props.modloader as ModLoaderType)}
+                  />
+                </Show>
                 <p class="m-0">{props.modloader}</p>
               </span>
               <p class="m-0">{props.version}</p>

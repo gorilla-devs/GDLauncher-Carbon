@@ -1,7 +1,7 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { For, Show, createEffect } from "solid-js";
-import { ModloaderType, isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
+import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
@@ -9,10 +9,19 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, produce } from "solid-js/store";
-import { Instance } from "@gd/core_module/bindings";
+import {
+  InvalidListInstance,
+  UngroupedInstance,
+  ValidListInstance,
+} from "@gd/core_module/bindings";
+import {
+  InvalidInstanceType,
+  ValidInstanceType,
+  isListInstanceValid,
+} from "@/utils/instances";
 
 export interface InstancesStore {
-  [modloader: string]: Instance[];
+  [modloader: string]: (InvalidInstanceType | ValidInstanceType)[];
 }
 
 const Sidebar = () => {
@@ -30,17 +39,37 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    if (routeData.instances.data) {
-      routeData.instances.data.forEach((instance) => {
-        setInstances(
-          produce((prev) => {
-            prev[instance.modloader] = [
-              ...(prev[instance.modloader] || []),
-              instance,
-            ];
-            return prev;
-          })
-        );
+    if (routeData.instancesUngrouped.data) {
+      routeData.instancesUngrouped.data.forEach((instance) => {
+        const validInstance = isListInstanceValid(instance.status)
+          ? instance.status.Valid
+          : null;
+        const InvalidInstance = !isListInstanceValid(instance.status)
+          ? instance.status.Invalid
+          : null;
+        const modloader = validInstance?.modloader;
+
+        if (validInstance && modloader) {
+          const mappedInstance: InvalidInstanceType | ValidInstanceType = {
+            id: instance.id,
+            name: instance.name,
+            favorite: instance.favorite,
+            ...(validInstance && { mc_version: validInstance.mc_version }),
+            ...(validInstance && {
+              modpack_platform: validInstance.modpack_platform,
+            }),
+            ...(validInstance && { img: "" }),
+            ...(validInstance && { modloader }),
+            ...(InvalidInstance && { error: InvalidInstance }),
+          };
+
+          setInstances(
+            produce((prev) => {
+              prev[modloader] = [...(prev[modloader] || []), mappedInstance];
+              return prev;
+            })
+          );
+        }
       });
     }
   });
@@ -53,7 +82,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 bg-darkSlate-700 rounded-full"
+                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700"
                 onClick={() => {
                   toggleSidebar();
                 }}
@@ -82,11 +111,17 @@ const Sidebar = () => {
                       <Tile
                         onClick={() => navigate(`/library/${instance.id}`)}
                         title={instance.name}
-                        modloader={instance.modloader as ModloaderType}
-                        version={instance.mc_version}
+                        modloader={
+                          "modloader" in instance ? instance?.modloader : null
+                        }
+                        version={
+                          "mc_version" in instance ? instance?.mc_version : null
+                        }
+                        invalid={"error" in instance}
                         variant={
                           isSidebarOpened() ? "sidebar" : "sidebar-small"
                         }
+                        img={"mc_version" in instance ? instance?.img : null}
                       />
                     )}
                   </For>
