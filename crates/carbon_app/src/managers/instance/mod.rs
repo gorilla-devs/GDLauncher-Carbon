@@ -363,6 +363,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                 (GroupId(instance.group_id), instance.index)
             }
+            InstanceMoveTarget::BeginningOfGroup(group) => (group, 0),
             InstanceMoveTarget::EndOfGroup(group) => {
                 let target_idx = self
                     .app
@@ -1102,6 +1103,7 @@ impl Deref for InstanceId {
 
 pub enum InstanceMoveTarget {
     Before(InstanceId),
+    BeginningOfGroup(GroupId),
     EndOfGroup(GroupId),
 }
 
@@ -1368,6 +1370,24 @@ mod test {
             .move_instance(
                 group0_instances[2],
                 InstanceMoveTarget::Before(group0_instances[0]),
+            )
+            .await?;
+
+        group0_instances = [
+            group0_instances[2],
+            group0_instances[0],
+            group0_instances[1],
+        ];
+
+        assert_eq!(
+            group0_instances[..],
+            get_ordered_instances(&app.prisma_client, group0).await?[..],
+        );
+
+        app.instance_manager()
+            .move_instance(
+                group0_instances[2],
+                InstanceMoveTarget::BeginningOfGroup(group0),
             )
             .await?;
 
