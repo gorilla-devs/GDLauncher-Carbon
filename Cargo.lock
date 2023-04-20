@@ -420,6 +420,7 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "serde_repr",
  "strum",
  "strum_macros",
  "task-local-extensions",
@@ -429,6 +430,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-test",
+ "url",
  "uuid",
  "winreg",
 ]

@@ -50,6 +50,8 @@ task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
+url = { workspace = true }
+serde_repr = { workspace = true }
 iridium = { path = "../iridium", optional = true }
 # libc = { workspace = true }
 
