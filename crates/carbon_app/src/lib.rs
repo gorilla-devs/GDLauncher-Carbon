@@ -21,6 +21,7 @@ mod error;
 pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
+mod iridium_client;
 mod once_send;
 mod runtime_path_override;
 
@@ -30,11 +31,12 @@ pub async fn init() {
 
     println!("Starting Carbon App");
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(feature = "production")]
+    #[cfg(not(test))]
     let _guard = {
         println!("Initializing Sentry");
         sentry::init((
-            env!("SENTRY_DSN"),
+            env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
                 release: Some(APP_VERSION.into()),
                 ..Default::default()
@@ -45,7 +47,7 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let listener = if cfg!(debug_assertions) {
+    let listener = if !cfg!(feature = "production") {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
         get_available_port().await
@@ -156,7 +158,7 @@ impl std::ops::Deref for TestEnv {
 #[cfg(test)]
 impl Drop for TestEnv {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.tmpdir).unwrap();
+        let _ = std::fs::remove_dir_all(&self.tmpdir);
     }
 }
 

@@ -25,8 +25,8 @@ let targetTripleLookup = {
 let targetTriple = targetTripleLookup[`${os}-${arch}`];
 
 module.exports = {
-  productName: "GDLauncher Carbon",
-  appId: "org.gorilladevs.GDLauncherCarbon",
+  productName: "GDLauncher",
+  appId: "org.gorilladevs.GDLauncher",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
   asar: true,
   directories: {
@@ -38,10 +38,6 @@ module.exports = {
     {
       from: `../../target/${targetTriple}/${profile}/${coreModuleBinName}`,
       to: coreModuleBinName,
-    },
-    {
-      from: "./JavaCheck.class",
-      to: "JavaCheck.class",
     },
   ],
   npmRebuild: false,

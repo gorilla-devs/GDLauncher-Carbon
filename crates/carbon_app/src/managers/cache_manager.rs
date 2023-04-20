@@ -217,7 +217,7 @@ mod test {
 
     macro_rules! launch_server {
         [$($headers:expr),*] => {{
-            let tcp_listener = TcpListener::bind("0.0.0.0:0").unwrap();
+            let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let port = tcp_listener.local_addr().unwrap().port();
 
             let server = Router::new()
@@ -239,7 +239,7 @@ mod test {
 
     async fn request_cached(app: &App, port: u16) -> bool {
         app.reqwest_client
-            .get(format!("http://0.0.0.0:{port}/"))
+            .get(format!("http://127.0.0.1:{port}/"))
             .send()
             .await
             .unwrap()

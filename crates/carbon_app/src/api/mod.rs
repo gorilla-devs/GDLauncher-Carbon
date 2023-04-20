@@ -11,6 +11,7 @@ mod instance;
 mod java;
 pub mod keys;
 mod mc;
+mod metrics;
 mod modplatforms;
 pub mod router;
 pub mod settings;
@@ -37,6 +38,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::vtask::GROUP_PREFIX, vtask::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
         .yolo_merge(keys::instance::GROUP_PREFIX, instance::mount())
+        .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
@@ -64,4 +66,21 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
         .nest("/mc", mc::mount_axum_router())
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    #[ignore]
+    #[allow(clippy::assertions_on_constants)]
+    fn verify_iridium_feature() {
+        #[cfg(feature = "production")]
+        {
+            assert!(true);
+        }
+        #[cfg(not(feature = "production"))]
+        {
+            assert!(false);
+        }
+    }
 }
