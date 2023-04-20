@@ -63,4 +63,5 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
         .route("/health", axum::routing::get(|| async { "OK" }))
         .nest("/mc", mc::mount_axum_router())
         .nest("/account", account::mount_axum_router())
+        .nest("/instance", instance::mount_axum_router())
 }
