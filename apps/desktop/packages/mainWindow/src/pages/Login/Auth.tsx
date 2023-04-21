@@ -88,11 +88,11 @@ const Auth = (props: Props) => {
         props.setStep(1);
       },
       onFail() {
-        setEnrollmentInProgress(false);
+        retryLogin();
         setError("Something went wrong while logging in");
-        accountEnrollCancelMutation.mutate(undefined);
-        setEnrollmentInProgress(false);
-        setClicked(false);
+      },
+      onError(_error) {
+        setError("Something went wrong while logging in");
       },
       onComplete() {
         setError(null);

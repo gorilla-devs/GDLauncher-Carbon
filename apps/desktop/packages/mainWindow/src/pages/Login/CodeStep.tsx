@@ -140,7 +140,8 @@ const CodeStep = (props: Props) => {
       },
       onFail() {
         setEnrollmentInProgress(false);
-        setError("something went wrong while logging in");
+        setError("Something went wrong while logging in");
+        accountEnrollCancelMutation.mutate(undefined);
         props.setStep(0);
       },
       onComplete(account) {
@@ -148,6 +149,11 @@ const CodeStep = (props: Props) => {
         // if (finalizeMutation.isSuccess) {
         setActiveUUIDMutation.mutate(account.uuid);
         // }
+      },
+      onError() {
+        setError("Something went wrong while logging in");
+        accountEnrollCancelMutation.mutate(undefined);
+        props.setStep(0);
       },
     });
   });
