@@ -2,9 +2,18 @@ import { QueryClient } from "@tanstack/solid-query";
 import { createClient, wsLink, createWSClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
+import { reconcile } from "solid-js/store";
 
 export const rspc = createSolidQueryHooks<Procedures>();
-export const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      structuralSharing(oldData, newData) {
+        return reconcile(newData)(oldData);
+      },
+    },
+  },
+});
 
 export let port: number | null = null;
 

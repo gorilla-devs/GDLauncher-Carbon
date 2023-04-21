@@ -2,12 +2,18 @@
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useParams,
+  useRouteData,
+} from "@solidjs/router";
 import { For, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
-import { convertMinutesToHumanTime } from "@/utils/helpers";
+import fetchData from "./instance.data";
 
 type InstancePage = {
   label: string;
@@ -19,15 +25,18 @@ const Instance = () => {
   const params = useParams();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const moveInstancepMutation = rspc.createMutation(["instance.moveInstance"]);
+  const moveInstanceMutation = rspc.createMutation(["instance.moveInstance"]);
 
   const createGroupMutation = rspc.createMutation(["instance.createGroup"], {
     onSuccess(groupId) {
-      // moveInstancepMutation.mutate({
-      //   instance: parseInt(params.id, 10),
-      //   target: {},
-      // });
+      moveInstanceMutation.mutate({
+        instance: parseInt(params.id, 10),
+        target: {
+          BeginningOfGroup: groupId,
+        },
+      });
     },
   });
 
@@ -65,11 +74,6 @@ const Instance = () => {
   let bgRef: HTMLDivElement;
   let innerContainerRef: HTMLDivElement;
   let refStickyContainer: HTMLDivElement;
-
-  const instanceDetails = rspc.createQuery(() => [
-    "mc.getInstanceDetails",
-    params.id,
-  ]);
 
   return (
     <div
@@ -146,9 +150,16 @@ const Instance = () => {
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 w-full justify-end lg:flex-row">
-                  <div class="bg-darkSlate-800 h-16 w-16 rounded-xl">
-                    {/* <img /> */}
-                  </div>
+                  <div
+                    class="h-16 w-16 rounded-xl bg-center bg-cover"
+                    classList={{
+                      "bg-darkSlate-800": !routeData.image(),
+                    }}
+                    style={{
+                      "background-image": `url("${routeData.image()}")`,
+                    }}
+                  />
+
                   <div class="flex flex-col max-w-185 flex-1">
                     <div class="flex gap-4 items-center">
                       <h1
@@ -161,7 +172,7 @@ const Instance = () => {
                           setEditableName(false);
                         }}
                       >
-                        {instanceDetails.data?.name}
+                        {routeData.instanceDetails.data?.name}
                       </h1>
                       <div class="flex gap-2">
                         <div
@@ -184,19 +195,23 @@ const Instance = () => {
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                         <div class="p-0 m-0 flex gap-2 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
-                          <span>{instanceDetails.data?.modloader}</span>
-                          <span>{instanceDetails.data?.modloader_version}</span>
+                          <span>
+                            {
+                              routeData.instanceDetails.data?.modloaders[0]
+                                .type_
+                            }
+                          </span>
+                          <span>
+                            {routeData.instanceDetails.data?.mc_version}
+                          </span>
                         </div>
                         <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
                           <div class="i-ri:time-fill" />
                           <span>
-                            {convertMinutesToHumanTime(
-                              parseInt(
-                                (instanceDetails.data?.last_played ||
-                                  "0") as string,
-                                10
-                              )
-                            )}
+                            {/* {formatDistance(
+                      routeData.instanceDetails.data?.last_played || Date.now(),
+                      Date.now()
+                    )} */}
                           </span>
                         </div>
                         <div class="p-0 lg:px-4 flex gap-2 items-center">
@@ -222,7 +237,13 @@ const Instance = () => {
                             createGroupMutation.mutate("localize>favorites")
                           }
                         >
-                          <div class="text-xl i-ri:star-s-fill" />
+                          <div
+                            class="text-xl i-ri:star-s-fill"
+                            // classList={{
+                            //   "color-yellow-500":
+                            //     routeData.instanceDetails.data.favorite,
+                            // }}
+                          />
                         </div>
                         <Button uppercase variant="glow" size="large">
                           <Trans
@@ -264,15 +285,21 @@ const Instance = () => {
             </Button>
           </div>
           <div class="flex flex-1 flex-col max-w-185">
-            <h4 class="m-0">{params.id}</h4>
+            <h4 class="m-0"> {routeData.instanceDetails.data?.name}</h4>
             <div class="flex flex-col lg:flex-row justify-between">
               <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-darkSlate-50">
                 <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
-                  Forge 1.19.2
+                  {routeData.instanceDetails.data?.modloader}
+                  {routeData.instanceDetails.data?.mc_version}
                 </div>
                 <div class="text-xs p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                   <div class="i-ri:time-fill" />
-                  1d ago
+                  <span>
+                    {/* {formatDistance(
+                      routeData.instanceDetails.data?.last_played || Date.now(),
+                      Date.now()
+                    )} */}
+                  </span>
                 </div>
                 <div class="text-xs p-0 lg:px-2 flex gap-2 items-center">
                   <div class="i-ri:user-fill" />

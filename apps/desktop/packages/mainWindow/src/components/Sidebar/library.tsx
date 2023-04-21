@@ -12,9 +12,10 @@ import { createStore, produce } from "solid-js/store";
 import {
   InvalidInstanceType,
   ValidInstanceType,
+  fetchImage,
   isListInstanceValid,
 } from "@/utils/instances";
-import { blobToBase64 } from "@/utils/helpers";
+import { useModal } from "@/managers/ModalsManager";
 
 export interface InstancesStore {
   favorites: (InvalidInstanceType | ValidInstanceType)[];
@@ -29,6 +30,7 @@ const Sidebar = () => {
   const location = useLocation();
 
   const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -41,12 +43,6 @@ const Sidebar = () => {
     if (routeData.instancesUngrouped.data) {
       Promise.all(
         routeData.instancesUngrouped.data.map(async (instance) => {
-          const fetchImage = async (id: number) => {
-            return await fetch(
-              `http://localhost:${4650}/instance/instanceIcon?id=${id}`
-            );
-          };
-
           const validInstance = isListInstanceValid(instance.status)
             ? instance.status.Valid
             : null;
@@ -55,10 +51,7 @@ const Sidebar = () => {
             : null;
           const modloader = validInstance?.modloader;
 
-          const image = await fetchImage(instance.id);
-
-          const blob = await image.blob();
-          const b64 = (await blobToBase64(blob)) as string;
+          const b64Image = await fetchImage(instance.id);
 
           if (validInstance && modloader) {
             const mappedInstance: InvalidInstanceType | ValidInstanceType = {
@@ -69,7 +62,7 @@ const Sidebar = () => {
               ...(validInstance && {
                 modpack_platform: validInstance.modpack_platform,
               }),
-              ...(validInstance && { img: b64 }),
+              ...(validInstance && { img: b64Image }),
               ...(validInstance && { modloader }),
               ...(InvalidInstance && { error: InvalidInstance }),
             };
@@ -153,7 +146,12 @@ const Sidebar = () => {
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
             variant="outline"
-            onClick={() => navigate(`/modpacks`)}
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "instanceCreation",
+                url: "/modpacks",
+              });
+            }}
             style={{
               ...(isSidebarOpened()
                 ? { width: "100%", "max-width": "200px" }

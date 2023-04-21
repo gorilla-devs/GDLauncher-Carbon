@@ -29,7 +29,7 @@ const InstanceCreation = (props: ModalProps) => {
               }}
             />
           </h5>
-          <TextArea value="New instance" class="min-h-40" />
+          <TextArea value="New instance" class="min-h-40 resize-none" />
         </div>
         <div>
           <h5 class="mt-0 mb-2">
@@ -72,6 +72,7 @@ const InstanceCreation = (props: ModalProps) => {
             containerClass="w-full"
             class="w-full"
             value="1.16.2"
+            placement="bottom"
           />
         </div>
         <div class="flex w-full justify-between">

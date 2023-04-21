@@ -15,9 +15,9 @@ import fetchData from "../Library/library.data";
 import {
   InvalidInstanceType,
   ValidInstanceType,
+  fetchImage,
   isListInstanceValid,
 } from "@/utils/instances";
-import { blobToBase64 } from "@/utils/helpers";
 
 const Home = () => {
   const navigate = useGDNavigate();
@@ -30,7 +30,7 @@ const Home = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const [port] = createResource(async () => {
-    let port = await window.getCoreModuleStatus();
+    let port = await window.getCoreModulePort();
     return port;
   });
 
@@ -38,13 +38,7 @@ const Home = () => {
     if (routeData.instancesUngrouped.data && port()) {
       Promise.all(
         routeData.instancesUngrouped.data.map(async (instance) => {
-          const fetchImage = async (id: number) => {
-            return await fetch(
-              `http://localhost:${port()}/instance/instanceIcon?id=${id}`
-            );
-          };
-
-          const image = await fetchImage(instance.id);
+          const b64Image = await fetchImage(instance.id);
 
           const validInstance = isListInstanceValid(instance.status)
             ? instance.status.Valid
@@ -55,10 +49,7 @@ const Home = () => {
             : null;
 
           const modloader = validInstance?.modloader;
-
-          const blob = await image.blob();
-          const b64 = (await blobToBase64(blob)) as string;
-
+          console.log("instances", instance);
           const mappedInstance: InvalidInstanceType | ValidInstanceType = {
             id: instance.id,
             name: instance.name,
@@ -68,12 +59,7 @@ const Home = () => {
               modpack_platform: validInstance.modpack_platform,
             }),
             ...(validInstance && {
-              img:
-                image.status === 204
-                  ? ""
-                  : `data:image/png;base64, ${b64.substring(
-                      b64.indexOf(",") + 1
-                    )}`,
+              img: b64Image,
             }),
             ...(validInstance && { modloader }),
             ...(InvalidInstance && { error: InvalidInstance }),

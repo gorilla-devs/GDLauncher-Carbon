@@ -21,6 +21,7 @@ export type Props = {
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
+  placement?: "bottom" | "top";
 };
 export interface DropDownButtonProps {
   children: JSX.Element;
@@ -126,7 +127,7 @@ const Dropdown = (props: Props) => {
       </button>
 
       <ul
-        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
+        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -138,6 +139,8 @@ const Dropdown = (props: Props) => {
           hidden: !menuOpened(),
           "-left-10": props.btnDropdown,
           "min-w-20": props.btnDropdown,
+          "bottom-[50px]": props.placement === "bottom",
+          "bottom-auto": props.placement === "top" || !props.placement,
         }}
       >
         <For each={props.options}>
