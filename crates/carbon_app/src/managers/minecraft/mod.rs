@@ -1,41 +1,44 @@
 use anyhow::anyhow;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
+use reqwest::Url;
 
 use crate::domain::minecraft::{
-    manifest::{ManifestVersion, MinecraftManifest},
-    version::Version,
+    minecraft::{ManifestVersion, MinecraftManifest, Version},
+    modded::ModdedManifest,
 };
 
 use super::ManagerRef;
 
 mod assets;
-mod manifest;
-mod version;
+mod forge;
+mod minecraft;
 
-pub(crate) struct MinecraftManager {}
+pub(crate) struct MinecraftManager {
+    meta_base_url: Url,
+}
 
 impl MinecraftManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            meta_base_url: Url::parse("https://meta.gdlauncher.com/").unwrap(),
+        }
     }
 }
 
 impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_manifest(&self) -> anyhow::Result<MinecraftManifest> {
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-
-        manifest::get_meta(client).await
+        minecraft::get_manifest(self.app.reqwest_client.clone(), &self.meta_base_url).await
     }
 
     pub async fn get_minecraft_version(
         &self,
         manifest_version_meta: ManifestVersion,
     ) -> anyhow::Result<Version> {
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        minecraft::get_version(self.app.reqwest_client.clone(), manifest_version_meta).await
+    }
 
-        version::get_meta(client, manifest_version_meta).await
+    pub async fn get_forge_manifest(&self) -> anyhow::Result<ModdedManifest> {
+        forge::get_manifest(self.app.reqwest_client.clone(), &self.meta_base_url).await
     }
 
     pub async fn get_game_download_files_list(
@@ -44,7 +47,11 @@ impl ManagerRef<'_, MinecraftManager> {
     ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
-        let manifest = manifest::get_meta(self.app.reqwest_client.clone()).await?;
+        let manifest = minecraft::get_manifest(
+            self.app.reqwest_client.clone(),
+            &Url::parse("https://meta.gdlauncher.com/").unwrap(),
+        )
+        .await?;
 
         let manifest_version = manifest
             .versions
@@ -53,7 +60,8 @@ impl ManagerRef<'_, MinecraftManager> {
             .ok_or(anyhow!("Minecraft version not found"))?;
 
         let version =
-            version::get_meta(self.app.reqwest_client.clone(), manifest_version.clone()).await?;
+            minecraft::get_version(self.app.reqwest_client.clone(), manifest_version.clone())
+                .await?;
 
         let mut all_files = vec![];
 
@@ -91,7 +99,7 @@ mod tests {
 
     use crate::managers::{
         account::{FullAccount, FullAccountType},
-        minecraft::version::generate_startup_command,
+        minecraft::minecraft::generate_startup_command,
     };
 
     // #[tokio::test(flavor = "multi_thread", worker_threads = 12)]

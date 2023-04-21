@@ -1,10 +1,36 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use carbon_net::{IntoDownloadable, IntoVecDownloadable};
 use serde::{Deserialize, Serialize};
 
+use super::modded::{Processor, SidedDataEntry};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MinecraftManifest {
+    pub latest: MinecraftLatest,
+    pub versions: Vec<ManifestVersion>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MinecraftLatest {
+    pub release: String,
+    pub snapshot: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ManifestVersion {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_: VersionType,
+    pub url: String,
+    pub time: String,
+    #[serde(rename = "releaseTime")]
+    pub release_time: String,
+    pub sha1: String,
+}
+
 // Need custom type to impl external traits for Vec<Library>
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Libraries {
     libraries: Vec<Library>,
 }
@@ -41,11 +67,11 @@ impl IntoVecDownloadable for Libraries {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Version {
     pub inherits_from: Option<String>,
-    pub arguments: Option<Arguments>,
+    pub arguments: Option<VersionArguments>,
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
     pub compliance_level: Option<i64>,
@@ -61,7 +87,13 @@ pub struct Version {
     pub time: Option<String>,
     pub minecraft_arguments: Option<String>,
     #[serde(rename = "type")]
-    pub type_: Option<String>,
+    pub type_: VersionType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (Forge-only)
+    pub data: Option<HashMap<String, SidedDataEntry>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (Forge-only) The list of processors to run after downloading the files
+    pub processors: Option<Vec<Processor>>,
 }
 
 impl Version {
@@ -83,6 +115,35 @@ impl Version {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum VersionType {
+    #[serde(rename = "old_alpha")]
+    OldAlpha,
+    #[serde(rename = "old_beta")]
+    OldBeta,
+    #[serde(rename = "release")]
+    Release,
+    #[serde(rename = "snapshot")]
+    Snapshot,
+}
+
+impl From<VersionType> for String {
+    fn from(type_: VersionType) -> Self {
+        type_.to_string()
+    }
+}
+
+impl ToString for VersionType {
+    fn to_string(&self) -> String {
+        match self {
+            VersionType::OldAlpha => "old_alpha".to_string(),
+            VersionType::OldBeta => "old_beta".to_string(),
+            VersionType::Release => "release".to_string(),
+            VersionType::Snapshot => "snapshot".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Argument {
     Complex(ArgumentEntry),
@@ -90,12 +151,12 @@ pub enum Argument {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Arguments {
+pub struct VersionArguments {
     pub game: Vec<Argument>,
     pub jvm: Vec<Argument>,
 }
 
-impl Default for Arguments {
+impl Default for VersionArguments {
     fn default() -> Self {
         Self {
             game: vec![
@@ -188,7 +249,7 @@ pub struct ArgumentEntry {
     pub value: Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VersionAssetIndex {
     pub id: String,
     pub sha1: String,
@@ -198,7 +259,7 @@ pub struct VersionAssetIndex {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VersionDownloads {
     pub client: VersionDownloadsMappingsClass,
     pub client_mappings: Option<VersionDownloadsMappingsClass>,
@@ -223,7 +284,7 @@ impl IntoDownloadable for VersionDownloadsMappingsClass {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JavaVersion {
     pub component: String,
     #[serde(rename = "majorVersion")]
@@ -453,12 +514,12 @@ impl Default for OsName {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Logging {
     pub client: LoggingClient,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoggingClient {
     pub argument: String,
     pub file: VersionAssetIndex,

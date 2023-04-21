@@ -1,19 +1,17 @@
 use std::path::PathBuf;
 
-use crate::domain::maven::MavenCoordinates;
+use crate::domain::{
+    maven::MavenCoordinates,
+    minecraft::minecraft::{Argument, Library, ManifestVersion, MinecraftManifest, Value, Version},
+};
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
+use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 
 use crate::{
-    domain::{
-        minecraft::{
-            manifest::ManifestVersion,
-            version::{Argument, Library, Value, Version},
-        },
-        runtime_path::{InstancePath, RuntimePath},
-    },
+    domain::runtime_path::{InstancePath, RuntimePath},
     managers::account::{FullAccount, FullAccountType},
 };
 
@@ -25,7 +23,30 @@ pub enum VersionError {
     QueryError(#[from] QueryError),
 }
 
-pub async fn get_meta(
+#[derive(Error, Debug)]
+pub enum MinecraftManifestError {
+    #[error("Could not fetch minecraft manifest from launchermeta: {0}")]
+    NetworkError(#[from] reqwest::Error),
+    #[error("Manifest database query error: {0}")]
+    DBQueryError(#[from] QueryError),
+}
+
+pub async fn get_manifest(
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+    meta_base_url: &Url,
+) -> anyhow::Result<MinecraftManifest> {
+    let server_url = meta_base_url.join("minecraft/v0/manifest.json")?;
+    let new_manifest = reqwest_client
+        .get(server_url)
+        .send()
+        .await?
+        .json::<MinecraftManifest>()
+        .await?;
+
+    Ok(new_manifest)
+}
+
+pub async fn get_version(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
 ) -> anyhow::Result<Version> {
@@ -35,16 +56,16 @@ pub async fn get_meta(
     Ok(version_meta)
 }
 
-// pub async fn save_meta_to_disk(version: Version, clients_path: PathBuf) -> anyhow::Result<()> {
-//     tokio::fs::create_dir_all(&clients_path).await?;
-//     tokio::fs::write(
-//         clients_path.join(format!("{}.json", version.id)),
-//         serde_json::to_string(&version)?,
-//     )
-//     .await?;
+pub async fn save_meta_to_disk(version: Version, clients_path: PathBuf) -> anyhow::Result<()> {
+    tokio::fs::create_dir_all(&clients_path).await?;
+    tokio::fs::write(
+        clients_path.join(format!("{}.json", version.id)),
+        serde_json::to_string(&version)?,
+    )
+    .await?;
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 #[cfg(target_os = "windows")]
 const CLASSPATH_SEPARATOR: &str = ";";
@@ -290,7 +311,7 @@ pub async fn generate_startup_command(
         auth_access_token: player_token.clone(),
         auth_session: player_token,
         user_type: "mojang".to_owned(),
-        version_type: version.type_.as_ref().unwrap().to_owned(),
+        version_type: version.type_.to_string(),
         user_properties: "{}".to_owned(),
     };
 
@@ -392,7 +413,7 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{domain::minecraft::manifest::MinecraftManifest, setup_managers_for_test};
+    use crate::setup_managers_for_test;
 
     use super::*;
     use carbon_net::Progress;
@@ -407,7 +428,6 @@ mod tests {
         }
     }
 
-    // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
         let app = setup_managers_for_test().await;

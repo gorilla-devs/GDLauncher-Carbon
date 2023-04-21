@@ -1,3 +1,3 @@
 pub mod assets;
-pub mod manifest;
-pub mod version;
+pub mod minecraft;
+pub mod modded;

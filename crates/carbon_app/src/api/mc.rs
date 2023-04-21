@@ -177,8 +177,8 @@ pub struct ManifestVersion {
     pub type_: McType,
 }
 
-impl From<crate::domain::minecraft::manifest::ManifestVersion> for ManifestVersion {
-    fn from(value: crate::domain::minecraft::manifest::ManifestVersion) -> Self {
+impl From<crate::domain::minecraft::minecraft::ManifestVersion> for ManifestVersion {
+    fn from(value: crate::domain::minecraft::minecraft::ManifestVersion) -> Self {
         ManifestVersion {
             id: value.id,
             type_: value.type_.into(),
@@ -198,9 +198,9 @@ pub enum McType {
     Snapshot,
 }
 
-impl From<crate::domain::minecraft::manifest::McType> for McType {
-    fn from(value: crate::domain::minecraft::manifest::McType) -> Self {
-        use crate::domain::minecraft::manifest::McType as domain;
+impl From<crate::domain::minecraft::minecraft::VersionType> for McType {
+    fn from(value: crate::domain::minecraft::minecraft::VersionType) -> Self {
+        use crate::domain::minecraft::minecraft::VersionType as domain;
 
         match value {
             domain::OldAlpha => Self::OldAlpha,
