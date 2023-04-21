@@ -1,19 +1,19 @@
 use std::path::PathBuf;
 
-use carbon_domain::{
-    maven::MavenCoordinates,
-    minecraft::{
-        manifest::ManifestVersion,
-        version::{Argument, Library, Value, Version},
-    },
-};
+use crate::domain::maven::MavenCoordinates;
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
 use strum_macros::EnumIter;
 use thiserror::Error;
 
 use crate::{
-    domain::runtime_path::{InstancePath, RuntimePath},
+    domain::{
+        minecraft::{
+            manifest::ManifestVersion,
+            version::{Argument, Library, Value, Version},
+        },
+        runtime_path::{InstancePath, RuntimePath},
+    },
     managers::account::{FullAccount, FullAccountType},
 };
 
@@ -28,21 +28,23 @@ pub enum VersionError {
 pub async fn get_meta(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
-    clients_path: PathBuf,
 ) -> anyhow::Result<Version> {
     let url = manifest_version_meta.url;
+    let version_meta = reqwest_client.get(url).send().await?.json().await?;
 
-    let version_meta_bytes = reqwest_client.get(url).send().await?.bytes().await?;
-
-    tokio::fs::create_dir_all(&clients_path).await?;
-    tokio::fs::write(
-        clients_path.join(format!("{}.json", manifest_version_meta.id)),
-        version_meta_bytes.clone(),
-    )
-    .await?;
-
-    Ok(serde_json::from_slice::<Version>(&version_meta_bytes)?)
+    Ok(version_meta)
 }
+
+// pub async fn save_meta_to_disk(version: Version, clients_path: PathBuf) -> anyhow::Result<()> {
+//     tokio::fs::create_dir_all(&clients_path).await?;
+//     tokio::fs::write(
+//         clients_path.join(format!("{}.json", version.id)),
+//         serde_json::to_string(&version)?,
+//     )
+//     .await?;
+
+//     Ok(())
+// }
 
 #[cfg(target_os = "windows")]
 const CLASSPATH_SEPARATOR: &str = ";";
@@ -390,8 +392,9 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
 
 #[cfg(test)]
 mod tests {
+    use crate::{domain::minecraft::manifest::MinecraftManifest, setup_managers_for_test};
+
     use super::*;
-    use carbon_domain::minecraft::manifest::MinecraftManifest;
     use carbon_net::Progress;
     use chrono::Utc;
 
@@ -407,14 +410,21 @@ mod tests {
     // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
-        let manifest = MinecraftManifest::fetch().await.unwrap();
+        let app = setup_managers_for_test().await;
 
-        let version = manifest
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_manifest()
+            .await
+            .unwrap()
             .versions
             .into_iter()
             .find(|v| v.id == "1.16.5")
-            .unwrap()
-            .fetch()
+            .unwrap();
+
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_version(version)
             .await
             .unwrap();
 
@@ -457,13 +467,19 @@ mod tests {
 
         let runtime_path = &app.settings_manager().runtime_path;
 
-        let manifest = MinecraftManifest::fetch().await.unwrap();
-        let version = manifest
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_manifest()
+            .await
+            .unwrap()
             .versions
             .into_iter()
             .find(|v| v.id == "1.16.5")
-            .unwrap()
-            .fetch()
+            .unwrap();
+
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_version(version)
             .await
             .unwrap();
 

@@ -1,6 +1,10 @@
 use anyhow::anyhow;
-use carbon_domain::minecraft::manifest::ManifestVersion;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
+
+use crate::domain::minecraft::{
+    manifest::{ManifestVersion, MinecraftManifest},
+    version::Version,
+};
 
 use super::ManagerRef;
 
@@ -17,10 +21,21 @@ impl MinecraftManager {
 }
 
 impl ManagerRef<'_, MinecraftManager> {
-    pub async fn get_minecraft_versions(&self) -> Vec<ManifestVersion> {
-        manifest::get_meta(self.app.reqwest_client.clone())
-            .await
-            .unwrap()
+    pub async fn get_minecraft_manifest(&self) -> anyhow::Result<MinecraftManifest> {
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+
+        manifest::get_meta(client).await
+    }
+
+    pub async fn get_minecraft_version(
+        &self,
+        manifest_version_meta: ManifestVersion,
+    ) -> anyhow::Result<Version> {
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+
+        version::get_meta(client, manifest_version_meta).await
     }
 
     pub async fn get_game_download_files_list(
@@ -32,16 +47,13 @@ impl ManagerRef<'_, MinecraftManager> {
         let manifest = manifest::get_meta(self.app.reqwest_client.clone()).await?;
 
         let manifest_version = manifest
+            .versions
             .iter()
             .find(|v| v.id == mc_version)
             .ok_or(anyhow!("Minecraft version not found"))?;
 
-        let version = version::get_meta(
-            self.app.reqwest_client.clone(),
-            manifest_version.clone(),
-            runtime_path.get_versions().get_clients_path(),
-        )
-        .await?;
+        let version =
+            version::get_meta(self.app.reqwest_client.clone(), manifest_version.clone()).await?;
 
         let mut all_files = vec![];
 

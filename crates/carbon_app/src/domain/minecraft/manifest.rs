@@ -6,15 +6,6 @@ pub struct MinecraftManifest {
     pub versions: Vec<ManifestVersion>,
 }
 
-impl MinecraftManifest {
-    pub async fn fetch() -> Result<Self, reqwest::Error> {
-        reqwest::get("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
-            .await?
-            .json::<MinecraftManifest>()
-            .await
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Latest {
     pub release: String,
@@ -25,7 +16,7 @@ pub struct Latest {
 pub struct ManifestVersion {
     pub id: String,
     #[serde(rename = "type")]
-    pub type_: Type,
+    pub type_: McType,
     pub url: String,
     pub time: String,
     #[serde(rename = "releaseTime")]
@@ -33,17 +24,8 @@ pub struct ManifestVersion {
     pub sha1: String,
 }
 
-impl ManifestVersion {
-    pub async fn fetch(&self) -> Result<super::version::Version, reqwest::Error> {
-        reqwest::get(&self.url)
-            .await?
-            .json::<super::version::Version>()
-            .await
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Type {
+pub enum McType {
     #[serde(rename = "old_alpha")]
     OldAlpha,
     #[serde(rename = "old_beta")]
@@ -54,13 +36,13 @@ pub enum Type {
     Snapshot,
 }
 
-impl From<Type> for String {
-    fn from(type_: Type) -> Self {
+impl From<McType> for String {
+    fn from(type_: McType) -> Self {
         match type_ {
-            Type::OldAlpha => "old_alpha".to_string(),
-            Type::OldBeta => "old_beta".to_string(),
-            Type::Release => "release".to_string(),
-            Type::Snapshot => "snapshot".to_string(),
+            McType::OldAlpha => "old_alpha".to_string(),
+            McType::OldBeta => "old_beta".to_string(),
+            McType::Release => "release".to_string(),
+            McType::Snapshot => "snapshot".to_string(),
         }
     }
 }

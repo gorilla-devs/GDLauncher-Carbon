@@ -1,6 +1,6 @@
 use std::{ops::Deref, path::PathBuf};
 
-use carbon_domain::maven::MavenCoordinates;
+use super::maven::MavenCoordinates;
 
 pub struct RuntimePath(PathBuf);
 
