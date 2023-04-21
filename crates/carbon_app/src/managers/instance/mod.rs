@@ -931,11 +931,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub async fn instance_details(
         self,
-        instance: InstanceId,
+        instance_id: InstanceId,
     ) -> anyhow::Result<domain::InstanceDetails> {
         let instances = self.instances.read().await;
         let instance = instances
-            .get(&instance)
+            .get(&instance_id)
             .ok_or_else(|| anyhow!("instance_details called with invalid instance id"))?;
 
         let instance = match &instance.type_ {
@@ -943,7 +943,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceType::Valid(x) => x,
         };
 
+        let group_name = self
+            .app
+            .prisma_client
+            .instance()
+            .find_unique(db::instance::UniqueWhereParam::IdEquals(*instance_id))
+            .with(db::instance::group::fetch())
+            .exec()
+            .await?
+            .ok_or(anyhow!("Instance present in instances list but not db"))?
+            .group
+            .ok_or(anyhow!(
+                "Requested group relation for instance but prisma returned None"
+            ))?
+            .name;
+
         Ok(domain::InstanceDetails {
+            favorite: group_name == "localize➽favorite",
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
                 info::GameVersion::Standard(version) => version.release.clone(),

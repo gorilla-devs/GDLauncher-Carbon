@@ -326,6 +326,7 @@ enum MoveInstanceTarget {
 
 #[derive(Type, Serialize)]
 pub struct InstanceDetails {
+    pub favorite: bool,
     pub name: String,
     pub version: String,
     pub last_played: DateTime<Utc>,
@@ -350,6 +351,7 @@ pub enum ModLoaderType {
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
+            favorite: value.favorite,
             name: value.name,
             version: value.version,
             last_played: value.last_played,
