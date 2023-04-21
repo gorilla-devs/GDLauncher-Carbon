@@ -6,6 +6,7 @@ import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
 import LibraryData from "@/pages/Library/library.data";
 import InstanceData from "@/pages/Library/Instance/instance.data";
+import BrowserData from "@/pages/Modpacks/browser.data";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -80,18 +81,11 @@ export const routes: RouteDefinition[] = [
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
-        data: async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10000));
-          console.log("Fetching whatever data...");
-          return {};
-        },
         children: [
           {
             path: "/",
             component: lazy(() => import("@/pages/Modpacks/Browser")),
-            data: () => {
-              console.log("Fetching modpacks data...");
-            },
+            data: BrowserData,
           },
         ],
       },

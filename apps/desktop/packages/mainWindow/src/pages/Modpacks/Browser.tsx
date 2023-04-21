@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import BG from "/assets/images/rlccraft_img.png";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
@@ -8,6 +8,9 @@ import Tags from "./Tags";
 import CurseforgeIcon from "/assets/images/icons/curseforge.png";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
+import fetchData from "./browser.data";
+import { useRouteData } from "@solidjs/router";
+import { setMcVersions } from "@/utils/mcVersion";
 
 const modpacks = [
   {
@@ -98,6 +101,13 @@ const NoModpacks = () => {
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  createEffect(() => {
+    if (routeData.minecraftVersion.data)
+      setMcVersions(routeData.minecraftVersion.data);
+  });
+
   return (
     <div class="w-full relative box-border">
       <div class="flex flex-col left-0 right-0 sticky top-0 bg-darkSlate-800 z-10 px-5 pt-5">

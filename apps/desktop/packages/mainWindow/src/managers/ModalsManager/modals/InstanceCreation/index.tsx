@@ -2,9 +2,28 @@ import { Button, Dropdown, Input, TextArea } from "@gd/ui";
 import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
+import { createEffect, createSignal } from "solid-js";
+import { mcVersions } from "@/utils/mcVersion";
+
+type MappedMcVersion = {
+  label: string;
+  key: string;
+};
 
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
+
+  const [mappedMcVersions, setMappedMcVersions] = createSignal<
+    MappedMcVersion[]
+  >([]);
+
+  createEffect(() => {
+    const versions = mcVersions().map((version) => ({
+      label: `${version.id} - ${version.type}`,
+      key: version.id,
+    }));
+    setMappedMcVersions(versions);
+  });
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
@@ -62,16 +81,11 @@ const InstanceCreation = (props: ModalProps) => {
             />
           </h5>
           <Dropdown
-            options={[
-              { label: "1.16.5", key: "1.16.5" },
-              { label: "1.16.4", key: "1.16.4" },
-              { label: "1.16.3", key: "1.16.3" },
-              { label: "1.16.2", key: "1.16.2" },
-            ]}
+            options={mappedMcVersions()}
             bgColorClass="bg-darkSlate-800"
             containerClass="w-full"
             class="w-full"
-            value="1.16.2"
+            value={mappedMcVersions()[0].key}
             placement="bottom"
           />
         </div>
