@@ -3,7 +3,7 @@ use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
 use reqwest::Url;
 
 use crate::domain::minecraft::{
-    minecraft::{ManifestVersion, MinecraftManifest, Version},
+    minecraft::{ManifestVersion, MinecraftManifest, VersionInfo},
     modded::ModdedManifest,
 };
 
@@ -33,7 +33,7 @@ impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_version(
         &self,
         manifest_version_meta: ManifestVersion,
-    ) -> anyhow::Result<Version> {
+    ) -> anyhow::Result<VersionInfo> {
         minecraft::get_version(self.app.reqwest_client.clone(), manifest_version_meta).await
     }
 

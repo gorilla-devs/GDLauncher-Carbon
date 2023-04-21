@@ -2,7 +2,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::minecraft::{Library, VersionArguments, VersionType};
+use super::minecraft::{Libraries, Library, VersionArguments, VersionInfo, VersionType};
+
+pub const DUMMY_REPLACE_STRING: &str = "${gdlauncher.gameVersion}";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +45,75 @@ pub struct PartialVersionInfo {
     pub data: Option<HashMap<String, SidedDataEntry>>,
     /// (Forge-only) The list of processors to run after downloading the files
     pub processors: Option<Vec<Processor>>,
+}
+
+pub fn merge_partial_version(partial: PartialVersionInfo, merge: VersionInfo) -> VersionInfo {
+    let merge_id = merge.id.clone();
+
+    VersionInfo {
+        arguments: if let Some(partial_args) = partial.arguments {
+            if let Some(merge_args) = merge.arguments {
+                let mut new_map = VersionArguments::new();
+
+                fn add_keys(new_map: &mut VersionArguments, args: VersionArguments) {
+                    for game in args.game {
+                        if !new_map.game.contains(&game) {
+                            new_map.game.push(game);
+                        }
+                    }
+
+                    for jvm in args.jvm {
+                        if !new_map.jvm.contains(&jvm) {
+                            new_map.jvm.push(jvm);
+                        }
+                    }
+                }
+
+                add_keys(&mut new_map, merge_args);
+                add_keys(&mut new_map, partial_args);
+
+                Some(new_map)
+            } else {
+                Some(partial_args)
+            }
+        } else {
+            merge.arguments
+        },
+        asset_index: merge.asset_index,
+        inherits_from: merge.inherits_from,
+        assets: merge.assets,
+        downloads: merge.downloads,
+        id: partial.id.replace(DUMMY_REPLACE_STRING, &merge_id),
+        java_version: merge.java_version,
+        libraries: Libraries {
+            libraries: partial
+                .libraries
+                .into_iter()
+                .chain(merge.libraries.libraries)
+                .map(|x| Library {
+                    downloads: x.downloads,
+                    extract: x.extract,
+                    name: x.name.replace(DUMMY_REPLACE_STRING, &merge_id),
+                    url: x.url,
+                    natives: x.natives,
+                    rules: x.rules,
+                })
+                .collect::<Vec<_>>(),
+        },
+        main_class: if let Some(main_class) = partial.main_class {
+            main_class
+        } else {
+            merge.main_class
+        },
+        minecraft_arguments: partial.minecraft_arguments,
+        minimum_launcher_version: merge.minimum_launcher_version,
+        release_time: partial.release_time,
+        time: partial.time,
+        type_: partial.type_,
+        data: partial.data,
+        processors: partial.processors,
+        logging: merge.logging,
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use crate::domain::{
     maven::MavenCoordinates,
-    minecraft::minecraft::{Argument, Library, ManifestVersion, MinecraftManifest, Value, Version},
+    minecraft::minecraft::{
+        Argument, Library, ManifestVersion, MinecraftManifest, Value, VersionInfo,
+    },
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -49,14 +51,14 @@ pub async fn get_manifest(
 pub async fn get_version(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
-) -> anyhow::Result<Version> {
+) -> anyhow::Result<VersionInfo> {
     let url = manifest_version_meta.url;
     let version_meta = reqwest_client.get(url).send().await?.json().await?;
 
     Ok(version_meta)
 }
 
-pub async fn save_meta_to_disk(version: Version, clients_path: PathBuf) -> anyhow::Result<()> {
+pub async fn save_meta_to_disk(version: VersionInfo, clients_path: PathBuf) -> anyhow::Result<()> {
     tokio::fs::create_dir_all(&clients_path).await?;
     tokio::fs::write(
         clients_path.join(format!("{}.json", version.id)),
@@ -204,7 +206,7 @@ pub async fn generate_startup_command(
     xmx_memory: u16,
     xms_memory: u16,
     runtime_path: &RuntimePath,
-    version: Version,
+    version: VersionInfo,
     instance_id: &str,
 ) -> Vec<String> {
     let libraries = version
@@ -342,7 +344,7 @@ pub async fn generate_startup_command(
         .collect()
 }
 
-pub async fn extract_natives(runtime_path: &RuntimePath, version: &Version) {
+pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) {
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,

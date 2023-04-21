@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use carbon_net::{IntoDownloadable, IntoVecDownloadable};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::modded::{Processor, SidedDataEntry};
@@ -32,7 +33,7 @@ pub struct ManifestVersion {
 // Need custom type to impl external traits for Vec<Library>
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Libraries {
-    libraries: Vec<Library>,
+    pub libraries: Vec<Library>,
 }
 impl Libraries {
     pub fn get_allowed_libraries(&self) -> Vec<Library> {
@@ -69,12 +70,11 @@ impl IntoVecDownloadable for Libraries {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Version {
+pub struct VersionInfo {
     pub inherits_from: Option<String>,
     pub arguments: Option<VersionArguments>,
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
-    pub compliance_level: Option<i64>,
     pub downloads: Option<VersionDownloads>,
     pub id: String,
     pub java_version: Option<JavaVersion>,
@@ -83,8 +83,8 @@ pub struct Version {
     pub logging: Option<Logging>,
     pub main_class: String,
     pub minimum_launcher_version: Option<i64>,
-    pub release_time: Option<String>,
-    pub time: Option<String>,
+    pub release_time: DateTime<Utc>,
+    pub time: DateTime<Utc>,
     pub minecraft_arguments: Option<String>,
     #[serde(rename = "type")]
     pub type_: VersionType,
@@ -96,21 +96,9 @@ pub struct Version {
     pub processors: Option<Vec<Processor>>,
 }
 
-impl Version {
-    pub fn is_older_than(&self, other: &Version) -> bool {
-        if let Some(release_time) = &self.release_time {
-            if let Some(other_release_time) = &other.release_time {
-                return release_time < other_release_time;
-            }
-        }
-
-        if let Some(time) = &self.time {
-            if let Some(other_time) = &other.time {
-                return time < other_time;
-            }
-        }
-
-        false
+impl VersionInfo {
+    pub fn is_older_than(&self, other: &VersionInfo) -> bool {
+        return &self.release_time < &other.release_time;
     }
 }
 
@@ -143,7 +131,7 @@ impl ToString for VersionType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Argument {
     Complex(ArgumentEntry),
@@ -154,6 +142,15 @@ pub enum Argument {
 pub struct VersionArguments {
     pub game: Vec<Argument>,
     pub jvm: Vec<Argument>,
+}
+
+impl VersionArguments {
+    pub fn new() -> Self {
+        Self {
+            game: vec![],
+            jvm: vec![],
+        }
+    }
 }
 
 impl Default for VersionArguments {
@@ -237,13 +234,13 @@ impl Default for VersionArguments {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Features {
     pub is_demo_user: Option<bool>,
     pub has_custom_resolution: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ArgumentEntry {
     pub rules: Vec<Rule>,
     pub value: Value,
@@ -440,14 +437,14 @@ impl Natives {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Rule {
     pub action: Action,
     pub os: Option<OsRule>,
     pub features: Option<Features>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Action {
     #[serde(rename = "allow")]
     Allow,
@@ -477,7 +474,7 @@ impl Rule {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct OsRule {
     pub name: Option<OsName>,
     pub version: Option<String>,
@@ -527,7 +524,7 @@ pub struct LoggingClient {
     pub client_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Value {
     String(String),
