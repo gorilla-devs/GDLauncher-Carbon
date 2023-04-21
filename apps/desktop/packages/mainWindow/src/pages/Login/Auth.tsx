@@ -89,10 +89,10 @@ const Auth = (props: Props) => {
       },
       onFail() {
         retryLogin();
-        setError("Something went wrong while logging in");
+        setError("Something went wrong while logging in, Try again!");
       },
       onError(_error) {
-        setError("Something went wrong while logging in");
+        setError("Something went wrong while logging in, Try again!");
       },
       onComplete() {
         setError(null);
