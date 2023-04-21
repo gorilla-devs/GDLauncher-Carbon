@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 pub mod info;
 
 pub struct InstanceDetails {
+    pub favorite: bool,
     pub name: String,
     pub version: String,
     pub last_played: DateTime<Utc>,

@@ -46,25 +46,7 @@ keys! {
     }
 
     mc {
-        GET_INSTANCES                    = "getInstances";
         GET_MINECRAFT_VERSIONS           = "getMinecraftVersions";
-        GET_INSTANCE_DETAILS             = "getInstanceDetails";
-        OPEN_INSTANCE_FOLDER_PATH        = "openInstanceFolderPath";
-        START_INSTANCE                   = "startInstance";
-        STOP_INSTANCE                    = "stopInstance";
-        DELETE_INSTANCE                  = "deleteInstance";
-        ENABLE_MOD                       = "enableMod";
-        DISABLE_MOD                      = "disableMod";
-        REMOVE_MOD                       = "removeMod";
-        REMOVE_MODS                      = "removeMods";
-        SWITCH_MINECRAFT_VERSION         = "switchMinecraftVersion";
-        SWITCH_MODLOADER                 = "switchModloader";
-        SWITCH_MODLOADER_VERSION         = "switchModloaderVersion";
-        UPDATE_INSTANCE_NAME             = "updateInstanceName";
-        GET_INSTANCE_MEMORY              = "getInstanceMemory";
-        UPDATE_INSTANCE_MEMORY           = "updateInstanceMemory";
-        GET_INSTANCE_JAVA_ARGS           = "getInstanceJavaArgs";
-        UPDATE_INSTANCE_JAVA_ARGS        = "updateInstanceJavaArgs";
     }
 
     instance {
