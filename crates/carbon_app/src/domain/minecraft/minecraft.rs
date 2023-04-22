@@ -2,7 +2,10 @@ use std::{collections::HashMap, path::PathBuf};
 
 use carbon_net::{IntoDownloadable, IntoVecDownloadable};
 use chrono::{DateTime, Utc};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
+
+use crate::domain::maven::MavenCoordinates;
 
 use super::modded::{Processor, SidedDataEntry};
 
@@ -35,15 +38,6 @@ pub struct ManifestVersion {
 pub struct Libraries {
     pub libraries: Vec<Library>,
 }
-impl Libraries {
-    pub fn get_allowed_libraries(&self) -> Vec<Library> {
-        let libs = &self.libraries;
-
-        let results = libs.iter().filter(|l| l.is_allowed());
-
-        results.cloned().collect()
-    }
-}
 
 impl IntoVecDownloadable for Libraries {
     /// Returns a list of Downloadable objects for all libraries (native and non-native)
@@ -59,8 +53,26 @@ impl IntoVecDownloadable for Libraries {
                 files.push(downloadable);
             }
 
-            if let Some(downloadable) = library.into_natives_downloadable(base_path) {
+            if let Some(downloadable) = library.clone().into_natives_downloadable(base_path) {
                 files.push(downloadable);
+            }
+
+            // Forge special case where downloads is not present but `url` defines the base url
+            if let Some(base_url) = &library.url {
+                let checksum = None;
+
+                let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
+                    continue
+                };
+
+                let maven_path = maven_path.into_path();
+
+                files.push(carbon_net::Downloadable {
+                    url: format!("{}/{}", base_url, maven_path.to_string_lossy()),
+                    path: PathBuf::from(base_path).join(maven_path),
+                    checksum,
+                    size: None,
+                });
             }
         }
 
@@ -297,6 +309,12 @@ pub struct Library {
     pub rules: Option<Vec<Rule>>,
     pub natives: Option<Natives>,
     pub extract: Option<Extract>,
+    #[serde(default = "default_include_in_classpath")]
+    pub include_in_classpath: bool,
+}
+
+fn default_include_in_classpath() -> bool {
+    true
 }
 
 impl Library {

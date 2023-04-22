@@ -57,7 +57,7 @@ pub enum MavenError {
 /// Needs to be in the format of `group:artifact:version@extension`
 /// This is not the full maven specification but should be enough for our use case
 fn is_maven_coordinates(maven_coordinates: &str) -> bool {
-    Regex::new(r#"^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+:[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9._-]+)*(\.[a-zA-Z0-9._-]+)*(:[a-zA-Z0-9._-]+)?(@[a-zA-Z0-9._-]+)?$"#)
+    Regex::new(r#"^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+:[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9._-]+)*(\.[a-zA-Z0-9._-]+)*(:[a-zA-Z0-9._-]+)?(@[a-zA-Z0-9_-]+)?$"#)
         .expect("failed to compile maven coordinates regex!!!")
         .is_match(maven_coordinates)
 }

@@ -97,6 +97,7 @@ pub fn merge_partial_version(partial: PartialVersionInfo, merge: VersionInfo) ->
                     url: x.url,
                     natives: x.natives,
                     rules: x.rules,
+                    include_in_classpath: x.include_in_classpath,
                 })
                 .collect::<Vec<_>>(),
         },

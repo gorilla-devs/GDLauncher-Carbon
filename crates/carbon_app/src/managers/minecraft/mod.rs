@@ -1,6 +1,3 @@
-use std::path::PathBuf;
-
-use anyhow::anyhow;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
 use reqwest::Url;
 
@@ -8,8 +5,6 @@ use crate::domain::minecraft::{
     minecraft::{ManifestVersion, MinecraftManifest, VersionInfo},
     modded::ModdedManifest,
 };
-
-use self::forge::execute_processors;
 
 use super::ManagerRef;
 
@@ -70,7 +65,7 @@ impl ManagerRef<'_, MinecraftManager> {
             runtime_path.get_assets().get_indexes_path(),
         )
         .await?
-        .into_vec_downloadable(&runtime_path.get_assets().to_path());
+        .into_vec_downloadable(&runtime_path.get_assets().get_objects_path());
 
         all_files.push(client_main_jar);
         all_files.extend(libraries);
@@ -137,25 +132,25 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-            &app.reqwest_client.clone(),
-            &app.minecraft_manager.meta_base_url,
-        )
-        .await
-        .unwrap()
-        .game_versions
-        .into_iter()
-        .find(|v| v.id == "1.16.5")
-        .unwrap()
-        .loaders[0]
-            .clone();
+        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+        //     &app.reqwest_client.clone(),
+        //     &app.minecraft_manager.meta_base_url,
+        // )
+        // .await
+        // .unwrap()
+        // .game_versions
+        // .into_iter()
+        // .find(|v| v.id == "1.16.5")
+        // .unwrap()
+        // .loaders[0]
+        //     .clone();
 
-        let forge_version_info =
-            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-                .await
-                .unwrap();
+        // let forge_version_info =
+        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+        //         .await
+        //         .unwrap();
 
-        let version_info = merge_partial_version(forge_version_info, version_info);
+        // let version_info = merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
@@ -174,13 +169,13 @@ mod tests {
             .as_ref()
             .unwrap_or(&version_info.id)
             .to_string();
-        let client_path = runtime_path
-            .get_versions()
-            .get_clients_path()
-            .join(format!("{}.jar", game_version));
+        let client_path = runtime_path.get_versions().get_clients_path().join(format!(
+            "{}.jar",
+            version_info.downloads.as_ref().unwrap().client.sha1
+        ));
 
         if let Some(processors) = &version_info.processors {
-            let _ = execute_processors(
+            execute_processors(
                 processors,
                 version_info
                     .data
@@ -193,7 +188,8 @@ mod tests {
                 game_version,
                 libraries_path,
             )
-            .await;
+            .await
+            .unwrap();
         }
 
         let full_account = FullAccount {

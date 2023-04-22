@@ -212,8 +212,9 @@ pub async fn generate_startup_command(
 ) -> Vec<String> {
     let libraries = version
         .libraries
-        .get_allowed_libraries()
+        .libraries
         .iter()
+        .filter(|&library| library.is_allowed() && library.include_in_classpath)
         .map(|library| {
             let path = runtime_path
                 .get_libraries()
@@ -362,6 +363,8 @@ pub async fn launch_minecraft(
     )
     .await;
 
+    println!("Starting Minecraft with command: {:?}", startup_command);
+
     let mut command_exec = tokio::process::Command::new(java_binary);
 
     let child = command_exec.args(startup_command);
@@ -387,7 +390,7 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
         carbon_compression::decompress(path, &dest).await.unwrap();
     }
 
-    for library in version.libraries.get_allowed_libraries() {
+    for library in version.libraries.libraries.iter() {
         match &library.natives {
             Some(natives) => {
                 if cfg!(target_os = "windows") {
@@ -530,9 +533,9 @@ mod tests {
             .await
             .unwrap();
 
-        let libraries = version.libraries.get_allowed_libraries();
-
-        let natives = libraries
+        let natives = version
+            .libraries
+            .libraries
             .iter()
             .filter(|&lib| lib.is_native_artifact())
             .collect::<Vec<_>>();
@@ -545,7 +548,6 @@ mod tests {
 
         let progress = tokio::sync::watch::channel(Progress::new());
 
-        println!("{:#?}", downloadables);
         carbon_net::download_multiple(downloadables, progress.0)
             .await
             .unwrap();

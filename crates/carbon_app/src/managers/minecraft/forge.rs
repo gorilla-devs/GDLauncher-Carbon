@@ -132,13 +132,7 @@ fn get_processor_arguments<T: AsRef<str>>(
         } else if argument.as_ref().starts_with('[') {
             new_arguments.push(
                 libraries_path
-                    .join(
-                        MavenCoordinates::try_from(
-                            trimmed_arg[1..trimmed_arg.len() - 1].to_string(),
-                            None,
-                        )?
-                        .into_path(),
-                    )
+                    .join(MavenCoordinates::try_from(trimmed_arg.to_string(), None)?.into_path())
                     .to_string_lossy()
                     .to_string(),
             )
@@ -223,6 +217,8 @@ pub async fn execute_processors(
             .map_err(|err| {
                 anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
             })?;
+
+        // println!("{}", String::from_utf8_lossy(&child.stdout));
 
         if !child.status.success() {
             bail!(
