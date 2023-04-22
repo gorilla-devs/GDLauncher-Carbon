@@ -1,13 +1,7 @@
 import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import {
-  For,
-  Show,
-  createEffect,
-  createResource,
-  createSignal,
-} from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -29,13 +23,8 @@ const Home = () => {
   const [isNewsVisible, setIsNewVisible] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const [port] = createResource(async () => {
-    let port = await window.getCoreModulePort();
-    return port;
-  });
-
   createEffect(() => {
-    if (routeData.instancesUngrouped.data && port()) {
+    if (routeData.instancesUngrouped.data) {
       Promise.all(
         routeData.instancesUngrouped.data.map(async (instance) => {
           const b64Image = await fetchImage(instance.id);
@@ -49,7 +38,6 @@ const Home = () => {
             : null;
 
           const modloader = validInstance?.modloader;
-          console.log("instances", instance);
           const mappedInstance: InvalidInstanceType | ValidInstanceType = {
             id: instance.id,
             name: instance.name,

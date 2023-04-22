@@ -1,6 +1,6 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import { useLocation, useRouteData } from "@solidjs/router";
@@ -17,15 +17,16 @@ import {
 } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 
-export interface InstancesStore {
-  favorites: (InvalidInstanceType | ValidInstanceType)[];
-  [modloader: string]: (InvalidInstanceType | ValidInstanceType)[];
+type Instance = InvalidInstanceType | ValidInstanceType;
+interface InstancesStore {
+  [modloader: string]: Instance[];
 }
 
 const Sidebar = () => {
-  const [instances, setInstances] = createStore<InstancesStore>({
-    favorites: [],
-  });
+  const [instances, setInstances] = createStore<InstancesStore>({});
+  const [favoriteInstances, setFavoriteInstances] = createSignal<Instance[]>(
+    []
+  );
   const navigate = useGDNavigate();
   const location = useLocation();
 
@@ -37,6 +38,53 @@ const Sidebar = () => {
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
+  });
+
+  createEffect(() => {
+    console.log("GROUP", routeData.groups.data);
+  });
+  // localize➽favorites
+  createEffect(() => {
+    console.log("GRRR", routeData.groups.data);
+    const favorites = (routeData.groups.data || []).find(
+      (group) => group.name === "localize➽favorites"
+    )?.instances;
+
+    console.log("FAV", favorites);
+
+    if (favorites) {
+      Promise.all(
+        favorites.map(async (instance) => {
+          const validInstance = isListInstanceValid(instance.status)
+            ? instance.status.Valid
+            : null;
+
+          const InvalidInstance = !isListInstanceValid(instance.status)
+            ? instance.status.Invalid
+            : null;
+
+          const modloader = validInstance?.modloader;
+
+          const b64Image = await fetchImage(instance.id);
+
+          if (validInstance && modloader) {
+            const mappedInstance: InvalidInstanceType | ValidInstanceType = {
+              id: instance.id,
+              name: instance.name,
+              favorite: true,
+              ...(validInstance && { mc_version: validInstance.mc_version }),
+              ...(validInstance && {
+                modpack_platform: validInstance.modpack_platform,
+              }),
+              ...(validInstance && { img: b64Image }),
+              ...(validInstance && { modloader }),
+              ...(InvalidInstance && { error: InvalidInstance }),
+            };
+            setFavoriteInstances((prev) => [...prev, mappedInstance]);
+          }
+        })
+      );
+    }
   });
 
   createEffect(() => {
@@ -69,10 +117,6 @@ const Sidebar = () => {
 
             setInstances(
               produce((prev) => {
-                prev["favorites"] = [
-                  ...(prev["favorites"] || []),
-                  ...(mappedInstance.favorite ? [mappedInstance] : []),
-                ];
                 prev[modloader] = [...(prev[modloader] || []), mappedInstance];
                 return prev;
               })
@@ -109,6 +153,30 @@ const Sidebar = () => {
         </div>
         <Show when={Object.entries(instances).length > 0}>
           <div class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]">
+            <Show when={favoriteInstances().length > 0}>
+              <Collapsable
+                title={"Favorites"}
+                size={isSidebarOpened() ? "standard" : "small"}
+              >
+                <For each={favoriteInstances()}>
+                  {(instance) => (
+                    <Tile
+                      onClick={() => navigate(`/library/${instance.id}`)}
+                      title={instance.name}
+                      modloader={
+                        "modloader" in instance ? instance?.modloader : null
+                      }
+                      version={
+                        "mc_version" in instance ? instance?.mc_version : null
+                      }
+                      invalid={"error" in instance}
+                      variant={isSidebarOpened() ? "sidebar" : "sidebar-small"}
+                      img={"img" in instance ? instance?.img : null}
+                    />
+                  )}
+                </For>
+              </Collapsable>
+            </Show>
             <For
               each={Object.entries(instances).filter(
                 (group) => group[1].length > 0

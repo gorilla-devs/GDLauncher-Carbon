@@ -1,9 +1,5 @@
-import { rspc } from "@/utils/rspcClient";
-
 const fetchData = () => {
-  const minecraftVersion = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
-
-  return { minecraftVersion };
+  console.log("fetch browser data...");
 };
 
 export default fetchData;

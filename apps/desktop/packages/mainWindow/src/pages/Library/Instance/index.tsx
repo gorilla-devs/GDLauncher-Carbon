@@ -9,11 +9,12 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, createSignal } from "solid-js";
+import { For, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
+import { formatDistance } from "date-fns";
 
 type InstancePage = {
   label: string;
@@ -27,10 +28,15 @@ const Instance = () => {
   const [editableName, setEditableName] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const moveInstanceMutation = rspc.createMutation(["instance.moveInstance"]);
+  const moveInstanceMutation = rspc.createMutation(["instance.moveInstance"], {
+    onSuccess() {
+      console.log("SUCCESS");
+    },
+  });
 
   const createGroupMutation = rspc.createMutation(["instance.createGroup"], {
     onSuccess(groupId) {
+      console.log("GROUP", groupId);
       moveInstanceMutation.mutate({
         instance: parseInt(params.id, 10),
         target: {
@@ -201,17 +207,18 @@ const Instance = () => {
                                 .type_
                             }
                           </span>
-                          <span>
-                            {routeData.instanceDetails.data?.mc_version}
-                          </span>
+                          <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
                         <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
                           <div class="i-ri:time-fill" />
                           <span>
-                            {/* {formatDistance(
-                      routeData.instanceDetails.data?.last_played || Date.now(),
-                      Date.now()
-                    )} */}
+                            {formatDistance(
+                              new Date(
+                                routeData.instanceDetails.data?.last_played ||
+                                  Date.now()
+                              ).getTime(),
+                              Date.now()
+                            )}
                           </span>
                         </div>
                         <div class="p-0 lg:px-4 flex gap-2 items-center">
@@ -234,15 +241,15 @@ const Instance = () => {
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                           onClick={() =>
-                            createGroupMutation.mutate("localize>favorites")
+                            createGroupMutation.mutate("localize➽favorites")
                           }
                         >
                           <div
                             class="text-xl i-ri:star-s-fill"
-                            // classList={{
-                            //   "color-yellow-500":
-                            //     routeData.instanceDetails.data.favorite,
-                            // }}
+                            classList={{
+                              "text-yello-500":
+                                routeData.instanceDetails.data?.favorite,
+                            }}
                           />
                         </div>
                         <Button uppercase variant="glow" size="large">
@@ -288,17 +295,22 @@ const Instance = () => {
             <h4 class="m-0"> {routeData.instanceDetails.data?.name}</h4>
             <div class="flex flex-col lg:flex-row justify-between">
               <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-darkSlate-50">
-                <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
-                  {routeData.instanceDetails.data?.modloader}
-                  {routeData.instanceDetails.data?.mc_version}
+                <div class="flex gap-2 p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
+                  <span>
+                    {routeData.instanceDetails.data?.modloaders[0].type_}
+                  </span>
+                  <span>{routeData.instanceDetails.data?.version}</span>
                 </div>
                 <div class="text-xs p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                   <div class="i-ri:time-fill" />
                   <span>
-                    {/* {formatDistance(
-                      routeData.instanceDetails.data?.last_played || Date.now(),
+                    {formatDistance(
+                      new Date(
+                        routeData.instanceDetails.data?.last_played ||
+                          Date.now()
+                      ).getTime(),
                       Date.now()
-                    )} */}
+                    )}
                   </span>
                 </div>
                 <div class="text-xs p-0 lg:px-2 flex gap-2 items-center">
@@ -323,8 +335,12 @@ const Instance = () => {
                 >
                   <div
                     class="i-ri:star-s-fill text-xl"
+                    classList={{
+                      "text-yello-500":
+                        routeData.instanceDetails.data?.favorite,
+                    }}
                     onClick={() =>
-                      createGroupMutation.mutate("localize>favorites")
+                      createGroupMutation.mutate("localize➽favorites")
                     }
                   />
                 </div>
