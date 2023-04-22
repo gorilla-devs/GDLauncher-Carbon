@@ -99,7 +99,7 @@ mod tests {
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
-        let version = "1.12.2";
+        let version = "1.16.5";
 
         let app = crate::setup_managers_for_test().await;
 
