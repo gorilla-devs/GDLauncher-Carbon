@@ -165,84 +165,59 @@ impl VersionArguments {
     }
 }
 
-impl Default for VersionArguments {
-    fn default() -> Self {
-        Self {
-            game: vec![
-                Argument::String("-Xms${ram}M".to_string()),
-                Argument::String("-Xmx${ram}M".to_string()),
-                Argument::String("-XX:+UnlockExperimentalVMOptions".to_string()),
-                Argument::String("-XX:+UseG1GC".to_string()),
-                Argument::String("-XX:G1NewSizePercent=20".to_string()),
-                Argument::String("-XX:G1ReservePercent=20".to_string()),
-                Argument::String("-XX:MaxGCPauseMillis=50".to_string()),
-                Argument::String("-XX:G1HeapRegionSize=32M".to_string()),
-                Argument::String("-Dlog4j2.formatMsgNoLookups=true".to_string()),
-            ],
-            jvm: vec![
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::MacOS),
-                            version: None,
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-XstartOnFirstThread".to_string()),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::Windows),
-                            version: None,
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".to_string()),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::Windows),
-                            version: Some(r#"^10\\."#.to_string()),
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::StringArray(vec![
-                        "-Dos.name=Windows 10".to_string(),
-                        "-Dos.version=10.0".to_string(),
-                    ]),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: None,
-                            version: None,
-                            arch: Some("x86".to_string()),
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-Xss1M".to_string()),
-                }),
-                Argument::String("-Djava.library.path=${natives_directory}".to_string()),
-                Argument::String("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
-                Argument::String("-Dminecraft.launcher.version=${launcher_version}".to_string()),
+impl VersionArguments {
+    pub fn get_default_jvm_args() -> Vec<Argument> {
+        vec![
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::MacOS),
+                        version: None,
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::String("-XstartOnFirstThread".to_string()),
+            }),
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::Windows),
+                        version: None,
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::String("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".to_string()),
+            }),
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::Windows),
+                        version: Some(r#"^10\\."#.to_string()),
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::StringArray(vec![
+                    "-Dos.name=Windows 10".to_string(),
+                    "-Dos.version=10.0".to_string(),
+                ]),
+            }),
+            Argument::String("-Djava.library.path=${natives_directory}".to_string()),
+            Argument::String("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
+            Argument::String("-Dminecraft.launcher.version=${launcher_version}".to_string()),
 
-                // Apparently this "hack" is only needed for launcherVersion < 18
-                Argument::String(
-                    "-Dminecraft.applet.TargetDirectory=${game_directory}".to_string(),
-                ),
-                Argument::String("-cp".to_string()),
-                Argument::String("${classpath}".to_string()),
-            ],
-        }
+            // Apparently this "hack" is only needed for launcherVersion < 18
+            // Argument::String(
+            //     "-Dminecraft.applet.TargetDirectory=${game_directory}".to_string(),
+            // ),
+            Argument::String("-cp".to_string()),
+            Argument::String("${classpath}".to_string()),
+        ]
     }
 }
 

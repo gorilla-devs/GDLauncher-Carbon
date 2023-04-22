@@ -57,9 +57,11 @@ pub enum MavenError {
 /// Needs to be in the format of `group:artifact:version@extension`
 /// This is not the full maven specification but should be enough for our use case
 fn is_maven_coordinates(maven_coordinates: &str) -> bool {
-    Regex::new(r#"^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+:[0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9._-]+)*(\.[a-zA-Z0-9._-]+)*(:[a-zA-Z0-9._-]+)?(@[a-zA-Z0-9_-]+)?$"#)
-        .expect("failed to compile maven coordinates regex!!!")
-        .is_match(maven_coordinates)
+    Regex::new(
+        r#"^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+:(([._-])?[0-9a-zA-Z]+)+(:[a-zA-Z0-9._-]+)?(@[a-zA-Z0-9_-]+)?$"#,
+    )
+    .expect("failed to compile maven coordinates regex!!!")
+    .is_match(maven_coordinates)
 }
 
 fn parse_maven_coordinates(
@@ -99,6 +101,9 @@ mod tests {
             "com.example:example:1.0:identifier@zip"
         ));
         assert!(is_maven_coordinates(
+            "com.example:example-something:full-text-version"
+        ));
+        assert!(is_maven_coordinates(
             "com.example:example-something:1.0.final"
         ));
         assert!(is_maven_coordinates(
@@ -124,11 +129,7 @@ mod tests {
     #[test]
     fn test_invalid_coordinates() {
         assert!(!is_maven_coordinates(""));
-        assert!(!is_maven_coordinates("com.example:example:1"));
         assert!(!is_maven_coordinates("com.example:example"));
-        assert!(!is_maven_coordinates(
-            "com.example:example:not_a_version:extra"
-        ));
         assert!(!is_maven_coordinates("@com.example:example:1.0.0"));
         assert!(!is_maven_coordinates("com.example:example:1.0.0:@"));
         assert!(!is_maven_coordinates("com.example@:example:1.0.0"));
