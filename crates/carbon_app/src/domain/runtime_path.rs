@@ -90,9 +90,13 @@ impl InstancesPath {
     }
 }
 
+#[derive(Clone)]
 pub struct InstancePath(PathBuf);
 
 impl InstancePath {
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
+    }
     pub fn get_root(&self) -> PathBuf {
         self.0.clone()
     }

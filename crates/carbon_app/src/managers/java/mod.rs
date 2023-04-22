@@ -13,7 +13,7 @@ pub mod discovery;
 pub mod java_checker;
 mod parser;
 mod scan_and_sync;
-mod utils;
+pub mod utils;
 
 pub(crate) struct JavaManager {}
 

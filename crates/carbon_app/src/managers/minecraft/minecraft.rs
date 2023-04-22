@@ -11,6 +11,7 @@ use regex::{Captures, Regex};
 use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
+use tokio::process::Child;
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -34,7 +35,7 @@ pub enum MinecraftManifestError {
 }
 
 pub async fn get_manifest(
-    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+    reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &Url,
 ) -> anyhow::Result<MinecraftManifest> {
     let server_url = meta_base_url.join("minecraft/v0/manifest.json")?;
@@ -49,7 +50,7 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
-    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+    reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     manifest_version_meta: ManifestVersion,
 ) -> anyhow::Result<VersionInfo> {
     let url = manifest_version_meta.url;
@@ -207,7 +208,7 @@ pub async fn generate_startup_command(
     xms_memory: u16,
     runtime_path: &RuntimePath,
     version: VersionInfo,
-    instance_id: &str,
+    instance_path: InstancePath,
 ) -> Vec<String> {
     let libraries = version
         .libraries
@@ -281,9 +282,7 @@ pub async fn generate_startup_command(
     };
 
     let version_name = version.id.clone();
-    let game_directory = runtime_path
-        .get_instances()
-        .get_instance_path(instance_id.to_owned());
+    let game_directory = instance_path;
     let assets_root = runtime_path.get_assets().to_path();
     let game_assets = runtime_path.get_assets().to_path();
     let assets_index_name = version.assets.clone().unwrap();
@@ -342,6 +341,32 @@ pub async fn generate_startup_command(
             argument.replace("\\\"", "\"").replace("\\\\", "\\")
         })
         .collect()
+}
+
+pub async fn launch_minecraft(
+    java_binary: PathBuf,
+    full_account: FullAccount,
+    xmx_memory: u16,
+    xms_memory: u16,
+    runtime_path: &RuntimePath,
+    version: VersionInfo,
+    instance_path: InstancePath,
+) -> anyhow::Result<Child> {
+    let startup_command = generate_startup_command(
+        full_account,
+        xmx_memory,
+        xms_memory,
+        runtime_path,
+        version,
+        instance_path,
+    )
+    .await;
+
+    let mut command_exec = tokio::process::Command::new(java_binary);
+
+    let child = command_exec.args(startup_command);
+
+    Ok(child.spawn()?)
 }
 
 pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) {
@@ -460,7 +485,7 @@ mod tests {
         // Mock RuntimePath to have a stable path
         let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
 
-        let instance_id = "something";
+        let instance_id = InstancePath::new(PathBuf::from("something"));
 
         let command = generate_startup_command(
             full_account,

@@ -1,11 +1,15 @@
+use std::path::PathBuf;
+
 use anyhow::anyhow;
-use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable};
+use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
 use reqwest::Url;
 
 use crate::domain::minecraft::{
     minecraft::{ManifestVersion, MinecraftManifest, VersionInfo},
     modded::ModdedManifest,
 };
+
+use self::forge::execute_processors;
 
 use super::ManagerRef;
 
@@ -14,7 +18,7 @@ mod forge;
 mod minecraft;
 
 pub(crate) struct MinecraftManager {
-    meta_base_url: Url,
+    pub meta_base_url: Url,
 }
 
 impl MinecraftManager {
@@ -27,49 +31,34 @@ impl MinecraftManager {
 
 impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_manifest(&self) -> anyhow::Result<MinecraftManifest> {
-        minecraft::get_manifest(self.app.reqwest_client.clone(), &self.meta_base_url).await
+        minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
     pub async fn get_minecraft_version(
         &self,
         manifest_version_meta: ManifestVersion,
     ) -> anyhow::Result<VersionInfo> {
-        minecraft::get_version(self.app.reqwest_client.clone(), manifest_version_meta).await
+        minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
     }
 
     pub async fn get_forge_manifest(&self) -> anyhow::Result<ModdedManifest> {
-        forge::get_manifest(self.app.reqwest_client.clone(), &self.meta_base_url).await
+        forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
-    pub async fn get_game_download_files_list(
+    pub async fn download_minecraft(
         self,
-        mc_version: String,
-    ) -> anyhow::Result<Vec<Downloadable>> {
+        version_info: VersionInfo,
+        progress: tokio::sync::watch::Sender<Progress>,
+    ) -> anyhow::Result<()> {
         let runtime_path = &self.app.settings_manager().runtime_path;
-
-        let manifest = minecraft::get_manifest(
-            self.app.reqwest_client.clone(),
-            &Url::parse("https://meta.gdlauncher.com/").unwrap(),
-        )
-        .await?;
-
-        let manifest_version = manifest
-            .versions
-            .iter()
-            .find(|v| v.id == mc_version)
-            .ok_or(anyhow!("Minecraft version not found"))?;
-
-        let version =
-            minecraft::get_version(self.app.reqwest_client.clone(), manifest_version.clone())
-                .await?;
 
         let mut all_files = vec![];
 
-        let libraries = version
+        let libraries = version_info
             .libraries
             .into_vec_downloadable(&runtime_path.get_libraries().to_path());
 
-        let client_main_jar = version
+        let client_main_jar = version_info
             .downloads
             .unwrap()
             .client
@@ -77,7 +66,7 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let assets = assets::get_meta(
             self.app.reqwest_client.clone(),
-            version.asset_index,
+            version_info.asset_index,
             runtime_path.get_assets().get_indexes_path(),
         )
         .await?
@@ -87,100 +76,147 @@ impl ManagerRef<'_, MinecraftManager> {
         all_files.extend(libraries);
         all_files.extend(assets);
 
-        Ok(all_files)
+        carbon_net::download_multiple(all_files, progress).await?;
+
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
 
+    use std::path::PathBuf;
+
+    use carbon_net::Progress;
     use chrono::Utc;
 
-    use crate::managers::{
-        account::{FullAccount, FullAccountType},
-        minecraft::minecraft::generate_startup_command,
+    use crate::{
+        domain::minecraft::modded::merge_partial_version,
+        managers::{
+            account::{FullAccount, FullAccountType},
+            minecraft::{
+                forge::execute_processors,
+                minecraft::{extract_natives, launch_minecraft},
+            },
+        },
     };
 
-    // #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
-    // async fn test_download_minecraft() {
-    //     use crate::managers::minecraft::version::extract_natives;
-    //     use carbon_domain::minecraft::manifest::MinecraftManifest;
-    //     use carbon_net::Progress;
+    #[ignore]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+    async fn test_download_minecraft() {
+        let app = crate::setup_managers_for_test().await;
 
-    //     let app = crate::setup_managers_for_test().await;
+        let runtime_path = &app.app.settings_manager().runtime_path;
+        let instance_path = runtime_path
+            .get_instances()
+            .get_instance_path("test".to_owned());
 
-    //     let runtime_path = &app.app.settings_manager().runtime_path;
+        std::fs::create_dir_all(instance_path.get_root()).unwrap();
 
-    //     let manifest = MinecraftManifest::fetch().await.unwrap();
+        let manifest = crate::managers::minecraft::minecraft::get_manifest(
+            &app.reqwest_client,
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap();
 
-    //     let version = manifest
-    //         .versions
-    //         .into_iter()
-    //         .find(|v| v.id == "1.16.5")
-    //         .unwrap()
-    //         .fetch()
-    //         .await
-    //         .unwrap();
+        let manifest_version = manifest
+            .versions
+            .iter()
+            .find(|v| v.id == "1.16.5")
+            .unwrap()
+            .clone();
 
-    //     // Move all metas to json instead of db
-    //     // Download assets json to assets/
+        let version_info = crate::managers::minecraft::minecraft::get_version(
+            &app.reqwest_client,
+            manifest_version,
+        )
+        .await
+        .unwrap();
 
-    //     let files = app
-    //         .minecraft_manager()
-    //         .get_game_download_files_list("1.16.5".to_string())
-    //         .await
-    //         .unwrap();
+        // Uncomment for FORGE
+        // -----FORGE
 
-    //     let progress = tokio::sync::watch::channel(Progress::new());
+        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+            &app.reqwest_client.clone(),
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap()
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == "1.16.5")
+        .unwrap()
+        .loaders[0]
+            .clone();
 
-    //     tokio::spawn(async move {
-    //         let mut rec = progress.1.clone();
-    //         while let Ok(p) = rec.changed().await {
-    //             println!("Progress: {:#?}", p);
-    //         }
-    //     });
+        let forge_version_info =
+            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+                .await
+                .unwrap();
 
-    //     carbon_net::download_multiple(files, progress.0)
-    //         .await
-    //         .unwrap();
+        let version_info = merge_partial_version(forge_version_info, version_info);
 
-    //     extract_natives(runtime_path, &version).await;
+        // -----FORGE
 
-    //     let full_account = FullAccount {
-    //         username: "test".to_owned(),
-    //         uuid: "test-uuid".to_owned(),
-    //         type_: FullAccountType::Offline,
-    //         last_used: Utc::now().into(),
-    //     };
+        let progress = tokio::sync::watch::channel(Progress::new());
 
-    //     let instance_id = "something";
+        app.minecraft_manager()
+            .download_minecraft(version_info.clone(), progress.0)
+            .await
+            .unwrap();
 
-    //     let instance_path = runtime_path
-    //         .get_instances()
-    //         .get_instance_path(instance_id.to_owned())
-    //         .get_root();
+        extract_natives(runtime_path, &version_info).await;
 
-    //     tokio::fs::create_dir_all(&instance_path).await.unwrap();
+        let libraries_path = runtime_path.get_libraries();
+        let game_version = version_info
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version_info.id)
+            .to_string();
+        let client_path = runtime_path
+            .get_versions()
+            .get_clients_path()
+            .join(format!("{}.jar", game_version));
 
-    //     let command =
-    //         generate_startup_command(full_account, 2048, 2048, runtime_path, version, instance_id)
-    //             .await;
+        if let Some(processors) = &version_info.processors {
+            let _ = execute_processors(
+                processors,
+                version_info
+                    .data
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Data entries missing"))
+                    .unwrap(),
+                PathBuf::from("java"),
+                instance_path.clone(),
+                client_path,
+                game_version,
+                libraries_path,
+            )
+            .await;
+        }
 
-    //     for c in command.iter() {
-    //         println!("Command: {}", c);
-    //     }
+        let full_account = FullAccount {
+            username: "test".to_owned(),
+            uuid: "test-uuid".to_owned(),
+            type_: FullAccountType::Offline,
+            last_used: Utc::now().into(),
+        };
 
-    //     let mut command_exec = tokio::process::Command::new("java");
+        let mut child = launch_minecraft(
+            PathBuf::from("java"),
+            full_account,
+            2048_u16,
+            2048_u16,
+            runtime_path,
+            version_info,
+            instance_path,
+        )
+        .await
+        .unwrap();
 
-    //     let child = command_exec.args(command);
+        let _ = child.wait().await;
 
-    //     println!("Command: {:#?}", child);
-
-    //     let mut child = child.spawn().unwrap();
-
-    //     let _ = child.wait().await;
-
-    //     // assert!(status.success());
-    // }
+        // assert!(status.success());
+    }
 }

@@ -80,7 +80,7 @@ pub fn merge_partial_version(partial: PartialVersionInfo, merge: VersionInfo) ->
             merge.arguments
         },
         asset_index: merge.asset_index,
-        inherits_from: merge.inherits_from,
+        inherits_from: Some(partial.inherits_from),
         assets: merge.assets,
         downloads: merge.downloads,
         id: partial.id.replace(DUMMY_REPLACE_STRING, &merge_id),

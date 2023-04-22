@@ -290,7 +290,7 @@ pub struct JavaVersion {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Library {
-    pub downloads: LibraryDownloads,
+    pub downloads: Option<LibraryDownloads>,
     /// Url only appears in some forge libraries apparently
     pub url: Option<String>,
     pub name: String,
@@ -304,7 +304,7 @@ impl Library {
         self,
         base_path: &std::path::Path,
     ) -> Option<carbon_net::Downloadable> {
-        let artifact = self.downloads.artifact;
+        let artifact = self.downloads.and_then(|v| v.artifact);
 
         if let Some(artifact) = artifact {
             let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
@@ -324,7 +324,7 @@ impl Library {
         self,
         base_path: &std::path::Path,
     ) -> Option<carbon_net::Downloadable> {
-        let Some(classifiers) = self.downloads.classifiers else {
+        let Some(classifiers) = self.downloads.and_then(|v| v.classifiers) else {
             return None;
         };
 
