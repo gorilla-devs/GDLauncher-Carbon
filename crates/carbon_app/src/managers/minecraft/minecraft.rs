@@ -377,6 +377,8 @@ pub async fn launch_minecraft(
 
     let mut command_exec = tokio::process::Command::new(java_binary);
 
+    command_exec.stdout(std::process::Stdio::piped());
+
     let child = command_exec.args(startup_command);
 
     Ok(child.spawn()?)
@@ -474,59 +476,58 @@ mod tests {
         }
     }
 
-    // #[tokio::test]
-    // async fn test_generate_startup_command() {
-    //     let app = setup_managers_for_test().await;
+    async fn run_test_generate_startup_command(mc_version: &str) {
+        let app = setup_managers_for_test().await;
 
-    //     let version = app
-    //         .minecraft_manager()
-    //         .get_minecraft_manifest()
-    //         .await
-    //         .unwrap()
-    //         .versions
-    //         .into_iter()
-    //         .find(|v| v.id == "1.16.5")
-    //         .unwrap();
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_manifest()
+            .await
+            .unwrap()
+            .versions
+            .into_iter()
+            .find(|v| v.id == "1.16.5")
+            .unwrap();
 
-    //     let version = app
-    //         .minecraft_manager()
-    //         .get_minecraft_version(version)
-    //         .await
-    //         .unwrap();
+        let version = app
+            .minecraft_manager()
+            .get_minecraft_version(version)
+            .await
+            .unwrap();
 
-    //     let full_account = FullAccount {
-    //         username: "test".to_owned(),
-    //         uuid: "test-uuid".to_owned(),
-    //         type_: FullAccountType::Offline,
-    //         last_used: Utc::now().into(),
-    //     };
+        let full_account = FullAccount {
+            username: "test".to_owned(),
+            uuid: "test-uuid".to_owned(),
+            type_: FullAccountType::Offline,
+            last_used: Utc::now().into(),
+        };
 
-    //     // Mock RuntimePath to have a stable path
-    //     let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
+        // Mock RuntimePath to have a stable path
+        let runtime_path = RuntimePath::new(PathBuf::from("stable_path"));
 
-    //     let instance_id = InstancePath::new(PathBuf::from("something"));
+        let instance_id = InstancePath::new(PathBuf::from("something"));
 
-    //     let command = generate_startup_command(
-    //         full_account,
-    //         2048,
-    //         2048,
-    //         &runtime_path,
-    //         version,
-    //         instance_id,
-    //     )
-    //     .await;
+        let command = generate_startup_command(
+            full_account,
+            2048,
+            2048,
+            &runtime_path,
+            version,
+            instance_id,
+        )
+        .await;
 
-    //     // generate a json file with the command
-    //     let command = serde_json::to_string(&command).unwrap();
+        // generate a json file with the command
+        let command = serde_json::to_string(&command).unwrap();
 
-    //     // write to file
-    //     let mut file =
-    //         tokio::fs::File::create("./src/managers/minecraft/test_fixtures/test_command.json")
-    //             .await
-    //             .unwrap();
+        // write to file
+        let mut file =
+            tokio::fs::File::create("./src/managers/minecraft/test_fixtures/test_command.json")
+                .await
+                .unwrap();
 
-    //     file.write_all(command.as_bytes()).await.unwrap();
-    // }
+        file.write_all(command.as_bytes()).await.unwrap();
+    }
 
     #[tokio::test]
     async fn test_extract_natives() {

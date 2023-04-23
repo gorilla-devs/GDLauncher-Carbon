@@ -213,7 +213,7 @@ mod tests {
         .await
         .unwrap();
 
-        // print stdout
+        // intercept stdout
 
         let _ = child.wait().await;
 
