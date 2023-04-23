@@ -31,7 +31,7 @@ const Collapsable = (props: Props) => {
           class="m-0 text-darkSlate-100 flex items-center uppercase"
           classList={{
             "text-md": props.size !== "small",
-            "text-sm": props.size === "small",
+            "text-xs": props.size === "small",
           }}
         >
           {props.title}

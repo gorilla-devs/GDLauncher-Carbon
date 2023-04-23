@@ -1,6 +1,6 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import Tile from "../Instance/Tile";
 import { useLocation, useRouteData } from "@solidjs/router";
@@ -10,23 +10,20 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, produce } from "solid-js/store";
 import {
+  Instance,
+  InstancesStore,
   InvalidInstanceType,
   ValidInstanceType,
+  favoriteInstances,
   fetchImage,
+  filteredByModloaderInstances,
   isListInstanceValid,
+  setFavoriteInstances,
+  setFilteredByModloaderfilteredByModloaderInstances,
 } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 
-type Instance = InvalidInstanceType | ValidInstanceType;
-interface InstancesStore {
-  [modloader: string]: Instance[];
-}
-
 const Sidebar = () => {
-  const [instances, setInstances] = createStore<InstancesStore>({});
-  const [favoriteInstances, setFavoriteInstances] = createSignal<Instance[]>(
-    []
-  );
   const navigate = useGDNavigate();
   const location = useLocation();
 
@@ -35,55 +32,56 @@ const Sidebar = () => {
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [localInstances, setLocalInstances] = createStore<InstancesStore>({});
+  const [localFavoriteInstances, setLocalFavoriteInstances] = createStore<
+    Instance[]
+  >([]);
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
   });
 
   createEffect(() => {
-    console.log("GROUP", routeData.groups.data);
-  });
-  // localize➽favorites
-  createEffect(() => {
-    console.log("GRRR", routeData.groups.data);
-    const favorites = (routeData.groups.data || []).find(
-      (group) => group.name === "localize➽favorites"
-    )?.instances;
+    if (routeData.groups.data) {
+      const favorites = routeData.groups.data.find(
+        (group) => group.name === "localize➽favorites"
+      )?.instances;
 
-    console.log("FAV", favorites);
+      if (favorites) {
+        Promise.all(
+          favorites.map(async (instance) => {
+            const validInstance = isListInstanceValid(instance.status)
+              ? instance.status.Valid
+              : null;
 
-    if (favorites) {
-      Promise.all(
-        favorites.map(async (instance) => {
-          const validInstance = isListInstanceValid(instance.status)
-            ? instance.status.Valid
-            : null;
+            const InvalidInstance = !isListInstanceValid(instance.status)
+              ? instance.status.Invalid
+              : null;
 
-          const InvalidInstance = !isListInstanceValid(instance.status)
-            ? instance.status.Invalid
-            : null;
+            const modloader = validInstance?.modloader;
 
-          const modloader = validInstance?.modloader;
+            const b64Image = await fetchImage(instance.id);
 
-          const b64Image = await fetchImage(instance.id);
-
-          if (validInstance && modloader) {
-            const mappedInstance: InvalidInstanceType | ValidInstanceType = {
-              id: instance.id,
-              name: instance.name,
-              favorite: true,
-              ...(validInstance && { mc_version: validInstance.mc_version }),
-              ...(validInstance && {
-                modpack_platform: validInstance.modpack_platform,
-              }),
-              ...(validInstance && { img: b64Image }),
-              ...(validInstance && { modloader }),
-              ...(InvalidInstance && { error: InvalidInstance }),
-            };
-            setFavoriteInstances((prev) => [...prev, mappedInstance]);
-          }
-        })
-      );
+            if (validInstance && modloader) {
+              const mappedInstance: InvalidInstanceType | ValidInstanceType = {
+                id: instance.id,
+                name: instance.name,
+                favorite: true,
+                ...(validInstance && { mc_version: validInstance.mc_version }),
+                ...(validInstance && {
+                  modpack_platform: validInstance.modpack_platform,
+                }),
+                ...(validInstance && { img: b64Image }),
+                ...(validInstance && { modloader }),
+                ...(InvalidInstance && { error: InvalidInstance }),
+              };
+              setLocalFavoriteInstances((prev) => [...prev, mappedInstance]);
+            }
+          })
+        ).then(() => {
+          setFavoriteInstances(localFavoriteInstances);
+        });
+      }
     }
   });
 
@@ -115,7 +113,7 @@ const Sidebar = () => {
               ...(InvalidInstance && { error: InvalidInstance }),
             };
 
-            setInstances(
+            setLocalInstances(
               produce((prev) => {
                 prev[modloader] = [...(prev[modloader] || []), mappedInstance];
                 return prev;
@@ -123,7 +121,9 @@ const Sidebar = () => {
             );
           }
         })
-      );
+      ).then(() => {
+        setFilteredByModloaderfilteredByModloaderInstances(localInstances);
+      });
     }
   });
 
@@ -151,14 +151,19 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Show when={Object.entries(instances).length > 0}>
-          <div class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]">
-            <Show when={favoriteInstances().length > 0}>
+        <Show when={Object.entries(filteredByModloaderInstances).length > 0}>
+          <div
+            class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
+            classList={{
+              "scrollbar-hide": !isSidebarOpened(),
+            }}
+          >
+            <Show when={favoriteInstances.length > 0}>
               <Collapsable
                 title={"Favorites"}
                 size={isSidebarOpened() ? "standard" : "small"}
               >
-                <For each={favoriteInstances()}>
+                <For each={favoriteInstances}>
                   {(instance) => (
                     <Tile
                       onClick={() => navigate(`/library/${instance.id}`)}
@@ -178,7 +183,7 @@ const Sidebar = () => {
               </Collapsable>
             </Show>
             <For
-              each={Object.entries(instances).filter(
+              each={Object.entries(filteredByModloaderInstances).filter(
                 (group) => group[1].length > 0
               )}
             >

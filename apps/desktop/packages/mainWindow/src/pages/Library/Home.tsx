@@ -7,19 +7,18 @@ import { createStore } from "solid-js/store";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "../Library/library.data";
 import {
+  instances,
   InvalidInstanceType,
   ValidInstanceType,
   fetchImage,
   isListInstanceValid,
+  setInstances,
 } from "@/utils/instances";
 
 const Home = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
-  const [instances, setInstances] = createStore<
-    (InvalidInstanceType | ValidInstanceType)[]
-  >([]);
   const [isNewsVisible, setIsNewVisible] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 

@@ -5,6 +5,7 @@ import {
   ValidListInstance,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
+import { createStore } from "solid-js/store";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -36,3 +37,20 @@ export const fetchImage = async (id: number) => {
     return `data:image/png;base64, ${b64.substring(b64.indexOf(",") + 1)}`;
   } else return "";
 };
+
+export type Instance = InvalidInstanceType | ValidInstanceType;
+
+export interface InstancesStore {
+  [modloader: string]: Instance[];
+}
+
+export const [favoriteInstances, setFavoriteInstances] = createStore<
+  Instance[]
+>([]);
+
+export const [instances, setInstances] = createStore<Instance[]>([]);
+
+export const [
+  filteredByModloaderInstances,
+  setFilteredByModloaderfilteredByModloaderInstances,
+] = createStore<InstancesStore>({});
