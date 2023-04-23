@@ -2,7 +2,7 @@ import ThemePreview from "@/components/ThemePreview";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { Show } from "solid-js";
+import { Show, createEffect } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
 
@@ -12,10 +12,13 @@ const Appearance = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newTheme) => {
-      queryClient.setQueryData(["settings.setSettings"], {
-        theme: newTheme.theme,
-      });
+      console.log("TEST", newTheme);
+      queryClient.setQueryData(["settings.setSettings"], newTheme);
     },
+  });
+
+  createEffect(() => {
+    console.log("THEME", routeData?.data?.data?.theme);
   });
 
   return (

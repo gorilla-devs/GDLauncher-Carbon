@@ -1,6 +1,6 @@
 import { JSX, splitProps } from "solid-js";
 
-export interface Props extends JSX.SvgSVGAttributes<SVGSVGElement> {}
+interface Props extends JSX.SvgSVGAttributes<SVGSVGElement> {}
 
 function Spinner(props: Props) {
   const [local, others] = splitProps(props, ["class"]);

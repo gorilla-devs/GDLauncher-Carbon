@@ -7,7 +7,7 @@ import {
   onMount,
 } from "solid-js";
 
-export interface Props {
+interface Props {
   children?: JSX.Element;
   class?: string;
   title: string;

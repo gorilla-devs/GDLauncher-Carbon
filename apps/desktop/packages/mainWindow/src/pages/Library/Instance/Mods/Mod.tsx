@@ -13,7 +13,7 @@ const Mod = (props: Props) => {
         <div class="flex gap-4 justify-between items-center">
           <Checkbox checked={true} disabled={false} />
           <div class="flex items-center gap-2">
-            <div class="h-10 w-10 bg-green-500 rounded-xl" />
+            <div class="h-10 w-10 rounded-xl bg-green-500" />
             <div class="flex flex-col">
               {props.mod.name}
               <div class="flex gap-2">
@@ -21,7 +21,7 @@ const Mod = (props: Props) => {
                   class="w-4 h-4"
                   src={getModloaderIcon(props.mod.modloader)}
                 /> */}
-                <img class="w-4 h-4" src={getModloaderIcon("forge")} />
+                <img class="w-4 h-4" src={getModloaderIcon("Forge")} />
                 {/* <p class="m-0 text-darkSlate-500 text-sm">
                   {`${props.mod.modloader} ${props.mod.mcversion}`}
                 </p> */}

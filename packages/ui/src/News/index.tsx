@@ -24,7 +24,7 @@ type SliderProps = {
   onSlideClick?: (_news: SlideProps) => void;
 };
 
-export interface CarouselProps {
+interface CarouselProps {
   slides: SlideProps[];
   speed?: number;
   rtl?: boolean;

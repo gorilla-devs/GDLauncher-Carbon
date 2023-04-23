@@ -155,8 +155,10 @@ const InstanceCreation = (props: ModalProps) => {
                 version: {
                   Version: {
                     Standard: {
-                      release: "",
-                      modloaders: [{ type_: loader(), version: "" }],
+                      release: mcVersion(),
+                      modloaders: loader()
+                        ? [{ type_: loader() as ModLoaderType, version: "" }]
+                        : [],
                     },
                   },
                 },

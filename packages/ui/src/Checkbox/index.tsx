@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 
-export interface Props {
+interface Props {
   checked?: boolean;
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;

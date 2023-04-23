@@ -1,7 +1,7 @@
 import { JSX, createSignal, onCleanup, onMount, untrack } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
-export interface Props extends JSX.HTMLAttributes<HTMLDivElement> {}
+interface Props extends JSX.HTMLAttributes<HTMLDivElement> {}
 
 const Spacing = (props: Props) => {
   const [index, setIndex] = createSignal(-1);

@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
@@ -38,8 +38,8 @@ const Mods = () => {
   const params = useParams();
 
   const instanceDetails = rspc.createQuery(() => [
-    "mc.getInstanceDetails",
-    params.id,
+    "instance.getInstanceDetails",
+    parseInt(params.id, 10),
   ]);
 
   return (

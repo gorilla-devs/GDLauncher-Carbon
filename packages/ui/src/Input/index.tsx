@@ -1,6 +1,6 @@
 import { Show, JSX, splitProps } from "solid-js";
 
-export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
+interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
   value?: string | number;
   placeholder?: string;
   error?: string;

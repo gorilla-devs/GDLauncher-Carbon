@@ -58,7 +58,7 @@ type ActiveUUID = Extract<
   { key: "account.setActiveUuid" }
 >["result"];
 
-export interface DropDownButtonProps extends Props {
+interface DropDownButtonProps extends Props {
   children: JSX.Element;
 }
 

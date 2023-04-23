@@ -1,12 +1,12 @@
 import { createSignal, For, Show, JSX } from "solid-js";
 import { Button } from "../Button";
 
-export type Option = {
+type Option = {
   label: string;
   key: string;
 };
 
-export type Props = {
+type Props = {
   options: Option[];
   value: string;
   error?: boolean;
@@ -23,7 +23,7 @@ export type Props = {
   placeholder?: string;
   placement?: "bottom" | "top";
 };
-export interface DropDownButtonProps {
+interface DropDownButtonProps {
   children: JSX.Element;
   options: Option[];
   value: string;

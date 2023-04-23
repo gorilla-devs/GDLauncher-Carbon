@@ -9,7 +9,7 @@ export const toggleSidebar = () => {
   return setIsSidebarOpened(!isSidebarOpened());
 };
 
-const getModloaderIcon = (modloader: ModLoaderType) => {
+const getModloaderIcon = (modloader?: ModLoaderType) => {
   switch (modloader) {
     case "Forge":
       return forgeIcon;
