@@ -19,11 +19,7 @@ impl IntoVecDownloadable for AssetIndex {
 
         for (_, object) in self.objects.iter() {
             // TODO: handle directories for different versions (virtual legacy)
-            let asset_path = base_path
-                .join("assets")
-                .join("objects")
-                .join(&object.hash[0..2])
-                .join(&object.hash);
+            let asset_path = base_path.join(&object.hash[0..2]).join(&object.hash);
 
             files.push(
                 carbon_net::Downloadable::new(

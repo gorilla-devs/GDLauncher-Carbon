@@ -1,5 +1,7 @@
 pub mod assets;
 pub mod manifest;
+pub mod minecraft;
+pub mod modded;
 pub mod version;
 
 #[cfg(test)]
