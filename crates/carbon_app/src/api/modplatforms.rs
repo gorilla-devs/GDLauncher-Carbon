@@ -29,6 +29,9 @@ pub struct FEModSearchParameters {
     pub game_version: Option<String>,
     pub category_id: Option<i32>,
     pub sort_order: Option<FEModSearchSortOrder>,
+    pub sort_field: Option<FEModSearchSortField>,
+    pub class_id: Option<FEClassId>,
+    pub mod_loader_type: Option<FEModLoaderType>,
     pub game_version_type_id: Option<i32>,
     pub author_id: Option<i32>,
     pub slug: Option<String>,
@@ -36,46 +39,45 @@ pub struct FEModSearchParameters {
     pub page_size: Option<i32>,
 }
 
-// #[derive(Type, Debug, Serialize, Deserialize)]
-// #[serde(rename_all = "camelCase")]
-// #[derive(FromTo)]
-// #[to(crate::domain::modplatforms::curseforge::search::ModSearchSortField)]
-// pub enum FEModSearchSortField {
-//     Featured,
-//     Popularity,
-//     LastUpdated,
-//     Name,
-//     Author,
-//     TotalDownloads,
-//     Category,
-//     GameVersion,
-// }
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[derive(FromTo)]
+#[to(crate::domain::modplatforms::curseforge::search::ModSearchSortField)]
+pub enum FEModSearchSortField {
+    Featured,
+    Popularity,
+    LastUpdated,
+    Name,
+    Author,
+    TotalDownloads,
+    Category,
+    GameVersion,
+}
 
 #[derive(Type, Debug, Serialize, Deserialize, FromTo)]
+#[serde(rename_all = "camelCase")]
 #[to(crate::domain::modplatforms::curseforge::search::ModSearchSortOrder)]
 pub enum FEModSearchSortOrder {
-    #[serde(rename = "asc")]
     Ascending,
-    #[serde(rename = "desc")]
     Descending,
 }
 
-// #[derive(Type, Debug, Serialize_repr, Deserialize_repr, FromTo)]
-// #[repr(u16)]
-// #[to(crate::domain::modplatforms::curseforge::ClassId)]
-// pub enum FEClassId {
-//     Mods = 6,
-//     Modpacks = 4471,
-// }
+#[derive(Type, Debug, Serialize, Deserialize, FromTo)]
+#[serde(rename_all = "camelCase")]
+#[to(crate::domain::modplatforms::curseforge::ClassId)]
+pub enum FEClassId {
+    Mods,
+    Modpacks,
+}
 
-// #[derive(Type, Debug, Serialize_repr, Deserialize_repr, FromTo)]
-// #[repr(u8)]
-// #[to(crate::domain::modplatforms::curseforge::ModLoaderType)]
-// pub enum FEModLoaderType {
-//     Any = 0,
-//     Forge = 1,
-//     Cauldron = 2,
-//     LiteLoader = 3,
-//     Fabric = 4,
-//     Quilt = 5,
-// }
+#[derive(Type, Debug, Serialize, Deserialize, FromTo)]
+#[serde(rename_all = "camelCase")]
+#[to(crate::domain::modplatforms::curseforge::ModLoaderType)]
+pub enum FEModLoaderType {
+    Any,
+    Forge,
+    Cauldron,
+    LiteLoader,
+    Fabric,
+    Quilt,
+}
