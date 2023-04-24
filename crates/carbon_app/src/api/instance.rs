@@ -334,6 +334,7 @@ pub struct InstanceDetails {
     pub instance_start_time: Option<DateTime<Utc>>,
     pub modloaders: Vec<ModLoader>,
     pub notes: String,
+    mods: Vec<Mod>,
 }
 
 #[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -359,6 +360,32 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             instance_start_time: value.instance_start_time,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
+            mods: vec![
+                Mod {
+                    id: "88r39459345939453".to_string(),
+                    name: "My first instance".to_string(),
+                },
+                Mod {
+                    id: "88r39459345939456".to_string(),
+                    name: "My second instance".to_string(),
+                },
+                Mod {
+                    id: "88r39459345939451".to_string(),
+                    name: "Instance with a very long name".to_string(),
+                },
+                Mod {
+                    id: "88r39459345336457".to_string(),
+                    name: "Vanilla Minecraft".to_string(),
+                },
+                Mod {
+                    id: "84439459345336457".to_string(),
+                    name: "Forge Minecraft".to_string(),
+                },
+                Mod {
+                    id: "82h39459345336457".to_string(),
+                    name: "All The Mods 6".to_string(),
+                },
+            ],
         }
     }
 }
@@ -513,4 +540,11 @@ impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType 
             manager::Eof => Self::Eof,
         }
     }
+}
+
+// old mockup
+#[derive(Type, Serialize)]
+struct Mod {
+    id: String,
+    name: String,
 }
