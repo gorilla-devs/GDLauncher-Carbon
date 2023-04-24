@@ -1,61 +1,23 @@
-import Tile from "@/components/Instance/Tile";
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, Suspense, createEffect, createSignal } from "solid-js";
 import { useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
-import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "../Library/library.data";
-import {
-  instances,
-  InvalidInstanceType,
-  ValidInstanceType,
-  fetchImage,
-  isListInstanceValid,
-  setInstances,
-} from "@/utils/instances";
+import { UngroupedInstance } from "@gd/core_module/bindings";
+import InstanceTile from "@/components/InstanceTile";
 
 const Home = () => {
-  const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
   const [isNewsVisible, setIsNewVisible] = createSignal(false);
+  const [instances, setInstances] = createStore<UngroupedInstance[]>([]);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   createEffect(() => {
     if (routeData.instancesUngrouped.data) {
-      Promise.all(
-        routeData.instancesUngrouped.data.map(async (instance) => {
-          const b64Image = await fetchImage(instance.id);
-
-          const validInstance = isListInstanceValid(instance.status)
-            ? instance.status.Valid
-            : null;
-
-          const InvalidInstance = !isListInstanceValid(instance.status)
-            ? instance.status.Invalid
-            : null;
-
-          const modloader = validInstance?.modloader;
-          const mappedInstance: InvalidInstanceType | ValidInstanceType = {
-            id: instance.id,
-            name: instance.name,
-            favorite: instance.favorite,
-            ...(validInstance && { mc_version: validInstance.mc_version }),
-            ...(validInstance && {
-              modpack_platform: validInstance.modpack_platform,
-            }),
-            ...(validInstance && {
-              img: b64Image,
-            }),
-            ...(validInstance && { modloader }),
-            ...(InvalidInstance && { error: InvalidInstance }),
-          };
-
-          return mappedInstance;
-        })
-      ).then((mappedInstances) => {
-        setInstances(mappedInstances);
+      routeData.instancesUngrouped.data.forEach((instance) => {
+        setInstances((prev) => [...prev, instance]);
       });
     }
   });
@@ -102,18 +64,10 @@ const Home = () => {
             <Carousel title={t("your_instances")}>
               <For each={instances}>
                 {(instance) => (
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.name}
-                    modloader={
-                      "modloader" in instance ? instance?.modloader : null
-                    }
-                    version={
-                      "mc_version" in instance ? instance?.mc_version : null
-                    }
-                    invalid={"error" in instance}
-                    img={"img" in instance ? instance?.img : null}
-                  />
+                  //TODO: SKELETON
+                  <Suspense fallback={<></>}>
+                    <InstanceTile instance={instance} />
+                  </Suspense>
                 )}
               </For>
             </Carousel>

@@ -6,12 +6,12 @@ type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   title: string;
-  modloader: ModLoaderType | null;
+  modloader: ModLoaderType | null | undefined;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
-  version: string | null;
-  img: string | null;
+  version: string | undefined;
+  img: string | undefined;
   variant?: Variant;
   invalid?: boolean;
   onClick?: (_e: MouseEvent) => void;

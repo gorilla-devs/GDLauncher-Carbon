@@ -6,6 +6,7 @@ import {
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
 import { createStore } from "solid-js/store";
+import { port } from "./rspcClient";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -26,7 +27,7 @@ export interface ValidInstanceType
 
 export const fetchImage = async (id: number) => {
   const image = await fetch(
-    `http://localhost:${4650}/instance/instanceIcon?id=${id}`
+    `http://localhost:${port}/instance/instanceIcon?id=${id}`
   );
 
   const imageNotPresent = image.status === 204;
@@ -41,16 +42,5 @@ export const fetchImage = async (id: number) => {
 export type Instance = InvalidInstanceType | ValidInstanceType;
 
 export interface InstancesStore {
-  [modloader: string]: Instance[];
+  [modloader: string]: UngroupedInstance[];
 }
-
-export const [favoriteInstances, setFavoriteInstances] = createStore<
-  Instance[]
->([]);
-
-export const [instances, setInstances] = createStore<Instance[]>([]);
-
-export const [
-  filteredByModloaderInstances,
-  setFilteredByModloaderfilteredByModloaderInstances,
-] = createStore<InstancesStore>({});

@@ -1,30 +1,18 @@
 import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, Suspense, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
-import Tile from "../Instance/Tile";
 import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
-import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, produce } from "solid-js/store";
-import {
-  Instance,
-  InstancesStore,
-  InvalidInstanceType,
-  ValidInstanceType,
-  favoriteInstances,
-  fetchImage,
-  filteredByModloaderInstances,
-  isListInstanceValid,
-  setFavoriteInstances,
-  setFilteredByModloaderfilteredByModloaderInstances,
-} from "@/utils/instances";
+import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
+import { ListInstance } from "@gd/core_module/bindings";
+import InstanceTile from "../InstanceTile";
 
 const Sidebar = () => {
-  const navigate = useGDNavigate();
   const location = useLocation();
 
   const [t] = useTransContext();
@@ -32,10 +20,10 @@ const Sidebar = () => {
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const [localInstances, setLocalInstances] = createStore<InstancesStore>({});
-  const [localFavoriteInstances, setLocalFavoriteInstances] = createStore<
-    Instance[]
-  >([]);
+  const [instances, setInstances] = createStore<InstancesStore>({});
+  const [favoriteInstances, setFavoriteInstances] = createStore<ListInstance[]>(
+    []
+  );
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
@@ -48,38 +36,8 @@ const Sidebar = () => {
       )?.instances;
 
       if (favorites) {
-        Promise.all(
-          favorites.map(async (instance) => {
-            const validInstance = isListInstanceValid(instance.status)
-              ? instance.status.Valid
-              : null;
-
-            const InvalidInstance = !isListInstanceValid(instance.status)
-              ? instance.status.Invalid
-              : null;
-
-            const modloader = validInstance?.modloader;
-
-            const b64Image = await fetchImage(instance.id);
-
-            if (validInstance && modloader) {
-              const mappedInstance: InvalidInstanceType | ValidInstanceType = {
-                id: instance.id,
-                name: instance.name,
-                favorite: true,
-                ...(validInstance && { mc_version: validInstance.mc_version }),
-                ...(validInstance && {
-                  modpack_platform: validInstance.modpack_platform,
-                }),
-                ...(validInstance && { img: b64Image }),
-                ...(validInstance && { modloader }),
-                ...(InvalidInstance && { error: InvalidInstance }),
-              };
-              setLocalFavoriteInstances((prev) => [...prev, mappedInstance]);
-            }
-          })
-        ).then(() => {
-          setFavoriteInstances(localFavoriteInstances);
+        favorites.forEach((instance) => {
+          setFavoriteInstances((prev) => [...prev, instance]);
         });
       }
     }
@@ -87,42 +45,21 @@ const Sidebar = () => {
 
   createEffect(() => {
     if (routeData.instancesUngrouped.data) {
-      Promise.all(
-        routeData.instancesUngrouped.data.map(async (instance) => {
-          const validInstance = isListInstanceValid(instance.status)
-            ? instance.status.Valid
-            : null;
-          const InvalidInstance = !isListInstanceValid(instance.status)
-            ? instance.status.Invalid
-            : null;
-          const modloader = validInstance?.modloader;
+      routeData.instancesUngrouped.data.forEach((instance) => {
+        const validInstance = isListInstanceValid(instance.status)
+          ? instance.status.Valid
+          : null;
 
-          const b64Image = await fetchImage(instance.id);
+        const modloader = validInstance?.modloader;
 
-          if (validInstance && modloader) {
-            const mappedInstance: InvalidInstanceType | ValidInstanceType = {
-              id: instance.id,
-              name: instance.name,
-              favorite: instance.favorite,
-              ...(validInstance && { mc_version: validInstance.mc_version }),
-              ...(validInstance && {
-                modpack_platform: validInstance.modpack_platform,
-              }),
-              ...(validInstance && { img: b64Image }),
-              ...(validInstance && { modloader }),
-              ...(InvalidInstance && { error: InvalidInstance }),
-            };
-
-            setLocalInstances(
-              produce((prev) => {
-                prev[modloader] = [...(prev[modloader] || []), mappedInstance];
-                return prev;
-              })
-            );
-          }
-        })
-      ).then(() => {
-        setFilteredByModloaderfilteredByModloaderInstances(localInstances);
+        if (modloader) {
+          setInstances(
+            produce((prev) => {
+              prev[modloader] = [...(prev[modloader] || []), instance];
+              return prev;
+            })
+          );
+        }
       });
     }
   });
@@ -151,7 +88,7 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Show when={Object.entries(filteredByModloaderInstances).length > 0}>
+        <Show when={Object.entries(instances).length > 0}>
           <div
             class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
             classList={{
@@ -165,25 +102,19 @@ const Sidebar = () => {
               >
                 <For each={favoriteInstances}>
                   {(instance) => (
-                    <Tile
-                      onClick={() => navigate(`/library/${instance.id}`)}
-                      title={instance.name}
-                      modloader={
-                        "modloader" in instance ? instance?.modloader : null
-                      }
-                      version={
-                        "mc_version" in instance ? instance?.mc_version : null
-                      }
-                      invalid={"error" in instance}
-                      variant={isSidebarOpened() ? "sidebar" : "sidebar-small"}
-                      img={"img" in instance ? instance?.img : null}
-                    />
+                    //TODO: SKELETON
+                    <Suspense fallback={<></>}>
+                      <InstanceTile
+                        instance={instance}
+                        isSidebarOpened={isSidebarOpened()}
+                      />
+                    </Suspense>
                   )}
                 </For>
               </Collapsable>
             </Show>
             <For
-              each={Object.entries(filteredByModloaderInstances).filter(
+              each={Object.entries(instances).filter(
                 (group) => group[1].length > 0
               )}
             >
@@ -194,21 +125,13 @@ const Sidebar = () => {
                 >
                   <For each={values}>
                     {(instance) => (
-                      <Tile
-                        onClick={() => navigate(`/library/${instance.id}`)}
-                        title={instance.name}
-                        modloader={
-                          "modloader" in instance ? instance?.modloader : null
-                        }
-                        version={
-                          "mc_version" in instance ? instance?.mc_version : null
-                        }
-                        invalid={"error" in instance}
-                        variant={
-                          isSidebarOpened() ? "sidebar" : "sidebar-small"
-                        }
-                        img={"img" in instance ? instance?.img : null}
-                      />
+                      //TODO: SKELETON
+                      <Suspense fallback={<></>}>
+                        <InstanceTile
+                          instance={instance}
+                          isSidebarOpened={isSidebarOpened()}
+                        />
+                      </Suspense>
                     )}
                   </For>
                 </Collapsable>
