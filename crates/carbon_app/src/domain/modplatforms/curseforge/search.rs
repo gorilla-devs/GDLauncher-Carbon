@@ -1,7 +1,7 @@
 use carbon_macro::into_query_parameters;
 use serde::{Deserialize, Serialize};
 
-use super::{ClassId, Mod, ModLoaderType};
+use super::{ClassId, ModLoaderType};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,9 +34,9 @@ pub struct ModSearchParameters {
     pub game_version: Option<String>,
     pub category_id: Option<i32>,
     pub sort_order: Option<ModSearchSortOrder>,
-    pub sort_field: Option<ModSearchSortField>,
-    pub class_id: Option<ClassId>,
-    pub mod_loader_type: Option<ModLoaderType>,
+    // pub sort_field: Option<ModSearchSortField>,
+    // pub class_id: Option<ClassId>,
+    // pub mod_loader_type: Option<ModLoaderType>,
     pub game_version_type_id: Option<i32>,
     pub author_id: Option<i32>,
     pub slug: Option<String>,

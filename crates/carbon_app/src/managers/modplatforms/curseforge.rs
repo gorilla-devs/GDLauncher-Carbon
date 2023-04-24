@@ -85,12 +85,12 @@ mod test {
             page_size: None,
             search_filter: None,
             slug: None,
-            class_id: None,
+            // class_id: None,
             game_version_type_id: None,
             page: None,
-            mod_loader_type: None,
+            // mod_loader_type: None,
             author_id: None,
-            sort_field: None,
+            // sort_field: None,
             sort_order: None,
         };
 
@@ -114,12 +114,12 @@ mod test {
             page_size: None,
             search_filter: Some("jei".to_string()),
             slug: None,
-            class_id: None,
+            // class_id: None,
             game_version_type_id: None,
             page: None,
-            mod_loader_type: None,
+            // mod_loader_type: None,
             author_id: None,
-            sort_field: None,
+            // sort_field: None,
             sort_order: None,
         };
 
