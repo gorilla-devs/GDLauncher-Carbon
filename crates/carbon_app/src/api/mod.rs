@@ -37,7 +37,6 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::vtask::GROUP_PREFIX, vtask::mount())
         .yolo_merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
-        .yolo_merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
