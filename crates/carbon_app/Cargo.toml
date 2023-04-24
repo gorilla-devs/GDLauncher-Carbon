@@ -49,6 +49,7 @@ regex = { workspace = true }
 image = { workspace = true, features = ["png"], default-features = false }
 task-local-extensions = { workspace = true }
 hyper = { workspace = true }
+zip = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
 url = { workspace = true }

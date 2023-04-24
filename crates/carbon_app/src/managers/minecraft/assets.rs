@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 
-use crate::domain::minecraft::{assets::AssetIndex, version::VersionAssetIndex};
+use crate::domain::minecraft::{assets::AssetIndex, minecraft::VersionAssetIndex};
 
 #[derive(Error, Debug)]
 pub enum AssetsError {

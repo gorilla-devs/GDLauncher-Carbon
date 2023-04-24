@@ -434,6 +434,7 @@ dependencies = [
  "url",
  "uuid",
  "winreg",
+ "zip",
 ]
 
 [[package]]

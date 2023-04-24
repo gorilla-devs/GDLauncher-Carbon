@@ -46,6 +46,7 @@ keys! {
     }
 
     mc {
+        GET_FORGE_VERSIONS               = "getForgeVersions";
         GET_INSTANCES                    = "getInstances";
         GET_MINECRAFT_VERSIONS           = "getMinecraftVersions";
         GET_INSTANCE_DETAILS             = "getInstanceDetails";

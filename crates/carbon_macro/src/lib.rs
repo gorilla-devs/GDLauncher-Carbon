@@ -35,7 +35,7 @@ pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStre
 }
 
 #[proc_macro_derive(FromTo, attributes(to))]
-pub fn from_to_structs(input: TokenStream) -> TokenStream {
+pub fn from_to(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident_from = &input.ident;
     let ident_to = input
@@ -45,8 +45,16 @@ pub fn from_to_structs(input: TokenStream) -> TokenStream {
         .and_then(|attr| attr.parse_args::<syn::Path>().ok())
         .expect("Missing #[to(...)] attribute or invalid syntax");
 
-    let field_assignments_from = generate_field_assignments(&input);
-    let field_assignments_to = generate_field_assignments(&input);
+    match &input.data {
+        syn::Data::Struct(_) => from_to_struct(&input, ident_from, &ident_to),
+        syn::Data::Enum(_) => from_to_enum(&input, ident_from, &ident_to),
+        _ => panic!("FromTo macro only supports structs and enums"),
+    }
+}
+
+fn from_to_struct(input: &DeriveInput, ident_from: &Ident, ident_to: &syn::Path) -> TokenStream {
+    let field_assignments_from = generate_field_assignments(input);
+    let field_assignments_to = generate_field_assignments(input);
 
     let expanded = quote! {
         impl From<#ident_from> for #ident_to {
@@ -61,6 +69,44 @@ pub fn from_to_structs(input: TokenStream) -> TokenStream {
             fn from(src: #ident_to) -> Self {
                 Self {
                     #( #field_assignments_to ),*
+                }
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+fn from_to_enum(input: &DeriveInput, ident_from: &Ident, ident_to: &syn::Path) -> TokenStream {
+    let variants = if let syn::Data::Enum(data_enum) = &input.data {
+        &data_enum.variants
+    } else {
+        panic!("Expected an enum");
+    };
+
+    let from_match_arms = variants.iter().map(|variant| {
+        let variant_ident = &variant.ident;
+        quote! { #ident_from::#variant_ident => #ident_to::#variant_ident }
+    });
+
+    let to_match_arms = variants.iter().map(|variant| {
+        let variant_ident = &variant.ident;
+        quote! { #ident_to::#variant_ident => #ident_from::#variant_ident }
+    });
+
+    let expanded = quote! {
+        impl From<#ident_from> for #ident_to {
+            fn from(src: #ident_from) -> Self {
+                match src {
+                    #( #from_match_arms, )*
+                }
+            }
+        }
+
+        impl From<#ident_to> for #ident_from {
+            fn from(src: #ident_to) -> Self {
+                match src {
+                    #( #to_match_arms, )*
                 }
             }
         }

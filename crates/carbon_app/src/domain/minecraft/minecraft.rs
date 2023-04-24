@@ -1,21 +1,42 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use carbon_net::{IntoDownloadable, IntoVecDownloadable};
+use chrono::{DateTime, Utc};
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
-// Need custom type to impl external traits for Vec<Library>
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Libraries {
-    libraries: Vec<Library>,
+use crate::domain::maven::MavenCoordinates;
+
+use super::modded::{Processor, SidedDataEntry};
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MinecraftManifest {
+    pub latest: MinecraftLatest,
+    pub versions: Vec<ManifestVersion>,
 }
-impl Libraries {
-    pub fn get_allowed_libraries(&self) -> Vec<Library> {
-        let libs = &self.libraries;
 
-        let results = libs.iter().filter(|l| l.is_allowed());
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MinecraftLatest {
+    pub release: String,
+    pub snapshot: String,
+}
 
-        results.cloned().collect()
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ManifestVersion {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub type_: VersionType,
+    pub url: String,
+    pub time: String,
+    #[serde(rename = "releaseTime")]
+    pub release_time: String,
+    pub sha1: String,
+}
+
+// Need custom type to impl external traits for Vec<Library>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Libraries {
+    pub libraries: Vec<Library>,
 }
 
 impl IntoVecDownloadable for Libraries {
@@ -32,8 +53,26 @@ impl IntoVecDownloadable for Libraries {
                 files.push(downloadable);
             }
 
-            if let Some(downloadable) = library.into_natives_downloadable(base_path) {
+            if let Some(downloadable) = library.clone().into_natives_downloadable(base_path) {
                 files.push(downloadable);
+            }
+
+            // Forge special case where downloads is not present but `url` defines the base url
+            if let Some(base_url) = &library.url {
+                let checksum = None;
+
+                let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
+                    continue
+                };
+
+                let maven_path = maven_path.into_path();
+
+                files.push(carbon_net::Downloadable {
+                    url: format!("{}/{}", base_url, maven_path.to_string_lossy()),
+                    path: PathBuf::from(base_path).join(maven_path),
+                    checksum,
+                    size: None,
+                });
             }
         }
 
@@ -41,14 +80,13 @@ impl IntoVecDownloadable for Libraries {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Version {
+pub struct VersionInfo {
     pub inherits_from: Option<String>,
-    pub arguments: Option<Arguments>,
+    pub arguments: Option<VersionArguments>,
     pub asset_index: VersionAssetIndex,
     pub assets: Option<String>,
-    pub compliance_level: Option<i64>,
     pub downloads: Option<VersionDownloads>,
     pub id: String,
     pub java_version: Option<JavaVersion>,
@@ -57,32 +95,55 @@ pub struct Version {
     pub logging: Option<Logging>,
     pub main_class: String,
     pub minimum_launcher_version: Option<i64>,
-    pub release_time: Option<String>,
-    pub time: Option<String>,
+    pub release_time: DateTime<Utc>,
+    pub time: DateTime<Utc>,
     pub minecraft_arguments: Option<String>,
     #[serde(rename = "type")]
-    pub type_: Option<String>,
+    pub type_: VersionType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (Forge-only)
+    pub data: Option<HashMap<String, SidedDataEntry>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// (Forge-only) The list of processors to run after downloading the files
+    pub processors: Option<Vec<Processor>>,
 }
 
-impl Version {
-    pub fn is_older_than(&self, other: &Version) -> bool {
-        if let Some(release_time) = &self.release_time {
-            if let Some(other_release_time) = &other.release_time {
-                return release_time < other_release_time;
-            }
-        }
-
-        if let Some(time) = &self.time {
-            if let Some(other_time) = &other.time {
-                return time < other_time;
-            }
-        }
-
-        false
+impl VersionInfo {
+    pub fn is_older_than(&self, other: &VersionInfo) -> bool {
+        return &self.release_time < &other.release_time;
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum VersionType {
+    #[serde(rename = "old_alpha")]
+    OldAlpha,
+    #[serde(rename = "old_beta")]
+    OldBeta,
+    #[serde(rename = "release")]
+    Release,
+    #[serde(rename = "snapshot")]
+    Snapshot,
+}
+
+impl From<VersionType> for String {
+    fn from(type_: VersionType) -> Self {
+        type_.to_string()
+    }
+}
+
+impl ToString for VersionType {
+    fn to_string(&self) -> String {
+        match self {
+            VersionType::OldAlpha => "old_alpha".to_string(),
+            VersionType::OldBeta => "old_beta".to_string(),
+            VersionType::Release => "release".to_string(),
+            VersionType::Snapshot => "snapshot".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Argument {
     Complex(ArgumentEntry),
@@ -90,105 +151,89 @@ pub enum Argument {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Arguments {
+pub struct VersionArguments {
     pub game: Vec<Argument>,
     pub jvm: Vec<Argument>,
 }
 
-impl Default for Arguments {
-    fn default() -> Self {
+impl VersionArguments {
+    pub fn new() -> Self {
         Self {
-            game: vec![
-                Argument::String("-Xms${ram}M".to_string()),
-                Argument::String("-Xmx${ram}M".to_string()),
-                Argument::String("-XX:+UnlockExperimentalVMOptions".to_string()),
-                Argument::String("-XX:+UseG1GC".to_string()),
-                Argument::String("-XX:G1NewSizePercent=20".to_string()),
-                Argument::String("-XX:G1ReservePercent=20".to_string()),
-                Argument::String("-XX:MaxGCPauseMillis=50".to_string()),
-                Argument::String("-XX:G1HeapRegionSize=32M".to_string()),
-                Argument::String("-Dlog4j2.formatMsgNoLookups=true".to_string()),
-            ],
-            jvm: vec![
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::MacOS),
-                            version: None,
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-XstartOnFirstThread".to_string()),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::Windows),
-                            version: None,
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".to_string()),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: Some(OsName::Windows),
-                            version: Some(r#"^10\\."#.to_string()),
-                            arch: None,
-                        }),
-                        features: None,
-                    }],
-                    value: Value::StringArray(vec![
-                        "-Dos.name=Windows 10".to_string(),
-                        "-Dos.version=10.0".to_string(),
-                    ]),
-                }),
-                Argument::Complex(ArgumentEntry {
-                    rules: vec![Rule {
-                        action: Action::Allow,
-                        os: Some(OsRule {
-                            name: None,
-                            version: None,
-                            arch: Some("x86".to_string()),
-                        }),
-                        features: None,
-                    }],
-                    value: Value::String("-Xss1M".to_string()),
-                }),
-                Argument::String("-Djava.library.path=${natives_directory}".to_string()),
-                Argument::String("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
-                Argument::String("-Dminecraft.launcher.version=${launcher_version}".to_string()),
-
-                // Apparently this "hack" is only needed for launcherVersion < 18
-                Argument::String(
-                    "-Dminecraft.applet.TargetDirectory=${game_directory}".to_string(),
-                ),
-                Argument::String("-cp".to_string()),
-                Argument::String("${classpath}".to_string()),
-            ],
+            game: vec![],
+            jvm: vec![],
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+impl VersionArguments {
+    pub fn get_default_jvm_args() -> Vec<Argument> {
+        vec![
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::MacOS),
+                        version: None,
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::String("-XstartOnFirstThread".to_string()),
+            }),
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::Windows),
+                        version: None,
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::String("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".to_string()),
+            }),
+            Argument::Complex(ArgumentEntry {
+                rules: vec![Rule {
+                    action: Action::Allow,
+                    os: Some(OsRule {
+                        name: Some(OsName::Windows),
+                        version: Some(r#"^10\\."#.to_string()),
+                        arch: None,
+                    }),
+                    features: None,
+                }],
+                value: Value::StringArray(vec![
+                    "-Dos.name=Windows 10".to_string(),
+                    "-Dos.version=10.0".to_string(),
+                ]),
+            }),
+            Argument::String("-Djava.library.path=${natives_directory}".to_string()),
+            Argument::String("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
+            Argument::String("-Dminecraft.launcher.version=${launcher_version}".to_string()),
+
+            // Apparently this "hack" is only needed for launcherVersion < 18
+            // Argument::String(
+            //     "-Dminecraft.applet.TargetDirectory=${game_directory}".to_string(),
+            // ),
+            Argument::String("-cp".to_string()),
+            Argument::String("${classpath}".to_string()),
+        ]
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Features {
     pub is_demo_user: Option<bool>,
     pub has_custom_resolution: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ArgumentEntry {
     pub rules: Vec<Rule>,
     pub value: Value,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VersionAssetIndex {
     pub id: String,
     pub sha1: String,
@@ -198,7 +243,7 @@ pub struct VersionAssetIndex {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VersionDownloads {
     pub client: VersionDownloadsMappingsClass,
     pub client_mappings: Option<VersionDownloadsMappingsClass>,
@@ -223,7 +268,7 @@ impl IntoDownloadable for VersionDownloadsMappingsClass {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JavaVersion {
     pub component: String,
     #[serde(rename = "majorVersion")]
@@ -232,13 +277,19 @@ pub struct JavaVersion {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Library {
-    pub downloads: LibraryDownloads,
+    pub downloads: Option<LibraryDownloads>,
     /// Url only appears in some forge libraries apparently
     pub url: Option<String>,
     pub name: String,
     pub rules: Option<Vec<Rule>>,
     pub natives: Option<Natives>,
     pub extract: Option<Extract>,
+    #[serde(default = "default_include_in_classpath")]
+    pub include_in_classpath: bool,
+}
+
+fn default_include_in_classpath() -> bool {
+    true
 }
 
 impl Library {
@@ -246,7 +297,7 @@ impl Library {
         self,
         base_path: &std::path::Path,
     ) -> Option<carbon_net::Downloadable> {
-        let artifact = self.downloads.artifact;
+        let artifact = self.downloads.and_then(|v| v.artifact);
 
         if let Some(artifact) = artifact {
             let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
@@ -266,7 +317,7 @@ impl Library {
         self,
         base_path: &std::path::Path,
     ) -> Option<carbon_net::Downloadable> {
-        let Some(classifiers) = self.downloads.classifiers else {
+        let Some(classifiers) = self.downloads.and_then(|v| v.classifiers) else {
             return None;
         };
 
@@ -379,14 +430,14 @@ impl Natives {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Rule {
     pub action: Action,
     pub os: Option<OsRule>,
     pub features: Option<Features>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum Action {
     #[serde(rename = "allow")]
     Allow,
@@ -416,7 +467,7 @@ impl Rule {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct OsRule {
     pub name: Option<OsName>,
     pub version: Option<String>,
@@ -453,12 +504,12 @@ impl Default for OsName {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Logging {
     pub client: LoggingClient,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoggingClient {
     pub argument: String,
     pub file: VersionAssetIndex,
@@ -466,7 +517,7 @@ pub struct LoggingClient {
     pub client_type: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Value {
     String(String),
