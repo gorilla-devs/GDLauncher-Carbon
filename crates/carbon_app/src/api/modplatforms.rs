@@ -1,9 +1,5 @@
-use crate::{
-    api::{keys::modplatforms::TEST_QUERY, router::router},
-    managers::App,
-};
+use crate::{api::router::router, managers::App};
 use rspc::{RouterBuilderLike, Type};
-use serde::{Deserialize, Serialize};
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

@@ -404,7 +404,6 @@ mod tests {
         }
     }
 
-    // Test with cargo test -- --nocapture --exact managers::minecraft::version::tests::test_generate_startup_command
     #[tokio::test]
     async fn test_generate_startup_command() {
         let manifest = MinecraftManifest::fetch().await.unwrap();

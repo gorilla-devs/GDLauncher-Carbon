@@ -421,6 +421,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_repr",
+ "serde_urlencoded",
  "strum",
  "strum_macros",
  "task-local-extensions",

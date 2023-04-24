@@ -18,6 +18,7 @@ env_logger = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
+serde_urlencoded = "0.7.1"
 tracing-test = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

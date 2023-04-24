@@ -82,6 +82,7 @@ keys! {
     }
 
     modplatforms {
-        TEST_QUERY                      = "testQuery";
+        CURSEFORGE_SEARCH                = "curseforgeSearch";
+        CURSEFORGE_GET_MOD               = "curseforgeGetMod";
     }
 }
