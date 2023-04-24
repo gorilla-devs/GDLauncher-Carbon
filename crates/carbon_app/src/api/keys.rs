@@ -89,6 +89,7 @@ keys! {
         CURSEFORGE_GET_MODS                         = "curseforgeGetMods";
         CURSEFORGE_GET_MOD_DESCRIPTION              = "curseforgeGetModDescription";
         CURSEFORGE_GET_MOD_FILE                     = "curseforgeGetModFile";
+        CURSEFORGE_GET_MOD_FILES                    = "curseforgeGetModFiles";
         CURSEFORGE_GET_FILES                        = "curseforgeGetFiles";
         CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforgeGetModFileChangelog";
     }

@@ -3,7 +3,7 @@ use crate::{
         keys::modplatforms::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
             CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
-            CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
+            CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
         },
         router::router,
     },
@@ -59,7 +59,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(response)
         }
 
-        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: ModFilesParameters] {
+        query CURSEFORGE_GET_MOD_FILES[app, mod_parameters: ModFilesParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_files(mod_parameters).await?;
 
