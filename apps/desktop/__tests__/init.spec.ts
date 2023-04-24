@@ -39,7 +39,7 @@ const getRootPath = () => {
     basePath = path.join(
       basePath,
       isArm64() ? "mac-arm64" : "mac",
-      "GDLauncher Carbon.app"
+      "GDLauncher.app"
     );
   }
 

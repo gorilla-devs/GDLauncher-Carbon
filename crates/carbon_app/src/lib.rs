@@ -150,7 +150,7 @@ impl std::ops::Deref for TestEnv {
 #[cfg(test)]
 impl Drop for TestEnv {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.tmpdir).unwrap();
+        let _ = std::fs::remove_dir_all(&self.tmpdir);
     }
 }
 

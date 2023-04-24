@@ -431,6 +431,7 @@ dependencies = [
  "tracing-test",
  "uuid",
  "winreg",
+ "zip",
 ]
 
 [[package]]
