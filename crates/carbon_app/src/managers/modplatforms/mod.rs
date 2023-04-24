@@ -5,7 +5,7 @@ use crate::{iridium_client::get_client, managers::GDL_API_BASE};
 mod curseforge;
 
 pub struct ModplatformsManager {
-    curseforge: curseforge::CurseForge,
+    pub curseforge: curseforge::CurseForge,
 }
 
 impl ModplatformsManager {
@@ -16,21 +16,7 @@ impl ModplatformsManager {
     }
 }
 
-impl ManagerRef<'_, ModplatformsManager> {
-    pub async fn curseforge_search(
-        &self,
-        filters: cf::search::ModSearchParameters,
-    ) -> anyhow::Result<cf::CurseForgeResponse<Vec<cf::Mod>>> {
-        self.curseforge.search(filters).await
-    }
-
-    pub async fn curseforge_get_mod(
-        &self,
-        mod_id: u32,
-    ) -> anyhow::Result<cf::CurseForgeResponse<cf::Mod>> {
-        self.curseforge.get_mod(mod_id).await
-    }
-}
+impl ManagerRef<'_, ModplatformsManager> {}
 
 // #[cfg(test)]
 // mod test {

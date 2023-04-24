@@ -1,10 +1,11 @@
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
-pub mod search;
+pub mod filters;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeaturedModsResponse {
     pub featured: Vec<Mod>,
@@ -12,7 +13,7 @@ pub struct FeaturedModsResponse {
     pub recently_updated: Vec<Mod>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct File {
     pub id: i32,
@@ -25,8 +26,8 @@ pub struct File {
     pub file_status: FileStatus,
     pub hashes: Vec<FileHash>,
     pub file_date: String, // Consider using a datetime library for date-time representation
-    pub file_length: i64,
-    pub download_count: i64,
+    pub file_length: u32,
+    pub download_count: u32,
     pub download_url: Option<String>,
     pub game_versions: Vec<String>,
     pub sortable_game_versions: Vec<SortableGameVersion>,
@@ -38,25 +39,25 @@ pub struct File {
     pub server_pack_file_id: Option<i32>,
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
-    pub file_fingerprint: i64,
+    pub file_fingerprint: String,
     pub modules: Vec<FileModule>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDependency {
     pub mod_id: i32,
     pub relation_type: FileRelationType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileHash {
     pub value: String,
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Release = 1,
@@ -64,7 +65,7 @@ pub enum FileReleaseType {
     Alpha = 3,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FileStatus {
     Processing = 1,
@@ -84,7 +85,7 @@ pub enum FileStatus {
     FailedPublishing = 15,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FileRelationType {
     EmbeddedLibrary = 1,
@@ -95,21 +96,21 @@ pub enum FileRelationType {
     Include = 6,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum HashAlgo {
     Sha1 = 1,
     Md5 = 2,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileModule {
     pub name: String,
-    pub fingerprint: i64,
+    pub fingerprint: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FingerprintFuzzyMatch {
     pub id: i32,
@@ -118,13 +119,13 @@ pub struct FingerprintFuzzyMatch {
     pub fingerprints: Vec<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FingerprintFuzzyMatchResult {
     pub fuzzy_matches: Vec<FingerprintFuzzyMatch>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FingerprintMatch {
     pub id: i32,
@@ -132,7 +133,7 @@ pub struct FingerprintMatch {
     pub latest_files: Vec<File>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FingerprintsMatchesResult {
     pub is_cache_built: bool,
@@ -144,14 +145,14 @@ pub struct FingerprintsMatchesResult {
     pub unmatched_fingerprints: Vec<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderFingerprint {
     pub foldername: String,
     pub fingerprints: Vec<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Game {
     pub id: i32,
@@ -163,7 +164,7 @@ pub struct Game {
     pub api_status: CoreApiStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MinecraftGameVersion {
     pub id: i32,
@@ -178,7 +179,7 @@ pub struct MinecraftGameVersion {
     pub game_version_type_status: GameVersionTypeStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MinecraftModLoaderIndex {
     pub name: String,
@@ -189,7 +190,7 @@ pub struct MinecraftModLoaderIndex {
     pub mod_loader_type: ModLoaderType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MinecraftModLoaderVersion {
     pub id: i32,
@@ -221,7 +222,7 @@ pub struct MinecraftModLoaderVersion {
     pub install_profile_json: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Mod {
     pub id: i32,
@@ -231,7 +232,7 @@ pub struct Mod {
     pub links: ModLinks,
     pub summary: String,
     pub status: ModStatus,
-    pub download_count: i64,
+    pub download_count: u32,
     pub is_featured: bool,
     pub primary_category_id: i32,
     pub categories: Vec<Category>,
@@ -251,14 +252,14 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,
     Modpacks = 4471,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModDependencies {
     pub id: i32,
@@ -269,7 +270,7 @@ pub struct ModDependencies {
     pub dependency_type: DependencyType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFile {
     pub id: i32,
@@ -278,14 +279,14 @@ pub struct ModFile {
     pub display_name: String,
     pub file_name: String,
     pub file_date: String, // date-time
-    pub file_length: i64,
+    pub file_length: u32,
     pub release_type: FileReleaseType,
     pub is_available: bool,
     pub modules: Vec<ModFileModule>,
     pub game_version: Vec<String>,
     pub install_metadata: Option<String>,
     pub changelog: Option<String>,
-    pub package_fingerprint: i64,
+    pub package_fingerprint: String,
     pub file_dependencies: Vec<FileDependency>,
     pub is_alternate: bool,
     pub alternate_file_id: Option<i32>,
@@ -306,25 +307,25 @@ pub struct ModFile {
     pub game_version_type_status: GameVersionTypeStatus,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFileModule {
     pub folder_name: String,
-    pub fingerprint: i64,
+    pub fingerprint: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFileStat {
     pub mod_id: i32,
     pub file_id: i32,
     pub timestamp: String, // date-time
-    pub total_downloads: i64,
-    pub downloads: i64,
+    pub total_downloads: u32,
+    pub downloads: u32,
     pub update_count: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFileVersion {
     pub id: i32,
@@ -334,7 +335,7 @@ pub struct ModFileVersion {
     pub game_version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SortableGameVersion {
     pub game_version_name: String,
@@ -344,14 +345,14 @@ pub struct SortableGameVersion {
     pub game_version_type_id: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameAssets {
     pub game: String,
     pub logo: String,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum CoreStatus {
     Draft = 1,
@@ -362,14 +363,14 @@ pub enum CoreStatus {
     Live = 6,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum CoreApiStatus {
     Private = 1,
     Public = 2,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum GameVersionStatus {
     Approved = 1,
@@ -377,14 +378,14 @@ pub enum GameVersionStatus {
     New = 3,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum GameVersionTypeStatus {
     Normal = 1,
     Deleted = 2,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum ModLoaderType {
     Any = 0,
@@ -395,7 +396,7 @@ pub enum ModLoaderType {
     Quilt = 5,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum ModLoaderInstallMethod {
     ForgeInstaller = 1,
@@ -403,7 +404,7 @@ pub enum ModLoaderInstallMethod {
     ForgeInstallerV2 = 3,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModLinks {
     pub website_url: Option<String>,
@@ -412,7 +413,7 @@ pub struct ModLinks {
     pub source_url: Option<String>,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum ModStatus {
     New = 1,
@@ -427,7 +428,7 @@ pub enum ModStatus {
     UnderReview = 10,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub id: i32,
@@ -437,7 +438,7 @@ pub struct Category {
     pub parent_category_id: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAuthor {
     pub id: i32,
@@ -445,7 +446,7 @@ pub struct ModAuthor {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAsset {
     pub id: i32,
@@ -456,7 +457,7 @@ pub struct ModAsset {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileIndex {
     pub game_version: String,
@@ -467,7 +468,7 @@ pub struct FileIndex {
     pub mod_loader: Option<ModLoaderType>,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum DependencyType {
     EmbeddedLibrary = 1,
@@ -478,7 +479,7 @@ pub enum DependencyType {
     Include = 6,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Pagination {
     pub index: i32,
@@ -487,7 +488,7 @@ pub struct Pagination {
     pub total_count: i32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 pub struct CurseForgeResponse<T> {
     pub data: T,
     pub pagination: Option<Pagination>,

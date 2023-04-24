@@ -1,83 +1,83 @@
 use crate::{
-    api::{keys::modplatforms::CURSEFORGE_SEARCH, router::router},
+    api::{
+        keys::modplatforms::{
+            CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
+            CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
+            CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
+        },
+        router::router,
+    },
+    domain::modplatforms::curseforge::filters::{
+        FilesParameters, ModDescriptionParameters, ModFileChangelogParameters, ModFileParameters,
+        ModFilesParameters, ModParameters, ModSearchParameters, ModsParameters,
+    },
     managers::App,
 };
-use carbon_macro::FromTo;
-use rspc::{RouterBuilderLike, Type};
-use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use rspc::RouterBuilderLike;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query CURSEFORGE_SEARCH[app, filters: FEModSearchParameters] {
-            let response = app.modplatforms_manager();
-            response.curseforge_search(filters.into()).await?;
+        query CURSEFORGE_SEARCH[app, filters: ModSearchParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.search(filters).await?;
 
-            Ok(())
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_CATEGORIES[app, _: ()] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_categories().await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MOD[app, mod_parameters: ModParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mod(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MODS[app, mod_parameters: ModsParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mods(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MOD_DESCRIPTION[app, mod_parameters: ModDescriptionParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mod_description(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: ModFileParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mod_file(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: ModFilesParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mod_files(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_FILES[app, mod_parameters: FilesParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_files(mod_parameters).await?;
+
+            Ok(response)
+        }
+
+        query CURSEFORGE_GET_MOD_FILE_CHANGELOG[app, mod_parameters: ModFileChangelogParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.curseforge.get_mod_file_changelog(mod_parameters).await?;
+
+            Ok(response)
         }
     }
-}
-
-#[derive(Type, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[derive(FromTo)]
-#[to(crate::domain::modplatforms::curseforge::search::ModSearchParameters)]
-pub struct FEModSearchParameters {
-    pub game_id: i32,
-    pub page: Option<i32>,
-    pub search_filter: Option<String>,
-    pub game_version: Option<String>,
-    pub category_id: Option<i32>,
-    pub sort_order: Option<FEModSearchSortOrder>,
-    pub sort_field: Option<FEModSearchSortField>,
-    pub class_id: Option<FEClassId>,
-    pub mod_loader_type: Option<FEModLoaderType>,
-    pub game_version_type_id: Option<i32>,
-    pub author_id: Option<i32>,
-    pub slug: Option<String>,
-    pub index: Option<i32>,
-    pub page_size: Option<i32>,
-}
-
-#[derive(Type, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[derive(FromTo)]
-#[to(crate::domain::modplatforms::curseforge::search::ModSearchSortField)]
-pub enum FEModSearchSortField {
-    Featured,
-    Popularity,
-    LastUpdated,
-    Name,
-    Author,
-    TotalDownloads,
-    Category,
-    GameVersion,
-}
-
-#[derive(Type, Debug, Serialize, Deserialize, FromTo)]
-#[serde(rename_all = "camelCase")]
-#[to(crate::domain::modplatforms::curseforge::search::ModSearchSortOrder)]
-pub enum FEModSearchSortOrder {
-    Ascending,
-    Descending,
-}
-
-#[derive(Type, Debug, Serialize, Deserialize, FromTo)]
-#[serde(rename_all = "camelCase")]
-#[to(crate::domain::modplatforms::curseforge::ClassId)]
-pub enum FEClassId {
-    Mods,
-    Modpacks,
-}
-
-#[derive(Type, Debug, Serialize, Deserialize, FromTo)]
-#[serde(rename_all = "camelCase")]
-#[to(crate::domain::modplatforms::curseforge::ModLoaderType)]
-pub enum FEModLoaderType {
-    Any,
-    Forge,
-    Cauldron,
-    LiteLoader,
-    Fabric,
-    Quilt,
 }
