@@ -1,6 +1,7 @@
-use carbon_domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
+
+use crate::domain::minecraft::manifest::{ManifestVersion, MinecraftManifest};
 
 #[derive(Error, Debug)]
 pub enum ManifestError {
@@ -10,10 +11,9 @@ pub enum ManifestError {
     DBQueryError(#[from] QueryError),
 }
 
-// get should abstract the complexity of fetching it from either the network or the db
 pub async fn get_meta(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
-) -> anyhow::Result<Vec<ManifestVersion>> {
+) -> anyhow::Result<MinecraftManifest> {
     let server_url = "https://launchermeta.mojang.com/mc/game/version_manifest_v2.json";
     let new_manifest = reqwest_client
         .get(server_url)
@@ -22,5 +22,5 @@ pub async fn get_meta(
         .json::<MinecraftManifest>()
         .await?;
 
-    Ok(new_manifest.versions)
+    Ok(new_manifest)
 }
