@@ -22,7 +22,7 @@ impl CurseForge {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
         Self {
             client,
-            base_url: format!("{GDL_API_BASE}/cf/v1/").parse().unwrap(),
+            base_url: format!("{GDL_API_BASE}/cf/").parse().unwrap(),
         }
     }
 
@@ -64,8 +64,7 @@ impl CurseForge {
     ) -> anyhow::Result<CurseForgeResponse<Mod>> {
         let url = self
             .base_url
-            .join("mods/")?
-            .join(&mod_parameters.mod_id.to_string())?;
+            .join(&format!("mods/{}", &mod_parameters.mod_id.to_string()))?;
 
         let resp = self
             .client
@@ -101,11 +100,10 @@ impl CurseForge {
         &self,
         mod_parameters: ModDescriptionParameters,
     ) -> anyhow::Result<CurseForgeResponse<String>> {
-        let url = self
-            .base_url
-            .join("mods/")?
-            .join(&mod_parameters.mod_id.to_string())?
-            .join("description")?;
+        let url = self.base_url.join(&format!(
+            "mods/{}/description",
+            &mod_parameters.mod_id.to_string()
+        ))?;
 
         let resp = self
             .client
@@ -121,12 +119,11 @@ impl CurseForge {
         &self,
         mod_parameters: ModFileParameters,
     ) -> anyhow::Result<CurseForgeResponse<File>> {
-        let url = self
-            .base_url
-            .join("mods/")?
-            .join(&mod_parameters.mod_id.to_string())?
-            .join("files/")?
-            .join(&mod_parameters.file_id.to_string())?;
+        let url = self.base_url.join(&format!(
+            "mods/{}/files/{}",
+            &mod_parameters.mod_id.to_string(),
+            &mod_parameters.file_id.to_string()
+        ))?;
 
         let resp = self
             .client
@@ -142,11 +139,10 @@ impl CurseForge {
         &self,
         mod_parameters: ModFilesParameters,
     ) -> anyhow::Result<CurseForgeResponse<Vec<File>>> {
-        let mut url = self
-            .base_url
-            .join("mods/")?
-            .join(&mod_parameters.mod_id.to_string())?
-            .join("files")?;
+        let mut url = self.base_url.join(&format!(
+            "mods/{}/files",
+            &mod_parameters.mod_id.to_string()
+        ))?;
 
         let query = mod_parameters.query.into_query_parameters()?;
         url.set_query(Some(&query));
@@ -185,13 +181,11 @@ impl CurseForge {
         &self,
         mod_parameters: ModFileChangelogParameters,
     ) -> anyhow::Result<CurseForgeResponse<String>> {
-        let url = self
-            .base_url
-            .join("mods/")?
-            .join(&mod_parameters.mod_id.to_string())?
-            .join("files/")?
-            .join(&mod_parameters.file_id.to_string())?
-            .join("changelog")?;
+        let url = self.base_url.join(&format!(
+            "mods/{}/files/{}/changelog",
+            &mod_parameters.mod_id.to_string(),
+            &mod_parameters.file_id.to_string()
+        ))?;
 
         let resp = self
             .client
@@ -206,7 +200,9 @@ impl CurseForge {
 
 #[cfg(test)]
 mod test {
-    use crate::domain::modplatforms::curseforge::filters::ModSearchParametersQuery;
+    use crate::domain::modplatforms::curseforge::filters::{
+        ModFilesParametersQuery, ModSearchParametersQuery,
+    };
 
     #[tokio::test]
     async fn test_search_no_query() {
@@ -268,5 +264,98 @@ mod test {
 
         let mods = curseforge.search(search_params).await.unwrap();
         assert!(!mods.data.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_mod() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let curseforge = CurseForge::new(client);
+
+        let mod_id = 389615;
+
+        let mod_ = curseforge.get_mod(ModParameters { mod_id }).await.unwrap();
+        assert_eq!(mod_.data.id, mod_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_mod_description() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let curseforge = CurseForge::new(client);
+
+        let mod_id = 389615;
+
+        let mod_ = curseforge
+            .get_mod_description(ModDescriptionParameters { mod_id })
+            .await
+            .unwrap();
+        assert_ne!(mod_.data.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_get_mod_file() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let curseforge = CurseForge::new(client);
+
+        let mod_id = 389615;
+        let file_id = 3931045;
+
+        let mod_ = curseforge
+            .get_mod_file(ModFileParameters { mod_id, file_id })
+            .await
+            .unwrap();
+        assert_eq!(mod_.data.id, file_id);
+    }
+
+    #[tokio::test]
+    async fn test_get_mod_files() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let curseforge = CurseForge::new(client);
+
+        let mod_id = 389615;
+
+        let mod_ = curseforge
+            .get_mod_files(ModFilesParameters {
+                mod_id,
+                query: ModFilesParametersQuery {
+                    game_version: None,
+                    index: None,
+                    page_size: None,
+                    game_version_type_id: None,
+                    mod_loader_type: None,
+                },
+            })
+            .await
+            .unwrap();
+        assert!(!mod_.data.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_mod_file_changelog() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let curseforge = CurseForge::new(client);
+
+        let mod_id = 389615;
+        let file_id = 3931045;
+
+        let mod_ = curseforge
+            .get_mod_file_changelog(ModFileChangelogParameters { mod_id, file_id })
+            .await
+            .unwrap();
+        assert_ne!(mod_.data.len(), 0);
     }
 }

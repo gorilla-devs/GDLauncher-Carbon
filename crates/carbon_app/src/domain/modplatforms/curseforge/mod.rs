@@ -39,7 +39,7 @@ pub struct File {
     pub server_pack_file_id: Option<i32>,
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
-    pub file_fingerprint: String,
+    pub file_fingerprint: u32,
     pub modules: Vec<FileModule>,
 }
 
@@ -107,7 +107,7 @@ pub enum HashAlgo {
 #[serde(rename_all = "camelCase")]
 pub struct FileModule {
     pub name: String,
-    pub fingerprint: String,
+    pub fingerprint: u32,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -116,7 +116,7 @@ pub struct FingerprintFuzzyMatch {
     pub id: i32,
     pub file: File,
     pub latest_files: Vec<File>,
-    pub fingerprints: Vec<i32>,
+    pub fingerprints: Vec<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -138,18 +138,18 @@ pub struct FingerprintMatch {
 pub struct FingerprintsMatchesResult {
     pub is_cache_built: bool,
     pub exact_matches: Vec<FingerprintMatch>,
-    pub exact_fingerprints: Vec<i32>,
+    pub exact_fingerprints: Vec<u32>,
     pub partial_matches: Vec<FingerprintMatch>,
-    pub partial_match_fingerprints: HashMap<String, Vec<i32>>,
-    pub installed_fingerprints: Vec<i32>,
-    pub unmatched_fingerprints: Vec<i32>,
+    pub partial_match_fingerprints: HashMap<String, Vec<u32>>,
+    pub installed_fingerprints: Vec<u32>,
+    pub unmatched_fingerprints: Vec<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FolderFingerprint {
     pub foldername: String,
-    pub fingerprints: Vec<i32>,
+    pub fingerprints: Vec<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -286,7 +286,7 @@ pub struct ModFile {
     pub game_version: Vec<String>,
     pub install_metadata: Option<String>,
     pub changelog: Option<String>,
-    pub package_fingerprint: String,
+    pub package_fingerprint: u32,
     pub file_dependencies: Vec<FileDependency>,
     pub is_alternate: bool,
     pub alternate_file_id: Option<i32>,
@@ -311,7 +311,7 @@ pub struct ModFile {
 #[serde(rename_all = "camelCase")]
 pub struct ModFileModule {
     pub folder_name: String,
-    pub fingerprint: String,
+    pub fingerprint: u32,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
