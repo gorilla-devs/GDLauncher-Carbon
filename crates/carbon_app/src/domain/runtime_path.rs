@@ -40,11 +40,8 @@ impl AssetsPath {
         self.0.join("virtual").join("legacy")
     }
 
-    pub fn get_asset_path(&self, asset_hash: &str) -> PathBuf {
-        self.0
-            .join("objects")
-            .join(&asset_hash[..2])
-            .join(asset_hash)
+    pub fn get_objects_path(&self) -> PathBuf {
+        self.0.join("objects")
     }
 }
 
@@ -90,9 +87,13 @@ impl InstancesPath {
     }
 }
 
+#[derive(Clone)]
 pub struct InstancePath(PathBuf);
 
 impl InstancePath {
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
+    }
     pub fn get_root(&self) -> PathBuf {
         self.0.clone()
     }
