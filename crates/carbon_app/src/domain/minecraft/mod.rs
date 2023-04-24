@@ -1,10 +1,10 @@
 pub mod assets;
-pub mod manifest;
-pub mod version;
+pub mod minecraft;
+pub mod modded;
 
 #[cfg(test)]
 mod test {
-    use crate::domain::minecraft::manifest::MinecraftManifest;
+    use crate::domain::minecraft::minecraft::MinecraftManifest;
 
     // #[tokio::test]
     // async fn test_live_manifest_versions_format() {

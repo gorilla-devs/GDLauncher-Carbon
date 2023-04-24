@@ -432,6 +432,7 @@ dependencies = [
  "trash",
  "uuid",
  "winreg",
+ "zip",
 ]
 
 [[package]]

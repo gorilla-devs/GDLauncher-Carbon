@@ -47,6 +47,7 @@ keys! {
 
     mc {
         GET_MINECRAFT_VERSIONS           = "getMinecraftVersions";
+        GET_FORGE_VERSIONS               = "getForgeVersions";
     }
 
     instance {
