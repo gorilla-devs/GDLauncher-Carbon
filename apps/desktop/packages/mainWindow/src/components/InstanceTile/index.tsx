@@ -7,6 +7,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 const InstanceTile = (props: {
   instance: UngroupedInstance | ListInstance;
   isSidebarOpened?: boolean;
+  selected?: boolean;
 }) => {
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
@@ -33,6 +34,7 @@ const InstanceTile = (props: {
         invalid={!isListInstanceValid(props.instance.status)}
         variant={type()}
         img={image()}
+        selected={props.selected}
       />
     </div>
   );

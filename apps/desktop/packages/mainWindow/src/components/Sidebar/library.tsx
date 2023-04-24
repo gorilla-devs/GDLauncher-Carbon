@@ -107,6 +107,7 @@ const Sidebar = () => {
                       <InstanceTile
                         instance={instance}
                         isSidebarOpened={isSidebarOpened()}
+                        selected={instanceId() === instance.id.toString()}
                       />
                     </Suspense>
                   )}
@@ -130,6 +131,7 @@ const Sidebar = () => {
                         <InstanceTile
                           instance={instance}
                           isSidebarOpened={isSidebarOpened()}
+                          selected={instanceId() === instance.id.toString()}
                         />
                       </Suspense>
                     )}
