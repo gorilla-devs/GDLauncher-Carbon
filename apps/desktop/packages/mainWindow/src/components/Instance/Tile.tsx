@@ -106,7 +106,7 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="select-none w-full flex items-center gap-4 box-border group cursor-pointer erelative h-14 px-3"
+          class="relative group select-none w-full flex items-center gap-4 box-border cursor-pointer erelative h-14 px-3"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>

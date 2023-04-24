@@ -10,7 +10,7 @@ const Collapsable = (props: Props) => {
   const [opened, setOpened] = createSignal(true);
 
   return (
-    <div class="w-full box-border flex flex-col py-2 overflow-hidden">
+    <div class="w-full box-border flex flex-col py-2 overflow-hidden select-none max-w-full">
       <div
         class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         classList={{
@@ -22,13 +22,13 @@ const Collapsable = (props: Props) => {
         }}
       >
         <div
-          class="transition ease-in-out i-ri:arrow-down-s-line text-darkSlate-100"
+          class="transition ease-in-out i-ri:arrow-down-s-line min-w-4 min-h-4 text-darkSlate-100"
           classList={{
             "-rotate-180": !opened(),
           }}
         />
         <p
-          class="m-0 text-darkSlate-100 flex items-center uppercase"
+          class="m-0 text-darkSlate-100 flex items-center uppercase text-ellipsis overflow-hidden max-w-full"
           classList={{
             "text-md": props.size !== "small",
             "text-xs": props.size === "small",
