@@ -144,12 +144,12 @@ impl From<crate::domain::modplatforms::curseforge::FileHash> for FEFileHash {
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEFileReleaseType {
-    Release = 1,
-    Beta = 2,
-    Alpha = 3,
+    Release,
+    Beta,
+    Alpha,
 }
 
 impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for FEFileReleaseType {
@@ -168,24 +168,24 @@ impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for FEFileRe
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEFileStatus {
-    Processing = 1,
-    ChangesRequired = 2,
-    UnderReview = 3,
-    Approved = 4,
-    Rejected = 5,
-    MalwareDetected = 6,
-    Deleted = 7,
-    Archived = 8,
-    Testing = 9,
-    Released = 10,
-    ReadyForReview = 11,
-    Deprecated = 12,
-    Baking = 13,
-    AwaitingPublishing = 14,
-    FailedPublishing = 15,
+    Processing,
+    ChangesRequired,
+    UnderReview,
+    Approved,
+    Rejected,
+    MalwareDetected,
+    Deleted,
+    Archived,
+    Testing,
+    Released,
+    ReadyForReview,
+    Deprecated,
+    Baking,
+    AwaitingPublishing,
+    FailedPublishing,
 }
 
 impl From<crate::domain::modplatforms::curseforge::FileStatus> for FEFileStatus {
@@ -226,15 +226,15 @@ impl From<crate::domain::modplatforms::curseforge::FileStatus> for FEFileStatus 
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEFileRelationType {
-    EmbeddedLibrary = 1,
-    OptionalDependency = 2,
-    RequiredDependency = 3,
-    Tool = 4,
-    Incompatible = 5,
-    Include = 6,
+    EmbeddedLibrary,
+    OptionalDependency,
+    RequiredDependency,
+    Tool,
+    Incompatible,
+    Include,
 }
 
 impl From<crate::domain::modplatforms::curseforge::FileRelationType> for FEFileRelationType {
@@ -262,11 +262,11 @@ impl From<crate::domain::modplatforms::curseforge::FileRelationType> for FEFileR
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEHashAlgo {
-    Sha1 = 1,
-    Md5 = 2,
+    Sha1,
+    Md5,
 }
 
 impl From<crate::domain::modplatforms::curseforge::HashAlgo> for FEHashAlgo {
@@ -689,11 +689,11 @@ impl From<crate::domain::modplatforms::curseforge::Mod> for FEMod {
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u16)]
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEClassId {
-    Mods = 6,
-    Modpacks = 4471,
+    Mods,
+    Modpacks,
 }
 
 impl From<crate::domain::modplatforms::curseforge::ClassId> for FEClassId {
@@ -846,15 +846,15 @@ impl From<crate::domain::modplatforms::curseforge::GameAssets> for FEGameAssets 
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FECoreStatus {
-    Draft = 1,
-    Test = 2,
-    PendingReview = 3,
-    Rejected = 4,
-    Approved = 5,
-    Live = 6,
+    Draft,
+    Test,
+    PendingReview,
+    Rejected,
+    Approved,
+    Live,
 }
 
 impl From<crate::domain::modplatforms::curseforge::CoreStatus> for FECoreStatus {
@@ -872,11 +872,11 @@ impl From<crate::domain::modplatforms::curseforge::CoreStatus> for FECoreStatus 
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FECoreApiStatus {
-    Private = 1,
-    Public = 2,
+    Private,
+    Public,
 }
 
 impl From<crate::domain::modplatforms::curseforge::CoreApiStatus> for FECoreApiStatus {
@@ -894,12 +894,12 @@ impl From<crate::domain::modplatforms::curseforge::CoreApiStatus> for FECoreApiS
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEGameVersionStatus {
-    Approved = 1,
-    Deleted = 2,
-    New = 3,
+    Approved,
+    Deleted,
+    New,
 }
 
 impl From<crate::domain::modplatforms::curseforge::GameVersionStatus> for FEGameVersionStatus {
@@ -920,11 +920,11 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionStatus> for FEGame
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEGameVersionTypeStatus {
-    Normal = 1,
-    Deleted = 2,
+    Normal,
+    Deleted,
 }
 
 impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
@@ -944,15 +944,15 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEModLoaderType {
-    Any = 0,
-    Forge = 1,
-    Cauldron = 2,
-    LiteLoader = 3,
-    Fabric = 4,
-    Quilt = 5,
+    Any,
+    Forge,
+    Cauldron,
+    LiteLoader,
+    Fabric,
+    Quilt,
 }
 
 impl From<crate::domain::modplatforms::curseforge::ModLoaderType> for FEModLoaderType {
@@ -997,12 +997,12 @@ impl From<FEModLoaderType> for crate::domain::modplatforms::curseforge::ModLoade
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEModLoaderInstallMethod {
-    ForgeInstaller = 1,
-    ForgeJarInstall = 2,
-    ForgeInstallerV2 = 3,
+    ForgeInstaller,
+    ForgeJarInstall,
+    ForgeInstallerV2,
 }
 
 impl From<crate::domain::modplatforms::curseforge::ModLoaderInstallMethod>
@@ -1045,19 +1045,19 @@ impl From<crate::domain::modplatforms::curseforge::ModLinks> for FEModLinks {
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEModStatus {
-    New = 1,
-    ChangesRequired = 2,
-    UnderSoftReview = 3,
-    Approved = 4,
-    Rejected = 5,
-    ChangesMade = 6,
-    Inactive = 7,
-    Abandoned = 8,
-    Deleted = 9,
-    UnderReview = 10,
+    New,
+    ChangesRequired,
+    UnderSoftReview,
+    Approved,
+    Rejected,
+    ChangesMade,
+    Inactive,
+    Abandoned,
+    Deleted,
+    UnderReview,
 }
 
 impl From<crate::domain::modplatforms::curseforge::ModStatus> for FEModStatus {
@@ -1175,15 +1175,15 @@ impl From<crate::domain::modplatforms::curseforge::FileIndex> for FEFileIndex {
     }
 }
 
-#[derive(Type, Debug, Serialize_repr, Deserialize_repr)]
-#[repr(u8)]
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEDependencyType {
-    EmbeddedLibrary = 1,
-    OptionalDependency = 2,
-    RequiredDependency = 3,
-    Tool = 4,
-    Incompatible = 5,
-    Include = 6,
+    EmbeddedLibrary,
+    OptionalDependency,
+    RequiredDependency,
+    Tool,
+    Incompatible,
+    Include,
 }
 
 impl From<crate::domain::modplatforms::curseforge::DependencyType> for FEDependencyType {

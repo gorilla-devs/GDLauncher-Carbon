@@ -54,10 +54,9 @@ impl From<ModSearchSortField> for FEModSearchSortField {
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEModSearchSortOrder {
-    #[serde(rename = "asc")]
     Ascending,
-    #[serde(rename = "desc")]
     Descending,
 }
 
