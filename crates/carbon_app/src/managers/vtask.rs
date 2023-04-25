@@ -1,4 +1,4 @@
-use crate::{api::keys::vtask::*, translation::Translation};
+use crate::api::keys::vtask::*;
 use std::{
     collections::HashMap,
     sync::{
@@ -11,7 +11,7 @@ use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
-use carbon_domain::vtask as domain;
+use carbon_domain::{vtask as domain, translation::Translation};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct VisualTaskId(pub i32);
@@ -307,8 +307,8 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::{managers::vtask::VisualTask, translation::translate};
-    use carbon_domain::vtask as domain;
+    use crate::managers::vtask::VisualTask;
+    use carbon_domain::{vtask as domain, translate};
 
     #[tokio::test]
     async fn test() {
