@@ -11,7 +11,7 @@ use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
-use carbon_domain::{vtask as domain, translation::Translation};
+use carbon_domain::{translation::Translation, vtask as domain};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct VisualTaskId(pub i32);
@@ -308,7 +308,7 @@ impl From<Progress> for domain::SubtaskProgress {
 #[cfg(test)]
 mod test {
     use crate::managers::vtask::VisualTask;
-    use carbon_domain::{vtask as domain, translate};
+    use carbon_domain::{translate, vtask as domain};
 
     #[tokio::test]
     async fn test() {
