@@ -1,8 +1,8 @@
-use crate::{api::keys::vtask::*, translation::Translation};
+use crate::api::keys::vtask::*;
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{Ordering, AtomicI32},
+        atomic::{AtomicI32, Ordering},
         Arc,
     },
 };
@@ -11,7 +11,7 @@ use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
-use carbon_domain::vtask as domain;
+use carbon_domain::{translation::Translation, vtask as domain};
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct VisualTaskId(pub i32);
@@ -50,10 +50,12 @@ impl ManagerRef<'_, VisualTaskManager> {
                     break;
                 }
                 app.invalidate(GET_TASKS, None);
+                app.invalidate(GET_TASK, Some(id.0.into()));
             }
 
             app.task_manager().tasks.write().await.remove(&id);
             app.invalidate(GET_TASKS, None);
+            app.invalidate(GET_TASK, Some(id.0.into()));
         });
 
         id
@@ -305,8 +307,8 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::{managers::vtask::VisualTask, translation::translate};
-    use carbon_domain::vtask as domain;
+    use crate::managers::vtask::VisualTask;
+    use carbon_domain::{translate, vtask as domain};
 
     #[tokio::test]
     async fn test() {

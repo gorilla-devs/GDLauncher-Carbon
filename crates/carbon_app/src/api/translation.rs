@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use carbon_domain::translation as domain;
 use rspc::Type;
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Type, Serialize, Clone, PartialEq)]
 pub struct Translation {

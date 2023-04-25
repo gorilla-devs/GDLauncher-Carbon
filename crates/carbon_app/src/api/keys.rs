@@ -55,6 +55,7 @@ keys! {
         GET_GROUPS                       = "getGroups";
         GET_INSTANCES_UNGROUPED          = "getInstancesUngrouped";
         CREATE_GROUP                     = "createGroup";
+        LOAD_ICON                        = "loadIcon";
         CREATE_INSTANCE                  = "createInstance";
         DELETE_GROUP                     = "deleteGroup";
         DELETE_INSTANCE                  = "deleteInstance";
