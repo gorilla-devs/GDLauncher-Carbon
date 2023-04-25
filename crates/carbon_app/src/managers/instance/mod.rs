@@ -5,8 +5,8 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
-use anyhow::anyhow;
 use anyhow::bail;
+use anyhow::{anyhow, Context};
 use chrono::DateTime;
 use chrono::Utc;
 use futures::future::BoxFuture;
@@ -31,6 +31,7 @@ pub struct InstanceManager {
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
+    loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
 }
 
 impl InstanceManager {
@@ -39,6 +40,7 @@ impl InstanceManager {
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
+            loaded_icon: Mutex::new(None),
         }
     }
 }
@@ -670,32 +672,45 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         bail!("unable to sanitize instance name")
     }
 
+    pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<Vec<u8>> {
+        let data = tokio::fs::read(icon.clone())
+            .await
+            .with_context(|| format!("Reading file `{}`", icon.to_string_lossy()))?;
+
+        let extension = match icon.extension() {
+            Some(ext) => ext,
+            None => OsStr::new(""),
+        };
+
+        let icon_name = PathBuf::from("icon")
+            .with_extension(extension)
+            .to_string_lossy()
+            .to_string();
+
+        *self.loaded_icon.lock().await = Some((icon_name, data.clone()));
+
+        Ok(data)
+    }
+
     pub async fn create_instance(
         self,
         group: GroupId,
         name: String,
-        icon: Option<PathBuf>,
+        use_loaded_icon: bool,
         version: InstanceVersionSouce,
     ) -> anyhow::Result<InstanceId> {
         let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
         tokio::fs::create_dir(tmpdir.path().join("instance")).await?;
 
-        let icon = match icon {
-            Some(icon) => {
-                let extension = match icon.extension() {
-                    Some(ext) => ext,
-                    None => OsStr::new(""),
-                };
+        let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
+            (true, Some((path, data))) => {
+                tokio::fs::write(tmpdir.path().join(&path), data)
+                    .await
+                    .context("saving instance icon")?;
 
-                let icon_name = PathBuf::from("icon")
-                    .with_extension(extension)
-                    .to_string_lossy()
-                    .to_string();
-                tokio::fs::copy(icon, tmpdir.path().join(&icon_name)).await?;
-
-                InstanceIcon::RelativePath(icon_name)
+                InstanceIcon::RelativePath(path)
             }
-            None => InstanceIcon::Default,
+            _ => InstanceIcon::Default,
         };
 
         let (modpack, version) = match version {
@@ -718,7 +733,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let json = schema::make_instance_config(info.clone())?;
-        tokio::fs::write(tmpdir.path().join("instance.json"), json).await?;
+        tokio::fs::write(tmpdir.path().join("instance.json"), json)
+            .await
+            .context("writing instance json")?;
 
         let _lock = self.path_lock.lock().await;
         let (shortpath, path) = self.next_folder(&name).await?;
@@ -732,7 +749,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        tokio::fs::rename(&tmpdir, path).await?;
+        tokio::fs::rename(&tmpdir, path)
+            .await
+            .context("moving tmpdir to instance location")?;
         drop(ManuallyDrop::new(tmpdir)); // prevent tmpdir cleanup
 
         let id = self.add_instance(name, shortpath.clone(), group).await?;
@@ -758,8 +777,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         instance_id: InstanceId,
         name: Option<String>,
-        icon: Option<Option<PathBuf>>,
-        // version not yet supported due to mod version concerns
+        use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
@@ -782,25 +800,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let mut info = data.config.clone();
 
-        if let Some(icon) = icon {
-            let icon = match icon {
-                Some(icon) => {
-                    let extension = match icon.extension() {
-                        Some(ext) => ext,
-                        None => OsStr::new(""),
-                    };
+        if let Some(use_loaded_icon) = use_loaded_icon {
+            let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
+                (true, Some((ipath, data))) => {
+                    tokio::fs::write(path.join(&ipath), data)
+                        .await
+                        .context("saving instance icon")?;
 
-                    let tmp_name = path.join("_icon").with_extension(extension);
-                    tokio::fs::copy(&icon, &tmp_name).await?;
-                    let icon_name = PathBuf::from("_icon")
-                        .with_extension(extension)
-                        .to_string_lossy()
-                        .to_string();
-                    tokio::fs::rename(tmp_name, path.join(&icon_name)).await?;
-
-                    InstanceIcon::RelativePath(icon_name)
+                    InstanceIcon::RelativePath(ipath)
                 }
-                None => InstanceIcon::Default,
+                _ => InstanceIcon::Default,
             };
 
             info.icon = icon;

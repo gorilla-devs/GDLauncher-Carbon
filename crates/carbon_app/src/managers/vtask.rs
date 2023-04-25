@@ -2,7 +2,7 @@ use crate::{api::keys::vtask::*, translation::Translation};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{Ordering, AtomicI32},
+        atomic::{AtomicI32, Ordering},
         Arc,
     },
 };
@@ -50,10 +50,12 @@ impl ManagerRef<'_, VisualTaskManager> {
                     break;
                 }
                 app.invalidate(GET_TASKS, None);
+                app.invalidate(GET_TASK, Some(id.0.into()));
             }
 
             app.task_manager().tasks.write().await.remove(&id);
             app.invalidate(GET_TASKS, None);
+            app.invalidate(GET_TASK, Some(id.0.into()));
         });
 
         id

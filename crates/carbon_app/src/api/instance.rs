@@ -59,12 +59,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation LOAD_ICON[app, path: String] {
+            app.instance_manager()
+                .load_icon(PathBuf::from(path))
+                .await
+        }
+
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
             app.instance_manager()
                 .create_instance(
                     details.group.into(),
                     details.name,
-                    details.icon.map(PathBuf::from),
+                    details.use_loaded_icon,
                     details.version.into()
                 )
                 .await
@@ -112,7 +118,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .update_instance(
                     details.instance.into(),
                     details.name.into(),
-                    details.icon.into_option().map(|i| i.map(PathBuf::from))
+                    details.use_loaded_icon.into(),
                 )
                 .await
         }
@@ -254,7 +260,7 @@ enum ConfigurationParseErrorType {
 struct CreateInstance {
     group: GroupId,
     name: String,
-    icon: Option<String>,
+    use_loaded_icon: bool,
     version: CreateInstanceVersion,
 }
 
@@ -262,7 +268,7 @@ struct CreateInstance {
 struct UpdateInstance {
     instance: InstanceId,
     name: Update<String>,
-    icon: Update<Option<String>>,
+    use_loaded_icon: Update<bool>,
     // version
 }
 
