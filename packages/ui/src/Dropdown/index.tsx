@@ -9,7 +9,7 @@ type Option = {
 type Props = {
   options: Option[];
   value: string;
-  error?: boolean;
+  error?: string | boolean;
   disabled?: boolean;
   rounded?: boolean;
   label?: string;
@@ -62,103 +62,109 @@ const Dropdown = (props: Props) => {
   };
 
   return (
-    <div
-      class={`inline-block relative ${props.containerClass || ""}`}
-      id={props.id}
-    >
-      <Show when={!props.rounded && props.label}>
-        <p
-          class="mt-0 mb-2 font-bold"
-          classList={{
-            "text-white": !props.disabled,
-            "text-darkSlate-50": props.disabled,
-          }}
-        >
-          {props.label}
-        </p>
-      </Show>
-      <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
-        onClick={() => {
-          if (props.disabled) return;
-          setMenuOpened(!menuOpened());
-        }}
-        onBlur={() => {
-          if (!focusIn()) {
-            setMenuOpened(false);
-          }
-        }}
-        classList={{
-          "border-0": !props.error,
-          "border-1 border-red-500": props.error,
-          "text-darkSlate-50 hover:text-white": !props.disabled && !props.error,
-          "text-darkSlate-500": props.error,
-          "rounded-full": props.rounded,
-          "bg-darkSlate-700": !props.bgColorClass,
-          "rounded-md": !props.btnDropdown && !props.rounded,
-        }}
+    <>
+      <div
+        class={`inline-block relative ${props.containerClass || ""}`}
+        id={props.id}
       >
-        <Show when={!props.btnDropdown}>
-          <Show when={props.icon}>
-            <span class="mr-2">{props.icon}</span>
-          </Show>
-          <span
+        <Show when={!props.rounded && props.label}>
+          <p
+            class="mt-0 mb-2 font-bold"
             classList={{
-              "text-white": props.error,
-              "text-darkSlate-50 hover:text-white group-hover:text-white":
-                !props.disabled && !props.error,
-              "text-darkSlate-500": props.disabled,
+              "text-white": !props.disabled,
+              "text-darkSlate-50": props.disabled,
             }}
           >
-            {selectedValue()}
-          </span>
+            {props.label}
+          </p>
         </Show>
-        <span
-          class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
-            menuOpened() ? "rotate-180" : "rotate-0"
-          }`}
-          classList={{
-            "text-darkSlate-50 group-hover:text-white":
-              !props.disabled && !props.error && !props.btnDropdown,
-            "text-white": props.error || props.btnDropdown,
-            "text-darkSlate-500": props.disabled,
+        <button
+          class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
+          onClick={() => {
+            if (props.disabled) return;
+            setMenuOpened(!menuOpened());
           }}
-        />
-      </button>
-
-      <ul
-        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
-        onMouseOut={() => {
-          setFocusIn(false);
-        }}
-        onMouseOver={() => {
-          setFocusIn(true);
-        }}
-        classList={{
-          block: menuOpened(),
-          hidden: !menuOpened(),
-          "-left-10": props.btnDropdown,
-          "min-w-20": props.btnDropdown,
-          "bottom-[50px]": props.placement === "bottom",
-          "bottom-auto": props.placement === "top" || !props.placement,
-        }}
-      >
-        <For each={props.options}>
-          {(option) => (
-            <li
-              class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
-              onClick={() => {
-                setSelectedValue(option.label);
-                props.onChange?.(option);
-                toggleMenu();
+          onBlur={() => {
+            if (!focusIn()) {
+              setMenuOpened(false);
+            }
+          }}
+          classList={{
+            "border-0": !props.error,
+            "border-2 border-solid border-red-500": !!props.error,
+            "text-darkSlate-50 hover:text-white":
+              !props.disabled && !props.error,
+            "text-darkSlate-500": !!props.error,
+            "rounded-full": props.rounded,
+            "bg-darkSlate-700": !props.bgColorClass,
+            "rounded-md": !props.btnDropdown && !props.rounded,
+          }}
+        >
+          <Show when={!props.btnDropdown}>
+            <Show when={props.icon}>
+              <span class="mr-2">{props.icon}</span>
+            </Show>
+            <span
+              classList={{
+                "text-white": !!props.error,
+                "text-darkSlate-50 hover:text-white group-hover:text-white":
+                  !props.disabled && !props.error,
+                "text-darkSlate-500": props.disabled,
               }}
             >
-              {option.label}
-            </li>
-          )}
-        </For>
-      </ul>
-    </div>
+              {selectedValue()}
+            </span>
+          </Show>
+          <span
+            class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
+              menuOpened() ? "rotate-180" : "rotate-0"
+            }`}
+            classList={{
+              "text-darkSlate-50 group-hover:text-white":
+                !props.disabled && !props.error && !props.btnDropdown,
+              "text-white": !!props.error || props.btnDropdown,
+              "text-darkSlate-500": props.disabled,
+            }}
+          />
+        </button>
+
+        <ul
+          class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
+          onMouseOut={() => {
+            setFocusIn(false);
+          }}
+          onMouseOver={() => {
+            setFocusIn(true);
+          }}
+          classList={{
+            block: menuOpened(),
+            hidden: !menuOpened(),
+            "-left-10": props.btnDropdown,
+            "min-w-20": props.btnDropdown,
+            "bottom-[50px]": props.placement === "bottom",
+            "bottom-auto": props.placement === "top" || !props.placement,
+          }}
+        >
+          <For each={props.options}>
+            {(option) => (
+              <li
+                class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
+                onClick={() => {
+                  setSelectedValue(option.label);
+                  props.onChange?.(option);
+                  toggleMenu();
+                }}
+              >
+                {option.label}
+              </li>
+            )}
+          </For>
+        </ul>
+      </div>
+      <Show when={props.error}>
+        <div class="text-red-500 text-left mt-2 font-light">{props.error}</div>
+      </Show>
+    </>
   );
 };
 
