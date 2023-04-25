@@ -1,8 +1,8 @@
-use crate::api::keys::vtask::*;
+use crate::{api::keys::vtask::*, translation::Translation};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{Ordering, AtomicI32},
         Arc,
     },
 };
@@ -13,8 +13,11 @@ use super::ManagerRef;
 
 use carbon_domain::vtask as domain;
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub struct VisualTaskId(pub i32);
+
 pub struct VisualTaskManager {
-    tasks: RwLock<HashMap<usize, VisualTask>>,
+    tasks: RwLock<HashMap<VisualTaskId, VisualTask>>,
 }
 
 impl VisualTaskManager {
@@ -26,12 +29,12 @@ impl VisualTaskManager {
 }
 
 impl ManagerRef<'_, VisualTaskManager> {
-    pub async fn spawn_task(self, task: &VisualTask) {
+    pub async fn spawn_task(self, task: &VisualTask) -> VisualTaskId {
         let task = task.clone();
-        static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+        static ATOMIC_ID: AtomicI32 = AtomicI32::new(0);
 
         // Note: the id also keeps tasks in order.
-        let id = ATOMIC_ID.fetch_add(1, Ordering::Relaxed);
+        let id = VisualTaskId(ATOMIC_ID.fetch_add(1, Ordering::Relaxed));
 
         let mut notify = task.notify_rx.clone();
 
@@ -52,6 +55,8 @@ impl ManagerRef<'_, VisualTaskManager> {
             app.task_manager().tasks.write().await.remove(&id);
             app.invalidate(GET_TASKS, None);
         });
+
+        id
     }
 
     pub async fn get_tasks(self) -> Vec<domain::Task> {
@@ -69,6 +74,16 @@ impl ManagerRef<'_, VisualTaskManager> {
         }
 
         ret
+    }
+
+    pub async fn get_task(self, task_id: VisualTaskId) -> Option<domain::Task> {
+        let tasklist = self.tasks.read().await;
+        let task = tasklist.get(&task_id);
+
+        match task {
+            Some(task) => Some(task.make_domain_task().await),
+            None => None,
+        }
     }
 }
 
@@ -92,7 +107,7 @@ impl Drop for VisualTask {
 }
 
 impl VisualTask {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: Translation) -> Self {
         let (notify_tx, notify_rx) = watch::channel(NotifyState::Update);
 
         Self {
@@ -106,7 +121,7 @@ impl VisualTask {
         }
     }
 
-    pub async fn subtask(&self, name: String) -> Subtask {
+    pub async fn subtask(&self, name: Translation) -> Subtask {
         let (watch_tx, watch_rx) = watch::channel(SubtaskData {
             name,
             weight: 1.0,
@@ -165,7 +180,7 @@ impl VisualTask {
         let (downloaded, download_total) = self.downloaded_bytes().await;
 
         domain::Task {
-            name,
+            name: name.into(),
             progress: match indeterminate {
                 true => domain::Progress::Indeterminate,
                 false => domain::Progress::Known(self.progress_float().await),
@@ -181,7 +196,7 @@ impl VisualTask {
                 .filter(|t| t.started)
                 .filter(|t| !t.progress.is_complete())
                 .map(|t| domain::Subtask {
-                    name: t.name.clone(),
+                    name: t.name.clone().into(),
                     progress: t.progress.into(),
                 })
                 .collect(),
@@ -228,7 +243,7 @@ impl Subtask {
 }
 
 pub struct TaskData {
-    pub name: String,
+    pub name: Translation,
     /// the indeterminate flag hides the progress bar before tasks have decided
     /// their respective weights.
     pub indeterminate: bool,
@@ -236,7 +251,7 @@ pub struct TaskData {
 
 pub struct SubtaskData {
     /// The subtask's name. Shows as subtext under the main task name.
-    pub name: String,
+    pub name: Translation,
     /// Relative amount of space on the task progress bar this subtask takes.
     pub weight: f32,
     /// Started tasks show in the task list if they are not also complete.
@@ -290,27 +305,27 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::managers::vtask::VisualTask;
+    use crate::{managers::vtask::VisualTask, translation::translate};
     use carbon_domain::vtask as domain;
 
     #[tokio::test]
     async fn test() {
         let app = crate::setup_managers_for_test().await;
 
-        let task = VisualTask::new(String::from("test"));
+        let task = VisualTask::new(translate!("test"));
         app.task_manager().spawn_task(&task).await;
 
-        let subtask = task.subtask(String::from("subtask")).await;
+        let subtask = task.subtask(translate!("subtask")).await;
 
         subtask.start_task();
 
         let mut tasks = vec![domain::Task {
-            name: String::from("test"),
+            name: translate!("test"),
             progress: domain::Progress::Indeterminate,
             downloaded: 0,
             download_total: 0,
             active_subtasks: vec![domain::Subtask {
-                name: String::from("subtask"),
+                name: translate!("subtask"),
                 progress: domain::SubtaskProgress::Opaque,
             }],
         }];

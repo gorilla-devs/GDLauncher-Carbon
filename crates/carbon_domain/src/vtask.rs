@@ -1,6 +1,8 @@
+use crate::translation::Translation;
+
 #[derive(Debug, PartialEq)]
 pub struct Task {
-    pub name: String,
+    pub name: Translation,
     pub progress: Progress,
     pub downloaded: u32,
     pub download_total: u32,
@@ -15,7 +17,7 @@ pub enum Progress {
 
 #[derive(Debug, PartialEq)]
 pub struct Subtask {
-    pub name: String,
+    pub name: Translation,
     pub progress: SubtaskProgress,
 }
 

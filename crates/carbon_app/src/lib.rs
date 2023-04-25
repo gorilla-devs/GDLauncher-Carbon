@@ -24,6 +24,7 @@ pub mod managers;
 mod iridium_client;
 mod once_send;
 mod runtime_path_override;
+mod translation;
 
 #[tokio::main]
 pub async fn init() {

@@ -51,21 +51,22 @@ keys! {
     }
 
     instance {
-        DEFAULT_GROUP                 = "getDefaultGroup";
-        GET_GROUPS                    = "getGroups";
-        GET_INSTANCES_UNGROUPED       = "getInstancesUngrouped";
-        CREATE_GROUP                  = "createGroup";
-        CREATE_INSTANCE               = "createInstance";
-        DELETE_GROUP                  = "deleteGroup";
-        DELETE_INSTANCE               = "deleteInstance";
-        MOVE_GROUP                    = "moveGroup";
-        MOVE_INSTANCE                 = "moveInstance";
-        UPDATE_INSTANCE               = "updateInstance";
-        INSTANCE_DETAILS              = "getInstanceDetails";
+        DEFAULT_GROUP                    = "getDefaultGroup";
+        GET_GROUPS                       = "getGroups";
+        GET_INSTANCES_UNGROUPED          = "getInstancesUngrouped";
+        CREATE_GROUP                     = "createGroup";
+        CREATE_INSTANCE                  = "createInstance";
+        DELETE_GROUP                     = "deleteGroup";
+        DELETE_INSTANCE                  = "deleteInstance";
+        MOVE_GROUP                       = "moveGroup";
+        MOVE_INSTANCE                    = "moveInstance";
+        UPDATE_INSTANCE                  = "updateInstance";
+        INSTANCE_DETAILS                 = "getInstanceDetails";
     }
 
     vtask {
         GET_TASKS                        = "getTasks";
+        GET_TASK                         = "getTask";
     }
 
     settings {
