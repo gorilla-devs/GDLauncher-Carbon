@@ -1599,11 +1599,12 @@ mod test {
             .create_instance(
                 default_group_id,
                 String::from("test"),
-                None,
+                false,
                 InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
                     release: String::from("1.7.10"),
                     modloaders: HashSet::new(),
                 })),
+                String::new(),
             )
             .await?;
 
@@ -1635,7 +1636,7 @@ mod test {
 
         // update
         app.instance_manager()
-            .update_instance(instance_id, Some(String::from("test2")), None)
+            .update_instance(instance_id, Some(String::from("test2")), None, None)
             .await?;
 
         expected[0].instances[0].name = String::from("test2");
