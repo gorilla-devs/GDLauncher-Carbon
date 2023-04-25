@@ -1,10 +1,9 @@
 use carbon_macro::into_query_parameters;
-use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use super::{ClassId, ModLoaderType};
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ModSearchSortField {
     Featured,
@@ -17,7 +16,7 @@ pub enum ModSearchSortField {
     GameVersion,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ModSearchSortOrder {
     #[serde(rename = "asc")]
     Ascending,
@@ -25,14 +24,14 @@ pub enum ModSearchSortOrder {
     Descending,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModSearchParameters {
     pub query: ModSearchParametersQuery,
 }
 
 #[into_query_parameters]
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModSearchParametersQuery {
     pub game_id: i32,
@@ -51,7 +50,7 @@ pub struct ModSearchParametersQuery {
     pub page_size: Option<i32>,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFilesParameters {
     pub mod_id: i32,
@@ -59,7 +58,7 @@ pub struct ModFilesParameters {
 }
 
 #[into_query_parameters]
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFilesParametersQuery {
     pub game_version: Option<String>,
@@ -69,50 +68,50 @@ pub struct ModFilesParametersQuery {
     pub page_size: Option<i32>,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFileParameters {
     pub mod_id: i32,
     pub file_id: i32,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModDescriptionParameters {
     pub mod_id: i32,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModParameters {
     pub mod_id: i32,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModsParameters {
     pub body: ModsParametersBody,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModsParametersBody {
     pub mod_ids: Vec<i32>,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilesParameters {
     pub body: FilesParametersBody,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilesParametersBody {
     pub file_ids: Vec<i32>,
 }
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModFileChangelogParameters {
     pub mod_id: i32,
