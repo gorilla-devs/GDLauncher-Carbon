@@ -320,12 +320,12 @@ mod test {
         subtask.start_task();
 
         let mut tasks = vec![domain::Task {
-            name: translate!("test"),
+            name: translate!("test").into(),
             progress: domain::Progress::Indeterminate,
             downloaded: 0,
             download_total: 0,
             active_subtasks: vec![domain::Subtask {
-                name: translate!("subtask"),
+                name: translate!("subtask").into(),
                 progress: domain::SubtaskProgress::Opaque,
             }],
         }];
