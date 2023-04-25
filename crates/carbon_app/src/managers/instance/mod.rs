@@ -97,6 +97,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
 
         Ok(())
     }
@@ -320,6 +321,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         Ok(())
     }
 
@@ -433,6 +435,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         Ok(())
     }
 
@@ -535,6 +538,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
 
         Ok(GroupId(group.id))
     }
@@ -769,6 +773,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
 
         Ok(id)
     }
@@ -844,6 +849,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
 
         Ok(())
     }
@@ -868,6 +874,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.remove_instance(instance_id).await?;
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
 
         Ok(())
     }
@@ -935,6 +942,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         Ok(())
     }
 
