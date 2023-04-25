@@ -784,6 +784,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instance_id: InstanceId,
         name: Option<String>,
         use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
+        notes: Option<String>,
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
@@ -823,6 +824,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(name) = name.clone() {
             info.name = name;
+        }
+
+        if let Some(notes) = notes {
+            info.notes = notes;
         }
 
         let json = schema::make_instance_config(info.clone())?;

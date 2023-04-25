@@ -120,6 +120,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.instance.into(),
                     details.name.into(),
                     details.use_loaded_icon.into(),
+                    details.notes.into(),
                 )
                 .await
         }
@@ -271,7 +272,7 @@ struct UpdateInstance {
     instance: InstanceId,
     name: Update<String>,
     use_loaded_icon: Update<bool>,
-    // version
+    notes: Update<String>,
 }
 
 #[derive(Type, Deserialize)]
