@@ -702,6 +702,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         name: String,
         use_loaded_icon: bool,
         version: InstanceVersionSouce,
+        notes: String,
     ) -> anyhow::Result<InstanceId> {
         let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
         tokio::fs::create_dir(tmpdir.path().join("instance")).await?;
@@ -733,7 +734,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 extra_java_args: None,
                 memory: None,
             },
-            notes: String::new(),
+            notes,
         };
 
         let json = schema::make_instance_config(info.clone())?;

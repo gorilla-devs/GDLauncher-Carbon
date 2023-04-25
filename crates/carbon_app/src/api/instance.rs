@@ -71,7 +71,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.group.into(),
                     details.name,
                     details.use_loaded_icon,
-                    details.version.into()
+                    details.version.into(),
+                    details.notes,
                 )
                 .await
         }
@@ -262,6 +263,7 @@ struct CreateInstance {
     name: String,
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
+    notes: String,
 }
 
 #[derive(Type, Deserialize)]
