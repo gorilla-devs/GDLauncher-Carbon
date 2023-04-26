@@ -3,15 +3,21 @@ import AppNavbar from "@/components/Navbar";
 import { Outlet, useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import fetchData from "./app.data";
-import { setMcVersions } from "@/utils/mcVersion";
+import { setForgeVersions, setMcVersions } from "@/utils/mcVersion";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   createEffect(() => {
+    if (routeData.forgeVersions.data)
+      setForgeVersions(routeData.forgeVersions.data);
+  });
+
+  createEffect(() => {
     if (routeData.minecraftVersions.data)
       setMcVersions(routeData.minecraftVersions.data);
   });
+
   return (
     <>
       <AppNavbar />

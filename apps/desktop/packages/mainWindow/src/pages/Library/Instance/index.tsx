@@ -9,7 +9,7 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, createEffect, createSignal } from "solid-js";
+import { For, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";

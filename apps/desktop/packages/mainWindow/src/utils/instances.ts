@@ -5,7 +5,6 @@ import {
   ValidListInstance,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
-import { createStore } from "solid-js/store";
 import { port } from "./rspcClient";
 
 export const isListInstanceValid = (

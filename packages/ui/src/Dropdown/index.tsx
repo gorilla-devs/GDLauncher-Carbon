@@ -8,7 +8,7 @@ type Option = {
 
 type Props = {
   options: Option[];
-  value: string;
+  value?: string | null | undefined;
   error?: string | boolean;
   disabled?: boolean;
   rounded?: boolean;
