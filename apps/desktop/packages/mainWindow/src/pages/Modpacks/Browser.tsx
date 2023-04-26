@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input } from "@gd/ui";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 import BG from "/assets/images/rlccraft_img.png";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
@@ -8,7 +8,6 @@ import Tags from "./Tags";
 import CurseforgeIcon from "/assets/images/icons/curseforge.png";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
-import { mcVersions } from "@/utils/mcVersion";
 
 const modpacks = [
   {
@@ -78,11 +77,6 @@ const modpacks = [
   },
 ];
 
-type MappedMcVersion = {
-  label: string;
-  key: string;
-};
-
 const NoModpacks = () => {
   return (
     <div class="flex w-full justify-center items-center h-full min-h-90">
@@ -104,18 +98,6 @@ const NoModpacks = () => {
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
-
-  const [mappedMcVersions, setMappedMcVersions] = createSignal<
-    MappedMcVersion[]
-  >([]);
-
-  createEffect(() => {
-    const versions = mcVersions().map((version) => ({
-      label: `${version.id} - ${version.type}`,
-      key: version.id,
-    }));
-    setMappedMcVersions(versions);
-  });
 
   return (
     <div class="w-full relative box-border">
@@ -197,16 +179,6 @@ export default function Browser() {
               </div>
             </span>
             <div class="flex gap-3">
-              <Show when={mappedMcVersions().length > 0}>
-                <Dropdown
-                  options={mappedMcVersions()}
-                  icon={<div class="i-ri:price-tag-3-fill" />}
-                  rounded
-                  bgColorClass="bg-darkSlate-400"
-                  class="w-full"
-                  value={mappedMcVersions()[0].key}
-                />
-              </Show>
               <Button
                 variant="glow"
                 onClick={() =>

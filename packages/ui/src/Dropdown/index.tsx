@@ -129,7 +129,7 @@ const Dropdown = (props: Props) => {
         </button>
 
         <ul
-          class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
+          class="absolute max-h-40 overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
           onMouseOut={() => {
             setFocusIn(false);
           }}
@@ -175,7 +175,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
 
   return (
     <div class="flex">
-      <Button class="rounded-r-0 pr-0 flex gap-1">
+      <Button class="rounded-r-0 pr-2 flex gap-1">
         <span>{props.children}</span>
       </Button>
       <Dropdown

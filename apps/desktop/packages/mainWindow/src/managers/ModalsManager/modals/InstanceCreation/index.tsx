@@ -1,4 +1,11 @@
-import { Button, Dropdown, Input, TextArea, createNotification } from "@gd/ui";
+import {
+  Button,
+  Checkbox,
+  Dropdown,
+  Input,
+  TextArea,
+  createNotification,
+} from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -13,11 +20,15 @@ type MappedVersion = {
   key: string;
 };
 
+interface MappedMcVersion extends MappedVersion {
+  type: string;
+}
+
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
-  const [mappedMcVersions, setMappedMcVersions] = createSignal<MappedVersion[]>(
-    []
-  );
+  const [mappedMcVersions, setMappedMcVersions] = createSignal<
+    MappedMcVersion[]
+  >([]);
   const [title, setTitle] = createSignal("");
   const [notes, setNotes] = createSignal("");
   const [error, setError] = createSignal("");
@@ -29,6 +40,8 @@ const InstanceCreation = (props: ModalProps) => {
     MappedVersion[] | undefined
   >(undefined);
   const [mcVersion, setMcVersion] = createSignal("");
+  const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
+  const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
 
   const addNotification = createNotification();
   const modalsContext = useModal();
@@ -48,10 +61,26 @@ const InstanceCreation = (props: ModalProps) => {
 
   createEffect(() => {
     const versions = mcVersions().map((version) => ({
-      label: `${version.id} - ${version.type}`,
+      label: version.id,
       key: version.id,
+      type: version.type,
     }));
-    setMappedMcVersions(versions);
+
+    const filteredVersions = versions.filter((v) => {
+      if (releaseVersionFilter() && snapshotVersionFilter()) {
+        return true;
+      } else if (releaseVersionFilter()) {
+        return v.type !== "release";
+      } else if (snapshotVersionFilter()) {
+        return v.type !== "snapshot";
+      } else if (!releaseVersionFilter() && !snapshotVersionFilter()) {
+        return false;
+      }
+    });
+
+    console.log("FILTERS", filteredVersions);
+
+    setMappedMcVersions(filteredVersions);
   });
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
@@ -121,6 +150,7 @@ const InstanceCreation = (props: ModalProps) => {
                   { name: "Image", extensions: ["png", "jpg", "jpeg"] },
                 ])
                 .then((files) => {
+                  if (!files.filePaths[0]) return;
                   fetch(
                     `http://localhost:${port}/instance/loadIcon?path=${files.filePaths[0]}`
                   ).then(async (img) => {
@@ -216,24 +246,56 @@ const InstanceCreation = (props: ModalProps) => {
                 }}
               />
             </h5>
-            <Show when={mappedMcVersions().length > 0}>
-              <Dropdown
-                options={mappedMcVersions()}
-                bgColorClass="bg-darkSlate-800"
-                containerClass="w-full"
-                class="w-full"
-                value={mappedMcVersions()[0].key}
-                placement="bottom"
-                onChange={(loader) => {
-                  setMcVersion(loader.key);
-                }}
-                error={
-                  error() &&
-                  !mcVersion() &&
-                  (t("error.missing_field_mc_version") as string)
-                }
-              />
-            </Show>
+            <div>
+              <Show when={mappedMcVersions().length > 0}>
+                <Dropdown
+                  options={mappedMcVersions()}
+                  bgColorClass="bg-darkSlate-800"
+                  containerClass="w-full"
+                  class="w-full"
+                  value={mappedMcVersions()[0].key}
+                  placement="bottom"
+                  onChange={(loader) => {
+                    setMcVersion(loader.key);
+                  }}
+                  error={
+                    error() &&
+                    !mcVersion() &&
+                    (t("error.missing_field_mc_version") as string)
+                  }
+                />
+              </Show>
+              <div class="flex gap-4 mt-2">
+                <div class="flex gap-2 items-center">
+                  <Checkbox
+                    checked={snapshotVersionFilter()}
+                    onChange={(e) => setSnapshotVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans
+                      key="instance.instance_version_snapshot"
+                      options={{
+                        defaultValue: "Snapshot",
+                      }}
+                    />
+                  </h6>
+                </div>
+                <div class="flex gap-2">
+                  <Checkbox
+                    checked={releaseVersionFilter()}
+                    onChange={(e) => setReleaseVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans
+                      key="instance.instance_version_release"
+                      options={{
+                        defaultValue: "Release",
+                      }}
+                    />
+                  </h6>
+                </div>
+              </div>
+            </div>
           </div>
           <div>
             <h5 class="mt-0 mb-2">
