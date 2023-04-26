@@ -137,6 +137,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
                 let instance = InstanceData {
+                    favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     instance_start_time: None,
                     mods: Late::Loading,
@@ -203,6 +204,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
                         name: instance.name,
+                        favorite: instance.favorite,
                         status: match status {
                             InstanceType::Valid(status) => {
                                 ListInstanceStatus::Valid(ValidListInstance {
@@ -766,6 +768,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             Instance {
                 shortpath,
                 type_: InstanceType::Valid(InstanceData {
+                    favorite: false,
                     config: info,
                     instance_start_time: None,
                     mods: Late::Loading,
@@ -982,7 +985,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .name;
 
         Ok(domain::InstanceDetails {
-            favorite: group_name == "localize➽favorite",
+            favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
                 info::GameVersion::Standard(version) => version.release.clone(),
@@ -1087,6 +1090,7 @@ pub struct ListGroup {
 pub struct ListInstance {
     pub id: InstanceId,
     pub name: String,
+    pub favorite: bool,
     pub status: ListInstanceStatus,
 }
 
@@ -1188,6 +1192,7 @@ pub enum Late<T> {
 
 #[derive(Debug)]
 pub struct InstanceData {
+    favorite: bool,
     config: info::Instance,
     instance_start_time: Option<DateTime<Utc>>,
     mods: Late<Vec<Mod>>,
@@ -1615,6 +1620,7 @@ mod test {
             instances: vec![ListInstance {
                 id: instance_id,
                 name: String::from("test"),
+                favorite: false,
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: String::from("1.7.10"),
                     modloader: None,

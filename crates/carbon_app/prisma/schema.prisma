@@ -74,6 +74,7 @@ model Instance {
   id        Int            @id @default(autoincrement())
   name      String
   shortpath String         @unique
+  favorite  Boolean        @default(false)
   index     Int
   group     InstanceGroup  @relation(fields: [groupId], references: [id])
   groupId   Int

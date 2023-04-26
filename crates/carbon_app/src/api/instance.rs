@@ -45,7 +45,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     group.instances
                         .into_iter()
                         .map(|instance| UngroupedInstance {
-                            favorite: group.name == "localize➽favorite",
+                            favorite: instance.favorite,
                             instance: instance.into(),
                         })
                         .collect::<Vec<_>>()
@@ -219,6 +219,7 @@ struct ListGroup {
 struct ListInstance {
     id: InstanceId,
     name: String,
+    favorite: bool,
     status: ListInstanceStatus,
 }
 
@@ -346,8 +347,8 @@ enum MoveInstanceTarget {
 
 #[derive(Type, Serialize)]
 pub struct InstanceDetails {
-    pub favorite: bool,
     pub name: String,
+    pub favorite: bool,
     pub version: String,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
@@ -503,6 +504,7 @@ impl From<manager::ListInstance> for ListInstance {
         Self {
             id: value.id.into(),
             name: value.name,
+            favorite: value.favorite,
             status: value.status.into(),
         }
     }
