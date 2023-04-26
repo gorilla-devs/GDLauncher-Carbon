@@ -59,12 +59,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        mutation LOAD_ICON[app, path: String] {
-            app.instance_manager()
-                .load_icon(PathBuf::from(path))
-                .await
-        }
-
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
             app.instance_manager()
                 .create_instance(
@@ -140,32 +134,49 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         id: i32,
     }
 
-    axum::Router::new().route(
-        "/instanceIcon",
-        axum::routing::get(
-            |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
-                let icon = app
-                    .instance_manager()
-                    .instance_icon(manager::InstanceId(query.id))
-                    .await
-                    .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+    #[derive(Deserialize)]
+    struct IconPathQuery {
+        path: String,
+    }
 
-                Ok::<_, AxumError>(match icon {
-                    Some((name, icon)) => {
-                        let mut headers = HeaderMap::new();
-                        headers.insert(
-                            "filename",
-                            name.parse::<HeaderValue>()
-                                .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
-                        );
+    axum::Router::new()
+        .route(
+            "/instanceIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
+                    let icon = app
+                        .instance_manager()
+                        .instance_icon(manager::InstanceId(query.id))
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                        (StatusCode::OK, headers, icon)
-                    }
-                    None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
-                })
-            },
-        ),
-    )
+                    Ok::<_, AxumError>(match icon {
+                        Some((name, icon)) => {
+                            let mut headers = HeaderMap::new();
+                            headers.insert(
+                                "filename",
+                                name.parse::<HeaderValue>()
+                                    .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
+                            );
+
+                            (StatusCode::OK, headers, icon)
+                        }
+                        None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
+                    })
+                },
+            ),
+        )
+        .route(
+            "/loadIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<IconPathQuery>| async move {
+                    app.instance_manager()
+                        .load_icon(PathBuf::from(query.path))
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())
+                }
+            )
+        )
 }
 #[derive(Type, Serialize, Deserialize)]
 struct GroupId(i32);
