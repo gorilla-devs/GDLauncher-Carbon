@@ -27,14 +27,14 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="select-none group flex justify-center cursor-pointer flex-col z-50 items-start"
+          class="select-none group flex justify-center cursor-pointer flex-col items-start z-50"
           onClick={(e) => {
             e.preventDefault();
             props?.onClick?.(e);
           }}
         >
           <div
-            class="relative rounded-2xl h-38 w-38 bg-cover bg-center"
+            class="relative bg-cover bg-center rounded-2xl h-38 w-38"
             classList={{
               "bg-green-600": !props.img,
             }}
@@ -43,7 +43,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="absolute ease-in-out top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 hidden transition-all"
+              class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
               classList={{
                 "group-hover:flex": !props.isLoading,
               }}
@@ -106,7 +106,7 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <div
-          class="relative group select-none w-full flex items-center gap-4 box-border cursor-pointer erelative h-14 px-3"
+          class="relative group select-none w-full flex items-center gap-4 box-border cursor-pointer h-14 px-3 erelative"
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>

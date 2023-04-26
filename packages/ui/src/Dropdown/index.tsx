@@ -1,4 +1,4 @@
-import { createSignal, For, Show, JSX } from "solid-js";
+import { createSignal, For, Show, JSX, createEffect } from "solid-js";
 import { Button } from "../Button";
 
 type Option = {
@@ -52,6 +52,10 @@ const Dropdown = (props: Props) => {
   );
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
+
+  createEffect(() => {
+    setSelectedValue(defaultValue());
+  });
 
   const toggleMenu = () => {
     if (props.disabled) return;
@@ -141,8 +145,8 @@ const Dropdown = (props: Props) => {
             hidden: !menuOpened(),
             "-left-10": props.btnDropdown,
             "min-w-20": props.btnDropdown,
-            "bottom-[50px]": props.placement === "bottom",
-            "bottom-auto": props.placement === "top" || !props.placement,
+            "bottom-[55px]": props.placement === "bottom",
+            "bottom-auto mt-2": props.placement === "top" || !props.placement,
           }}
         >
           <For each={props.options}>

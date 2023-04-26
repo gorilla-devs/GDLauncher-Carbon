@@ -42,6 +42,8 @@ const InstanceCreation = (props: ModalProps) => {
   const [mcVersion, setMcVersion] = createSignal("");
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
+  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
+  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(true);
 
   const addNotification = createNotification();
   const modalsContext = useModal();
@@ -67,18 +69,30 @@ const InstanceCreation = (props: ModalProps) => {
     }));
 
     const filteredVersions = versions.filter((v) => {
-      if (releaseVersionFilter() && snapshotVersionFilter()) {
+      if (
+        releaseVersionFilter() &&
+        snapshotVersionFilter() &&
+        oldAlphaVersionFilter() &&
+        oldBetaVersionFilter()
+      ) {
         return true;
       } else if (releaseVersionFilter()) {
-        return v.type !== "release";
+        return v.type === "release";
       } else if (snapshotVersionFilter()) {
-        return v.type !== "snapshot";
-      } else if (!releaseVersionFilter() && !snapshotVersionFilter()) {
+        return v.type === "snapshot";
+      } else if (oldAlphaVersionFilter()) {
+        return v.type === "old_alpha";
+      } else if (oldBetaVersionFilter()) {
+        return v.type === "old_beta";
+      } else if (
+        !releaseVersionFilter() &&
+        !snapshotVersionFilter() &&
+        !oldAlphaVersionFilter() &&
+        !oldBetaVersionFilter()
+      ) {
         return false;
       }
     });
-
-    console.log("FILTERS", filteredVersions);
 
     setMappedMcVersions(filteredVersions);
   });
@@ -253,7 +267,6 @@ const InstanceCreation = (props: ModalProps) => {
                   bgColorClass="bg-darkSlate-800"
                   containerClass="w-full"
                   class="w-full"
-                  value={mappedMcVersions()[0].key}
                   placement="bottom"
                   onChange={(loader) => {
                     setMcVersion(loader.key);
@@ -290,6 +303,34 @@ const InstanceCreation = (props: ModalProps) => {
                       key="instance.instance_version_release"
                       options={{
                         defaultValue: "Release",
+                      }}
+                    />
+                  </h6>
+                </div>
+                <div class="flex gap-2">
+                  <Checkbox
+                    checked={oldAlphaVersionFilter()}
+                    onChange={(e) => setOldAlphaVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans
+                      key="instance.instance_version_old_alphas"
+                      options={{
+                        defaultValue: "Old alpha",
+                      }}
+                    />
+                  </h6>
+                </div>
+                <div class="flex gap-2">
+                  <Checkbox
+                    checked={oldBetaVersionFilter()}
+                    onChange={(e) => setOldBetaVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans
+                      key="instance.instance_version_old_beta"
+                      options={{
+                        defaultValue: "Old beta",
                       }}
                     />
                   </h6>
