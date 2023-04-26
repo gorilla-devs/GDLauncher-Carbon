@@ -603,7 +603,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app.invalidate(INSTANCE_DETAILS, Some(instance.0.into()));
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance.0.into()));
 
         Ok(())
     }
@@ -879,7 +880,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
@@ -905,7 +907,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
