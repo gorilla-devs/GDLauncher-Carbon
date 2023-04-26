@@ -588,6 +588,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    pub async fn set_favorite(self, instance: InstanceId, favorite: bool) -> anyhow::Result<()> {
+        use db::instance::{SetParam, UniqueWhereParam};
+
+        self.app
+            .prisma_client
+            .instance()
+            .update(
+                UniqueWhereParam::IdEquals(*instance),
+                vec![SetParam::SetFavorite(favorite)],
+            )
+            .exec()
+            .await?;
+
+        Ok(())
+    }
+
     async fn next_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
         if name.is_empty() {
             bail!("Attempted to find an instance directory name for an unnamed instance");

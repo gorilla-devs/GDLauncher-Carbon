@@ -119,6 +119,15 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation SET_FAVORITE[app, favorite: SetFavorite] {
+            app.instance_manager()
+                .set_favorite(
+                    favorite.instance.into(),
+                    favorite.favorite,
+                )
+                .await
+        }
+
         query INSTANCE_DETAILS[app, id: InstanceId] {
             app.instance_manager()
                 .instance_details(id.into())
@@ -285,6 +294,12 @@ struct UpdateInstance {
     name: Update<String>,
     use_loaded_icon: Update<bool>,
     notes: Update<String>,
+}
+
+#[derive(Type, Deserialize)]
+struct SetFavorite {
+    instance: InstanceId,
+    favorite: bool,
 }
 
 #[derive(Type, Deserialize)]
