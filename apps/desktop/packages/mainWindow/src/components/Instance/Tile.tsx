@@ -182,7 +182,7 @@ const Tile = (props: Props) => {
           class="h-14 px-3 flex justify-center items-center relative"
         >
           <div
-            class="group h-10 w-10 bg-green-600 rounded-lg flex justify-center items-center bg-cover bg-center"
+            class="group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center bg-green-600"
             style={{
               "background-image": `url("${props.img as string}")`,
             }}

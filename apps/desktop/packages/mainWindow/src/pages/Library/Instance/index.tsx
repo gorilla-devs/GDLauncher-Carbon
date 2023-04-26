@@ -116,7 +116,7 @@ const Instance = () => {
         }}
       >
         <div
-          class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
+          class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
           style={{
             "background-image": `url("${headerMockImage}")`,
             "background-position": "right-5rem",

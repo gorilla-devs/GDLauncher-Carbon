@@ -139,7 +139,7 @@ const InstanceCreation = (props: ModalProps) => {
       <div class="flex flex-col justify-between overflow-y-scroll max-h-128 w-120">
         <div class="flex flex-col justify-between gap-4 p-5">
           <div
-            class="relative flex justify-center items-center w-20 bg-darkSlate-900 rounded-xl cursor-pointer h-20 bg-center bg-cover"
+            class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover w-20 rounded-xl h-20"
             style={{
               "background-image": `url("${bgPreview()}")`,
             }}
@@ -180,7 +180,7 @@ const InstanceCreation = (props: ModalProps) => {
               <Match when={bgPreview()}>
                 <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
                   <div
-                    class="text-white i-ri:close-circle-fill hover:color-red-500 transition-all duration-100 ease-in-out text-lg"
+                    class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
                     onClick={(e) => {
                       e.preventDefault();
                       setBgPreview(null);

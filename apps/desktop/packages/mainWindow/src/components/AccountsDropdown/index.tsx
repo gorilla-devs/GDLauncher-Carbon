@@ -12,15 +12,7 @@ import { AccountType, DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import {
-  createSignal,
-  For,
-  Show,
-  JSX,
-  Switch,
-  Match,
-  createEffect,
-} from "solid-js";
+import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
 
 export type Label = {
   name: string;
@@ -57,10 +49,6 @@ type ActiveUUID = Extract<
   Procedures["queries"],
   { key: "account.setActiveUuid" }
 >["result"];
-
-interface DropDownButtonProps extends Props {
-  children: JSX.Element;
-}
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
