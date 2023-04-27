@@ -18,16 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        path: GDLauncher
     - name: Init submodule if available
       env: 
         is_token: ${{ secrets.MACHINE_USER_TOKEN }}
       if: ${{ env.is_token != '' }}
-      run: |
-        git config --file .gitmodules --get-regexp url | while read url; do
-          git config --file=.gitmodules $(echo "$url" | sed -E "s/git@github.com:|https:\/\/github.com\//https:\/\/${{ secrets.MACHINE_USER_TOKEN }}:${{ secrets.MACHINE_USER_TOKEN }}@github.com\//")
-        done
-        git submodule sync
-        git submodule update --init --recursive
+      uses: actions/checkout@v3
+      with:
+        repository: gorilla-devs/iridium
+        ssh-key: ${{ secrets.MACHINE_USER_TOKEN }}
+        path: GDLauncher/crates/iridium
     - uses: actions/setup-node@v3
       with:
         node-version: 18
