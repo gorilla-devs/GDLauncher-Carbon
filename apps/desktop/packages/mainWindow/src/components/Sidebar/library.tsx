@@ -30,20 +30,6 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    if (routeData.groups.data) {
-      const favorites = routeData.groups.data.find(
-        (group) => group.name === "localize➽favorites"
-      )?.instances;
-
-      if (favorites) {
-        favorites.forEach((instance) => {
-          setFavoriteInstances((prev) => [...prev, instance]);
-        });
-      }
-    }
-  });
-
-  createEffect(() => {
     if (routeData.instancesUngrouped.data) {
       routeData.instancesUngrouped.data.forEach((instance) => {
         const validInstance = isListInstanceValid(instance.status)
@@ -53,12 +39,16 @@ const Sidebar = () => {
         const modloader = validInstance?.modloader;
 
         if (modloader) {
-          setInstances(
-            produce((prev) => {
-              prev[modloader] = [...(prev[modloader] || []), instance];
-              return prev;
-            })
-          );
+          if (!instance.favorite) {
+            setInstances(
+              produce((prev) => {
+                prev[modloader] = [...(prev[modloader] || []), instance];
+                return prev;
+              })
+            );
+          } else {
+            setFavoriteInstances((prev) => [...prev, instance]);
+          }
         }
       });
     }

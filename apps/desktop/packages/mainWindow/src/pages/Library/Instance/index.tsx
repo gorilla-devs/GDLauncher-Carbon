@@ -9,7 +9,7 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, createSignal } from "solid-js";
+import { For, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
@@ -28,22 +28,17 @@ const Instance = () => {
   const [editableName, setEditableName] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const moveInstanceMutation = rspc.createMutation(["instance.moveInstance"], {
+  const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onSuccess() {
-      console.log("SUCCESS");
+      console.log("SUCCESS FAV");
+    },
+    onError(error) {
+      console.log("ERR FAV", error);
     },
   });
 
-  const createGroupMutation = rspc.createMutation(["instance.createGroup"], {
-    onSuccess(groupId) {
-      console.log("GROUP", groupId);
-      moveInstanceMutation.mutate({
-        instance: parseInt(params.id, 10),
-        target: {
-          BeginningOfGroup: groupId,
-        },
-      });
-    },
+  createEffect(() => {
+    console.log("FAV", routeData.instanceDetails.data?.favorite);
   });
 
   const instancePages = () => [
@@ -157,7 +152,7 @@ const Instance = () => {
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 w-full justify-end lg:flex-row">
                   <div
-                    class="h-16 w-16 rounded-xl bg-center bg-cover"
+                    class="bg-center bg-cover h-16 w-16 rounded-xl"
                     classList={{
                       "bg-darkSlate-800": !routeData.image(),
                     }}
@@ -200,7 +195,7 @@ const Instance = () => {
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                        <div class="p-0 m-0 flex gap-2 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                        <div class="m-0 flex gap-2 p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                           <span>
                             {
                               routeData.instanceDetails.data?.modloaders[0]
@@ -228,12 +223,12 @@ const Instance = () => {
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <div
-                          class="rounded-full flex justify-center items-center w-8 h-8"
+                          class="rounded-full flex justify-center items-center h-8 w-8"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                         >
-                          <div class="text-xl i-ri:more-2-fill" />
+                          <div class="i-ri:more-2-fill text-xl" />
                         </div>
                         <div
                           class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
@@ -241,14 +236,19 @@ const Instance = () => {
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                           onClick={() =>
-                            createGroupMutation.mutate("localize➽favorites")
+                            setFavoriteMutation.mutate({
+                              instance: parseInt(params.id, 10),
+                              favorite: true,
+                            })
                           }
                         >
                           <div
-                            class="text-xl i-ri:star-s-fill"
+                            class="text-xl"
                             classList={{
-                              "text-yello-500":
+                              "text-yello-500 i-ri:star-s-fill":
                                 routeData.instanceDetails.data?.favorite,
+                              "i-ri:star-line":
+                                !routeData.instanceDetails.data?.favorite,
                             }}
                           />
                         </div>
@@ -334,13 +334,18 @@ const Instance = () => {
                   }}
                 >
                   <div
-                    class="i-ri:star-s-fill text-xl"
+                    class="text-xl"
                     classList={{
-                      "text-yello-500":
+                      "text-yello-500 i-ri:star-s-fill":
                         routeData.instanceDetails.data?.favorite,
+                      "i-ri:star-line":
+                        !routeData.instanceDetails.data?.favorite,
                     }}
                     onClick={() =>
-                      createGroupMutation.mutate("localize➽favorites")
+                      setFavoriteMutation.mutate({
+                        instance: parseInt(params.id, 10),
+                        favorite: true,
+                      })
                     }
                   />
                 </div>
