@@ -108,6 +108,8 @@
   "instance.create_instance_btn": "Create",
   "instance.clear_filters_modpacks": "Clear filters",
   "instance.download_modpacks": "Download",
+  "instance.action_open_folder": "Open folder",
+  "instance.action_delete": "Delete",
   "java.java_major": "Java Major",
   "java.java_distribution": "Java Distirbution",
   "java.install": "Install",

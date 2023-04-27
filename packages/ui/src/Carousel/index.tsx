@@ -82,6 +82,7 @@ const Carousel = (props: Props) => {
   };
 
   const mousedown = (e: MouseEvent) => {
+    if (e.button === 2) return;
     setIsMouseDown(true);
     horizontalSlider.classList.remove("snap-x", "snap-mandatory");
     setPrevPageX(e.pageX);

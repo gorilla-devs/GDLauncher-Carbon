@@ -1,6 +1,8 @@
 import { getModloaderIcon } from "@/utils/sidebar";
 import { ModLoaderType } from "@gd/core_module/bindings";
 import { Match, Show, Switch, mergeProps } from "solid-js";
+import { ContextMenu } from "../ContextMenu";
+import { useTransContext } from "@gd/i18n";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -22,146 +24,93 @@ const Tile = (props: Props) => {
     { variant: "default", isLoading: false },
     props
   );
+  const [t] = useTransContext();
+
+  const handleOpenFolder = () => {
+    console.log("OPEN FOLDER");
+  };
+
+  const handleDelete = () => {
+    console.log("DELETE");
+  };
+
+  const menuItems = [
+    {
+      icon: "i-ri:folder-open-fill",
+      label: t("instance.action_open_folder"),
+      action: handleOpenFolder,
+    },
+    {
+      icon: "i-ri:delete-bin-2-fill",
+      label: t("instance.action_delete"),
+      action: handleDelete,
+    },
+  ];
 
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
-        <div
-          class="select-none group flex justify-center cursor-pointer flex-col items-start z-50"
-          onClick={(e) => {
-            e.preventDefault();
-            props?.onClick?.(e);
-          }}
-        >
-          <div
-            class="relative bg-cover bg-center rounded-2xl h-38 w-38"
-            classList={{
-              "bg-green-600": !props.img,
-            }}
-            style={{
-              "background-image": `url("${props.img as string}")`,
-            }}
-          >
+        <ContextMenu menuItems={menuItems}>
+          <div class="select-none group flex justify-center cursor-pointer flex-col items-start z-50">
             <div
-              class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
+              class="relative bg-cover bg-center rounded-2xl h-38 w-38"
               classList={{
-                "group-hover:flex": !props.isLoading,
+                "bg-green-600": !props.img,
+              }}
+              style={{
+                "background-image": `url("${props.img as string}")`,
               }}
             >
-              <div class="rounded-full flex justify-center items-center cursor-pointer h-12 bg-primary-500 w-12">
-                <div
-                  class="text-white text-2xl i-ri:play-fill"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                />
-              </div>
-            </div>
-            <div
-              class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
-              classList={{
-                "group-hover:flex": !props.isLoading,
-              }}
-            >
-              <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
-                <div
-                  class="text-white i-ri:more-2-fill text-lg"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                />
-              </div>
-            </div>
-            <Show when={props.isLoading && props.percentage !== undefined}>
               <div
-                class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
-                style={{
-                  width: `${props.percentage}%`,
+                class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
+                classList={{
+                  "group-hover:flex": !props.isLoading,
                 }}
-              />
-            </Show>
-          </div>
-          <h4
-            class="text-ellipsis overflow-hidden mt-2 mb-1"
-            classList={{
-              "text-white": !props.isLoading,
-              "text-lightGray-900": props.isLoading,
-            }}
-          >
-            {props.title}
-          </h4>
-          <div class="flex gap-2 justify-between text-lightGray-900">
-            <span class="flex gap-2">
-              <Show when={!props.invalid}>
-                <img
-                  class="w-4 h-4"
-                  src={getModloaderIcon(props.modloader as ModLoaderType)}
+              >
+                <div class="rounded-full flex justify-center items-center cursor-pointer h-12 bg-primary-500 w-12">
+                  <div
+                    class="text-white text-2xl i-ri:play-fill"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  />
+                </div>
+              </div>
+              <div
+                class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
+                classList={{
+                  "group-hover:flex": !props.isLoading,
+                }}
+              >
+                <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
+                  <div
+                    class="text-white i-ri:more-2-fill text-lg"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props?.onClick?.(e);
+                    }}
+                  />
+                </div>
+              </div>
+              <Show when={props.isLoading && props.percentage !== undefined}>
+                <div
+                  class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
+                  style={{
+                    width: `${props.percentage}%`,
+                  }}
                 />
               </Show>
-              <p class="m-0">{props.modloader}</p>
-            </span>
-            <p class="m-0">{props.version}</p>
-          </div>
-        </div>
-      </Match>
-      <Match when={mergedProps.variant === "sidebar"}>
-        <div
-          class="relative group select-none w-full flex items-center gap-4 box-border cursor-pointer h-14 px-3 erelative"
-          onClick={(e) => props?.onClick?.(e)}
-        >
-          <Show when={props.selected && !props.isLoading}>
-            <div class="absolute right-0 ease-in-out transition duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500" />
-            <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
-          </Show>
-
-          <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
-            <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
-              <div
-                class="text-white i-ri:more-2-fill text-lg"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              />
             </div>
-            <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
-              <div
-                class="text-white text-lg i-ri:play-fill"
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-              />
-            </div>
-          </div>
-
-          <Show when={props.isLoading && props.percentage !== undefined}>
-            <div
-              class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
-              style={{
-                width: `${props.percentage}%`,
-              }}
-            />
-          </Show>
-          <div
-            class="h-10 rounded-lg w-10 bg-cover bg-center"
-            style={{
-              "background-image": `url("${props.img as string}")`,
-            }}
-            classList={{
-              grayscale: props.isLoading,
-              "bg-green-600": !props.img,
-            }}
-          />
-          <div class="flex flex-col">
             <h4
-              class="m-0 text-ellipsis max-w-40"
+              class="text-ellipsis overflow-hidden mt-2 mb-1"
               classList={{
-                "text-darkSlate-50": mergedProps.isLoading,
-                "text-white": !mergedProps.isLoading,
+                "text-white": !props.isLoading,
+                "text-lightGray-900": props.isLoading,
               }}
             >
               {props.title}
             </h4>
-            <div class="flex gap-4 text-darkSlate-50">
+            <div class="flex gap-2 justify-between text-lightGray-900">
               <span class="flex gap-2">
                 <Show when={!props.invalid}>
                   <img
@@ -174,7 +123,81 @@ const Tile = (props: Props) => {
               <p class="m-0">{props.version}</p>
             </div>
           </div>
-        </div>
+        </ContextMenu>
+      </Match>
+      <Match when={mergedProps.variant === "sidebar"}>
+        <ContextMenu menuItems={menuItems}>
+          <div
+            class="relative group select-none w-full flex items-center gap-4 box-border cursor-pointer h-14 px-3 erelative"
+            onClick={(e) => props?.onClick?.(e)}
+          >
+            <Show when={props.selected && !props.isLoading}>
+              <div class="absolute right-0 ease-in-out transition duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500" />
+              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+            </Show>
+
+            <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
+              <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
+                <div
+                  class="text-white i-ri:more-2-fill text-lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                />
+              </div>
+              <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
+                <div
+                  class="text-white text-lg i-ri:play-fill"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                />
+              </div>
+            </div>
+
+            <Show when={props.isLoading && props.percentage !== undefined}>
+              <div
+                class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
+                style={{
+                  width: `${props.percentage}%`,
+                }}
+              />
+            </Show>
+            <div
+              class="h-10 rounded-lg w-10 bg-cover bg-center"
+              style={{
+                "background-image": `url("${props.img as string}")`,
+              }}
+              classList={{
+                grayscale: props.isLoading,
+                "bg-green-600": !props.img,
+              }}
+            />
+            <div class="flex flex-col">
+              <h4
+                class="m-0 text-ellipsis max-w-40"
+                classList={{
+                  "text-darkSlate-50": mergedProps.isLoading,
+                  "text-white": !mergedProps.isLoading,
+                }}
+              >
+                {props.title}
+              </h4>
+              <div class="flex gap-4 text-darkSlate-50">
+                <span class="flex gap-2">
+                  <Show when={!props.invalid}>
+                    <img
+                      class="w-4 h-4"
+                      src={getModloaderIcon(props.modloader as ModLoaderType)}
+                    />
+                  </Show>
+                  <p class="m-0">{props.modloader}</p>
+                </span>
+                <p class="m-0">{props.version}</p>
+              </div>
+            </div>
+          </div>
+        </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar-small"}>
         <div
