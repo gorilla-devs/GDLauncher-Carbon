@@ -29,6 +29,7 @@ trash = { workspace = true }
 carbon_net = { path = "../carbon_net" }
 regex = { workspace = true }
 chrono = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

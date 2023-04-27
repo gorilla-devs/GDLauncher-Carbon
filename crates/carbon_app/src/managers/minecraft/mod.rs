@@ -1,3 +1,4 @@
+use anyhow::Context;
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
 use reqwest::Url;
 
@@ -9,8 +10,8 @@ use crate::domain::minecraft::{
 use super::ManagerRef;
 
 mod assets;
-mod forge;
-mod minecraft;
+pub mod forge;
+pub mod minecraft;
 
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,
@@ -30,7 +31,7 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 
     pub async fn get_minecraft_version(
-        &self,
+        self,
         manifest_version_meta: ManifestVersion,
     ) -> anyhow::Result<VersionInfo> {
         minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
@@ -61,17 +62,20 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let assets = assets::get_meta(
             self.app.reqwest_client.clone(),
-            version_info.asset_index,
+            version_info.asset_index.clone(),
             runtime_path.get_assets().get_indexes_path(),
         )
-        .await?
+        .await
+        .with_context(|| format!("Downloading asset index {}", version_info.asset_index.url))?
         .into_vec_downloadable(&runtime_path.get_assets().get_objects_path());
 
         all_files.push(client_main_jar);
         all_files.extend(libraries);
         all_files.extend(assets);
 
-        carbon_net::download_multiple(all_files, progress).await?;
+        carbon_net::download_multiple(all_files, progress)
+            .await
+            .context("while downloading")?;
 
         Ok(())
     }

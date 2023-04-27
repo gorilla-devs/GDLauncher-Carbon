@@ -2,15 +2,16 @@ pub mod request;
 
 use std::fmt::{Debug, Display};
 
+use rspc::Type;
 use serde::Serialize;
 
-#[derive(Serialize)]
+#[derive(Type, Serialize)]
 pub struct FeError {
     cause: Vec<CauseSegment>,
     backtrace: String,
 }
 
-#[derive(Serialize)]
+#[derive(Type, Serialize)]
 pub struct CauseSegment {
     pub display: String,
     pub debug: String,

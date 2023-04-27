@@ -451,6 +451,7 @@ dependencies = [
 name = "carbon_domain"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "carbon_net",
  "chrono",

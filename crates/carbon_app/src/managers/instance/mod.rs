@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
@@ -14,16 +15,20 @@ use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
+use thiserror::Error;
 use tokio::sync::{Mutex, MutexGuard, RwLock};
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
+
+use self::disk::PersistenceManager;
 
 use super::ManagerRef;
 
 use crate::domain::instance as domain;
 use domain::info;
 
+mod disk;
 mod schema;
 
 pub struct InstanceManager {
@@ -32,6 +37,7 @@ pub struct InstanceManager {
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
+    persistence_manager: PersistenceManager,
 }
 
 impl InstanceManager {
@@ -41,6 +47,7 @@ impl InstanceManager {
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
             loaded_icon: Mutex::new(None),
+            persistence_manager: PersistenceManager::new(),
         }
     }
 }
@@ -1153,6 +1160,18 @@ pub struct GroupId(pub i32);
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize, Hash)]
 pub struct InstanceId(pub i32);
 
+impl Display for GroupId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Display for InstanceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl Deref for GroupId {
     type Target = i32;
 
@@ -1233,6 +1252,15 @@ pub enum InstanceVersionSouce {
     Version(info::GameVersion),
     //Modpack(info::Modpack),
 }
+
+#[derive(Error, Debug)]
+#[error("Attempted to use invalid InstanceId {0}")]
+pub struct InvalidInstanceIdError(InstanceId);
+
+#[derive(Error, Debug)]
+#[error("Attempted to use invalid GroupId {0}")]
+pub struct InvalidGroupIdError(GroupId);
+
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, time::Duration};

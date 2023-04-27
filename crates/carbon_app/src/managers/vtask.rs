@@ -1,4 +1,4 @@
-use crate::api::keys::vtask::*;
+use crate::{api::keys::vtask::*, once_send::OnceSend};
 use std::{
     collections::HashMap,
     sync::{
@@ -6,6 +6,8 @@ use std::{
         Arc,
     },
 };
+
+use anyhow::anyhow;
 
 use tokio::sync::{watch, RwLock};
 
@@ -45,7 +47,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         tokio::task::spawn(async move {
             // Invalidate when changed until dropped.
             // On drop remove the task from the list.
-            while let Ok(()) = notify.changed().await {
+            while notify.changed().await.is_ok() {
                 if let NotifyState::Drop = *notify.borrow() {
                     break;
                 }
@@ -87,6 +89,54 @@ impl ManagerRef<'_, VisualTaskManager> {
             None => None,
         }
     }
+
+    #[cfg(test)]
+    pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
+        let tasklist = self.tasks.read().await;
+        let task = tasklist
+            .get(&task_id)
+            .ok_or_else(|| anyhow!("task does not exist"))?;
+
+        let mut notify = task.notify_rx.clone();
+
+        while notify.changed().await.is_ok() {
+            if let NotifyState::Drop = *notify.borrow() {
+                break;
+            }
+
+            let domain = task.make_domain_task().await;
+
+            let progress = match &domain.progress {
+                domain::Progress::Indeterminate => String::from("unk"),
+                domain::Progress::Known(p) => format!("{p}%"),
+                domain::Progress::Failed(_) => String::from("fail"),
+            };
+
+            println!(" -- Task Update ({progress}): {}", domain.name);
+
+            for task in domain.active_subtasks {
+                let progress = match task.progress {
+                    domain::SubtaskProgress::Opaque => String::from("opaque"),
+                    domain::SubtaskProgress::Download { downloaded, total } => format!(
+                        "{}kb / {}kb",
+                        downloaded as f32 * 0.001,
+                        total as f32 * 0.001
+                    ),
+                    domain::SubtaskProgress::Item { current, total } => {
+                        format!("{current} / {total}")
+                    }
+                };
+
+                println!("Subtask ({progress}): {}", task.name);
+            }
+
+            if let domain::Progress::Failed(e) = &domain.progress {
+                println!("Failure: {e}");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -115,7 +165,7 @@ impl VisualTask {
         Self {
             data: Arc::new(RwLock::new(TaskData {
                 name,
-                indeterminate: true,
+                state: TaskState::Indeterminate,
             })),
             notify_rx,
             notify_tx: Arc::new(notify_tx),
@@ -141,6 +191,11 @@ impl VisualTask {
 
     pub async fn edit(&self, f: impl FnOnce(&mut TaskData)) {
         f(&mut *self.data.write().await);
+    }
+
+    pub async fn fail(&self, error: anyhow::Error) {
+        self.edit(|data| data.state = TaskState::Failed(Arc::new(error)))
+            .await;
     }
 
     // Get the current task progress as a float from 0.0 to 1.0
@@ -174,18 +229,19 @@ impl VisualTask {
     }
 
     pub async fn make_domain_task(&self) -> domain::Task {
-        let (name, indeterminate) = {
+        let (name, state) = {
             let data = self.data.read().await;
-            (data.name.clone(), data.indeterminate)
+            (data.name.clone(), data.state.clone())
         };
 
         let (downloaded, download_total) = self.downloaded_bytes().await;
 
         domain::Task {
             name: name.into(),
-            progress: match indeterminate {
-                true => domain::Progress::Indeterminate,
-                false => domain::Progress::Known(self.progress_float().await),
+            progress: match state {
+                TaskState::Indeterminate => domain::Progress::Indeterminate,
+                TaskState::KnownProgress => domain::Progress::Known(self.progress_float().await),
+                TaskState::Failed(error) => domain::Progress::Failed(error),
             },
             downloaded,
             download_total,
@@ -219,12 +275,11 @@ impl Subtask {
 
     // convenience functions
 
-    pub fn start_task(&self) {
-        self.update(|data| data.started = true);
-    }
-
     pub fn update_progress(&self, progress: Progress) {
-        self.update(|data| data.progress = progress);
+        self.update(|data| {
+            data.started = true;
+            data.progress = progress;
+        });
     }
 
     pub fn update_download(&self, downloaded: u32, total: u32) {
@@ -233,6 +288,10 @@ impl Subtask {
 
     pub fn update_items(&self, current: u32, total: u32) {
         self.update_progress(Progress::Item { current, total });
+    }
+
+    pub fn start_opaque(&self) {
+        self.update_progress(Progress::Opaque(false));
     }
 
     pub fn complete_opaque(&self) {
@@ -246,9 +305,23 @@ impl Subtask {
 
 pub struct TaskData {
     pub name: Translation,
-    /// the indeterminate flag hides the progress bar before tasks have decided
-    /// their respective weights.
-    pub indeterminate: bool,
+    pub state: TaskState,
+}
+
+#[derive(Clone)]
+pub enum TaskState {
+    Indeterminate,
+    KnownProgress,
+    Failed(Arc<anyhow::Error>),
+}
+
+impl TaskState {
+    fn from_indeterminate(indeterminate: bool) -> Self {
+        match indeterminate {
+            true => Self::Indeterminate,
+            false => Self::KnownProgress,
+        }
+    }
 }
 
 pub struct SubtaskData {
@@ -307,7 +380,7 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::managers::vtask::VisualTask;
+    use crate::managers::vtask::{Progress, TaskState, VisualTask};
     use carbon_domain::{translate, vtask as domain};
 
     #[tokio::test]
@@ -319,7 +392,7 @@ mod test {
 
         let subtask = task.subtask(translate!("subtask")).await;
 
-        subtask.start_task();
+        subtask.start_opaque();
 
         let mut tasks = vec![domain::Task {
             name: translate!("test").into(),
@@ -334,7 +407,8 @@ mod test {
 
         assert_eq!(tasks, app.task_manager().get_tasks().await);
 
-        task.edit(|data| data.indeterminate = false).await;
+        task.edit(|data| data.state = TaskState::KnownProgress)
+            .await;
         tasks[0].progress = domain::Progress::Known(0.0);
         assert_eq!(tasks, app.task_manager().get_tasks().await);
 
