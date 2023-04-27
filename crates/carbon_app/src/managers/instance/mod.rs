@@ -595,14 +595,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn set_favorite(self, instance: InstanceId, favorite: bool) -> anyhow::Result<()> {
+    pub async fn set_favorite(self, instance_id: InstanceId, favorite: bool) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
+
+        let mut instances = self.instances.write().await;
+        let mut instance = instances
+            .get_mut(&instance_id)
+            .ok_or_else(|| anyhow!("instance id invalid"))?;
+
+        let Instance { type_: InstanceType::Valid(data), .. } = &mut instance else {
+            bail!("set_favorite called on invalid instance")
+        };
+
+        data.favorite = favorite;
+        drop(instances);
 
         self.app
             .prisma_client
             .instance()
             .update(
-                UniqueWhereParam::IdEquals(*instance),
+                UniqueWhereParam::IdEquals(*instance_id),
                 vec![SetParam::SetFavorite(favorite)],
             )
             .exec()
@@ -611,7 +623,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance.0.into()));
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
@@ -1000,21 +1012,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceType::Invalid(_) => bail!("instance_details called on invalid instance"),
             InstanceType::Valid(x) => x,
         };
-
-        let group_name = self
-            .app
-            .prisma_client
-            .instance()
-            .find_unique(db::instance::UniqueWhereParam::IdEquals(*instance_id))
-            .with(db::instance::group::fetch())
-            .exec()
-            .await?
-            .ok_or(anyhow!("Instance present in instances list but not db"))?
-            .group
-            .ok_or(anyhow!(
-                "Requested group relation for instance but prisma returned None"
-            ))?
-            .name;
 
         Ok(domain::InstanceDetails {
             favorite: instance.favorite,
