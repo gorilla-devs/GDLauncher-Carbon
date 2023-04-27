@@ -238,7 +238,8 @@ const Instance = () => {
                           onClick={() =>
                             setFavoriteMutation.mutate({
                               instance: parseInt(params.id, 10),
-                              favorite: true,
+                              favorite:
+                                !routeData.instanceDetails.data?.favorite,
                             })
                           }
                         >
@@ -344,7 +345,7 @@ const Instance = () => {
                     onClick={() =>
                       setFavoriteMutation.mutate({
                         instance: parseInt(params.id, 10),
-                        favorite: true,
+                        favorite: !routeData.instanceDetails.data?.favorite,
                       })
                     }
                   />

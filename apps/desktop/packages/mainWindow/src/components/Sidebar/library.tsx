@@ -78,19 +78,42 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Show when={Object.entries(instances).length > 0}>
-          <div
-            class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
-            classList={{
-              "scrollbar-hide": !isSidebarOpened(),
-            }}
+        <div
+          class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
+          classList={{
+            "scrollbar-hide": !isSidebarOpened(),
+          }}
+        >
+          <Show when={favoriteInstances.length > 0}>
+            <Collapsable
+              title={"Favorites"}
+              size={isSidebarOpened() ? "standard" : "small"}
+            >
+              <For each={favoriteInstances}>
+                {(instance) => (
+                  //TODO: SKELETON
+                  <Suspense fallback={<></>}>
+                    <InstanceTile
+                      instance={instance}
+                      isSidebarOpened={isSidebarOpened()}
+                      selected={instanceId() === instance.id.toString()}
+                    />
+                  </Suspense>
+                )}
+              </For>
+            </Collapsable>
+          </Show>
+          <For
+            each={Object.entries(instances).filter(
+              (group) => group[1].length > 0
+            )}
           >
-            <Show when={favoriteInstances.length > 0}>
+            {([key, values]) => (
               <Collapsable
-                title={"Favorites"}
+                title={key}
                 size={isSidebarOpened() ? "standard" : "small"}
               >
-                <For each={favoriteInstances}>
+                <For each={values}>
                   {(instance) => (
                     //TODO: SKELETON
                     <Suspense fallback={<></>}>
@@ -103,34 +126,9 @@ const Sidebar = () => {
                   )}
                 </For>
               </Collapsable>
-            </Show>
-            <For
-              each={Object.entries(instances).filter(
-                (group) => group[1].length > 0
-              )}
-            >
-              {([key, values]) => (
-                <Collapsable
-                  title={key}
-                  size={isSidebarOpened() ? "standard" : "small"}
-                >
-                  <For each={values}>
-                    {(instance) => (
-                      //TODO: SKELETON
-                      <Suspense fallback={<></>}>
-                        <InstanceTile
-                          instance={instance}
-                          isSidebarOpened={isSidebarOpened()}
-                          selected={instanceId() === instance.id.toString()}
-                        />
-                      </Suspense>
-                    )}
-                  </For>
-                </Collapsable>
-              )}
-            </For>
-          </div>
-        </Show>
+            )}
+          </For>
+        </div>
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
             variant="outline"
