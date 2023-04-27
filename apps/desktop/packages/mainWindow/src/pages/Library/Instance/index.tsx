@@ -246,7 +246,7 @@ const Instance = () => {
                           <div
                             class="text-xl"
                             classList={{
-                              "text-yello-500 i-ri:star-s-fill":
+                              "text-yellow-500 i-ri:star-s-fill":
                                 routeData.instanceDetails.data?.favorite,
                               "i-ri:star-line":
                                 !routeData.instanceDetails.data?.favorite,
@@ -337,7 +337,7 @@ const Instance = () => {
                   <div
                     class="text-xl"
                     classList={{
-                      "text-yello-500 i-ri:star-s-fill":
+                      "text-yellow-500 i-ri:star-s-fill":
                         routeData.instanceDetails.data?.favorite,
                       "i-ri:star-line":
                         !routeData.instanceDetails.data?.favorite,
