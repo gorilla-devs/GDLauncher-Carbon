@@ -24,7 +24,7 @@ jobs:
       if: ${{ env.is_token != '' }}
       run: |
         git config --file .gitmodules --get-regexp url | while read url; do
-          git config --file=.gitmodules $(echo "$url" | sed -E "s/git@github.com:|https:\/\/github.com\//https:\/\/${{ secrets.CI_PAT }}:${{ secrets.CI_PAT }}@github.com\//")
+          git config --file=.gitmodules $(echo "$url" | sed -E "s/git@github.com:|https:\/\/github.com\//https:\/\/${{ secrets.MACHINE_USER_TOKEN }}:${{ secrets.MACHINE_USER_TOKEN }}@github.com\//")
         done
         git submodule sync
         git submodule update --init --recursive
