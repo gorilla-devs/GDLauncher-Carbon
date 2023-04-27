@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::fmt::Display;
 use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
@@ -14,16 +15,20 @@ use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
+use thiserror::Error;
 use tokio::sync::{Mutex, MutexGuard, RwLock};
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
+
+use self::disk::PersistenceManager;
 
 use super::ManagerRef;
 
 use crate::domain::instance as domain;
 use domain::info;
 
+mod disk;
 mod schema;
 
 pub struct InstanceManager {
@@ -32,6 +37,7 @@ pub struct InstanceManager {
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
+    persistence_manager: PersistenceManager,
 }
 
 impl InstanceManager {
@@ -41,6 +47,7 @@ impl InstanceManager {
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
             loaded_icon: Mutex::new(None),
+            persistence_manager: PersistenceManager::new(),
         }
     }
 }
@@ -137,6 +144,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
                 let instance = InstanceData {
+                    favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     instance_start_time: None,
                     mods: Late::Loading,
@@ -203,6 +211,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
                         name: instance.name,
+                        favorite: instance.favorite,
                         status: match status {
                             InstanceType::Valid(status) => {
                                 ListInstanceStatus::Valid(ValidListInstance {
@@ -586,6 +595,27 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    pub async fn set_favorite(self, instance: InstanceId, favorite: bool) -> anyhow::Result<()> {
+        use db::instance::{SetParam, UniqueWhereParam};
+
+        self.app
+            .prisma_client
+            .instance()
+            .update(
+                UniqueWhereParam::IdEquals(*instance),
+                vec![SetParam::SetFavorite(favorite)],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance.0.into()));
+
+        Ok(())
+    }
+
     async fn next_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
         if name.is_empty() {
             bail!("Attempted to find an instance directory name for an unnamed instance");
@@ -766,6 +796,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             Instance {
                 shortpath,
                 type_: InstanceType::Valid(InstanceData {
+                    favorite: false,
                     config: info,
                     instance_start_time: None,
                     mods: Late::Loading,
@@ -856,6 +887,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
@@ -881,6 +914,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
@@ -982,7 +1017,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .name;
 
         Ok(domain::InstanceDetails {
-            favorite: group_name == "localize➽favorite",
+            favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
                 info::GameVersion::Standard(version) => version.release.clone(),
@@ -1087,6 +1122,7 @@ pub struct ListGroup {
 pub struct ListInstance {
     pub id: InstanceId,
     pub name: String,
+    pub favorite: bool,
     pub status: ListInstanceStatus,
 }
 
@@ -1123,6 +1159,18 @@ pub struct GroupId(pub i32);
 // Typed instance id to avoid dealing with a raw integer ids.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize, Hash)]
 pub struct InstanceId(pub i32);
+
+impl Display for GroupId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Display for InstanceId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Deref for GroupId {
     type Target = i32;
@@ -1188,6 +1236,7 @@ pub enum Late<T> {
 
 #[derive(Debug)]
 pub struct InstanceData {
+    favorite: bool,
     config: info::Instance,
     instance_start_time: Option<DateTime<Utc>>,
     mods: Late<Vec<Mod>>,
@@ -1203,6 +1252,15 @@ pub enum InstanceVersionSouce {
     Version(info::GameVersion),
     //Modpack(info::Modpack),
 }
+
+#[derive(Error, Debug)]
+#[error("Attempted to use invalid InstanceId {0}")]
+pub struct InvalidInstanceIdError(InstanceId);
+
+#[derive(Error, Debug)]
+#[error("Attempted to use invalid GroupId {0}")]
+pub struct InvalidGroupIdError(GroupId);
+
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, time::Duration};
@@ -1615,6 +1673,7 @@ mod test {
             instances: vec![ListInstance {
                 id: instance_id,
                 name: String::from("test"),
+                favorite: false,
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: String::from("1.7.10"),
                     modloader: None,

@@ -70,6 +70,7 @@ CREATE TABLE "Instance" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
     "shortpath" TEXT NOT NULL,
+    "favorite" BOOLEAN NOT NULL DEFAULT false,
     "index" INTEGER NOT NULL,
     "groupId" INTEGER NOT NULL,
     CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE

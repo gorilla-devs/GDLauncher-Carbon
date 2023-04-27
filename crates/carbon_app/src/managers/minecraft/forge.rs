@@ -179,7 +179,7 @@ pub async fn execute_processors(
             client => game_version,
             server => "";
         "ROOT":
-            client => instance_path.get_root().to_string_lossy(),
+            client => instance_path.get_data_path().to_string_lossy(),
             server => "";
         "LIBRARY_DIR":
             client => libraries_path.to_path().to_string_lossy(),

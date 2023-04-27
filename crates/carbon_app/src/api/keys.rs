@@ -61,6 +61,7 @@ keys! {
         MOVE_GROUP                       = "moveGroup";
         MOVE_INSTANCE                    = "moveInstance";
         UPDATE_INSTANCE                  = "updateInstance";
+        SET_FAVORITE                     = "setFavorite";
         INSTANCE_DETAILS                 = "getInstanceDetails";
     }
 

@@ -168,7 +168,7 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::VersionName => replacer_args.version_name.clone(),
         ArgPlaceholder::GameDirectory => replacer_args
             .game_directory
-            .get_root()
+            .get_data_path()
             .display()
             .to_string(),
         ArgPlaceholder::AssetsRoot => replacer_args.assets_root.display().to_string(),

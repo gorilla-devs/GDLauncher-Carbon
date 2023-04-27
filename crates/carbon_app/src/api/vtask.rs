@@ -2,6 +2,8 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::api::keys::vtask::*;
+use crate::error;
+use crate::error::FeError;
 use crate::managers::vtask;
 use crate::managers::App;
 use carbon_domain::vtask as domain;
@@ -55,6 +57,7 @@ pub struct Task {
 pub enum Progress {
     Indeterminate,
     Known(f32),
+    Failed(FeError),
 }
 
 #[derive(Type, Serialize)]
@@ -92,6 +95,7 @@ impl From<domain::Progress> for Progress {
         match value {
             domain::Progress::Indeterminate => Self::Indeterminate,
             domain::Progress::Known(x) => Self::Known(x),
+            domain::Progress::Failed(err) => Self::Failed(FeError::from_anyhow(&*err)),
         }
     }
 }

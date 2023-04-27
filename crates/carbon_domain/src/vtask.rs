@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::translation::Translation;
 
 #[derive(Debug, PartialEq)]
@@ -9,10 +11,11 @@ pub struct Task {
     pub active_subtasks: Vec<Subtask>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Progress {
     Indeterminate,
     Known(f32),
+    Failed(Arc<anyhow::Error>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,4 +29,15 @@ pub enum SubtaskProgress {
     Download { downloaded: u32, total: u32 },
     Item { current: u32, total: u32 },
     Opaque,
+}
+
+impl PartialEq for Progress {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Progress::Indeterminate, Progress::Indeterminate) => true,
+            (Progress::Known(a), Progress::Known(b)) if a == b => true,
+            (Progress::Failed(_), Progress::Failed(_)) => true,
+            _ => false,
+        }
+    }
 }
