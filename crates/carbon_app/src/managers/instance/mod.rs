@@ -560,8 +560,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         shortpath: String,
         group: GroupId,
     ) -> anyhow::Result<InstanceId> {
-        use db::instance_group::UniqueWhereParam;
         use db::instance::WhereParam;
+        use db::instance_group::UniqueWhereParam;
         let index = self.next_instance_index(group).await?;
 
         let (_, instance) = self
@@ -572,19 +572,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.app
                     .prisma_client
                     .instance()
-                    .delete_many(vec![
-                        WhereParam::Shortpath(StringFilter::Contains(shortpath.clone()))
-                    ]),
-                self.app
-                    .prisma_client
-                    .instance()
-                    .create(
-                        name,
-                        shortpath,
-                        index.value,
-                        UniqueWhereParam::IdEquals(*group),
-                        vec![],
-                    ),
+                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Contains(
+                        shortpath.clone(),
+                    ))]),
+                self.app.prisma_client.instance().create(
+                    name,
+                    shortpath,
+                    index.value,
+                    UniqueWhereParam::IdEquals(*group),
+                    vec![],
+                ),
             ))
             .await?;
 
@@ -757,7 +754,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSouce,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        let tmpdir = self.app.settings_manager()
+        let tmpdir = self
+            .app
+            .settings_manager()
             .runtime_path
             .get_temp()
             .maketmp()
@@ -813,7 +812,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        tmpdir.rename(path)
+        tmpdir
+            .rename(path)
             .await
             .context("moving tmpdir to instance location")?;
 

@@ -1,4 +1,8 @@
-use std::{ops::Deref, path::{PathBuf, Path}, mem::ManuallyDrop};
+use std::{
+    mem::ManuallyDrop,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use anyhow::anyhow;
 
