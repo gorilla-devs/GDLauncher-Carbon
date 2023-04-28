@@ -1,4 +1,6 @@
-use std::{ops::Deref, path::PathBuf};
+use std::{ops::Deref, path::{PathBuf, Path}, mem::ManuallyDrop};
+
+use anyhow::anyhow;
 
 use super::maven::MavenCoordinates;
 
@@ -151,6 +153,63 @@ pub struct TempPath(PathBuf);
 impl TempPath {
     pub fn to_path(&self) -> PathBuf {
         self.0.clone()
+    }
+
+    pub async fn maketmp(&self) -> anyhow::Result<Tempfolder> {
+        let time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time is somehow pre-epoch")
+            .as_millis();
+
+        let mut path = self.to_path();
+
+        for i in 0..1000 {
+            if i == 0 {
+                path.push(time.to_string());
+            } else {
+                path.push(format!("{time}{i}"));
+            }
+
+            if tokio::fs::create_dir_all(&path).await.is_ok() {
+                return Ok(Tempfolder(path));
+            }
+
+            path.pop();
+        }
+
+        Err(anyhow!("Could not create tmpdir"))
+    }
+}
+
+pub struct Tempfolder(PathBuf);
+
+impl Tempfolder {
+    /// Extract the contained path without deleting the tmpdir.
+    pub fn into_path(self) -> PathBuf {
+        let v = ManuallyDrop::new(self);
+
+        // SAFETY: v is not dropped so v.0 can be extracted safely.
+        let path = unsafe { std::ptr::read(&v.0 as *const PathBuf) };
+
+        path
+    }
+
+    pub async fn rename(self, path: impl AsRef<Path>) -> std::io::Result<()> {
+        tokio::fs::rename(self.into_path(), path).await
+    }
+}
+
+impl Deref for Tempfolder {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl Drop for Tempfolder {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
     }
 }
 

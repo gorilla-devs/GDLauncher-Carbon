@@ -746,12 +746,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSouce,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
-        tokio::fs::create_dir(tmpdir.path().join("instance")).await?;
+        let tmpdir = self.app.settings_manager()
+            .runtime_path
+            .get_temp()
+            .maketmp()
+            .await?;
+
+        //let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
+        tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
         let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
             (true, Some((path, data))) => {
-                tokio::fs::write(tmpdir.path().join(&path), data)
+                tokio::fs::write(tmpdir.join(&path), data)
                     .await
                     .context("saving instance icon")?;
 
@@ -780,7 +786,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let json = schema::make_instance_config(info.clone())?;
-        tokio::fs::write(tmpdir.path().join("instance.json"), json)
+        tokio::fs::write(tmpdir.join("instance.json"), json)
             .await
             .context("writing instance json")?;
 
@@ -796,10 +802,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        tokio::fs::rename(&tmpdir, path)
+        tmpdir.rename(path)
             .await
             .context("moving tmpdir to instance location")?;
-        drop(ManuallyDrop::new(tmpdir)); // prevent tmpdir cleanup
 
         let id = self.add_instance(name, shortpath.clone(), group).await?;
 
