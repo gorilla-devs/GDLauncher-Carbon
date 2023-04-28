@@ -1,20 +1,24 @@
+use std::sync::atomic::Ordering;
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
 
-use error::DownloadError;
 use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use sha1::{Digest, Sha1};
+use sha1::Digest as _;
+use sha1::Sha1;
+use sha2::Digest as _;
 use sha2::Sha256;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncReadExt, AsyncWriteExt},
 };
 use tracing::trace;
+
+use error::DownloadError;
 
 mod error;
 
@@ -129,13 +133,38 @@ pub async fn download_multiple(
 
     let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
 
+    let arced_progress = Arc::new(progress);
+
+    let atomic_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let atomic_size = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
     for file in files {
         let semaphore = Arc::clone(&downloads);
+        let progress = Arc::clone(&arced_progress);
+        let counter = Arc::clone(&atomic_counter);
+        let size = Arc::clone(&atomic_size);
         let url = file.url.clone();
         let path = file.path.clone();
         let client = client.clone();
 
         tasks.push(tokio::spawn(async move {
+            fn increase_progress(
+                counter: &Arc<std::sync::atomic::AtomicU64>,
+                size: &Arc<std::sync::atomic::AtomicU64>,
+                progress: &Arc<tokio::sync::watch::Sender<Progress>>,
+                file_size: Option<u64>,
+            ) -> Result<(), DownloadError> {
+                let new_current = counter.fetch_add(1, Ordering::SeqCst);
+                let new_size = size.fetch_add(file_size.unwrap_or(0), Ordering::SeqCst);
+
+                progress.send(Progress {
+                    current_count: new_current,
+                    current_size: new_size,
+                })?;
+
+                Ok(())
+            }
+
             let _permit = semaphore
                 .acquire()
                 .await
@@ -176,7 +205,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha1(ref hash)) => {
                         let finalized = sha1.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return Ok(file.size);
+                            return increase_progress(&counter, &size, &progress, file.size);
                         } else {
                             trace!(
                                 "Hash mismatch sha1 for file: {} - expected: {hash} - got: {}",
@@ -188,7 +217,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha256(ref hash)) => {
                         let finalized = sha256.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return Ok(file.size);
+                            return increase_progress(&counter, &size, &progress, file.size);
                         } else {
                             trace!(
                                 "Hash mismatch sha256 for file: {} - expected: {hash} - got: {}",
@@ -225,19 +254,24 @@ pub async fn download_multiple(
                     Some(Checksum::Sha256(_)) => sha256.update(&res),
                     None => {}
                 }
+
+                let buf_size = res.len() as u64;
+
                 tokio::io::copy(&mut res.as_ref(), &mut fs_file).await?;
+
+                increase_progress(&counter, &size, &progress, Some(buf_size))?;
             }
 
             match file.checksum {
                 Some(Checksum::Sha1(hash)) => {
-                    if hash != format!("{:x}", sha1.finalize()) {
+                    if hash != hex::encode(sha1.finalize().as_slice()) {
                         return Err(DownloadError::GenericDownload(
                             "Checksum mismatch".to_owned(),
                         ));
                     }
                 }
                 Some(Checksum::Sha256(hash)) => {
-                    if hash != format!("{:x}", sha256.finalize()) {
+                    if hash != hex::encode(sha256.finalize().as_slice()) {
                         return Err(DownloadError::GenericDownload(
                             "Checksum mismatch".to_owned(),
                         ));
@@ -246,19 +280,14 @@ pub async fn download_multiple(
                 None => {}
             }
 
-            Ok(file.size)
+            increase_progress(&counter, &size, &progress, None)?;
+
+            Ok(())
         }));
     }
 
-    let mut curr_size = 0;
-
-    for (curr_count, task) in tasks.into_iter().enumerate() {
-        let res = task.await??;
-        curr_size += res.unwrap_or(0);
-        progress.send(Progress {
-            current_count: curr_count as u64,
-            current_size: curr_size / (1024 * 1024),
-        })?;
+    for task in tasks {
+        task.await??;
     }
 
     Ok(())
