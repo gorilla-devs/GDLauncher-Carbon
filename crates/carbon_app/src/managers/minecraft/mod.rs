@@ -9,6 +9,7 @@ use crate::domain::minecraft::{
 use super::ManagerRef;
 
 mod assets;
+mod curseforge;
 mod forge;
 mod minecraft;
 

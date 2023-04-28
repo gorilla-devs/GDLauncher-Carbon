@@ -8,6 +8,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use sha1::digest::core_api::CoreWrapper;
 use sha1::Digest as _;
 use sha1::Sha1;
 use sha2::Digest as _;
@@ -67,23 +68,25 @@ impl Downloadable {
 
 #[derive(Debug, Default)]
 pub struct Progress {
+    pub total_count: u64,
     pub current_count: u64,
+    pub count_progress: u8,
+
+    pub total_size: u64,
     pub current_size: u64,
+    pub size_progress: u8,
 }
 
 impl Progress {
     pub fn new() -> Self {
-        Self {
-            current_count: 0,
-            current_size: 0,
-        }
+        Self::default()
     }
 }
 
 // Todo: Add checksum/size verification
 pub async fn download_file(
-    file: &Downloadable,
-    progress: tokio::sync::watch::Sender<Progress>,
+    downloadable_file: &Downloadable,
+    progress: Option<tokio::sync::watch::Sender<Progress>>,
 ) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build()?;
@@ -91,29 +94,49 @@ pub async fn download_file(
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build();
 
-    let mut response = client.get(&file.url).send().await?;
+    let mut response = client.get(&downloadable_file.url).send().await?;
 
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&file.path)
+        .open(&downloadable_file.path)
         .await?;
 
     let mut buf = vec![];
     while let Some(chunk) = response.chunk().await? {
         file.write_all(&chunk).await?;
         buf.extend_from_slice(&chunk);
-        progress.send(Progress {
-            current_count: 0,
-            current_size: buf.len() as u64,
-        })?;
+        if let Some(progress) = &progress {
+            let size_progress = (buf.len() as f64 / downloadable_file.size.unwrap_or(1) as f64)
+                .min(1.0)
+                .max(0.0)
+                * 100.0;
+
+            progress.send(Progress {
+                // Special case for single file
+                total_count: 1,
+                current_count: 0,
+                count_progress: 0,
+
+                current_size: buf.len() as u64,
+                total_size: downloadable_file.size.unwrap_or(0),
+                size_progress: size_progress as u8,
+            })?;
+        }
     }
 
-    progress.send(Progress {
-        current_count: 0,
-        current_size: 0,
-    })?;
+    if let Some(progress) = &progress {
+        progress.send(Progress {
+            total_count: 1,
+            current_count: 1,
+            count_progress: 100,
+
+            current_size: buf.len() as u64,
+            total_size: downloadable_file.size.unwrap_or(0),
+            size_progress: 100,
+        })?;
+    }
 
     Ok(())
 }
@@ -138,6 +161,12 @@ pub async fn download_multiple(
     let atomic_counter = Arc::new(std::sync::atomic::AtomicU64::new(0));
     let atomic_size = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
+    let total_size = files
+        .iter()
+        .fold(0, |acc, file| acc + file.size.unwrap_or(0));
+
+    let total_count = files.len() as u64;
+
     for file in files {
         let semaphore = Arc::clone(&downloads);
         let progress = Arc::clone(&arced_progress);
@@ -148,22 +177,26 @@ pub async fn download_multiple(
         let client = client.clone();
 
         tasks.push(tokio::spawn(async move {
-            fn increase_progress(
-                counter: &Arc<std::sync::atomic::AtomicU64>,
-                size: &Arc<std::sync::atomic::AtomicU64>,
-                progress: &Arc<tokio::sync::watch::Sender<Progress>>,
-                file_size: Option<u64>,
-            ) -> Result<(), DownloadError> {
-                let new_current = counter.fetch_add(1, Ordering::SeqCst);
-                let new_size = size.fetch_add(file_size.unwrap_or(0), Ordering::SeqCst);
+            let increase_progress =
+                move |counter: &Arc<std::sync::atomic::AtomicU64>,
+                      size: &Arc<std::sync::atomic::AtomicU64>,
+                      progress: &Arc<tokio::sync::watch::Sender<Progress>>,
+                      file_size: Option<u64>| {
+                    let new_current = counter.fetch_add(1, Ordering::SeqCst);
+                    let new_size = size.fetch_add(file_size.unwrap_or(0), Ordering::SeqCst);
 
-                progress.send(Progress {
-                    current_count: new_current,
-                    current_size: new_size,
-                })?;
+                    progress.send(Progress {
+                        current_count: new_current,
+                        total_count,
+                        count_progress: (new_current as f64 / total_count as f64 * 100.0) as u8,
 
-                Ok(())
-            }
+                        total_size,
+                        current_size: new_size,
+                        size_progress: (new_size as f64 / total_size as f64 * 100.0) as u8,
+                    })?;
+
+                    Ok(())
+                };
 
             let _permit = semaphore
                 .acquire()

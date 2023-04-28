@@ -1,9 +1,11 @@
+use rspc::RouterBuilderLike;
+
 use crate::{
     api::{
         keys::modplatforms::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
-            CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
-            CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
+            CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILE_CHANGELOG,
+            CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MODS, CURSEFORGE_SEARCH,
         },
         modplatforms::{
             curseforge::filters::{
@@ -21,7 +23,6 @@ use crate::{
     },
     managers::App,
 };
-use rspc::RouterBuilderLike;
 
 mod curseforge;
 
@@ -29,7 +30,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query CURSEFORGE_SEARCH[app, filters: FEModSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
-            let response = modplatforms.curseforge.search(filters.into()).await?;
+                let response = modplatforms.curseforge.search(filters.into()).await?;
 
             Ok(FEModSearchResponse::from(response))
         }
