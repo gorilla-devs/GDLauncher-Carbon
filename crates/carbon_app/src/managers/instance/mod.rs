@@ -561,20 +561,31 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
     ) -> anyhow::Result<InstanceId> {
         use db::instance_group::UniqueWhereParam;
+        use db::instance::WhereParam;
         let index = self.next_instance_index(group).await?;
 
-        let instance = self
+        let (_, instance) = self
             .app
             .prisma_client
-            .instance()
-            .create(
-                name,
-                shortpath,
-                index.value,
-                UniqueWhereParam::IdEquals(*group),
-                vec![],
-            )
-            .exec()
+            ._batch((
+                // delete any existing entry at the same shortpath
+                self.app
+                    .prisma_client
+                    .instance()
+                    .delete_many(vec![
+                        WhereParam::Shortpath(StringFilter::Contains(shortpath.clone()))
+                    ]),
+                self.app
+                    .prisma_client
+                    .instance()
+                    .create(
+                        name,
+                        shortpath,
+                        index.value,
+                        UniqueWhereParam::IdEquals(*group),
+                        vec![],
+                    ),
+            ))
             .await?;
 
         Ok(InstanceId(instance.id))
