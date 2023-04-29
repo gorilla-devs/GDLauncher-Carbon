@@ -6,7 +6,7 @@ import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
-import { createStore, produce } from "solid-js/store";
+import { createStore } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";

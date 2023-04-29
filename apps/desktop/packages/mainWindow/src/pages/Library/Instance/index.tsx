@@ -15,7 +15,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import { formatDistance } from "date-fns";
-import { InstanceDetails } from "@gd/core_module/bindings";
+import { InstanceDetails, UngroupedInstance } from "@gd/core_module/bindings";
 
 type InstancePage = {
   label: string;
@@ -31,42 +31,43 @@ const Instance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
-    onMutate: async (obj) => {
+    onMutate: async (
+      obj
+    ): Promise<
+      | {
+          instancesUngrouped: UngroupedInstance[];
+          instanceDetails: InstanceDetails;
+        }
+      | undefined
+    > => {
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceDetails"],
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
       });
       await queryClient.cancelQueries({
         queryKey: ["instance.getInstancesUngrouped"],
       });
 
-      const instancesUngrouped = queryClient.getQueryData([
-        "instance.getInstancesUngrouped",
-      ]);
+      const instancesUngrouped: UngroupedInstance[] | undefined =
+        queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+
+      const instanceDetails: InstanceDetails | undefined =
+        queryClient.getQueryData([
+          "instance.getInstanceDetails",
+          parseInt(params.id, 10),
+        ]);
 
       queryClient.setQueryData(
         ["instance.getInstanceDetails", parseInt(params.id, 10)],
         (old: InstanceDetails | undefined) => {
           const newDetails = old;
           if (newDetails) newDetails.favorite = obj.favorite;
-          console.log("SET FAVORITE", newDetails);
           if (newDetails) return newDetails;
           else return old;
         }
       );
 
-      return instancesUngrouped;
-    },
-    onSuccess() {
-      // const instancesUngrouped = queryClient.getQueryData([
-      //   "instance.getInstancesUngrouped",
-      // ]);
-      // queryClient.setQueryData(["instance.setFavorite", null], uuid);
-      // queryClient.invalidateQueries({
-      //   queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
-      // });
-      // queryClient.invalidateQueries({
-      //   queryKey: ["instance.getInstancesUngrouped"],
-      // });
+      if (instancesUngrouped && instanceDetails)
+        return { instancesUngrouped, instanceDetails };
     },
     onSettled() {
       queryClient.invalidateQueries({
@@ -77,18 +78,29 @@ const Instance = () => {
       });
       setIsFavorite((prev) => !prev);
     },
-    onError(error) {
-      console.log("ERR FAV", error);
+    onError(
+      _error,
+      _variables,
+      context:
+        | {
+            instancesUngrouped: UngroupedInstance[];
+            instanceDetails: InstanceDetails;
+          }
+        | undefined
+    ) {
+      if (context?.instanceDetails) {
+        setIsFavorite(context.instanceDetails.favorite);
+        queryClient.setQueryData(
+          ["instance.getInstanceDetails"],
+          context.instanceDetails
+        );
+      }
     },
   });
 
   createEffect(() => {
     if (routeData.instanceDetails.data)
       setIsFavorite(routeData.instanceDetails.data?.favorite);
-  });
-
-  createEffect(() => {
-    console.log("FAV", routeData.instanceDetails.data);
   });
 
   const instancePages = () => [
