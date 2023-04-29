@@ -560,21 +560,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         shortpath: String,
         group: GroupId,
     ) -> anyhow::Result<InstanceId> {
+        use db::instance::WhereParam;
         use db::instance_group::UniqueWhereParam;
         let index = self.next_instance_index(group).await?;
 
-        let instance = self
+        let (_, instance) = self
             .app
             .prisma_client
-            .instance()
-            .create(
-                name,
-                shortpath,
-                index.value,
-                UniqueWhereParam::IdEquals(*group),
-                vec![],
-            )
-            .exec()
+            ._batch((
+                // delete any existing entry at the same shortpath
+                self.app
+                    .prisma_client
+                    .instance()
+                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Contains(
+                        shortpath.clone(),
+                    ))]),
+                self.app.prisma_client.instance().create(
+                    name,
+                    shortpath,
+                    index.value,
+                    UniqueWhereParam::IdEquals(*group),
+                    vec![],
+                ),
+            ))
             .await?;
 
         Ok(InstanceId(instance.id))
@@ -746,12 +754,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSouce,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
-        tokio::fs::create_dir(tmpdir.path().join("instance")).await?;
+        let tmpdir = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .maketmp()
+            .await?;
+
+        //let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
+        tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
         let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
             (true, Some((path, data))) => {
-                tokio::fs::write(tmpdir.path().join(&path), data)
+                tokio::fs::write(tmpdir.join(&path), data)
                     .await
                     .context("saving instance icon")?;
 
@@ -780,7 +796,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let json = schema::make_instance_config(info.clone())?;
-        tokio::fs::write(tmpdir.path().join("instance.json"), json)
+        tokio::fs::write(tmpdir.join("instance.json"), json)
             .await
             .context("writing instance json")?;
 
@@ -796,10 +812,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        tokio::fs::rename(&tmpdir, path)
+        tmpdir
+            .rename(path)
             .await
             .context("moving tmpdir to instance location")?;
-        drop(ManuallyDrop::new(tmpdir)); // prevent tmpdir cleanup
 
         let id = self.add_instance(name, shortpath.clone(), group).await?;
 
