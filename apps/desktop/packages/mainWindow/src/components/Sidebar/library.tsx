@@ -9,7 +9,6 @@ import fetchData from "@/pages/Library/library.data";
 import { createStore, produce } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
-import { ListInstance } from "@gd/core_module/bindings";
 import InstanceTile from "../InstanceTile";
 
 const Sidebar = () => {
@@ -21,9 +20,6 @@ const Sidebar = () => {
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [instances, setInstances] = createStore<InstancesStore>({});
-  const [favoriteInstances, setFavoriteInstances] = createStore<ListInstance[]>(
-    []
-  );
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
@@ -35,24 +31,23 @@ const Sidebar = () => {
         const validInstance = isListInstanceValid(instance.status)
           ? instance.status.Valid
           : null;
-
         const modloader = validInstance?.modloader;
-
         if (modloader) {
-          if (!instance.favorite) {
-            setInstances(
-              produce((prev) => {
-                prev[modloader] = [...(prev[modloader] || []), instance];
-                return prev;
-              })
+          setInstances(modloader, (prev) => {
+            const filteredPrev = (prev || []).filter(
+              (prev) => prev.id !== instance.id
             );
-          } else {
-            setFavoriteInstances((prev) => [...prev, instance]);
-          }
+
+            if (!instance.favorite) return [...filteredPrev, instance];
+            else return [...filteredPrev];
+          });
         }
       });
     }
   });
+
+  const favoriteInstances = () =>
+    routeData.instancesUngrouped.data?.filter((inst) => inst.favorite) || [];
 
   return (
     <SiderbarWrapper noPadding>
@@ -84,12 +79,12 @@ const Sidebar = () => {
             "scrollbar-hide": !isSidebarOpened(),
           }}
         >
-          <Show when={favoriteInstances.length > 0}>
+          <Show when={favoriteInstances().length > 0}>
             <Collapsable
               title={"Favorites"}
               size={isSidebarOpened() ? "standard" : "small"}
             >
-              <For each={favoriteInstances}>
+              <For each={favoriteInstances()}>
                 {(instance) => (
                   //TODO: SKELETON
                   <Suspense fallback={<></>}>

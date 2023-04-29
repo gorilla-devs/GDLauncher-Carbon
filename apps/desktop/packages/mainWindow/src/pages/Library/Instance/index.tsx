@@ -12,9 +12,10 @@ import {
 import { For, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import { formatDistance } from "date-fns";
+import { InstanceDetails } from "@gd/core_module/bindings";
 
 type InstancePage = {
   label: string;
@@ -26,11 +27,55 @@ const Instance = () => {
   const params = useParams();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
+  const [isFavorite, setIsFavorite] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
+    onMutate: async (obj) => {
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstanceDetails"],
+      });
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstancesUngrouped"],
+      });
+
+      const instancesUngrouped = queryClient.getQueryData([
+        "instance.getInstancesUngrouped",
+      ]);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        (old: InstanceDetails | undefined) => {
+          const newDetails = old;
+          if (newDetails) newDetails.favorite = obj.favorite;
+          console.log("SET FAVORITE", newDetails);
+          if (newDetails) return newDetails;
+          else return old;
+        }
+      );
+
+      return instancesUngrouped;
+    },
     onSuccess() {
-      console.log("SUCCESS FAV");
+      // const instancesUngrouped = queryClient.getQueryData([
+      //   "instance.getInstancesUngrouped",
+      // ]);
+      // queryClient.setQueryData(["instance.setFavorite", null], uuid);
+      // queryClient.invalidateQueries({
+      //   queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+      // });
+      // queryClient.invalidateQueries({
+      //   queryKey: ["instance.getInstancesUngrouped"],
+      // });
+    },
+    onSettled() {
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getInstancesUngrouped"],
+      });
+      setIsFavorite((prev) => !prev);
     },
     onError(error) {
       console.log("ERR FAV", error);
@@ -38,7 +83,12 @@ const Instance = () => {
   });
 
   createEffect(() => {
-    console.log("FAV", routeData.instanceDetails.data?.favorite);
+    if (routeData.instanceDetails.data)
+      setIsFavorite(routeData.instanceDetails.data?.favorite);
+  });
+
+  createEffect(() => {
+    console.log("FAV", routeData.instanceDetails.data);
   });
 
   const instancePages = () => [
@@ -126,7 +176,7 @@ const Instance = () => {
             innerContainerRef = el;
           }}
         >
-          <div class="z-10 top-5 sticky left-5 w-fit">
+          <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -246,10 +296,8 @@ const Instance = () => {
                           <div
                             class="text-xl"
                             classList={{
-                              "text-yellow-500 i-ri:star-s-fill":
-                                routeData.instanceDetails.data?.favorite,
-                              "i-ri:star-line":
-                                !routeData.instanceDetails.data?.favorite,
+                              "text-yellow-500 i-ri:star-s-fill": isFavorite(),
+                              "i-ri:star-line": !isFavorite(),
                             }}
                           />
                         </div>
@@ -337,10 +385,8 @@ const Instance = () => {
                   <div
                     class="text-xl"
                     classList={{
-                      "text-yellow-500 i-ri:star-s-fill":
-                        routeData.instanceDetails.data?.favorite,
-                      "i-ri:star-line":
-                        !routeData.instanceDetails.data?.favorite,
+                      "text-yellow-500 i-ri:star-s-fill": isFavorite(),
+                      "i-ri:star-line": !isFavorite(),
                     }}
                     onClick={() =>
                       setFavoriteMutation.mutate({
