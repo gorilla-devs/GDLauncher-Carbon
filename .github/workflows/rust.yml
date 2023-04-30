@@ -46,6 +46,10 @@ jobs:
       run: pnpm codegen
     - name: Build
       run: IS_DOCKER_TEST=true pnpm build:linux-x64
+      env: 
+        CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
+        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
     - name: Lint
       run: pnpm lint
     - name: Test
