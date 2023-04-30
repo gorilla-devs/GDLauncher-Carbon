@@ -18,19 +18,11 @@ const Auth = (props: Props) => {
   const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
   const [clicked, setClicked] = createSignal(false);
+  const [retry, setRetry] = createSignal(0);
   const navigate = useNavigate();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const modalsContext = useModal();
-
-  const accountEnrollBeginMutation = rspc.createMutation(
-    ["account.enroll.begin"],
-    {
-      onError(error) {
-        setError(error.message);
-      },
-    }
-  );
 
   const accountEnrollFinalizeMutation = rspc.createMutation([
     "account.enroll.finalize",
@@ -39,6 +31,33 @@ const Auth = (props: Props) => {
   const accountEnrollCancelMutation = rspc.createMutation([
     "account.enroll.cancel",
   ]);
+
+  const accountEnrollBeginMutation = rspc.createMutation(
+    ["account.enroll.begin"],
+    {
+      onError() {
+        retryLogin();
+      },
+    }
+  );
+
+  const retryLogin = () => {
+    while (retry() <= 3) {
+      if (enrollmentInProgress()) {
+        accountEnrollCancelMutation.mutate(undefined);
+      }
+      accountEnrollBeginMutation.mutate(undefined);
+      setRetry((prev) => prev + 1);
+    }
+    if (retry() > 3) {
+      setError("Something went wrong while logging in, try again!");
+      if (enrollmentInProgress()) {
+        accountEnrollCancelMutation.mutate(undefined);
+      }
+      setEnrollmentInProgress(false);
+      setClicked(false);
+    }
+  };
 
   const handleClick = async () => {
     setClicked(true);
@@ -69,9 +88,11 @@ const Auth = (props: Props) => {
         props.setStep(1);
       },
       onFail() {
-        setEnrollmentInProgress(false);
-        setError("something went wrong while logging in");
-        accountEnrollCancelMutation.mutate(undefined);
+        retryLogin();
+        setError("Something went wrong while logging in, Try again!");
+      },
+      onError(_error) {
+        setError("Something went wrong while logging in, Try again!");
       },
       onComplete() {
         setError(null);

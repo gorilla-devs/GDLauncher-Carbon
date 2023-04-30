@@ -489,6 +489,7 @@ name = "carbon_net"
 version = "0.1.0"
 dependencies = [
  "futures",
+ "hex",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",

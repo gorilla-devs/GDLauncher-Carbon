@@ -28,18 +28,20 @@ export const handleStatus = (
 ) => {
   if (routeData.isSuccess) {
     const data = routeData.data;
-    if (typeof data === "string") return;
-    if (data && "pollingCode" in data) {
+    if (typeof data === "string" && !routeData.failureReason) return;
+    if (typeof data === "object" && data && "pollingCode" in data) {
       const info = data.pollingCode;
       if (info) {
-        callbacks?.onPolling?.(info);
+        return callbacks?.onPolling?.(info);
       }
-    } else if (data && "failed" in data) {
+    } else if (typeof data === "object" && data && "failed" in data) {
       const error = data.failed;
-      callbacks?.onFail?.(error);
-    } else if (data && "complete" in data) {
+      return callbacks?.onFail?.(error);
+    } else if (typeof data === "object" && data && "complete" in data) {
       const complete = data.complete;
-      callbacks?.onComplete?.(complete);
+      return callbacks?.onComplete?.(complete);
     }
-  } else if (routeData.isError) callbacks?.onError?.(routeData.error);
+  } else if (routeData.isError || routeData.failureReason) {
+    return callbacks?.onError?.(routeData.error);
+  }
 };
