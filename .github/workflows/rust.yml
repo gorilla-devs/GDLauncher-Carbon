@@ -43,6 +43,8 @@ jobs:
           npm run sudo-init
           chmod -R a+x node_modules
       - name: Codegen
+        env:
+          CARGO_INCREMENTAL: 0
         run: pnpm codegen
       - name: Build
         run: IS_DOCKER_TEST=true pnpm build:linux-x64
@@ -50,7 +52,10 @@ jobs:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
+          CARGO_INCREMENTAL: 0
       - name: Lint
         run: pnpm lint
       - name: Test
+        env:
+          CARGO_INCREMENTAL: 0
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test -- --features production -- --include-ignored
