@@ -17,7 +17,12 @@ const Home = () => {
   createEffect(() => {
     if (routeData.instancesUngrouped.data) {
       routeData.instancesUngrouped.data.forEach((instance) => {
-        setInstances((prev) => [...prev, instance]);
+        setInstances((prev) => {
+          const filteredPrev = (prev || []).filter(
+            (prev) => prev.id !== instance.id
+          );
+          return [...filteredPrev, instance];
+        });
       });
     }
   });

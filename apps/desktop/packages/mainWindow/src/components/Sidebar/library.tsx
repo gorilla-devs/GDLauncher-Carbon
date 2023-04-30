@@ -31,7 +31,7 @@ const Sidebar = () => {
         const validInstance = isListInstanceValid(instance.status)
           ? instance.status.Valid
           : null;
-        const modloader = validInstance?.modloader;
+        const modloader = validInstance?.modloader || "vanilla";
         if (modloader) {
           setInstances(modloader, (prev) => {
             const filteredPrev = (prev || []).filter(
@@ -51,7 +51,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full box-border pt-5 pb-5">
+      <div class="h-full w-full box-border pt-5 pb-5 transition-all">
         <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}

@@ -40,6 +40,7 @@ const InstanceCreation = (props: ModalProps) => {
     MappedVersion[] | undefined
   >(undefined);
   const [mcVersion, setMcVersion] = createSignal("");
+  const [loaderVersion, setLoaderVersion] = createSignal("");
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
@@ -50,14 +51,14 @@ const InstanceCreation = (props: ModalProps) => {
 
   createEffect(() => {
     const mcVersionLoaderVersions = forgeVersions()?.gameVersions.find(
-      (version) => version.id === mcVersion()
+      (version) =>
+        version.id === (mcVersion() || (mappedMcVersions()?.[0]?.key as string))
     )?.loaders;
 
     const mappedVersion = mcVersionLoaderVersions?.map((version) => ({
       label: version.id,
       key: version.id,
     }));
-
     setLoaderVersions(mappedVersion);
   });
 
@@ -114,7 +115,7 @@ const InstanceCreation = (props: ModalProps) => {
   );
 
   const handleCreate = () => {
-    if (!title() || !mcVersion() || !loader()) {
+    if (!title()) {
       setError("Fields must be filled in!");
     } else {
       setError("");
@@ -127,12 +128,13 @@ const InstanceCreation = (props: ModalProps) => {
         version: {
           Version: {
             Standard: {
-              release: mcVersion(),
+              release: mcVersion() || (mappedMcVersions()?.[0]?.key as string),
               modloaders: loader()
                 ? [
                     {
                       type_: loader() as ModLoaderType,
-                      version: "1.2.3",
+                      version:
+                        loaderVersion() || (loaderVersion()?.[0].key as string),
                     },
                   ]
                 : [],
@@ -204,7 +206,6 @@ const InstanceCreation = (props: ModalProps) => {
               </Match>
             </Switch>
           </div>
-
           <div>
             <h5 class="mt-0 mb-2">
               <Trans
@@ -244,11 +245,6 @@ const InstanceCreation = (props: ModalProps) => {
               onInput={(e) => {
                 setNotes(e.currentTarget.value);
               }}
-              error={
-                error() &&
-                !notes() &&
-                (t("error.missing_field_description") as string)
-              }
             />
           </div>
           <div>
@@ -271,11 +267,6 @@ const InstanceCreation = (props: ModalProps) => {
                   onChange={(loader) => {
                     setMcVersion(loader.key);
                   }}
-                  error={
-                    error() &&
-                    !mcVersion() &&
-                    (t("error.missing_field_mc_version") as string)
-                  }
                 />
               </Show>
               <div class="flex gap-4 mt-2">
@@ -362,13 +353,9 @@ const InstanceCreation = (props: ModalProps) => {
                   setLoader(loader.key as ModLoaderType);
                 }
               }}
-              error={
-                error() &&
-                !loader() &&
-                (t("error.missing_field_loader") as string)
-              }
             />
           </div>
+          AAA
           <Show when={loaderVersions() && loader() === "Forge"}>
             <div>
               <h5 class="mt-0 mb-2">
@@ -388,13 +375,8 @@ const InstanceCreation = (props: ModalProps) => {
                 value={loaderVersions()?.[0]?.key}
                 placement="bottom"
                 onChange={(loader) => {
-                  setMcVersion(loader.key);
+                  setLoaderVersion(loader.key);
                 }}
-                error={
-                  error() &&
-                  !loader() &&
-                  (t("error.missing_field_loader_version") as string)
-                }
               />
             </div>
           </Show>

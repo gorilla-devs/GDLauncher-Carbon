@@ -3,6 +3,7 @@ import { ModLoaderType } from "@gd/core_module/bindings";
 import { Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { useTransContext } from "@gd/i18n";
+import { rspc } from "@/utils/rspcClient";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -16,6 +17,8 @@ type Props = {
   img: string | undefined;
   variant?: Variant;
   invalid?: boolean;
+  instanceId: number;
+
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -25,13 +28,16 @@ const Tile = (props: Props) => {
     props
   );
   const [t] = useTransContext();
+  const deleteInstanceMutation = rspc.createMutation([
+    "instance.deleteInstance",
+  ]);
 
   const handleOpenFolder = () => {
     console.log("OPEN FOLDER");
   };
 
   const handleDelete = () => {
-    console.log("DELETE");
+    deleteInstanceMutation.mutate(props.instanceId);
   };
 
   const menuItems = [
@@ -118,7 +124,7 @@ const Tile = (props: Props) => {
                     src={getModloaderIcon(props.modloader as ModLoaderType)}
                   />
                 </Show>
-                <p class="m-0">{props.modloader}</p>
+                <p class="m-0">{props.modloader || "Vanilla"}</p>
               </span>
               <p class="m-0">{props.version}</p>
             </div>

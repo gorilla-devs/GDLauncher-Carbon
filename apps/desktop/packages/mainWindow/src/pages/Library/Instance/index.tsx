@@ -259,10 +259,8 @@ const Instance = () => {
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                         <div class="m-0 flex gap-2 p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                           <span>
-                            {
-                              routeData.instanceDetails.data?.modloaders[0]
-                                .type_
-                            }
+                            {routeData.instanceDetails.data?.modloaders[0]
+                              ?.type_ || "Vanilla"}
                           </span>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
@@ -358,7 +356,8 @@ const Instance = () => {
               <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-darkSlate-50">
                 <div class="flex gap-2 p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
                   <span>
-                    {routeData.instanceDetails.data?.modloaders[0].type_}
+                    {routeData.instanceDetails.data?.modloaders[0]?.type_ ||
+                      "Vanilla"}
                   </span>
                   <span>{routeData.instanceDetails.data?.version}</span>
                 </div>

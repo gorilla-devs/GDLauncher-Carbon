@@ -29,6 +29,7 @@ const InstanceTile = (props: {
       <Tile
         onClick={() => navigate(`/library/${props.instance.id}`)}
         title={props.instance.name}
+        instanceId={props.instance.id}
         modloader={modloader}
         version={validInstance()?.mc_version}
         invalid={!isListInstanceValid(props.instance.status)}
