@@ -2,17 +2,17 @@ name: Rust
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: ["develop"]
   pull_request:
-    branches: [ "develop" ]
+    branches: ["develop"]
 
 env:
   CARGO_TERM_COLOR: always
-  
+
 concurrency:
-  group: '${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}'
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
   cancel-in-progress: true
-  
+
 jobs:
   build:
     defaults:
@@ -20,37 +20,37 @@ jobs:
         working-directory: ./GDLauncher
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        path: GDLauncher
-    - name: Init submodule if available
-      env: 
-        is_token: ${{ secrets.MACHINE_USER_TOKEN }}
-      if: ${{ env.is_token != '' }}
-      uses: actions/checkout@v3
-      with:
-        repository: gorilla-devs/iridium
-        ssh-key: ${{ secrets.MACHINE_USER_TOKEN }}
-        path: GDLauncher/crates/iridium
-    - uses: actions/setup-node@v3
-      with:
-        node-version: 18
-    - name: Prepare
-      run: |
+      - uses: actions/checkout@v3
+        with:
+          path: GDLauncher
+      - name: Init submodule if available
+        env:
+          is_token: ${{ secrets.MACHINE_USER_TOKEN }}
+        if: ${{ env.is_token != '' }}
+        uses: actions/checkout@v3
+        with:
+          repository: gorilla-devs/iridium
+          ssh-key: ${{ secrets.MACHINE_USER_TOKEN }}
+          path: GDLauncher/crates/iridium
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Prepare
+        run: |
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
-    - run: |
-        npm run sudo-init
-        chmod -R a+x node_modules
-    - name: Codegen
-      run: pnpm codegen
-    - name: Build
-      run: IS_DOCKER_TEST=true pnpm build:linux-x64
-      env: 
-        CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
-        SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
-    - name: Lint
-      run: pnpm lint
-    - name: Test
-      run: pnpm test -- --features production -- --include-ignored
+      - run: |
+          npm run sudo-init
+          chmod -R a+x node_modules
+      - name: Codegen
+        run: pnpm codegen
+      - name: Build
+        run: IS_DOCKER_TEST=true pnpm build:linux-x64
+        env:
+          CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test -- --features production -- --include-ignored
