@@ -33,9 +33,7 @@ pub async fn init() {
 
     #[cfg(feature = "production")]
     #[inline(always)]
-    {
-        iridium::startup_check();
-    }
+    iridium::startup_check();
 
     #[cfg(feature = "production")]
     #[cfg(not(test))]
