@@ -355,7 +355,6 @@ const InstanceCreation = (props: ModalProps) => {
               }}
             />
           </div>
-          AAA
           <Show when={loaderVersions() && loader() === "Forge"}>
             <div>
               <h5 class="mt-0 mb-2">
