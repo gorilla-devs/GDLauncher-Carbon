@@ -18,6 +18,10 @@ importers:
         version: 1.7.0
 
   apps/desktop:
+    dependencies:
+      '@tanstack/solid-virtual':
+        specifier: 3.0.0-beta.6
+        version: 3.0.0-beta.6
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.241.0
@@ -3992,6 +3996,10 @@ packages:
     resolution: {integrity: sha512-a5Sab1C4/icpTZVzZc5Ghpz88yQtGOyNqYXcZgOssB2uuAr+wF/MvN6bgtW32q7HHrvBki+BsZ0OuNv6EV3K9g==}
     dev: true
 
+  /@reach/observe-rect@1.2.0:
+    resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
+    dev: false
+
   /@rollup/pluginutils@4.2.1:
     resolution: {integrity: sha512-iKnFXr7NkdZAIHiIWE+BX5ULi/ucVFYWD6TbAV+rZctiRTY2PL6tsIKhoIOaoskiWAkgu+VsbXgUVDNLHf+InQ==}
     engines: {node: '>= 8.0.0'}
@@ -6057,6 +6065,13 @@ packages:
       '@tanstack/query-core': 4.22.0
       solid-js: 1.6.15
     dev: true
+
+  /@tanstack/solid-virtual@3.0.0-beta.6:
+    resolution: {integrity: sha512-/HjeHZb4UZxxFSAkICUEWOozGwHQpKlvtnUoS5uSMSuLOz0XM5vFq6zR6ENwAczKWDtkh8ntddk+zXAhyXOlEw==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@reach/observe-rect': 1.2.0
+    dev: false
 
   /@testing-library/dom@8.19.0:
     resolution: {integrity: sha512-6YWYPPpxG3e/xOo6HIWwB/58HukkwIVTOaZ0VwdMVjhRUX/01E4FtQbck9GazOOj7MXHc5RBzMrU86iBJHbI+A==}
@@ -10878,7 +10893,7 @@ packages:
     resolution: {integrity: sha512-oWb1Z6mkHIskLzEJ/XWX0srkpkTQ7vaopMQkyaEIoq0fmtFVxOthb8cCxeT+p3ynTdkk/RZwbgG4brR5BeWECw==}
     engines: {node: '>= 4.0'}
     os: [darwin]
-    deprecated: fsevents 1 will break on node v14+ and could be using insecure binaries. Upgrade to fsevents 2.
+    deprecated: The v1 package contains DANGEROUS / INSECURE binaries. Upgrade to safe fsevents v2
     requiresBuild: true
     dependencies:
       bindings: 1.5.0

@@ -1,81 +1,16 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import BG from "/assets/images/rlccraft_img.png";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
-import CurseforgeIcon from "/assets/images/icons/curseforge.png";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
-
-const modpacks = [
-  {
-    img: BG,
-    name: "RLC Craft",
-    tags: [
-      { name: "curseforge", img: CurseforgeIcon },
-      { name: "curseforge", img: CurseforgeIcon },
-    ],
-    description:
-      "Minecraft Forge is a handy place to store, sort, and keep tabs on all your mods. If you’re after more inspiration, our guide to the best Minecraft shaders and Minecraft texture packs.",
-    author: "ATMTeam",
-    download: 1400000,
-    lastUpdate: "2023-02-28T09:45:43.029Z",
-  },
-  {
-    img: BG,
-    name: "RLC Craft",
-    tags: [
-      { name: "curseforge", img: CurseforgeIcon },
-      { name: "curseforge", img: CurseforgeIcon },
-    ],
-    description:
-      "Minecraft Forge is a handy place to store, sort, and keep tabs on all your mods. If you’re after more inspiration, our guide to the best Minecraft shaders and Minecraft texture packs.",
-    author: "ATMTeam",
-    download: 1400000,
-    lastUpdate: "2023-02-28T09:45:43.029Z",
-  },
-  {
-    img: BG,
-    name: "RLC Craft",
-    tags: [
-      { name: "curseforge", img: CurseforgeIcon },
-      { name: "curseforge", img: CurseforgeIcon },
-    ],
-    description:
-      "Minecraft Forge is a handy place to store, sort, and keep tabs on all your mods. If you’re after more inspiration, our guide to the best Minecraft shaders and Minecraft texture packs.",
-    author: "ATMTeam",
-    download: 1400000,
-    lastUpdate: "2023-02-28T09:45:43.029Z",
-  },
-  {
-    img: BG,
-    name: "RLC Craft",
-    tags: [
-      { name: "curseforge", img: CurseforgeIcon },
-      { name: "curseforge", img: CurseforgeIcon },
-    ],
-    description:
-      "Minecraft Forge is a handy place to store, sort, and keep tabs on all your mods. If you’re after more inspiration, our guide to the best Minecraft shaders and Minecraft texture packs.",
-    author: "ATMTeam",
-    download: 1400000,
-    lastUpdate: "2023-02-28T09:45:43.029Z",
-  },
-  {
-    img: BG,
-    name: "RLC Craft",
-    tags: [
-      { name: "curseforge", img: CurseforgeIcon },
-      { name: "curseforge", img: CurseforgeIcon },
-    ],
-    description:
-      "Minecraft Forge is a handy place to store, sort, and keep tabs on all your mods. If you’re after more inspiration, our guide to the best Minecraft shaders and Minecraft texture packs.",
-    author: "ATMTeam",
-    download: 1400000,
-    lastUpdate: "2023-02-28T09:45:43.029Z",
-  },
-];
+import { rspc } from "@/utils/rspcClient";
+import { createStore } from "solid-js/store";
+import { FEMod, FEModSearchParameters } from "@gd/core_module/bindings";
+import { createVirtualizer } from "@tanstack/solid-virtual";
 
 const NoModpacks = () => {
   return (
@@ -98,8 +33,73 @@ const NoModpacks = () => {
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
+  const [modpacks, setModpacks] = createStore<FEMod[]>([]);
+  const [query, setQuery] = createStore<FEModSearchParameters>({
+    query: {
+      categoryId: 0,
+      classId: "modpacks",
+      gameId: 432,
+      gameVersion: "1.19.2",
+      page: 1,
+      modLoaderType: "forge",
+      sortField: "popularity",
+      sortOrder: "descending",
+      pageSize: 20,
+      slug: "",
+      searchFilter: "",
+      gameVersionTypeId: null,
+      authorId: null,
+      index: 0,
+    },
+  });
+
+  const curseforgeSearch = rspc.createQuery(() => [
+    "modplatforms.curseforgeSearch",
+    query,
+  ]);
+
+  let containerRef: HTMLDivElement;
+
+  createEffect(() => {
+    if (curseforgeSearch.data?.data) {
+      curseforgeSearch.data.data.forEach((element) => {
+        setModpacks((prev) => [...prev, element]);
+      });
+    }
+  });
+
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return modpacks.length + 1;
+    },
+    getScrollElement: () => containerRef,
+    estimateSize: () => 190,
+    overscan: 5,
+  });
+
+  createEffect(() => {
+    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
+    if (!lastItem) return;
+    console.log(
+      "TTTT",
+      lastItem,
+      lastItem.index,
+      modpacks.length - 1,
+      curseforgeSearch.isFetching,
+      curseforgeSearch.data?.pagination
+    );
+    if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
+      setQuery("query", (prev) => {
+        return {
+          ...prev,
+          index: (prev.index as number) + 20 + 1,
+        };
+      });
+    }
+  });
+
   return (
-    <div class="w-full relative box-border">
+    <div class="relative box-border max-h-full w-full">
       <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
@@ -149,7 +149,7 @@ export default function Browser() {
           <Tags />
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden">
+      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden max-h-[460px]">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
@@ -209,7 +209,51 @@ export default function Browser() {
           </div>
         </div>
         <Show when={modpacks.length > 0} fallback={<NoModpacks />}>
-          <For each={modpacks}>{(props) => <Modpack modpack={props} />}</For>
+          <div
+            ref={(el) => {
+              containerRef = el;
+            }}
+            class="w-full overflow-auto h-[500px] scrollbar-hide"
+          >
+            <div
+              style={{
+                height: `${rowVirtualizer.getTotalSize()}px`,
+                width: "100%",
+                position: "relative",
+              }}
+            >
+              <For each={rowVirtualizer.getVirtualItems()}>
+                {(virtualItem) => {
+                  const isLoaderRow = virtualItem.index > modpacks.length - 1;
+                  const modpack = modpacks[virtualItem.index];
+                  return (
+                    <div
+                      class="box-border py-2"
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: `${virtualItem.size}px`,
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <div class="bg-darkSlate-700 rounded-xl h-44">
+                        {isLoaderRow ? (
+                          "Loading more..."
+                        ) : (
+                          <Modpack modpack={modpack} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                }}
+              </For>
+            </div>
+          </div>
+        </Show>
+        <Show when={curseforgeSearch.isError || curseforgeSearch.isFetching}>
+          <NoModpacks />
         </Show>
       </div>
     </div>

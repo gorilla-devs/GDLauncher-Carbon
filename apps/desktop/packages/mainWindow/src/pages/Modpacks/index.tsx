@@ -1,6 +1,6 @@
 import Sidebar from "@/components/Sidebar/modpacks";
 import { Outlet } from "@solidjs/router";
-import ContentWrapper from "@/components/ContentWrapper";
+import ContentWrapper from "@/components/ModpackBrowserWrapper";
 
 function ModpacksLayout() {
   return (

@@ -1,4 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
+import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Dropdown, Tag } from "@gd/ui";
 import { For } from "solid-js";
@@ -8,23 +9,17 @@ type TagType = {
   img: string;
 };
 
-type ModpackType = {
-  img: string;
-  name: string;
-  tags: TagType[];
-  author: string;
-  download: number;
-  lastUpdate: string;
-  description: string;
-};
-
-type Props = { modpack: ModpackType };
+type Props = { modpack: FEMod };
 
 const Modpack = (props: Props) => {
+  console.log("AAA", props.modpack.logo);
   return (
     <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl">
       <div class="flex gap-4">
-        <img class="h-22 w-22" src={props.modpack.img} />
+        <img
+          class="h-22 w-22 rounded-xl"
+          src={props.modpack.logo.thumbnailUrl}
+        />
         <div class="flex flex-col justify-between">
           <div class="flex justify-between">
             <h2 class="mt-0 mb-1">{props.modpack.name}</h2>
@@ -43,16 +38,14 @@ const Modpack = (props: Props) => {
               </div>
             </div>
           </div>
-          <p class="m-0 text-darkSlate-50 text-sm">
-            {props.modpack.description}
-          </p>
+          <p class="m-0 text-darkSlate-50 text-sm">{props.modpack.summary}</p>
         </div>
       </div>
       <div class="flex justify-between items-center gap-3">
         <div class="flex gap-2">
-          <For each={props.modpack.tags}>
+          {/* <For each={props.modpack.tags}>
             {(tag) => <Tag name={tag.name} img={tag.img} type="fixed" />}
-          </For>
+          </For> */}
         </div>
         <div class="flex gap-3">
           <Dropdown.button

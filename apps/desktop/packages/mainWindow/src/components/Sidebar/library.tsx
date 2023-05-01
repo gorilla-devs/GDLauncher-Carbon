@@ -29,12 +29,12 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 bg-darkSlate-700 rounded-full"
+                class="flex justify-center items-center bg-darkSlate-700 rounded-full group w-10 h-10"
                 onClick={() => {
                   toggleSidebar();
                 }}
               >
-                <div class="transition duration-100 ease-in-out i-ri:search-line text-darkSlate-500 group-hover:text-darkSlate-50" />
+                <div class="i-ri:search-line transition duration-100 ease-in-out text-darkSlate-500 group-hover:text-darkSlate-50" />
               </div>
             }
           >
@@ -84,7 +84,7 @@ const Sidebar = () => {
           </Collapsable>
         </Show>
         <Show when={!isSidebarOpened()}>
-          <div class="h-full w-full flex gap-4 items-center overflow-auto flex-col scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
+          <div class="h-full w-full flex gap-4 items-center flex-col overflow-auto scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
             <Tile
               // onClick={() => navigate(`/library/${instance.id}`)}
               title={"InstanceName"}
