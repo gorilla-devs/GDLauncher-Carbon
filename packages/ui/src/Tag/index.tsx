@@ -2,7 +2,7 @@ import { Show, mergeProps } from "solid-js";
 
 type Props = {
   name: string;
-  img: string;
+  img: string | undefined | null;
   type?: "fixed" | "default";
   onClose?: () => void;
 };
@@ -18,8 +18,14 @@ export const Tag = (props: Props) => {
         "bg-darkSlate-900": mergedProps.type === "fixed",
       }}
     >
-      <img class="w-4 h-4" src={props.img} alt={`icon_${props.name}`} />
-      <p class="m-0 text-darkSlate-100">{props.name}</p>
+      <Show when={props.img}>
+        <img
+          class="w-4 h-4"
+          src={props.img as string}
+          alt={`icon_${props.name}`}
+        />
+      </Show>
+      <p class="m-0 text-darkSlate-100 whitespace-nowrap">{props.name}</p>
       <Show when={mergedProps.type === "default"}>
         <div
           class="i-ri:close-fill text-lg text-darkSlate-200 cursor-pointer"

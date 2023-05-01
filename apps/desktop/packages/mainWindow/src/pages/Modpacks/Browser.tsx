@@ -1,7 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input } from "@gd/ui";
-import { For, Show, createEffect, createSignal } from "solid-js";
-import BG from "/assets/images/rlccraft_img.png";
+import { Button, Dropdown, Input, Spinner } from "@gd/ui";
+import { For, Show, createEffect } from "solid-js";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
@@ -11,6 +10,7 @@ import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { FEMod, FEModSearchParameters } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
+import { RSPCError } from "@rspc/client";
 
 const NoModpacks = () => {
   return (
@@ -24,6 +24,40 @@ const NoModpacks = () => {
               defaultValue: "At the moment there is no modpacks.",
             }}
           />
+        </p>
+      </div>
+    </div>
+  );
+};
+const FetchingModpacks = () => {
+  return (
+    <div class="w-full flex h-full justify-center items-center min-h-90">
+      <div class="flex justify-center items-center flex-col text-center">
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_modpacks_text"
+            options={{
+              defaultValue: "Loading modpacks",
+            }}
+          />
+        </p>
+        <Spinner />
+      </div>
+    </div>
+  );
+};
+const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
+  return (
+    <div class="w-full flex h-full justify-center items-center min-h-90">
+      <div class="flex justify-center items-center flex-col text-center">
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_modpacks_error"
+            options={{
+              defaultValue: "There was an error while fetching modpacks",
+            }}
+          />
+          {props.error?.message}
         </p>
       </div>
     </div>
@@ -73,21 +107,14 @@ export default function Browser() {
       return modpacks.length + 1;
     },
     getScrollElement: () => containerRef,
-    estimateSize: () => 190,
-    overscan: 5,
+    estimateSize: () => 230,
+    overscan: 20,
   });
 
   createEffect(() => {
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
     if (!lastItem) return;
-    console.log(
-      "TTTT",
-      lastItem,
-      lastItem.index,
-      modpacks.length - 1,
-      curseforgeSearch.isFetching,
-      curseforgeSearch.data?.pagination
-    );
+
     if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
       setQuery("query", (prev) => {
         return {
@@ -238,7 +265,7 @@ export default function Browser() {
                         transform: `translateY(${virtualItem.start}px)`,
                       }}
                     >
-                      <div class="bg-darkSlate-700 rounded-xl h-44">
+                      <div class="bg-darkSlate-700 rounded-xl">
                         {isLoaderRow ? (
                           "Loading more..."
                         ) : (
@@ -252,8 +279,11 @@ export default function Browser() {
             </div>
           </div>
         </Show>
-        <Show when={curseforgeSearch.isError || curseforgeSearch.isFetching}>
-          <NoModpacks />
+        <Show when={curseforgeSearch.isError}>
+          <ErrorFetchingModpacks error={curseforgeSearch.error} />
+        </Show>
+        <Show when={curseforgeSearch.isFetching}>
+          <FetchingModpacks />
         </Show>
       </div>
     </div>
