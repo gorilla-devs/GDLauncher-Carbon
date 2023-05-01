@@ -14,11 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu:
+  windows:
     defaults:
       run:
         working-directory: ./GDLauncher
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -37,29 +37,37 @@ jobs:
         with:
           node-version: 18
       - name: Prepare
+        shell: bash
         run: |
           echo "" > crates/carbon_app/src/db.rs
           cargo fmt --check
-      - run: |
-          npm run sudo-init
-          chmod -R a+x node_modules
+      - name: init
+        shell: bash
+        run: npm run init
       - name: Codegen
+        shell: bash
         env:
           CARGO_INCREMENTAL: 0
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm codegen
       - name: Build
-        run: IS_DOCKER_TEST=true pnpm build:linux-x64
+        shell: bash
+        run: pnpm build:win-x64
         env:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
           CARGO_INCREMENTAL: 0
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
+        shell: bash
         run: pnpm lint
       - name: Test
+        shell: bash
         env:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
           CARGO_INCREMENTAL: 0
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test -- --features production -- --include-ignored
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: pnpm test -- --features production -- --include-ignored

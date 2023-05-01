@@ -32,6 +32,12 @@ pub async fn init() {
     println!("Starting Carbon App");
 
     #[cfg(feature = "production")]
+    #[inline(always)]
+    {
+        iridium::startup_check();
+    }
+
+    #[cfg(feature = "production")]
     #[cfg(not(test))]
     let _guard = {
         println!("Initializing Sentry");
