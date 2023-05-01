@@ -1,4 +1,4 @@
-name: Rust
+name: Windows Desktop Build
 
 on:
   push:
@@ -23,11 +23,10 @@ jobs:
       - uses: actions/checkout@v3
         with:
           path: GDLauncher
-      - name: Init submodule if available
+      - uses: actions/checkout@v3
         env:
           is_token: ${{ secrets.MACHINE_USER_TOKEN }}
         if: ${{ env.is_token != '' }}
-        uses: actions/checkout@v3
         with:
           repository: gorilla-devs/iridium
           ref: release
