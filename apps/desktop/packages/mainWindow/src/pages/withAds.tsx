@@ -1,16 +1,31 @@
 import { AdsBanner } from "@/components/AdBanner";
 import AppNavbar from "@/components/Navbar";
-import { Outlet } from "@solidjs/router";
+import { Outlet, useRouteData } from "@solidjs/router";
+import { createEffect } from "solid-js";
+import fetchData from "./app.data";
+import { setForgeVersions, setMcVersions } from "@/utils/mcVersion";
 
 function withAdsLayout() {
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  createEffect(() => {
+    if (routeData.forgeVersions.data)
+      setForgeVersions(routeData.forgeVersions.data);
+  });
+
+  createEffect(() => {
+    if (routeData.minecraftVersions.data)
+      setMcVersions(routeData.minecraftVersions.data);
+  });
+
   return (
     <>
       <AppNavbar />
-      <div class="flex z-10 w-screen h-auto">
+      <div class="flex w-screen z-10 h-auto">
         <main class="relative flex-1 overflow-hidden">
-          <div class="flex justify-end h-[calc(100vh-60px-28px)]">
+          <div class="flex justify-end h-[calc(100vh-60px)]">
             <Outlet />
-            <div class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial">
+            <div class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 flex-initial">
               <AdsBanner />
               <div class="w-full h-16 bg-blue" />
             </div>

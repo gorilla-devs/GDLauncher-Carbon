@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
@@ -17,6 +17,7 @@ import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
 import fetchData from "./browser.data";
 import { useRouteData } from "@solidjs/router";
+import { mcVersions } from "@/utils/mcVersion";
 
 const NoModpacks = () => {
   return (
@@ -78,6 +79,9 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   const [modpacks, setModpacks] = createStore<FEMod[]>([]);
+  const [mappedMcVersions, setMappedMcVersions] = createSignal<
+    { label: string; key: string }[]
+  >([]);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const [query, setQuery] = createStore<FEModSearchParameters>({
@@ -85,7 +89,8 @@ export default function Browser() {
       categoryId: 0,
       classId: "modpacks",
       gameId: 432,
-      gameVersion: "1.19.2",
+      // eslint-disable-next-line solid/reactivity
+      gameVersion: mappedMcVersions()[0]?.key || "",
       page: 1,
       modLoaderType: "forge",
       sortField: "featured",
@@ -112,6 +117,17 @@ export default function Browser() {
         setModpacks((prev) => [...prev, element]);
       });
     }
+  });
+
+  createEffect(() => {
+    mcVersions().forEach((version) => {
+      if (version.type === "release") {
+        setMappedMcVersions((prev) => [
+          ...prev,
+          { label: version.id, key: version.id },
+        ]);
+      }
+    });
   });
 
   const rowVirtualizer = createVirtualizer({
@@ -148,6 +164,14 @@ export default function Browser() {
     "gameVersion",
   ];
 
+  createEffect(() => {
+    console.log(
+      "mappedMcVersions",
+      mappedMcVersions(),
+      mappedMcVersions()[0].key
+    );
+  });
+
   return (
     <div class="relative box-border max-h-full w-full">
       <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
@@ -156,7 +180,14 @@ export default function Browser() {
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
             class="w-full text-darkSlate-50 rounded-full max-w-none flex-1"
-            inputClass=""
+            onInput={(e) => {
+              const target = e.target as HTMLInputElement;
+
+              setQuery("query", (prev) => ({
+                ...prev,
+                searchFilter: target.value,
+              }));
+            }}
           />
           <div class="flex items-center gap-3">
             <p class="text-darkSlate-50">
@@ -180,6 +211,19 @@ export default function Browser() {
               }}
               value={0}
               rounded
+            />
+            <Dropdown
+              options={mappedMcVersions()}
+              icon={<div class="i-ri:price-tag-3-fill" />}
+              rounded
+              bgColorClass="bg-darkSlate-400"
+              value={mappedMcVersions()[0].key}
+              onChange={(val) => {
+                setQuery("query", (prev) => ({
+                  ...prev,
+                  gameVersion: val.key as string,
+                }));
+              }}
             />
           </div>
           <Button
@@ -228,18 +272,6 @@ export default function Browser() {
               </div>
             </span>
             <div class="flex gap-3">
-              <Dropdown
-                options={[
-                  { label: "1.16.5", key: "1.16.5" },
-                  { label: "1.16.4", key: "1.16.4" },
-                  { label: "1.16.3", key: "1.16.3" },
-                  { label: "1.16.2", key: "1.16.2" },
-                ]}
-                icon={<div class="i-ri:price-tag-3-fill" />}
-                rounded
-                bgColorClass="bg-darkSlate-400"
-                value="1.16.2"
-              />
               <Button
                 variant="glow"
                 onClick={() =>
