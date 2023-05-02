@@ -5,8 +5,6 @@ const fetchData = () => {
     "modplatforms.curseforgeGetCategories",
   ]);
 
-  console.log("forgeCategories", forgeCategories);
-
   return { forgeCategories };
 };
 

@@ -1,13 +1,13 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
-import { createStore } from "solid-js/store";
+import { createStore, produce } from "solid-js/store";
 import {
   FEMod,
   FEModSearchParameters,
@@ -15,9 +15,8 @@ import {
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
-import fetchData from "./browser.data";
-import { useRouteData } from "@solidjs/router";
 import { mcVersions } from "@/utils/mcVersion";
+import { deepTrack } from "@solid-primitives/deep";
 
 const NoModpacks = () => {
   return (
@@ -75,6 +74,10 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
+interface Query extends FEModSearchParameters {
+  updateByFilter: boolean;
+}
+
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
@@ -82,9 +85,9 @@ export default function Browser() {
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const [query, setQuery] = createStore<FEModSearchParameters>({
+  const [query, setQuery] = createStore<Query>({
+    updateByFilter: false,
     query: {
       categoryId: 0,
       classId: "modpacks",
@@ -106,28 +109,20 @@ export default function Browser() {
 
   const curseforgeSearch = rspc.createQuery(() => [
     "modplatforms.curseforgeSearch",
-    query,
+    deepTrack(query),
   ]);
 
   let containerRef: HTMLDivElement;
 
   createEffect(() => {
     if (curseforgeSearch.data?.data) {
-      curseforgeSearch.data.data.forEach((element) => {
-        setModpacks((prev) => [...prev, element]);
-      });
+      if (!query.updateByFilter) {
+        curseforgeSearch.data.data.forEach((element) => {
+          setModpacks((prev) => [...prev, element]);
+        });
+      } else setModpacks(curseforgeSearch.data.data);
     }
-  });
-
-  createEffect(() => {
-    mcVersions().forEach((version) => {
-      if (version.type === "release") {
-        setMappedMcVersions((prev) => [
-          ...prev,
-          { label: version.id, key: version.id },
-        ]);
-      }
-    });
+    setQuery("updateByFilter", false);
   });
 
   const rowVirtualizer = createVirtualizer({
@@ -137,20 +132,6 @@ export default function Browser() {
     getScrollElement: () => containerRef,
     estimateSize: () => 230,
     overscan: 20,
-  });
-
-  createEffect(() => {
-    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    if (!lastItem) return;
-
-    if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
-      setQuery("query", (prev) => {
-        return {
-          ...prev,
-          index: (prev.index as number) + 20 + 1,
-        };
-      });
-    }
   });
 
   const sortFields: Array<FEModSearchSortField> = [
@@ -165,11 +146,26 @@ export default function Browser() {
   ];
 
   createEffect(() => {
-    console.log(
-      "mappedMcVersions",
-      mappedMcVersions(),
-      mappedMcVersions()[0].key
-    );
+    mcVersions().forEach((version) => {
+      if (version.type === "release") {
+        setMappedMcVersions((prev) => [
+          ...prev,
+          { label: version.id, key: version.id },
+        ]);
+      }
+    });
+  });
+
+  createEffect(() => {
+    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
+    if (!lastItem) return;
+
+    if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
+      setQuery(
+        "query",
+        produce((prev) => (prev.index = (prev.index as number) + 20 + 1))
+      );
+    }
   });
 
   return (
@@ -183,10 +179,9 @@ export default function Browser() {
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
 
-              setQuery("query", (prev) => ({
-                ...prev,
-                searchFilter: target.value,
-              }));
+              setQuery("query", "searchFilter", target.value);
+              setQuery("updateByFilter", true);
+              setQuery("query", "index", 0);
             }}
           />
           <div class="flex items-center gap-3">
@@ -204,10 +199,9 @@ export default function Browser() {
                 key: field,
               }))}
               onChange={(val) => {
-                setQuery("query", (prev) => ({
-                  ...prev,
-                  sortField: val.key as FEModSearchSortField,
-                }));
+                setQuery("query", "sortField", val.key as FEModSearchSortField);
+                setQuery("updateByFilter", true);
+                setQuery("query", "index", 0);
               }}
               value={0}
               rounded
@@ -219,10 +213,9 @@ export default function Browser() {
               bgColorClass="bg-darkSlate-400"
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
-                setQuery("query", (prev) => ({
-                  ...prev,
-                  gameVersion: val.key as string,
-                }));
+                setQuery("query", "gameVersion", val.key as string);
+                setQuery("updateByFilter", true);
+                setQuery("query", "index", 0);
               }}
             />
           </div>
@@ -306,8 +299,10 @@ export default function Browser() {
             >
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualItem) => {
-                  const isLoaderRow = virtualItem.index > modpacks.length - 1;
-                  const modpack = modpacks[virtualItem.index];
+                  const isLoaderRow = () =>
+                    virtualItem.index > modpacks.length - 1;
+                  const modpack = () => modpacks[virtualItem.index];
+
                   return (
                     <div
                       class="box-border py-2"
@@ -321,11 +316,17 @@ export default function Browser() {
                       }}
                     >
                       <div class="bg-darkSlate-700 rounded-xl">
-                        {isLoaderRow ? (
-                          "Loading more..."
-                        ) : (
-                          <Modpack modpack={modpack} />
-                        )}
+                        <Switch
+                          fallback={
+                            <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl max-h-96">
+                              <Spinner />
+                            </div>
+                          }
+                        >
+                          <Match when={!isLoaderRow() && modpack()}>
+                            <Modpack modpack={modpack()} />
+                          </Match>
+                        </Switch>
                       </div>
                     </div>
                   );

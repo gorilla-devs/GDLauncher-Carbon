@@ -152,7 +152,7 @@ const Dropdown = (props: Props) => {
           <For each={props.options}>
             {(option) => (
               <li
-                class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
+                class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
                 onClick={() => {
                   setSelectedValue(option.label);
                   props.onChange?.(option);
