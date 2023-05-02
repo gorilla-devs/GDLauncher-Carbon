@@ -1,7 +1,13 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
-  console.log("fetch browser data...");
+  let forgeCategories = rspc.createQuery(() => [
+    "modplatforms.curseforgeGetCategories",
+  ]);
+
+  console.log("forgeCategories", forgeCategories);
+
+  return { forgeCategories };
 };
 
 export default fetchData;

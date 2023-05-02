@@ -6,11 +6,11 @@ function withAdsLayout() {
   return (
     <>
       <AppNavbar />
-      <div class="flex w-screen z-10 h-auto">
+      <div class="flex z-10 w-screen h-auto">
         <main class="relative flex-1 overflow-hidden">
           <div class="flex justify-end h-[calc(100vh-60px-28px)]">
             <Outlet />
-            <div class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 flex-initial">
+            <div class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial">
               <AdsBanner />
               <div class="w-full h-16 bg-blue" />
             </div>

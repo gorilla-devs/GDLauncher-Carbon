@@ -3,12 +3,12 @@ import { Button } from "../Button";
 
 export type Option = {
   label: string;
-  key: string;
+  key: string | number;
 };
 
 export type Props = {
   options: Option[];
-  value: string;
+  value: string | number;
   error?: boolean;
   disabled?: boolean;
   rounded?: boolean;
@@ -77,7 +77,7 @@ const Dropdown = (props: Props) => {
         </p>
       </Show>
       <button
-        class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
+        class={`group flex justify-between cursor-pointer font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
         onClick={() => {
           if (props.disabled) return;
           setMenuOpened(!menuOpened());
@@ -126,7 +126,7 @@ const Dropdown = (props: Props) => {
       </button>
 
       <ul
-        class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
+        class="absolute max-h-40 mt-1 overflow-y-auto overflow-x-hidden scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
           setFocusIn(false);
         }}
@@ -143,7 +143,7 @@ const Dropdown = (props: Props) => {
         <For each={props.options}>
           {(option) => (
             <li
-              class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline"
+              class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
               onClick={() => {
                 setSelectedValue(option.label);
                 props.onChange?.(option);

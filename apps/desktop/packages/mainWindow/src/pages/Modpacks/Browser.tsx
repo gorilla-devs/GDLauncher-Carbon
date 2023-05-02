@@ -8,9 +8,15 @@ import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
-import { FEMod, FEModSearchParameters } from "@gd/core_module/bindings";
+import {
+  FEMod,
+  FEModSearchParameters,
+  FEModSearchSortField,
+} from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
+import fetchData from "./browser.data";
+import { useRouteData } from "@solidjs/router";
 
 const NoModpacks = () => {
   return (
@@ -68,6 +74,8 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   const [modpacks, setModpacks] = createStore<FEMod[]>([]);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
   const [query, setQuery] = createStore<FEModSearchParameters>({
     query: {
       categoryId: 0,
@@ -125,6 +133,19 @@ export default function Browser() {
     }
   });
 
+  const sortFields = Object.values<FEModSearchSortField>(
+    {} as Record<FEModSearchSortField, never>
+  ).map((field) => {
+    return {
+      label: t(`instance.sort_by_${field}`),
+      key: field,
+    };
+  });
+
+  createEffect(() => {
+    console.log("routeData", routeData.forgeCategories.data, sortFields);
+  });
+
   return (
     <div class="relative box-border max-h-full w-full">
       <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
@@ -145,17 +166,11 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={[
-                { label: t("instance.sort_by_popular"), key: "popular" },
-                { label: t("instance.sort_by_featured"), key: "featured" },
-                { label: t("instance.sort_by_author"), key: "author" },
-                { label: t("instance.sort_by_name"), key: "name" },
-                {
-                  label: t("instance.sort_by_total_downloads"),
-                  key: "downloads",
-                },
-              ]}
-              value={"popular"}
+              options={sortFields}
+              onChange={(val) => {
+                // setQuery("query", (prev) => ({ ...prev, sortField: val.key }));
+              }}
+              value={0}
               rounded
             />
           </div>

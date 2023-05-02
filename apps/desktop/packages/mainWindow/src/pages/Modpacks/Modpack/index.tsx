@@ -1,8 +1,8 @@
-/* eslint-disable i18next/no-literal-string */
 import { formatDownloadCount } from "@/utils/helpers";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Dropdown, Tag } from "@gd/ui";
+import { format } from "date-fns";
 import { For } from "solid-js";
 
 type Props = { modpack: FEMod };
@@ -12,7 +12,7 @@ const Modpack = (props: Props) => {
     <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl max-h-96">
       <div class="flex gap-4">
         <img
-          class="h-30 rounded-xl w-30"
+          class="h-30 rounded-xl w-30 select-none"
           src={props.modpack.logo.thumbnailUrl}
         />
         <div class="flex flex-col gap-2">
@@ -21,19 +21,21 @@ const Modpack = (props: Props) => {
               {props.modpack.name}
             </h2>
             <div class="flex gap-4 items-center">
-              <div class="flex gap-2 items-center">
+              <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="i-ri:time-fill text-darkSlate-100" />
-                <div class="text-sm whitespace-nowrap">1d ago</div>
+                <div class="text-sm whitespace-nowrap">
+                  {format(new Date(props.modpack.dateCreated).getTime(), "P")}
+                </div>
               </div>
-              <div class="flex gap-2 items-center">
+              <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:download-fill" />
                 <div class="text-sm whitespace-nowrap">
                   {formatDownloadCount(props.modpack.downloadCount)}
                 </div>
               </div>
-              <div class="flex gap-2 items-center">
+              <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="i-ri:user-fill text-darkSlate-100" />
-                <div class="text-sm whitespace-nowrap flex gap-2">
+                <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
                   <For each={props.modpack.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
                   </For>
@@ -47,7 +49,7 @@ const Modpack = (props: Props) => {
         </div>
       </div>
       <div class="flex justify-between items-center gap-3">
-        <div class="flex gap-2 max-w-100 overflow-x-auto">
+        <div class="flex gap-2 max-w-100 overflow-x-auto scrollbar-hide">
           <For each={props.modpack.categories}>
             {(tag) => <Tag name={tag.name} img={tag.avatarUrl} type="fixed" />}
           </For>

@@ -90,9 +90,7 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: lazy(() => import("@/pages/Modpacks/Browser")),
-            data: () => {
-              console.log("Fetching modpacks data...");
-            },
+            data: BrowserData,
           },
         ],
       },
