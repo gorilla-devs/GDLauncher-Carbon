@@ -26,6 +26,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                .await
                .map(Task::from))
         }
+
+        mutation DISMISS_TASK[app, task: TaskId] {
+            app.task_manager().dismiss_task(task.into()).await
+        }
     }
 }
 

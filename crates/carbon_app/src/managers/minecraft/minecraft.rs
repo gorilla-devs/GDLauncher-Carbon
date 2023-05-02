@@ -377,7 +377,9 @@ pub async fn launch_minecraft(
 
     let mut command_exec = tokio::process::Command::new(java_binary);
 
-    command_exec.stdout(std::process::Stdio::piped());
+    command_exec
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
 
     let child = command_exec.args(startup_command);
 

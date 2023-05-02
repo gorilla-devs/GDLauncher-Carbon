@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::InstanceMoveTarget;
+use crate::managers::vtask::VisualTaskId;
 use crate::managers::{App, AppInner};
 
 use super::keys::instance::*;
@@ -134,6 +135,32 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
                 .map(InstanceDetails::from)
         }
+
+        mutation PREPARE_INSTANCE[app, id: InstanceId] {
+            app.instance_manager()
+                .prepare_game(id.into(), None)
+                .await
+        }
+
+        mutation LAUNCH_INSTANCE[app, id: InstanceId] {
+            let account = app.account_manager()
+                .get_active_account()
+                .await?;
+
+            let Some(account) = account else {
+                return Err(anyhow::anyhow!("attempted to launch instance without an account"));
+            };
+
+            app.instance_manager()
+                .prepare_game(id.into(), Some(account))
+                .await
+        }
+
+        mutation KILL_INSTANCE[app, id: InstanceId] {
+            app.instance_manager()
+                .kill_instance(id.into())
+                .await
+        }
     }
 }
 
@@ -250,6 +277,7 @@ struct ValidListInstance {
     mc_version: String,
     modloader: Option<ModLoaderType>,
     modpack_platform: Option<ModpackPlatform>,
+    state: LaunchState,
 }
 
 #[derive(Type, Serialize)]
@@ -367,9 +395,9 @@ pub struct InstanceDetails {
     pub version: String,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
-    pub instance_start_time: Option<DateTime<Utc>>,
     pub modloaders: Vec<ModLoader>,
     pub notes: String,
+    pub state: LaunchState,
     mods: Vec<Mod>,
 }
 
@@ -385,6 +413,13 @@ pub enum ModLoaderType {
     Fabric,
 }
 
+#[derive(Type, Serialize)]
+pub enum LaunchState {
+    Inactive,
+    Preparing(VisualTaskId),
+    Running { start_time: DateTime<Utc> },
+}
+
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
@@ -393,9 +428,9 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             version: value.version,
             last_played: value.last_played,
             seconds_played: value.seconds_played,
-            instance_start_time: value.instance_start_time,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
+            state: value.state.into(),
             mods: vec![
                 Mod {
                     id: "88r39459345939453".to_string(),
@@ -540,6 +575,7 @@ impl From<manager::ValidListInstance> for ValidListInstance {
             mc_version: value.mc_version,
             modloader: value.modloader.map(Into::into),
             modpack_platform: value.modpack_platform.map(Into::into),
+            state: value.state.into(),
         }
     }
 }
@@ -575,6 +611,18 @@ impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType 
             manager::Syntax => Self::Syntax,
             manager::Data => Self::Data,
             manager::Eof => Self::Eof,
+        }
+    }
+}
+
+impl From<domain::LaunchState> for LaunchState {
+    fn from(value: domain::LaunchState) -> Self {
+        use domain::LaunchState as domain;
+
+        match value {
+            domain::Inactive => Self::Inactive,
+            domain::Preparing(task) => Self::Preparing(task),
+            domain::Running { start_time } => Self::Running { start_time },
         }
     }
 }

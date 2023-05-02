@@ -63,11 +63,15 @@ keys! {
         UPDATE_INSTANCE                  = "updateInstance";
         SET_FAVORITE                     = "setFavorite";
         INSTANCE_DETAILS                 = "getInstanceDetails";
+        PREPARE_INSTANCE                 = "prepareInstance";
+        LAUNCH_INSTANCE                  = "launchInstance";
+        KILL_INSTANCE                    = "killInstance";
     }
 
     vtask {
         GET_TASKS                        = "getTasks";
         GET_TASK                         = "getTask";
+        DISMISS_TASK                     = "dismissTask";
     }
 
     settings {
