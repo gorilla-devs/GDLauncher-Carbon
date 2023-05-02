@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::fmt::Display;
-use std::mem::ManuallyDrop;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -8,7 +7,6 @@ use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
-use chrono::DateTime;
 use chrono::Utc;
 use futures::future::BoxFuture;
 use prisma_client_rust::Direction;
@@ -21,14 +19,14 @@ use tokio::sync::{Mutex, MutexGuard, RwLock};
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
-use self::disk::PersistenceManager;
+use self::run::PersistenceManager;
 
 use super::ManagerRef;
 
 use crate::domain::instance as domain;
 use domain::info;
 
-mod disk;
+mod run;
 mod schema;
 
 pub struct InstanceManager {
@@ -146,7 +144,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
-                    instance_start_time: None,
+                    state: run::LaunchState::Inactive,
                     mods: Late::Loading,
                 };
 
@@ -233,6 +231,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         .modpack
                                         .as_ref()
                                         .map(info::Modpack::as_platform),
+                                    state: (&status.state).into(),
                                 })
                             }
                             InstanceType::Invalid(status) => {
@@ -826,7 +825,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 type_: InstanceType::Valid(InstanceData {
                     favorite: false,
                     config: info,
-                    instance_start_time: None,
+                    state: run::LaunchState::Inactive,
                     mods: Late::Loading,
                 }),
             },
@@ -1038,7 +1037,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
-            instance_start_time: instance.instance_start_time,
             modloaders: match &instance.config.game_configuration.version {
                 info::GameVersion::Standard(version) => version
                     .modloaders
@@ -1053,6 +1051,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .collect::<Vec<_>>(),
                 info::GameVersion::Custom(_) => Vec::new(), // todo
             },
+            state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
         })
     }
@@ -1065,7 +1064,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let instance = instances
             .get(&instance_id)
-            .ok_or_else(|| anyhow!("instance_details called with invalid instance id"))?;
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let InstanceType::Valid(data) = &instance.type_ else { return Ok(None) };
 
@@ -1150,6 +1149,7 @@ pub struct ValidListInstance {
     pub mc_version: String,
     pub modloader: Option<info::ModLoaderType>,
     pub modpack_platform: Option<info::ModpackPlatform>,
+    pub state: domain::LaunchState,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1251,7 +1251,7 @@ pub enum Late<T> {
 pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
-    instance_start_time: Option<DateTime<Utc>>,
+    state: run::LaunchState,
     mods: Late<Vec<Mod>>,
 }
 
@@ -1278,6 +1278,7 @@ pub struct InvalidGroupIdError(GroupId);
 mod test {
     use std::{collections::HashSet, time::Duration};
 
+    use super::domain;
     use prisma_client_rust::Direction;
 
     use crate::{
@@ -1691,6 +1692,7 @@ mod test {
                     mc_version: String::from("1.7.10"),
                     modloader: None,
                     modpack_platform: None,
+                    state: domain::LaunchState::Inactive,
                 }),
             }],
         }];

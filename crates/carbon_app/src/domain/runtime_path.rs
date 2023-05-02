@@ -151,7 +151,6 @@ impl InstancePath {
     }
 }
 
-// TODO: WIP
 pub struct TempPath(PathBuf);
 
 impl TempPath {

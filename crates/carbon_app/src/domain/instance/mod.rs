@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 
+use crate::managers::vtask::VisualTaskId;
+
 pub mod info;
 
 pub struct InstanceDetails {
@@ -8,9 +10,16 @@ pub struct InstanceDetails {
     pub version: String,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
-    pub instance_start_time: Option<DateTime<Utc>>,
     pub modloaders: Vec<ModLoader>,
+    pub state: LaunchState,
     pub notes: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LaunchState {
+    Inactive,
+    Preparing(VisualTaskId),
+    Running { start_time: DateTime<Utc> },
 }
 
 pub struct ModLoader {
