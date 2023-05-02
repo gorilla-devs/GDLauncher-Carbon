@@ -5,7 +5,7 @@ import { Checkbox, Collapsable } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Show } from "solid-js";
-import { FECategoriesResponse, FECategory } from "@gd/core_module/bindings";
+import { FECategory } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();

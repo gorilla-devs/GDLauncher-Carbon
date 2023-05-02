@@ -35,6 +35,7 @@ const NoModpacks = () => {
     </div>
   );
 };
+
 const FetchingModpacks = () => {
   return (
     <div class="w-full flex h-full justify-center items-center min-h-90">
@@ -52,7 +53,10 @@ const FetchingModpacks = () => {
     </div>
   );
 };
+
 const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
+  const parsedError = () =>
+    props.error?.message && JSON.parse(props.error?.message);
   return (
     <div class="w-full flex h-full justify-center items-center min-h-90">
       <div class="flex justify-center items-center flex-col text-center">
@@ -63,7 +67,7 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
               defaultValue: "There was an error while fetching modpacks",
             }}
           />
-          {props.error?.message}
+          {parsedError().cause[0].display}
         </p>
       </div>
     </div>
@@ -121,7 +125,6 @@ export default function Browser() {
 
   createEffect(() => {
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    console.log("LOAD MORE", lastItem.index, modpacks.length - 1);
     if (!lastItem) return;
 
     if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
@@ -134,21 +137,16 @@ export default function Browser() {
     }
   });
 
-  const sortFields = Object.values<FEModSearchSortField>(
-    {} as Record<FEModSearchSortField, never>
-  ).map((field) => {
-    return {
-      label: t(`instance.sort_by_${field}`),
-      key: field,
-    };
-  });
-
-  // createEffect(() => {
-  //   console.log("routeData", routeData.forgeCategories.data, sortFields);
-  // });
-  createEffect(() => {
-    console.log("curseforgeSearch", modpacks);
-  });
+  const sortFields: Array<FEModSearchSortField> = [
+    "featured",
+    "popularity",
+    "lastUpdated",
+    "name",
+    "author",
+    "totalDownloads",
+    "category",
+    "gameVersion",
+  ];
 
   return (
     <div class="relative box-border max-h-full w-full">
@@ -170,7 +168,10 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={sortFields}
+              options={sortFields.map((field) => ({
+                label: t(`instance.sort_by_${field}`),
+                key: field,
+              }))}
               onChange={(val) => {
                 setQuery("query", (prev) => ({
                   ...prev,
