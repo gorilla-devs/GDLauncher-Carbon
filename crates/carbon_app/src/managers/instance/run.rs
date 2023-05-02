@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use tokio::sync::mpsc;
 
+use crate::api::keys::instance::*;
 use crate::domain::instance as domain;
 use carbon_domain::translate;
 use chrono::{DateTime, Utc};
@@ -94,6 +95,11 @@ impl ManagerRef<'_, InstanceManager> {
         let id = self.app.task_manager().spawn_task(&task).await;
 
         data.state = LaunchState::Preparing(id);
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
         let app = self.app.clone();
         tokio::spawn(async move {
@@ -340,6 +346,11 @@ impl ManagerRef<'_, InstanceManager> {
         };
 
         data.state = state;
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
         Ok(())
     }
