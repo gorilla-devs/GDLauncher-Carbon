@@ -84,7 +84,7 @@ export default function Browser() {
       gameVersion: "1.19.2",
       page: 1,
       modLoaderType: "forge",
-      sortField: "popularity",
+      sortField: "featured",
       sortOrder: "descending",
       pageSize: 20,
       slug: "",
@@ -121,6 +121,7 @@ export default function Browser() {
 
   createEffect(() => {
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
+    console.log("LOAD MORE", lastItem.index, modpacks.length - 1);
     if (!lastItem) return;
 
     if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
@@ -142,8 +143,11 @@ export default function Browser() {
     };
   });
 
+  // createEffect(() => {
+  //   console.log("routeData", routeData.forgeCategories.data, sortFields);
+  // });
   createEffect(() => {
-    console.log("routeData", routeData.forgeCategories.data, sortFields);
+    console.log("curseforgeSearch", modpacks);
   });
 
   return (
@@ -168,7 +172,10 @@ export default function Browser() {
             <Dropdown
               options={sortFields}
               onChange={(val) => {
-                // setQuery("query", (prev) => ({ ...prev, sortField: val.key }));
+                setQuery("query", (prev) => ({
+                  ...prev,
+                  sortField: val.key as FEModSearchSortField,
+                }));
               }}
               value={0}
               rounded
@@ -297,7 +304,11 @@ export default function Browser() {
         <Show when={curseforgeSearch.isError}>
           <ErrorFetchingModpacks error={curseforgeSearch.error} />
         </Show>
-        <Show when={curseforgeSearch.isFetching}>
+        <Show
+          when={
+            curseforgeSearch.isFetching && curseforgeSearch.status === "loading"
+          }
+        >
           <FetchingModpacks />
         </Show>
       </div>
