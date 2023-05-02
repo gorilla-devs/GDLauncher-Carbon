@@ -110,6 +110,7 @@
   "instance.download_modpacks": "Download",
   "instance.action_open_folder": "Open folder",
   "instance.action_delete": "Delete",
+  "instance.action_play": "Play",
   "java.java_major": "Java Major",
   "java.java_distribution": "Java Distirbution",
   "java.install": "Install",

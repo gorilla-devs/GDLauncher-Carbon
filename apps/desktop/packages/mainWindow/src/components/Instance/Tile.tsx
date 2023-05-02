@@ -31,9 +31,16 @@ const Tile = (props: Props) => {
   const deleteInstanceMutation = rspc.createMutation([
     "instance.deleteInstance",
   ]);
+  const launchInstanceMutation = rspc.createMutation([
+    "instance.launchInstance",
+  ]);
 
   const handleOpenFolder = () => {
     console.log("OPEN FOLDER");
+  };
+
+  const handlePlay = () => {
+    launchInstanceMutation.mutate(props.instanceId);
   };
 
   const handleDelete = () => {
@@ -41,6 +48,11 @@ const Tile = (props: Props) => {
   };
 
   const menuItems = [
+    {
+      icon: "i-ri:play-fill",
+      label: t("instance.action_play"),
+      action: handlePlay,
+    },
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
@@ -78,6 +90,7 @@ const Tile = (props: Props) => {
                     class="text-white text-2xl i-ri:play-fill"
                     onClick={(e) => {
                       e.stopPropagation();
+                      launchInstanceMutation.mutate(props.instanceId);
                     }}
                   />
                 </div>
@@ -156,6 +169,7 @@ const Tile = (props: Props) => {
                   class="text-white text-lg i-ri:play-fill"
                   onClick={(e) => {
                     e.stopPropagation();
+                    launchInstanceMutation.mutate(props.instanceId);
                   }}
                 />
               </div>
@@ -229,7 +243,10 @@ const Tile = (props: Props) => {
               <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
                 <div
                   class="text-white text-lg i-ri:play-fill"
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    launchInstanceMutation.mutate(props.instanceId);
+                  }}
                 />
               </div>
             </div>
