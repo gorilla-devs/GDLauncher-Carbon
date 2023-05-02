@@ -68,6 +68,7 @@ keys! {
     vtask {
         GET_TASKS                        = "getTasks";
         GET_TASK                         = "getTask";
+        DISMISS_TASK                     = "dismissTask";
     }
 
     settings {

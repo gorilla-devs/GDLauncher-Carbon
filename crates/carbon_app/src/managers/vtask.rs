@@ -1,4 +1,4 @@
-use crate::{api::keys::vtask::*, once_send::OnceSend};
+use crate::api::keys::vtask::*;
 use std::{
     collections::HashMap,
     sync::{
@@ -9,13 +9,18 @@ use std::{
 
 use anyhow::anyhow;
 
+use rspc::Type;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
 use carbon_domain::{translation::Translation, vtask as domain};
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+#[derive(
+    Copy, Clone, Type, Serialize, Deserialize, PartialEq, Eq, Debug, Hash, PartialOrd, Ord,
+)]
 pub struct VisualTaskId(pub i32);
 
 pub struct VisualTaskManager {
@@ -51,6 +56,8 @@ impl ManagerRef<'_, VisualTaskManager> {
                 if let NotifyState::Drop = *notify.borrow() {
                     break;
                 }
+
+                app.task_manager.tasks.write().await.remove(&id);
                 app.invalidate(GET_TASKS, None);
                 app.invalidate(GET_TASK, Some(id.0.into()));
             }
@@ -90,12 +97,28 @@ impl ManagerRef<'_, VisualTaskManager> {
         }
     }
 
+    pub async fn dismiss_task(self, task_id: VisualTaskId) -> anyhow::Result<()> {
+        let mut tasklist = self.tasks.write().await;
+        let task = tasklist.get(&task_id).ok_or(InvalidTaskIdError)?;
+
+        let data = task.data.read().await;
+        if let TaskState::Failed(_) = &data.state {
+            drop(data);
+            tasklist.remove(&task_id);
+
+            self.app.invalidate(GET_TASKS, None);
+            self.app.invalidate(GET_TASK, Some(task_id.0.into()));
+
+            Ok(())
+        } else {
+            Err(anyhow!(NonFailedDismissError))
+        }
+    }
+
     #[cfg(test)]
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
         let tasklist = self.tasks.read().await;
-        let task = tasklist
-            .get(&task_id)
-            .ok_or_else(|| anyhow!("task does not exist"))?;
+        let task = tasklist.get(&task_id).ok_or(InvalidTaskIdError)?;
 
         let mut notify = task.notify_rx.clone();
 
@@ -131,7 +154,8 @@ impl ManagerRef<'_, VisualTaskManager> {
             }
 
             if let domain::Progress::Failed(e) = &domain.progress {
-                println!("Failure: {e}");
+                println!("Failure: {e} {e:#?}");
+                break;
             }
         }
 
@@ -139,12 +163,24 @@ impl ManagerRef<'_, VisualTaskManager> {
     }
 }
 
-#[derive(Clone)]
 pub struct VisualTask {
     data: Arc<RwLock<TaskData>>,
     notify_rx: watch::Receiver<NotifyState>,
     notify_tx: Arc<watch::Sender<NotifyState>>,
     subtasks: Arc<RwLock<Vec<watch::Receiver<SubtaskData>>>>,
+    owner: bool,
+}
+
+impl Clone for VisualTask {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            notify_tx: self.notify_tx.clone(),
+            notify_rx: self.notify_rx.clone(),
+            subtasks: self.subtasks.clone(),
+            owner: false,
+        }
+    }
 }
 
 enum NotifyState {
@@ -154,7 +190,9 @@ enum NotifyState {
 
 impl Drop for VisualTask {
     fn drop(&mut self) {
-        let _ = self.notify_tx.send(NotifyState::Drop);
+        if self.owner {
+            let _ = self.notify_tx.send(NotifyState::Drop);
+        }
     }
 }
 
@@ -170,6 +208,7 @@ impl VisualTask {
             notify_rx,
             notify_tx: Arc::new(notify_tx),
             subtasks: Arc::new(RwLock::new(Vec::new())),
+            owner: true,
         }
     }
 
@@ -193,9 +232,14 @@ impl VisualTask {
         f(&mut *self.data.write().await);
     }
 
-    pub async fn fail(&self, error: anyhow::Error) {
+    pub async fn fail(mut self, error: anyhow::Error) {
         self.edit(|data| data.state = TaskState::Failed(Arc::new(error)))
             .await;
+
+        // disown and drop self, leaving it in the task list
+        self.owner = false;
+
+        let _ = self.notify_tx.send(NotifyState::Update);
     }
 
     // Get the current task progress as a float from 0.0 to 1.0
@@ -380,7 +424,7 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
-    use crate::managers::vtask::{Progress, TaskState, VisualTask};
+    use crate::managers::vtask::{TaskState, VisualTask};
     use carbon_domain::{translate, vtask as domain};
 
     #[tokio::test]
@@ -427,3 +471,11 @@ mod test {
         assert_eq!(tasks, app.task_manager().get_tasks().await);
     }
 }
+
+#[derive(Error, Debug)]
+#[error("task id does not refer to a valid task")]
+pub struct InvalidTaskIdError;
+
+#[derive(Error, Debug)]
+#[error("tasks that are not in a failed state cannot be dismissed")]
+pub struct NonFailedDismissError;
