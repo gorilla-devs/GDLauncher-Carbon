@@ -26,6 +26,7 @@ use super::ManagerRef;
 use crate::domain::instance as domain;
 use domain::info;
 
+mod log;
 mod run;
 mod schema;
 
