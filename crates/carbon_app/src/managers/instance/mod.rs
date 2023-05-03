@@ -26,6 +26,7 @@ use super::ManagerRef;
 use crate::domain::instance as domain;
 use domain::info;
 
+mod log;
 mod run;
 mod schema;
 
@@ -1247,7 +1248,6 @@ pub enum Late<T> {
     Ready(T),
 }
 
-#[derive(Debug)]
 pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
