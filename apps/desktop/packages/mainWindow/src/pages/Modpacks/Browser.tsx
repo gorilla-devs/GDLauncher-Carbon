@@ -1,6 +1,14 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  batch,
+  createEffect,
+  createSignal,
+} from "solid-js";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import Tags from "./Tags";
@@ -178,10 +186,12 @@ export default function Browser() {
             class="w-full text-darkSlate-50 rounded-full max-w-none flex-1"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
-
-              setQuery("query", "searchFilter", target.value);
-              setQuery("updateByFilter", true);
-              setQuery("query", "index", 0);
+              rowVirtualizer.scrollToIndex(0);
+              batch(() => {
+                setQuery("query", "searchFilter", target.value);
+                setQuery("updateByFilter", true);
+                setQuery("query", "index", 0);
+              });
             }}
           />
           <div class="flex items-center gap-3">
@@ -199,9 +209,16 @@ export default function Browser() {
                 key: field,
               }))}
               onChange={(val) => {
-                setQuery("query", "sortField", val.key as FEModSearchSortField);
-                setQuery("updateByFilter", true);
-                setQuery("query", "index", 0);
+                rowVirtualizer.scrollToIndex(0);
+                batch(() => {
+                  setQuery(
+                    "query",
+                    "sortField",
+                    val.key as FEModSearchSortField
+                  );
+                  setQuery("updateByFilter", true);
+                  setQuery("query", "index", 0);
+                });
               }}
               value={0}
               rounded
@@ -213,9 +230,12 @@ export default function Browser() {
               bgColorClass="bg-darkSlate-400"
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
-                setQuery("query", "gameVersion", val.key as string);
-                setQuery("updateByFilter", true);
-                setQuery("query", "index", 0);
+                rowVirtualizer.scrollToIndex(0);
+                batch(() => {
+                  setQuery("query", "gameVersion", val.key as string);
+                  setQuery("updateByFilter", true);
+                  setQuery("query", "index", 0);
+                });
               }}
             />
           </div>
