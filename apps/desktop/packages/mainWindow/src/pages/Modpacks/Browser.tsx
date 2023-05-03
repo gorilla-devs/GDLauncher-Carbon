@@ -18,6 +18,7 @@ import { rspc } from "@/utils/rspcClient";
 import { createStore, produce } from "solid-js/store";
 import {
   FEMod,
+  FEModLoaderType,
   FEModSearchParameters,
   FEModSearchSortField,
 } from "@gd/core_module/bindings";
@@ -25,6 +26,7 @@ import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
 import { deepTrack } from "@solid-primitives/deep";
+import { modLoader } from "@/utils/modpackBrowser";
 
 const NoModpacks = () => {
   return (
@@ -103,7 +105,7 @@ export default function Browser() {
       // eslint-disable-next-line solid/reactivity
       gameVersion: mappedMcVersions()[0]?.key || "",
       page: 1,
-      modLoaderType: "forge",
+      modLoaderType: "any",
       sortField: "featured",
       sortOrder: "descending",
       pageSize: 20,
@@ -121,6 +123,11 @@ export default function Browser() {
   ]);
 
   let containerRef: HTMLDivElement;
+
+  createEffect(() => {
+    console.log("MODLOADER", modLoader());
+    setQuery("query", "modLoaderType", modLoader() as FEModLoaderType);
+  });
 
   createEffect(() => {
     if (curseforgeSearch.data?.data) {
