@@ -1,9 +1,10 @@
 import { getModloaderIcon } from "@/utils/sidebar";
-import { ModLoaderType } from "@gd/core_module/bindings";
+import { ModLoaderType, UngroupedInstance } from "@gd/core_module/bindings";
 import { Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { useTransContext } from "@gd/i18n";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
+import { createNotification } from "@gd/ui";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -28,9 +29,58 @@ const Tile = (props: Props) => {
     props
   );
   const [t] = useTransContext();
-  const deleteInstanceMutation = rspc.createMutation([
-    "instance.deleteInstance",
-  ]);
+  const addNotification = createNotification();
+
+  const deleteInstanceMutation = rspc.createMutation(
+    ["instance.deleteInstance"],
+    {
+      onMutate: async (
+        instanceId
+      ): Promise<
+        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
+      > => {
+        await queryClient.cancelQueries({
+          queryKey: ["instance.getInstancesUngrouped"],
+        });
+
+        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
+          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+
+        queryClient.setQueryData(
+          ["account.setActiveUuid", null],
+          (old: UngroupedInstance[] | undefined) => {
+            const filteredAccounts = old?.filter(
+              (account) => account.id !== instanceId
+            );
+
+            if (filteredAccounts) return filteredAccounts;
+          }
+        );
+
+        if (previusInstancesUngrouped) return { previusInstancesUngrouped };
+      },
+      onError: (
+        error,
+        _variables,
+        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
+      ) => {
+        addNotification(error.message, "error");
+
+        if (context?.previusInstancesUngrouped) {
+          queryClient.setQueryData(
+            ["instance.getInstancesUngrouped"],
+            context.previusInstancesUngrouped
+          );
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["instance.getInstancesUngrouped"],
+        });
+      },
+    }
+  );
+
   const launchInstanceMutation = rspc.createMutation([
     "instance.launchInstance",
   ]);

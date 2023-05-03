@@ -100,12 +100,30 @@ const InstanceCreation = (props: ModalProps) => {
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        console.log("SUCCC PREP");
+        addNotification("Instance saccessfully created.");
+        modalsContext?.closeModal();
+      },
+      onError() {
+        console.log("ERR PREP");
+        addNotification("Error while creating the instance.");
+        modalsContext?.closeModal();
+      },
+    }
+  );
+
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
-      onSuccess() {
-        addNotification("Instance saccessfully created.");
-        modalsContext?.closeModal();
+      onSuccess(instanceId) {
+        // addNotification("Instance saccessfully created.");
+        // modalsContext?.closeModal();
+        console.log("instanceId", instanceId);
+        prepareInstanceMutation.mutate(instanceId);
       },
       onError() {
         addNotification("Error while creating the instance.");
@@ -120,6 +138,12 @@ const InstanceCreation = (props: ModalProps) => {
     } else {
       setError("");
 
+      console.log(
+        "loaderVersion()",
+        loader(),
+        loaderVersions(),
+        loaderVersions()?.[0]?.key
+      );
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,
@@ -134,7 +158,8 @@ const InstanceCreation = (props: ModalProps) => {
                     {
                       type_: loader() as ModLoaderType,
                       version:
-                        loaderVersion() || (loaderVersion()?.[0].key as string),
+                        loaderVersion() ||
+                        (loaderVersions()?.[0]?.key as string),
                     },
                   ]
                 : [],

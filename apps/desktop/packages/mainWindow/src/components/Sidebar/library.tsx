@@ -6,7 +6,7 @@ import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
-import { createStore } from "solid-js/store";
+import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
@@ -26,18 +26,22 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    setInstances(reconcile({}));
+
     if (routeData.instancesUngrouped.data) {
+      routeData.instancesUngrouped.data;
+
       routeData.instancesUngrouped.data.forEach((instance) => {
         const validInstance = isListInstanceValid(instance.status)
           ? instance.status.Valid
           : null;
+
         const modloader = validInstance?.modloader || "vanilla";
         if (modloader) {
           setInstances(modloader, (prev) => {
             const filteredPrev = (prev || []).filter(
               (prev) => prev.id !== instance.id
             );
-
             if (!instance.favorite) return [...filteredPrev, instance];
             else return [...filteredPrev];
           });

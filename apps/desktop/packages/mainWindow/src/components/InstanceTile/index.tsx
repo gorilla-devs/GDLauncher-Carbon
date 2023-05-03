@@ -1,4 +1,4 @@
-import { createResource } from "solid-js";
+import { createEffect, createResource } from "solid-js";
 import Tile from "../Instance/Tile";
 import { fetchImage, isListInstanceValid } from "@/utils/instances";
 import { ListInstance, UngroupedInstance } from "@gd/core_module/bindings";
@@ -23,6 +23,10 @@ const InstanceTile = (props: {
   const variant = () => (props.isSidebarOpened ? "sidebar" : "sidebar-small");
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
+
+  createEffect(() => {
+    console.log("instance", props.instance);
+  });
 
   return (
     <div>
