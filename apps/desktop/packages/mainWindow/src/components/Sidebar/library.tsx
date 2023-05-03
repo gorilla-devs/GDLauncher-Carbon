@@ -10,6 +10,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
+import glassBlock from "/assets/images/icons/glassBlock.png";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -29,8 +30,6 @@ const Sidebar = () => {
     setInstances(reconcile({}));
 
     if (routeData.instancesUngrouped.data) {
-      routeData.instancesUngrouped.data;
-
       routeData.instancesUngrouped.data.forEach((instance) => {
         const validInstance = isListInstanceValid(instance.status)
           ? instance.status.Valid
@@ -74,6 +73,7 @@ const Sidebar = () => {
               placeholder={t("general.type_here") || ""}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
+              disabled={(routeData.instancesUngrouped?.data || []).length === 0}
             />
           </Show>
         </div>
@@ -127,6 +127,20 @@ const Sidebar = () => {
               </Collapsable>
             )}
           </For>
+          <Show when={(routeData.instancesUngrouped?.data || []).length === 0}>
+            <div class="w-full h-full flex flex-col justify-center items-center">
+              <img src={glassBlock} class="w-16 h-16" />
+              <p class="text-darkSlate-50 max-w-100 text-center text-xs">
+                <Trans
+                  key="instance.no_mods_text"
+                  options={{
+                    defaultValue:
+                      "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                  }}
+                />
+              </p>
+            </div>
+          </Show>
         </div>
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button

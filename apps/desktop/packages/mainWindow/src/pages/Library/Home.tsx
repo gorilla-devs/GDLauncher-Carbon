@@ -1,11 +1,12 @@
 import { Carousel, News } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, Suspense, createEffect, createSignal } from "solid-js";
-import { useTransContext } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import fetchData from "../Library/library.data";
 import { UngroupedInstance } from "@gd/core_module/bindings";
 import InstanceTile from "@/components/InstanceTile";
+import glassBlock from "/assets/images/icons/glassBlock.png";
 
 const Home = () => {
   const [t] = useTransContext();
@@ -69,6 +70,20 @@ const Home = () => {
                 )}
               </For>
             </Carousel>
+          </div>
+        </Show>
+        <Show when={instances.length === 0}>
+          <div class="w-full h-full flex flex-col justify-center items-center mt-12">
+            <img src={glassBlock} class="w-16 h-16" />
+            <p class="text-darkSlate-50 max-w-100 text-center">
+              <Trans
+                key="instance.no_mods_text"
+                options={{
+                  defaultValue:
+                    "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                }}
+              />
+            </p>
           </div>
         </Show>
         {/* <div class="mt-4">
