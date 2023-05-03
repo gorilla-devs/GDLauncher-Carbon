@@ -1248,7 +1248,6 @@ pub enum Late<T> {
     Ready(T),
 }
 
-#[derive(Debug)]
 pub struct InstanceData {
     favorite: bool,
     config: info::Instance,

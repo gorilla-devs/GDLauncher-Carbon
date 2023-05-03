@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Bound, RangeBounds};
 
 pub struct GameLog {
     // buffer holding the full log
@@ -17,9 +17,9 @@ pub struct InternalLogEntry {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct LogEntry<'a> {
-    type_: EntryType,
-    start_line: usize,
-    text: &'a str,
+    pub type_: EntryType,
+    pub start_line: usize,
+    pub text: &'a str,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -27,12 +27,6 @@ pub enum EntryType {
     StdOut,
     StdErr,
     // more entries once log levels are handled
-}
-
-impl InternalLogEntry {
-    pub fn retreive<'l>(&self, log: &'l GameLog) -> &'l str {
-        &log.log[self.start..self.end]
-    }
 }
 
 impl GameLog {
@@ -139,10 +133,22 @@ impl GameLog {
     }
 
     /// Get a region of log entries containing the given start and end lines
-    pub fn get_region(&self, lines: Range<usize>) -> Vec<LogEntry> {
+    pub fn get_region(&self, lines: impl RangeBounds<usize>) -> Vec<LogEntry> {
         let mut entries = Vec::<LogEntry>::new();
 
-        for i in (0..lines.end).rev() {
+        let start = match lines.start_bound() {
+            Bound::Included(&v) => v,
+            Bound::Excluded(&v) => v + 1,
+            Bound::Unbounded => 0,
+        };
+
+        let end = match lines.end_bound() {
+            Bound::Included(&v) => v + 1,
+            Bound::Excluded(&v) => v,
+            Bound::Unbounded => self.lines.len(),
+        };
+
+        for i in (0..end).rev() {
             let Some(entry) = self.lines.get(i) else { continue };
 
             if let Some(entry) = entry {
@@ -152,7 +158,7 @@ impl GameLog {
                     text: &self.log[entry.start..entry.end],
                 });
 
-                if i <= lines.start {
+                if i <= start {
                     break;
                 }
             }
@@ -160,6 +166,10 @@ impl GameLog {
 
         entries.reverse();
         return entries;
+    }
+
+    pub fn len(&self) -> usize {
+        self.lines.len()
     }
 }
 
@@ -187,7 +197,7 @@ mod test {
         log.push(EntryType::StdOut, "testing1\n");
         log.push(EntryType::StdOut, "testing2\n");
         assert_eq!(
-            log.get_region(0..2),
+            log.get_region(..),
             vec![
                 LogEntry {
                     type_: EntryType::StdOut,
@@ -220,7 +230,7 @@ mod test {
         log.push(EntryType::StdOut, "testing3");
         log.push(EntryType::StdErr, "testing4\n");
         assert_eq!(
-            log.get_region(0..3),
+            log.get_region(..),
             vec![
                 LogEntry {
                     type_: EntryType::StdOut,
@@ -254,7 +264,12 @@ mod test {
 
         assert_eq!(log.get_entry(0), Some(entry));
         assert_eq!(log.get_entry(1), Some(entry));
+        assert_eq!(log.get_region(..), vec![entry]);
+        assert_eq!(log.get_region(..2), vec![entry]);
+        assert_eq!(log.get_region(..=1), vec![entry]);
+        assert_eq!(log.get_region(0..), vec![entry]);
         assert_eq!(log.get_region(0..2), vec![entry]);
+        assert_eq!(log.get_region(0..=1), vec![entry]);
         assert_eq!(log.get_region(0..1), vec![entry]);
         assert_eq!(log.get_region(1..2), vec![entry]);
     }

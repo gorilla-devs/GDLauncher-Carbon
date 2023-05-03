@@ -57,7 +57,6 @@ impl ManagerRef<'_, VisualTaskManager> {
                     break;
                 }
 
-                app.task_manager.tasks.write().await.remove(&id);
                 app.invalidate(GET_TASKS, None);
                 app.invalidate(GET_TASK, Some(id.0.into()));
             }
@@ -118,7 +117,10 @@ impl ManagerRef<'_, VisualTaskManager> {
     #[cfg(test)]
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
         let tasklist = self.tasks.read().await;
-        let task = tasklist.get(&task_id).ok_or(InvalidTaskIdError)?;
+        let Some(task) = tasklist.get(&task_id) else {
+            println!("task already exited");
+            return Ok(())
+        };
 
         let mut notify = task.notify_rx.clone();
 

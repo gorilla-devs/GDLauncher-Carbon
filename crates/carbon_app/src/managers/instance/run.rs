@@ -1,11 +1,14 @@
 use std::path::PathBuf;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::{io::AsyncReadExt, sync::mpsc};
 
 use crate::api::keys::instance::*;
 use crate::domain::instance as domain;
+use crate::managers::instance::log::{EntryType, LogEntry};
 use carbon_domain::translate;
 use chrono::{DateTime, Utc};
-use tokio::sync::Semaphore;
+use tokio::sync::{RwLock, Semaphore};
 
 use anyhow::{anyhow, bail};
 
@@ -22,6 +25,7 @@ use crate::{
     },
 };
 
+use super::log::GameLog;
 use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 pub struct PersistenceManager {
@@ -274,6 +278,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
+                    let log = Arc::new(RwLock::new(GameLog::new()));
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,
@@ -281,49 +286,94 @@ impl ManagerRef<'_, InstanceManager> {
                                 process_id: child.id().expect("child process id is not present even though child process was started"),
                                 kill_tx,
                                 start_time: Utc::now(),
+                                log: log.clone(),
                             }),
                         )
                         .await;
 
+                    dbg!(&child.stdout, &child.stderr);
+                    let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
+                        panic!("stdout and stderr are not availible even though the child process was created with both enabled");
+                    };
+                    let read_logs = async {
+                        let mut last_log = 0;
+                        let mut outbuf = [0u8; 1024];
+                        let mut errbuf = [0u8; 1024];
+
+                        loop {
+                            tokio::select!(biased;
+                                r = stdout.read(&mut outbuf) => match r {
+                                    Ok(count) if count > 0 => {
+                                        let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
+                                        log.write().await.push(EntryType::StdOut, &*utf8);
+
+                                        loop {
+                                            tokio::select!(biased;
+                                                _ = tokio::time::sleep(Duration::from_millis(1)) => break,
+                                                r = stdout.read(&mut outbuf) => match r {
+                                                    Ok(count) if count > 0 => {
+                                                        let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
+                                                        log.write().await.push(EntryType::StdOut, &*utf8);
+                                                    },
+                                                    Ok(_) => return Ok(()),
+                                                    Err(e) => return Err(e),
+                                                },
+                                            );
+                                        }
+                                    },
+                                    Ok(_) => {},
+                                    Err(e) => return Err(e),
+                                },
+                                r = stderr.read(&mut errbuf) => match r {
+                                    Ok(count) if count > 0 => {
+                                        let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
+                                        log.write().await.push(EntryType::StdErr, &*utf8);
+
+                                        loop {
+                                            tokio::select!(biased;
+                                                _ = tokio::time::sleep(Duration::from_millis(1)) => break,
+                                                r = stderr.read(&mut errbuf) => match r {
+                                                    Ok(count) if count > 0 => {
+                                                        let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
+                                                        log.write().await.push(EntryType::StdErr, &*utf8);
+                                                    },
+                                                    Ok(_) => return Ok(()),
+                                                    Err(e) => return Err(e),
+                                                },
+                                            );
+                                        }
+                                    },
+                                    Ok(_) => {},
+                                    Err(e) => return Err(e),
+                                },
+                            );
+
+                            let log = log.read().await;
+                            let new_log_events = log.get_region(last_log..);
+                            last_log = log.len();
+
+                            for LogEntry {
+                                type_,
+                                text,
+                                start_line,
+                            } in new_log_events
+                            {
+                                println!("[{start_line}] {type_:?}: {text}");
+                            }
+                        }
+                    };
+
                     tokio::select! {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
+                        // canceled by one of the others being selected
+                        _ = read_logs => {},
                     }
 
                     let _ = app
                         .instance_manager()
                         .change_launch_state(instance_id, LaunchState::Inactive)
                         .await;
-
-                    /*dbg!(&child.stdout, &child.stderr);
-                    let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
-                        panic!("Stdout and stderr are not availible even though the child process was created with both enabled");
-                    };
-
-                    loop {
-                        #[derive(Debug)]
-                        enum ReadBuf {
-                            Stdout,
-                            Stderr,
-                        }
-
-                        let mut outbuf = [0u8; 32];
-                        let mut errbuf = [0u8; 32];
-                        let result = tokio::select!(biased;
-                            r = stdout.read(&mut outbuf) => match r {
-                                Ok(count) => Ok((ReadBuf::Stdout, &outbuf[0..count])),
-                                Err(e) => Err(e),
-                            },
-                            r = stderr.read(&mut errbuf) => match r {
-                                Ok(count) => Ok((ReadBuf::Stderr, &errbuf[0..count])),
-                                Err(e) => Err(e),
-                            },
-                        );
-
-                        let Ok((readtype, newtext)) = result else { break };
-                        let newtext = String::from_utf8_lossy(newtext);
-                        println!("Read {readtype:?}: {newtext}");
-                    }*/
                 }
             }
         });
@@ -391,18 +441,17 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
-#[derive(Debug)]
 pub enum LaunchState {
     Inactive,
     Preparing(VisualTaskId),
     Running(RunningInstance),
 }
 
-#[derive(Debug)]
 pub struct RunningInstance {
     process_id: u32,
     kill_tx: mpsc::Sender<()>,
     start_time: DateTime<Utc>,
+    log: Arc<RwLock<GameLog>>,
 }
 
 impl From<&LaunchState> for domain::LaunchState {
@@ -465,6 +514,7 @@ mod test {
 
         app.task_manager().wait_with_log(task).await?;
         println!("Task exited");
+        tokio::time::sleep(std::time::Duration::from_secs(10000)).await;
 
         Ok(())
     }
