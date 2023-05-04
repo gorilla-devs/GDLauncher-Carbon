@@ -33,11 +33,9 @@ jobs:
         with:
           node-version: 18
       - uses: dtolnay/rust-toolchain@1.68.2
-      - name: Install Darwin-x86_64 target
-        shell: bash
-        run: |
-          rustup target add x86_64-apple-darwin
-          rustup default stable-x86_64-apple-darwin
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs
