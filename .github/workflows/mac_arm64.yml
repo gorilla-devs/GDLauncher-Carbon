@@ -66,4 +66,4 @@ jobs:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
           CARGO_INCREMENTAL: 0
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test -- --features production -- --include-ignored
+        run: pnpm test -- --features production -- --include-ignored
