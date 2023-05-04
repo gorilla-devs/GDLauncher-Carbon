@@ -61,6 +61,9 @@ jobs:
       - name: Lint
         shell: bash
         run: pnpm lint
+      - name: Clear target before tests to avoid folder getting too big
+        shell: bash
+        run: rm -rf target
       - name: Test
         shell: bash
         env:
