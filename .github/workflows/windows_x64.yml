@@ -34,7 +34,6 @@ jobs:
           node-version: 18
       - name: Update rust
         run: |
-          rustup self uninstall
           rustup target add x86_64-pc-windows-msvc
           rustup default stable-x86_64-pc-windows-msvc
       - name: Prepare

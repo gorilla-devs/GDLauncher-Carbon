@@ -34,7 +34,7 @@ jobs:
           node-version: 18
       - name: Update rust
         run: |
-          rustup self uninstall
+          rustup toolchain remove stable
           rustup target add aarch64-apple-darwin
           rustup default stable-aarch64-apple-darwin
           rustc --version
