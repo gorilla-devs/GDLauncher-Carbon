@@ -18,6 +18,11 @@ const App = (props: Props) => {
 
   initThemes();
 
+  // let data = rspc.createQuery(() => ["account.getActiveUuid"]);
+  // useBeforeLeave(() => {
+  //   if (!data.data) navigate("/");
+  // });
+
   return (
     <div class="w-screen relative">
       <Show when={process.env.NODE_ENV === "development"}>

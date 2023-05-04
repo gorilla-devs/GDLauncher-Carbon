@@ -1,6 +1,9 @@
 use crate::api::keys::mc::*;
 use crate::api::managers::App;
 use crate::api::router::router;
+use crate::managers::AppInner;
+use axum::extract::DefaultBodyLimit;
+use daedalus::{minecraft, modded};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -26,8 +29,8 @@ pub struct FEModdedManifest {
     pub game_versions: Vec<FEModdedManifestVersion>,
 }
 
-impl From<crate::domain::minecraft::modded::ModdedManifest> for FEModdedManifest {
-    fn from(value: crate::domain::minecraft::modded::ModdedManifest) -> Self {
+impl From<modded::Manifest> for FEModdedManifest {
+    fn from(value: modded::Manifest) -> Self {
         FEModdedManifest {
             game_versions: value.game_versions.into_iter().map(|v| v.into()).collect(),
         }
@@ -41,8 +44,8 @@ pub struct FEModdedManifestVersion {
     pub loaders: Vec<FEModdedManifestLoaderVersion>,
 }
 
-impl From<crate::domain::minecraft::modded::ModdedManifestVersion> for FEModdedManifestVersion {
-    fn from(value: crate::domain::minecraft::modded::ModdedManifestVersion) -> Self {
+impl From<modded::Version> for FEModdedManifestVersion {
+    fn from(value: modded::Version) -> Self {
         FEModdedManifestVersion {
             id: value.id,
             stable: value.stable,
@@ -56,10 +59,8 @@ pub struct FEModdedManifestLoaderVersion {
     pub id: String,
 }
 
-impl From<crate::domain::minecraft::modded::ModdedManifestLoaderVersion>
-    for FEModdedManifestLoaderVersion
-{
-    fn from(value: crate::domain::minecraft::modded::ModdedManifestLoaderVersion) -> Self {
+impl From<modded::LoaderVersion> for FEModdedManifestLoaderVersion {
+    fn from(value: modded::LoaderVersion) -> Self {
         FEModdedManifestLoaderVersion { id: value.id }
     }
 }
@@ -71,8 +72,8 @@ pub struct ManifestVersion {
     pub type_: McType,
 }
 
-impl From<crate::domain::minecraft::minecraft::ManifestVersion> for ManifestVersion {
-    fn from(value: crate::domain::minecraft::minecraft::ManifestVersion) -> Self {
+impl From<minecraft::Version> for ManifestVersion {
+    fn from(value: minecraft::Version) -> Self {
         ManifestVersion {
             id: value.id,
             type_: value.type_.into(),
@@ -92,15 +93,13 @@ pub enum McType {
     Snapshot,
 }
 
-impl From<crate::domain::minecraft::minecraft::VersionType> for McType {
-    fn from(value: crate::domain::minecraft::minecraft::VersionType) -> Self {
-        use crate::domain::minecraft::minecraft::VersionType as domain;
-
+impl From<minecraft::VersionType> for McType {
+    fn from(value: minecraft::VersionType) -> Self {
         match value {
-            domain::OldAlpha => Self::OldAlpha,
-            domain::OldBeta => Self::OldBeta,
-            domain::Release => Self::Release,
-            domain::Snapshot => Self::Snapshot,
+            minecraft::VersionType::OldAlpha => Self::OldAlpha,
+            minecraft::VersionType::OldBeta => Self::OldBeta,
+            minecraft::VersionType::Release => Self::Release,
+            minecraft::VersionType::Snapshot => Self::Snapshot,
         }
     }
 }

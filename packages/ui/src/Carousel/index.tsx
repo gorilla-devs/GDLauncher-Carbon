@@ -227,7 +227,7 @@ const Carousel = (props: Props) => {
           }}
           class="scrollbar-hide w-full flex items-start gap-4 overflow-x-scroll scroll-smooth cursor-pointer"
         >
-          {mappedChildren}
+          {mappedChildren()}
         </div>
       </div>
     </div>

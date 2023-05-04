@@ -351,6 +351,10 @@ export const AccountsDropdown = (props: Props) => {
   };
 
   createEffect(() => {
+    if (routeData.accounts.data?.length === 0) navigate("/");
+  });
+
+  createEffect(() => {
     if (routeData.status.isSuccess && !routeData.status.data && expired()) {
       reset();
     }
@@ -661,11 +665,13 @@ export const AccountsDropdown = (props: Props) => {
             </Show>
           </div>
           <div
-            class="flex gap-3 py-2 items-center cursor-pointer color-red"
+            class="flex gap-3 py-2 items-center"
+            classList={{
+              "text-darkSlate-500": !!enrollmentInProgress(),
+              "color-red cursor-pointer": !enrollmentInProgress(),
+            }}
             onClick={() => {
-              if (enrollmentInProgress()) {
-                accountEnrollCancelMutation.mutate(undefined);
-              }
+              if (enrollmentInProgress()) return;
               deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
             }}
           >

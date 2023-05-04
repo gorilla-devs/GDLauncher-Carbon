@@ -8,7 +8,9 @@ use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use sha1::{Digest, Sha1};
+use sha1::Digest as _;
+use sha1::Sha1;
+use sha2::Digest as _;
 use sha2::Sha256;
 use tokio::{
     fs::OpenOptions,
@@ -262,14 +264,14 @@ pub async fn download_multiple(
 
             match file.checksum {
                 Some(Checksum::Sha1(hash)) => {
-                    if hash != format!("{:x}", sha1.finalize()) {
+                    if hash != hex::encode(sha1.finalize().as_slice()) {
                         return Err(DownloadError::GenericDownload(
                             "Checksum mismatch".to_owned(),
                         ));
                     }
                 }
                 Some(Checksum::Sha256(hash)) => {
-                    if hash != format!("{:x}", sha256.finalize()) {
+                    if hash != hex::encode(sha256.finalize().as_slice()) {
                         return Err(DownloadError::GenericDownload(
                             "Checksum mismatch".to_owned(),
                         ));
