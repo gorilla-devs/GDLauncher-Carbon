@@ -34,6 +34,7 @@ jobs:
           node-version: 18
       - name: Update rust
         run: |
+          rustup self uninstall
           rustup target add x86_64-unknown-linux-gnu
           rustup default stable-x86_64-unknown-linux-gnu
       - name: Prepare
