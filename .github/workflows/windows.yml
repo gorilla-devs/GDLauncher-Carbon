@@ -1,10 +1,6 @@
 name: Windows Desktop Build
 
-on:
-  push:
-    branches: ["develop"]
-  pull_request:
-    branches: ["develop"]
+on: push
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,7 +13,8 @@ jobs:
   windows:
     defaults:
       run:
-        working-directory: ./GDLauncher
+        working-directory: ./GDLauncher\
+    if: "contains(github.ref, 'refs/heads/develop') || contains(github.ref, 'refs/heads/release') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/release') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))"
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3

@@ -1,17 +1,17 @@
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::domain::metrics::{Event, EventName};
-use crate::iridium_client::get_client;
+
+
 use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
-use std::collections::HashMap;
+
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tokio::runtime::Handle;
+
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;

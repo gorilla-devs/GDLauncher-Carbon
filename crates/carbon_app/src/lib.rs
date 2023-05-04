@@ -2,7 +2,6 @@
 #![allow(dead_code)]
 
 use crate::{
-    app_version::APP_VERSION,
     managers::{
         java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
         App, AppInner,
