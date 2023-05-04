@@ -35,6 +35,8 @@ jobs:
       - name: Update rust
         run: |
           rustup update
+          rustup target add x86_64-pc-windows-msvc
+          rustup default x86_64-pc-windows-msvc
       - name: Prepare
         shell: bash
         run: |
