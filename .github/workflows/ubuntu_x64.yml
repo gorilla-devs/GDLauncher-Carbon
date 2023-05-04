@@ -1,4 +1,4 @@
-name: Ubuntu Desktop Build
+name: Ubuntu x64 Desktop Build
 
 on: push
 
@@ -47,7 +47,7 @@ jobs:
           CARGO_INCREMENTAL: 0
         run: pnpm codegen
       - name: Build
-        run: pnpm build:mac-x64
+        run: pnpm build:linux-x64
         env:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

@@ -1,4 +1,4 @@
-name: Windows Desktop Build
+name: Windows x64 Desktop Build
 
 on: push
 

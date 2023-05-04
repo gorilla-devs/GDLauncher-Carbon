@@ -1,4 +1,4 @@
-name: Ubuntu Desktop Build
+name: MacOS x64 Desktop Build
 
 on: push
 
@@ -35,7 +35,6 @@ jobs:
       - name: Update rust
         run: |
           rustup update
-          rustup target add aarch64-apple-darwin
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs
@@ -48,7 +47,7 @@ jobs:
           CARGO_INCREMENTAL: 0
         run: pnpm codegen
       - name: Build
-        run: pnpm build:mac-arm64
+        run: pnpm build:mac-x64
         env:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
