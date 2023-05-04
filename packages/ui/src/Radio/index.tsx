@@ -58,12 +58,10 @@ const Group = (props: GroupProps) => {
   const c = children(() => props.children);
 
   createEffect(() => {
-    console.log("AAAA", props.value);
     (c() as JSX.InputHTMLAttributes<HTMLInputElement>[])?.forEach((item) => {
       // @ts-ignore
       const input = item.querySelector(".cursor-pointer input");
-      console.log("VAL", props.value, input.value, props.value === input.value);
-      item.checked = props.value === input.value;
+      input.checked = props.value === input.value;
     });
   });
 

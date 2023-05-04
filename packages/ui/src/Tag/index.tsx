@@ -4,7 +4,7 @@ type Props = {
   name: string;
   img: string | undefined | null;
   type?: "fixed" | "default";
-  onClose?: () => void;
+  onClose?: (_name: string) => void;
 };
 
 export const Tag = (props: Props) => {
@@ -29,7 +29,7 @@ export const Tag = (props: Props) => {
       <Show when={mergedProps.type === "default"}>
         <div
           class="i-ri:close-fill text-lg text-darkSlate-200 cursor-pointer"
-          onClick={() => props.onClose?.()}
+          onClick={() => props.onClose?.(props.name)}
         />
       </Show>
     </div>

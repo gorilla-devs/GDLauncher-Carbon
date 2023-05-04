@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 
 export interface Props {
   checked?: boolean;
@@ -10,9 +10,13 @@ function Checkbox(props: Props) {
   const isChecked = () => props.checked;
   const [checked, setChecked] = createSignal(isChecked());
 
+  createEffect(() => {
+    setChecked(props.checked);
+  });
+
   return (
     <div
-      class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border"
+      class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer"
       classList={{
         "bg-primary-500": checked(),
         "bg-darkSlate-500": !checked(),

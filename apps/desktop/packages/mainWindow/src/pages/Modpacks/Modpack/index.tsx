@@ -43,7 +43,7 @@ const Modpack = (props: Props) => {
               </div>
             </div>
           </div>
-          <p class="m-0 text-darkSlate-50 text-sm h-10">
+          <p class="m-0 text-darkSlate-50 text-sm max-h-16">
             {props.modpack.summary}
           </p>
         </div>
@@ -56,7 +56,6 @@ const Modpack = (props: Props) => {
         </div>
         <div class="flex gap-3">
           <Dropdown.button
-            onChange={() => {}}
             options={[
               { label: "1.16.5", key: "1.16.5" },
               { label: "1.16.4", key: "1.16.4" },

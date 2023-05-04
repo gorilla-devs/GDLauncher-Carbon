@@ -26,7 +26,11 @@ import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
 import { deepTrack } from "@solid-primitives/deep";
-import { modLoader } from "@/utils/modpackBrowser";
+import {
+  modpacksCategories,
+  modLoader,
+  setModpacksCategories,
+} from "@/utils/modpackBrowser";
 
 const NoModpacks = () => {
   return (
@@ -125,8 +129,13 @@ export default function Browser() {
   let containerRef: HTMLDivElement;
 
   createEffect(() => {
-    console.log("MODLOADER", modLoader());
     setQuery("query", "modLoaderType", modLoader() as FEModLoaderType);
+  });
+
+  createEffect(() => {
+    const categoryId = () =>
+      modpacksCategories.filter((prev) => prev.selected)[0]?.id;
+    if (categoryId()) setQuery("query", "categoryId", categoryId());
   });
 
   createEffect(() => {
@@ -184,7 +193,7 @@ export default function Browser() {
   });
 
   return (
-    <div class="relative box-border max-h-full w-full">
+    <div class="relative box-border h-full w-full">
       <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
@@ -260,10 +269,40 @@ export default function Browser() {
           </Button>
         </div>
         <div class="flex justify-between text-darkSlate-50 z-10 mb-6 max-w-150">
-          <Tags />
+          <Show
+            when={
+              modpacksCategories
+                .filter((category) => category.selected)
+                .map((category) => ({
+                  name: category,
+                  img: "",
+                })).length > 0
+            }
+          >
+            <Tags
+              tags={modpacksCategories
+                .filter((category) => category.selected)
+                .map((category) => ({
+                  name: category.name,
+                  img: "",
+                }))}
+              onClose={(name) => {
+                setModpacksCategories(
+                  (prev) => prev.name === name,
+                  produce((prev) => (prev.selected = false))
+                );
+              }}
+              onClearAll={() => {
+                setModpacksCategories(
+                  (prev) => prev.selected,
+                  produce((prev) => (prev.selected = false))
+                );
+              }}
+            />
+          </Show>
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden max-h-[460px]">
+      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden absolute bottom-0 top-[142px] left-0 right-0">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
@@ -315,7 +354,7 @@ export default function Browser() {
             ref={(el) => {
               containerRef = el;
             }}
-            class="w-full overflow-auto h-[500px] scrollbar-hide"
+            class="w-full overflow-auto h-full scrollbar-hide"
           >
             <div
               style={{
