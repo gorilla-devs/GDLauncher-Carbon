@@ -1,5 +1,3 @@
-use reqwest::{Certificate, Identity};
-
 use crate::{iridium_client::get_client, managers::GDL_API_BASE};
 
 use super::ManagerRef;
