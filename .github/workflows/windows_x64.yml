@@ -36,6 +36,7 @@ jobs:
         with:
           toolchain: 1.68.2
           targets: x86_64-pc-windows-msvc
+          components: clippy, rustfmt
       - name: Prepare
         shell: bash
         run: |

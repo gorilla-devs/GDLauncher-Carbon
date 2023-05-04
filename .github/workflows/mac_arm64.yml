@@ -36,6 +36,7 @@ jobs:
         with:
           toolchain: 1.68.2
           targets: aarch64-apple-darwin
+          components: clippy, rustfmt
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs

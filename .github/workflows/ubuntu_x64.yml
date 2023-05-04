@@ -36,6 +36,7 @@ jobs:
         with:
           toolchain: 1.68.2
           targets: x86_64-unknown-linux-gnu
+          components: clippy, rustfmt
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs
