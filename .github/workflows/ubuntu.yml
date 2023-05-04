@@ -1,0 +1,67 @@
+name: Ubuntu Desktop Build
+
+on:
+  push:
+    branches: ["develop"]
+  pull_request:
+    branches: ["develop"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  ubuntu:
+    defaults:
+      run:
+        working-directory: ./GDLauncher
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: GDLauncher
+      - uses: actions/checkout@v3
+        env:
+          is_token: ${{ secrets.MACHINE_USER_TOKEN }}
+        if: ${{ env.is_token != '' }}
+        with:
+          repository: gorilla-devs/iridium
+          ref: release
+          ssh-key: ${{ secrets.MACHINE_USER_TOKEN }}
+          path: GDLauncher/crates/iridium
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - name: Prepare
+        run: |
+          echo "" > crates/carbon_app/src/db.rs
+          cargo fmt --check
+      - run: |
+          npm run sudo-init
+          chmod -R a+x node_modules
+      - name: Codegen
+        env:
+          CARGO_INCREMENTAL: 0
+        run: pnpm codegen
+      - name: Build
+        run: IS_DOCKER_TEST=true pnpm build:linux-x64
+        env:
+          CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
+          CARGO_INCREMENTAL: 0
+      - name: Lint
+        run: pnpm lint
+      - name: Clear target before tests to avoid folder getting too big
+        shell: bash
+        run: rm -rf target
+      - name: Test
+        env:
+          CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
+          CARGO_INCREMENTAL: 0
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test -- --features production -- --include-ignored

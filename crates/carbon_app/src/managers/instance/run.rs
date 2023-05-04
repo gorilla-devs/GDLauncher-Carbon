@@ -1,4 +1,5 @@
 use carbon_domain::vtask::VisualTaskId;
+use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
@@ -184,7 +185,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?;
 
                         version_info =
-                            minecraft::modded::merge_partial_version(forge_version, version_info);
+                            daedalus::modded::merge_partial_version(forge_version, version_info);
                     }
                     _ => {}
                 }
@@ -213,15 +214,14 @@ impl ManagerRef<'_, InstanceManager> {
                 t_extract_natives.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
-                let game_version = version_info
-                    .inherits_from
-                    .as_ref()
-                    .unwrap_or(&version_info.id)
-                    .to_string();
-
+                let game_version = version_info.id.to_string();
                 let client_path = runtime_path.get_versions().get_clients_path().join(format!(
                     "{}.jar",
-                    version_info.downloads.as_ref().unwrap().client.sha1
+                    version_info
+                        .downloads
+                        .get(&DownloadType::Client)
+                        .unwrap()
+                        .sha1
                 ));
 
                 t_forge_processors.start_opaque();
