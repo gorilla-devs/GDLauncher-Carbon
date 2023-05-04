@@ -15,14 +15,25 @@ import {
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
+import { createStore, produce } from "solid-js/store";
+
+type InstanceDownloadProgress = {
+  totalDownload: number;
+  downloaded: number;
+  percentage: number;
+};
 
 const InstanceTile = (props: {
   instance: UngroupedInstance | ListInstance;
   isSidebarOpened?: boolean;
   selected?: boolean;
 }) => {
-  const [progress, setProgress] = createSignal(0);
   const [isLoading, setIsLoading] = createSignal(false);
+  const [progress, setProgress] = createStore<InstanceDownloadProgress>({
+    totalDownload: 0,
+    downloaded: 0,
+    percentage: 0,
+  });
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
 
@@ -47,9 +58,12 @@ const InstanceTile = (props: {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
     createEffect(() => {
+      console.log("TASK", task.data, task.data?.download_total);
       if (task.data) {
+        setProgress("totalDownload", task.data.download_total);
+        setProgress("downloaded", task.data.downloaded);
         if (isProgressKnown(task.data.progress)) {
-          setProgress(task.data.progress.Known);
+          setProgress("percentage", task.data.progress.Known);
           setIsLoading(true);
         } else if (isProgressFailed(task.data.progress)) {
           setIsLoading(false);
@@ -76,7 +90,7 @@ const InstanceTile = (props: {
         img={image()}
         selected={props.selected}
         isLoading={isLoading()}
-        percentage={progress()}
+        percentage={progress.percentage}
       />
     </div>
   );
