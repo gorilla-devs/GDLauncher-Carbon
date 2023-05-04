@@ -34,11 +34,10 @@ jobs:
           node-version: 18
       - name: Update rust
         run: |
-          ls -la
           rustup update
           rustup target add aarch64-apple-darwin
           rustup default stable-aarch64-apple-darwin
-          ls -la
+          cargo --version
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs
