@@ -47,7 +47,7 @@ jobs:
           CARGO_INCREMENTAL: 0
         run: pnpm codegen
       - name: Build
-        run: pnpm build:linux-x64
+        run: pnpm build:mac-x64
         env:
           CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
