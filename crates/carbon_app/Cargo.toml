@@ -51,6 +51,7 @@ hyper = { workspace = true }
 zip = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
+daedalus = { workspace = true }
 iridium = { path = "../iridium", optional = true }
 # libc = { workspace = true }
 

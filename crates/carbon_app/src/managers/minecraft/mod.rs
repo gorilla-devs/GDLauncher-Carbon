@@ -1,9 +1,13 @@
 use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
+use daedalus::{
+    minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
+    modded::Manifest,
+};
 use reqwest::Url;
 
-use crate::domain::minecraft::{
-    minecraft::{ManifestVersion, MinecraftManifest, VersionInfo},
-    modded::ModdedManifest,
+use crate::domain::minecraft::minecraft::{
+    assets_index_into_vec_downloadable, libraries_into_vec_downloadable,
+    version_download_into_downloadable,
 };
 
 use super::ManagerRef;
@@ -25,18 +29,18 @@ impl MinecraftManager {
 }
 
 impl ManagerRef<'_, MinecraftManager> {
-    pub async fn get_minecraft_manifest(&self) -> anyhow::Result<MinecraftManifest> {
+    pub async fn get_minecraft_manifest(&self) -> anyhow::Result<VersionManifest> {
         minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
     pub async fn get_minecraft_version(
         &self,
-        manifest_version_meta: ManifestVersion,
+        manifest_version_meta: Version,
     ) -> anyhow::Result<VersionInfo> {
         minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
     }
 
-    pub async fn get_forge_manifest(&self) -> anyhow::Result<ModdedManifest> {
+    pub async fn get_forge_manifest(&self) -> anyhow::Result<Manifest> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
@@ -49,23 +53,29 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let mut all_files = vec![];
 
-        let libraries = version_info
-            .libraries
-            .into_vec_downloadable(&runtime_path.get_libraries().to_path());
+        let libraries = libraries_into_vec_downloadable(
+            version_info.libraries,
+            &runtime_path.get_libraries().to_path(),
+        );
 
-        let client_main_jar = version_info
-            .downloads
-            .unwrap()
-            .client
-            .into_downloadable(&runtime_path.get_versions().get_clients_path());
+        let client_main_jar = version_download_into_downloadable(
+            version_info
+                .downloads
+                .get(&DownloadType::Client)
+                .unwrap()
+                .clone(),
+            &runtime_path.get_versions().get_clients_path(),
+        );
 
-        let assets = assets::get_meta(
-            self.app.reqwest_client.clone(),
-            version_info.asset_index,
-            runtime_path.get_assets().get_indexes_path(),
-        )
-        .await?
-        .into_vec_downloadable(&runtime_path.get_assets().get_objects_path());
+        let assets = assets_index_into_vec_downloadable(
+            assets::get_meta(
+                self.app.reqwest_client.clone(),
+                version_info.asset_index,
+                runtime_path.get_assets().get_indexes_path(),
+            )
+            .await?,
+            &runtime_path.get_assets().get_objects_path(),
+        );
 
         all_files.push(client_main_jar);
         all_files.extend(libraries);
@@ -84,15 +94,13 @@ mod tests {
 
     use carbon_net::Progress;
     use chrono::Utc;
+    use daedalus::{minecraft::DownloadType, modded::merge_partial_version};
 
-    use crate::{
-        domain::minecraft::modded::merge_partial_version,
-        managers::{
-            account::{FullAccount, FullAccountType},
-            minecraft::{
-                forge::execute_processors,
-                minecraft::{extract_natives, launch_minecraft},
-            },
+    use crate::managers::{
+        account::{FullAccount, FullAccountType},
+        minecraft::{
+            forge::execute_processors,
+            minecraft::{extract_natives, launch_minecraft},
         },
     };
 
@@ -166,14 +174,14 @@ mod tests {
         extract_natives(runtime_path, &version_info).await;
 
         let libraries_path = runtime_path.get_libraries();
-        let game_version = version_info
-            .inherits_from
-            .as_ref()
-            .unwrap_or(&version_info.id)
-            .to_string();
+        let game_version = version_info.id.to_string();
         let client_path = runtime_path.get_versions().get_clients_path().join(format!(
             "{}.jar",
-            version_info.downloads.as_ref().unwrap().client.sha1
+            version_info
+                .downloads
+                .get(&DownloadType::Client)
+                .unwrap()
+                .sha1
         ));
 
         if let Some(processors) = &version_info.processors {

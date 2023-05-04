@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
+use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
-
-use crate::domain::minecraft::{assets::AssetIndex, minecraft::VersionAssetIndex};
 
 #[derive(Error, Debug)]
 pub enum AssetsError {
@@ -15,9 +14,9 @@ pub enum AssetsError {
 
 pub async fn get_meta(
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
-    version_asset_index: VersionAssetIndex,
+    version_asset_index: AssetIndex,
     asset_indexes_path: PathBuf,
-) -> anyhow::Result<AssetIndex> {
+) -> anyhow::Result<AssetsIndex> {
     let asset_index_bytes = reqwest_client
         .get(version_asset_index.url)
         .send()
