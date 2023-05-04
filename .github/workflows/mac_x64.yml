@@ -34,9 +34,9 @@ jobs:
           node-version: 18
       - name: Update rust
         run: |
-          rustup update
           rustup target add x86_64-apple-darwin
           rustup default stable-x86_64-apple-darwin
+          rustc --version
           cargo --version
       - name: Prepare
         run: |
