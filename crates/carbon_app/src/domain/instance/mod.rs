@@ -1,8 +1,10 @@
+use carbon_domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
 
-use crate::managers::vtask::VisualTaskId;
-
 pub mod info;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
+pub struct GameLogId(pub i32);
 
 pub struct InstanceDetails {
     pub favorite: bool,
@@ -19,7 +21,10 @@ pub struct InstanceDetails {
 pub enum LaunchState {
     Inactive,
     Preparing(VisualTaskId),
-    Running { start_time: DateTime<Utc> },
+    Running {
+        start_time: DateTime<Utc>,
+        log_id: GameLogId,
+    },
 }
 
 pub struct ModLoader {

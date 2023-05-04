@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
 use std::fmt::Display;
+use std::sync::Arc;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -14,19 +15,20 @@ use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
-use tokio::sync::{Mutex, MutexGuard, RwLock};
+use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
+use self::log::GameLog;
 use self::run::PersistenceManager;
 
 use super::ManagerRef;
 
-use crate::domain::instance as domain;
+use crate::domain::instance::{self as domain, GameLogId};
 use domain::info;
 
-mod log;
+pub mod log;
 mod run;
 mod schema;
 
@@ -37,6 +39,7 @@ pub struct InstanceManager {
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
+    game_logs: RwLock<HashMap<GameLogId, watch::Receiver<GameLog>>>,
 }
 
 impl InstanceManager {
@@ -47,6 +50,7 @@ impl InstanceManager {
             path_lock: Mutex::new(()),
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
+            game_logs: RwLock::new(HashMap::new()),
         }
     }
 }

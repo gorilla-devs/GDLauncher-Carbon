@@ -1,14 +1,14 @@
+use carbon_domain::vtask::VisualTaskId;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
 use crate::api::keys::instance::*;
-use crate::domain::instance as domain;
-use crate::managers::instance::log::{EntryType, LogEntry};
+use crate::domain::instance::{self as domain, GameLogId};
+use crate::managers::instance::log::EntryType;
 use carbon_domain::translate;
 use chrono::{DateTime, Utc};
-use tokio::sync::{RwLock, Semaphore};
+use tokio::sync::Semaphore;
 
 use anyhow::{anyhow, bail};
 
@@ -20,12 +20,11 @@ use crate::{
     managers::{
         self,
         account::FullAccount,
-        vtask::{NonFailedDismissError, TaskState, VisualTask, VisualTaskId},
+        vtask::{NonFailedDismissError, TaskState, VisualTask},
         ManagerRef,
     },
 };
 
-use super::log::GameLog;
 use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 pub struct PersistenceManager {
@@ -278,7 +277,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
-                    let log = Arc::new(RwLock::new(GameLog::new()));
+                    let (log_id, log) = app.instance_manager().create_log().await;
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,
@@ -286,17 +285,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 process_id: child.id().expect("child process id is not present even though child process was started"),
                                 kill_tx,
                                 start_time: Utc::now(),
-                                log: log.clone(),
+                                log: log_id,
                             }),
                         )
                         .await;
 
-                    dbg!(&child.stdout, &child.stderr);
                     let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };
+
                     let read_logs = async {
-                        let mut last_log = 0;
                         let mut outbuf = [0u8; 1024];
                         let mut errbuf = [0u8; 1024];
 
@@ -305,7 +303,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stdout.read(&mut outbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
-                                        log.write().await.push(EntryType::StdOut, &*utf8);
+                                        log.send_if_modified(|log| {
+                                            log.push(EntryType::StdOut, &*utf8);
+                                            false
+                                        });
 
                                         loop {
                                             tokio::select!(biased;
@@ -313,7 +314,10 @@ impl ManagerRef<'_, InstanceManager> {
                                                 r = stdout.read(&mut outbuf) => match r {
                                                     Ok(count) if count > 0 => {
                                                         let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
-                                                        log.write().await.push(EntryType::StdOut, &*utf8);
+                                                        log.send_if_modified(|log| {
+                                                            log.push(EntryType::StdOut, &*utf8);
+                                                            false
+                                                        });
                                                     },
                                                     Ok(_) => return Ok(()),
                                                     Err(e) => return Err(e),
@@ -327,7 +331,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stderr.read(&mut errbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
-                                        log.write().await.push(EntryType::StdErr, &*utf8);
+                                        log.send_if_modified(|log| {
+                                            log.push(EntryType::StdErr, &*utf8);
+                                            false
+                                        });
 
                                         loop {
                                             tokio::select!(biased;
@@ -335,7 +342,10 @@ impl ManagerRef<'_, InstanceManager> {
                                                 r = stderr.read(&mut errbuf) => match r {
                                                     Ok(count) if count > 0 => {
                                                         let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
-                                                        log.write().await.push(EntryType::StdErr, &*utf8);
+                                                        log.send_if_modified(|log| {
+                                                            log.push(EntryType::StdErr, &*utf8);
+                                                            false
+                                                        });
                                                     },
                                                     Ok(_) => return Ok(()),
                                                     Err(e) => return Err(e),
@@ -348,18 +358,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 },
                             );
 
-                            let log = log.read().await;
-                            let new_log_events = log.get_region(last_log..);
-                            last_log = log.len();
-
-                            for LogEntry {
-                                type_,
-                                text,
-                                start_line,
-                            } in new_log_events
-                            {
-                                println!("[{start_line}] {type_:?}: {text}");
-                            }
+                            log.send_if_modified(|_| true);
                         }
                     };
 
@@ -451,7 +450,7 @@ pub struct RunningInstance {
     process_id: u32,
     kill_tx: mpsc::Sender<()>,
     start_time: DateTime<Utc>,
-    log: Arc<RwLock<GameLog>>,
+    log: GameLogId,
 }
 
 impl From<&LaunchState> for domain::LaunchState {
@@ -459,8 +458,11 @@ impl From<&LaunchState> for domain::LaunchState {
         match value {
             LaunchState::Inactive => Self::Inactive,
             LaunchState::Preparing(t) => Self::Preparing(*t),
-            LaunchState::Running(RunningInstance { start_time, .. }) => Self::Running {
+            LaunchState::Running(RunningInstance {
+                start_time, log, ..
+            }) => Self::Running {
                 start_time: *start_time,
+                log_id: *log,
             },
         }
     }

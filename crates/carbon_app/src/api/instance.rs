@@ -1,24 +1,33 @@
 use std::collections::HashSet;
+use std::convert::Infallible;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Poll;
 
 use anyhow::anyhow;
+use axum::body::{Bytes, StreamBody};
 use axum::extract::{Query, State};
+use axum::response::{IntoResponse, Response};
 use chrono::{DateTime, Utc};
+use futures::{Stream, TryStream};
 use http::{HeaderMap, HeaderValue, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use tokio::sync::watch;
 
 use crate::error::{AxumError, FeError};
+use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::vtask::VisualTaskId;
 use crate::managers::{App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
+use super::vtask::TaskId;
 
-use crate::domain::instance as domain;
+use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance as manager;
+use manager::log::GameLog;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -175,6 +184,11 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
+    #[derive(Deserialize)]
+    struct LogQuery {
+        id: i32,
+    }
+
     axum::Router::new()
         .route(
             "/instanceIcon",
@@ -210,6 +224,68 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .load_icon(PathBuf::from(query.path))
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())
+                }
+            )
+        )
+        .route(
+            "/log",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
+                    let log_rx = app.instance_manager()
+                        .get_log(GameLogId(query.id))
+                        .await;
+
+                    let Ok(mut log_rx) = log_rx else {
+                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
+                    };
+
+                    #[derive(Serialize)]
+                    enum LogEntryType {
+                        StdOut,
+                        StdErr,
+                    }
+
+                    #[derive(Serialize)]
+                    struct LogEntry<'a> {
+                        line: &'a str,
+                        type_: LogEntryType,
+                    }
+
+                    let s = async_stream::stream! {
+                        let mut last_idx = 0;
+
+                        loop {
+                            let new_lines = {
+                                let log = log_rx.borrow();
+
+                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
+                                    let entry = LogEntry {
+                                        line: line.text,
+                                        type_: match line.type_ {
+                                            EntryType::StdOut => LogEntryType::StdOut,
+                                            EntryType::StdErr => LogEntryType::StdErr,
+                                        }
+                                    };
+
+                                    serde_json::to_vec(&entry)
+                                        .expect("serialization of a log entry should be infallible")
+                                }).collect::<Vec<_>>();
+
+                                last_idx = log.len();
+                                new_lines
+                            };
+
+                            for line in new_lines {
+                                yield Ok::<_, Infallible>(line)
+                            }
+
+                            if let Err(_) = log_rx.changed().await {
+                                break
+                            }
+                        }
+                    };
+
+                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
                 }
             )
         )
@@ -416,8 +492,11 @@ pub enum ModLoaderType {
 #[derive(Type, Serialize)]
 pub enum LaunchState {
     Inactive,
-    Preparing(VisualTaskId),
-    Running { start_time: DateTime<Utc> },
+    Preparing(TaskId),
+    Running {
+        start_time: DateTime<Utc>,
+        log_id: i32,
+    },
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -621,8 +700,11 @@ impl From<domain::LaunchState> for LaunchState {
 
         match value {
             domain::Inactive => Self::Inactive,
-            domain::Preparing(task) => Self::Preparing(task),
-            domain::Running { start_time } => Self::Running { start_time },
+            domain::Preparing(task) => Self::Preparing(task.into()),
+            domain::Running { start_time, log_id } => Self::Running {
+                start_time,
+                log_id: log_id.0,
+            },
         }
     }
 }

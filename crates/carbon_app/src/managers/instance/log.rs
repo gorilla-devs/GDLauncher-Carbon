@@ -1,4 +1,14 @@
-use std::ops::{Bound, RangeBounds};
+use std::{
+    ops::{Bound, RangeBounds},
+    sync::atomic::{AtomicI32, Ordering},
+};
+
+use thiserror::Error;
+use tokio::sync::watch;
+
+use crate::{domain::instance::GameLogId, managers::ManagerRef};
+
+use super::InstanceManager;
 
 pub struct GameLog {
     // buffer holding the full log
@@ -172,6 +182,47 @@ impl GameLog {
         self.lines.len()
     }
 }
+
+impl ManagerRef<'_, InstanceManager> {
+    pub async fn create_log(self) -> (GameLogId, watch::Sender<GameLog>) {
+        static LOG_ID: AtomicI32 = AtomicI32::new(0);
+        let (log_tx, log_rx) = watch::channel(GameLog::new());
+        let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
+        self.game_logs.write().await.insert(id, log_rx);
+
+        (id, log_tx)
+    }
+
+    pub async fn delete_log(self, id: GameLogId) -> Result<(), InvalidGameLogIdError> {
+        match self.game_logs.write().await.remove(&id) {
+            Some(_) => Ok(()),
+            None => Err(InvalidGameLogIdError),
+        }
+    }
+
+    pub async fn get_log(
+        self,
+        id: GameLogId,
+    ) -> Result<watch::Receiver<GameLog>, InvalidGameLogIdError> {
+        match self.game_logs.read().await.get(&id) {
+            Some(log) => Ok(log.clone()),
+            None => Err(InvalidGameLogIdError),
+        }
+    }
+
+    pub async fn get_log_ids(self) -> Vec<GameLogId> {
+        self.game_logs
+            .read()
+            .await
+            .keys()
+            .map(Clone::clone)
+            .collect()
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("log id does not refer to a valid game log")]
+pub struct InvalidGameLogIdError;
 
 #[cfg(test)]
 mod test {

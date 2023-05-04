@@ -2,7 +2,6 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::api::keys::vtask::*;
-use crate::error;
 use crate::error::FeError;
 use crate::managers::vtask;
 use crate::managers::App;
@@ -36,13 +35,13 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 #[derive(Type, Serialize, Deserialize)]
 pub struct TaskId(pub i32);
 
-impl From<vtask::VisualTaskId> for TaskId {
-    fn from(value: vtask::VisualTaskId) -> Self {
+impl From<domain::VisualTaskId> for TaskId {
+    fn from(value: domain::VisualTaskId) -> Self {
         Self(value.0)
     }
 }
 
-impl From<TaskId> for vtask::VisualTaskId {
+impl From<TaskId> for domain::VisualTaskId {
     fn from(value: TaskId) -> Self {
         Self(value.0)
     }

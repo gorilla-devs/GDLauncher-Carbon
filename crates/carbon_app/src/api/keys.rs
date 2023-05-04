@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 macro_rules! keys {
     {$($group:ident { $($name:ident = $value:literal;)* })*} => {
         $(pub mod $group {
@@ -20,6 +22,12 @@ pub struct Key {
     pub local: &'static str,
     /// full keypath `mygroup.mykey`
     pub full: &'static str,
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.full)
+    }
 }
 
 keys! {

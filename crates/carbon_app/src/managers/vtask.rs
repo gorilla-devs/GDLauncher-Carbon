@@ -9,19 +9,13 @@ use std::{
 
 use anyhow::anyhow;
 
-use rspc::Type;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
 use carbon_domain::{translation::Translation, vtask as domain};
-
-#[derive(
-    Copy, Clone, Type, Serialize, Deserialize, PartialEq, Eq, Debug, Hash, PartialOrd, Ord,
-)]
-pub struct VisualTaskId(pub i32);
+use domain::VisualTaskId;
 
 pub struct VisualTaskManager {
     tasks: RwLock<HashMap<VisualTaskId, VisualTask>>,
@@ -434,7 +428,7 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         let task = VisualTask::new(translate!("test"));
-        app.task_manager().spawn_task(&task).await;
+        let id = app.task_manager().spawn_task(&task).await;
 
         let subtask = task.subtask(translate!("subtask")).await;
 
@@ -452,6 +446,10 @@ mod test {
         }];
 
         assert_eq!(tasks, app.task_manager().get_tasks().await);
+        assert_eq!(
+            Some(&tasks[0]),
+            app.task_manager().get_task(id).await.as_ref()
+        );
 
         task.edit(|data| data.state = TaskState::KnownProgress)
             .await;
