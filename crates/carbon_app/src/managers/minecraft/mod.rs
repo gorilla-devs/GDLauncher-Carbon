@@ -115,9 +115,7 @@ mod tests {
         let app = crate::setup_managers_for_test().await;
 
         let runtime_path = &app.app.settings_manager().runtime_path;
-        let instance_path = runtime_path
-            .get_instances()
-            .get_instance_path("test");
+        let instance_path = runtime_path.get_instances().get_instance_path("test");
 
         std::fs::create_dir_all(instance_path.get_root()).unwrap();
 
