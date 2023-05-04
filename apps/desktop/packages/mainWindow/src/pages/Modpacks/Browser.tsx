@@ -255,6 +255,25 @@ export default function Browser() {
               }}
             />
           </div>
+          <div
+            class="text-2xl cursor-pointer"
+            classList={{
+              "i-ri:sort-asc": query.query.sortOrder === "ascending",
+              "i-ri:sort-desc": query.query.sortOrder === "descending",
+            }}
+            onClick={() => {
+              const isAsc = query.query.sortOrder === "ascending";
+              batch(() => {
+                setQuery(
+                  "query",
+                  "sortOrder",
+                  isAsc ? "descending" : "ascending"
+                );
+                setQuery("updateByFilter", true);
+                setQuery("query", "index", 0);
+              });
+            }}
+          />
           <Button
             variant="outline"
             size="medium"
