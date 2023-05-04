@@ -1,4 +1,4 @@
-name: Ubuntu x64 Desktop Build
+name: Docker x64 Desktop Build
 
 on: push
 
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu_x64:
+  docker_x64:
     defaults:
       run:
         working-directory: ./GDLauncher
