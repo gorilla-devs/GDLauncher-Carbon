@@ -38,7 +38,7 @@ pub async fn init() {
         sentry::init((
             env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
-                release: Some(APP_VERSION.into()),
+                release: Some(app_version::APP_VERSION.into()),
                 ..Default::default()
             },
         ))
