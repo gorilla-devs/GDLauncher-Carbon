@@ -1090,8 +1090,13 @@ pub struct FECategory {
     pub id: i32,
     pub name: String,
     pub slug: String,
-    pub avatar_url: Option<String>,
+    pub url: String,
+    pub icon_url: String,
+    pub date_modified: String,
+    pub is_class: bool,
+    pub class_id: Option<i32>,
     pub parent_category_id: Option<i32>,
+    pub display_index: Option<i32>,
 }
 
 impl From<crate::domain::modplatforms::curseforge::Category> for FECategory {
@@ -1100,8 +1105,13 @@ impl From<crate::domain::modplatforms::curseforge::Category> for FECategory {
             id: minecraft_category.id,
             name: minecraft_category.name,
             slug: minecraft_category.slug,
-            avatar_url: minecraft_category.avatar_url,
+            url: minecraft_category.url,
+            icon_url: minecraft_category.icon_url,
+            date_modified: minecraft_category.date_modified,
+            is_class: minecraft_category.is_class,
+            class_id: minecraft_category.class_id,
             parent_category_id: minecraft_category.parent_category_id,
+            display_index: minecraft_category.display_index,
         }
     }
 }
