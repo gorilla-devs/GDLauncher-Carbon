@@ -104,12 +104,10 @@ const InstanceCreation = (props: ModalProps) => {
     ["instance.prepareInstance"],
     {
       onSuccess() {
-        console.log("SUCCC PREP");
         addNotification("Instance saccessfully created.");
         modalsContext?.closeModal();
       },
       onError() {
-        console.log("ERR PREP");
         addNotification("Error while creating the instance.");
         modalsContext?.closeModal();
       },
@@ -135,12 +133,6 @@ const InstanceCreation = (props: ModalProps) => {
     } else {
       setError("");
 
-      console.log(
-        "loaderVersion()",
-        loader(),
-        loaderVersions(),
-        loaderVersions()?.[0]?.key
-      );
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,

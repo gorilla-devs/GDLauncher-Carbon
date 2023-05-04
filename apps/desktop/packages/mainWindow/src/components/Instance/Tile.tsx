@@ -87,7 +87,7 @@ const Tile = (props: Props) => {
       onSuccess() {
         console.log("SUCCESS PLAY");
       },
-      onError(error, variables, context) {
+      onError(error) {
         console.log("ERROR PLAY", error);
       },
     }

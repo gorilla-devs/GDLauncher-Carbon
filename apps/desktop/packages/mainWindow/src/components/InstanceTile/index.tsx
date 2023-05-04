@@ -4,13 +4,14 @@ import {
   fetchImage,
   getLaunchState,
   isListInstanceValid,
-  isPreparing,
+  isInstancePreparing,
+  isProgressKnown,
+  isProgressFailed,
 } from "@/utils/instances";
 import {
   ListInstance,
-  Progress,
+  TaskId,
   UngroupedInstance,
-  VisualTaskId,
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
@@ -20,7 +21,8 @@ const InstanceTile = (props: {
   isSidebarOpened?: boolean;
   selected?: boolean;
 }) => {
-  const [progress, setProgress] = createSignal<Progress>();
+  const [progress, setProgress] = createSignal(0);
+  const [isLoading, setIsLoading] = createSignal(false);
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
 
@@ -31,9 +33,9 @@ const InstanceTile = (props: {
 
   const isPreparingState = () =>
     isListInstanceValid(props.instance.status) &&
-    isPreparing(props.instance.status.Valid.state)
+    isInstancePreparing(props.instance.status.Valid.state)
       ? (getLaunchState(props.instance.status.Valid.state) as {
-          Preparing: VisualTaskId;
+          Preparing: TaskId;
         })
       : null;
 
@@ -41,17 +43,17 @@ const InstanceTile = (props: {
 
   const taskId = isPreparingState()?.Preparing;
 
-  createEffect(() => {
-    console.log("taskId", taskId);
-  });
-
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
     createEffect(() => {
-      console.log("task", task.data, taskId);
       if (task.data) {
-        setProgress(task.data.progress);
+        if (isProgressKnown(task.data.progress)) {
+          setProgress(task.data.progress.Known);
+          setIsLoading(true);
+        } else if (isProgressFailed(task.data.progress)) {
+          setIsLoading(false);
+        }
       }
     });
   }
@@ -60,10 +62,6 @@ const InstanceTile = (props: {
   const variant = () => (props.isSidebarOpened ? "sidebar" : "sidebar-small");
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
-
-  createEffect(() => {
-    console.log("instance", props.instance);
-  });
 
   return (
     <div>
@@ -77,6 +75,8 @@ const InstanceTile = (props: {
         variant={type()}
         img={image()}
         selected={props.selected}
+        isLoading={isLoading()}
+        percentage={progress()}
       />
     </div>
   );
