@@ -238,8 +238,7 @@ impl ManagerRef<'_, InstanceManager> {
                         game_version,
                         libraries_path,
                     )
-                    .await
-                    .unwrap();
+                    .await?;
                 }
                 t_forge_processors.complete_opaque();
 
