@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu:
+  ubuntu_x64:
     defaults:
       run:
         working-directory: ./GDLauncher

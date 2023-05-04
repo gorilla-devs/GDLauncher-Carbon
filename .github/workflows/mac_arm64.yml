@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ubuntu:
+  mac_arm64:
     defaults:
       run:
         working-directory: ./GDLauncher
