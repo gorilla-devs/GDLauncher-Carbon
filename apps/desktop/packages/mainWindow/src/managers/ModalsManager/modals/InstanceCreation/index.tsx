@@ -120,9 +120,6 @@ const InstanceCreation = (props: ModalProps) => {
     ["instance.createInstance"],
     {
       onSuccess(instanceId) {
-        // addNotification("Instance saccessfully created.");
-        // modalsContext?.closeModal();
-        console.log("instanceId", instanceId);
         prepareInstanceMutation.mutate(instanceId);
       },
       onError() {

@@ -1,4 +1,4 @@
-import { Button, Collapsable, Input } from "@gd/ui";
+import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import { For, Show, Suspense, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
@@ -91,7 +91,7 @@ const Sidebar = () => {
               <For each={favoriteInstances()}>
                 {(instance) => (
                   //TODO: SKELETON
-                  <Suspense fallback={<></>}>
+                  <Suspense fallback={<Skeleton.sidebarInstance />}>
                     <InstanceTile
                       instance={instance}
                       isSidebarOpened={isSidebarOpened()}
@@ -115,7 +115,7 @@ const Sidebar = () => {
                 <For each={values}>
                   {(instance) => (
                     //TODO: SKELETON
-                    <Suspense fallback={<></>}>
+                    <Suspense fallback={<Skeleton.sidebarInstance />}>
                       <InstanceTile
                         instance={instance}
                         isSidebarOpened={isSidebarOpened()}
