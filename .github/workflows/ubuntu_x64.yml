@@ -32,9 +32,9 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-      - uses: dtolnay/rust-toolchain@1.68.2
+      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
+          toolchain: 1.68.2
           targets: x86_64-unknown-linux-gnu
       - name: Prepare
         run: |
