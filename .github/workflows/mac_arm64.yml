@@ -36,7 +36,7 @@ jobs:
         run: |
           rustup update
           rustup target add aarch64-apple-darwin
-          rustup default aarch64-apple-darwin
+          rustup default stable-aarch64-apple-darwin
       - name: Prepare
         run: |
           echo "" > crates/carbon_app/src/db.rs
