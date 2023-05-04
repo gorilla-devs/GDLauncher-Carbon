@@ -123,7 +123,7 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_download_files = task
                     .subtask(translate!("instance.task.ensure.download_files"))
                     .await;
-                t_download_files.set_weight(10.0);
+                t_download_files.set_weight(20.0);
                 let t_extract_natives = task
                     .subtask(translate!("instance.task.ensure.extract_natives"))
                     .await;

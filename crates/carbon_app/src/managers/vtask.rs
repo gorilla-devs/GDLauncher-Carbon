@@ -127,7 +127,7 @@ impl ManagerRef<'_, VisualTaskManager> {
 
             let progress = match &domain.progress {
                 domain::Progress::Indeterminate => String::from("unk"),
-                domain::Progress::Known(p) => format!("{p}%"),
+                domain::Progress::Known(p) => format!("{}%", p * 100.0),
                 domain::Progress::Failed(_) => String::from("fail"),
             };
 
