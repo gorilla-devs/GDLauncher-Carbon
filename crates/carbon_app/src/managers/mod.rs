@@ -141,6 +141,10 @@ impl Drop for AppInner {
         #[cfg(feature = "production")]
         #[cfg(not(test))]
         {
+            use crate::domain::metrics::{Event, EventName};
+            use crate::iridium_client::get_client;
+            use std::collections::HashMap;
+
             let close_event = Event {
                 name: EventName::AppClosed,
                 properties: HashMap::new(),
@@ -148,7 +152,7 @@ impl Drop for AppInner {
 
             let client = get_client();
 
-            Handle::current().block_on(async move {
+            tokio::runtime::Handle::current().block_on(async move {
                 println!("Collecting metric for app close");
                 let res = self.metrics_manager.track_event(client, close_event).await;
                 match res {
