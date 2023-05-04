@@ -1,11 +1,9 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-use crate::{
-    managers::{
-        java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
-        App, AppInner,
-    },
+use crate::managers::{
+    java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+    App, AppInner,
 };
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};

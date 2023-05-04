@@ -1,6 +1,5 @@
 use daedalus::minecraft::{
-    Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule,
-    RuleAction,
+    Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
 use std::path::{Path, PathBuf};
 

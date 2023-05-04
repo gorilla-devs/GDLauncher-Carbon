@@ -2,7 +2,6 @@ use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
 
-
 use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
 

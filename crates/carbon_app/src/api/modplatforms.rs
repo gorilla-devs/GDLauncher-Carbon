@@ -2,8 +2,7 @@ use crate::{
     api::{keys::modplatforms::TEST_QUERY, router::router},
     managers::App,
 };
-use rspc::{RouterBuilderLike};
-
+use rspc::RouterBuilderLike;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
