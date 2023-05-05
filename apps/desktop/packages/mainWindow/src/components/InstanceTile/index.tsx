@@ -16,6 +16,7 @@ import {
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore, produce } from "solid-js/store";
+import { bytesToMB } from "@/utils/helpers";
 
 type InstanceDownloadProgress = {
   totalDownload: number;
@@ -56,9 +57,10 @@ const InstanceTile = (props: {
 
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
+    const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
 
     createEffect(() => {
-      console.log("TASK", task.data, task.data?.download_total);
+      console.log("TASK", task.data, task.data?.download_total, tasks);
       if (task.data) {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);
@@ -90,7 +92,9 @@ const InstanceTile = (props: {
         img={image()}
         selected={props.selected}
         isLoading={isLoading()}
-        percentage={progress.percentage}
+        percentage={progress.percentage * 100}
+        totalDownload={bytesToMB(progress.totalDownload)}
+        downloaded={bytesToMB(progress.downloaded)}
       />
     </div>
   );

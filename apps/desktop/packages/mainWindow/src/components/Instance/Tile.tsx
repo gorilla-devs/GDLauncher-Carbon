@@ -1,3 +1,4 @@
+/* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import { ModLoaderType, UngroupedInstance } from "@gd/core_module/bindings";
 import { Match, Show, Switch, mergeProps } from "solid-js";
@@ -19,7 +20,8 @@ type Props = {
   variant?: Variant;
   invalid?: boolean;
   instanceId: number;
-
+  downloaded?: number;
+  totalDownload?: number;
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -134,7 +136,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="relative bg-cover bg-center rounded-2xl h-38 w-38"
+              class="relative bg-cover bg-center rounded-2xl h-38 w-38 flex justify-center items-center"
               classList={{
                 grayscale: props.isLoading,
                 "bg-green-600": !props.img,
@@ -159,6 +161,19 @@ const Tile = (props: Props) => {
                   />
                 </div>
               </div>
+              <Show
+                when={
+                  props.isLoading &&
+                  props.percentage !== undefined &&
+                  props.percentage !== null
+                }
+              >
+                <div class="flex flex-col gap-2">
+                  <h3 class="m-0 text-center">
+                    {Math.round(props.percentage as number)}%
+                  </h3>
+                </div>
+              </Show>
               <div
                 class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
                 classList={{
@@ -193,18 +208,28 @@ const Tile = (props: Props) => {
             >
               {props.title}
             </h4>
-            <div class="flex gap-2 justify-between text-lightGray-900">
-              <span class="flex gap-2">
-                <Show when={!props.invalid}>
-                  <img
-                    class="w-4 h-4"
-                    src={getModloaderIcon(props.modloader as ModLoaderType)}
-                  />
-                </Show>
-                <p class="m-0">{props.modloader || "Vanilla"}</p>
-              </span>
-              <p class="m-0">{props.version}</p>
-            </div>
+            <Switch>
+              <Match when={!props.isLoading}>
+                <div class="flex gap-2 justify-between text-lightGray-900">
+                  <span class="flex gap-2">
+                    <Show when={!props.invalid}>
+                      <img
+                        class="w-4 h-4"
+                        src={getModloaderIcon(props.modloader as ModLoaderType)}
+                      />
+                    </Show>
+                    <p class="m-0">{props.modloader || "Vanilla"}</p>
+                  </span>
+                  <p class="m-0">{props.version}</p>
+                </div>
+              </Match>
+              <Match when={props.isLoading}>
+                <p class="m-0 text-center text-lightGray-900">
+                  {Math.round(props.downloaded || 0)}MB/
+                  {Math.round(props.totalDownload || 0)}MB
+                </p>
+              </Match>
+            </Switch>
           </div>
         </ContextMenu>
       </Match>

@@ -56,3 +56,8 @@ export const blobToBase64 = (
     reader.readAsDataURL(blob);
   });
 };
+
+export const bytesToMB = (bytes: number) => {
+  const bytesInMB = 1024 * 1024;
+  return bytes / bytesInMB;
+};
