@@ -1,12 +1,8 @@
+/* eslint-disable i18next/no-literal-string */
 import Card from "@/components/Card";
 import { Trans } from "@gd/i18n";
-import { Show } from "solid-js";
-import fetchData from "./instance.data";
-import { useRouteData } from "@solidjs/router";
 
 const Overview = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
-
   return (
     <div class="flex flex-col gap-4 max-w-185 mt-10">
       <div class="w-full flex justify-center flex-wrap gap-4">
@@ -26,11 +22,12 @@ const Overview = () => {
             }}
           />
         </div>
-        <Show when={routeData.instanceDetails.data?.notes}>
-          <p class="m-0 text-sm leading-6">
-            {routeData.instanceDetails.data?.notes}
-          </p>
-        </Show>
+        <p class="m-0 text-sm leading-6">
+          Minecraft Forge is a handy place to store, sort, and keep tabs on all
+          your mods. If you’re after more inspiration, our guide to the best
+          Minecraft shaders and Minecraft texture packs add plenty of visual
+          flair to the blocky universe. Not sure what to build in game?
+        </p>
       </div>
     </div>
   );

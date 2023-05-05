@@ -10,14 +10,13 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port, rspc } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
   { key: "account.getAccountStatus" }
 >["result"];
 
-interface AccountsStatus {
+export interface AccountsStatus {
   label: {
     name: string;
     icon: string | undefined;
@@ -31,7 +30,6 @@ interface AccountsStatus {
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
-  const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
 
   const isLogin = useMatch(() => "/");
@@ -71,7 +69,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center text-white px-5 bg-dark-slate-800 h-15">
+      <nav class="flex items-center text-white bg-dark-slate-800 px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -112,12 +110,7 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div
-                      class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill"
-                      onClick={() =>
-                        modalsContext?.openModal({ name: "logViewer" })
-                      }
-                    />
+                    <div class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill" />
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>
@@ -130,17 +123,12 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </Link>
-                  <div
-                    class="text-dark-slate-50 text-2xl cursor-pointer i-ri:notification-2-fill"
-                    onClick={() =>
-                      modalsContext?.openModal({ name: "notification" })
-                    }
-                  />
+                  <div class="text-dark-slate-50 text-2xl cursor-pointer i-ri:notification-2-fill" />
                 </div>
               </TabList>
             </Tabs>
           </ul>
-          <div class="flex justify-end ml-4 min-w-52">
+          <div class="flex ml-4 min-w-52 justify-end">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

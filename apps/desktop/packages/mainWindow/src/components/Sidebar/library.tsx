@@ -1,66 +1,35 @@
-import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
+import { Button, Collapsable, Input } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { For, Show, Suspense, createEffect } from "solid-js";
+import { Show, createEffect } from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
-import { useLocation, useRouteData } from "@solidjs/router";
+import Tile from "../Instance/Tile";
+import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
-import fetchData from "@/pages/Library/library.data";
-import { createStore, reconcile } from "solid-js/store";
-import { InstancesStore, isListInstanceValid } from "@/utils/instances";
-import { useModal } from "@/managers/ModalsManager";
-import InstanceTile from "../InstanceTile";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Sidebar = () => {
+  const navigate = useGDNavigate();
   const location = useLocation();
 
   const [t] = useTransContext();
-  const modalsContext = useModal();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const [instances, setInstances] = createStore<InstancesStore>({});
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
   });
 
-  createEffect(() => {
-    setInstances(reconcile({}));
-
-    if (routeData.instancesUngrouped.data) {
-      routeData.instancesUngrouped.data.forEach((instance) => {
-        const validInstance = isListInstanceValid(instance.status)
-          ? instance.status.Valid
-          : null;
-
-        const modloader = validInstance?.modloader || "vanilla";
-        if (modloader) {
-          setInstances(modloader, (prev) => {
-            const filteredPrev = (prev || []).filter(
-              (prev) => prev.id !== instance.id
-            );
-            if (!instance.favorite) return [...filteredPrev, instance];
-            else return [...filteredPrev];
-          });
-        }
-      });
-    }
-  });
-
-  const favoriteInstances = () =>
-    routeData.instancesUngrouped.data?.filter((inst) => inst.favorite) || [];
-
+  // TODO: adapt to real data
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full box-border pt-5 pb-5 transition-all">
+      <div class="h-full w-full box-border pt-5 pb-5">
         <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700"
+                class="flex justify-center items-center group w-10 h-10 bg-darkSlate-700 rounded-full"
                 onClick={() => {
                   toggleSidebar();
                 }}
@@ -73,84 +42,134 @@ const Sidebar = () => {
               placeholder={t("general.type_here") || ""}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
-              disabled={(routeData.instancesUngrouped?.data || []).length === 0}
             />
           </Show>
         </div>
-        <div
-          class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
-          classList={{
-            "scrollbar-hide": !isSidebarOpened(),
-          }}
-        >
-          <Show when={favoriteInstances().length > 0}>
-            <Collapsable
-              title={"Favorites"}
-              size={isSidebarOpened() ? "standard" : "small"}
-            >
-              <For each={favoriteInstances()}>
-                {(instance) => (
-                  //TODO: SKELETON
-                  <Suspense fallback={<Skeleton.sidebarInstance />}>
-                    <InstanceTile
-                      instance={instance}
-                      isSidebarOpened={isSidebarOpened()}
-                      selected={instanceId() === instance.id.toString()}
-                    />
-                  </Suspense>
-                )}
-              </For>
-            </Collapsable>
-          </Show>
-          <For
-            each={Object.entries(instances).filter(
-              (group) => group[1].length > 0
-            )}
-          >
-            {([key, values]) => (
-              <Collapsable
-                title={key}
-                size={isSidebarOpened() ? "standard" : "small"}
-              >
-                <For each={values}>
-                  {(instance) => (
-                    //TODO: SKELETON
-                    <Suspense fallback={<Skeleton.sidebarInstance />}>
-                      <InstanceTile
-                        instance={instance}
-                        isSidebarOpened={isSidebarOpened()}
-                        selected={instanceId() === instance.id.toString()}
-                      />
-                    </Suspense>
-                  )}
-                </For>
-              </Collapsable>
-            )}
-          </For>
-          <Show when={(routeData.instancesUngrouped?.data || []).length === 0}>
-            <div class="w-full h-full flex flex-col justify-center items-center">
-              <img src={glassBlock} class="w-16 h-16" />
-              <p class="text-darkSlate-50 max-w-100 text-center text-xs">
-                <Trans
-                  key="instance.no_mods_text"
-                  options={{
-                    defaultValue:
-                      "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
-                  }}
-                />
-              </p>
-            </div>
-          </Show>
-        </div>
+        <Show when={isSidebarOpened()}>
+          <Collapsable title="VANILLA">
+            <Tile
+              isLoading={true}
+              percentage={50}
+              title={"Instance"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+            <Tile
+              onClick={() => navigate(`/library/ABDFEAD`)}
+              selected={instanceId() === "ABDFEAD"}
+              title={"Instance ABDFEAD"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="FAVOURITED">
+            <Tile
+              onClick={() => navigate(`/library/DDAEDF`)}
+              selected={instanceId() === "DDAEDF"}
+              title={"Instance DDAEDF"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+          <Collapsable title="CURSEFORGE">
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar"
+            />
+          </Collapsable>
+        </Show>
+        <Show when={!isSidebarOpened()}>
+          <div class="h-full w-full flex gap-4 items-center overflow-auto flex-col scrollbar-hide max-h-[calc(100vh-60px-28px-80px-80px)] mt-6">
+            <Tile
+              // onClick={() => navigate(`/library/${instance.id}`)}
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+            <Tile
+              title={"InstanceName"}
+              modloader={"forge"}
+              version={"1.19.2"}
+              variant="sidebar-small"
+            />
+          </div>
+        </Show>
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
             variant="outline"
-            onClick={() => {
-              modalsContext?.openModal({
-                name: "instanceCreation",
-                url: "/modpacks",
-              });
-            }}
+            onClick={() => navigate(`/modpacks`)}
             style={{
               ...(isSidebarOpened()
                 ? { width: "100%", "max-width": "200px" }

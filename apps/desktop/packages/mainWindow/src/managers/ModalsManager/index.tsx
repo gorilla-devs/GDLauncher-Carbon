@@ -57,10 +57,6 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/LogViewer")),
     title: "Logs",
   },
-  notification: {
-    component: lazy(() => import("./modals/Notification")),
-    title: "Logs",
-  },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true,

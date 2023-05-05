@@ -11,7 +11,6 @@ import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
-import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -75,11 +74,9 @@ const InnerApp = (props: InnerAppProps) => {
         <NavigationManager>
           <TransProvider instance={props.i18nInstance}>
             <NotificationsProvider>
-              <ContextMenuProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={createInvalidateQuery} />
-                </ModalProvider>
-              </ContextMenuProvider>
+              <ModalProvider>
+                <App createInvalidateQuery={createInvalidateQuery} />
+              </ModalProvider>
             </NotificationsProvider>
           </TransProvider>
         </NavigationManager>

@@ -11,7 +11,7 @@ import {
 interface Marks {
   [mark: number]: string | { label: JSX.Element };
 }
-interface Props {
+export interface Props {
   max: number;
   min: number;
   steps?: number | null;

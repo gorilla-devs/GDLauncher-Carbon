@@ -1,6 +1,6 @@
 import { createSignal, Show } from "solid-js";
 
-interface Props {
+export interface Props {
   checked?: boolean;
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;
@@ -12,7 +12,7 @@ function Checkbox(props: Props) {
 
   return (
     <div
-      class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer"
+      class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border"
       classList={{
         "bg-primary-500": checked(),
         "bg-darkSlate-500": !checked(),
@@ -20,7 +20,8 @@ function Checkbox(props: Props) {
       }}
       onClick={() => {
         if (!props.disabled) {
-          props.onChange?.(setChecked(!checked()));
+          setChecked(!checked());
+          props.onChange?.(!checked());
         }
       }}
     >

@@ -22,5 +22,4 @@ export {
   createNotification,
 } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
-export { Skeleton } from "./Skeleton";
 export * from "./themes";
