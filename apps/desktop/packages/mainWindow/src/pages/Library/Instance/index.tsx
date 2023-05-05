@@ -2,10 +2,20 @@
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import { Link, Outlet, useLocation, useParams } from "@solidjs/router";
-import { For, createSignal } from "solid-js";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useParams,
+  useRouteData,
+} from "@solidjs/router";
+import { For, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { queryClient, rspc } from "@/utils/rspcClient";
+import fetchData from "./instance.data";
+import { formatDistance } from "date-fns";
+import { InstanceDetails, UngroupedInstance } from "@gd/core_module/bindings";
 
 type InstancePage = {
   label: string;
@@ -17,6 +27,81 @@ const Instance = () => {
   const params = useParams();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
+  const [isFavorite, setIsFavorite] = createSignal(false);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
+    onMutate: async (
+      obj
+    ): Promise<
+      | {
+          instancesUngrouped: UngroupedInstance[];
+          instanceDetails: InstanceDetails;
+        }
+      | undefined
+    > => {
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+      });
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstancesUngrouped"],
+      });
+
+      const instancesUngrouped: UngroupedInstance[] | undefined =
+        queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+
+      const instanceDetails: InstanceDetails | undefined =
+        queryClient.getQueryData([
+          "instance.getInstanceDetails",
+          parseInt(params.id, 10),
+        ]);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        (old: InstanceDetails | undefined) => {
+          const newDetails = old;
+          if (newDetails) newDetails.favorite = obj.favorite;
+          if (newDetails) return newDetails;
+          else return old;
+        }
+      );
+
+      if (instancesUngrouped && instanceDetails)
+        return { instancesUngrouped, instanceDetails };
+    },
+    onSettled() {
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getInstancesUngrouped"],
+      });
+      setIsFavorite((prev) => !prev);
+    },
+    onError(
+      _error,
+      _variables,
+      context:
+        | {
+            instancesUngrouped: UngroupedInstance[];
+            instanceDetails: InstanceDetails;
+          }
+        | undefined
+    ) {
+      if (context?.instanceDetails) {
+        setIsFavorite(context.instanceDetails.favorite);
+        queryClient.setQueryData(
+          ["instance.getInstanceDetails"],
+          context.instanceDetails
+        );
+      }
+    },
+  });
+
+  createEffect(() => {
+    if (routeData.instanceDetails.data)
+      setIsFavorite(routeData.instanceDetails.data?.favorite);
+  });
 
   const instancePages = () => [
     {
@@ -88,7 +173,7 @@ const Instance = () => {
         }}
       >
         <div
-          class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
+          class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
           style={{
             "background-image": `url("${headerMockImage}")`,
             "background-position": "right-5rem",
@@ -103,7 +188,7 @@ const Instance = () => {
             innerContainerRef = el;
           }}
         >
-          <div class="z-10 top-5 sticky left-5 w-fit">
+          <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -128,10 +213,17 @@ const Instance = () => {
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 w-full justify-end lg:flex-row">
-                  <div class="bg-darkSlate-800 h-16 w-16 rounded-xl">
-                    {/* <img /> */}
-                  </div>
-                  <div class="flex flex-1 flex-col max-w-185">
+                  <div
+                    class="bg-center bg-cover h-16 w-16 rounded-xl"
+                    classList={{
+                      "bg-darkSlate-800": !routeData.image(),
+                    }}
+                    style={{
+                      "background-image": `url("${routeData.image()}")`,
+                    }}
+                  />
+
+                  <div class="flex flex-col max-w-185 flex-1">
                     <div class="flex gap-4 items-center">
                       <h1
                         class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
@@ -143,7 +235,7 @@ const Instance = () => {
                           setEditableName(false);
                         }}
                       >
-                        {params.id}
+                        {routeData.instanceDetails.data?.name}
                       </h1>
                       <div class="flex gap-2">
                         <div
@@ -165,12 +257,24 @@ const Instance = () => {
                     </div>
                     <div class="flex flex-col lg:flex-row justify-between cursor-default">
                       <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                        <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
-                          Forge 1.19.2
+                        <div class="m-0 flex gap-2 p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                          <span>
+                            {routeData.instanceDetails.data?.modloaders[0]
+                              ?.type_ || "Vanilla"}
+                          </span>
+                          <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
                         <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
                           <div class="i-ri:time-fill" />
-                          1d ago
+                          <span>
+                            {formatDistance(
+                              new Date(
+                                routeData.instanceDetails.data?.last_played ||
+                                  Date.now()
+                              ).getTime(),
+                              Date.now()
+                            )}
+                          </span>
                         </div>
                         <div class="p-0 lg:px-4 flex gap-2 items-center">
                           <div class="i-ri:user-fill" />
@@ -179,20 +283,33 @@ const Instance = () => {
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <div
-                          class="rounded-full flex justify-center items-center w-8 h-8"
+                          class="rounded-full flex justify-center items-center h-8 w-8"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                         >
-                          <div class="text-xl i-ri:more-2-fill" />
+                          <div class="i-ri:more-2-fill text-xl" />
                         </div>
                         <div
-                          class="rounded-full w-8 h-8 flex justify-center items-center"
+                          class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
+                          onClick={() =>
+                            setFavoriteMutation.mutate({
+                              instance: parseInt(params.id, 10),
+                              favorite:
+                                !routeData.instanceDetails.data?.favorite,
+                            })
+                          }
                         >
-                          <div class="text-xl i-ri:star-s-fill" />
+                          <div
+                            class="text-xl"
+                            classList={{
+                              "text-yellow-500 i-ri:star-s-fill": isFavorite(),
+                              "i-ri:star-line": !isFavorite(),
+                            }}
+                          />
                         </div>
                         <Button uppercase variant="glow" size="large">
                           <Trans
@@ -218,7 +335,7 @@ const Instance = () => {
         }}
       >
         <div class="flex items-start w-full ease-in-out transition-opacity duration-300">
-          <div class="w-fit justify-center items-center transition duration-100 ease-in-out h-fit mr-4">
+          <div class="w-fit justify-center items-center transition ease-in-out duration-100 h-fit mr-4">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
@@ -234,15 +351,27 @@ const Instance = () => {
             </Button>
           </div>
           <div class="flex flex-1 flex-col max-w-185">
-            <h4 class="m-0">{params.id}</h4>
+            <h4 class="m-0"> {routeData.instanceDetails.data?.name}</h4>
             <div class="flex flex-col lg:flex-row justify-between">
               <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-darkSlate-50">
-                <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
-                  Forge 1.19.2
+                <div class="flex gap-2 p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
+                  <span>
+                    {routeData.instanceDetails.data?.modloaders[0]?.type_ ||
+                      "Vanilla"}
+                  </span>
+                  <span>{routeData.instanceDetails.data?.version}</span>
                 </div>
                 <div class="text-xs p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                   <div class="i-ri:time-fill" />
-                  1d ago
+                  <span>
+                    {formatDistance(
+                      new Date(
+                        routeData.instanceDetails.data?.last_played ||
+                          Date.now()
+                      ).getTime(),
+                      Date.now()
+                    )}
+                  </span>
                 </div>
                 <div class="text-xs p-0 lg:px-2 flex gap-2 items-center">
                   <div class="i-ri:user-fill" />
@@ -259,12 +388,24 @@ const Instance = () => {
                   <div class="i-ri:more-2-fill text-xl" />
                 </div>
                 <div
-                  class="rounded-full w-8 h-8 flex justify-center items-center"
+                  class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                   style={{
                     background: "rgba(255, 255, 255, 0.1)",
                   }}
                 >
-                  <div class="i-ri:star-s-fill text-xl" />
+                  <div
+                    class="text-xl"
+                    classList={{
+                      "text-yellow-500 i-ri:star-s-fill": isFavorite(),
+                      "i-ri:star-line": !isFavorite(),
+                    }}
+                    onClick={() =>
+                      setFavoriteMutation.mutate({
+                        instance: parseInt(params.id, 10),
+                        favorite: !routeData.instanceDetails.data?.favorite,
+                      })
+                    }
+                  />
                 </div>
                 <Button uppercase variant="glow" size="small">
                   <Trans

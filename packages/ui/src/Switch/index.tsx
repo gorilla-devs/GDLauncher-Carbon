@@ -1,5 +1,5 @@
 import { JSX } from "solid-js";
-export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {}
+interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {}
 
 function Switch(props: Props) {
   return (

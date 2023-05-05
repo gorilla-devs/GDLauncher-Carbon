@@ -1,6 +1,6 @@
 import { mergeProps } from "solid-js";
 
-export interface Props {
+interface Props {
   percentage: number;
 }
 

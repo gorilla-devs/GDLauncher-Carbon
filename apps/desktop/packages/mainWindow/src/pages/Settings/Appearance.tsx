@@ -12,9 +12,7 @@ const Appearance = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newTheme) => {
-      queryClient.setQueryData(["settings.setSettings"], {
-        theme: newTheme.theme,
-      });
+      queryClient.setQueryData(["settings.setSettings"], newTheme);
     },
   });
 

@@ -1,11 +1,11 @@
 import { children, JSXElement, Match, mergeProps, Switch } from "solid-js";
 import { VirtualContainer } from "@minht11/solid-virtual-container";
 
-export interface ItemSize {
+interface ItemSize {
   width: number;
   height: number;
 }
-export interface Props {
+interface Props {
   children: JSXElement[] | JSXElement;
   type?: "list" | "grid";
   cols?: number;
