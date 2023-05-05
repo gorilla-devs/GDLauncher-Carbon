@@ -1,5 +1,4 @@
-use anyhow::Context;
-use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
+use carbon_net::Progress;
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,

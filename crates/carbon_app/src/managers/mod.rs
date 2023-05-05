@@ -1,17 +1,16 @@
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
-use crate::domain::metrics::{Event, EventName};
-use crate::iridium_client::get_client;
+
 use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
-use std::collections::HashMap;
+
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tokio::runtime::Handle;
+
 use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
@@ -153,6 +152,10 @@ impl Drop for AppInner {
         #[cfg(feature = "production")]
         #[cfg(not(test))]
         {
+            use crate::domain::metrics::{Event, EventName};
+            use crate::iridium_client::get_client;
+            use std::collections::HashMap;
+
             let close_event = Event {
                 name: EventName::AppClosed,
                 properties: HashMap::new(),
@@ -160,7 +163,7 @@ impl Drop for AppInner {
 
             let client = get_client();
 
-            Handle::current().block_on(async move {
+            tokio::runtime::Handle::current().block_on(async move {
                 println!("Collecting metric for app close");
                 let res = self.metrics_manager.track_event(client, close_event).await;
                 match res {
