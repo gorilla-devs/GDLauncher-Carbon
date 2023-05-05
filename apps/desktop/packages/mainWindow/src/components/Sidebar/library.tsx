@@ -91,7 +91,15 @@ const Sidebar = () => {
               <For each={favoriteInstances()}>
                 {(instance) => (
                   //TODO: SKELETON
-                  <Suspense fallback={<Skeleton.sidebarInstance />}>
+                  <Suspense
+                    fallback={
+                      isSidebarOpened() ? (
+                        <Skeleton.sidebarInstance />
+                      ) : (
+                        <Skeleton.sidebarInstanceSmall />
+                      )
+                    }
+                  >
                     <InstanceTile
                       instance={instance}
                       isSidebarOpened={isSidebarOpened()}
@@ -115,7 +123,15 @@ const Sidebar = () => {
                 <For each={values}>
                   {(instance) => (
                     //TODO: SKELETON
-                    <Suspense fallback={<Skeleton.sidebarInstance />}>
+                    <Suspense
+                      fallback={
+                        isSidebarOpened() ? (
+                          <Skeleton.sidebarInstance />
+                        ) : (
+                          <Skeleton.sidebarInstanceSmall />
+                        )
+                      }
+                    >
                       <InstanceTile
                         instance={instance}
                         isSidebarOpened={isSidebarOpened()}

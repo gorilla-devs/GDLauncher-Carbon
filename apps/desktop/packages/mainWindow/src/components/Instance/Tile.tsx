@@ -248,14 +248,6 @@ const Tile = (props: Props) => {
             </Show>
 
             <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
-              <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
-                <div
-                  class="text-white i-ri:more-2-fill text-lg"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                />
-              </div>
               <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
                 <div
                   class="text-white text-lg i-ri:play-fill"

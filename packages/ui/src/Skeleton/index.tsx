@@ -14,6 +14,10 @@ Skeleton.sidebarInstance = () => {
   );
 };
 
+Skeleton.sidebarInstanceSmall = () => {
+  return <div class="h-10 w-10 rounded-lg bg-darkSlate-700 py-2 px-4" />;
+};
+
 Skeleton.instance = () => {
   return (
     <div class="flex flex-col gap-2">
