@@ -400,7 +400,7 @@ pub struct Category {
     pub url: String,
     pub icon_url: String,
     pub date_modified: String,
-    pub is_class: bool,
+    pub is_class: Option<bool>,
     pub class_id: Option<i32>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,

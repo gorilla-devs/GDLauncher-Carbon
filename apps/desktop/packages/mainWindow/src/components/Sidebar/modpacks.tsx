@@ -30,7 +30,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
-      <div class="h-full w-full py-5 px-4 box-border overflow-y-auto">
+      <div class="h-full w-full py-5 box-border overflow-y-auto px-4">
         <Collapsable title="Modloader">
           <div class="flex flex-col gap-3">
             <Radio.group
@@ -54,9 +54,9 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
-        <Collapsable title="Categories">
-          <div class="flex flex-col gap-3">
-            <Show when={modpacksCategories.length > 0}>
+        <Show when={deepTrack(modpacksCategories).length > 0}>
+          <Collapsable title="Categories">
+            <div class="flex flex-col gap-3">
               <For each={deepTrack(modpacksCategories)}>
                 {(category) => {
                   const selected = () => category.selected;
@@ -74,19 +74,16 @@ const Sidebar = () => {
                         }}
                       />
                       <div class="flex items-center gap-2 max-w-32">
-                        <img
-                          class="h-4 w-4"
-                          src={getModloaderIcon("vanilla")}
-                        />
+                        <img class="h-4 w-4" src={category.iconUrl} />
                         <p class="m-0">{category.name}</p>
                       </div>
                     </div>
                   );
                 }}
               </For>
-            </Show>
-          </div>
-        </Collapsable>
+            </div>
+          </Collapsable>
+        </Show>
       </div>
     </SiderbarWrapper>
   );
