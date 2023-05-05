@@ -30,7 +30,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
-      <div class="h-full w-full py-5 box-border overflow-y-auto px-4">
+      <div class="h-full w-full py-5 box-border px-4 overflow-y-auto">
         <Collapsable title="Modloader">
           <div class="flex flex-col gap-3">
             <Radio.group

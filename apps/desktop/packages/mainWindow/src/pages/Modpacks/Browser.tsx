@@ -199,7 +199,7 @@ export default function Browser() {
           <Input
             placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
-            class="w-full text-darkSlate-50 rounded-full max-w-none flex-1"
+            class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
               rowVirtualizer.scrollToIndex(0);
@@ -277,7 +277,7 @@ export default function Browser() {
           <Button
             variant="outline"
             size="medium"
-            icon={<div class="rounded-full i-ri:download-2-fill text-md" />}
+            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
           >
             <Trans
               key="instance.import"
@@ -321,7 +321,7 @@ export default function Browser() {
           </Show>
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden absolute bottom-0 top-[142px] left-0 right-0">
+      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden absolute bottom-0 left-0 right-0 top-[142px]">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">

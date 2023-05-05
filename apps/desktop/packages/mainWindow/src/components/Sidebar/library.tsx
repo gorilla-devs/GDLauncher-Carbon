@@ -34,7 +34,7 @@ const Sidebar = () => {
                   toggleSidebar();
                 }}
               >
-                <div class="i-ri:search-line transition duration-100 ease-in-out text-darkSlate-500 group-hover:text-darkSlate-50" />
+                <div class="transition duration-100 ease-in-out i-ri:search-line text-darkSlate-500 group-hover:text-darkSlate-50" />
               </div>
             }
           >

@@ -30,7 +30,7 @@ const General = () => {
   });
 
   return (
-    <div class="bg-darkSlate-800 w-full h-auto flex flex-col py-5 px-6 box-border">
+    <div class="w-full flex flex-col py-5 box-border bg-darkSlate-800 h-auto px-6">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="settings.general"
@@ -49,7 +49,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 m-0 max-w-96">
+          <p class="m-0 text-darkSlate-300 max-w-96">
             <Trans
               key="settings.choose_a_language_text"
               options={{
@@ -65,7 +65,7 @@ const General = () => {
               { label: t("languages.italian"), key: "it" },
             ]}
             onChange={(lang) => {
-              settingsMutation.mutate({ language: lang.key });
+              settingsMutation.mutate({ language: lang.key as string });
             }}
           />
         </div>
@@ -96,7 +96,9 @@ const General = () => {
               { label: t("settings.release_channel_alpha"), key: "alpha" },
             ]}
             onChange={(channel) => {
-              settingsMutation.mutate({ releaseChannel: channel.key });
+              settingsMutation.mutate({
+                releaseChannel: channel.key as string,
+              });
             }}
           />
         </div>
@@ -128,7 +130,7 @@ const General = () => {
             }))}
             onChange={(downloads) => {
               settingsMutation.mutate({
-                concurrentDownloads: parseInt(downloads.key, 10),
+                concurrentDownloads: parseInt(downloads.key as string, 10),
               });
             }}
           />
@@ -144,7 +146,7 @@ const General = () => {
           />
         </h5>
         <div class="flex w-full justify-between">
-          <div class="flex gap-4 items-center">
+          <div class="flex items-center gap-4">
             <Input
               class="w-20"
               placeholder={t("settings.resolution_width") || ""}
@@ -342,7 +344,7 @@ const General = () => {
             <p class="mb-0 mt-2">v.1.1.26</p>
           </div>
         </div>
-        <p class="text-darkSlate-500 m-0">
+        <p class="m-0 text-darkSlate-500">
           <Trans
             key="settings.last_version"
             options={{

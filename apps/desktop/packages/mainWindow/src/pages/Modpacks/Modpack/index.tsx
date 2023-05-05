@@ -9,21 +9,21 @@ type Props = { modpack: FEMod };
 
 const Modpack = (props: Props) => {
   return (
-    <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl max-h-96">
+    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-xl max-h-96">
       <div class="flex gap-4">
         <img
-          class="h-30 rounded-xl w-30 select-none"
+          class="rounded-xl select-none h-30 w-30"
           src={props.modpack.logo.thumbnailUrl}
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
-            <h2 class="mt-0 mb-1 text-ellipsis overflow-hidden whitespace-nowrap max-w-92">
+            <h2 class="mt-0 text-ellipsis overflow-hidden mb-1 whitespace-nowrap max-w-92">
               {props.modpack.name}
             </h2>
             <div class="flex gap-4 items-center">
               <div class="flex gap-2 items-center text-darkSlate-100">
-                <i class="i-ri:time-fill text-darkSlate-100" />
-                <div class="text-sm whitespace-nowrap">
+                <i class="text-darkSlate-100 i-ri:time-fill" />
+                <div class="whitespace-nowrap text-sm">
                   {format(new Date(props.modpack.dateCreated).getTime(), "P")}
                 </div>
               </div>
@@ -34,7 +34,7 @@ const Modpack = (props: Props) => {
                 </div>
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
-                <i class="i-ri:user-fill text-darkSlate-100" />
+                <i class="text-darkSlate-100 i-ri:user-fill" />
                 <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
                   <For each={props.modpack.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
@@ -43,15 +43,15 @@ const Modpack = (props: Props) => {
               </div>
             </div>
           </div>
-          <p class="m-0 text-darkSlate-50 text-sm max-h-16">
+          <p class="m-0 text-sm text-darkSlate-50 max-h-16">
             {props.modpack.summary}
           </p>
         </div>
       </div>
       <div class="flex justify-between items-center gap-3">
-        <div class="flex gap-2 max-w-100 overflow-x-auto scrollbar-hide">
+        <div class="flex gap-2 overflow-x-auto max-w-100 scrollbar-hide">
           <For each={props.modpack.categories}>
-            {(tag) => <Tag name={tag.name} img={tag.avatarUrl} type="fixed" />}
+            {(tag) => <Tag name={tag.name} img={tag.iconUrl} type="fixed" />}
           </For>
         </div>
         <div class="flex gap-3">
