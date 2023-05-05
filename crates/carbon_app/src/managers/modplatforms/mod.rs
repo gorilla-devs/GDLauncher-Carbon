@@ -1,6 +1,6 @@
-use super::ManagerRef;
-use crate::domain::modplatforms::curseforge as cf;
 use crate::{iridium_client::get_client, managers::GDL_API_BASE};
+
+use super::ManagerRef;
 
 mod curseforge;
 

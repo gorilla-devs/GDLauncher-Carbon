@@ -1,11 +1,14 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::domain::{
     maven::MavenCoordinates,
     minecraft::minecraft::{
-        Action, Argument, ArgumentEntry, Library, ManifestVersion, MinecraftManifest, OsName,
-        OsRule, Rule, Value, VersionArguments, VersionInfo,
+        get_current_os, get_default_jvm_args, is_rule_allowed, library_is_allowed,
     },
+};
+use daedalus::minecraft::{
+    Argument, ArgumentType, ArgumentValue, DownloadType, Library, Version, VersionInfo,
+    VersionManifest,
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -38,13 +41,13 @@ pub enum MinecraftManifestError {
 pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &Url,
-) -> anyhow::Result<MinecraftManifest> {
+) -> anyhow::Result<VersionManifest> {
     let server_url = meta_base_url.join("minecraft/v0/manifest.json")?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
         .await?
-        .json::<MinecraftManifest>()
+        .json::<VersionManifest>()
         .await?;
 
     Ok(new_manifest)
@@ -52,7 +55,7 @@ pub async fn get_manifest(
 
 pub async fn get_version(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
-    manifest_version_meta: ManifestVersion,
+    manifest_version_meta: Version,
 ) -> anyhow::Result<VersionInfo> {
     let url = manifest_version_meta.url;
     let version_meta = reqwest_client.get(url).send().await?.json().await?;
@@ -213,9 +216,8 @@ pub async fn generate_startup_command(
 ) -> Vec<String> {
     let libraries = version
         .libraries
-        .libraries
         .iter()
-        .filter(|&library| library.is_allowed() && library.include_in_classpath)
+        .filter(|&library| library_is_allowed(library.clone()) && library.include_in_classpath)
         .map(|library| {
             let path = runtime_path
                 .get_libraries()
@@ -231,32 +233,36 @@ pub async fn generate_startup_command(
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
 
-    let arguments = version
-        .arguments
-        .clone()
-        .unwrap_or_else(|| VersionArguments {
-            game: version
+    let arguments = version.arguments.clone().unwrap_or_else(|| {
+        let mut arguments = HashMap::new();
+        arguments.insert(
+            ArgumentType::Game,
+            version
                 .minecraft_arguments
                 .unwrap()
                 .split(' ')
-                .map(|s| Argument::String(s.to_string()))
+                .map(|s| Argument::Normal(s.to_string()))
                 .collect(),
-            jvm: VersionArguments::get_default_jvm_args(),
-        });
+        );
 
-    let game_arguments = arguments.game;
-    let jvm_arguments = arguments.jvm;
+        arguments.insert(ArgumentType::Jvm, get_default_jvm_args());
 
-    for arg in jvm_arguments {
+        arguments
+    });
+
+    let game_arguments = arguments.get(&ArgumentType::Game).unwrap();
+    let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
+
+    for arg in jvm_arguments.clone() {
         match arg {
-            Argument::String(string) => command.push(string),
-            Argument::Complex(rule) => {
-                let is_allowed = rule.rules.iter().all(|rule| rule.is_allowed());
+            Argument::Normal(string) => command.push(string),
+            Argument::Ruled { rules, value } => {
+                let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
 
                 if is_allowed {
-                    match rule.value {
-                        Value::String(string) => command.push(string),
-                        Value::StringArray(arr) => command.extend(arr),
+                    match value {
+                        ArgumentValue::Single(string) => command.push(string),
+                        ArgumentValue::Many(arr) => command.extend(arr),
                     }
                 }
             }
@@ -265,16 +271,16 @@ pub async fn generate_startup_command(
 
     command.push(version.main_class.clone());
 
-    for arg in game_arguments {
+    for arg in game_arguments.clone() {
         match arg {
-            Argument::String(string) => command.push(string),
-            Argument::Complex(rule) => {
-                let is_allowed = rule.rules.iter().all(|rule| rule.is_allowed());
+            Argument::Normal(string) => command.push(string),
+            Argument::Ruled { rules, value } => {
+                let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
 
                 if is_allowed {
-                    match rule.value {
-                        Value::String(string) => command.push(string),
-                        Value::StringArray(arr) => command.extend(arr),
+                    match value {
+                        ArgumentValue::Single(string) => command.push(string),
+                        ArgumentValue::Many(arr) => command.extend(arr),
                     }
                 }
             }
@@ -296,10 +302,10 @@ pub async fn generate_startup_command(
     let game_directory = instance_path;
     let assets_root = runtime_path.get_assets().to_path();
     let game_assets = runtime_path.get_assets().to_path();
-    let assets_index_name = version.assets.clone().unwrap();
+    let assets_index_name = version.assets.clone();
     let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
         "{}.jar",
-        version.downloads.as_ref().unwrap().client.sha1
+        version.downloads.get(&DownloadType::Client).unwrap().sha1
     ));
 
     let replacer_args = ReplacerArgs {
@@ -323,7 +329,7 @@ pub async fn generate_startup_command(
         auth_access_token: player_token.clone(),
         auth_session: player_token,
         user_type: "mojang".to_owned(),
-        version_type: version.type_.to_string(),
+        version_type: version.type_.as_str().to_string(),
         user_properties: "{}".to_owned(),
     };
 
@@ -404,53 +410,14 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
 
     for library in version
         .libraries
-        .libraries
         .iter()
-        .filter(|lib| lib.is_allowed())
+        .filter(|&lib| library_is_allowed(lib.clone()))
     {
         match &library.natives {
             Some(natives) => {
-                if cfg!(target_os = "windows") {
-                    match natives.windows.as_ref() {
-                        Some(native_name) => {
-                            extract_single_library_natives(
-                                runtime_path,
-                                library,
-                                &version.id,
-                                native_name,
-                            )
-                            .await
-                        }
-                        None => continue,
-                    }
-                } else if cfg!(target_os = "linux") {
-                    match natives.linux.as_ref() {
-                        Some(native_name) => {
-                            extract_single_library_natives(
-                                runtime_path,
-                                library,
-                                &version.id,
-                                native_name,
-                            )
-                            .await
-                        }
-                        None => continue,
-                    }
-                } else if cfg!(target_os = "macos") {
-                    match natives.osx.as_ref() {
-                        Some(native_name) => {
-                            extract_single_library_natives(
-                                runtime_path,
-                                &library,
-                                &version.id,
-                                native_name,
-                            )
-                            .await
-                        }
-                        None => continue,
-                    }
-                } else {
-                    panic!("Unsupported platform");
+                if let Some(native_name) = natives.get(&get_current_os()) {
+                    extract_single_library_natives(runtime_path, library, &version.id, native_name)
+                        .await;
                 }
             }
             None => continue,
@@ -460,7 +427,9 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
 
 #[cfg(test)]
 mod tests {
-    use crate::setup_managers_for_test;
+    use crate::{
+        domain::minecraft::minecraft::library_into_natives_downloadable, setup_managers_for_test,
+    };
 
     use super::*;
     use carbon_net::Progress;
@@ -553,17 +522,18 @@ mod tests {
 
         let natives = version
             .libraries
-            .libraries
             .iter()
-            .filter(|&lib| lib.is_native_artifact())
+            .filter(|&lib| lib.natives.is_some())
             .collect::<Vec<_>>();
 
         let mut downloadables = vec![];
         let libraries_path = runtime_path.get_libraries().to_path();
         for native in natives {
-            downloadables.extend(native.clone().into_natives_downloadable(&libraries_path));
+            downloadables.extend(library_into_natives_downloadable(
+                native.clone(),
+                &libraries_path,
+            ));
         }
-
         let progress = tokio::sync::watch::channel(Progress::new());
 
         carbon_net::download_multiple(downloadables, progress.0)
