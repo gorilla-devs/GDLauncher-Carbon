@@ -54,7 +54,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full box-border pt-5 pb-5 transition-all">
+      <div class="h-full w-full box-border transition-all pt-5 pb-5">
         <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}
@@ -146,7 +146,7 @@ const Sidebar = () => {
           <Show when={(routeData.instancesUngrouped?.data || []).length === 0}>
             <div class="w-full h-full flex flex-col justify-center items-center">
               <img src={glassBlock} class="w-16 h-16" />
-              <p class="text-darkSlate-50 max-w-100 text-center text-xs">
+              <p class="text-darkSlate-50 text-center text-xs max-w-100">
                 <Trans
                   key="instance.no_mods_text"
                   options={{

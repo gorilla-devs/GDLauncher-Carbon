@@ -130,13 +130,13 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems}>
           <div
-            class="select-none group flex justify-center flex-col items-start z-50"
+            class="select-none group flex justify-center flex-col z-50 items-start"
             classList={{
               "cursor-pointer": props.isLoading,
             }}
           >
             <div
-              class="relative bg-cover bg-center rounded-2xl h-38 w-38 flex justify-center items-center"
+              class="relative rounded-2xl flex justify-center items-center bg-cover bg-center h-38 w-38"
               classList={{
                 grayscale: props.isLoading,
                 "bg-green-600": !props.img,
@@ -236,7 +236,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems}>
           <div
-            class="relative group select-none w-full flex items-center gap-4 box-border h-14 px-3 erelative"
+            class="relative group select-none w-full flex items-center gap-4 box-border px-3 h-14 erelative"
             onClick={(e) => props?.onClick?.(e)}
             classList={{
               "cursor-pointer": props.isLoading,

@@ -32,7 +32,7 @@ const Home = () => {
   });
 
   return (
-    <div class="p-6 pb-0">
+    <div class="pb-0 p-6">
       <div>
         <Show when={news.length > 0 && isNewsVisible()}>
           <News

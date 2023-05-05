@@ -55,7 +55,7 @@ const ContextMenu = (props: ContextMenuProps) => {
       <Show when={menuRef == ContextMenu?.openMenu()}>
         <Portal mount={document.body}>
           <div
-            class="context-menu bg-darkSlate-900 w-40 h-48 rounded-lg overflow-hidden"
+            class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40 h-48"
             style={{
               position: "absolute",
               top: y() - 190 + "px",
@@ -67,7 +67,7 @@ const ContextMenu = (props: ContextMenuProps) => {
             <For each={props.menuItems}>
               {(item) => (
                 <div
-                  class="flex items-center gap-1 px-3 cursor-pointer w-full h-8 hover:bg-darkSlate-700 hover:text-white text-darkGray-50 py-1"
+                  class="flex items-center cursor-pointer w-full gap-1 hover:text-white px-3 h-8 hover:bg-darkSlate-700 text-darkGray-50 py-1"
                   onClick={item.action}
                 >
                   <Show when={item.icon}>
