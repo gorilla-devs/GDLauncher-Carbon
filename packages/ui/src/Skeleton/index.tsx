@@ -14,4 +14,16 @@ Skeleton.sidebarInstance = () => {
   );
 };
 
+Skeleton.instance = () => {
+  return (
+    <div class="flex flex-col gap-2">
+      <div class="w-38 h-38 rounded-lg bg-darkSlate-700" />
+      <div class="flex flex-col space-between gap-2">
+        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
+        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
+      </div>
+    </div>
+  );
+};
+
 export { Skeleton };

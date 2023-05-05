@@ -1,4 +1,4 @@
-import { Carousel, News } from "@gd/ui";
+import { Carousel, News, Skeleton } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, Suspense, createEffect, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -64,7 +64,7 @@ const Home = () => {
               <For each={instances}>
                 {(instance) => (
                   //TODO: SKELETON
-                  <Suspense fallback={<></>}>
+                  <Suspense fallback={<Skeleton.instance />}>
                     <InstanceTile instance={instance} />
                   </Suspense>
                 )}
