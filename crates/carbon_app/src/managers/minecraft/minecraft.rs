@@ -208,8 +208,8 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
 
 pub async fn generate_startup_command(
     full_account: FullAccount,
-    xmx_memory: u16,
-    xms_memory: u16,
+    xmx_memory: u64,
+    xms_memory: u64,
     runtime_path: &RuntimePath,
     version: VersionInfo,
     instance_path: InstancePath,
@@ -363,8 +363,8 @@ pub async fn generate_startup_command(
 pub async fn launch_minecraft(
     java_binary: PathBuf,
     full_account: FullAccount,
-    xmx_memory: u16,
-    xms_memory: u16,
+    xmx_memory: u64,
+    xms_memory: u64,
     runtime_path: &RuntimePath,
     version: VersionInfo,
     instance_path: InstancePath,

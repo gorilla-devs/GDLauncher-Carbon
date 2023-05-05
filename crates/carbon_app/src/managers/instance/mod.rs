@@ -848,6 +848,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         name: Option<String>,
         use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
         notes: Option<String>,
+        memory: Option<Option<(u64, u64)>>,
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
@@ -891,6 +892,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(notes) = notes {
             info.notes = notes;
+        }
+
+        if let Some(memory) = memory {
+            info.game_configuration.memory = memory;
         }
 
         let json = schema::make_instance_config(info.clone())?;
