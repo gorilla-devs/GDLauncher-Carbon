@@ -125,6 +125,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.name.into(),
                     details.use_loaded_icon.into(),
                     details.notes.into(),
+                    details.memory.into_option()
+                        .map(|m| m.map(|(xms, xmx)| (xms as u64, xmx as u64))),
                 )
                 .await
         }
@@ -398,6 +400,7 @@ struct UpdateInstance {
     name: Update<String>,
     use_loaded_icon: Update<bool>,
     notes: Update<String>,
+    memory: Update<Option<(u32, u32)>>,
 }
 
 #[derive(Type, Deserialize)]

@@ -74,6 +74,16 @@ impl ManagerRef<'_, InstanceManager> {
 
         let config = data.config.clone();
 
+        let (xms_memory, xmx_memory) = match config.game_configuration.memory {
+            Some(memory) => memory,
+            None => self
+                .app
+                .settings_manager()
+                .get()
+                .await
+                .map(|c| (c.xms as u64, c.xmx as u64))?,
+        };
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
@@ -240,6 +250,7 @@ impl ManagerRef<'_, InstanceManager> {
                     )
                     .await?;
                 }
+
                 t_forge_processors.complete_opaque();
 
                 dbg!();
@@ -248,8 +259,8 @@ impl ManagerRef<'_, InstanceManager> {
                         managers::minecraft::minecraft::launch_minecraft(
                             PathBuf::from("java"),
                             account,
-                            2048_u16,
-                            2048_u16,
+                            xms_memory,
+                            xmx_memory,
                             &runtime_path,
                             version_info,
                             instance_path,
