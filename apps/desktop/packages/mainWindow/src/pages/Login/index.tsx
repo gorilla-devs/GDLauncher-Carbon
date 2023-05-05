@@ -68,6 +68,7 @@ export default function Login() {
               </Match>
               <Match when={step() === 1}>
                 <CodeStep
+                  setStep={setStep}
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />

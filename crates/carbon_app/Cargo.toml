@@ -52,6 +52,7 @@ hyper = { workspace = true }
 zip = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
+daedalus = { workspace = true }
 url = { workspace = true }
 serde_repr = { workspace = true }
 iridium = { path = "../iridium", optional = true }
