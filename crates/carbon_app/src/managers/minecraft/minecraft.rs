@@ -217,13 +217,30 @@ pub async fn generate_startup_command(
     let libraries = version
         .libraries
         .iter()
-        .filter(|&library| library_is_allowed(library.clone()) && library.include_in_classpath)
-        .map(|library| {
-            let path = runtime_path
-                .get_libraries()
-                .get_library_path(MavenCoordinates::try_from(library.name.clone(), None).unwrap());
+        .filter_map(|library| {
+            if !library_is_allowed(library.clone()) || !library.include_in_classpath {
+                return None;
+            }
 
-            path.display().to_string()
+            let path = runtime_path.get_libraries().get_library_path({
+                if let Some(artifact) = &library.downloads.as_ref().unwrap().artifact {
+                    artifact.path.clone()
+                } else if let Some(classifiers) = &library.downloads.as_ref().unwrap().classifiers {
+                    let Some(native_name) = library
+                        .natives
+                        .as_ref()
+                        .expect("No natives specified")
+                        .get(&get_current_os()) else {
+                            return None;
+                        };
+
+                    classifiers.get(native_name).unwrap().path.clone()
+                } else {
+                    panic!("Library has no artifact or classifier");
+                }
+            });
+
+            Some(path.display().to_string())
         })
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
         .unwrap();
@@ -397,9 +414,19 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
         version_id: &str,
         native_name: &str,
     ) {
-        let maven = MavenCoordinates::try_from(library.name.clone(), Some(native_name.to_string()))
-            .unwrap();
-        let path = runtime_path.get_libraries().get_library_path(maven);
+        let path = runtime_path.get_libraries().get_library_path({
+            library
+                .downloads
+                .as_ref()
+                .unwrap()
+                .classifiers
+                .as_ref()
+                .unwrap()
+                .get(native_name)
+                .unwrap()
+                .path
+                .clone()
+        });
         let dest = runtime_path.get_natives().get_versioned(version_id);
         tokio::fs::create_dir_all(&dest).await.unwrap();
 
