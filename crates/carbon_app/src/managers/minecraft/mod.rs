@@ -212,8 +212,8 @@ mod tests {
         let mut child = launch_minecraft(
             PathBuf::from("java"),
             full_account,
-            2048_u16,
-            2048_u16,
+            2048,
+            2048,
             runtime_path,
             version_info,
             instance_path,

@@ -87,8 +87,8 @@ pub enum ModLoaderType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryRange {
-    pub min_mb: u64,
-    pub max_mb: u64,
+    pub min_mb: u16,
+    pub max_mb: u16,
 }
 
 use crate::domain::instance::info;
@@ -279,14 +279,14 @@ impl From<info::ModLoaderType> for ModLoaderType {
     }
 }
 
-impl From<MemoryRange> for (u64, u64) {
+impl From<MemoryRange> for (u16, u16) {
     fn from(value: MemoryRange) -> Self {
         (value.min_mb, value.max_mb)
     }
 }
 
-impl From<(u64, u64)> for MemoryRange {
-    fn from(value: (u64, u64)) -> Self {
+impl From<(u16, u16)> for MemoryRange {
+    fn from(value: (u16, u16)) -> Self {
         Self {
             min_mb: value.0,
             max_mb: value.1,
