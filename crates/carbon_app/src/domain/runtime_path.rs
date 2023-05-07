@@ -16,8 +16,8 @@ pub struct LibrariesPath(PathBuf);
 
 // TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
-    pub fn get_library_path(&self, maven_coordinate: MavenCoordinates) -> PathBuf {
-        self.0.join(maven_coordinate.into_path())
+    pub fn get_library_path(&self, library_path: String) -> PathBuf {
+        self.0.join(library_path)
     }
 
     pub fn to_path(&self) -> PathBuf {
