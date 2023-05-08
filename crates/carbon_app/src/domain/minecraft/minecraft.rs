@@ -28,6 +28,7 @@ pub fn libraries_into_vec_downloadable(
         if let Some(base_url) = &library.url {
             let checksum = None;
 
+            // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
             let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
                 continue
             };
@@ -77,7 +78,7 @@ pub fn library_into_lib_downloadable(
 
         return Some(carbon_net::Downloadable {
             url: artifact.url,
-            path: PathBuf::from(base_path).join(artifact.path.unwrap()),
+            path: PathBuf::from(base_path).join(artifact.path),
             checksum,
             size: Some(artifact.size as u64),
         });
@@ -110,7 +111,7 @@ pub fn library_into_natives_downloadable(
 
     Some(carbon_net::Downloadable {
         url: mapping_class.url.clone(),
-        path: PathBuf::from(base_path).join(mapping_class.clone().path.unwrap()),
+        path: PathBuf::from(base_path).join(mapping_class.clone().path),
         checksum,
         size: Some(mapping_class.size as u64),
     })
