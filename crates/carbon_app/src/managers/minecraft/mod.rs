@@ -1,3 +1,4 @@
+use anyhow::Context;
 use carbon_net::Progress;
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
