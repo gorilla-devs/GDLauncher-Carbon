@@ -34,7 +34,7 @@ import {
 
 const NoModpacks = () => {
   return (
-    <div class="w-full flex h-full justify-center items-center min-h-90">
+    <div class="w-full flex h-full items-center justify-center min-h-90">
       <div class="flex justify-center items-center flex-col text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
@@ -52,7 +52,7 @@ const NoModpacks = () => {
 
 const FetchingModpacks = () => {
   return (
-    <div class="w-full flex h-full justify-center items-center min-h-90">
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
       <div class="flex justify-center items-center flex-col text-center">
         <p class="text-darkSlate-50 max-w-100">
           <Trans
@@ -63,6 +63,22 @@ const FetchingModpacks = () => {
           />
         </p>
         <Spinner />
+      </div>
+    </div>
+  );
+};
+const NoMoreModpacks = () => {
+  return (
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
+      <div class="flex justify-center items-center flex-col text-center">
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_no_more_modpacks"
+            options={{
+              defaultValue: "No more modpacks to load",
+            }}
+          />
+        </p>
       </div>
     </div>
   );
@@ -96,6 +112,7 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   const [modpacks, setModpacks] = createStore<FEMod[]>([]);
+  const [hasNextPage, setHasNextPage] = createSignal(true);
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
@@ -181,10 +198,23 @@ export default function Browser() {
   });
 
   createEffect(() => {
+    if (curseforgeSearch.data?.pagination) {
+      setHasNextPage(
+        curseforgeSearch.data.pagination.index <
+          curseforgeSearch.data.pagination.totalCount
+      );
+    }
+  });
+
+  createEffect(() => {
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
     if (!lastItem) return;
 
-    if (lastItem.index >= modpacks.length - 1 && !curseforgeSearch.isFetching) {
+    if (
+      lastItem.index >= modpacks.length - 1 &&
+      !curseforgeSearch.isFetching &&
+      hasNextPage()
+    ) {
       setQuery(
         "query",
         produce((prev) => (prev.index = (prev.index as number) + 20 + 1))
@@ -193,8 +223,8 @@ export default function Browser() {
   });
 
   return (
-    <div class="relative box-border h-full w-full">
-      <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
+    <div class="box-border h-full w-full relative">
+      <div class="flex flex-col bg-darkSlate-800 pt-5 sticky top-0 left-0 right-0 z-10 px-5">
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -256,7 +286,7 @@ export default function Browser() {
             />
           </div>
           <div
-            class="text-2xl cursor-pointer"
+            class="cursor-pointer text-2xl"
             classList={{
               "i-ri:sort-asc": query.query.sortOrder === "ascending",
               "i-ri:sort-desc": query.query.sortOrder === "descending",
@@ -321,7 +351,7 @@ export default function Browser() {
           </Show>
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden absolute bottom-0 left-0 right-0 top-[142px]">
+      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[142px]">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
@@ -373,7 +403,7 @@ export default function Browser() {
             ref={(el) => {
               containerRef = el;
             }}
-            class="w-full overflow-auto h-full scrollbar-hide"
+            class="w-full h-full scrollbar-hide overflow-auto"
           >
             <div
               style={{
@@ -401,15 +431,12 @@ export default function Browser() {
                       }}
                     >
                       <div class="bg-darkSlate-700 rounded-xl">
-                        <Switch
-                          fallback={
-                            <div class="p-5 flex flex-col gap-4 bg-darkSlate-700 rounded-xl max-h-96">
-                              <Spinner />
-                            </div>
-                          }
-                        >
+                        <Switch fallback={<FetchingModpacks />}>
                           <Match when={!isLoaderRow() && modpack()}>
                             <Modpack modpack={modpack()} />
+                          </Match>
+                          <Match when={isLoaderRow() && !hasNextPage()}>
+                            <NoMoreModpacks />
                           </Match>
                         </Switch>
                       </div>
@@ -423,13 +450,9 @@ export default function Browser() {
         <Show when={curseforgeSearch.isError}>
           <ErrorFetchingModpacks error={curseforgeSearch.error} />
         </Show>
-        <Show
-          when={
-            curseforgeSearch.isFetching && curseforgeSearch.status === "loading"
-          }
-        >
+        {/* <Show when={curseforgeSearch.isFetching}>
           <FetchingModpacks />
-        </Show>
+        </Show> */}
       </div>
     </div>
   );
