@@ -57,20 +57,23 @@ const Group = (props: GroupProps) => {
     },
   };
 
-  const c = children(() => props.children);
+  const Inner = () => {
+    const c = children(() => props.children);
 
-  createEffect(() => {
-    (c() as JSX.InputHTMLAttributes<HTMLInputElement>[])?.forEach((item) => {
-      // @ts-ignore
-      const input = item.querySelector(".cursor-pointer input");
+    createEffect(() => {
+      (c() as JSX.InputHTMLAttributes<HTMLInputElement>[])?.forEach((item) => {
+        // @ts-ignore
+        const input = item.querySelector(".cursor-pointer input");
 
-      return (input.checked = props.value === input.value);
+        return (input.checked = props.value === input.value);
+      });
     });
-  });
+    return <>{c()}</>;
+  };
 
   return (
     <RadioContext.Provider value={context}>
-      {props.children}
+      <Inner />
     </RadioContext.Provider>
   );
 };
