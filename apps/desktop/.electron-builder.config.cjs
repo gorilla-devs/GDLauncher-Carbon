@@ -49,7 +49,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip", "nsis"],
+    target: isDockerBuild ? ["dir", "zip"] : ["dir", "zip", "nsis"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
   },
   nsis: {
@@ -59,7 +59,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip", "dmg"],
+    target: isDockerBuild ? ["dir", "zip"] : ["dir", "zip", "dmg"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",

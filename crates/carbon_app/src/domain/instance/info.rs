@@ -42,7 +42,7 @@ pub struct GameConfig {
     pub version: GameVersion,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
-    pub memory: Option<(u64, u64)>,
+    pub memory: Option<(u16, u16)>,
 }
 
 #[derive(Debug, Clone)]

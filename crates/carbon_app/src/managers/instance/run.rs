@@ -81,7 +81,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .settings_manager()
                 .get()
                 .await
-                .map(|c| (c.xms as u64, c.xmx as u64))?,
+                .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
 
         let runtime_path = self.app.settings_manager().runtime_path.clone();
@@ -207,11 +207,15 @@ impl ManagerRef<'_, InstanceManager> {
                 // dropped when the sender is dropped
                 tokio::spawn(async move {
                     while progress_watch_rx.changed().await.is_ok() {
-                        let progress = progress_watch_rx.borrow();
-                        t_download_files.update_download(
-                            progress.current_count as u32,
-                            progress.current_size as u32,
-                        );
+                        {
+                            let progress = progress_watch_rx.borrow();
+                            t_download_files.update_download(
+                                progress.current_count as u32,
+                                progress.current_size as u32,
+                            );
+                        }
+
+                        tokio::time::sleep(Duration::from_millis(200)).await;
                     }
                 });
 
@@ -253,7 +257,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_forge_processors.complete_opaque();
 
-                dbg!();
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(

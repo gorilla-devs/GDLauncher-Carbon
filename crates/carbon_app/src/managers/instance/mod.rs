@@ -848,7 +848,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         name: Option<String>,
         use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
         notes: Option<String>,
-        memory: Option<Option<(u64, u64)>>,
+        memory: Option<Option<(u16, u16)>>,
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
@@ -1719,7 +1719,7 @@ mod test {
 
         // update
         app.instance_manager()
-            .update_instance(instance_id, Some(String::from("test2")), None, None)
+            .update_instance(instance_id, Some(String::from("test2")), None, None, None)
             .await?;
 
         expected[0].instances[0].name = String::from("test2");

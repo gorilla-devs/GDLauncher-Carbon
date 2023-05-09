@@ -1,5 +1,5 @@
 use anyhow::Context;
-use carbon_net::{Downloadable, IntoDownloadable, IntoVecDownloadable, Progress};
+use carbon_net::Progress;
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,
@@ -213,8 +213,8 @@ mod tests {
         let mut child = launch_minecraft(
             PathBuf::from("java"),
             full_account,
-            2048_u16,
-            2048_u16,
+            2048,
+            2048,
             runtime_path,
             version_info,
             instance_path,

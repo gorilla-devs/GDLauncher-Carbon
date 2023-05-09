@@ -1,6 +1,5 @@
 use daedalus::minecraft::{
-    Argument, ArgumentValue, AssetIndex, AssetsIndex, Download, Library, Os, OsRule, Rule,
-    RuleAction,
+    Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
 use std::path::{Path, PathBuf};
 
@@ -76,9 +75,19 @@ pub fn library_into_lib_downloadable(
     if let Some(artifact) = artifact {
         let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
+        // workaround patched libs not having a path (TEMP?)
+        let artifact_path = artifact.path.unwrap_or(
+            MavenCoordinates::try_from(library.name, None)
+                .ok()
+                .unwrap()
+                .into_path()
+                .to_string_lossy()
+                .to_string(),
+        );
+
         return Some(carbon_net::Downloadable {
             url: artifact.url,
-            path: PathBuf::from(base_path).join(artifact.path.unwrap()),
+            path: PathBuf::from(base_path).join(artifact_path),
             checksum,
             size: Some(artifact.size as u64),
         });

@@ -15,7 +15,7 @@ import {
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
-import { createStore, produce } from "solid-js/store";
+import { createStore } from "solid-js/store";
 import { bytesToMB } from "@/utils/helpers";
 
 type InstanceDownloadProgress = {
