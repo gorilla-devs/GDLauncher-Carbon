@@ -1,36 +1,23 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  batch,
-  createEffect,
-  createSignal,
-} from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
-import Tags from "./Tags";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
-import { createStore, produce } from "solid-js/store";
+import { createStore } from "solid-js/store";
 import {
   FEMod,
   FEModLoaderType,
-  FEModSearchParameters,
   FEModSearchSortField,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
 import { deepTrack } from "@solid-primitives/deep";
-import {
-  modpacksCategories,
-  modLoader,
-  setModpacksCategories,
-} from "@/utils/modpackBrowser";
+import { modLoader, selectedModpackCategory } from "@/utils/modpackBrowser";
+import useModpacksQuery from "./useModpacksQuery";
 
 const NoModpacks = () => {
   return (
@@ -42,6 +29,23 @@ const NoModpacks = () => {
             key="instance.no_modpacks_text"
             options={{
               defaultValue: "At the moment there is no modpacks.",
+            }}
+          />
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const NoMoreModpacks = () => {
+  return (
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
+      <div class="flex justify-center items-center flex-col text-center">
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_no_more_modpacks"
+            options={{
+              defaultValue: "No more modpacks to load",
             }}
           />
         </p>
@@ -67,22 +71,6 @@ const FetchingModpacks = () => {
     </div>
   );
 };
-const NoMoreModpacks = () => {
-  return (
-    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
-      <div class="flex justify-center items-center flex-col text-center">
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.fetching_no_more_modpacks"
-            options={{
-              defaultValue: "No more modpacks to load",
-            }}
-          />
-        </p>
-      </div>
-    </div>
-  );
-};
 
 const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   const parsedError = () =>
@@ -104,10 +92,6 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
-interface Query extends FEModSearchParameters {
-  updateByFilter: boolean;
-}
-
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
@@ -116,26 +100,40 @@ export default function Browser() {
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
-
-  const [query, setQuery] = createStore<Query>({
-    updateByFilter: false,
-    query: {
-      categoryId: 0,
-      classId: "modpacks",
-      gameId: 432,
-      // eslint-disable-next-line solid/reactivity
-      gameVersion: mappedMcVersions()[0]?.key || "",
-      page: 1,
-      modLoaderType: "any",
-      sortField: "featured",
-      sortOrder: "descending",
-      pageSize: 20,
-      slug: "",
-      searchFilter: "",
-      gameVersionTypeId: null,
-      authorId: null,
-      index: 0,
-    },
+  // const [query, setQuery] = createStore<FEModSearchParameters>({
+  //   query: {
+  //     categoryId: 0,
+  //     classId: "modpacks",
+  //     gameId: 432,
+  //     // eslint-disable-next-line solid/reactivity
+  //     gameVersion: mappedMcVersions()[0]?.key || "",
+  //     page: 1,
+  //     modLoaderType: "any",
+  //     sortField: "featured",
+  //     sortOrder: "descending",
+  //     pageSize: 20,
+  //     slug: "",
+  //     searchFilter: "",
+  //     gameVersionTypeId: null,
+  //     authorId: null,
+  //     index: 0,
+  //   },
+  // });
+  const [query, setQuery, incrementIndex, replaceList] = useModpacksQuery({
+    categoryId: selectedModpackCategory() ?? null,
+    classId: "modpacks",
+    gameId: 432,
+    gameVersion: mappedMcVersions()[0]?.key || "",
+    page: 1,
+    modLoaderType: "any",
+    sortField: "featured",
+    sortOrder: "descending",
+    pageSize: 20,
+    slug: "",
+    searchFilter: "",
+    gameVersionTypeId: null,
+    authorId: null,
+    index: 0,
   });
 
   const curseforgeSearch = rspc.createQuery(() => [
@@ -146,24 +144,13 @@ export default function Browser() {
   let containerRef: HTMLDivElement;
 
   createEffect(() => {
-    setQuery("query", "modLoaderType", modLoader() as FEModLoaderType);
+    if (modLoader() === undefined || modLoader() === null) return;
+
+    setQuery({ modLoaderType: modLoader() as FEModLoaderType });
   });
 
   createEffect(() => {
-    const categoryId = () =>
-      modpacksCategories.filter((prev) => prev.selected)[0]?.id;
-    if (categoryId()) setQuery("query", "categoryId", categoryId());
-  });
-
-  createEffect(() => {
-    if (curseforgeSearch.data?.data) {
-      if (!query.updateByFilter) {
-        curseforgeSearch.data.data.forEach((element) => {
-          setModpacks((prev) => [...prev, element]);
-        });
-      } else setModpacks(curseforgeSearch.data.data);
-    }
-    setQuery("updateByFilter", false);
+    setQuery({ categoryId: selectedModpackCategory() });
   });
 
   const rowVirtualizer = createVirtualizer({
@@ -205,20 +192,46 @@ export default function Browser() {
       );
     }
   });
+  // createEffect(() => {
+  //   console.log("LIST", rowVirtualizer.getVirtualItems());
+  // });
 
   createEffect(() => {
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    if (!lastItem) return;
+    if (!lastItem || modpacks.length === 0) return;
 
     if (
       lastItem.index >= modpacks.length - 1 &&
       !curseforgeSearch.isFetching &&
+      !curseforgeSearch.isInitialLoading &&
       hasNextPage()
     ) {
-      setQuery(
-        "query",
-        produce((prev) => (prev.index = (prev.index as number) + 20 + 1))
+      console.log(
+        "LOADDD",
+        lastItem.index >= modpacks.length - 1 &&
+          !curseforgeSearch.isFetching &&
+          !curseforgeSearch.isInitialLoading &&
+          hasNextPage(),
+        lastItem.index,
+        modpacks.length - 1,
+        rowVirtualizer.getVirtualItems(),
+        lastItem
       );
+      incrementIndex();
+    }
+  });
+
+  createEffect(() => {
+    console.log("curseforgeSearch", curseforgeSearch.data?.data, replaceList());
+
+    if (curseforgeSearch.data?.data && !curseforgeSearch.isFetching) {
+      if (!replaceList()) {
+        console.log("ADD");
+        setModpacks((prev) => [...prev, ...curseforgeSearch.data.data]);
+      } else {
+        console.log("UPDATE");
+        setModpacks(curseforgeSearch.data.data);
+      }
     }
   });
 
@@ -233,11 +246,7 @@ export default function Browser() {
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
               rowVirtualizer.scrollToIndex(0);
-              batch(() => {
-                setQuery("query", "searchFilter", target.value);
-                setQuery("updateByFilter", true);
-                setQuery("query", "index", 0);
-              });
+              setQuery({ searchFilter: target.value });
             }}
           />
           <div class="flex items-center gap-3">
@@ -256,15 +265,7 @@ export default function Browser() {
               }))}
               onChange={(val) => {
                 rowVirtualizer.scrollToIndex(0);
-                batch(() => {
-                  setQuery(
-                    "query",
-                    "sortField",
-                    val.key as FEModSearchSortField
-                  );
-                  setQuery("updateByFilter", true);
-                  setQuery("query", "index", 0);
-                });
+                setQuery({ sortField: val.key as FEModSearchSortField });
               }}
               value={0}
               rounded
@@ -277,11 +278,7 @@ export default function Browser() {
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
                 rowVirtualizer.scrollToIndex(0);
-                batch(() => {
-                  setQuery("query", "gameVersion", val.key as string);
-                  setQuery("updateByFilter", true);
-                  setQuery("query", "index", 0);
-                });
+                setQuery({ gameVersion: val.key as string });
               }}
             />
           </div>
@@ -293,15 +290,7 @@ export default function Browser() {
             }}
             onClick={() => {
               const isAsc = query.query.sortOrder === "ascending";
-              batch(() => {
-                setQuery(
-                  "query",
-                  "sortOrder",
-                  isAsc ? "descending" : "ascending"
-                );
-                setQuery("updateByFilter", true);
-                setQuery("query", "index", 0);
-              });
+              setQuery({ sortOrder: isAsc ? "descending" : "ascending" });
             }}
           />
           <Button
@@ -317,41 +306,8 @@ export default function Browser() {
             />
           </Button>
         </div>
-        <div class="flex justify-between text-darkSlate-50 z-10 mb-6 max-w-150">
-          <Show
-            when={
-              modpacksCategories
-                .filter((category) => category.selected)
-                .map((category) => ({
-                  name: category,
-                  img: "",
-                })).length > 0
-            }
-          >
-            <Tags
-              tags={modpacksCategories
-                .filter((category) => category.selected)
-                .map((category) => ({
-                  name: category.name,
-                  img: "",
-                }))}
-              onClose={(name) => {
-                setModpacksCategories(
-                  (prev) => prev.name === name,
-                  produce((prev) => (prev.selected = false))
-                );
-              }}
-              onClearAll={() => {
-                setModpacksCategories(
-                  (prev) => prev.selected,
-                  produce((prev) => (prev.selected = false))
-                );
-              }}
-            />
-          </Show>
-        </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[142px]">
+      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
@@ -420,6 +376,7 @@ export default function Browser() {
 
                   return (
                     <div
+                      data-index={virtualItem.index}
                       class="box-border py-2"
                       style={{
                         position: "absolute",
@@ -451,7 +408,19 @@ export default function Browser() {
           <ErrorFetchingModpacks error={curseforgeSearch.error} />
         </Show>
         {/* <Show when={curseforgeSearch.isFetching}>
-          <FetchingModpacks />
+          <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-full">
+            <div class="flex justify-center items-center flex-col text-center">
+              <p class="text-darkSlate-50 max-w-100">
+                <Trans
+                  key="instance.fetching_modpacks_text"
+                  options={{
+                    defaultValue: "Loading modpacks",
+                  }}
+                />
+              </p>
+              <Spinner />
+            </div>
+          </div>
         </Show> */}
       </div>
     </div>
