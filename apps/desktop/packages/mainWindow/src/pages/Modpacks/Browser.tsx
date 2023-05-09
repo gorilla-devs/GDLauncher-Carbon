@@ -92,33 +92,25 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
+const sortFields: Array<FEModSearchSortField> = [
+  "featured",
+  "popularity",
+  "lastUpdated",
+  "name",
+  "author",
+  "totalDownloads",
+  "category",
+  "gameVersion",
+];
+
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   const [modpacks, setModpacks] = createStore<FEMod[]>([]);
-  const [hasNextPage, setHasNextPage] = createSignal(true);
+  // const [hasNextPage, setHasNextPage] = createSignal(true);
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
-  // const [query, setQuery] = createStore<FEModSearchParameters>({
-  //   query: {
-  //     categoryId: 0,
-  //     classId: "modpacks",
-  //     gameId: 432,
-  //     // eslint-disable-next-line solid/reactivity
-  //     gameVersion: mappedMcVersions()[0]?.key || "",
-  //     page: 1,
-  //     modLoaderType: "any",
-  //     sortField: "featured",
-  //     sortOrder: "descending",
-  //     pageSize: 20,
-  //     slug: "",
-  //     searchFilter: "",
-  //     gameVersionTypeId: null,
-  //     authorId: null,
-  //     index: 0,
-  //   },
-  // });
   const [query, setQuery, incrementIndex, replaceList] = useModpacksQuery({
     categoryId: selectedModpackCategory() ?? null,
     classId: "modpacks",
@@ -158,20 +150,9 @@ export default function Browser() {
       return modpacks.length + 1;
     },
     getScrollElement: () => containerRef,
-    estimateSize: () => 230,
-    overscan: 20,
+    estimateSize: () => 240,
+    overscan: 40,
   });
-
-  const sortFields: Array<FEModSearchSortField> = [
-    "featured",
-    "popularity",
-    "lastUpdated",
-    "name",
-    "author",
-    "totalDownloads",
-    "category",
-    "gameVersion",
-  ];
 
   createEffect(() => {
     mcVersions().forEach((version) => {
@@ -184,16 +165,29 @@ export default function Browser() {
     });
   });
 
+  const index = () =>
+    (curseforgeSearch.data?.pagination &&
+      curseforgeSearch.data.pagination.index) ||
+    0;
+
+  const totalCount = () =>
+    (curseforgeSearch.data?.pagination &&
+      curseforgeSearch.data.pagination.totalCount) ||
+    1;
+
+  const hasNextPage = () => index() < totalCount();
+
   createEffect(() => {
-    if (curseforgeSearch.data?.pagination) {
-      setHasNextPage(
-        curseforgeSearch.data.pagination.index <
-          curseforgeSearch.data.pagination.totalCount
-      );
-    }
+    console.log("test", hasNextPage());
   });
+
   // createEffect(() => {
-  //   console.log("LIST", rowVirtualizer.getVirtualItems());
+  //   if (curseforgeSearch.data?.pagination) {
+  //     setHasNextPage(
+  //       curseforgeSearch.data.pagination.index <
+  //         curseforgeSearch.data.pagination.totalCount
+  //     );
+  //   }
   // });
 
   createEffect(() => {
@@ -206,17 +200,6 @@ export default function Browser() {
       !curseforgeSearch.isInitialLoading &&
       hasNextPage()
     ) {
-      console.log(
-        "LOADDD",
-        lastItem.index >= modpacks.length - 1 &&
-          !curseforgeSearch.isFetching &&
-          !curseforgeSearch.isInitialLoading &&
-          hasNextPage(),
-        lastItem.index,
-        modpacks.length - 1,
-        rowVirtualizer.getVirtualItems(),
-        lastItem
-      );
       incrementIndex();
     }
   });
@@ -360,6 +343,9 @@ export default function Browser() {
               containerRef = el;
             }}
             class="w-full h-full scrollbar-hide overflow-auto"
+            style={{
+              height: "386px",
+            }}
           >
             <div
               style={{
@@ -374,10 +360,21 @@ export default function Browser() {
                     virtualItem.index > modpacks.length - 1;
                   const modpack = () => modpacks[virtualItem.index];
 
+                  const index =
+                    (curseforgeSearch.data?.pagination &&
+                      curseforgeSearch.data.pagination.index) ||
+                    0;
+
+                  const totalCount =
+                    (curseforgeSearch.data?.pagination &&
+                      curseforgeSearch.data.pagination.totalCount) ||
+                    1;
+
+                  const hasNextPage = index < totalCount;
+
                   return (
                     <div
                       data-index={virtualItem.index}
-                      class="box-border py-2"
                       style={{
                         position: "absolute",
                         top: 0,
@@ -392,7 +389,7 @@ export default function Browser() {
                           <Match when={!isLoaderRow() && modpack()}>
                             <Modpack modpack={modpack()} />
                           </Match>
-                          <Match when={isLoaderRow() && !hasNextPage()}>
+                          <Match when={isLoaderRow() && !hasNextPage}>
                             <NoMoreModpacks />
                           </Match>
                         </Switch>

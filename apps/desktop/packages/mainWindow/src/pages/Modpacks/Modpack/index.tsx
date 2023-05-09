@@ -9,7 +9,7 @@ type Props = { modpack: FEMod };
 
 const Modpack = (props: Props) => {
   return (
-    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-xl max-h-96">
+    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 max-h-60 rounded-2xl">
       <div class="flex gap-4">
         <img
           class="rounded-xl select-none h-30 w-30"
