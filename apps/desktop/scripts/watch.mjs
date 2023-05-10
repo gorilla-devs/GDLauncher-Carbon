@@ -25,7 +25,7 @@ function watchMain(mainWindow) {
         writeBundle() {
           electronProcess && electronProcess.kill();
           // Add "--inspect-brk=5858",  to debug main process
-          electronProcess = spawn(electron, ["."], {
+          electronProcess = spawn(electron, [".", "--test-ad"], {
             stdio: "inherit",
             env,
           });

@@ -66,7 +66,7 @@ impl Downloadable {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Progress {
     pub total_count: u64,
     pub current_count: u64,
@@ -181,8 +181,10 @@ pub async fn download_multiple(
                 move |counter: &Arc<std::sync::atomic::AtomicU64>,
                       size: &Arc<std::sync::atomic::AtomicU64>,
                       progress: &Arc<tokio::sync::watch::Sender<Progress>>,
-                      file_size: Option<u64>| {
-                    let new_current = counter.fetch_add(1, Ordering::SeqCst);
+                      file_size: Option<u64>,
+                      increase_count: bool| {
+                    let new_current =
+                        counter.fetch_add(if increase_count { 1 } else { 0 }, Ordering::SeqCst);
                     let new_size = size.fetch_add(file_size.unwrap_or(0), Ordering::SeqCst);
 
                     progress.send(Progress {
@@ -238,7 +240,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha1(ref hash)) => {
                         let finalized = sha1.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return increase_progress(&counter, &size, &progress, file.size);
+                            return increase_progress(&counter, &size, &progress, file.size, true);
                         } else {
                             trace!(
                                 "Hash mismatch sha1 for file: {} - expected: {hash} - got: {}",
@@ -250,7 +252,7 @@ pub async fn download_multiple(
                     Some(Checksum::Sha256(ref hash)) => {
                         let finalized = sha256.finalize();
                         if hash == &format!("{finalized:x}") {
-                            return increase_progress(&counter, &size, &progress, file.size);
+                            return increase_progress(&counter, &size, &progress, file.size, true);
                         } else {
                             trace!(
                                 "Hash mismatch sha256 for file: {} - expected: {hash} - got: {}",
@@ -292,7 +294,7 @@ pub async fn download_multiple(
 
                 tokio::io::copy(&mut res.as_ref(), &mut fs_file).await?;
 
-                increase_progress(&counter, &size, &progress, Some(buf_size))?;
+                increase_progress(&counter, &size, &progress, Some(buf_size), false)?;
             }
 
             match file.checksum {
@@ -313,7 +315,7 @@ pub async fn download_multiple(
                 None => {}
             }
 
-            increase_progress(&counter, &size, &progress, None)?;
+            increase_progress(&counter, &size, &progress, None, true)?;
 
             Ok(())
         }));
