@@ -1,4 +1,4 @@
-use carbon_net::Progress;
+use carbon_net::{Downloadable, Progress};
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,
@@ -24,7 +24,7 @@ pub(crate) struct MinecraftManager {
 impl MinecraftManager {
     pub fn new() -> Self {
         Self {
-            meta_base_url: Url::parse("https://meta.gdlauncher.com/").unwrap(),
+            meta_base_url: Url::parse("https://meta.gdl.gg/").unwrap(),
         }
     }
 }
@@ -45,11 +45,10 @@ impl ManagerRef<'_, MinecraftManager> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
-    pub async fn download_minecraft(
+    pub async fn get_all_vanilla_files(
         self,
         version_info: VersionInfo,
-        progress: tokio::sync::watch::Sender<Progress>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
         let mut all_files = vec![];
@@ -82,16 +81,14 @@ impl ManagerRef<'_, MinecraftManager> {
         all_files.extend(libraries);
         all_files.extend(assets);
 
-        carbon_net::download_multiple(all_files, progress).await?;
-
-        Ok(())
+        Ok(all_files)
     }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use std::path::PathBuf;
+    use std::{io::Write, path::PathBuf};
 
     use carbon_net::Progress;
     use chrono::Utc;
@@ -105,8 +102,8 @@ mod tests {
         },
     };
 
-    // #[ignore]
-    // #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+    #[ignore]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
         let version = "1.16.5";
 
@@ -143,32 +140,44 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-            &app.reqwest_client.clone(),
-            &app.minecraft_manager.meta_base_url,
-        )
-        .await
-        .unwrap()
-        .game_versions
-        .into_iter()
-        .find(|v| v.id == version)
-        .unwrap()
-        .loaders[0]
-            .clone();
+        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+        //     &app.reqwest_client.clone(),
+        //     &app.minecraft_manager.meta_base_url,
+        // )
+        // .await
+        // .unwrap()
+        // .game_versions
+        // .into_iter()
+        // .find(|v| v.id == version)
+        // .unwrap()
+        // .loaders[0]
+        //     .clone();
 
-        let forge_version_info =
-            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-                .await
-                .unwrap();
+        // let forge_version_info =
+        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+        //         .await
+        //         .unwrap();
 
-        let version_info = merge_partial_version(forge_version_info, version_info);
+        // let version_info = merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
-        let progress = tokio::sync::watch::channel(Progress::new());
+        let mut progress = tokio::sync::watch::channel(Progress::new());
 
-        app.minecraft_manager()
-            .download_minecraft(version_info.clone(), progress.0)
+        tokio::spawn(async move {
+            while progress.1.changed().await.is_ok() {
+                let progress_value = progress.1.borrow().clone();
+                println!("{:?}", progress_value);
+            }
+        });
+
+        let vanilla_files = app
+            .minecraft_manager()
+            .get_all_vanilla_files(version_info.clone())
+            .await
+            .unwrap();
+
+        carbon_net::download_multiple(vanilla_files, progress.0)
             .await
             .unwrap();
 
@@ -211,7 +220,7 @@ mod tests {
         };
 
         let mut child = launch_minecraft(
-            PathBuf::from("java"),
+            PathBuf::from("/Users/davideceschia/.sdkman/candidates/java/current/bin/java"),
             full_account,
             2048_u16,
             2048_u16,
@@ -223,6 +232,14 @@ mod tests {
         .unwrap();
 
         // intercept stdout
+        let stdout = child.stdout.take().unwrap();
+        let mut reader = tokio::io::BufReader::new(stdout);
+
+        tokio::spawn(async move {
+            tokio::io::copy(&mut reader, &mut tokio::io::stdout())
+                .await
+                .unwrap();
+        });
 
         let _ = child.wait().await;
 
