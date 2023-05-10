@@ -47,7 +47,7 @@ pub struct Mod {
     pub metadata: ModFileMetadata,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
     pub modid: String,
     pub name: Option<String>,
