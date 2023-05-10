@@ -43,8 +43,8 @@ const Modpack = (props: Props) => {
               </div>
             </div>
           </div>
-          <p class="m-0 text-sm text-darkSlate-50 max-h-16">
-            {props.modpack.summary}
+          <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15">
+            {props.modpack?.summary}
           </p>
         </div>
       </div>

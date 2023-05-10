@@ -60,11 +60,11 @@ const Sidebar = () => {
             <div class="flex flex-col gap-3">
               <Radio.group
                 onChange={(val) => {
-                  setSelectedModpackCategory(val as number);
+                  setSelectedModpackCategory(val as string | number);
                 }}
                 value={"all"}
               >
-                <Radio name="category" value={"all"}>
+                <Radio name="category" value="all">
                   <div class="flex items-center gap-3">
                     <div class="flex items-center gap-2 max-w-32">
                       {/* <img class="h-4 w-4" src={category.iconUrl} /> */}

@@ -2,8 +2,7 @@ import {
   FEModSearchParameters,
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
-import { deepTrack } from "@solid-primitives/deep";
-import { Accessor, createEffect, createSignal } from "solid-js";
+import { Accessor, createSignal } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 const useModpacksQuery = (
@@ -11,10 +10,10 @@ const useModpacksQuery = (
 ): [
   FEModSearchParameters,
   (_newValue: Partial<FEModSearchParametersQuery>) => void,
-  () => void,
+  (_isFirstIncrement?: boolean) => void,
   Accessor<boolean>
 ] => {
-  const [replaceList, setReplaceList] = createSignal(true);
+  const [replaceList, setReplaceList] = createSignal(false);
   const [query, setQuery] = createStore<FEModSearchParameters>({
     query: initialValue || {
       categoryId: 0,
@@ -50,13 +49,14 @@ const useModpacksQuery = (
     }));
   };
 
-  const incrementIndex = () => {
-    const pageSize = query.query.pageSize || 20;
-    setReplaceList(false);
+  const incrementIndex = (isFirstIncrement?: boolean) => {
+    const pageSize = query.query.pageSize || 40;
+
+    if (!isFirstIncrement) setReplaceList(false);
 
     setQuery(
       "query",
-      produce((prev) => (prev.index = (prev.index as number) + pageSize + 1))
+      produce((prev) => (prev.index = (prev.index as number) + pageSize))
     );
   };
 

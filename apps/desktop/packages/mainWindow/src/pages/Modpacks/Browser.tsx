@@ -107,12 +107,11 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
   const [modpacks, setModpacks] = createStore<FEMod[]>([]);
-  // const [hasNextPage, setHasNextPage] = createSignal(true);
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
   const [query, setQuery, incrementIndex, replaceList] = useModpacksQuery({
-    categoryId: selectedModpackCategory() ?? null,
+    categoryId: null,
     classId: "modpacks",
     gameId: 432,
     gameVersion: mappedMcVersions()[0]?.key || "",
@@ -120,7 +119,7 @@ export default function Browser() {
     modLoaderType: "any",
     sortField: "featured",
     sortOrder: "descending",
-    pageSize: 20,
+    pageSize: 40,
     slug: "",
     searchFilter: "",
     gameVersionTypeId: null,
@@ -130,20 +129,10 @@ export default function Browser() {
 
   const curseforgeSearch = rspc.createQuery(() => [
     "modplatforms.curseforgeSearch",
-    deepTrack(query),
+    query,
   ]);
 
   let containerRef: HTMLDivElement;
-
-  createEffect(() => {
-    if (modLoader() === undefined || modLoader() === null) return;
-
-    setQuery({ modLoaderType: modLoader() as FEModLoaderType });
-  });
-
-  createEffect(() => {
-    setQuery({ categoryId: selectedModpackCategory() });
-  });
 
   const rowVirtualizer = createVirtualizer({
     get count() {
@@ -152,6 +141,26 @@ export default function Browser() {
     getScrollElement: () => containerRef,
     estimateSize: () => 240,
     overscan: 40,
+  });
+
+  createEffect(() => {
+    if (
+      modLoader() === undefined ||
+      modLoader() === null ||
+      modLoader() === query.query.modLoaderType
+    )
+      return;
+    rowVirtualizer.scrollToIndex(0);
+    setQuery({ modLoaderType: modLoader() as FEModLoaderType });
+  });
+
+  createEffect(() => {
+    if (selectedModpackCategory() === query.query.categoryId) return;
+    rowVirtualizer.scrollToIndex(0);
+    const isAll = selectedModpackCategory() === "all";
+    setQuery({
+      categoryId: isAll ? null : (selectedModpackCategory() as number),
+    });
   });
 
   createEffect(() => {
@@ -178,40 +187,64 @@ export default function Browser() {
   const hasNextPage = () => index() < totalCount();
 
   createEffect(() => {
-    console.log("test", hasNextPage());
-  });
-
-  // createEffect(() => {
-  //   if (curseforgeSearch.data?.pagination) {
-  //     setHasNextPage(
-  //       curseforgeSearch.data.pagination.index <
-  //         curseforgeSearch.data.pagination.totalCount
-  //     );
-  //   }
-  // });
-
-  createEffect(() => {
+    const pageSize = query.query.pageSize || 40;
     const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    if (!lastItem || modpacks.length === 0) return;
-
+    // const reload =  pageSize &&
+    console.log(
+      "BEFORE_NEXT_PAGE",
+      modpacks.length,
+      query.query.index,
+      index() + pageSize,
+      modpacks,
+      lastItem.index
+    );
+    if (
+      !lastItem ||
+      modpacks.length === 0 ||
+      modpacks.length === index() + pageSize
+    )
+      return;
     if (
       lastItem.index >= modpacks.length - 1 &&
-      !curseforgeSearch.isFetching &&
+      !curseforgeSearch.isLoading &&
       !curseforgeSearch.isInitialLoading &&
       hasNextPage()
     ) {
+      console.log(
+        "NEXT_PAGE"
+        // firstIncrement,
+        // modpacks.length
+        // query.query.index,
+        // lastItem.index
+      );
       incrementIndex();
     }
   });
 
   createEffect(() => {
-    console.log("curseforgeSearch", curseforgeSearch.data?.data, replaceList());
+    // console.log("QUERY-OBJ", deepTrack(query), query.query.index);
+    console.log("QUERY-OBJ", deepTrack(query), query.query.index);
+  });
 
+  createEffect(() => {
+    console.log("replaceList", replaceList());
+  });
+
+  createEffect(() => {
+    console.log("curseforgeSearch", curseforgeSearch.data?.data);
+  });
+
+  createEffect(() => {
     if (curseforgeSearch.data?.data && !curseforgeSearch.isFetching) {
       if (!replaceList()) {
         console.log("ADD");
         setModpacks((prev) => [...prev, ...curseforgeSearch.data.data]);
-      } else {
+      }
+    }
+  });
+  createEffect(() => {
+    if (curseforgeSearch.data?.data && !curseforgeSearch.isFetching) {
+      if (replaceList()) {
         console.log("UPDATE");
         setModpacks(curseforgeSearch.data.data);
       }
@@ -343,9 +376,6 @@ export default function Browser() {
               containerRef = el;
             }}
             class="w-full h-full scrollbar-hide overflow-auto"
-            style={{
-              height: "386px",
-            }}
           >
             <div
               style={{
