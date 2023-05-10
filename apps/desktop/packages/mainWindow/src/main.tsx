@@ -1,6 +1,12 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createResource, Show } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createResource,
+  Show,
+  useContext,
+} from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -64,23 +70,31 @@ type InnerAppProps = {
   i18nInstance: typeof i18n;
 };
 
+const ClientRspcContext = createContext();
+
+export function useClientRspc() {
+  return useContext(ClientRspcContext);
+}
+
 const InnerApp = (props: InnerAppProps) => {
   // eslint-disable-next-line solid/reactivity
   let { client, createInvalidateQuery } = initRspc(props.port);
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
-      <Router source={hashIntegration()}>
-        <NavigationManager>
-          <TransProvider instance={props.i18nInstance}>
-            <NotificationsProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={createInvalidateQuery} />
-              </ModalProvider>
-            </NotificationsProvider>
-          </TransProvider>
-        </NavigationManager>
-      </Router>
+      <ClientRspcContext.Provider value={client}>
+        <Router source={hashIntegration()}>
+          <NavigationManager>
+            <TransProvider instance={props.i18nInstance}>
+              <NotificationsProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={createInvalidateQuery} />
+                </ModalProvider>
+              </NotificationsProvider>
+            </TransProvider>
+          </NavigationManager>
+        </Router>
+      </ClientRspcContext.Provider>
     </rspc.Provider>
   );
 };

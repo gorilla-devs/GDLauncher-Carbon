@@ -5,19 +5,12 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
-import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
-import {
-  FEMod,
-  FEModLoaderType,
-  FEModSearchSortField,
-} from "@gd/core_module/bindings";
+import { FEMod, FEModSearchSortField } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
-import { deepTrack } from "@solid-primitives/deep";
-import { modLoader, selectedModpackCategory } from "@/utils/modpackBrowser";
-import useModpacksQuery from "./useModpacksQuery";
+import { useInfiniteQuery } from ".";
 
 const NoModpacks = () => {
   return (
@@ -106,61 +99,57 @@ const sortFields: Array<FEModSearchSortField> = [
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
-  const [modpacks, setModpacks] = createStore<FEMod[]>([]);
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     { label: string; key: string }[]
   >([]);
-  const [query, setQuery, incrementIndex, replaceList] = useModpacksQuery({
-    categoryId: null,
-    classId: "modpacks",
-    gameId: 432,
-    gameVersion: mappedMcVersions()[0]?.key || "",
-    page: 1,
-    modLoaderType: "any",
-    sortField: "featured",
-    sortOrder: "descending",
-    pageSize: 40,
-    slug: "",
-    searchFilter: "",
-    gameVersionTypeId: null,
-    authorId: null,
-    index: 0,
+
+  const infiniteQuery = useInfiniteQuery();
+
+  createEffect(() => {
+    console.log("infiniteQuery", infiniteQuery?.infiniteQuery.data);
   });
 
-  const curseforgeSearch = rspc.createQuery(() => [
-    "modplatforms.curseforgeSearch",
-    query,
-  ]);
+  let parentRef: HTMLDivElement | undefined;
 
-  let containerRef: HTMLDivElement;
+  const modpacks = () =>
+    infiniteQuery?.infiniteQuery.data
+      ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
+      : [];
 
   const rowVirtualizer = createVirtualizer({
     get count() {
-      return modpacks.length + 1;
+      return infiniteQuery?.infiniteQuery.hasNextPage
+        ? modpacks().length + 1
+        : modpacks().length;
     },
-    getScrollElement: () => containerRef,
+    getScrollElement: () => parentRef,
+    // getScrollElement: () => undefined,
     estimateSize: () => 240,
-    overscan: 40,
+    overscan: 20,
   });
 
-  createEffect(() => {
-    if (
-      modLoader() === undefined ||
-      modLoader() === null ||
-      modLoader() === query.query.modLoaderType
-    )
-      return;
-    rowVirtualizer.scrollToIndex(0);
-    setQuery({ modLoaderType: modLoader() as FEModLoaderType });
-  });
+  // createEffect(() => {
+  //   if (
+  //     modLoader() === undefined ||
+  //     modLoader() === null ||
+  //     modLoader() === query.query.modLoaderType
+  //   )
+  //     return;
+  //   rowVirtualizer.scrollToIndex(0);
+  //   setQuery({ modLoaderType: modLoader() as FEModLoaderType });
+  // });
+
+  // createEffect(() => {
+  //   if (selectedModpackCategory() === query.query.categoryId) return;
+  //   rowVirtualizer.scrollToIndex(0);
+  //   const isAll = selectedModpackCategory() === "all";
+  //   setQuery({
+  //     categoryId: isAll ? null : (selectedModpackCategory() as number),
+  //   });
+  // });
 
   createEffect(() => {
-    if (selectedModpackCategory() === query.query.categoryId) return;
-    rowVirtualizer.scrollToIndex(0);
-    const isAll = selectedModpackCategory() === "all";
-    setQuery({
-      categoryId: isAll ? null : (selectedModpackCategory() as number),
-    });
+    console.log("HASNEXTPAGE", infiniteQuery?.infiniteQuery.hasNextPage);
   });
 
   createEffect(() => {
@@ -174,80 +163,27 @@ export default function Browser() {
     });
   });
 
-  const index = () =>
-    (curseforgeSearch.data?.pagination &&
-      curseforgeSearch.data.pagination.index) ||
-    0;
-
-  const totalCount = () =>
-    (curseforgeSearch.data?.pagination &&
-      curseforgeSearch.data.pagination.totalCount) ||
-    1;
-
-  const hasNextPage = () => index() < totalCount();
-
   createEffect(() => {
-    const pageSize = query.query.pageSize || 40;
-    const [lastItem] = [...rowVirtualizer.getVirtualItems()].reverse();
-    // const reload =  pageSize &&
-    console.log(
-      "BEFORE_NEXT_PAGE",
-      modpacks.length,
-      query.query.index,
-      index() + pageSize,
-      modpacks,
-      lastItem.index
-    );
-    if (
-      !lastItem ||
-      modpacks.length === 0 ||
-      modpacks.length === index() + pageSize
-    )
+    console.log("MODPACKS", modpacks());
+  });
+  createEffect(() => {
+    console.log("ROW", rowVirtualizer.getTotalSize());
+  });
+  createEffect(() => {
+    const [lastItem] = [...(rowVirtualizer.getVirtualItems() || [])].reverse();
+
+    if (!lastItem) {
       return;
+    }
+
     if (
-      lastItem.index >= modpacks.length - 1 &&
-      !curseforgeSearch.isLoading &&
-      !curseforgeSearch.isInitialLoading &&
-      hasNextPage()
+      lastItem.index >= modpacks().length - 1 &&
+      infiniteQuery?.infiniteQuery.hasNextPage &&
+      !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
-      console.log(
-        "NEXT_PAGE"
-        // firstIncrement,
-        // modpacks.length
-        // query.query.index,
-        // lastItem.index
-      );
-      incrementIndex();
-    }
-  });
+      console.log("REFETCH");
 
-  createEffect(() => {
-    // console.log("QUERY-OBJ", deepTrack(query), query.query.index);
-    console.log("QUERY-OBJ", deepTrack(query), query.query.index);
-  });
-
-  createEffect(() => {
-    console.log("replaceList", replaceList());
-  });
-
-  createEffect(() => {
-    console.log("curseforgeSearch", curseforgeSearch.data?.data);
-  });
-
-  createEffect(() => {
-    if (curseforgeSearch.data?.data && !curseforgeSearch.isFetching) {
-      if (!replaceList()) {
-        console.log("ADD");
-        setModpacks((prev) => [...prev, ...curseforgeSearch.data.data]);
-      }
-    }
-  });
-  createEffect(() => {
-    if (curseforgeSearch.data?.data && !curseforgeSearch.isFetching) {
-      if (replaceList()) {
-        console.log("UPDATE");
-        setModpacks(curseforgeSearch.data.data);
-      }
+      infiniteQuery.infiniteQuery.fetchNextPage();
     }
   });
 
@@ -261,8 +197,8 @@ export default function Browser() {
             class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
-              rowVirtualizer.scrollToIndex(0);
-              setQuery({ searchFilter: target.value });
+              // rowVirtualizer.scrollToIndex(0);
+              // setQuery({ searchFilter: target.value });
             }}
           />
           <div class="flex items-center gap-3">
@@ -280,8 +216,8 @@ export default function Browser() {
                 key: field,
               }))}
               onChange={(val) => {
-                rowVirtualizer.scrollToIndex(0);
-                setQuery({ sortField: val.key as FEModSearchSortField });
+                // rowVirtualizer.scrollToIndex(0);
+                // setQuery({ sortField: val.key as FEModSearchSortField });
               }}
               value={0}
               rounded
@@ -293,20 +229,22 @@ export default function Browser() {
               bgColorClass="bg-darkSlate-400"
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
-                rowVirtualizer.scrollToIndex(0);
-                setQuery({ gameVersion: val.key as string });
+                // rowVirtualizer.scrollToIndex(0);
+                // setQuery({ gameVersion: val.key as string });
               }}
             />
           </div>
           <div
             class="cursor-pointer text-2xl"
-            classList={{
-              "i-ri:sort-asc": query.query.sortOrder === "ascending",
-              "i-ri:sort-desc": query.query.sortOrder === "descending",
-            }}
+            classList={
+              {
+                // "i-ri:sort-asc": query.query.sortOrder === "ascending",
+                // "i-ri:sort-desc": query.query.sortOrder === "descending",
+              }
+            }
             onClick={() => {
-              const isAsc = query.query.sortOrder === "ascending";
-              setQuery({ sortOrder: isAsc ? "descending" : "ascending" });
+              // const isAsc = query.query.sortOrder === "ascending";
+              // setQuery({ sortOrder: isAsc ? "descending" : "ascending" });
             }}
           />
           <Button
@@ -370,12 +308,10 @@ export default function Browser() {
             </div>
           </div>
         </div>
-        <Show when={modpacks.length > 0} fallback={<NoModpacks />}>
+        <Show when={modpacks().length > 0} fallback={<NoModpacks />}>
           <div
-            ref={(el) => {
-              containerRef = el;
-            }}
             class="w-full h-full scrollbar-hide overflow-auto"
+            ref={parentRef}
           >
             <div
               style={{
@@ -387,20 +323,11 @@ export default function Browser() {
               <For each={rowVirtualizer.getVirtualItems()}>
                 {(virtualItem) => {
                   const isLoaderRow = () =>
-                    virtualItem.index > modpacks.length - 1;
-                  const modpack = () => modpacks[virtualItem.index];
+                    virtualItem.index > modpacks().length - 1;
+                  const modpack = () => modpacks()[virtualItem.index];
 
-                  const index =
-                    (curseforgeSearch.data?.pagination &&
-                      curseforgeSearch.data.pagination.index) ||
-                    0;
-
-                  const totalCount =
-                    (curseforgeSearch.data?.pagination &&
-                      curseforgeSearch.data.pagination.totalCount) ||
-                    1;
-
-                  const hasNextPage = index < totalCount;
+                  const hasNextPage = () =>
+                    infiniteQuery?.infiniteQuery.hasNextPage;
 
                   return (
                     <div
@@ -419,7 +346,7 @@ export default function Browser() {
                           <Match when={!isLoaderRow() && modpack()}>
                             <Modpack modpack={modpack()} />
                           </Match>
-                          <Match when={isLoaderRow() && !hasNextPage}>
+                          <Match when={isLoaderRow() && !hasNextPage()}>
                             <NoMoreModpacks />
                           </Match>
                         </Switch>
@@ -431,9 +358,9 @@ export default function Browser() {
             </div>
           </div>
         </Show>
-        <Show when={curseforgeSearch.isError}>
+        {/* <Show when={curseforgeSearch.isError}>
           <ErrorFetchingModpacks error={curseforgeSearch.error} />
-        </Show>
+        </Show> */}
         {/* <Show when={curseforgeSearch.isFetching}>
           <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-full">
             <div class="flex justify-center items-center flex-col text-center">

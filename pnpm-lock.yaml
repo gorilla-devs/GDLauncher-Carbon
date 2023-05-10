@@ -65,6 +65,9 @@ importers:
       '@tanstack/solid-query':
         specifier: ^4.22.0
         version: 4.22.0(solid-js@1.7.3)
+      '@tanstack/virtual-core':
+        specifier: 3.0.0-alpha.1
+        version: 3.0.0-alpha.1
       '@typescript-eslint/parser':
         specifier: ^5.48.0
         version: 5.48.0(eslint@8.31.0)(typescript@4.9.4)
@@ -4001,7 +4004,6 @@ packages:
 
   /@reach/observe-rect@1.2.0:
     resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
-    dev: false
 
   /@rollup/pluginutils@4.2.1:
     resolution: {integrity: sha512-iKnFXr7NkdZAIHiIWE+BX5ULi/ucVFYWD6TbAV+rZctiRTY2PL6tsIKhoIOaoskiWAkgu+VsbXgUVDNLHf+InQ==}
@@ -6083,6 +6085,13 @@ packages:
     dependencies:
       '@reach/observe-rect': 1.2.0
     dev: false
+
+  /@tanstack/virtual-core@3.0.0-alpha.1:
+    resolution: {integrity: sha512-Fa82aHSjxMVpqIg+yuxEj+mlSVadOjcqaMeD7uJ39JE8FHpGoO+53kyedIf+ypWD7zYlSWXB4ah/3W9NNHaI6g==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@reach/observe-rect': 1.2.0
+    dev: true
 
   /@testing-library/dom@8.19.0:
     resolution: {integrity: sha512-6YWYPPpxG3e/xOo6HIWwB/58HukkwIVTOaZ0VwdMVjhRUX/01E4FtQbck9GazOOj7MXHc5RBzMrU86iBJHbI+A==}

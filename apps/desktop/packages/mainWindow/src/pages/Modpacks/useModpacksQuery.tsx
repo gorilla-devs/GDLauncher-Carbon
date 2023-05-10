@@ -2,18 +2,14 @@ import {
   FEModSearchParameters,
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
-import { Accessor, createSignal } from "solid-js";
-import { createStore, produce } from "solid-js/store";
+import { createStore } from "solid-js/store";
 
 const useModpacksQuery = (
   initialValue?: FEModSearchParametersQuery
 ): [
   FEModSearchParameters,
-  (_newValue: Partial<FEModSearchParametersQuery>) => void,
-  (_isFirstIncrement?: boolean) => void,
-  Accessor<boolean>
+  (_newValue: Partial<FEModSearchParametersQuery>) => void
 ] => {
-  const [replaceList, setReplaceList] = createSignal(false);
   const [query, setQuery] = createStore<FEModSearchParameters>({
     query: initialValue || {
       categoryId: 0,
@@ -36,12 +32,6 @@ const useModpacksQuery = (
   const setQueryParams = (newValue: Partial<FEModSearchParametersQuery>) => {
     const indexValue = newValue.index ?? 0;
 
-    if ("index" in newValue) {
-      setReplaceList(false);
-    } else {
-      setReplaceList(true);
-    }
-
     setQuery("query", (prev) => ({
       ...prev,
       ...newValue,
@@ -49,18 +39,7 @@ const useModpacksQuery = (
     }));
   };
 
-  const incrementIndex = (isFirstIncrement?: boolean) => {
-    const pageSize = query.query.pageSize || 40;
-
-    if (!isFirstIncrement) setReplaceList(false);
-
-    setQuery(
-      "query",
-      produce((prev) => (prev.index = (prev.index as number) + pageSize))
-    );
-  };
-
-  return [query, setQueryParams, incrementIndex, replaceList];
+  return [query, setQueryParams];
 };
 
 export default useModpacksQuery;
