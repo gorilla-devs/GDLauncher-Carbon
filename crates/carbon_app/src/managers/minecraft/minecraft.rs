@@ -214,7 +214,7 @@ pub async fn generate_startup_command(
     version: VersionInfo,
     instance_path: InstancePath,
 ) -> Vec<String> {
-    let libraries = version
+    let mut libraries = version
         .libraries
         .iter()
         .filter_map(|library| {
@@ -242,6 +242,12 @@ pub async fn generate_startup_command(
 
             Some(path.display().to_string())
         })
+        .collect::<Vec<String>>();
+
+    libraries.dedup();
+
+    let libraries = libraries
+        .into_iter()
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
         .unwrap();
 
@@ -249,6 +255,7 @@ pub async fn generate_startup_command(
 
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
+    command.push(format!("-XstartOnFirstThread"));
 
     let arguments = version.arguments.clone().unwrap_or_else(|| {
         let mut arguments = HashMap::new();
@@ -396,7 +403,10 @@ pub async fn launch_minecraft(
     )
     .await;
 
-    println!("Starting Minecraft with command: {:?}", startup_command);
+    println!(
+        "Starting Minecraft with command: {:?}",
+        startup_command.join(" ")
+    );
 
     let mut command_exec = tokio::process::Command::new(java_binary);
 
