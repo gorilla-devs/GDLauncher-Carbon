@@ -172,6 +172,26 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .kill_instance(id.into())
                 .await
         }
+
+        mutation ENABLE_MOD[app, imod: InstanceMod] {
+            app.instance_manager()
+                .enable_mod(
+                    imod.instance_id.into(),
+                    imod.mod_id,
+                    true,
+                )
+                .await
+        }
+
+        mutation DISABLE_MOD[app, imod: InstanceMod] {
+            app.instance_manager()
+                .enable_mod(
+                    imod.instance_id.into(),
+                    imod.mod_id,
+                    false,
+                )
+                .await
+        }
     }
 }
 
@@ -415,6 +435,12 @@ enum Update<T> {
     Unchanged,
 }
 
+#[derive(Type, Deserialize)]
+struct InstanceMod {
+    instance_id: InstanceId,
+    mod_id: String,
+}
+
 impl<T> Update<T> {
     fn into_option(self) -> Option<T> {
         self.into()
@@ -502,6 +528,24 @@ pub enum LaunchState {
     },
 }
 
+#[derive(Type, Serialize)]
+struct Mod {
+    id: String,
+    filename: String,
+    enabled: bool,
+    modloader: ModLoaderType,
+    metadata: ModFileMetadata,
+}
+
+#[derive(Type, Serialize)]
+pub struct ModFileMetadata {
+    pub modid: String,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub description: Option<String>,
+    pub authors: Option<String>,
+}
+
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
@@ -513,32 +557,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
             state: value.state.into(),
-            mods: vec![
-                Mod {
-                    id: "88r39459345939453".to_string(),
-                    name: "My first instance".to_string(),
-                },
-                Mod {
-                    id: "88r39459345939456".to_string(),
-                    name: "My second instance".to_string(),
-                },
-                Mod {
-                    id: "88r39459345939451".to_string(),
-                    name: "Instance with a very long name".to_string(),
-                },
-                Mod {
-                    id: "88r39459345336457".to_string(),
-                    name: "Vanilla Minecraft".to_string(),
-                },
-                Mod {
-                    id: "84439459345336457".to_string(),
-                    name: "Forge Minecraft".to_string(),
-                },
-                Mod {
-                    id: "82h39459345336457".to_string(),
-                    name: "All The Mods 6".to_string(),
-                },
-            ],
+            mods: value.mods.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -712,9 +731,26 @@ impl From<domain::LaunchState> for LaunchState {
     }
 }
 
-// old mockup
-#[derive(Type, Serialize)]
-struct Mod {
-    id: String,
-    name: String,
+impl From<domain::Mod> for Mod {
+    fn from(value: domain::Mod) -> Self {
+        Self {
+            id: value.id,
+            filename: value.filename,
+            enabled: value.enabled,
+            modloader: value.modloader.into(),
+            metadata: value.metadata.into(),
+        }
+    }
+}
+
+impl From<domain::ModFileMetadata> for ModFileMetadata {
+    fn from(value: domain::ModFileMetadata) -> Self {
+        Self {
+            modid: value.modid,
+            name: value.name,
+            version: value.version,
+            description: value.description,
+            authors: value.authors,
+        }
+    }
 }

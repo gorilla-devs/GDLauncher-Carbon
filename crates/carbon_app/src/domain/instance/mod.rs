@@ -15,6 +15,7 @@ pub struct InstanceDetails {
     pub modloaders: Vec<ModLoader>,
     pub state: LaunchState,
     pub notes: String,
+    pub mods: Vec<Mod>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -32,7 +33,25 @@ pub struct ModLoader {
     pub version: String,
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum ModLoaderType {
     Forge,
     Fabirc,
+}
+
+pub struct Mod {
+    pub id: String,
+    pub filename: String,
+    pub enabled: bool,
+    pub modloader: ModLoaderType,
+    pub metadata: ModFileMetadata,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModFileMetadata {
+    pub modid: String,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub description: Option<String>,
+    pub authors: Option<String>,
 }

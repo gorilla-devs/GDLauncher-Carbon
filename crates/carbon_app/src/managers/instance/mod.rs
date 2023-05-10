@@ -1,6 +1,9 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
-use std::sync::Arc;
+use std::os::unix::prelude::OsStrExt;
+use std::pin::{pin, Pin};
+use std::sync::atomic::AtomicUsize;
+use std::sync::{atomic, Arc};
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -10,6 +13,7 @@ use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use futures::future::BoxFuture;
+use futures::Future;
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
@@ -29,6 +33,7 @@ use crate::domain::instance::{self as domain, GameLogId};
 use domain::info;
 
 pub mod log;
+mod mods;
 mod run;
 mod schema;
 
@@ -146,11 +151,67 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
+                let mods_path = path.join("mods");
+                let mut mod_futures = Vec::new();
+
+                if mods_path.is_dir() {
+                    let mut reader = tokio::fs::read_dir(mods_path).await?;
+
+                    while let Some(entry) = reader.next_entry().await? {
+                        mod_futures.push(async move {
+                            let path = entry.path();
+                            let is_jar = path.ends_with(".jar");
+                            let is_jar_disabled = path.ends_with(".jar.disabled");
+
+                            if (is_jar || is_jar_disabled) && entry.file_type().await?.is_file() {
+                                let path2 = path.clone();
+                                let mod_ = tokio::task::spawn_blocking(|| {
+                                    let file = std::fs::File::open(path2)?;
+                                    mods::meta::parse_metadata(file)
+                                })
+                                    .await??
+                                    .map(|metadata| {
+                                        static GLOBAL_MOD_INDEX: AtomicUsize = AtomicUsize::new(0);
+                                        let id = GLOBAL_MOD_INDEX.fetch_add(1, atomic::Ordering::Relaxed).to_string();
+
+                                        let mut filename = path.file_name()
+                                            .expect("this path cannot end in .. since we have used it as a file");
+
+                                        if is_jar_disabled {
+                                            let bytes = filename.as_bytes();
+                                            // ".disabled".len() == 9
+                                            filename = OsStr::from_bytes(&bytes[..bytes.len() - 9]);
+                                        }
+
+                                        Mod {
+                                            id,
+                                            filename: filename.to_owned(),
+                                            enabled: !is_jar_disabled,
+                                            modloader: domain::ModLoaderType::Forge,
+                                            metadata,
+                                        }
+                                    });
+
+                                Ok(mod_)
+                            } else {
+                                Ok::<_, anyhow::Error>(None)
+                            }
+                        });
+                    }
+                };
+
+                let mods = futures::future::join_all(mod_futures)
+                    .await
+                    .into_iter()
+                    .map(|r| r.unwrap_or(None))
+                    .filter_map(|x| x)
+                    .collect::<Vec<_>>();
+
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive,
-                    mods: Late::Loading,
+                    mods,
                 };
 
                 Ok(Some(Instance {
@@ -831,7 +892,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: info,
                     state: run::LaunchState::Inactive,
-                    mods: Late::Loading,
+                    mods: Vec::new(),
                 }),
             },
         );
@@ -1063,6 +1124,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
+            mods: instance
+                .mods
+                .iter()
+                .map(|m| domain::Mod {
+                    id: m.id.clone(),
+                    filename: m.filename.to_string_lossy().to_string(),
+                    enabled: m.enabled,
+                    modloader: m.modloader,
+                    metadata: m.metadata.clone(),
+                })
+                .collect(),
         })
     }
 
@@ -1261,13 +1333,16 @@ pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
-    mods: Late<Vec<Mod>>,
+    mods: Vec<Mod>,
 }
 
 #[derive(Debug)]
 pub struct Mod {
-    name: String,
-    // todo
+    id: String,
+    filename: OsString,
+    enabled: bool,
+    modloader: domain::ModLoaderType,
+    metadata: domain::ModFileMetadata,
 }
 
 pub enum InstanceVersionSouce {
