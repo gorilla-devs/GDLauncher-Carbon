@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use crate::api::keys::vtask::*;
 use crate::error::FeError;
 
+use crate::domain::vtask as domain;
 use crate::managers::App;
-use carbon_domain::vtask as domain;
 
 use super::router::router;
 use super::translation::Translation;

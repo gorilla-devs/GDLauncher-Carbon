@@ -1,13 +1,13 @@
-use carbon_domain::vtask::VisualTaskId;
+use crate::domain::vtask::VisualTaskId;
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
 use crate::api::keys::instance::*;
+use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
-use carbon_domain::translate;
 use chrono::{DateTime, Utc};
 use tokio::sync::Semaphore;
 
@@ -96,11 +96,12 @@ impl ManagerRef<'_, InstanceManager> {
             None => "instance.task.ensure",
         };
 
-        let task = VisualTask::new(translate!([task_string] { "name": config.name.clone() }));
+        let task = VisualTask::new(match &launch_account {
+            Some(_) => Translation::InstanceTaskLaunch(config.name.clone()),
+            None => Translation::InstanceTaskInstall(config.name.clone()),
+        });
 
-        let wait_task = task
-            .subtask(translate!("instance.task.ensure.waiting"))
-            .await;
+        let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting).await;
         wait_task.set_weight(0.0);
 
         let id = self.app.task_manager().spawn_task(&task).await;
@@ -125,17 +126,17 @@ impl ManagerRef<'_, InstanceManager> {
 
             let try_result: anyhow::Result<_> = (|| async {
                 let t_request_version_info = task
-                    .subtask(translate!("instance.task.ensure.request_versions"))
+                    .subtask(Translation::InstanceTaskLaunchRequestVersions)
                     .await;
                 let t_download_files = task
-                    .subtask(translate!("instance.task.ensure.download_files"))
+                    .subtask(Translation::InstanceTaskLaunchDownloadFiles)
                     .await;
                 t_download_files.set_weight(20.0);
                 let t_extract_natives = task
-                    .subtask(translate!("instance.task.ensure.extract_natives"))
+                    .subtask(Translation::InstanceTaskLaunchExtractNatives)
                     .await;
                 let t_forge_processors = task
-                    .subtask(translate!("instance.task.ensure.run_forge_processors"))
+                    .subtask(Translation::InstanceTaskLaunchRunForgeProcessors)
                     .await;
 
                 task.edit(|data| data.state = TaskState::KnownProgress)

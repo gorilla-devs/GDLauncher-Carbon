@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::translation::Translation;
+use crate::api::translation::Translation;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct VisualTaskId(pub i32);

@@ -1,4 +1,4 @@
-use carbon_domain::vtask::VisualTaskId;
+use crate::domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
 
 pub mod info;

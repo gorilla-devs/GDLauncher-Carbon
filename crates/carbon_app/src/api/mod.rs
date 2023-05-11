@@ -15,7 +15,7 @@ mod metrics;
 mod modplatforms;
 pub mod router;
 pub mod settings;
-mod translation;
+pub mod translation;
 mod vtask;
 
 #[derive(Clone, Serialize, Deserialize, Type)]

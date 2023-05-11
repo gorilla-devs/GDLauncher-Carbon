@@ -1,4 +1,4 @@
-use crate::api::keys::vtask::*;
+use crate::api::{keys::vtask::*, translation::Translation};
 use std::{
     collections::HashMap,
     sync::{
@@ -14,7 +14,7 @@ use tokio::sync::{watch, RwLock};
 
 use super::ManagerRef;
 
-use carbon_domain::{translation::Translation, vtask as domain};
+use crate::domain::vtask as domain;
 use domain::VisualTaskId;
 
 pub struct VisualTaskManager {
@@ -131,7 +131,7 @@ impl ManagerRef<'_, VisualTaskManager> {
                 domain::Progress::Failed(_) => String::from("fail"),
             };
 
-            println!(" -- Task Update ({progress}): {}", domain.name);
+            println!(" -- Task Update ({progress}): {:?}", domain.name);
 
             for task in domain.active_subtasks {
                 let progress = match task.progress {
@@ -146,7 +146,7 @@ impl ManagerRef<'_, VisualTaskManager> {
                     }
                 };
 
-                println!("Subtask ({progress}): {}", task.name);
+                println!("Subtask ({progress}): {:?}", task.name);
             }
 
             if let domain::Progress::Failed(e) = &domain.progress {
@@ -420,27 +420,28 @@ impl From<Progress> for domain::SubtaskProgress {
 
 #[cfg(test)]
 mod test {
+    use crate::api::translation::Translation;
+    use crate::domain::vtask as domain;
     use crate::managers::vtask::{TaskState, VisualTask};
-    use carbon_domain::{translate, vtask as domain};
 
     #[tokio::test]
     async fn test() {
         let app = crate::setup_managers_for_test().await;
 
-        let task = VisualTask::new(translate!("test"));
+        let task = VisualTask::new(Translation::Test);
         let id = app.task_manager().spawn_task(&task).await;
 
-        let subtask = task.subtask(translate!("subtask")).await;
+        let subtask = task.subtask(Translation::Test).await;
 
         subtask.start_opaque();
 
         let mut tasks = vec![domain::Task {
-            name: translate!("test").into(),
+            name: Translation::Test,
             progress: domain::Progress::Indeterminate,
             downloaded: 0,
             download_total: 0,
             active_subtasks: vec![domain::Subtask {
-                name: translate!("subtask").into(),
+                name: Translation::Test,
                 progress: domain::SubtaskProgress::Opaque,
             }],
         }];
