@@ -247,13 +247,14 @@ const CodeStep = (props: Props) => {
           class="normal-case"
           onClick={() => {
             setLoading(true);
+            navigator.clipboard.writeText(userCode() || "");
             window.openExternalLink(deviceCodeLink() || "");
           }}
         >
           <Trans
             key="login.open_in_browser"
             options={{
-              defaultValue: "Open in browser",
+              defaultValue: "Copy and open in browser",
             }}
           />
           <div class="text-md i-ri:link" />

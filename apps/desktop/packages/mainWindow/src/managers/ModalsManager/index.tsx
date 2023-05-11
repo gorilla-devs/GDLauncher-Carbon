@@ -63,12 +63,12 @@ const defaultModals: Hash = {
   },
 };
 
-type Modalskeys = string;
+type ModalName = string;
 
-type OpenModal = { name: Modalskeys; url?: string };
+type Modal = { name: ModalName; url?: string };
 
 type Context = {
-  openModal: (_modal: OpenModal) => void;
+  openModal: (_modal: Modal) => void;
   closeModal: () => void;
   isVisible: Accessor<boolean>;
 };
@@ -79,7 +79,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const navigate = useGDNavigate();
   const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
-  const queryParams = () => location.search as Modalskeys;
+  const queryParams = () => location.search as ModalName;
   const urlSearchParams = () => new URLSearchParams(queryParams());
   const mParam = () => urlSearchParams().get("m");
 
@@ -93,7 +93,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const title = () => defaultModals[modalTypeIndex()]?.title;
 
   const manager = {
-    openModal: (modal: OpenModal) => {
+    openModal: (modal: Modal) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
       if (modal.url) {

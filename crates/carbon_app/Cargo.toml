@@ -18,6 +18,7 @@ env_logger = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
+serde_urlencoded = "0.7.1"
 tracing-test = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
@@ -52,6 +53,8 @@ zip = { workspace = true }
 http = { workspace = true }
 httpdate = { workspace = true }
 daedalus = { workspace = true }
+url = { workspace = true }
+serde_repr = { workspace = true }
 iridium = { path = "../iridium", optional = true }
 # libc = { workspace = true }
 

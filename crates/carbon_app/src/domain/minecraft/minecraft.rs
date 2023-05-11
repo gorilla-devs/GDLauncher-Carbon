@@ -56,7 +56,9 @@ pub fn is_rule_allowed(rule: Rule) -> bool {
         arch: None,
     });
 
-    let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os();
+    let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os()
+        || os.name.clone().unwrap_or(get_current_os_base_arch()) == get_current_os_base_arch();
+
     let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
     let is_feature_allowed = rule.features.is_none();
     // TODO: Check version
@@ -197,6 +199,25 @@ pub fn get_current_os() -> Os {
         } else {
             panic!("Unsupported architecture")
         }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        panic!("Unsupported OS")
+    }
+}
+
+pub fn get_current_os_base_arch() -> Os {
+    #[cfg(target_os = "macos")]
+    {
+        Os::Osx
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Os::Windows
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Os::Linux
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {

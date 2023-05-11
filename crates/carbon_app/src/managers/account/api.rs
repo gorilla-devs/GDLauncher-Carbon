@@ -58,7 +58,8 @@ impl DeviceCode {
             user_code: response.user_code,
             device_code: response.device_code,
             verification_uri: response.verification_uri,
-            polling_interval: Duration::from_secs(response.interval.into()),
+            // polling_interval: Duration::from_secs(response.interval.into()),
+            polling_interval: Duration::from_secs(1),
             expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
         })
     }
