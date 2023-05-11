@@ -283,7 +283,7 @@ version = "1.0.0"
 displayName = "TestMod"
 description = "test desc"
 authors = "TestAuthor1, TestAuthor2"
-"#;
+        "#;
 
         let expected = Some(ModFileMetadata {
             modid: String::from("com.test.testmod"),

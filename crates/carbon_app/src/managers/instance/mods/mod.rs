@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, path::Path};
+use std::ffi::OsStr;
 
 use anyhow::{anyhow, bail};
 

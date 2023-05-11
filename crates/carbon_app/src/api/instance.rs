@@ -1,20 +1,18 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::path::PathBuf;
-use std::pin::Pin;
+
 use std::sync::Arc;
-use std::task::Poll;
 
 use anyhow::anyhow;
-use axum::body::{Bytes, StreamBody};
+use axum::body::StreamBody;
 use axum::extract::{Query, State};
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-use futures::{Stream, TryStream};
+
 use http::{HeaderMap, HeaderValue, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
-use tokio::sync::watch;
 
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::EntryType;
@@ -27,7 +25,6 @@ use super::vtask::TaskId;
 
 use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance as manager;
-use manager::log::GameLog;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

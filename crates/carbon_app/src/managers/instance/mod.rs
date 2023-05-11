@@ -1,9 +1,9 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 use std::os::unix::prelude::OsStrExt;
-use std::pin::{pin, Pin};
+
+use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
-use std::sync::{atomic, Arc};
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -13,7 +13,7 @@ use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use futures::future::BoxFuture;
-use futures::Future;
+
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;

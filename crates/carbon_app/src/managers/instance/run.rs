@@ -14,10 +14,7 @@ use tokio::sync::Semaphore;
 use anyhow::{anyhow, bail};
 
 use crate::{
-    domain::{
-        instance::info::{GameVersion, ModLoader, ModLoaderType},
-        minecraft,
-    },
+    domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
     managers::{
         self,
         account::FullAccount,
