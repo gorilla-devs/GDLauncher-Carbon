@@ -1,7 +1,8 @@
+import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount } from "@/utils/helpers";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Dropdown, Tag } from "@gd/ui";
+import { Button, Dropdown, Tag } from "@gd/ui";
 import { format } from "date-fns";
 import { For } from "solid-js";
 
@@ -16,6 +17,7 @@ const truncateText = (text: string, maxLength: number): string => {
 };
 
 const Modpack = (props: Props) => {
+  const navigate = useGDNavigate();
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 max-h-60 rounded-2xl">
       <div class="flex gap-4">
@@ -63,6 +65,17 @@ const Modpack = (props: Props) => {
           </For>
         </div>
         <div class="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/modpacks/${props.modpack.id}`)}
+          >
+            <Trans
+              key="instance.explore_modpack"
+              options={{
+                defaultValue: "Explore",
+              }}
+            />
+          </Button>
           <Dropdown.button
             options={[
               { label: "1.16.5", key: "1.16.5" },

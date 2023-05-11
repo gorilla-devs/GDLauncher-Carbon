@@ -6,6 +6,7 @@ import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
 import BrowserData from "@/pages/Modpacks/browser.data";
+import ModpackData from "@/pages/Modpacks/modpack.data";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -96,9 +97,17 @@ export const routes: RouteDefinition[] = [
       {
         path: "/modpacks/:id",
         component: lazy(() => import("@/pages/Modpacks/Explore")),
-        data: () => {
-          console.log("Fetching specific modpack data...");
-        },
+        data: ModpackData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+          },
+          {
+            path: "/versions",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
+          },
+        ],
       },
       {
         path: "/settings",

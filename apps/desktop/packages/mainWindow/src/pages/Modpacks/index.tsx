@@ -80,7 +80,7 @@ function ModpacksLayout() {
     },
     getScrollElement: () => parentRef(),
     estimateSize: () => 230,
-    overscan: 20,
+    overscan: 40,
   });
 
   createEffect(() => {
