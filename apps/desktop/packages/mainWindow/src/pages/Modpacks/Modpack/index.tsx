@@ -52,7 +52,7 @@ const Modpack = (props: Props) => {
             </div>
           </div>
           <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15">
-            {truncateText(props.modpack?.summary, 140)}
+            {truncateText(props.modpack?.summary, 137)}
           </p>
         </div>
       </div>

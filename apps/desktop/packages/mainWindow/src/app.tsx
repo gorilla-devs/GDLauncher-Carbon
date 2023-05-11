@@ -1,4 +1,4 @@
-import { Show, Suspense } from "solid-js";
+import { Show } from "solid-js";
 import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import { Trans } from "@gd/i18n";
