@@ -97,6 +97,7 @@
   "instance.active_version": "Active",
   "instance.switch_version": "Switch Version",
   "instance.no_modpacks_text": "At the moment there is no modpacks.",
+  "modpack.download": "Download",
   "instance.sort_by_popularity": "Popular",
   "instance.sort_by_lastUpdated": "Last update",
   "instance.sort_by_gameVersion": "Game version",

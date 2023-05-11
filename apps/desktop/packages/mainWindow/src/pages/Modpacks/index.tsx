@@ -26,6 +26,7 @@ type InfiniteQueryType = {
   setQuery: (_newValue: Partial<FEModSearchParametersQuery>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
+  resetList: () => void;
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
@@ -96,12 +97,19 @@ function ModpacksLayout() {
     rowVirtualizer.scrollToIndex(0);
   };
 
+  const resetList = () => {
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    rowVirtualizer.scrollToIndex(0);
+  };
+
   const context = {
     infiniteQuery: infiniteQuery,
     query,
     setQuery: setQueryWrapper,
     rowVirtualizer,
     setParentRef,
+    resetList,
   };
 
   return (

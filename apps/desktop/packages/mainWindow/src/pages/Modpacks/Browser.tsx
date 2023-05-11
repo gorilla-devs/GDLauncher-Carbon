@@ -1,6 +1,13 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import { For, Match, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Switch,
+  createEffect,
+  createSignal,
+  onMount,
+} from "solid-js";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
@@ -116,6 +123,10 @@ export default function Browser() {
     ) {
       infiniteQuery.infiniteQuery.fetchNextPage();
     }
+  });
+
+  onMount(() => {
+    if (modpacks().length > 0) infiniteQuery?.resetList();
   });
 
   return (
