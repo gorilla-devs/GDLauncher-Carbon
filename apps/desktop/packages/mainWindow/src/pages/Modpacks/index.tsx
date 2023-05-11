@@ -79,7 +79,7 @@ function ModpacksLayout() {
         : allRows().length;
     },
     getScrollElement: () => parentRef(),
-    estimateSize: () => 240,
+    estimateSize: () => 230,
     overscan: 20,
   });
 

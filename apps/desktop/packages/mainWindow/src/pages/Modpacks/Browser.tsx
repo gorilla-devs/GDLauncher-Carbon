@@ -1,7 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
@@ -9,24 +8,6 @@ import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
 import { useInfiniteQuery } from ".";
-
-const NoModpacks = () => {
-  return (
-    <div class="w-full flex h-full items-center justify-center min-h-90">
-      <div class="flex justify-center items-center flex-col text-center">
-        <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.no_modpacks_text"
-            options={{
-              defaultValue: "At the moment there is no modpacks.",
-            }}
-          />
-        </p>
-      </div>
-    </div>
-  );
-};
 
 const NoMoreModpacks = () => {
   return (
@@ -260,76 +241,91 @@ export default function Browser() {
             </div>
           </div>
         </div>
-        <Show when={modpacks().length > 0} fallback={<NoModpacks />}>
-          <div
-            class="w-full h-full scrollbar-hide overflow-auto"
-            ref={(el) => {
-              infiniteQuery?.setParentRef(el);
-            }}
+        <Switch>
+          <Match
+            when={
+              modpacks().length > 0 &&
+              !infiniteQuery?.infiniteQuery.isInitialLoading
+            }
           >
             <div
-              style={{
-                height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
-                position: "relative",
+              class="w-full h-full scrollbar-hide overflow-auto"
+              ref={(el) => {
+                infiniteQuery?.setParentRef(el);
               }}
             >
-              <For each={infiniteQuery?.rowVirtualizer.getVirtualItems()}>
-                {(virtualItem) => {
-                  const isLoaderRow = () =>
-                    virtualItem.index > modpacks().length - 1;
-                  const modpack = () => modpacks()[virtualItem.index];
-
-                  const hasNextPage = () =>
-                    infiniteQuery?.infiniteQuery.hasNextPage;
-
-                  return (
-                    <div
-                      data-index={virtualItem.index}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: `${virtualItem.size}px`,
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <div class="bg-darkSlate-700 rounded-xl">
-                        <Switch fallback={<FetchingModpacks />}>
-                          <Match when={!isLoaderRow() && modpack()}>
-                            <Modpack modpack={modpack()} />
-                          </Match>
-                          <Match when={isLoaderRow() && !hasNextPage()}>
-                            <NoMoreModpacks />
-                          </Match>
-                        </Switch>
-                      </div>
-                    </div>
-                  );
+              <div
+                style={{
+                  height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
                 }}
-              </For>
-            </div>
-          </div>
-        </Show>
-        {/* <Show when={curseforgeSearch.isError}>
-          <ErrorFetchingModpacks error={curseforgeSearch.error} />
-        </Show> */}
-        {/* <Show when={curseforgeSearch.isFetching}>
-          <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-full">
-            <div class="flex justify-center items-center flex-col text-center">
-              <p class="text-darkSlate-50 max-w-100">
-                <Trans
-                  key="instance.fetching_modpacks_text"
-                  options={{
-                    defaultValue: "Loading modpacks",
+              >
+                <For each={infiniteQuery?.rowVirtualizer.getVirtualItems()}>
+                  {(virtualItem) => {
+                    const isLoaderRow = () =>
+                      virtualItem.index > modpacks().length - 1;
+                    const modpack = () => modpacks()[virtualItem.index];
+
+                    const hasNextPage = () =>
+                      infiniteQuery?.infiniteQuery.hasNextPage;
+
+                    return (
+                      <div
+                        data-index={virtualItem.index}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: `${virtualItem.size}px`,
+                          transform: `translateY(${virtualItem.start}px)`,
+                        }}
+                      >
+                        <div class="bg-darkSlate-700 rounded-xl">
+                          <Switch fallback={<FetchingModpacks />}>
+                            <Match when={!isLoaderRow() && modpack()}>
+                              <Modpack modpack={modpack()} />
+                            </Match>
+                            <Match when={isLoaderRow() && !hasNextPage()}>
+                              <NoMoreModpacks />
+                            </Match>
+                          </Switch>
+                        </div>
+                      </div>
+                    );
                   }}
-                />
-              </p>
-              <Spinner />
+                </For>
+              </div>
             </div>
-          </div>
-        </Show> */}
+          </Match>
+          <Match
+            when={
+              modpacks().length === 0 &&
+              infiniteQuery?.infiniteQuery.isFetching &&
+              infiniteQuery?.infiniteQuery.isInitialLoading
+            }
+          >
+            <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-full">
+              <div class="flex justify-center items-center flex-col text-center">
+                <p class="text-darkSlate-50 max-w-100">
+                  <Trans
+                    key="instance.fetching_modpacks_text"
+                    options={{
+                      defaultValue: "Loading modpacks",
+                    }}
+                  />
+                </p>
+                <Spinner />
+              </div>
+            </div>
+          </Match>
+          <Match when={infiniteQuery?.infiniteQuery.isError}>
+            <ErrorFetchingModpacks
+              error={infiniteQuery?.infiniteQuery.error as RSPCError | null}
+            />
+          </Match>
+        </Switch>
       </div>
     </div>
   );

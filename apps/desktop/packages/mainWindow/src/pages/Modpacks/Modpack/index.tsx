@@ -7,6 +7,14 @@ import { For } from "solid-js";
 
 type Props = { modpack: FEMod };
 
+const truncateText = (text: string, maxLength: number): string => {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return text.slice(0, maxLength) + "...";
+};
+
 const Modpack = (props: Props) => {
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 max-h-60 rounded-2xl">
@@ -44,7 +52,7 @@ const Modpack = (props: Props) => {
             </div>
           </div>
           <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15">
-            {props.modpack?.summary}
+            {truncateText(props.modpack?.summary, 140)}
           </p>
         </div>
       </div>
