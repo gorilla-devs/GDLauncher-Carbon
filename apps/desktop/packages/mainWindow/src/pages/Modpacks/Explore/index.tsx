@@ -3,10 +3,11 @@ import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { FEModResponse } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Tab, TabList, Tabs } from "@gd/ui";
+import { Button, Dropdown, Tab, TabList, Tabs } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
 import { For } from "solid-js";
 import fetchData from "../modpack.data";
+import { mappedMcVersions } from "@/utils/mcVersion";
 
 const Modpack = () => {
   const navigate = useGDNavigate();
@@ -30,6 +31,7 @@ const Modpack = () => {
     },
   ];
 
+  // eslint-disable-next-line no-unused-vars
   let containerRef: HTMLDivElement;
   let bgRef: HTMLDivElement;
   let innerContainerRef: HTMLDivElement;
@@ -123,22 +125,14 @@ const Modpack = () => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <div
-                        class="rounded-full flex justify-center items-center w-8 h-8"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.1)",
-                        }}
-                      >
-                        <div class="text-xl i-ri:more-2-fill" />
-                      </div>
-                      <div
-                        class="rounded-full w-8 h-8 flex justify-center items-center"
-                        style={{
-                          background: "rgba(255, 255, 255, 0.1)",
-                        }}
-                      >
-                        <div class="text-xl i-ri:star-s-fill" />
-                      </div>
+                      <Dropdown
+                        options={mappedMcVersions()}
+                        icon={<div class="i-ri:price-tag-3-fill" />}
+                        rounded
+                        bgColorClass="bg-darkSlate-400"
+                        value={mappedMcVersions()[0].key}
+                        onChange={() => {}}
+                      />
                       <Button uppercase variant="glow" size="large">
                         <Trans
                           key="modpack.download"
@@ -154,13 +148,10 @@ const Modpack = () => {
             </div>
           </div>
         </div>
-        <div
-          // class="bg-red-800"
-          class="bg-darkSlate-800"
-        >
+        <div class="bg-darkSlate-800">
           <div class="flex justify-center px-4">
             <div class="bg-darkSlate-800 w-full">
-              <div class="sticky top-0 z-20 flex flex-col bg-darkSlate-800 mb-4">
+              <div class="sticky top-0 flex flex-col mb-4 z-0">
                 <Tabs>
                   <TabList>
                     <For each={instancePages()}>

@@ -1,20 +1,13 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Spinner } from "@gd/ui";
-import {
-  For,
-  Match,
-  Switch,
-  createEffect,
-  createSignal,
-  onMount,
-} from "solid-js";
+import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
+import { For, Match, Switch, createEffect, onMount } from "solid-js";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { mcVersions } from "@/utils/mcVersion";
 import { useInfiniteQuery } from ".";
+import { mappedMcVersions } from "@/utils/mcVersion";
 
 const NoMoreModpacks = () => {
   return (
@@ -85,9 +78,6 @@ const sortFields: Array<FEModSearchSortField> = [
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
-  const [mappedMcVersions, setMappedMcVersions] = createSignal<
-    { label: string; key: string }[]
-  >([]);
 
   const infiniteQuery = useInfiniteQuery();
 
@@ -95,17 +85,6 @@ export default function Browser() {
     infiniteQuery?.infiniteQuery.data
       ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
-
-  createEffect(() => {
-    mcVersions().forEach((version) => {
-      if (version.type === "release") {
-        setMappedMcVersions((prev) => [
-          ...prev,
-          { label: version.id, key: version.id },
-        ]);
-      }
-    });
-  });
 
   createEffect(() => {
     const [lastItem] = [
@@ -317,19 +296,7 @@ export default function Browser() {
               infiniteQuery?.infiniteQuery.isInitialLoading
             }
           >
-            <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-full">
-              <div class="flex justify-center items-center flex-col text-center">
-                <p class="text-darkSlate-50 max-w-100">
-                  <Trans
-                    key="instance.fetching_modpacks_text"
-                    options={{
-                      defaultValue: "Loading modpacks",
-                    }}
-                  />
-                </p>
-                <Spinner />
-              </div>
-            </div>
+            <Skeleton.modpacksList />
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
             <ErrorFetchingModpacks
