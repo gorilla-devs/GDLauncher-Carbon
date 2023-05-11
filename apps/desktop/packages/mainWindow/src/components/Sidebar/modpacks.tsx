@@ -5,19 +5,16 @@ import { Collapsable, Radio } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
-import {
-  modLoader,
-  selectedModpackCategory,
-  setModloader,
-  setSelectedModpackCategory,
-} from "@/utils/modpackBrowser";
-import { FECategory } from "@gd/core_module/bindings";
+import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
+import { useInfiniteQuery } from "@/pages/Modpacks";
 
 const Sidebar = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [modpacksCategories, setModpacksCategories] = createSignal<
     FECategory[]
   >([]);
+
+  const infiniteQuery = useInfiniteQuery();
 
   createEffect(() => {
     if (routeData.forgeCategories.data?.data) {
@@ -36,9 +33,11 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
-                setModloader(val as string);
+                infiniteQuery?.setQuery({
+                  modLoaderType: val as FEModLoaderType,
+                });
               }}
-              value={"modLoader()"}
+              value={infiniteQuery?.query.query.modLoaderType || "any"}
             >
               <Radio name="modloader" value="any">
                 <div class="flex items-center gap-2">
@@ -60,9 +59,15 @@ const Sidebar = () => {
             <div class="flex flex-col gap-3">
               <Radio.group
                 onChange={(val) => {
-                  setSelectedModpackCategory(val as string | number);
+                  const isAll = val === "all";
+
+                  infiniteQuery?.setQuery({
+                    categoryId: isAll ? null : (val as number),
+                  });
                 }}
-                value={"all"}
+                value={
+                  infiniteQuery?.query.query.categoryId?.toString() ?? "all"
+                }
               >
                 <Radio name="category" value="all">
                   <div class="flex items-center gap-3">

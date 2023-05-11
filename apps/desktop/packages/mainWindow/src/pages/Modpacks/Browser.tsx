@@ -5,9 +5,7 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
-import { createStore } from "solid-js/store";
-import { FEMod, FEModSearchSortField } from "@gd/core_module/bindings";
-import { createVirtualizer } from "@tanstack/solid-virtual";
+import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { mcVersions } from "@/utils/mcVersion";
 import { useInfiniteQuery } from ".";
@@ -105,52 +103,10 @@ export default function Browser() {
 
   const infiniteQuery = useInfiniteQuery();
 
-  createEffect(() => {
-    console.log("infiniteQuery", infiniteQuery?.infiniteQuery.data);
-  });
-
-  let parentRef: HTMLDivElement | undefined;
-
   const modpacks = () =>
     infiniteQuery?.infiniteQuery.data
       ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
-
-  const rowVirtualizer = createVirtualizer({
-    get count() {
-      return infiniteQuery?.infiniteQuery.hasNextPage
-        ? modpacks().length + 1
-        : modpacks().length;
-    },
-    getScrollElement: () => parentRef,
-    // getScrollElement: () => undefined,
-    estimateSize: () => 240,
-    overscan: 20,
-  });
-
-  // createEffect(() => {
-  //   if (
-  //     modLoader() === undefined ||
-  //     modLoader() === null ||
-  //     modLoader() === query.query.modLoaderType
-  //   )
-  //     return;
-  //   rowVirtualizer.scrollToIndex(0);
-  //   setQuery({ modLoaderType: modLoader() as FEModLoaderType });
-  // });
-
-  // createEffect(() => {
-  //   if (selectedModpackCategory() === query.query.categoryId) return;
-  //   rowVirtualizer.scrollToIndex(0);
-  //   const isAll = selectedModpackCategory() === "all";
-  //   setQuery({
-  //     categoryId: isAll ? null : (selectedModpackCategory() as number),
-  //   });
-  // });
-
-  createEffect(() => {
-    console.log("HASNEXTPAGE", infiniteQuery?.infiniteQuery.hasNextPage);
-  });
 
   createEffect(() => {
     mcVersions().forEach((version) => {
@@ -164,13 +120,9 @@ export default function Browser() {
   });
 
   createEffect(() => {
-    console.log("MODPACKS", modpacks());
-  });
-  createEffect(() => {
-    console.log("ROW", rowVirtualizer.getTotalSize());
-  });
-  createEffect(() => {
-    const [lastItem] = [...(rowVirtualizer.getVirtualItems() || [])].reverse();
+    const [lastItem] = [
+      ...(infiniteQuery?.rowVirtualizer.getVirtualItems() || []),
+    ].reverse();
 
     if (!lastItem) {
       return;
@@ -181,8 +133,6 @@ export default function Browser() {
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
-      console.log("REFETCH");
-
       infiniteQuery.infiniteQuery.fetchNextPage();
     }
   });
@@ -197,8 +147,7 @@ export default function Browser() {
             class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
-              // rowVirtualizer.scrollToIndex(0);
-              // setQuery({ searchFilter: target.value });
+              infiniteQuery?.setQuery({ searchFilter: target.value });
             }}
           />
           <div class="flex items-center gap-3">
@@ -216,8 +165,9 @@ export default function Browser() {
                 key: field,
               }))}
               onChange={(val) => {
-                // rowVirtualizer.scrollToIndex(0);
-                // setQuery({ sortField: val.key as FEModSearchSortField });
+                infiniteQuery?.setQuery({
+                  sortField: val.key as FEModSearchSortField,
+                });
               }}
               value={0}
               rounded
@@ -229,22 +179,24 @@ export default function Browser() {
               bgColorClass="bg-darkSlate-400"
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
-                // rowVirtualizer.scrollToIndex(0);
-                // setQuery({ gameVersion: val.key as string });
+                infiniteQuery?.setQuery({ gameVersion: val.key as string });
               }}
             />
           </div>
           <div
             class="cursor-pointer text-2xl"
-            classList={
-              {
-                // "i-ri:sort-asc": query.query.sortOrder === "ascending",
-                // "i-ri:sort-desc": query.query.sortOrder === "descending",
-              }
-            }
+            classList={{
+              "i-ri:sort-asc":
+                infiniteQuery?.query.query.sortOrder === "ascending",
+              "i-ri:sort-desc":
+                infiniteQuery?.query.query.sortOrder === "descending",
+            }}
             onClick={() => {
-              // const isAsc = query.query.sortOrder === "ascending";
-              // setQuery({ sortOrder: isAsc ? "descending" : "ascending" });
+              const isAsc =
+                infiniteQuery?.query.query.sortOrder === "ascending";
+              infiniteQuery?.setQuery({
+                sortOrder: isAsc ? "descending" : "ascending",
+              });
             }}
           />
           <Button
@@ -311,16 +263,18 @@ export default function Browser() {
         <Show when={modpacks().length > 0} fallback={<NoModpacks />}>
           <div
             class="w-full h-full scrollbar-hide overflow-auto"
-            ref={parentRef}
+            ref={(el) => {
+              infiniteQuery?.setParentRef(el);
+            }}
           >
             <div
               style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
+                height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
                 width: "100%",
                 position: "relative",
               }}
             >
-              <For each={rowVirtualizer.getVirtualItems()}>
+              <For each={infiniteQuery?.rowVirtualizer.getVirtualItems()}>
                 {(virtualItem) => {
                   const isLoaderRow = () =>
                     virtualItem.index > modpacks().length - 1;

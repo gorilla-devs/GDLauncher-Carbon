@@ -1,12 +1,6 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import {
-  createContext,
-  createEffect,
-  createResource,
-  Show,
-  useContext,
-} from "solid-js";
+import { createContext, createResource, Show, useContext } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";

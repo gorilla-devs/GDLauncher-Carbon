@@ -7,21 +7,25 @@ import {
 } from "@tanstack/solid-query";
 import useModpacksQuery from "./useModpacksQuery";
 import { useClientRspc } from "@/main";
-import { createContext, createEffect, useContext } from "solid-js";
+import {
+  Setter,
+  createContext,
+  createEffect,
+  createSignal,
+  useContext,
+} from "solid-js";
 import {
   FEModSearchParameters,
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { Virtualizer } from "@tanstack/virtual-core";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
   query: FEModSearchParameters;
   setQuery: (_newValue: Partial<FEModSearchParametersQuery>) => void;
-  // rowVirtualizer: Virtualizer<any, any>;
-  // rowVirtualizer: Virtualizer<TScrollElement, TItemElemen>;
-  allRows: any[];
+  rowVirtualizer: any;
+  setParentRef: Setter<HTMLDivElement | undefined>;
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
@@ -33,7 +37,7 @@ export const useInfiniteQuery = () => {
 function ModpacksLayout() {
   const client: any = useClientRspc();
 
-  const [query, setQuery, incrementIndex, replaceList] = useModpacksQuery({
+  const [query, setQuery] = useModpacksQuery({
     categoryId: null,
     classId: "modpacks",
     gameId: 432,
@@ -54,48 +58,50 @@ function ModpacksLayout() {
     queryKey: () => ["modpacks"],
     queryFn: (ctx) => {
       setQuery({ index: ctx.pageParam });
-      const newQuery = query;
-      console.log(
-        "CTX",
-        query.query.index,
-        newQuery.query.index,
-        ctx.pageParam
-      );
-      return client.query(["modplatforms.curseforgeSearch", newQuery]);
+      return client.query(["modplatforms.curseforgeSearch", query]);
     },
     getNextPageParam: (lastPage) => {
-      console.log(
-        "getNextPageParam",
-        lastPage,
-        lastPage.pagination.index + lastPage.pagination.pageSize + 1
-      );
       return lastPage.pagination.index + lastPage.pagination.pageSize + 1;
     },
   });
 
-  const allRows = infiniteQuery.data
-    ? infiniteQuery.data.pages.flatMap((d) => d.rows)
-    : [];
+  const allRows = () =>
+    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
 
-  // const rowVirtualizer = createVirtualizer({
-  //   get count() {
-  //     return infiniteQuery.hasNextPage ? allRows.length + 1 : allRows.length;
-  //   },
-  //   getScrollElement: () => undefined,
-  //   estimateSize: () => 240,
-  //   overscan: 20,
-  // });
+  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
+    undefined
+  );
+
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return infiniteQuery.hasNextPage
+        ? allRows().length + 1
+        : allRows().length;
+    },
+    getScrollElement: () => parentRef(),
+    estimateSize: () => 240,
+    overscan: 20,
+  });
 
   createEffect(() => {
-    console.log("TEST", infiniteQuery.data);
+    rowVirtualizer.setOptions({
+      getScrollElement: () => parentRef(),
+    });
   });
+
+  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+    setQuery(newValue);
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    rowVirtualizer.scrollToIndex(0);
+  };
 
   const context = {
     infiniteQuery: infiniteQuery,
     query,
-    setQuery,
-    // rowVirtualizer,
-    allRows,
+    setQuery: setQueryWrapper,
+    rowVirtualizer,
+    setParentRef,
   };
 
   return (
