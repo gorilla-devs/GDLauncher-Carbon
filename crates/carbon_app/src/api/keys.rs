@@ -76,6 +76,7 @@ keys! {
         KILL_INSTANCE                    = "killInstance";
         ENABLE_MOD                       = "enableMod";
         DISABLE_MOD                      = "disableMod";
+        DELETE_MOD                       = "deleteMod";
     }
 
     vtask {
