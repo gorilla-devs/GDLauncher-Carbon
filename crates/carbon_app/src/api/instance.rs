@@ -198,6 +198,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 )
                 .await
         }
+
+        mutation OPEN_INSTANCE_FOLDER[app, id: InstanceId] {
+            app.instance_manager().open_folder(id.into()).await
+        }
     }
 }
 

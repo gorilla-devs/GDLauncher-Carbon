@@ -56,6 +56,7 @@ iridium = { path = "../iridium", optional = true }
 tempdir = { workspace = true }
 trash = { workspace = true }
 toml = { workspace = true }
+opener = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

@@ -74,6 +74,7 @@ keys! {
         PREPARE_INSTANCE                 = "prepareInstance";
         LAUNCH_INSTANCE                  = "launchInstance";
         KILL_INSTANCE                    = "killInstance";
+        OPEN_INSTANCE_FOLDER             = "openInstanceFolder";
         ENABLE_MOD                       = "enableMod";
         DISABLE_MOD                      = "disableMod";
         DELETE_MOD                       = "deleteMod";

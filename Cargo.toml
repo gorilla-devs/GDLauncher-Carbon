@@ -38,6 +38,7 @@ libc = "0.2"
 log = "0.4.17"
 mockall = "0.11.3"
 ntest = "0.9.0"
+opener = "0.6.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
