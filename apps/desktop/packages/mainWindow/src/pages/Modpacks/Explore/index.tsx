@@ -6,7 +6,7 @@ import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tab, TabList, Tabs } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
 import { For } from "solid-js";
-import fetchData from "../modpack.data";
+import fetchData from "../modpack.overview";
 import { mappedMcVersions } from "@/utils/mcVersion";
 
 const Modpack = () => {
@@ -149,7 +149,7 @@ const Modpack = () => {
           </div>
         </div>
         <div class="bg-darkSlate-800">
-          <div class="flex justify-center px-4">
+          <div class="flex justify-center px-4 pb-4">
             <div class="bg-darkSlate-800 w-full">
               <div class="sticky top-0 flex flex-col mb-4 z-0">
                 <Tabs>

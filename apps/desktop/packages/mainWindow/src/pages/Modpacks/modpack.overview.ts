@@ -6,12 +6,7 @@ const fetchData = ({ params }: { params: any }) => {
     { modId: parseInt(params.id, 10) },
   ]);
 
-  const modpackDescription = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetModDescription",
-    { modId: parseInt(params.id, 10) },
-  ]);
-
-  return { modpackDetails, modpackDescription };
+  return { modpackDetails };
 };
 
 export default fetchData;

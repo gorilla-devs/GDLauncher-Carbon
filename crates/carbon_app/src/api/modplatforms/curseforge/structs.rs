@@ -146,7 +146,7 @@ impl From<crate::domain::modplatforms::curseforge::FileHash> for FEFileHash {
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEFileReleaseType {
-    Release,
+    Stable,
     Beta,
     Alpha,
 }
@@ -154,8 +154,8 @@ pub enum FEFileReleaseType {
 impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for FEFileReleaseType {
     fn from(release_type: crate::domain::modplatforms::curseforge::FileReleaseType) -> Self {
         match release_type {
-            crate::domain::modplatforms::curseforge::FileReleaseType::Release => {
-                FEFileReleaseType::Release
+            crate::domain::modplatforms::curseforge::FileReleaseType::Stable => {
+                FEFileReleaseType::Stable
             }
             crate::domain::modplatforms::curseforge::FileReleaseType::Beta => {
                 FEFileReleaseType::Beta

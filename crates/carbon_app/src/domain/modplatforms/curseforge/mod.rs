@@ -60,7 +60,7 @@ pub struct FileHash {
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FileReleaseType {
-    Release = 1,
+    Stable = 1,
     Beta = 2,
     Alpha = 3,
 }
