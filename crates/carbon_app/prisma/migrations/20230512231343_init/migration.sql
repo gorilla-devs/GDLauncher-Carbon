@@ -13,7 +13,8 @@ CREATE TABLE "AppConfiguration" (
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
     "xmx" INTEGER NOT NULL DEFAULT 1024,
     "xms" INTEGER NOT NULL DEFAULT 1024,
-    "defaultInstanceGroup" INTEGER
+    "defaultInstanceGroup" INTEGER,
+    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable

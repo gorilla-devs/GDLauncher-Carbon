@@ -1,9 +1,11 @@
-import { Show, Suspense } from "solid-js";
-import { useRoutes } from "@solidjs/router";
+import { Show, createEffect, untrack } from "solid-js";
+import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
+import { rspc } from "@/utils/rspcClient";
 import { useGDNavigate } from "./managers/NavigationManager";
+import { useModal } from "./managers/ModalsManager";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -12,16 +14,25 @@ type Props = {
 const App = (props: Props) => {
   const Route = useRoutes(routes);
   const navigate = useGDNavigate();
+  const modalsContext = useModal();
+  const currentRoute = useLocation();
 
   // eslint-disable-next-line solid/reactivity
   props.createInvalidateQuery();
 
   initThemes();
 
-  // let data = rspc.createQuery(() => ["account.getActiveUuid"]);
-  // useBeforeLeave(() => {
-  //   if (!data.data) navigate("/");
-  // });
+  const isFirstRun = rspc.createQuery(() => ["settings.getIsFirstLaunch"]);
+  const setIsFirstRun = rspc.createMutation(["settings.setIsFirstLaunch"]);
+
+  createEffect(() => {
+    if (isFirstRun.data && currentRoute.pathname !== "/") {
+      untrack(() => {
+        modalsContext?.openModal({ name: "onBoarding" });
+        setIsFirstRun.mutate(false);
+      });
+    }
+  });
 
   return (
     <div class="w-screen relative">
@@ -56,9 +67,9 @@ const App = (props: Props) => {
       </Show>
       <div class="flex w-screen h-auto z-10">
         <main class="relative overflow-hidden flex-1">
-          <Suspense fallback={<></>}>
-            <Route />
-          </Suspense>
+          {/* <Suspense fallback={<></>}> */}
+          <Route />
+          {/* </Suspense> */}
         </main>
       </div>
     </div>

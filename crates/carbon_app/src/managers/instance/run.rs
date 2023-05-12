@@ -220,8 +220,11 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 });
 
-                app.minecraft_manager()
-                    .download_minecraft(version_info.clone(), progress_watch_tx)
+                let mc_files = app.minecraft_manager()
+                    .get_all_vanilla_files(version_info.clone())
+                    .await?;
+
+                carbon_net::download_multiple(mc_files, progress_watch_tx)
                     .await?;
 
                 t_extract_natives.start_opaque();

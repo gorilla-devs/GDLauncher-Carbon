@@ -28,6 +28,7 @@ pub fn libraries_into_vec_downloadable(
         if let Some(base_url) = &library.url {
             let checksum = None;
 
+            // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
             let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
                 continue
             };
@@ -55,7 +56,9 @@ pub fn is_rule_allowed(rule: Rule) -> bool {
         arch: None,
     });
 
-    let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os();
+    let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os()
+        || os.name.clone().unwrap_or(get_current_os_base_arch()) == get_current_os_base_arch();
+
     let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
     let is_feature_allowed = rule.features.is_none();
     // TODO: Check version
@@ -75,19 +78,9 @@ pub fn library_into_lib_downloadable(
     if let Some(artifact) = artifact {
         let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
 
-        // workaround patched libs not having a path (TEMP?)
-        let artifact_path = artifact.path.unwrap_or(
-            MavenCoordinates::try_from(library.name, None)
-                .ok()
-                .unwrap()
-                .into_path()
-                .to_string_lossy()
-                .to_string(),
-        );
-
         return Some(carbon_net::Downloadable {
             url: artifact.url,
-            path: PathBuf::from(base_path).join(artifact_path),
+            path: PathBuf::from(base_path).join(artifact.path),
             checksum,
             size: Some(artifact.size as u64),
         });
@@ -120,7 +113,7 @@ pub fn library_into_natives_downloadable(
 
     Some(carbon_net::Downloadable {
         url: mapping_class.url.clone(),
-        path: PathBuf::from(base_path).join(mapping_class.clone().path.unwrap()),
+        path: PathBuf::from(base_path).join(mapping_class.clone().path),
         checksum,
         size: Some(mapping_class.size as u64),
     })
@@ -206,6 +199,25 @@ pub fn get_current_os() -> Os {
         } else {
             panic!("Unsupported architecture")
         }
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    {
+        panic!("Unsupported OS")
+    }
+}
+
+pub fn get_current_os_base_arch() -> Os {
+    #[cfg(target_os = "macos")]
+    {
+        Os::Osx
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Os::Windows
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Os::Linux
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {

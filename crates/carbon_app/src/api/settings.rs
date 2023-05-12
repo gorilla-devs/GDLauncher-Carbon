@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        keys::settings::{GET_SETTINGS, SET_SETTINGS},
+        keys::settings::{GET_IS_FIRST_LAUNCH, GET_SETTINGS, SET_IS_FIRST_LAUNCH, SET_SETTINGS},
         router::router,
     },
     managers::App,
@@ -16,6 +16,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     .await.unwrap();
 
             Ok(Into::<FESettings>::into(response))
+        }
+
+        query GET_IS_FIRST_LAUNCH [app, _args: ()] {
+            app.settings_manager().get_is_first_launch().await
+        }
+
+        mutation SET_IS_FIRST_LAUNCH [app, value: bool] {
+            app.settings_manager().set_is_first_launch(value).await
         }
 
         mutation SET_SETTINGS[app, new_settings: FESettingsUpdate] {
