@@ -6,7 +6,7 @@ pub enum Translation {
     #[cfg(test)]
     Test,
     InstanceTaskLaunch(String),
-    InstanceTaskInstall(String),
+    InstanceTaskPrepare(String),
     InstanceTaskLaunchWaiting,
     InstanceTaskLaunchRequestVersions,
     InstanceTaskLaunchDownloadFiles,

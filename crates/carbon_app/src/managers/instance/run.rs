@@ -91,14 +91,9 @@ impl ManagerRef<'_, InstanceManager> {
             GameVersion::Custom(_) => panic!("Custom versions are not supported yet"),
         };
 
-        let task_string = match &launch_account {
-            Some(_) => "instance.task.launch",
-            None => "instance.task.ensure",
-        };
-
         let task = VisualTask::new(match &launch_account {
             Some(_) => Translation::InstanceTaskLaunch(config.name.clone()),
-            None => Translation::InstanceTaskInstall(config.name.clone()),
+            None => Translation::InstanceTaskPrepare(config.name.clone()),
         });
 
         let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting).await;
@@ -125,6 +120,9 @@ impl ManagerRef<'_, InstanceManager> {
                 .expect("the ensure lock semaphore should never be closed");
 
             let try_result: anyhow::Result<_> = (|| async {
+                let first_run_path = instance_path.get_root().join(".first_run_incomplete");
+                let is_first_run = first_run_path.is_file();
+
                 let t_request_version_info = task
                     .subtask(Translation::InstanceTaskLaunchRequestVersions)
                     .await;
@@ -135,9 +133,14 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_extract_natives = task
                     .subtask(Translation::InstanceTaskLaunchExtractNatives)
                     .await;
-                let t_forge_processors = task
-                    .subtask(Translation::InstanceTaskLaunchRunForgeProcessors)
-                    .await;
+
+                let t_forge_processors = match is_first_run {
+                    true => Some(
+                        task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)
+                            .await,
+                    ),
+                    false => None,
+                };
 
                 task.edit(|data| data.state = TaskState::KnownProgress)
                     .await;
@@ -236,24 +239,29 @@ impl ManagerRef<'_, InstanceManager> {
                         .sha1
                 ));
 
-                t_forge_processors.start_opaque();
-                if let Some(processors) = &version_info.processors {
-                    managers::minecraft::forge::execute_processors(
-                        processors,
-                        version_info
-                            .data
-                            .as_ref()
-                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                        PathBuf::from("java"),
-                        instance_path.clone(),
-                        client_path,
-                        game_version,
-                        libraries_path,
-                    )
-                    .await?;
+                if let Some(t_forge_processors) = t_forge_processors {
+                    t_forge_processors.start_opaque();
+
+                    if let Some(processors) = &version_info.processors {
+                        managers::minecraft::forge::execute_processors(
+                            processors,
+                            version_info
+                                .data
+                                .as_ref()
+                                .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                            PathBuf::from("java"),
+                            instance_path.clone(),
+                            client_path,
+                            game_version,
+                            libraries_path,
+                        )
+                        .await?;
+                    }
+
+                    t_forge_processors.complete_opaque();
                 }
 
-                t_forge_processors.complete_opaque();
+                let _ = tokio::fs::remove_file(first_run_path).await;
 
                 match launch_account {
                     Some(account) => Ok(Some(

@@ -865,6 +865,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing instance json")?;
 
+        tokio::fs::write(tmpdir.join(".first_run_incomplete"), "")
+            .await
+            .context("writing incomplete instance marker")?;
+
         let _lock = self.path_lock.lock().await;
         let (shortpath, path) = self.next_folder(&name).await?;
 

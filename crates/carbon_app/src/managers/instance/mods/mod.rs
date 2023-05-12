@@ -1,6 +1,6 @@
 use std::ffi::OsStr;
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use thiserror::Error;
 
 use crate::managers::ManagerRef;
