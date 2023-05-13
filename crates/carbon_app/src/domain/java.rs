@@ -167,6 +167,17 @@ impl TryFrom<&str> for JavaVersion {
                     }
                 }
             }
+
+            // 1.8.0_832 -> 8.0.832
+            if version.major == 1 {
+                version.major = version.minor.ok_or(anyhow::anyhow!(
+                    "No minor version found, but 1.x format found"
+                ))?;
+                version.minor = version.patch.map(|p| p.parse().unwrap_or(0));
+                version.patch = version.update_number;
+                version.update_number = None;
+            }
+
             return Ok(version);
         }
 
@@ -202,6 +213,55 @@ impl JavaVersion {
         }
     }
 }
+
+pub enum SystemProfile {
+    Legacy,
+    Alpha,
+    Beta,
+    Gamma,
+}
+
+impl std::str::FromStr for SystemProfile {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "legacy" => Ok(SystemProfile::Legacy),
+            "alpha" => Ok(SystemProfile::Alpha),
+            "beta" => Ok(SystemProfile::Beta),
+            "gamma" => Ok(SystemProfile::Gamma),
+            _ => bail!("Unknown system profile: {}", s),
+        }
+    }
+}
+
+impl From<SystemProfile> for String {
+    fn from(profile: SystemProfile) -> Self {
+        match profile {
+            SystemProfile::Legacy => "legacy".to_string(),
+            SystemProfile::Alpha => "alpha".to_string(),
+            SystemProfile::Beta => "beta".to_string(),
+            SystemProfile::Gamma => "gamma".to_string(),
+        }
+    }
+}
+
+impl From<&SystemProfile> for String {
+    fn from(profile: &SystemProfile) -> Self {
+        match profile {
+            SystemProfile::Legacy => "legacy".to_string(),
+            SystemProfile::Alpha => "alpha".to_string(),
+            SystemProfile::Beta => "beta".to_string(),
+            SystemProfile::Gamma => "gamma".to_string(),
+        }
+    }
+}
+
+pub const SYSTEM_PROFILES: &[SystemProfile] = &[
+    SystemProfile::Legacy,
+    SystemProfile::Alpha,
+    SystemProfile::Beta,
+    SystemProfile::Gamma,
+];
 
 #[cfg(test)]
 mod test {

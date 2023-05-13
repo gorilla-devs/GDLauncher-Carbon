@@ -2,26 +2,14 @@ use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::JavaComponentType;
 use crate::{api::keys::java::*, domain::java::Java};
-use anyhow::anyhow;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query GET_AVAILABLE[app, _args: ()] {
-            let all_javas = app.java_manager().get_available_javas().await?;
-            let default_javas = app.java_manager().get_default_javas().await?;
-
-            let mut result = HashMap::new();
-            for (major, javas) in all_javas {
-                result.insert(major, FEAvailableJavas {
-                    default_id: default_javas.get(&major).map(|s| s.to_string()).ok_or(anyhow!("No default java for major version {}", major))?,
-                    javas: javas.into_iter().map(FEJavaComponent::from).collect(),
-                });
-            }
-
-            Ok(result)
+        query GET_ALL_AVAILABLE_JAVAS[app, _args: ()] {
+            get_all_available_javas(app, _args).await
         }
 
         mutation SET_DEFAULT[_, _args: SetDefaultArgs] { Ok(()) }
@@ -39,16 +27,26 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     }
 }
 
-#[derive(Type, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Javas(HashMap<u8, FEAvailableJavas>);
+async fn get_all_available_javas(
+    app: App,
+    _args: (),
+) -> anyhow::Result<HashMap<u8, Vec<FEJavaComponent>>> {
+    let all_javas = app.java_manager().get_available_javas().await?;
+
+    let mut result = HashMap::new();
+    for (major, javas) in all_javas {
+        result.insert(
+            major,
+            javas.into_iter().map(FEJavaComponent::from).collect(),
+        );
+    }
+
+    Ok(result)
+}
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct FEAvailableJavas {
-    default_id: String,
-    javas: Vec<FEJavaComponent>,
-}
+struct Javas(HashMap<u8, Vec<FEJavaComponent>>);
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]

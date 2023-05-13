@@ -38,7 +38,7 @@ keys! {
     }
 
     java {
-        GET_AVAILABLE                               = "getAvailable";
+        GET_ALL_AVAILABLE_JAVAS                     = "getAllAvailableJavas";
         SET_DEFAULT                                 = "setDefault";
         SETUP_CONTROLLED                            = "setupControlled";
         GET_CONTROLLED_INSTALL_STATUS               = "getControlledInstallStatus";

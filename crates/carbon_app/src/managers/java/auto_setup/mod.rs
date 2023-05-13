@@ -1,10 +1,13 @@
 use carbon_net::Downloadable;
 use chrono::{DateTime, FixedOffset};
-use std::path::{Path, PathBuf};
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::watch::Sender;
+
+use crate::db::PrismaClient;
 
 // mod adoptopenjdk;
 // mod mojang;
+mod azul;
 
 #[derive(Default)]
 pub struct JavaProgress {
@@ -20,14 +23,11 @@ struct JavaMeta {
 }
 
 #[async_trait::async_trait]
-trait JavaAuto {
+trait AutoSetup {
     async fn setup(
         &mut self,
-        base_path: &Path,
+        base_path: PathBuf,
+        db_client: &Arc<PrismaClient>,
         progress_report: Sender<JavaProgress>,
     ) -> anyhow::Result<()>;
-    async fn get_runtime_assets(&self, runtime_path: &Path) -> anyhow::Result<JavaMeta>;
-    fn locate_binary(&self, base_path: &Path) -> anyhow::Result<PathBuf>;
-    async fn check_for_updates(&self, runtime_path: &Path) -> anyhow::Result<bool>;
-    async fn update(&mut self) -> anyhow::Result<()>;
 }

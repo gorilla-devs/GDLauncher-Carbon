@@ -3,7 +3,7 @@ use self::{discovery::Discovery, java_checker::JavaChecker};
 use super::ManagerRef;
 use crate::{
     db::PrismaClient,
-    domain::java::{Java, JavaVersion},
+    domain::java::{Java, SystemProfile, SYSTEM_PROFILES},
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -20,6 +20,20 @@ pub(crate) struct JavaManager {}
 impl JavaManager {
     pub fn new() -> Self {
         Self {}
+    }
+
+    pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+        if db_client.java_system_profile().count(vec![]).exec().await? == 0 {
+            for profile in SYSTEM_PROFILES {
+                db_client
+                    .java_system_profile()
+                    .create(String::from(profile), vec![])
+                    .exec()
+                    .await?;
+            }
+        }
+
+        Ok(())
     }
 
     pub async fn scan_and_sync<T, G>(
@@ -54,17 +68,18 @@ impl ManagerRef<'_, JavaManager> {
         Ok(result)
     }
 
-    pub async fn get_default_javas(self) -> anyhow::Result<HashMap<u8, String>> {
+    pub async fn get_java_profiles(
+        self,
+    ) -> anyhow::Result<Vec<crate::db::java_system_profile::Data>> {
         let db = &self.app.prisma_client;
-        let all_javas = db
-            .default_java()
+        let all_profiles = db
+            .java_system_profile()
             .find_many(vec![])
             .exec()
             .await?
             .into_iter()
-            .map(|j| (j.major as u8, j.path))
             .collect();
 
-        Ok(all_javas)
+        Ok(all_profiles)
     }
 }

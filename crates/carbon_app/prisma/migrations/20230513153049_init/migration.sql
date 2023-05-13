@@ -13,7 +13,8 @@ CREATE TABLE "AppConfiguration" (
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
     "xmx" INTEGER NOT NULL DEFAULT 1024,
     "xms" INTEGER NOT NULL DEFAULT 1024,
-    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true
+    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
+    "autoManageJava" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable
@@ -27,9 +28,13 @@ CREATE TABLE "Java" (
 );
 
 -- CreateTable
-CREATE TABLE "DefaultJava" (
-    "path" TEXT NOT NULL PRIMARY KEY,
-    "major" INTEGER NOT NULL
+CREATE TABLE "JavaSystemProfile" (
+    "name" TEXT NOT NULL,
+    "supportedJavaVersionRegex" TEXT,
+    "autodetect" BOOLEAN NOT NULL DEFAULT true,
+    "useManagedAsFallback" BOOLEAN NOT NULL DEFAULT true,
+    "javaPath" TEXT,
+    CONSTRAINT "JavaSystemProfile_javaPath_fkey" FOREIGN KEY ("javaPath") REFERENCES "Java" ("path") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -72,7 +77,7 @@ CREATE UNIQUE INDEX "AppConfiguration_id_key" ON "AppConfiguration"("id");
 CREATE UNIQUE INDEX "Java_path_key" ON "Java"("path");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DefaultJava_major_key" ON "DefaultJava"("major");
+CREATE UNIQUE INDEX "JavaSystemProfile_name_key" ON "JavaSystemProfile"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");

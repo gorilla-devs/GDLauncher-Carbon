@@ -60,14 +60,16 @@ where
     T: Discovery,
     G: JavaChecker,
 {
+    let auto_manage_java = true;
     let local_javas = discovery.find_java_paths().await;
-    let default_javas = db.default_java().find_many(vec![]).exec().await?;
+    let java_profiles = db.java_system_profile().find_many(vec![]).exec().await?;
 
     for local_java in &local_javas {
         // Verify whether the java is valid
         let java_bin_info = java_checker
             .get_bin_info(local_java, JavaComponentType::Local)
             .await;
+
         match java_bin_info {
             // If it is valid, check whether it's in the DB
             Ok(java_component) => {
@@ -87,10 +89,27 @@ where
             // If it isn't valid, check whether it's in the DB
             Err(_) => {
                 let java = get_java_component_from_db(db, local_java.display().to_string()).await?;
+                let is_java_used_in_profile = java_profiles.iter().any(|profile| {
+                    let Some(ref java_path) = profile.java_path else { return false; };
+                    java_path == &local_java.display().to_string()
+                });
+
                 // If it is in the db, update it to invalid
                 if java.is_some() {
-                    update_java_component_in_db_to_invalid(db, local_java.display().to_string())
+                    if is_java_used_in_profile && !auto_manage_java {
+                        update_java_component_in_db_to_invalid(
+                            db,
+                            local_java.display().to_string(),
+                        )
                         .await?;
+                    } else {
+                        db.java()
+                            .delete(crate::db::java::UniqueWhereParam::PathEquals(
+                                local_java.display().to_string(),
+                            ))
+                            .exec()
+                            .await?;
+                    }
                 }
             }
         }
@@ -106,13 +125,22 @@ where
         .await?;
 
     for local_java_from_db in local_javas_from_db {
-        if !default_javas
+        let has_been_scanned = local_javas
             .iter()
-            .any(|default_java| local_java_from_db.path == default_java.path)
-            && !local_javas
-                .iter()
-                .any(|local_java| local_java_from_db.path == local_java.display().to_string())
-        {
+            .any(|local_java| local_java_from_db.path == local_java.display().to_string());
+
+        if has_been_scanned {
+            continue;
+        }
+
+        let is_used_in_profile = java_profiles
+            .iter()
+            .filter_map(|profile| profile.java_path.clone())
+            .any(|java_profile_path| local_java_from_db.path == java_profile_path);
+
+        if is_used_in_profile && !auto_manage_java {
+            update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
+        } else {
             db.java()
                 .delete(crate::db::java::UniqueWhereParam::PathEquals(
                     local_java_from_db.path,
