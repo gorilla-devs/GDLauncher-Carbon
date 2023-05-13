@@ -1,5 +1,8 @@
 import { createSignal, For, Show, JSX, createEffect } from "solid-js";
 import { Button } from "../Button";
+import { Portal } from "solid-js/web";
+import { useFloating } from "solid-floating-ui";
+import { offset, flip, shift, autoUpdate } from "@floating-ui/dom";
 
 type Option = {
   label: string;
@@ -52,6 +55,10 @@ const Dropdown = (props: Props) => {
   );
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
+  const [buttonRef, setButtonRef] = createSignal<
+    HTMLButtonElement | undefined
+  >();
+  const [menuRef, setMenuRef] = createSignal<HTMLUListElement | undefined>();
 
   createEffect(() => {
     setSelectedValue(defaultValue());
@@ -65,23 +72,26 @@ const Dropdown = (props: Props) => {
     }, 100);
   };
 
+  // createEffect(() => {
+  const position = useFloating(buttonRef, menuRef, {
+    placement: "bottom",
+    middleware: [offset(5), flip(), shift()],
+    whileElementsMounted: autoUpdate,
+  });
+
+  // setMenuCoordinate({ x: position.x || 0, y: position.y || 0 });
+  console.log("position", position, position.x, position.y, buttonRef());
+  // });
+
+  // createEffect(() => {
+  // });
+
   return (
     <>
       <div
         class={`inline-block relative ${props.containerClass || ""}`}
         id={props.id}
       >
-        <Show when={!props.rounded && props.label}>
-          <p
-            class="mt-0 mb-2 font-bold"
-            classList={{
-              "text-white": !props.disabled,
-              "text-darkSlate-50": props.disabled,
-            }}
-          >
-            {props.label}
-          </p>
-        </Show>
         <button
           class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
           onClick={() => {
@@ -93,6 +103,7 @@ const Dropdown = (props: Props) => {
               setMenuOpened(false);
             }
           }}
+          ref={setButtonRef}
           classList={{
             "border-0": !props.error,
             "border-2 border-solid border-red-500": !!props.error,
@@ -131,39 +142,45 @@ const Dropdown = (props: Props) => {
             }}
           />
         </button>
-
-        <ul
-          class="absolute max-h-40 overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
-          onMouseOut={() => {
-            setFocusIn(false);
-          }}
-          onMouseOver={() => {
-            setFocusIn(true);
-          }}
-          classList={{
-            block: menuOpened(),
-            hidden: !menuOpened(),
-            "-left-10": props.btnDropdown,
-            "min-w-20": props.btnDropdown,
-            "bottom-[55px]": props.placement === "bottom",
-            "bottom-auto mt-2": props.placement === "top" || !props.placement,
-          }}
-        >
-          <For each={props.options}>
-            {(option) => (
-              <li
-                class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
-                onClick={() => {
-                  setSelectedValue(option.label);
-                  props.onChange?.(option);
-                  toggleMenu();
-                }}
-              >
-                {option.label}
-              </li>
-            )}
-          </For>
-        </ul>
+        <Portal>
+          <ul
+            ref={setMenuRef}
+            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-60 min-w-32 max-w-fit"
+            onMouseOut={() => {
+              setFocusIn(false);
+            }}
+            onMouseOver={() => {
+              setFocusIn(true);
+            }}
+            classList={{
+              block: menuOpened(),
+              hidden: !menuOpened(),
+              // "-left-10": props.btnDropdown,
+              "min-w-20": props.btnDropdown,
+              // "bottom-[55px]": props.placement === "bottom",
+              // "bottom-auto": props.placement === "top" || !props.placement,
+            }}
+            style={{
+              top: `${position.y ?? 0}px`,
+              left: `${position.x ?? 0}px`,
+            }}
+          >
+            <For each={props.options}>
+              {(option) => (
+                <li
+                  class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
+                  onClick={() => {
+                    setSelectedValue(option.label);
+                    props.onChange?.(option);
+                    toggleMenu();
+                  }}
+                >
+                  {option.label}
+                </li>
+              )}
+            </For>
+          </ul>
+        </Portal>
       </div>
       <Show when={props.error}>
         <div class="text-red-500 text-left mt-2 font-light">{props.error}</div>
