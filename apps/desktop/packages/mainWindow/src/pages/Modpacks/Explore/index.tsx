@@ -5,7 +5,7 @@ import { FEModResponse } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tab, TabList, Tabs } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show } from "solid-js";
 import fetchData from "../modpack.overview";
 import { mappedMcVersions } from "@/utils/mcVersion";
 import { format } from "date-fns";
@@ -25,10 +25,6 @@ const Modpack = () => {
       path: `/modpacks/${params.id}/versions`,
     },
   ];
-
-  createEffect(() => {
-    console.log("AAAA", routeData.modpackDetails.data?.data);
-  });
 
   // eslint-disable-next-line no-unused-vars
   // let containerRef: HTMLDivElement;
@@ -85,7 +81,7 @@ const Modpack = () => {
               </Button>
             </div>
             <div class="flex justify-center sticky px-4 h-24 top-52 z-20 bg-gradient-to-t from-darkSlate-800 from-10%">
-              <div class="flex gap-4 w-full justify-between lg:flex-row">
+              <div class="flex gap-4 w-full lg:flex-row">
                 <div
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                   style={{
@@ -95,7 +91,6 @@ const Modpack = () => {
                     }")`,
                   }}
                 />
-
                 <div class="flex flex-1 flex-col max-w-185">
                   <div
                     class="flex gap-4 items-center cursor-pointer"

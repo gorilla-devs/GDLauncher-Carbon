@@ -51,7 +51,6 @@ render(() => {
     return instance;
   });
 
-
   return (
     <Show
       when={
@@ -86,22 +85,20 @@ const InnerApp = (props: InnerAppProps) => {
   });
 
   return (
-    <Show when={client}>
-      <rspc.Provider client={client as any} queryClient={queryClient}>
-        <Router source={hashIntegration()}>
-          <ClientRspcContext.Provider value={client}>
-            <NavigationManager>
-              <TransProvider instance={props.i18nInstance}>
-                <NotificationsProvider>
-                  <ModalProvider>
-                    <App createInvalidateQuery={createInvalidateQuery} />
-                  </ModalProvider>
-                </NotificationsProvider>
-              </TransProvider>
-            </NavigationManager>
-          </ClientRspcContext.Provider>
-        </Router>
-      </rspc.Provider>
-    </Show>
+    <rspc.Provider client={client as any} queryClient={queryClient}>
+      <Router source={hashIntegration()}>
+        <ClientRspcContext.Provider value={client}>
+          <NavigationManager>
+            <TransProvider instance={props.i18nInstance}>
+              <NotificationsProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={createInvalidateQuery} />
+                </ModalProvider>
+              </NotificationsProvider>
+            </TransProvider>
+          </NavigationManager>
+        </ClientRspcContext.Provider>
+      </Router>
+    </rspc.Provider>
   );
 };
