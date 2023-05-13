@@ -56,4 +56,24 @@ Skeleton.modpacksList = () => {
   );
 };
 
+const ModpackVersion = () => {
+  return (
+    <div class="flex flex-col justify-between w-1/2 rounded-xl p-4 gap-4 box-border">
+      <div class="w-full h-2 rounded-md bg-darkSlate-500" />
+      <div class="w-1/2 h-2 rounded-md bg-darkSlate-500" />
+    </div>
+  );
+};
+
+Skeleton.modpackVersionList = () => {
+  return (
+    <div class="flex flex-col gap-2 w-full">
+      <ModpackVersion />
+      <ModpackVersion />
+      <ModpackVersion />
+      <ModpackVersion />
+    </div>
+  );
+};
+
 export { Skeleton };

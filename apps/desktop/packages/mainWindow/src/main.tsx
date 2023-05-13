@@ -1,6 +1,12 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createContext, createResource, Show, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createResource,
+  Show,
+  useContext,
+} from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -45,6 +51,7 @@ render(() => {
     return instance;
   });
 
+
   return (
     <Show
       when={
@@ -66,29 +73,35 @@ type InnerAppProps = {
 
 const ClientRspcContext = createContext();
 
-export function useClientRspc() {
+export const useClientRspc = () => {
   return useContext(ClientRspcContext);
-}
+};
 
 const InnerApp = (props: InnerAppProps) => {
   // eslint-disable-next-line solid/reactivity
   let { client, createInvalidateQuery } = initRspc(props.port);
 
+  createEffect(() => {
+    console.log("CLIENT", client, !!client, props.port);
+  });
+
   return (
-    <rspc.Provider client={client as any} queryClient={queryClient}>
-      <ClientRspcContext.Provider value={client}>
+    <Show when={client}>
+      <rspc.Provider client={client as any} queryClient={queryClient}>
         <Router source={hashIntegration()}>
-          <NavigationManager>
-            <TransProvider instance={props.i18nInstance}>
-              <NotificationsProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={createInvalidateQuery} />
-                </ModalProvider>
-              </NotificationsProvider>
-            </TransProvider>
-          </NavigationManager>
+          <ClientRspcContext.Provider value={client}>
+            <NavigationManager>
+              <TransProvider instance={props.i18nInstance}>
+                <NotificationsProvider>
+                  <ModalProvider>
+                    <App createInvalidateQuery={createInvalidateQuery} />
+                  </ModalProvider>
+                </NotificationsProvider>
+              </TransProvider>
+            </NavigationManager>
+          </ClientRspcContext.Provider>
         </Router>
-      </ClientRspcContext.Provider>
-    </rspc.Provider>
+      </rspc.Provider>
+    </Show>
   );
 };
