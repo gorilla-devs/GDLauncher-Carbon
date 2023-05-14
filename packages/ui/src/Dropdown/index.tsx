@@ -94,7 +94,7 @@ const Dropdown = (props: Props) => {
         id={props.id}
       >
         <button
-          class={`group flex justify-between font-semibold py-2 px-4 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass}`}
+          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer border-l-1 border-solid border-primary-300 ${props.class} ${props.bgColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -114,6 +114,8 @@ const Dropdown = (props: Props) => {
             "rounded-full": props.rounded,
             "bg-darkSlate-700": !props.bgColorClass,
             "rounded-md": !props.btnDropdown && !props.rounded,
+            "group-hover:bg-primary-300": props.btnDropdown,
+            "group px-4": !props.btnDropdown,
           }}
         >
           <Show when={!props.btnDropdown}>
@@ -132,14 +134,14 @@ const Dropdown = (props: Props) => {
             </span>
           </Show>
           <span
-            class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
-              menuOpened() ? "rotate-0" : "rotate-180"
-            }`}
+            class="i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100"
             classList={{
               "text-darkSlate-50 group-hover:text-white":
                 !props.disabled && !props.error && !props.btnDropdown,
               "text-white": !!props.error || props.btnDropdown,
               "text-darkSlate-500": props.disabled,
+              "rotate-0": menuOpened(),
+              "rotate-180": !menuOpened(),
             }}
           />
         </button>
@@ -197,7 +199,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
 
   return (
     <div class="flex">
-      <Button class="rounded-r-0 pr-2 flex gap-1">
+      <Button class="rounded-r-0 pr-4 pl-4 flex gap-1">
         <span>{props.children}</span>
       </Button>
       <Dropdown
@@ -205,7 +207,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bgColorClass="bg-primary-500"
+        bgColorClass="bg-primary-500 hover:bg-primary-300 duration-100"
         value={props.value}
         onChange={(option) => handleChange(option)}
       />
