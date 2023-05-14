@@ -94,7 +94,7 @@ const Dropdown = (props: Props) => {
         id={props.id}
       >
         <button
-          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer border-l-1 border-solid border-primary-300 ${props.class} ${props.bgColorClass}`}
+          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer ${props.class} ${props.bgColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -114,7 +114,8 @@ const Dropdown = (props: Props) => {
             "rounded-full": props.rounded,
             "bg-darkSlate-700": !props.bgColorClass,
             "rounded-md": !props.btnDropdown && !props.rounded,
-            "group-hover:bg-primary-300": props.btnDropdown,
+            "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300":
+              props.btnDropdown,
             "group px-4": !props.btnDropdown,
           }}
         >
