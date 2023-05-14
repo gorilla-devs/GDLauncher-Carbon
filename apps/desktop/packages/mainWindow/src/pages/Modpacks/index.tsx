@@ -55,13 +55,17 @@ function ModpacksLayout() {
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modpacks"],
+    queryKey: () => ["modplatforms.curseforgeSearch"],
     queryFn: (ctx) => {
-      setQuery({ index: ctx.pageParam + query.query.pageSize + 1 });
+      setQuery({ index: ctx.pageParam + (query.query.pageSize || 20) + 1 });
       return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
     },
     getNextPageParam: (lastPage) => {
-      return lastPage?.pagination?.index || 0;
+      const index = lastPage?.pagination?.index || 0;
+      const totalCount = lastPage.pagination?.totalCount || 0;
+      const pageSize = query.query.pageSize || 20;
+      const hasNextPage = index + pageSize < totalCount;
+      return hasNextPage && lastPage?.pagination?.index;
     },
   });
 

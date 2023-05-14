@@ -91,7 +91,7 @@ export default function Browser() {
       ...(infiniteQuery?.rowVirtualizer.getVirtualItems() || []),
     ].reverse();
 
-    if (!lastItem) {
+    if (!lastItem || lastItem.index === infiniteQuery?.query.query.index) {
       return;
     }
 
@@ -148,6 +148,7 @@ export default function Browser() {
               icon={<div class="i-ri:price-tag-3-fill" />}
               rounded
               bgColorClass="bg-darkSlate-400"
+              textColorClass="text-white"
               value={mappedMcVersions()[0].key}
               onChange={(val) => {
                 infiniteQuery?.setQuery({ gameVersion: val.key as string });
