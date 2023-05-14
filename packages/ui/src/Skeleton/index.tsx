@@ -1,7 +1,7 @@
 import { For } from "solid-js";
 
 const Skeleton = () => {
-  return <div />;
+  return <div class="w-1/3 min-w-20 h-4 rounded-md bg-darkSlate-500" />;
 };
 
 Skeleton.sidebarInstance = () => {

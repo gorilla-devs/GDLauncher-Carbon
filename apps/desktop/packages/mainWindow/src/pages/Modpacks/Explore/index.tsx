@@ -3,11 +3,10 @@ import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { FEModResponse } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Tab, TabList, Tabs } from "@gd/ui";
+import { Button, Skeleton, Tab, TabList, Tabs } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch, createEffect } from "solid-js";
 import fetchData from "../modpack.overview";
-import { mappedMcVersions } from "@/utils/mcVersion";
 import { format } from "date-fns";
 
 const Modpack = () => {
@@ -31,6 +30,10 @@ const Modpack = () => {
   // let bgRef: HTMLDivElement;
   // let innerContainerRef: HTMLDivElement;
   // let refStickyContainer: HTMLDivElement;
+
+  createEffect(() => {
+    console.log("EXPLORE", routeData.modpackDetails.isFetching);
+  });
 
   return (
     <ContentWrapper>
@@ -101,57 +104,83 @@ const Modpack = () => {
                       );
                     }}
                   >
-                    <h1 class="m-0">
-                      {
-                        (routeData.modpackDetails?.data as FEModResponse)?.data
-                          .name
-                      }
-                    </h1>
+                    <Switch>
+                      <Match when={!routeData.modpackDetails.isFetching}>
+                        <h1 class="m-0">
+                          {
+                            (routeData.modpackDetails?.data as FEModResponse)
+                              ?.data.name
+                          }
+                        </h1>
+                      </Match>
+                      <Match when={routeData.modpackDetails.isFetching}>
+                        <Skeleton />
+                      </Match>
+                    </Switch>
                     <div class="i-ri:external-link-line text-2xl" />
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
-                        {
-                          routeData.modpackDetails.data?.data
-                            .latestFilesIndexes[0].gameVersion
-                        }
+                        <Switch>
+                          <Match when={!routeData.modpackDetails.isFetching}>
+                            {
+                              routeData.modpackDetails.data?.data
+                                .latestFilesIndexes[0].gameVersion
+                            }
+                          </Match>
+                          <Match when={routeData.modpackDetails.isFetching}>
+                            <Skeleton />
+                          </Match>
+                        </Switch>
                       </div>
-                      <Show
-                        when={routeData.modpackDetails.data?.data.dateCreated}
-                      >
-                        <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
-                          <div class="i-ri:time-fill" />
-                          {format(
-                            new Date(
-                              (
-                                routeData.modpackDetails.data as FEModResponse
-                              ).data.dateCreated
-                            ).getTime(),
-                            "P"
-                          )}
-                        </div>
-                      </Show>
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
+                        <div class="i-ri:time-fill" />
+
+                        <Switch>
+                          <Match when={!routeData.modpackDetails.isFetching}>
+                            <Show
+                              when={
+                                routeData.modpackDetails.data?.data.dateCreated
+                              }
+                            >
+                              {format(
+                                new Date(
+                                  (
+                                    routeData.modpackDetails
+                                      .data as FEModResponse
+                                  ).data.dateCreated
+                                ).getTime(),
+                                "P"
+                              )}
+                            </Show>
+                          </Match>
+                          <Match when={routeData.modpackDetails.isFetching}>
+                            <Skeleton />
+                          </Match>
+                        </Switch>
+                      </div>
                       <div class="p-0 lg:px-4 flex gap-2 items-center">
                         <div class="i-ri:user-fill" />
                         <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
-                          <For
-                            each={routeData.modpackDetails.data?.data.authors}
-                          >
-                            {(author) => <p class="m-0">{author.name}</p>}
-                          </For>
+                          <Switch>
+                            <Match when={!routeData.modpackDetails.isFetching}>
+                              <For
+                                each={
+                                  routeData.modpackDetails.data?.data.authors
+                                }
+                              >
+                                {(author) => <p class="m-0">{author.name}</p>}
+                              </For>
+                            </Match>
+                            <Match when={routeData.modpackDetails.isFetching}>
+                              <Skeleton />
+                            </Match>
+                          </Switch>
                         </div>
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <Dropdown
-                        options={mappedMcVersions()}
-                        icon={<div class="i-ri:price-tag-3-fill" />}
-                        rounded
-                        bgColorClass="bg-darkSlate-400"
-                        value={mappedMcVersions()[0].key}
-                        onChange={() => {}}
-                      />
                       <Button uppercase variant="glow" size="large">
                         <Trans
                           key="modpack.download"
