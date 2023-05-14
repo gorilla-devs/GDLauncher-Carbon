@@ -946,7 +946,6 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEModLoaderType {
-    Any,
     Forge,
     Cauldron,
     LiteLoader,
@@ -959,7 +958,6 @@ impl From<crate::domain::modplatforms::curseforge::ModLoaderType> for FEModLoade
         minecraft_mod_loader_type: crate::domain::modplatforms::curseforge::ModLoaderType,
     ) -> Self {
         match minecraft_mod_loader_type {
-            crate::domain::modplatforms::curseforge::ModLoaderType::Any => FEModLoaderType::Any,
             crate::domain::modplatforms::curseforge::ModLoaderType::Forge => FEModLoaderType::Forge,
             crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron => {
                 FEModLoaderType::Cauldron
@@ -980,7 +978,6 @@ impl From<FEModLoaderType> for crate::domain::modplatforms::curseforge::ModLoade
         minecraft_mod_loader_type: FEModLoaderType,
     ) -> crate::domain::modplatforms::curseforge::ModLoaderType {
         match minecraft_mod_loader_type {
-            FEModLoaderType::Any => crate::domain::modplatforms::curseforge::ModLoaderType::Any,
             FEModLoaderType::Forge => crate::domain::modplatforms::curseforge::ModLoaderType::Forge,
             FEModLoaderType::Cauldron => {
                 crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron

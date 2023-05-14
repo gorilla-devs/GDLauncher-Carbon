@@ -41,8 +41,7 @@ function ModpacksLayout() {
     classId: "modpacks",
     gameId: 432,
     gameVersion: "",
-    page: 1,
-    modLoaderType: "any",
+    modLoaderType: null,
     sortField: "featured",
     sortOrder: "descending",
     pageSize: 20,
@@ -58,15 +57,11 @@ function ModpacksLayout() {
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modpacks"],
     queryFn: (ctx) => {
-      setQuery({ index: ctx.pageParam });
+      setQuery({ index: ctx.pageParam + query.query.pageSize + 1 });
       return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
     },
     getNextPageParam: (lastPage) => {
-      return (
-        (lastPage?.pagination?.index || 0) +
-        (lastPage?.pagination?.pageSize || 20) +
-        1
-      );
+      return lastPage?.pagination?.index || 0;
     },
   });
 

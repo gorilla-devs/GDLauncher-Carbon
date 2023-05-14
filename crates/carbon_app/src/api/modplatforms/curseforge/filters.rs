@@ -96,7 +96,6 @@ impl From<FEModSearchParameters> for ModSearchParameters {
 #[serde(rename_all = "camelCase")]
 pub struct FEModSearchParametersQuery {
     pub game_id: i32,
-    pub page: Option<i32>,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
     pub category_id: Option<i32>,
@@ -115,7 +114,6 @@ impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
     fn from(params: FEModSearchParametersQuery) -> Self {
         Self {
             game_id: params.game_id,
-            page: params.page,
             search_filter: params.search_filter,
             game_version: params.game_version,
             category_id: params.category_id,

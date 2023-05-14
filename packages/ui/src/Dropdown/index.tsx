@@ -28,6 +28,7 @@ type Props = {
   containerClass?: string;
   id?: string;
   bgColorClass?: string;
+  textColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
   placeholder?: string;
@@ -94,7 +95,7 @@ const Dropdown = (props: Props) => {
         id={props.id}
       >
         <button
-          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer ${props.class} ${props.bgColorClass}`}
+          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -109,8 +110,8 @@ const Dropdown = (props: Props) => {
             "border-0": !props.error,
             "border-2 border-solid border-red-500": !!props.error,
             "text-darkSlate-50 hover:text-white":
-              !props.disabled && !props.error,
-            "text-darkSlate-500": !!props.error,
+              !props.disabled && !props.error && !props.textColorClass,
+            "text-darkSlate-500": !!props.error && !props.textColorClass,
             "rounded-full": props.rounded,
             "bg-darkSlate-700": !props.bgColorClass,
             "rounded-md": !props.btnDropdown && !props.rounded,
@@ -127,8 +128,8 @@ const Dropdown = (props: Props) => {
               classList={{
                 "text-white": !!props.error,
                 "text-darkSlate-50 hover:text-white group-hover:text-white":
-                  !props.disabled && !props.error,
-                "text-darkSlate-500": props.disabled,
+                  !props.disabled && !props.error && !props.textColorClass,
+                "text-darkSlate-500": props.disabled && !props.textColorClass,
               }}
             >
               {selectedValue()}
@@ -138,8 +139,12 @@ const Dropdown = (props: Props) => {
             class="i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100"
             classList={{
               "text-darkSlate-50 group-hover:text-white":
-                !props.disabled && !props.error && !props.btnDropdown,
-              "text-white": !!props.error || props.btnDropdown,
+                !props.disabled &&
+                !props.error &&
+                !props.btnDropdown &&
+                !props.textColorClass,
+              "text-white":
+                !!props.error || (props.btnDropdown && !props.textColorClass),
               "text-darkSlate-500": props.disabled,
               "rotate-0": menuOpened(),
               "rotate-180": !menuOpened(),
