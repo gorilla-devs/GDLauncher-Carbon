@@ -6,7 +6,6 @@ import {
   createInfiniteQuery,
 } from "@tanstack/solid-query";
 import useModpacksQuery from "./useModpacksQuery";
-import { useClientRspc } from "@/main";
 import {
   Setter,
   createContext,
@@ -19,6 +18,7 @@ import {
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
+import { rspc } from "@/utils/rspcClient";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -36,8 +36,6 @@ export const useInfiniteQuery = () => {
 };
 
 function ModpacksLayout() {
-  const client: any = useClientRspc();
-
   const [query, setQuery] = useModpacksQuery({
     categoryId: null,
     classId: "modpacks",
@@ -55,14 +53,20 @@ function ModpacksLayout() {
     index: 0,
   });
 
+  const rspcContext = rspc.useContext();
+
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modpacks"],
     queryFn: (ctx) => {
       setQuery({ index: ctx.pageParam });
-      return client.query(["modplatforms.curseforgeSearch", query]);
+      return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
     },
     getNextPageParam: (lastPage) => {
-      return lastPage.pagination.index + lastPage.pagination.pageSize + 1;
+      return (
+        (lastPage?.pagination?.index || 0) +
+        (lastPage?.pagination?.pageSize || 20) +
+        1
+      );
     },
   });
 

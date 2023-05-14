@@ -4,15 +4,7 @@ import SiderbarWrapper from "./wrapper";
 import { Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
-  onMount,
-} from "solid-js";
+import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
 import { useInfiniteQuery } from "@/pages/Modpacks";
 

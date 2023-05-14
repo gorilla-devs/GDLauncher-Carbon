@@ -70,34 +70,22 @@ type InnerAppProps = {
   i18nInstance: typeof i18n;
 };
 
-const ClientRspcContext = createContext();
-
-export const useClientRspc = () => {
-  return useContext(ClientRspcContext);
-};
-
 const InnerApp = (props: InnerAppProps) => {
   // eslint-disable-next-line solid/reactivity
   let { client, createInvalidateQuery } = initRspc(props.port);
 
-  createEffect(() => {
-    console.log("CLIENT", client, !!client, props.port);
-  });
-
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
-        <ClientRspcContext.Provider value={client}>
-          <NavigationManager>
-            <TransProvider instance={props.i18nInstance}>
-              <NotificationsProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={createInvalidateQuery} />
-                </ModalProvider>
-              </NotificationsProvider>
-            </TransProvider>
-          </NavigationManager>
-        </ClientRspcContext.Provider>
+        <NavigationManager>
+          <TransProvider instance={props.i18nInstance}>
+            <NotificationsProvider>
+              <ModalProvider>
+                <App createInvalidateQuery={createInvalidateQuery} />
+              </ModalProvider>
+            </NotificationsProvider>
+          </TransProvider>
+        </NavigationManager>
       </Router>
     </rspc.Provider>
   );

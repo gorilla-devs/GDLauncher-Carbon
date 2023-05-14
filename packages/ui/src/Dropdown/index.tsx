@@ -1,8 +1,15 @@
-import { createSignal, For, Show, JSX, createEffect } from "solid-js";
+import {
+  createSignal,
+  For,
+  Show,
+  JSX,
+  createEffect,
+  onCleanup,
+} from "solid-js";
 import { Button } from "../Button";
 import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
-import { offset, flip, shift, autoUpdate } from "@floating-ui/dom";
+import { offset, flip, shift, autoUpdate, hide, size } from "@floating-ui/dom";
 
 type Option = {
   label: string;
@@ -72,19 +79,13 @@ const Dropdown = (props: Props) => {
     }, 100);
   };
 
-  // createEffect(() => {
   const position = useFloating(buttonRef, menuRef, {
     placement: "bottom",
-    middleware: [offset(5), flip(), shift()],
+    middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: autoUpdate,
   });
 
-  // setMenuCoordinate({ x: position.x || 0, y: position.y || 0 });
-  console.log("position", position, position.x, position.y, buttonRef());
-  // });
-
-  // createEffect(() => {
-  // });
+  onCleanup(() => setMenuOpened(false));
 
   return (
     <>
@@ -145,7 +146,7 @@ const Dropdown = (props: Props) => {
         <Portal>
           <ul
             ref={setMenuRef}
-            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-60 min-w-32 max-w-fit"
+            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20 min-w-32 max-w-fit"
             onMouseOut={() => {
               setFocusIn(false);
             }}
