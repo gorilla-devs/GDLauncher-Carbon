@@ -1,3 +1,5 @@
+import { For } from "solid-js";
+
 const Skeleton = () => {
   return <div />;
 };
@@ -76,109 +78,37 @@ Skeleton.modpackVersionList = () => {
   );
 };
 
+Skeleton.modpackOverviewPage = () => {
+  return (
+    <div class="flex flex-col gap-2 w-full">
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
+      <div class="mt-5 flex flex-wrap gap-4">
+        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+      </div>
+    </div>
+  );
+};
+
 Skeleton.modpackSidebar = () => {
   return (
     <div class="flex flex-col gap-4 w-full py-2">
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
-      <div class="flex gap-2 items-center">
-        <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
-        <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      </div>
+      <For each={new Array(16)}>
+        {() => (
+          <div class="flex gap-2 items-center">
+            <div class="w-4 h-4 rounded-xl bg-darkSlate-500" />
+            <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
+          </div>
+        )}
+      </For>
     </div>
   );
 };
