@@ -133,7 +133,7 @@ const Dropdown = (props: Props) => {
           </Show>
           <span
             class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
-              menuOpened() ? "rotate-180" : "rotate-0"
+              menuOpened() ? "rotate-0" : "rotate-180"
             }`}
             classList={{
               "text-darkSlate-50 group-hover:text-white":
