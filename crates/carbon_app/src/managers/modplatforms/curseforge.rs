@@ -139,13 +139,12 @@ impl CurseForge {
         &self,
         mod_parameters: ModFilesParameters,
     ) -> anyhow::Result<CurseForgeResponse<Vec<File>>> {
-        let mut url: Url = self.base_url.join(&format!(
+        let mut url = self.base_url.join(&format!(
             "mods/{}/files",
             &mod_parameters.mod_id.to_string()
         ))?;
 
         let query = mod_parameters.query.into_query_parameters()?;
-
         url.set_query(Some(&query));
 
         let resp = self

@@ -1,5 +1,4 @@
 use carbon_macro::into_query_parameters;
-use rspc::internal::specta;
 use serde::{Deserialize, Serialize};
 
 use super::{ClassId, ModLoaderType};

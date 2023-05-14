@@ -75,6 +75,8 @@ keys! {
     settings {
         GET_SETTINGS                                = "getSettings";
         SET_SETTINGS                                = "setSettings";
+        GET_IS_FIRST_LAUNCH                         = "getIsFirstLaunch";
+        SET_IS_FIRST_LAUNCH                         = "setIsFirstLaunch";
     }
 
     metrics {

@@ -151,15 +151,10 @@ impl From<FEModFilesParameters> for ModFilesParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEModFilesParametersQuery {
-    #[specta(optional)]
     pub game_version: Option<String>,
-    #[specta(optional)]
     pub mod_loader_type: Option<FEModLoaderType>,
-    #[specta(optional)]
     pub game_version_type_id: Option<i32>,
-    #[specta(optional)]
     pub index: Option<i32>,
-    #[specta(optional)]
     pub page_size: Option<i32>,
 }
 
