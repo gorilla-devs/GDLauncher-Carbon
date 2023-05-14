@@ -88,11 +88,10 @@ Skeleton.modpackOverviewPage = () => {
       <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
       <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
       <div class="mt-5 flex flex-wrap gap-4">
-        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
-        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
-        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
-        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
-        <div class="w-60 h-40 rounded-xl bg-darkSlate-500" />
+        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
       </div>
     </div>
   );

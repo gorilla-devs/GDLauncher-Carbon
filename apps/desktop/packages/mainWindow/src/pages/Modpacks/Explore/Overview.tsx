@@ -53,12 +53,12 @@ const Overview = () => {
                   }}
                 />
               </h2>
-              <div class="flex gap-2 flex-wrap">
+              <div class="flex gap-4 flex-wrap">
                 <For each={routeData.modpackDetails.data?.data.screenshots}>
                   {(screenshot) => (
                     <img
                       src={screenshot.thumbnailUrl}
-                      class="rounded-xl"
+                      class="rounded-xl w-72 h-44"
                       alt={screenshot.description}
                     />
                   )}
