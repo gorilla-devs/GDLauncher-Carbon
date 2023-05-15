@@ -6,6 +6,7 @@ import { ContextMenu } from "../ContextMenu";
 import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { createNotification } from "@gd/ui";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -32,6 +33,7 @@ const Tile = (props: Props) => {
   );
   const [t] = useTransContext();
   const addNotification = createNotification();
+  const navigate = useGDNavigate();
 
   const deleteInstanceMutation = rspc.createMutation(
     ["instance.deleteInstance"],
@@ -111,7 +113,9 @@ const Tile = (props: Props) => {
     deleteInstanceMutation.mutate(props.instanceId);
   };
 
-  const handleSettings = () => {};
+  const handleSettings = () => {
+    navigate(`/library/${props.instanceId}/settings`);
+  };
 
   const handleDuplicate = () => {};
 

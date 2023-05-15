@@ -1,4 +1,4 @@
-import { Show, Suspense } from "solid-js";
+import { Show } from "solid-js";
 import { useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import { Trans } from "@gd/i18n";
@@ -56,9 +56,9 @@ const App = (props: Props) => {
       </Show>
       <div class="flex w-screen h-auto z-10">
         <main class="relative overflow-hidden flex-1">
-          <Suspense fallback={<></>}>
-            <Route />
-          </Suspense>
+          {/* <Suspense fallback={<></>}> */}
+          <Route />
+          {/* </Suspense> */}
         </main>
       </div>
     </div>

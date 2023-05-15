@@ -59,7 +59,7 @@ const ContextMenu = (props: ContextMenuProps) => {
             class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40"
             style={{
               position: "absolute",
-              top: y() - 190 + "px",
+              top: y() - 200 + "px",
               left: x() + 10 + "px",
               "z-index": "1000",
             }}

@@ -1,6 +1,14 @@
 import { Carousel, News, Skeleton } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, Suspense, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Suspense,
+  Switch,
+  createEffect,
+  createSignal,
+} from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import fetchData from "../Library/library.data";
@@ -34,7 +42,10 @@ const Home = () => {
   return (
     <div class="pb-0 p-6">
       <div>
-        <Show when={news.length > 0 && isNewsVisible()}>
+        <Show
+          when={news.length > 0 && isNewsVisible()}
+          fallback={<Skeleton.news />}
+        >
           <News
             slides={news}
             onClick={(news) => {
@@ -58,34 +69,48 @@ const Home = () => {
             </For>
           </Carousel>
         </div> */}
-        <Show when={instances.length > 0}>
-          <div class="mt-4">
-            <Carousel title={t("your_instances")}>
-              <For each={instances}>
-                {(instance) => (
-                  //TODO: SKELETON
-                  <Suspense fallback={<Skeleton.instance />}>
-                    <InstanceTile instance={instance} />
-                  </Suspense>
-                )}
-              </For>
-            </Carousel>
-          </div>
-        </Show>
-        <Show when={instances.length === 0}>
-          <div class="w-full h-full flex flex-col justify-center items-center mt-12">
-            <img src={glassBlock} class="w-16 h-16" />
-            <p class="text-darkSlate-50 max-w-100 text-center">
-              <Trans
-                key="instance.no_mods_text"
-                options={{
-                  defaultValue:
-                    "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
-                }}
-              />
-            </p>
-          </div>
-        </Show>
+        <Switch>
+          <Match
+            when={
+              instances.length > 0 && !routeData.instancesUngrouped.isLoading
+            }
+          >
+            <div class="mt-4">
+              <Carousel title={t("your_instances")}>
+                <For each={instances}>
+                  {(instance) => (
+                    //TODO: SKELETON
+                    <Suspense fallback={<Skeleton.instance />}>
+                      <InstanceTile instance={instance} />
+                    </Suspense>
+                  )}
+                </For>
+              </Carousel>
+            </div>
+          </Match>
+          <Match when={routeData.instancesUngrouped.isLoading}>
+            <Skeleton.instances />
+          </Match>
+          <Match
+            when={
+              instances.length === 0 && !routeData.instancesUngrouped.isLoading
+            }
+          >
+            <div class="w-full h-full flex flex-col justify-center items-center mt-12">
+              <img src={glassBlock} class="w-16 h-16" />
+              <p class="text-darkSlate-50 max-w-100 text-center">
+                <Trans
+                  key="instance.no_mods_text"
+                  options={{
+                    defaultValue:
+                      "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                  }}
+                />
+              </p>
+            </div>
+          </Match>
+        </Switch>
+
         {/* <div class="mt-4">
           <Carousel title={t("popular_modpacks")}>
             <For each={mockCarousel}>
