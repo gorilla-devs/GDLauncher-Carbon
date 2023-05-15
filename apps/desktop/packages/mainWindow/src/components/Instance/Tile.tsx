@@ -111,11 +111,25 @@ const Tile = (props: Props) => {
     deleteInstanceMutation.mutate(props.instanceId);
   };
 
+  const handleSettings = () => {};
+
+  const handleDuplicate = () => {};
+
   const menuItems = [
     {
       icon: "i-ri:play-fill",
       label: t("instance.action_play"),
       action: handlePlay,
+    },
+    {
+      icon: "i-ri:settings-3-fill",
+      label: t("instance.action_settings"),
+      action: handleSettings,
+    },
+    {
+      icon: "i-ri:file-copy-fill",
+      label: t("instance.action_duplicate"),
+      action: handleDuplicate,
     },
     {
       icon: "i-ri:folder-open-fill",

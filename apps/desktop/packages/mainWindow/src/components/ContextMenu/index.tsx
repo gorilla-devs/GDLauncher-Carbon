@@ -56,7 +56,7 @@ const ContextMenu = (props: ContextMenuProps) => {
       <Show when={menuRef == ContextMenu?.openMenu()}>
         <Portal mount={document.body}>
           <div
-            class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40 h-48"
+            class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40"
             style={{
               position: "absolute",
               top: y() - 190 + "px",

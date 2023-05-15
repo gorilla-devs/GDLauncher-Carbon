@@ -114,6 +114,8 @@
   "instance.action_open_folder": "Open folder",
   "instance.action_delete": "Delete",
   "instance.action_play": "Play",
+  "instance.action_settings": "Settings",
+  "instance.action_duplicate": "Duplicate",
   "java.java_major": "Java Major",
   "java.java_distribution": "Java Distirbution",
   "java.install": "Install",
