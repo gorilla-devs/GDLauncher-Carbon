@@ -28,7 +28,7 @@ const NoMoreModpacks = () => {
 
 const FetchingModpacks = () => {
   return (
-    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
+    <div class="flex flex-col justify-center items-center gap-4 p-5 rounded-xl h-56">
       <div class="flex justify-center items-center flex-col text-center">
         <p class="text-darkSlate-50 max-w-100">
           <Trans
@@ -86,17 +86,20 @@ export default function Browser() {
       ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
 
-  createEffect(() => {
-    const [lastItem] = [
-      ...(infiniteQuery?.rowVirtualizer.getVirtualItems() || []),
-    ].reverse();
+  const allVirtualRows = () => infiniteQuery?.rowVirtualizer.getVirtualItems();
 
-    if (!lastItem || lastItem.index === infiniteQuery?.query.query.index) {
+  const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
+  createEffect(() => {
+    if (!lastItem() || lastItem().index === infiniteQuery?.query.query.index) {
       return;
     }
 
+    const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
+      ? lastItem().index - 1
+      : lastItem().index;
+
     if (
-      lastItem.index >= modpacks().length - 1 &&
+      lastItemIndex >= modpacks().length - 1 &&
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
@@ -105,7 +108,8 @@ export default function Browser() {
   });
 
   onMount(() => {
-    if (modpacks().length > 0) infiniteQuery?.resetList();
+    if (modpacks().length > 0 && !infiniteQuery?.infiniteQuery.isInitialLoading)
+      infiniteQuery?.resetList();
   });
 
   return (
@@ -252,7 +256,7 @@ export default function Browser() {
                   position: "relative",
                 }}
               >
-                <For each={infiniteQuery?.rowVirtualizer.getVirtualItems()}>
+                <For each={allVirtualRows()}>
                   {(virtualItem) => {
                     const isLoaderRow = () =>
                       virtualItem.index > modpacks().length - 1;
@@ -273,8 +277,14 @@ export default function Browser() {
                           transform: `translateY(${virtualItem.start}px)`,
                         }}
                       >
-                        <div class="bg-darkSlate-700 rounded-xl">
-                          <Switch fallback={<FetchingModpacks />}>
+                        <div>
+                          <Switch
+                            fallback={
+                              <div>
+                                <FetchingModpacks />
+                              </div>
+                            }
+                          >
                             <Match when={!isLoaderRow() && modpack()}>
                               <Modpack modpack={modpack()} />
                             </Match>

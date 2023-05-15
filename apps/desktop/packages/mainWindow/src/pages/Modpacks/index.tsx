@@ -44,7 +44,7 @@ function ModpacksLayout() {
     modLoaderType: null,
     sortField: "featured",
     sortOrder: "descending",
-    pageSize: 20,
+    pageSize: 40,
     slug: "",
     searchFilter: "",
     gameVersionTypeId: null,
@@ -65,7 +65,7 @@ function ModpacksLayout() {
       const totalCount = lastPage.pagination?.totalCount || 0;
       const pageSize = query.query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
-      return hasNextPage && lastPage?.pagination?.index;
+      return hasNextPage && index;
     },
   });
 
@@ -84,7 +84,7 @@ function ModpacksLayout() {
     },
     getScrollElement: () => parentRef(),
     estimateSize: () => 230,
-    overscan: 40,
+    overscan: 15,
   });
 
   createEffect(() => {
