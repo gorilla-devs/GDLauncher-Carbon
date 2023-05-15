@@ -8,6 +8,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use sha1::digest::core_api::CoreWrapper;
 use sha1::Digest as _;
 use sha1::Sha1;
 use sha2::Digest as _;
@@ -66,25 +67,25 @@ impl Downloadable {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Progress {
+    pub total_count: u64,
     pub current_count: u64,
+
+    pub total_size: u64,
     pub current_size: u64,
 }
 
 impl Progress {
     pub fn new() -> Self {
-        Self {
-            current_count: 0,
-            current_size: 0,
-        }
+        Self::default()
     }
 }
 
 // Todo: Add checksum/size verification
 pub async fn download_file(
-    file: &Downloadable,
-    progress: watch::Sender<Progress>,
+    downloadable_file: &Downloadable,
+    progress: Option<watch::Sender<Progress>>,
 ) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build()?;
@@ -92,29 +93,45 @@ pub async fn download_file(
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build();
 
-    let mut response = client.get(&file.url).send().await?;
+    let mut response = client.get(&downloadable_file.url).send().await?;
 
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&file.path)
+        .open(&downloadable_file.path)
         .await?;
 
     let mut buf = vec![];
     while let Some(chunk) = response.chunk().await? {
         file.write_all(&chunk).await?;
         buf.extend_from_slice(&chunk);
-        progress.send(Progress {
-            current_count: 0,
-            current_size: buf.len() as u64,
-        })?;
+        if let Some(progress) = &progress {
+            let size_progress = (buf.len() as f64 / downloadable_file.size.unwrap_or(1) as f64)
+                .min(1.0)
+                .max(0.0)
+                * 100.0;
+
+            progress.send(Progress {
+                // Special case for single file
+                total_count: 1,
+                current_count: 0,
+
+                current_size: buf.len() as u64,
+                total_size: downloadable_file.size.unwrap_or(0),
+            })?;
+        }
     }
 
-    progress.send(Progress {
-        current_count: 0,
-        current_size: 0,
-    })?;
+    if let Some(progress) = &progress {
+        progress.send(Progress {
+            total_count: 1,
+            current_count: 1,
+
+            current_size: buf.len() as u64,
+            total_size: downloadable_file.size.unwrap_or(0),
+        })?;
+    }
 
     Ok(())
 }
@@ -136,13 +153,21 @@ pub async fn download_multiple(
 
     let arced_progress = Arc::new(progress);
 
-    let atomic_counter = Arc::new(AtomicU64::new(0));
+    let atomic_size_counter = Arc::new(AtomicU64::new(0));
+    let atomic_file_counter = Arc::new(AtomicU64::new(0));
     let atomic_size = Arc::new(AtomicU64::new(files.iter().map(|f| f.size).flatten().sum()));
+
+    let total_size = files
+        .iter()
+        .fold(0, |acc, file| acc + file.size.unwrap_or(0));
+
+    let total_count = files.len() as u64;
 
     for file in files {
         let semaphore = Arc::clone(&downloads);
         let progress = Arc::clone(&arced_progress);
-        let counter = Arc::clone(&atomic_counter);
+        let size_counter = Arc::clone(&atomic_size_counter);
+        let file_counter = Arc::clone(&atomic_file_counter);
         let size = Arc::clone(&atomic_size);
         let url = file.url.clone();
         let path = file.path.clone();
@@ -191,11 +216,13 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             // unwraps will be fine because file_looks_good can't happen without it
                             let downloaded =
-                                counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
+                                size_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
                             progress.send(Progress {
-                                current_count: downloaded,
-                                current_size: size.load(Ordering::SeqCst),
+                                current_count: file_counter.load(Ordering::SeqCst),
+                                total_count,
+                                current_size: downloaded,
+                                total_size: size.load(Ordering::SeqCst),
                             })?;
 
                             return Ok(());
@@ -212,11 +239,13 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             // unwraps will be fine because file_looks_good can't happen without it
                             let downloaded =
-                                counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
+                                size_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
                             progress.send(Progress {
-                                current_count: downloaded,
-                                current_size: size.load(Ordering::SeqCst),
+                                current_count: file_counter.load(Ordering::SeqCst),
+                                total_count,
+                                current_size: downloaded,
+                                total_size: size.load(Ordering::SeqCst),
                             })?;
 
                             return Ok(());
@@ -262,7 +291,7 @@ pub async fn download_multiple(
 
                 tokio::io::copy(&mut res.as_ref(), &mut fs_file).await?;
 
-                let downloaded = counter.fetch_add(res.len() as u64, Ordering::SeqCst);
+                let downloaded = size_counter.fetch_add(res.len() as u64, Ordering::SeqCst);
                 file_downloaded += res.len() as u64;
 
                 if file_downloaded > file_size_reported {
@@ -272,20 +301,22 @@ pub async fn download_multiple(
                 }
 
                 progress.send(Progress {
-                    current_count: downloaded,
-                    current_size: size.load(Ordering::SeqCst),
+                    current_count: size_counter.load(Ordering::SeqCst),
+                    total_count,
+                    current_size: downloaded,
+                    total_size: size.load(Ordering::SeqCst),
                 })?;
             }
 
-            if file_size_reported > file_downloaded {
-                let diff = file_size_reported - file_downloaded;
-                let total = size.fetch_sub(diff, Ordering::SeqCst);
+            let diff = file_size_reported - file_downloaded;
+            let total = size.fetch_sub(diff, Ordering::SeqCst) - diff;
 
-                progress.send(Progress {
-                    current_count: counter.load(Ordering::SeqCst),
-                    current_size: total,
-                })?;
-            }
+            progress.send(Progress {
+                current_count: file_counter.fetch_add(1, Ordering::SeqCst),
+                total_count,
+                current_size: total,
+                total_size: size.load(Ordering::SeqCst),
+            })?;
 
             match file.checksum {
                 Some(Checksum::Sha1(hash)) => {

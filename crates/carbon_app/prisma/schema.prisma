@@ -23,6 +23,7 @@ model AppConfiguration {
   xmx                 Int     @default(1024)
   xms                 Int     @default(1024)
   defaultInstanceGroup Int?
+  isFirstLaunch       Boolean @default(true)
 }
 
 // Can't really use relations between java and defaultJava because external instances could refer to java as well

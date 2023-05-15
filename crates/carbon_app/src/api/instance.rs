@@ -189,6 +189,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 )
                 .await
         }
+
+        mutation DELETE_MOD[app, imod: InstanceMod] {
+            app.instance_manager()
+                .delete_mod(
+                    imod.instance_id.into(),
+                    imod.mod_id,
+                )
+                .await
+        }
+
+        mutation OPEN_INSTANCE_FOLDER[app, id: InstanceId] {
+            app.instance_manager().open_folder(id.into()).await
+        }
     }
 }
 

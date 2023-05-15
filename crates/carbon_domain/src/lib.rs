@@ -2,8 +2,6 @@
 #![allow(dead_code)]
 
 mod minecraft_mod;
-pub mod translation;
-pub mod vtask;
 
 #[macro_export]
 macro_rules! try_path_fmt {

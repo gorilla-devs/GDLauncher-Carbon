@@ -674,7 +674,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut instances = self.instances.write().await;
         let mut instance = instances
             .get_mut(&instance_id)
-            .ok_or_else(|| anyhow!("instance id invalid"))?;
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let Instance { type_: InstanceType::Valid(data), .. } = &mut instance else {
             bail!("set_favorite called on invalid instance")
@@ -865,6 +865,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing instance json")?;
 
+        tokio::fs::write(tmpdir.join(".first_run_incomplete"), "")
+            .await
+            .context("writing incomplete instance marker")?;
+
         let _lock = self.path_lock.lock().await;
         let (shortpath, path) = self.next_folder(&name).await?;
 
@@ -916,7 +920,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut instances = self.instances.write().await;
         let mut instance = instances
             .get_mut(&instance_id)
-            .ok_or_else(|| anyhow!("instance id invalid"))?;
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let Instance { shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
             bail!("update_instance called on invalid instance")
@@ -995,7 +999,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut instances = self.instances.write().await;
         let instance = instances
             .get(&instance_id)
-            .ok_or_else(|| anyhow!("instance id invalid"))?;
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let path = self
             .app
@@ -1014,6 +1018,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+
+        Ok(())
+    }
+
+    pub async fn open_folder(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path()
+            .join(&instance.shortpath as &str);
+
+        opener::open(path)?;
 
         Ok(())
     }
@@ -1092,7 +1115,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
-            .ok_or_else(|| anyhow!("instance_details called with invalid instance id"))?;
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let instance = match &instance.type_ {
             InstanceType::Invalid(_) => bail!("instance_details called on invalid instance"),

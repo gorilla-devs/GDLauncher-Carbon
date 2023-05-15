@@ -606,13 +606,13 @@ impl AccountRefreshService {
                         .min_by(|(_, a), (_, b)| a.cmp(b))
                         .map(|(uuid, _)| uuid);
 
-                    let Some(uuid) = least_recently_checked else { continue };
-
-                    // ignore the result since we can't do anything if it failed.
-                    let _ = account_manager
-                        .refresh_account_status(uuid.clone(), false)
-                        .await;
-                    last_check_times.insert(uuid.clone(), Instant::now());
+                    if let Some(uuid) = least_recently_checked {
+                        // ignore the result since we can't do anything if it failed.
+                        let _ = account_manager
+                            .refresh_account_status(uuid.clone(), false)
+                            .await;
+                        last_check_times.insert(uuid.clone(), Instant::now());
+                    }
                 }
 
                 tokio::time::sleep(Duration::from_secs(30)).await;

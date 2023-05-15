@@ -1,19 +1,15 @@
-use carbon_domain::translation as domain;
 use rspc::Type;
 use serde::Serialize;
-use std::collections::HashMap;
 
-#[derive(Type, Serialize, Clone, PartialEq)]
-pub struct Translation {
-    pub key: &'static str,
-    pub params: HashMap<&'static str, String>,
-}
-
-impl From<domain::Translation> for Translation {
-    fn from(value: domain::Translation) -> Self {
-        Self {
-            key: value.key,
-            params: value.params,
-        }
-    }
+#[derive(Debug, Type, Serialize, Clone, PartialEq)]
+pub enum Translation {
+    #[cfg(test)]
+    Test,
+    InstanceTaskLaunch(String),
+    InstanceTaskPrepare(String),
+    InstanceTaskLaunchWaiting,
+    InstanceTaskLaunchRequestVersions,
+    InstanceTaskLaunchDownloadFiles,
+    InstanceTaskLaunchExtractNatives,
+    InstanceTaskLaunchRunForgeProcessors,
 }
