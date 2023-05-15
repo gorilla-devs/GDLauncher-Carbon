@@ -1,11 +1,4 @@
-import {
-  Button,
-  Checkbox,
-  Dropdown,
-  Input,
-  TextArea,
-  createNotification,
-} from "@gd/ui";
+import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -30,7 +23,6 @@ const InstanceCreation = (props: ModalProps) => {
     MappedMcVersion[]
   >([]);
   const [title, setTitle] = createSignal("");
-  const [notes, setNotes] = createSignal("");
   const [error, setError] = createSignal("");
   const [bgPreview, setBgPreview] = createSignal<string | null>(null);
   const [loader, setLoader] = createSignal<ModLoaderType | undefined>(
@@ -124,6 +116,14 @@ const InstanceCreation = (props: ModalProps) => {
         addNotification("Error while creating the instance.");
         modalsContext?.closeModal();
       },
+      onSettled() {
+        setError("");
+        setTitle("");
+        setError("");
+        setBgPreview(null);
+        setMcVersion("");
+        setLoaderVersion("");
+      },
     }
   );
 
@@ -136,7 +136,7 @@ const InstanceCreation = (props: ModalProps) => {
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,
-        notes: notes(),
+        notes: "",
         name: title(),
         version: {
           Version: {
@@ -236,29 +236,12 @@ const InstanceCreation = (props: ModalProps) => {
               onInput={(e) => {
                 setTitle(e.currentTarget.value);
               }}
+              value={title()}
               error={
                 error() &&
                 !title() &&
                 (t("error.missing_field_title") as string)
               }
-            />
-          </div>
-          <div>
-            <h5 class="mt-0 mb-2">
-              <Trans
-                key="instance.instance_notes"
-                options={{
-                  defaultValue: "Notes",
-                }}
-              />
-            </h5>
-            <TextArea
-              required
-              placeholder="New instance"
-              class="min-h-40 resize-none"
-              onInput={(e) => {
-                setNotes(e.currentTarget.value);
-              }}
             />
           </div>
           <div>

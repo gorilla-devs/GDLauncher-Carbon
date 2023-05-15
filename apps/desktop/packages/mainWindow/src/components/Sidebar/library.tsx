@@ -77,6 +77,9 @@ const Sidebar = () => {
             />
           </Show>
         </div>
+        <Show when={routeData.instancesUngrouped.isLoading}>
+          <Skeleton.sidebarInstances />
+        </Show>
         <div
           class="mt-4 overflow-y-auto h-[calc(100%-84px-40px)]"
           classList={{
@@ -143,10 +146,15 @@ const Sidebar = () => {
               </Collapsable>
             )}
           </For>
-          <Show when={(routeData.instancesUngrouped?.data || []).length === 0}>
+          <Show
+            when={
+              (routeData.instancesUngrouped?.data || []).length === 0 &&
+              !routeData.instancesUngrouped.isLoading
+            }
+          >
             <div class="w-full h-full flex flex-col justify-center items-center">
               <img src={glassBlock} class="w-16 h-16" />
-              <p class="text-darkSlate-50 text-center text-xs max-w-100">
+              <p class="text-darkSlate-50 text-center max-w-100 text-xs">
                 <Trans
                   key="instance.no_mods_text"
                   options={{

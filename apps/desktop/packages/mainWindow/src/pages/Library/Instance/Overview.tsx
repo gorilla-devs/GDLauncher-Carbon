@@ -17,21 +17,21 @@ const Overview = () => {
         <Card title="Minecraft version" text="1.19.2" icon="clock" />
         <Card title="Minecraft version" text="1.19.2" icon="sign" />
       </div>
-      <div class="flex flex-col items-start justify-between gap-2 p-5 bg-darkSlate-700 rounded-xl box-border w-full w-59">
-        <div class="text-darkSlate-50 uppercase">
-          <Trans
-            key="instance.notes"
-            options={{
-              defaultValue: "notes",
-            }}
-          />
-        </div>
-        <Show when={routeData.instanceDetails.data?.notes}>
+      <Show when={routeData.instanceDetails.data?.notes}>
+        <div class="flex flex-col items-start justify-between gap-2 p-5 bg-darkSlate-700 rounded-xl box-border w-full w-59">
+          <div class="text-darkSlate-50 uppercase">
+            <Trans
+              key="instance.notes"
+              options={{
+                defaultValue: "notes",
+              }}
+            />
+          </div>
           <p class="m-0 text-sm leading-6">
             {routeData.instanceDetails.data?.notes}
           </p>
-        </Show>
-      </div>
+        </div>
+      </Show>
     </div>
   );
 };
