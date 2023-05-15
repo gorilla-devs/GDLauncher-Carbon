@@ -95,8 +95,12 @@ const Tile = (props: Props) => {
     }
   );
 
+  const openFolderMutation = rspc.createMutation([
+    "instance.openInstanceFolder",
+  ]);
+
   const handleOpenFolder = () => {
-    console.log("OPEN FOLDER");
+    openFolderMutation.mutate(props.instanceId);
   };
 
   const handlePlay = () => {
@@ -119,6 +123,7 @@ const Tile = (props: Props) => {
       action: handleOpenFolder,
     },
     {
+      id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
       action: handleDelete,

@@ -1350,19 +1350,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad0a93d233ebf96623465aad4046a8d3aa4da22d4f4beba5388838c8a434bbb4"
 
 [[package]]
-name = "goldberg"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2d9cbd1fdba1a34e35404e93aab99efbf14076ab4c3380b4d408f7cd3cd9710"
-dependencies = [
- "moisture",
- "proc-macro2",
- "quote",
- "rand 0.8.5",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "graphql-parser"
 version = "0.3.0"
 source = "git+https://github.com/prisma/graphql-parser#6a3f58bd879065588e710cb02b5bd30c1ce182c3"
@@ -1728,15 +1715,6 @@ checksum = "12b6ee2129af8d4fb011108c73d99a1b83a85977f23b82460c0ae2e25bb4b57f"
 [[package]]
 name = "iridium"
 version = "0.1.0"
-dependencies = [
- "base64 0.21.0",
- "goldberg",
- "rand 0.8.5",
- "reqwest",
- "reqwest-middleware",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "is-terminal"
@@ -2195,17 +2173,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22ce75669015c4f47b289fd4d4f56e894e4c96003ffdf3ac51313126f94c6cbb"
 dependencies = [
  "cfg-if",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "moisture"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da1c12ec95f955162f01e673f383afd3f1306a5d7254f0aa38c4d219066ad7b0"
-dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",

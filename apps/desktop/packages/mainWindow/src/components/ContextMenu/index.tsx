@@ -6,6 +6,7 @@ interface MenuItem {
   icon?: string;
   label: string;
   action: () => void;
+  id?: string;
 }
 
 interface ContextMenuProps {
@@ -67,7 +68,11 @@ const ContextMenu = (props: ContextMenuProps) => {
             <For each={props.menuItems}>
               {(item) => (
                 <div
-                  class="flex items-center cursor-pointer w-full gap-1 hover:text-white px-3 h-8 hover:bg-darkSlate-700 text-darkGray-50 py-1"
+                  class="flex items-center cursor-pointer w-full gap-1 px-3 h-8 hover:bg-darkSlate-700 py-1"
+                  classList={{
+                    "hover:text-red-600 text-red-500": item.id === "delete",
+                    "hover:text-white text-darkGray-50": !item.id,
+                  }}
                   onClick={item.action}
                 >
                   <Show when={item.icon}>
