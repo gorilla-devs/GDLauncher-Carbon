@@ -128,6 +128,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
       urls: ["http://*/*", "https://*/*"],

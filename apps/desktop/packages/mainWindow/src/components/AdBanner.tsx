@@ -8,7 +8,8 @@ export const AdsBanner = () => {
         height: `${adSize.height}px`,
         width: `${adSize.width}px`,
       }}
-      class="bg-red-500"
-    />
+    >
+      <owadview />
+    </div>
   );
 };
