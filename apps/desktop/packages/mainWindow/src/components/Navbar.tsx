@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -33,10 +33,13 @@ const AppNavbar = () => {
   const navigate = useGDNavigate();
   const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
+  const [activeInstances, setActiveInstances] = createSignal(0);
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
+
+  const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
@@ -68,6 +71,10 @@ const AppNavbar = () => {
       setAccounts(mappedAccounts);
     }
   });
+
+  // createSignal(() => {
+  //   instances.data?.forEach((instance) => {});
+  // });
 
   return (
     <Show when={!isLogin()}>
@@ -112,12 +119,17 @@ const AppNavbar = () => {
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
                   <Tab ignored>
-                    <div
-                      class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill"
-                      onClick={() =>
-                        modalsContext?.openModal({ name: "logViewer" })
-                      }
-                    />
+                    <div class="relative">
+                      <div class="absolute w-4 h-4 -top-1 -right-1 rounded-full bg-red-500 z-30 text-white flex justify-center items-center text-xs">
+                        2
+                      </div>
+                      <div
+                        class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill z-20"
+                        onClick={() =>
+                          modalsContext?.openModal({ name: "logViewer" })
+                        }
+                      />
+                    </div>
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>

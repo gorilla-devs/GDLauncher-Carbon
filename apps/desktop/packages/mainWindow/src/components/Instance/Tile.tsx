@@ -16,7 +16,7 @@ type Props = {
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
-  version: string | undefined;
+  version: string | undefined | null;
   img: string | undefined;
   variant?: Variant;
   invalid?: boolean;

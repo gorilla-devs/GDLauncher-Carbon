@@ -59,7 +59,7 @@ const defaultModals: Hash = {
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
-    title: "Logs",
+    title: "Notification",
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),

@@ -2,7 +2,8 @@
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
-import { For } from "solid-js";
+import { For, createEffect } from "solid-js";
+import { port, rspc } from "@/utils/rspcClient";
 
 const logs = [
   {
@@ -41,6 +42,16 @@ const logs = [
 ];
 
 const LogViewer = (props: ModalProps) => {
+  const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
+  const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
+
+  createEffect(() => {
+    console.log("TASKSSSSS", tasks.data, instances);
+    // fetch(
+    //   `http://localhost:${port}/instance/log?id=${files.filePaths[0]}`
+    // ).then(async (img) => {});
+  });
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 overflow-hidden">
@@ -48,13 +59,25 @@ const LogViewer = (props: ModalProps) => {
           <Tabs variant="traditional">
             <div class="flex items-center max-h-full">
               <TabList>
-                <Tab>
-                  <div class="w-full flex gap-2 items-center h-10 justify-start">
-                    <div class="w-6 rounded-md bg-green h-6" />
-                    <p class="my-2">Valhelsia</p>
-                  </div>
-                </Tab>
-                <Tab>
+                <For each={instances.data}>
+                  {(instance) => {
+                    fetch(
+                      `http://localhost:${port}/instance/log?id=${instance.id}`
+                    ).then(async (log) => {
+                      console.log("LOG", log);
+                    });
+
+                    return (
+                      <Tab>
+                        <div class="w-full flex gap-2 items-center h-10 justify-start">
+                          <div class="w-6 rounded-md bg-green h-6" />
+                          <p class="my-2">{instance.name}</p>
+                        </div>
+                      </Tab>
+                    );
+                  }}
+                </For>
+                {/* <Tab>
                   <div class="w-full h-10 flex gap-2 items-center justify-start">
                     <div class="w-6 h-6 rounded-md bg-green" />
                     <p class="my-2">Valhelsia</p>
@@ -71,7 +94,7 @@ const LogViewer = (props: ModalProps) => {
                     <div class="w-6 h-6 rounded-md bg-green" />
                     <p class="my-2">Valhelsia</p>
                   </div>
-                </Tab>
+                </Tab> */}
               </TabList>
               <div class="flex gap-4 px-5">
                 <div class="cursor-pointer text-darkSlate-50 i-ri:upload-2-line" />
