@@ -213,8 +213,8 @@ impl ManagerRef<'_, InstanceManager> {
                         {
                             let progress = progress_watch_rx.borrow();
                             t_download_files.update_download(
-                                progress.current_count as u32,
                                 progress.current_size as u32,
+                                progress.total_size as u32,
                             );
                         }
 
@@ -281,7 +281,16 @@ impl ManagerRef<'_, InstanceManager> {
                         )
                         .await?,
                     )),
-                    None => Ok(None),
+                    None => {
+                        let _ = app.instance_manager()
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive
+                            )
+                            .await;
+
+                        Ok(None)
+                    },
                 }
             })()
             .await;
