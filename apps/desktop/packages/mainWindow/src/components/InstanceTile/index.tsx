@@ -2,17 +2,13 @@ import { createEffect, createResource, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
   fetchImage,
-  getLaunchState,
   isListInstanceValid,
-  isInstancePreparing,
   isProgressKnown,
   isProgressFailed,
+  getValideInstance,
+  getPreparingState,
 } from "@/utils/instances";
-import {
-  ListInstance,
-  TaskId,
-  UngroupedInstance,
-} from "@gd/core_module/bindings";
+import { ListInstance, UngroupedInstance } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
@@ -38,22 +34,13 @@ const InstanceTile = (props: {
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
 
-  const validInstance = () =>
-    isListInstanceValid(props.instance.status)
-      ? props.instance.status.Valid
-      : null;
+  const validInstance = () => getValideInstance(props.instance.status);
 
-  const isPreparingState = () =>
-    isListInstanceValid(props.instance.status) &&
-    isInstancePreparing(props.instance.status.Valid.state)
-      ? (getLaunchState(props.instance.status.Valid.state) as {
-          Preparing: TaskId;
-        })
-      : null;
+  const isPreparingState = () => getPreparingState(props.instance.status);
 
   const modloader = validInstance()?.modloader;
 
-  const taskId = isPreparingState()?.Preparing;
+  const taskId = isPreparingState();
 
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);

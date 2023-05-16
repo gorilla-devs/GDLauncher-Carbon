@@ -17,6 +17,12 @@ export const isListInstanceValid = (
   return "Valid" in status;
 };
 
+export const getValideInstance = (
+  status: ListInstanceStatus
+): ValidListInstance | undefined => {
+  if (isListInstanceValid(status)) return status.Valid;
+};
+
 export const isListInstanceInvalid = (
   status: ListInstanceStatus
 ): status is { Invalid: InvalidListInstance } => {
@@ -32,6 +38,32 @@ export const getLaunchState = (
     return { Running: launchState.Running };
   }
   return undefined;
+};
+
+export const getPreparingState = (status: ListInstanceStatus) => {
+  const isValidState = getValideInstance(status);
+
+  if (
+    isValidState &&
+    isValidState.state &&
+    typeof isValidState.state === "object" &&
+    "Preparing" in isValidState.state
+  ) {
+    return isValidState.state.Preparing;
+  }
+};
+
+export const getRunningState = (status: ListInstanceStatus) => {
+  const isValidState = getValideInstance(status);
+
+  if (
+    isValidState &&
+    isValidState.state &&
+    typeof isValidState.state === "object" &&
+    "Running" in isValidState.state
+  ) {
+    return isValidState.state.Running;
+  }
 };
 
 export const isInstancePreparing = (

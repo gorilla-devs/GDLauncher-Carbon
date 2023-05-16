@@ -11,6 +11,7 @@ import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port, rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
+import { getRunningState, getValideInstance } from "@/utils/instances";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
@@ -72,9 +73,15 @@ const AppNavbar = () => {
     }
   });
 
-  // createSignal(() => {
-  //   instances.data?.forEach((instance) => {});
-  // });
+  createEffect(() => {
+    instances.data?.forEach((instance) => {
+      console.log("instances", instance);
+
+      const isPreparingState = () => getRunningState(instance.status);
+
+      const logId = isPreparingState()?.log_id;
+    });
+  });
 
   return (
     <Show when={!isLogin()}>

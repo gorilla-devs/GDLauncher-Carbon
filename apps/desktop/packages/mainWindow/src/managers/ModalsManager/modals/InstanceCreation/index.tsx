@@ -380,6 +380,7 @@ const InstanceCreation = (props: ModalProps) => {
             <Button
               variant="secondary"
               style={{ width: "100%", "max-width": "200px" }}
+              onClick={() => modalsContext?.closeModal()}
             >
               <Trans
                 key="instance.instance_modal_instance_creation_cancel"
