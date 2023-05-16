@@ -45,7 +45,7 @@ pub struct CurseforgeModpack {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GameConfig {
-    pub version: GameVersion,
+    pub version: Option<GameVersion>,
     #[serde(default = "default_global_java_args")]
     pub global_java_args: bool,
     #[serde(default)]
@@ -180,7 +180,7 @@ impl From<info::CurseforgeModpack> for CurseforgeModpack {
 impl From<GameConfig> for info::GameConfig {
     fn from(value: GameConfig) -> Self {
         Self {
-            version: value.version.into(),
+            version: value.version.map(Into::into),
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
@@ -191,7 +191,7 @@ impl From<GameConfig> for info::GameConfig {
 impl From<info::GameConfig> for GameConfig {
     fn from(value: info::GameConfig) -> Self {
         Self {
-            version: value.version.into(),
+            version: value.version.map(Into::into),
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),

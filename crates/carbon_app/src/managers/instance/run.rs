@@ -1,4 +1,5 @@
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::minecraft::curseforge;
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -87,8 +88,9 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instance_path(&instance.shortpath);
 
         let version = match config.game_configuration.version {
-            GameVersion::Standard(v) => v,
-            GameVersion::Custom(_) => panic!("Custom versions are not supported yet"),
+            Some(GameVersion::Standard(v)) => v,
+            Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
+            None => bail!("Instance has no associated game version and cannot be launched"),
         };
 
         let task = VisualTask::new(match &launch_account {
@@ -242,7 +244,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .sha1
                 ));
 
-                if let Some(t_forge_processors) = t_forge_processors {
+                if let Some(t_forge_processors) = &t_forge_processors {
                     t_forge_processors.start_opaque();
 
                     if let Some(processors) = &version_info.processors {
