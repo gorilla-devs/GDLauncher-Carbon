@@ -17,7 +17,10 @@ use crate::{
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
 };
 
-use super::{Managed, ManagedJavaArch, ManagedJavaOs, ManagedJavaOsMap, ManagedJavaVersion, Step};
+use super::{
+    Managed, ManagedJavaArch, ManagedJavaArchMap, ManagedJavaOs, ManagedJavaOsMap,
+    ManagedJavaVersion, Step,
+};
 
 #[derive(Debug, Default)]
 pub struct AzulZulu;
@@ -154,7 +157,9 @@ impl AzulAPI {
                     let versions = Self::get_all_by_os_arch(&os, &arch).await?;
 
                     let mut results = arced_rwlock_results.write().await;
-                    let os = results.entry(os.clone()).or_insert_with(HashMap::new);
+                    let os = results
+                        .entry(os.clone())
+                        .or_insert_with(|| ManagedJavaArchMap(HashMap::new()));
 
                     let arch = os.entry(arch).or_insert_with(Vec::new);
 
@@ -176,7 +181,9 @@ impl AzulAPI {
         }
 
         // Get the hashmap out of the rwlock
-        Ok(std::mem::take(&mut *rwlock_results.write_owned().await))
+        Ok(ManagedJavaOsMap(std::mem::take(
+            &mut *rwlock_results.write_owned().await,
+        )))
     }
 
     async fn get_all_by_os_arch(

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -105,5 +105,40 @@ impl From<FEManagedJavaVersion> for crate::managers::java::managed::ManagedJavaV
     }
 }
 
-pub type FEManagedJavaArchMap = HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>;
-pub type FEManagedJavaOsMap = HashMap<FEManagedJavaOs, FEManagedJavaArchMap>;
+#[derive(Type, Debug, Clone, Serialize, Deserialize)]
+pub struct FEManagedJavaArchMap(HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>);
+
+impl Deref for FEManagedJavaArchMap {
+    type Target = HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<crate::managers::java::managed::ManagedJavaArchMap> for FEManagedJavaArchMap {
+    fn from(v: crate::managers::java::managed::ManagedJavaArchMap) -> Self {
+        Self(
+            v.into_iter()
+                .map(|(k, v)| (k.into(), v.into_iter().map(|v| v.into()).collect()))
+                .collect(),
+        )
+    }
+}
+
+#[derive(Type, Debug, Clone, Serialize, Deserialize)]
+pub struct FEManagedJavaOsMap(HashMap<FEManagedJavaOs, FEManagedJavaArchMap>);
+
+impl Deref for FEManagedJavaOsMap {
+    type Target = HashMap<FEManagedJavaOs, FEManagedJavaArchMap>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<crate::managers::java::managed::ManagedJavaOsMap> for FEManagedJavaOsMap {
+    fn from(v: crate::managers::java::managed::ManagedJavaOsMap) -> Self {
+        Self(v.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+    }
+}

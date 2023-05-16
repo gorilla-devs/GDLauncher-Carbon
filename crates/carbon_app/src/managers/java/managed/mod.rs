@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    ops::{Deref, DerefMut},
+    path::PathBuf,
+    sync::Arc,
+};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use tokio::sync::{watch::Sender, Mutex};
@@ -72,8 +77,39 @@ pub struct ManagedJavaVersion {
     pub download_url: String,
 }
 
-pub type ManagedJavaArchMap = HashMap<ManagedJavaArch, Vec<ManagedJavaVersion>>;
-pub type ManagedJavaOsMap = HashMap<ManagedJavaOs, ManagedJavaArchMap>;
+#[derive(Debug, Clone)]
+pub struct ManagedJavaArchMap(HashMap<ManagedJavaArch, Vec<ManagedJavaVersion>>);
+
+impl Deref for ManagedJavaArchMap {
+    type Target = HashMap<ManagedJavaArch, Vec<ManagedJavaVersion>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ManagedJavaArchMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ManagedJavaOsMap(HashMap<ManagedJavaOs, ManagedJavaArchMap>);
+
+impl Deref for ManagedJavaOsMap {
+    type Target = HashMap<ManagedJavaOs, ManagedJavaArchMap>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ManagedJavaOsMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[async_trait::async_trait]
 pub trait Managed {

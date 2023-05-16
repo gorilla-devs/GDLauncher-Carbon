@@ -74,24 +74,13 @@ async fn get_managed_versions_by_vendor(
     app: App,
     args: FEVendor,
 ) -> anyhow::Result<FEManagedJavaOsMap> {
-    let app = &app
+    let managed_java_map_os = app
         .java_manager()
         .managed_service
         .get_versions_for_vendor(Vendor::from(args))
         .await?;
 
-    // let fe_hashmap: HashMap<_, _> = HashMap::new();
-
-    // for (os, archs) in app {
-    //     let mut fe_archs = HashMap::new();
-    //     for (arch, versions) in archs {
-    //         fe_archs.insert(FEManagedJavaArch::from(*arch), versions.clone());
-    //     }
-    //     fe_hashmap.insert(FEManagedJavaOs::from(*os), fe_archs);
-    // }
-
-    todo!()
-    // Ok(x.collect())
+    Ok(managed_java_map_os.into())
 }
 
 #[derive(Type, Serialize)]
