@@ -2,24 +2,46 @@ use anyhow::bail;
 
 use crate::domain::java::{JavaArch, JavaVersion};
 
-pub fn parse_cmd_output_java_version(cmd_output: &str) -> anyhow::Result<JavaVersion> {
-    for line in cmd_output.lines() {
-        if line.trim().starts_with("java.version=") {
-            return JavaVersion::try_from(line.replace("java.version=", "").trim());
-        }
-    }
-
-    bail!("Could not find java version in output: {}", cmd_output);
+pub struct JavaCmdParsedOutput {
+    pub version: JavaVersion,
+    pub arch: JavaArch,
+    pub vendor: String,
 }
 
-pub fn parse_cmd_output_java_arch(cmd_output: &str) -> anyhow::Result<JavaArch> {
+pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOutput> {
+    let mut version = None;
+    let mut arch = None;
+    let mut vendor = None;
+
     for line in cmd_output.lines() {
-        if line.trim().starts_with("os.arch=") {
-            return Ok(JavaArch::from(line.replace("os.arch=", "").trim()));
+        if line.trim().starts_with("java.version=") {
+            version = Some(JavaVersion::try_from(
+                line.replace("java.version=", "").trim(),
+            )?);
+        } else if line.trim().starts_with("os.arch=") {
+            arch = Some(JavaArch::from(line.replace("os.arch=", "").trim()));
+        } else if line.trim().starts_with("java.vendor=") {
+            vendor = Some(line.replace("java.vendor=", "").trim().to_string());
         }
     }
 
-    bail!("Could not find java arch in output: {}", cmd_output);
+    if version.is_none() {
+        bail!("Could not parse java version from output");
+    }
+
+    if arch.is_none() {
+        bail!("Could not parse java arch from output");
+    }
+
+    if vendor.is_none() {
+        bail!("Could not parse java vendor from output");
+    }
+
+    Ok(JavaCmdParsedOutput {
+        version: version.unwrap(),
+        arch: arch.unwrap(),
+        vendor: vendor.unwrap(),
+    })
 }
 
 #[cfg(test)]
@@ -56,7 +78,9 @@ mod test {
         ];
 
         for test_case in expected.iter() {
-            let actual = super::parse_cmd_output_java_version(test_case.output).ok();
+            let actual = super::parse_cmd_output_java(test_case.output)
+                .map(|x| x.version)
+                .ok();
             assert_eq!(actual, test_case.expected);
         }
     }
@@ -96,7 +120,9 @@ mod test {
         ];
 
         for test_case in expected.iter() {
-            let actual = super::parse_cmd_output_java_arch(test_case.output).ok();
+            let actual = super::parse_cmd_output_java(test_case.output)
+                .map(|x| x.arch)
+                .ok();
             assert_eq!(actual, test_case.expected);
         }
     }

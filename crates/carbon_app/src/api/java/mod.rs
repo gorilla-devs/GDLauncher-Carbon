@@ -1,7 +1,6 @@
 use crate::api::managers::App;
 use crate::api::router::router;
-use crate::domain::java::JavaComponentType;
-use crate::managers::java::managed::Vendor;
+use crate::domain::java::{JavaComponentType, Vendor};
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};

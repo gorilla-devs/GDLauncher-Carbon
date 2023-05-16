@@ -8,7 +8,10 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use tokio::sync::{watch::Sender, Mutex};
 
-use crate::db::PrismaClient;
+use crate::{
+    db::PrismaClient,
+    domain::java::{JavaArch, JavaOs, Vendor},
+};
 
 use self::azul_zulu::AzulZulu;
 
@@ -27,49 +30,6 @@ pub enum Step {
     Done,
 }
 
-#[derive(Debug, EnumIter)]
-pub enum Vendor {
-    Azul,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, EnumIter, Clone)]
-pub enum ManagedJavaOs {
-    Windows,
-    Linux,
-    MacOs,
-}
-
-impl TryFrom<String> for ManagedJavaOs {
-    type Error = anyhow::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "windows" => Ok(Self::Windows),
-            "linux" => Ok(Self::Linux),
-            "macos" => Ok(Self::MacOs),
-            _ => Err(anyhow::anyhow!("Unknown OS: {}", value)),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, EnumIter, Clone)]
-pub enum ManagedJavaArch {
-    X64,
-    Aarch64,
-}
-
-impl TryFrom<String> for ManagedJavaArch {
-    type Error = anyhow::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "x64" => Ok(Self::X64),
-            "aarch64" => Ok(Self::Aarch64),
-            _ => Err(anyhow::anyhow!("Unknown arch: {}", value)),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct ManagedJavaVersion {
     pub id: String,
@@ -78,10 +38,10 @@ pub struct ManagedJavaVersion {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManagedJavaArchMap(HashMap<ManagedJavaArch, Vec<ManagedJavaVersion>>);
+pub struct ManagedJavaArchMap(HashMap<JavaArch, Vec<ManagedJavaVersion>>);
 
 impl Deref for ManagedJavaArchMap {
-    type Target = HashMap<ManagedJavaArch, Vec<ManagedJavaVersion>>;
+    type Target = HashMap<JavaArch, Vec<ManagedJavaVersion>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -95,10 +55,10 @@ impl DerefMut for ManagedJavaArchMap {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManagedJavaOsMap(HashMap<ManagedJavaOs, ManagedJavaArchMap>);
+pub struct ManagedJavaOsMap(HashMap<JavaOs, ManagedJavaArchMap>);
 
 impl Deref for ManagedJavaOsMap {
-    type Target = HashMap<ManagedJavaOs, ManagedJavaArchMap>;
+    type Target = HashMap<JavaOs, ManagedJavaArchMap>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -141,12 +101,12 @@ impl ManagedService {
         }
     }
 
-    pub fn get_all_os(&self) -> Vec<ManagedJavaOs> {
-        ManagedJavaOs::iter().collect()
+    pub fn get_all_os(&self) -> Vec<JavaOs> {
+        JavaOs::iter().collect()
     }
 
-    pub fn get_all_archs(&self) -> Vec<ManagedJavaArch> {
-        ManagedJavaArch::iter().collect()
+    pub fn get_all_archs(&self) -> Vec<JavaArch> {
+        JavaArch::iter().collect()
     }
 
     pub fn get_all_vendors(&self) -> Vec<Vendor> {

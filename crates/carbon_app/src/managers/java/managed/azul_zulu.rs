@@ -14,13 +14,11 @@ use tokio::{
 
 use crate::{
     db::PrismaClient,
+    domain::java::{JavaArch, JavaOs},
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
 };
 
-use super::{
-    Managed, ManagedJavaArch, ManagedJavaArchMap, ManagedJavaOs, ManagedJavaOsMap,
-    ManagedJavaVersion, Step,
-};
+use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
 
 #[derive(Debug, Default)]
 pub struct AzulZulu;
@@ -148,8 +146,8 @@ impl AzulAPI {
         let rwlock_results = Arc::new(RwLock::new(results));
         let mut tasks = Vec::new();
 
-        for os in ManagedJavaOs::iter() {
-            for arch in ManagedJavaArch::iter() {
+        for os in JavaOs::iter() {
+            for arch in JavaArch::iter() {
                 let os = os.clone();
                 let arch = arch.clone();
                 let arced_rwlock_results = rwlock_results.clone();
@@ -187,8 +185,8 @@ impl AzulAPI {
     }
 
     async fn get_all_by_os_arch(
-        os: &ManagedJavaOs,
-        arch: &ManagedJavaArch,
+        os: &JavaOs,
+        arch: &JavaArch,
     ) -> anyhow::Result<Vec<AzulZuluVersion>> {
         let mut results: Vec<AzulZuluVersion> = Vec::new();
         let mut page = 0;
@@ -198,13 +196,14 @@ impl AzulAPI {
                 "{AZUL_BASE_URL}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&include_fields=os%2C%20arch&page={}&os={}&arch={}",
                 page,
                 match os {
-                    ManagedJavaOs::Windows => "windows",
-                    ManagedJavaOs::Linux => "linux",
-                    ManagedJavaOs::MacOs => "macos",
+                    JavaOs::Windows => "windows",
+                    JavaOs::Linux => "linux",
+                    JavaOs::MacOs => "macos",
                 },
                 match arch {
-                    ManagedJavaArch::X64 => "amd64",
-                    ManagedJavaArch::Aarch64 => "aarch64",
+                    JavaArch::X64 => "amd64",
+                    JavaArch::X86 => "x86",
+                    JavaArch::Aarch64 => "aarch64",
                 }
             );
 

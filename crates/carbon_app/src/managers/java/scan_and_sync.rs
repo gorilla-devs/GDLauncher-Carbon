@@ -27,7 +27,9 @@ pub async fn add_java_component_to_db(
             java_component.version.major as i32,
             java_component.version.try_into().unwrap(),
             java_component._type.into(),
+            java_component.os.to_string(),
             Into::<&str>::into(java_component.arch).to_string(),
+            java_component.vendor,
             vec![],
         )
         .exec()
@@ -184,7 +186,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::{
-        domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaVersion},
+        domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion},
         managers::java::{
             discovery::MockDiscovery,
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
@@ -207,6 +209,8 @@ mod test {
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
         };
         add_java_component_to_db(db, component_to_remove)
             .await
@@ -217,6 +221,8 @@ mod test {
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
         };
 
         add_java_component_to_db(db, component_to_keep)
@@ -247,6 +253,8 @@ mod test {
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
         };
 
         add_java_component_to_db(db, component_to_add)
@@ -277,6 +285,8 @@ mod test {
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Custom,
             arch: JavaArch::X86,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
         };
 
         add_java_component_to_db(db, component_to_add)

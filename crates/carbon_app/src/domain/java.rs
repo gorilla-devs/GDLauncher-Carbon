@@ -1,6 +1,7 @@
 use anyhow::bail;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 // TODO: This does not handle the case where the same path still exists between executions but changes the version
 pub struct Java {
@@ -27,10 +28,12 @@ pub enum JavaMajorVer {
 pub struct JavaComponent {
     pub path: String,
     pub arch: JavaArch,
+    pub os: JavaOs,
     /// Indicates whether the component has manually been added by the user
     #[serde(rename = "type")]
     pub _type: JavaComponentType,
     pub version: JavaVersion,
+    pub vendor: String,
 }
 
 impl From<crate::db::java::Data> for JavaComponent {
@@ -40,6 +43,8 @@ impl From<crate::db::java::Data> for JavaComponent {
             arch: JavaArch::from(&*value.arch),
             _type: JavaComponentType::from(&*value.r#type),
             version: JavaVersion::try_from(&*value.full_version).unwrap(),
+            os: JavaOs::try_from(value.os).unwrap(),
+            vendor: value.vendor,
         }
     }
 }
@@ -72,7 +77,7 @@ impl From<JavaComponentType> for String {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Clone, EnumIter)]
 pub enum JavaArch {
     X64,
     X86,
@@ -98,6 +103,51 @@ impl<'a> From<&'a str> for JavaArch {
             "x86" => JavaArch::X86,
             "aarch64" => JavaArch::Aarch64,
             _ => panic!("Unknown JavaArch: {s}"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Clone)]
+pub enum JavaOs {
+    Windows,
+    Linux,
+    MacOs,
+}
+
+impl TryFrom<String> for JavaOs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "windows" => Ok(Self::Windows),
+            "linux" => Ok(Self::Linux),
+            "macos" => Ok(Self::MacOs),
+            _ => Err(anyhow::anyhow!("Unknown OS: {}", value)),
+        }
+    }
+}
+
+impl ToString for JavaOs {
+    fn to_string(&self) -> String {
+        match self {
+            JavaOs::Windows => "windows",
+            JavaOs::Linux => "linux",
+            JavaOs::MacOs => "macos",
+        }
+        .to_string()
+    }
+}
+
+#[derive(Debug, EnumIter)]
+pub enum Vendor {
+    Azul,
+}
+
+impl Vendor {
+    pub fn from_java_dot_vendor(vendor: &str) -> Option<Self> {
+        match vendor {
+            "Azul Systems, Inc." => Some(Self::Azul),
+            _ => None,
         }
     }
 }

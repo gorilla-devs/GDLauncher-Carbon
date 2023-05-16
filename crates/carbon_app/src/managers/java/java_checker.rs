@@ -3,10 +3,10 @@ use std::path::Path;
 use anyhow::bail;
 use tokio::process::Command;
 
-use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaVersion};
+use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion};
 
 use super::{
-    parser::{parse_cmd_output_java_arch, parse_cmd_output_java_version},
+    parser::parse_cmd_output_java,
     utils::{locate_java_check_class, JAVA_CHECK_APP_NAME},
 };
 
@@ -48,13 +48,14 @@ impl JavaChecker for RealJavaChecker {
             .await?;
 
         let output = String::from_utf8(output.stdout)?;
-        let java_version = parse_cmd_output_java_version(&output)?;
-        let java_arch = parse_cmd_output_java_arch(&output)?;
+        let parsed_output = parse_cmd_output_java(&output)?;
 
         Ok(JavaComponent {
             path: java_bin_path.to_string_lossy().to_string(),
-            version: java_version,
-            arch: java_arch,
+            version: parsed_output.version,
+            arch: parsed_output.arch,
+            vendor: parsed_output.vendor,
+            os: JavaOs::try_from(std::env::consts::OS.to_string())?,
             _type,
         })
     }
@@ -81,6 +82,8 @@ impl JavaChecker for MockJavaChecker {
             },
             arch: JavaArch::X86,
             _type: JavaComponentType::Local,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
         })
     }
 }

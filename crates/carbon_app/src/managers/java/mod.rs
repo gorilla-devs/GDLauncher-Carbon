@@ -1,15 +1,4 @@
-use daedalus::minecraft::Os;
-use strum::IntoEnumIterator;
-use tokio::sync::Mutex;
-
-use self::{
-    discovery::Discovery,
-    java_checker::JavaChecker,
-    managed::{
-        azul_zulu::AzulZulu, Managed, ManagedJavaArch, ManagedJavaOs, ManagedJavaOsMap,
-        ManagedService, Vendor,
-    },
-};
+use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
 
 use super::ManagerRef;
 use crate::{

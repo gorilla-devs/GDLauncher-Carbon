@@ -8,16 +8,16 @@ pub enum FEVendor {
     Azul,
 }
 
-impl From<crate::managers::java::managed::Vendor> for FEVendor {
-    fn from(v: crate::managers::java::managed::Vendor) -> Self {
-        use crate::managers::java::managed::Vendor;
+impl From<crate::domain::java::Vendor> for FEVendor {
+    fn from(v: crate::domain::java::Vendor) -> Self {
+        use crate::domain::java::Vendor;
         match v {
             Vendor::Azul => Self::Azul,
         }
     }
 }
 
-impl From<FEVendor> for crate::managers::java::managed::Vendor {
+impl From<FEVendor> for crate::domain::java::Vendor {
     fn from(v: FEVendor) -> Self {
         match v {
             FEVendor::Azul => Self::Azul,
@@ -32,18 +32,18 @@ pub enum FEManagedJavaOs {
     MacOs,
 }
 
-impl From<crate::managers::java::managed::ManagedJavaOs> for FEManagedJavaOs {
-    fn from(v: crate::managers::java::managed::ManagedJavaOs) -> Self {
-        use crate::managers::java::managed::ManagedJavaOs;
+impl From<crate::domain::java::JavaOs> for FEManagedJavaOs {
+    fn from(v: crate::domain::java::JavaOs) -> Self {
+        use crate::domain::java::JavaOs;
         match v {
-            ManagedJavaOs::Windows => Self::Windows,
-            ManagedJavaOs::Linux => Self::Linux,
-            ManagedJavaOs::MacOs => Self::MacOs,
+            JavaOs::Windows => Self::Windows,
+            JavaOs::Linux => Self::Linux,
+            JavaOs::MacOs => Self::MacOs,
         }
     }
 }
 
-impl From<FEManagedJavaOs> for crate::managers::java::managed::ManagedJavaOs {
+impl From<FEManagedJavaOs> for crate::domain::java::JavaOs {
     fn from(v: FEManagedJavaOs) -> Self {
         match v {
             FEManagedJavaOs::Windows => Self::Windows,
@@ -56,23 +56,26 @@ impl From<FEManagedJavaOs> for crate::managers::java::managed::ManagedJavaOs {
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum FEManagedJavaArch {
     X64,
+    X86,
     Aarch64,
 }
 
-impl From<crate::managers::java::managed::ManagedJavaArch> for FEManagedJavaArch {
-    fn from(v: crate::managers::java::managed::ManagedJavaArch) -> Self {
-        use crate::managers::java::managed::ManagedJavaArch;
+impl From<crate::domain::java::JavaArch> for FEManagedJavaArch {
+    fn from(v: crate::domain::java::JavaArch) -> Self {
+        use crate::domain::java::JavaArch;
         match v {
-            ManagedJavaArch::X64 => Self::X64,
-            ManagedJavaArch::Aarch64 => Self::Aarch64,
+            JavaArch::X64 => Self::X64,
+            JavaArch::X86 => Self::X64,
+            JavaArch::Aarch64 => Self::Aarch64,
         }
     }
 }
 
-impl From<FEManagedJavaArch> for crate::managers::java::managed::ManagedJavaArch {
+impl From<FEManagedJavaArch> for crate::domain::java::JavaArch {
     fn from(v: FEManagedJavaArch) -> Self {
         match v {
             FEManagedJavaArch::X64 => Self::X64,
+            FEManagedJavaArch::X86 => Self::X64,
             FEManagedJavaArch::Aarch64 => Self::Aarch64,
         }
     }
