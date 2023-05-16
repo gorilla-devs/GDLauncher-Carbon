@@ -38,11 +38,11 @@ keys! {
     }
 
     java {
-        GET_ALL_AVAILABLE_JAVAS                     = "getAllAvailableJavas";
-        SET_DEFAULT                                 = "setDefault";
-        SETUP_CONTROLLED                            = "setupControlled";
-        GET_CONTROLLED_INSTALL_STATUS               = "getControlledInstallStatus";
-        DELETE_CONTROLLED                           = "deleteControlled";
+        GET_AVAILABLE_JAVAS                     = "getAvailableJavas";
+        GET_MANAGED_VENDORS                     = "getManagedVendors";
+        GET_MANAGED_OS                          = "getManagedOS";
+        GET_MANAGED_ARCH                        = "getManagedArch";
+        GET_MANAGED_VERSIONS_BY_VENDOR          = "getManagedVersionsByVendor";
     }
 
     mc {

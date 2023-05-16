@@ -221,6 +221,17 @@ pub enum SystemProfile {
     Gamma,
 }
 
+impl SystemProfile {
+    pub fn get_system_profiles() -> Vec<Self> {
+        vec![
+            SystemProfile::Legacy,
+            SystemProfile::Alpha,
+            SystemProfile::Beta,
+            SystemProfile::Gamma,
+        ]
+    }
+}
+
 impl std::str::FromStr for SystemProfile {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -244,24 +255,6 @@ impl From<SystemProfile> for String {
         }
     }
 }
-
-impl From<&SystemProfile> for String {
-    fn from(profile: &SystemProfile) -> Self {
-        match profile {
-            SystemProfile::Legacy => "legacy".to_string(),
-            SystemProfile::Alpha => "alpha".to_string(),
-            SystemProfile::Beta => "beta".to_string(),
-            SystemProfile::Gamma => "gamma".to_string(),
-        }
-    }
-}
-
-pub const SYSTEM_PROFILES: &[SystemProfile] = &[
-    SystemProfile::Legacy,
-    SystemProfile::Alpha,
-    SystemProfile::Beta,
-    SystemProfile::Gamma,
-];
 
 #[cfg(test)]
 mod test {

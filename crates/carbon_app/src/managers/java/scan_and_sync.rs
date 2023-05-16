@@ -17,7 +17,7 @@ async fn get_java_component_from_db(db: &PrismaClient, path: String) -> anyhow::
     Ok(if res.is_some() { Some(()) } else { None })
 }
 
-async fn add_java_component_to_db(
+pub async fn add_java_component_to_db(
     db: &Arc<PrismaClient>,
     java_component: JavaComponent,
 ) -> anyhow::Result<()> {

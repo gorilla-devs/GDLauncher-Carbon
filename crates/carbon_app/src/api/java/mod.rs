@@ -1,29 +1,37 @@
 use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::JavaComponentType;
+use crate::managers::java::managed::Vendor;
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor};
+
+mod managed;
+
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query GET_ALL_AVAILABLE_JAVAS[app, _args: ()] {
+        query GET_AVAILABLE_JAVAS[app, _args: ()] {
             get_all_available_javas(app, _args).await
         }
 
-        mutation SET_DEFAULT[_, _args: SetDefaultArgs] { Ok(()) }
-
-        mutation SETUP_CONTROLLED[_, _args: SetupArgs] {
-            // invalidate_query!("java.autoSetupjavaProgress");
-            Ok(())
+        query GET_MANAGED_OS[app, _args: ()] {
+            get_managed_os(app, _args)
         }
 
-        query GET_CONTROLLED_INSTALL_STATUS[_, _args: ()] {
-            Ok(0) // progress
+        query GET_MANAGED_ARCH[app, _args: ()] {
+            get_managed_arch(app, _args)
         }
 
-        mutation DELETE_CONTROLLED[_, _major_version: u8] { Ok(()) }
+        query GET_MANAGED_VENDORS[app, _args: ()] {
+            get_managed_vendors(app, _args)
+        }
+
+        query GET_MANAGED_VERSIONS_BY_VENDOR[app, args: FEVendor] {
+            get_managed_versions_by_vendor(app, args).await
+        }
     }
 }
 
@@ -42,6 +50,48 @@ async fn get_all_available_javas(
     }
 
     Ok(result)
+}
+
+fn get_managed_os(app: App, _args: ()) -> anyhow::Result<Vec<FEManagedJavaOs>> {
+    let all_os = app.java_manager().managed_service.get_all_os();
+
+    Ok(all_os.into_iter().map(FEManagedJavaOs::from).collect())
+}
+
+fn get_managed_arch(app: App, _args: ()) -> anyhow::Result<Vec<FEManagedJavaArch>> {
+    let all_arch = app.java_manager().managed_service.get_all_archs();
+
+    Ok(all_arch.into_iter().map(FEManagedJavaArch::from).collect())
+}
+
+fn get_managed_vendors(app: App, _args: ()) -> anyhow::Result<Vec<FEVendor>> {
+    let all_vendors = app.java_manager().managed_service.get_all_vendors();
+
+    Ok(all_vendors.into_iter().map(FEVendor::from).collect())
+}
+
+async fn get_managed_versions_by_vendor(
+    app: App,
+    args: FEVendor,
+) -> anyhow::Result<FEManagedJavaOsMap> {
+    let app = &app
+        .java_manager()
+        .managed_service
+        .get_versions_for_vendor(Vendor::from(args))
+        .await?;
+
+    // let fe_hashmap: HashMap<_, _> = HashMap::new();
+
+    // for (os, archs) in app {
+    //     let mut fe_archs = HashMap::new();
+    //     for (arch, versions) in archs {
+    //         fe_archs.insert(FEManagedJavaArch::from(*arch), versions.clone());
+    //     }
+    //     fe_hashmap.insert(FEManagedJavaOs::from(*os), fe_archs);
+    // }
+
+    todo!()
+    // Ok(x.collect())
 }
 
 #[derive(Type, Serialize)]
@@ -85,21 +135,6 @@ impl From<JavaComponentType> for FEJavaComponentType {
             JavaComponentType::Custom => Self::Custom,
         }
     }
-}
-
-#[derive(Type, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SetupArgs {
-    major_version: u8,
-    #[serde(rename = "type")]
-    _type: AutoSetupTypes,
-}
-
-#[derive(Type, Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum AutoSetupTypes {
-    AdoptOpenJDK,
-    MojangJDK,
 }
 
 #[derive(Type, Deserialize)]

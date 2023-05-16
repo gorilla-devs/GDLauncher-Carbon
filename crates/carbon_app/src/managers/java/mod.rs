@@ -1,30 +1,45 @@
-use self::{discovery::Discovery, java_checker::JavaChecker};
+use daedalus::minecraft::Os;
+use strum::IntoEnumIterator;
+use tokio::sync::Mutex;
+
+use self::{
+    discovery::Discovery,
+    java_checker::JavaChecker,
+    managed::{
+        azul_zulu::AzulZulu, Managed, ManagedJavaArch, ManagedJavaOs, ManagedJavaOsMap,
+        ManagedService, Vendor,
+    },
+};
 
 use super::ManagerRef;
 use crate::{
     db::PrismaClient,
-    domain::java::{Java, SystemProfile, SYSTEM_PROFILES},
+    domain::java::{Java, SystemProfile},
 };
 use std::{collections::HashMap, sync::Arc};
 
-mod auto_setup;
 mod constants;
 pub mod discovery;
 pub mod java_checker;
+pub mod managed;
 mod parser;
 mod scan_and_sync;
 pub mod utils;
 
-pub(crate) struct JavaManager {}
+pub(crate) struct JavaManager {
+    pub managed_service: ManagedService,
+}
 
 impl JavaManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            managed_service: ManagedService::new(),
+        }
     }
 
     pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
         if db_client.java_system_profile().count(vec![]).exec().await? == 0 {
-            for profile in SYSTEM_PROFILES {
+            for profile in SystemProfile::get_system_profiles() {
                 db_client
                     .java_system_profile()
                     .create(String::from(profile), vec![])
@@ -53,7 +68,7 @@ impl JavaManager {
 }
 
 impl ManagerRef<'_, JavaManager> {
-    pub async fn get_available_javas(self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
+    pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
         let db = &self.app.prisma_client;
         let all_javas = db.java().find_many(vec![]).exec().await?;
 
@@ -69,7 +84,7 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn get_java_profiles(
-        self,
+        &self,
     ) -> anyhow::Result<Vec<crate::db::java_system_profile::Data>> {
         let db = &self.app.prisma_client;
         let all_profiles = db
@@ -82,4 +97,14 @@ impl ManagerRef<'_, JavaManager> {
 
         Ok(all_profiles)
     }
+
+    // async fn setup_managed_java(
+    //     distribution: Vendor,
+    //     os: Os,
+    //     major_version: u8,
+    // ) -> anyhow::Result<()> {
+    //     match distribution {
+    //         Vendor::Azul => AzulZulu::setup().await?,
+    //     }
+    // }
 }
