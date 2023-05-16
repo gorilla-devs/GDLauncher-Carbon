@@ -80,28 +80,6 @@ keys! {
         DELETE_MOD                                  = "deleteMod";
     }
 
-    instance {
-        DEFAULT_GROUP                               = "getDefaultGroup";
-        GET_GROUPS                                  = "getGroups";
-        GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
-        CREATE_GROUP                                = "createGroup";
-        CREATE_INSTANCE                             = "createInstance";
-        DELETE_GROUP                                = "deleteGroup";
-        DELETE_INSTANCE                             = "deleteInstance";
-        MOVE_GROUP                                  = "moveGroup";
-        MOVE_INSTANCE                               = "moveInstance";
-        UPDATE_INSTANCE                             = "updateInstance";
-        SET_FAVORITE                                = "setFavorite";
-        INSTANCE_DETAILS                            = "getInstanceDetails";
-        PREPARE_INSTANCE                            = "prepareInstance";
-        LAUNCH_INSTANCE                             = "launchInstance";
-        KILL_INSTANCE                               = "killInstance";
-        OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
-        ENABLE_MOD                                  = "enableMod";
-        DISABLE_MOD                                 = "disableMod";
-        DELETE_MOD                                  = "deleteMod";
-    }
-
     vtask {
         GET_TASKS                                   = "getTasks";
         GET_TASK                                    = "getTask";
