@@ -7,6 +7,7 @@ import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
 import { useInfiniteQuery } from "@/pages/Modpacks";
+import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 
 const Sidebar = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -23,6 +24,21 @@ const Sidebar = () => {
           (category) => category.classId === 4471
         ) || [];
       setModpacksCategories(modpacksCategories());
+    }
+  });
+
+  createEffect(() => {
+    if (routeData.minecraftVersions.data) {
+      setMcVersions(routeData.minecraftVersions.data);
+
+      routeData.minecraftVersions.data.forEach((version) => {
+        if (version.type === "release") {
+          setMappedMcVersions((prev) => [
+            ...prev,
+            { label: version.id, key: version.id },
+          ]);
+        }
+      });
     }
   });
 
@@ -97,7 +113,7 @@ const Sidebar = () => {
             </Collapsable>
           </Match>
           <Match when={modpacksCategories().length === 0}>
-            <Skeleton.modpackSidebar />
+            <Skeleton.modpackSidebarCategories />
           </Match>
         </Switch>
       </div>

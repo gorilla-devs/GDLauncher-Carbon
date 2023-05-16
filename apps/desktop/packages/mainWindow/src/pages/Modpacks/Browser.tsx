@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
-import { For, Match, Switch, createEffect, onMount } from "solid-js";
+import { For, Match, Show, Switch, createEffect, onMount } from "solid-js";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
@@ -147,17 +147,22 @@ export default function Browser() {
               value={0}
               rounded
             />
-            <Dropdown
-              options={mappedMcVersions()}
-              icon={<div class="i-ri:price-tag-3-fill" />}
-              rounded
-              bgColorClass="bg-darkSlate-400"
-              textColorClass="text-white"
-              value={mappedMcVersions()[0].key}
-              onChange={(val) => {
-                infiniteQuery?.setQuery({ gameVersion: val.key as string });
-              }}
-            />
+            <Show when={mappedMcVersions().length > 0}>
+              <Dropdown
+                options={mappedMcVersions()}
+                icon={<div class="i-ri:price-tag-3-fill" />}
+                rounded
+                bgColorClass="bg-darkSlate-400"
+                textColorClass="text-white"
+                value={mappedMcVersions()[0].key}
+                onChange={(val) => {
+                  infiniteQuery?.setQuery({ gameVersion: val.key as string });
+                }}
+              />
+            </Show>
+            <Show when={mappedMcVersions().length === 0}>
+              <Skeleton.select />
+            </Show>
           </div>
           <div
             class="cursor-pointer text-2xl"
