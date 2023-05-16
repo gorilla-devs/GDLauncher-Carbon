@@ -117,7 +117,7 @@ const Modpack = () => {
                         <Skeleton />
                       </Match>
                     </Switch>
-                    <div class="i-ri:external-link-line text-2xl" />
+                    <div class="text-2xl i-ri:external-link-line" />
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
@@ -162,7 +162,7 @@ const Modpack = () => {
                       </div>
                       <div class="p-0 lg:px-4 flex gap-2 items-center">
                         <div class="i-ri:user-fill" />
-                        <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
+                        <div class="text-sm flex gap-2 overflow-x-auto whitespace-nowrap max-w-52">
                           <Switch>
                             <Match when={!routeData.modpackDetails.isFetching}>
                               <For

@@ -12,7 +12,7 @@ const VersionRow = (props: Props) => {
       <h4 class="font-medium m-0">{props.modVersion.displayName}</h4>
       <div class="flex justify-between">
         <div class="flex justify-between">
-          <div class="flex justify-between text-sm text-lightGray-800 divide-x-1 divide-darkSlate-500">
+          <div class="flex justify-between text-sm divide-darkSlate-500 text-lightGray-800 divide-x-1">
             <span class="pr-3">{props.modVersion.gameVersions[0]}</span>
             <span class="px-3">
               {format(new Date(props.modVersion.fileDate), "dd-MM-yyyy")}

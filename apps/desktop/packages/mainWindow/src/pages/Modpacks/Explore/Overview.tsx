@@ -20,7 +20,7 @@ const Overview = () => {
                 }}
               />
             </h2>
-            <div class="flex gap-2 overflow-x-auto scrollbar-hide">
+            <div class="flex gap-2 scrollbar-hide overflow-x-auto">
               <For each={routeData.modpackDetails.data?.data.categories}>
                 {(tag) => (
                   <Tag name={tag.name} img={tag.iconUrl} type="fixed" />

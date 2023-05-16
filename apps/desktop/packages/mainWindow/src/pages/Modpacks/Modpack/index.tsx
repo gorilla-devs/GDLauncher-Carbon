@@ -19,7 +19,7 @@ const truncateText = (text: string, maxLength: number): string => {
 const Modpack = (props: Props) => {
   const navigate = useGDNavigate();
   return (
-    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 max-h-60 rounded-2xl">
+    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
         <img
           class="rounded-xl select-none h-30 w-30"
@@ -27,7 +27,7 @@ const Modpack = (props: Props) => {
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
-            <h2 class="mt-0 text-ellipsis overflow-hidden mb-1 whitespace-nowrap max-w-92">
+            <h2 class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92">
               {props.modpack.name}
             </h2>
             <div class="flex gap-4 items-center">
