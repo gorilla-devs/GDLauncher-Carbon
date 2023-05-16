@@ -30,7 +30,7 @@ export interface DropDownButtonProps {
   disabled?: boolean;
   rounded?: boolean;
   label?: string;
-  onChange?: (_value: string) => void;
+  onChange?: (_value: Option) => void;
   class?: string;
   id?: string;
   bgColorClass?: string;

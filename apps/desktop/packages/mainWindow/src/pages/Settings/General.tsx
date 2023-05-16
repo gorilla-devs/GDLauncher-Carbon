@@ -66,7 +66,7 @@ const General = () => {
               { label: t("languages.italian"), key: "it" },
             ]}
             onChange={(lang) => {
-              settingsMutation.mutate({ language: lang.key });
+              settingsMutation.mutate({ language: lang.key as string });
             }}
           />
         </div>
@@ -97,7 +97,9 @@ const General = () => {
               { label: t("settings.release_channel_alpha"), key: "alpha" },
             ]}
             onChange={(channel) => {
-              settingsMutation.mutate({ releaseChannel: channel.key });
+              settingsMutation.mutate({
+                releaseChannel: channel.key as string,
+              });
             }}
           />
         </div>
@@ -129,7 +131,7 @@ const General = () => {
             }))}
             onChange={(downloads) => {
               settingsMutation.mutate({
-                concurrentDownloads: parseInt(downloads.key, 10),
+                concurrentDownloads: parseInt(downloads.key as string, 10),
               });
             }}
           />
