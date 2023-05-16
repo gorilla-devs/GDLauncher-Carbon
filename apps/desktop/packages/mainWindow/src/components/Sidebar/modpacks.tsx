@@ -39,6 +39,10 @@ const Sidebar = () => {
           ]);
         }
       });
+      setMappedMcVersions((prev) => [
+        { key: "", label: "All version" },
+        ...prev,
+      ]);
     }
   });
 
