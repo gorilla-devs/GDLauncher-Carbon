@@ -3,8 +3,8 @@ use chrono::{DateTime, FixedOffset};
 use std::path::{Path, PathBuf};
 use tokio::sync::watch::Sender;
 
-mod adoptopenjdk;
-mod mojang;
+// mod adoptopenjdk;
+// mod mojang;
 
 #[derive(Default)]
 pub struct JavaProgress {

@@ -38,7 +38,7 @@
     "eslint-plugin-solid": "^0.9.1",
     "jsdom": "^20.0.3",
     "prettier": "^2.8.1",
-    "solid-js": "1.6.7",
+    "solid-js": "1.7.3",
     "solid-testing-library": "^0.5.0",
     "typescript": "^4.9.4",
     "unocss": "^0.48.0",

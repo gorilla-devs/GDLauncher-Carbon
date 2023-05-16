@@ -1,30 +1,22 @@
-use reqwest::{Certificate, Identity};
-
 use crate::{iridium_client::get_client, managers::GDL_API_BASE};
 
 use super::ManagerRef;
 
-pub struct ModplatformsManager {}
+pub mod curseforge;
+
+pub struct ModplatformsManager {
+    pub curseforge: curseforge::CurseForge,
+}
 
 impl ModplatformsManager {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            curseforge: curseforge::CurseForge::new(get_client()),
+        }
     }
 }
 
-impl ManagerRef<'_, ModplatformsManager> {
-    pub async fn some_api_request(&self) -> anyhow::Result<()> {
-        let client = get_client();
-        let response = client
-            .get(format!("{}/v1/curseforge/mods/520914", GDL_API_BASE))
-            .send()
-            .await?;
-
-        println!("{:?}", response);
-
-        Ok(())
-    }
-}
+impl ManagerRef<'_, ModplatformsManager> {}
 
 // #[cfg(test)]
 // mod test {

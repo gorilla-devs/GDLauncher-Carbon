@@ -12,7 +12,8 @@ CREATE TABLE "AppConfiguration" (
     "startupResolution" TEXT NOT NULL DEFAULT '854x480',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
     "xmx" INTEGER NOT NULL DEFAULT 1024,
-    "xms" INTEGER NOT NULL DEFAULT 1024
+    "xms" INTEGER NOT NULL DEFAULT 1024,
+    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable

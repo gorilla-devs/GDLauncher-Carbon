@@ -160,4 +160,13 @@ impl ManagerRef<'_, SettingsManager> {
             .await?
             .ok_or(anyhow!("Can't find this key"))
     }
+
+    pub async fn get_is_first_launch(&self) -> anyhow::Result<bool> {
+        self.get().await.map(|x| x.is_first_launch)
+    }
+
+    pub async fn set_is_first_launch(&self, value: bool) -> anyhow::Result<()> {
+        self.set(app_configuration::SetParam::SetIsFirstLaunch(value))
+            .await
+    }
 }

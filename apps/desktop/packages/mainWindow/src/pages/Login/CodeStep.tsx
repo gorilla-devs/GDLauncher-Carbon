@@ -16,6 +16,7 @@ import { Procedures } from "@gd/core_module";
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
+  setStep: Setter<number>;
 }
 
 type ActiveUUID = Extract<
@@ -139,13 +140,20 @@ const CodeStep = (props: Props) => {
       },
       onFail() {
         setEnrollmentInProgress(false);
-        setError("something went wrong while logging in");
+        setError("Something went wrong while logging in");
+        accountEnrollCancelMutation.mutate(undefined);
+        props.setStep(0);
       },
       onComplete(account) {
         finalizeMutation.mutate(undefined);
         // if (finalizeMutation.isSuccess) {
         setActiveUUIDMutation.mutate(account.uuid);
         // }
+      },
+      onError() {
+        setError("Something went wrong while logging in");
+        accountEnrollCancelMutation.mutate(undefined);
+        props.setStep(0);
       },
     });
   });
@@ -239,13 +247,14 @@ const CodeStep = (props: Props) => {
           class="normal-case"
           onClick={() => {
             setLoading(true);
+            navigator.clipboard.writeText(userCode() || "");
             window.openExternalLink(deviceCodeLink() || "");
           }}
         >
           <Trans
             key="login.open_in_browser"
             options={{
-              defaultValue: "Open in browser",
+              defaultValue: "Copy and open in browser",
             }}
           />
           <div class="text-md i-ri:link" />

@@ -1,12 +1,9 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-use crate::{
-    app_version::APP_VERSION,
-    managers::{
-        java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
-        App, AppInner,
-    },
+use crate::managers::{
+    java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+    App, AppInner,
 };
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
@@ -32,13 +29,16 @@ pub async fn init() {
     println!("Starting Carbon App");
 
     #[cfg(feature = "production")]
+    iridium::startup_check();
+
+    #[cfg(feature = "production")]
     #[cfg(not(test))]
     let _guard = {
         println!("Initializing Sentry");
         sentry::init((
             env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
-                release: Some(APP_VERSION.into()),
+                release: Some(app_version::APP_VERSION.into()),
                 ..Default::default()
             },
         ))

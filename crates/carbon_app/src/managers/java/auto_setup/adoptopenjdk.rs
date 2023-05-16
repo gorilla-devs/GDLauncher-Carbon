@@ -45,7 +45,7 @@ impl JavaAuto for AdoptOpenJDK {
         let download = &meta.download[0];
         let download_path = &download.path.clone();
 
-        carbon_net::download_file(download, tx).await?;
+        carbon_net::download_file(download, Some(tx)).await?;
         carbon_compression::decompress(&download_path, &runtime).await?;
 
         tokio::fs::remove_file(&download_path).await?;
