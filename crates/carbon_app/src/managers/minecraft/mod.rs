@@ -14,7 +14,7 @@ use crate::domain::minecraft::minecraft::{
 use super::ManagerRef;
 
 mod assets;
-mod curseforge;
+pub mod curseforge;
 pub mod forge;
 pub mod minecraft;
 

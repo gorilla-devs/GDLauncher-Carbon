@@ -382,7 +382,7 @@ enum ListInstanceStatus {
 
 #[derive(Type, Serialize)]
 struct ValidListInstance {
-    mc_version: String,
+    mc_version: Option<String>,
     modloader: Option<ModLoaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
@@ -507,7 +507,7 @@ enum MoveInstanceTarget {
 pub struct InstanceDetails {
     pub name: String,
     pub favorite: bool,
-    pub version: String,
+    pub version: Option<String>,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
     pub modloaders: Vec<ModLoader>,

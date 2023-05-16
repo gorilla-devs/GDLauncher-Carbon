@@ -39,7 +39,7 @@ pub struct CurseforgeModpack {
 
 #[derive(Debug, Clone)]
 pub struct GameConfig {
-    pub version: GameVersion,
+    pub version: Option<GameVersion>,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,

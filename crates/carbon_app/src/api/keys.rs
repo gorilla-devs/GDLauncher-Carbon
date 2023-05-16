@@ -54,26 +54,30 @@ keys! {
     }
 
     mc {
-        GET_FORGE_VERSIONS                          = "getForgeVersions";
-        GET_INSTANCES                               = "getInstances";
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
-        GET_INSTANCE_DETAILS                        = "getInstanceDetails";
-        OPEN_INSTANCE_FOLDER_PATH                   = "openInstanceFolderPath";
-        START_INSTANCE                              = "startInstance";
-        STOP_INSTANCE                               = "stopInstance";
+        GET_FORGE_VERSIONS                          = "getForgeVersions";
+    }
+
+    instance {
+        DEFAULT_GROUP                               = "getDefaultGroup";
+        GET_GROUPS                                  = "getGroups";
+        GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
+        CREATE_GROUP                                = "createGroup";
+        CREATE_INSTANCE                             = "createInstance";
+        DELETE_GROUP                                = "deleteGroup";
         DELETE_INSTANCE                             = "deleteInstance";
+        MOVE_GROUP                                  = "moveGroup";
+        MOVE_INSTANCE                               = "moveInstance";
+        UPDATE_INSTANCE                             = "updateInstance";
+        SET_FAVORITE                                = "setFavorite";
+        INSTANCE_DETAILS                            = "getInstanceDetails";
+        PREPARE_INSTANCE                            = "prepareInstance";
+        LAUNCH_INSTANCE                             = "launchInstance";
+        KILL_INSTANCE                               = "killInstance";
+        OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
-        REMOVE_MOD                                  = "removeMod";
-        REMOVE_MODS                                 = "removeMods";
-        SWITCH_MINECRAFT_VERSION                    = "switchMinecraftVersion";
-        SWITCH_MODLOADER                            = "switchModloader";
-        SWITCH_MODLOADER_VERSION                    = "switchModloaderVersion";
-        UPDATE_INSTANCE_NAME                        = "updateInstanceName";
-        GET_INSTANCE_MEMORY                         = "getInstanceMemory";
-        UPDATE_INSTANCE_MEMORY                      = "updateInstanceMemory";
-        GET_INSTANCE_JAVA_ARGS                      = "getInstanceJavaArgs";
-        UPDATE_INSTANCE_JAVA_ARGS                   = "updateInstanceJavaArgs";
+        DELETE_MOD                                  = "deleteMod";
     }
 
     instance {

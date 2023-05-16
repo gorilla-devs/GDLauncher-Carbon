@@ -280,17 +280,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                             InstanceType::Valid(status) => {
                                 ListInstanceStatus::Valid(ValidListInstance {
                                     mc_version: match &status.config.game_configuration.version {
-                                        GameVersion::Standard(version) => version.release.clone(),
-                                        GameVersion::Custom(name) => name.clone(),
+                                        Some(GameVersion::Standard(version)) => {
+                                            Some(version.release.clone())
+                                        }
+                                        Some(GameVersion::Custom(name)) => Some(name.clone()),
+                                        None => None,
                                     },
                                     modloader: match &status.config.game_configuration.version {
-                                        GameVersion::Standard(version) => {
+                                        Some(GameVersion::Standard(version)) => {
                                             match version.modloaders.iter().next() {
                                                 Some(modloader) => Some(modloader.type_),
                                                 None => None,
                                             }
                                         }
-                                        GameVersion::Custom(_) => None,
+                                        Some(GameVersion::Custom(_)) => None,
+                                        None => None,
                                     },
                                     modpack_platform: status
                                         .config
@@ -841,8 +845,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             _ => InstanceIcon::Default,
         };
 
-        let (modpack, version) = match version {
-            InstanceVersionSouce::Version(version) => (None, version),
+        let (version, modpack) = match version {
+            InstanceVersionSouce::Version(version) => (Some(version), None),
+            InstanceVersionSouce::Modpack(modpack) => (None, Some(modpack)),
         };
 
         let info = info::Instance {
@@ -1126,13 +1131,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
-                info::GameVersion::Standard(version) => version.release.clone(),
-                info::GameVersion::Custom(custom) => custom.clone(),
+                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+                Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
+                None => None,
             },
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
             modloaders: match &instance.config.game_configuration.version {
-                info::GameVersion::Standard(version) => version
+                Some(info::GameVersion::Standard(version)) => version
                     .modloaders
                     .iter()
                     .map(|loader| domain::ModLoader {
@@ -1143,7 +1149,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         },
                     })
                     .collect::<Vec<_>>(),
-                info::GameVersion::Custom(_) => Vec::new(), // todo
+                Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
+                None => Vec::new(),
             },
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
@@ -1251,7 +1258,7 @@ pub enum ListInstanceStatus {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ValidListInstance {
-    pub mc_version: String,
+    pub mc_version: Option<String>,
     pub modloader: Option<info::ModLoaderType>,
     pub modpack_platform: Option<info::ModpackPlatform>,
     pub state: domain::LaunchState,
@@ -1370,7 +1377,7 @@ pub struct Mod {
 
 pub enum InstanceVersionSouce {
     Version(info::GameVersion),
-    //Modpack(info::Modpack),
+    Modpack(info::Modpack),
 }
 
 #[derive(Error, Debug)]
@@ -1796,7 +1803,7 @@ mod test {
                 name: String::from("test"),
                 favorite: false,
                 status: ListInstanceStatus::Valid(ValidListInstance {
-                    mc_version: String::from("1.7.10"),
+                    mc_version: Some(String::from("1.7.10")),
                     modloader: None,
                     modpack_platform: None,
                     state: domain::LaunchState::Inactive,
