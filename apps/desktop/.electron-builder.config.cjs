@@ -59,7 +59,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: isDockerBuild ? ["dir", "zip"] : ["dir", "zip", "dmg"],
+    target: isDockerBuild ? ["dir", "zip"] : ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",

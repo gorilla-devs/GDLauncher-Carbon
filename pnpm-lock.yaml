@@ -42,8 +42,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^22.3.2
-        version: 22.3.2
+        specifier: ^22.3.3
+        version: 22.3.3
       '@overwolf/ow-electron-builder':
         specifier: ^23.6.0
         version: 23.6.0
@@ -3980,8 +3980,8 @@ packages:
       - supports-color
     dev: true
 
-  /@overwolf/ow-electron@22.3.2:
-    resolution: {integrity: sha512-LObtvM/qaoTylEkP3RDbuLYxJNfu38mUtmL9MTrUcHlky5SUIP94OwwB8ep00g6rWOJC0H3ofU+zUuuw0PFOYA==}
+  /@overwolf/ow-electron@22.3.3:
+    resolution: {integrity: sha512-nwUom1oBSLjMFPbwHxiL7FXk0EaholnI1IRutpoCFWZ4tG/6EALIYqCtGxXaqMNeWh+LeEvwSOnVYkN4R2KbCA==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
     requiresBuild: true
@@ -6214,7 +6214,7 @@ packages:
   /@types/fs-extra@9.0.13:
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
     dependencies:
-      '@types/node': 18.11.9
+      '@types/node': 18.15.11
     dev: true
 
   /@types/glob@7.2.0:
