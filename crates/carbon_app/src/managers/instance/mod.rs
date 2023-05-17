@@ -1,6 +1,10 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
-use std::os::unix::prelude::OsStrExt;
+
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
