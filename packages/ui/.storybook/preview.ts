@@ -1,6 +1,19 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
 import "virtual:uno.css";
+import { mainTheme, Theme } from "../src/themes";
+
+function applyTheme(theme: Theme) {
+  // Inject theme
+  for (const key in theme) {
+    document.documentElement.style.setProperty(
+      `--${key}`,
+      theme[key as keyof Theme]
+    );
+  }
+}
+
+applyTheme(mainTheme);
 
 export const decorators = [
   (Story) => {

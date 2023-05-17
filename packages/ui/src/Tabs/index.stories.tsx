@@ -28,8 +28,6 @@ export default meta;
 
 type Story = StoryObj<typeof Tabs>;
 
-applyTheme(mainTheme);
-
 export const Main: Story = {
   render: (args) => (
     <Tabs {...args}>
@@ -44,13 +42,3 @@ export const Main: Story = {
     </Tabs>
   ),
 };
-
-function applyTheme(theme: Theme) {
-  // Inject theme
-  for (const key in theme) {
-    document.documentElement.style.setProperty(
-      `--${key}`,
-      theme[key as keyof Theme]
-    );
-  }
-}
