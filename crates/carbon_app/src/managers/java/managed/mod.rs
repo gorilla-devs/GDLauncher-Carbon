@@ -38,7 +38,7 @@ pub struct ManagedJavaVersion {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManagedJavaArchMap(HashMap<JavaArch, Vec<ManagedJavaVersion>>);
+pub struct ManagedJavaArchMap(pub HashMap<JavaArch, Vec<ManagedJavaVersion>>);
 
 impl Deref for ManagedJavaArchMap {
     type Target = HashMap<JavaArch, Vec<ManagedJavaVersion>>;
@@ -55,7 +55,7 @@ impl DerefMut for ManagedJavaArchMap {
 }
 
 #[derive(Debug, Clone)]
-pub struct ManagedJavaOsMap(HashMap<JavaOs, ManagedJavaArchMap>);
+pub struct ManagedJavaOsMap(pub HashMap<JavaOs, ManagedJavaArchMap>);
 
 impl Deref for ManagedJavaOsMap {
     type Target = HashMap<JavaOs, ManagedJavaArchMap>;

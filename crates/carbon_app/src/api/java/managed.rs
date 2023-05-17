@@ -109,7 +109,7 @@ impl From<FEManagedJavaVersion> for crate::managers::java::managed::ManagedJavaV
 }
 
 #[derive(Type, Debug, Clone, Serialize, Deserialize)]
-pub struct FEManagedJavaArchMap(HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>);
+pub struct FEManagedJavaArchMap(pub HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>);
 
 impl Deref for FEManagedJavaArchMap {
     type Target = HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>;
@@ -122,7 +122,7 @@ impl Deref for FEManagedJavaArchMap {
 impl From<crate::managers::java::managed::ManagedJavaArchMap> for FEManagedJavaArchMap {
     fn from(v: crate::managers::java::managed::ManagedJavaArchMap) -> Self {
         Self(
-            v.into_iter()
+            v.0.into_iter()
                 .map(|(k, v)| (k.into(), v.into_iter().map(|v| v.into()).collect()))
                 .collect(),
         )
@@ -130,7 +130,7 @@ impl From<crate::managers::java::managed::ManagedJavaArchMap> for FEManagedJavaA
 }
 
 #[derive(Type, Debug, Clone, Serialize, Deserialize)]
-pub struct FEManagedJavaOsMap(HashMap<FEManagedJavaOs, FEManagedJavaArchMap>);
+pub struct FEManagedJavaOsMap(pub HashMap<FEManagedJavaOs, FEManagedJavaArchMap>);
 
 impl Deref for FEManagedJavaOsMap {
     type Target = HashMap<FEManagedJavaOs, FEManagedJavaArchMap>;
@@ -142,6 +142,6 @@ impl Deref for FEManagedJavaOsMap {
 
 impl From<crate::managers::java::managed::ManagedJavaOsMap> for FEManagedJavaOsMap {
     fn from(v: crate::managers::java::managed::ManagedJavaOsMap) -> Self {
-        Self(v.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
+        Self(v.0.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
     }
 }
