@@ -1,19 +1,22 @@
 import { Checkbox } from "./index";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Checkbox> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Checkbox",
   component: Checkbox,
 };
 
-const Template = ((args) => <Checkbox {...args} />) as StoryFn<
-  ComponentProps<typeof Checkbox>
->;
+export default meta;
 
-export const Checked = Template.bind({});
+type Story = StoryObj<typeof Checkbox>;
 
-Checked.args = {
-  checked: true,
-  disabled: false,
+export const Checked: Story = {
+  args: {
+    checked: true,
+    disabled: false,
+  },
 };

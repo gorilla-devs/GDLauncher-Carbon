@@ -1,8 +1,11 @@
 import { Button } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Button> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Button",
   component: Button,
   argTypes: {
@@ -17,35 +20,35 @@ export default {
   },
 };
 
-const Template = ((args) => <Button {...args} />) as StoryFn<
-  ComponentProps<typeof Button>
->;
+export default meta;
 
-export const Primary = Template.bind({});
+type Story = StoryObj<typeof Button>;
 
-Primary.args = {
-  disabled: false,
-  variant: "primary",
-  children: "Click Here",
-  uppercase: true,
+export const Primary: Story = {
+  args: {
+    disabled: false,
+    variant: "primary",
+    children: "Click Here",
+    uppercase: true,
+  },
 };
 
-export const Outline = Template.bind({});
-
-Outline.args = {
-  disabled: false,
-  variant: "outline",
-  children: "Click Here",
-  uppercase: true,
+export const Outline: Story = {
+  args: {
+    disabled: false,
+    variant: "outline",
+    children: "Click Here",
+    uppercase: true,
+  },
 };
 
-export const Icon = Template.bind({});
-
-Icon.args = {
-  disabled: false,
-  variant: "primary",
-  children: "Click Here",
-  icon: <div class="i-ri:refresh-line" />,
-  iconRight: false,
-  uppercase: true,
+export const Icon: Story = {
+  args: {
+    disabled: false,
+    variant: "primary",
+    children: "Click Here",
+    icon: <div class="i-ri:refresh-line" />,
+    iconRight: false,
+    uppercase: true,
+  },
 };
