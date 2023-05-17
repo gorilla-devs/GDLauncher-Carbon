@@ -17,5 +17,11 @@ declare global {
     getCoreModulePort: () => Promise<number>;
   }
 }
-
+declare module "solid-js" {
+  namespace JSX {
+    interface IntrinsicElements {
+      owadview: any;
+    }
+  }
+}
 export {};
