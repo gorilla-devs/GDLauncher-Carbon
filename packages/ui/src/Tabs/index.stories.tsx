@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "storybook-solidjs";
-import { mainTheme, Theme } from "../themes";
 import { Tabs } from "./Tabs.jsx";
 import { Tab } from "./Tab.jsx";
 import { TabList } from "./TabList.jsx";
