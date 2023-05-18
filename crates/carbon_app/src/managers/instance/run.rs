@@ -309,9 +309,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
 
-                carbon_net::download_multiple(mc_files, progress_watch_tx)
-                    .await?;
-
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(&runtime_path, &version_info).await;
                 t_extract_natives.complete_opaque();
