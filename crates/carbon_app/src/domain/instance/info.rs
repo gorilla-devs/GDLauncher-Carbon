@@ -33,8 +33,8 @@ pub enum ModpackPlatform {
 
 #[derive(Debug, Clone)]
 pub struct CurseforgeModpack {
-    pub project_id: String,
-    pub file_id: String,
+    pub project_id: u32,
+    pub file_id: u32,
 }
 
 #[derive(Debug, Clone)]

@@ -1,5 +1,7 @@
+use crate::domain::instance::info::Modpack;
+use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
-use crate::managers::minecraft::curseforge;
+use crate::managers::minecraft::curseforge::{self, ProgressState};
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -125,9 +127,24 @@ impl ManagerRef<'_, InstanceManager> {
                 let first_run_path = instance_path.get_root().join(".first_run_incomplete");
                 let is_first_run = first_run_path.is_file();
 
+                let t_modpack = match is_first_run {
+                    true => Some((
+                        task.subtask(Translation::InstanceTaskLaunchRequestModpack)
+                            .await,
+                        task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles)
+                            .await,
+                        task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles)
+                            .await,
+                        task.subtask(Translation::InstanceTaskLaunchDownloadAddonMetadata)
+                            .await,
+                    )),
+                    false => None,
+                };
+
                 let t_request_version_info = task
                     .subtask(Translation::InstanceTaskLaunchRequestVersions)
                     .await;
+
                 let t_download_files = task
                     .subtask(Translation::InstanceTaskLaunchDownloadFiles)
                     .await;
@@ -148,6 +165,67 @@ impl ManagerRef<'_, InstanceManager> {
                     .await;
 
                 wait_task.complete_opaque();
+
+                let mut downloads = Vec::new();
+
+                if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
+                    t_modpack
+                {
+                    if let Some(modpack) = &config.modpack {
+                        let modpack = match modpack {
+                            Modpack::Curseforge(modpack) => modpack,
+                        };
+
+                        t_request.start_opaque();
+                        let file = app
+                            .modplatforms_manager()
+                            .curseforge
+                            .get_mod_file(ModFileParameters {
+                                file_id: modpack.file_id as i32,
+                                mod_id: modpack.project_id as i32,
+                            })
+                            .await?
+                            .data;
+                        t_request.complete_opaque();
+
+                        let (modpack_progress_tx, mut modpack_progress_rx) =
+                            tokio::sync::watch::channel(ProgressState::Idle);
+
+                        tokio::spawn(async move {
+                            while modpack_progress_rx.changed().await.is_ok() {
+                                {
+                                    let progress = modpack_progress_rx.borrow();
+                                    match *progress {
+                                        ProgressState::Idle => {}
+                                        ProgressState::DownloadingAddonZip((downloaded, total)) => {
+                                            t_download_files
+                                                .update_download(downloaded as u32, total as u32)
+                                        }
+                                        ProgressState::ExtractingAddonOverrides((count, total)) => {
+                                            t_extract_files.update_items(count as u32, total as u32)
+                                        }
+                                        ProgressState::AcquiringAddonsMetadata((count, total)) => {
+                                            t_addon_metadata
+                                                .update_items(count as u32, total as u32)
+                                        }
+                                    }
+                                }
+
+                                tokio::time::sleep(Duration::from_millis(200)).await;
+                            }
+                        });
+
+                        let modpack_info = curseforge::prepare_modpack(
+                            &app,
+                            &file,
+                            instance_path.clone(),
+                            modpack_progress_tx,
+                        )
+                        .await?;
+
+                        downloads.extend(modpack_info.downloadables);
+                    }
+                }
 
                 t_request_version_info.update_items(0, 3);
                 let manifest = app.minecraft_manager().get_minecraft_manifest().await?;
@@ -202,7 +280,14 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                     _ => {}
                 }
+
                 t_request_version_info.update_items(3, 3);
+
+                downloads.extend(
+                    app.minecraft_manager()
+                        .get_all_vanilla_files(version_info.clone())
+                        .await?,
+                );
 
                 let (progress_watch_tx, mut progress_watch_rx) =
                     tokio::sync::watch::channel(carbon_net::Progress::new());
@@ -222,12 +307,7 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 });
 
-                let mc_files = app.minecraft_manager()
-                    .get_all_vanilla_files(version_info.clone())
-                    .await?;
-
-                carbon_net::download_multiple(mc_files, progress_watch_tx)
-                    .await?;
+                carbon_net::download_multiple(downloads, progress_watch_tx).await?;
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(&runtime_path, &version_info).await;
@@ -282,15 +362,13 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                     )),
                     None => {
-                        let _ = app.instance_manager()
-                            .change_launch_state(
-                                instance_id,
-                                LaunchState::Inactive
-                            )
+                        let _ = app
+                            .instance_manager()
+                            .change_launch_state(instance_id, LaunchState::Inactive)
                             .await;
 
                         Ok(None)
-                    },
+                    }
                 }
             })()
             .await;
