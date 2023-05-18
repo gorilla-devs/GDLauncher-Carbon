@@ -44,10 +44,9 @@ const InstanceTile = (props: {
 
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
-    const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
 
     createEffect(() => {
-      console.log("TASK", task.data, task.data?.download_total, tasks);
+      // console.log("TASK", task.data, task.data?.download_total);
       if (task.data) {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);

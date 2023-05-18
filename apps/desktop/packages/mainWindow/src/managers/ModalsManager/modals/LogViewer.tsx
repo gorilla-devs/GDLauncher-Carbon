@@ -4,6 +4,8 @@ import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
 import { For, createEffect } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
+import { getRunningState } from "@/utils/instances";
+import { UngroupedInstance } from "@gd/core_module/bindings";
 
 const logs = [
   {
@@ -41,16 +43,31 @@ const logs = [
   },
 ];
 
-const LogViewer = (props: ModalProps) => {
-  const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
-  const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
+async function streamToJson(stream) {
+  // Step 1: Read all data from the stream
+  const reader = stream.getReader();
+  const chunks = [];
+  let done, value;
 
-  createEffect(() => {
-    console.log("TASKSSSSS", tasks.data, instances);
-    // fetch(
-    //   `http://localhost:${port}/instance/log?id=${files.filePaths[0]}`
-    // ).then(async (img) => {});
-  });
+  while (!done) {
+    ({ done, value } = await reader.read());
+    if (value) {
+      chunks.push(value);
+    }
+  }
+
+  // Step 2: Convert the Uint8Array to a string
+  const decoder = new TextDecoder();
+  const string = chunks.map((chunk) => decoder.decode(chunk)).join("");
+
+  // Step 3: Parse the string into JSON
+  const json = JSON.parse(string);
+
+  return json;
+}
+
+const LogViewer = (props: ModalProps) => {
+  const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
@@ -61,11 +78,17 @@ const LogViewer = (props: ModalProps) => {
               <TabList>
                 <For each={instances.data}>
                   {(instance) => {
-                    fetch(
-                      `http://localhost:${port}/instance/log?id=${instance.id}`
-                    ).then(async (log) => {
-                      console.log("LOG", log);
-                    });
+                    const runningState = getRunningState(instance.status);
+                    if (runningState) {
+                      fetch(
+                        `http://localhost:${port}/instance/log?id=${runningState?.log_id}`
+                      ).then(async (log) => {
+                        console.log("LOG", log, log.body);
+                        streamToJson(log.body).then((AA) => {
+                          console.log("AAA", AA);
+                        });
+                      });
+                    }
 
                     return (
                       <Tab>
