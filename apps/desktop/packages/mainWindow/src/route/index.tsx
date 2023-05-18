@@ -8,6 +8,8 @@ import AppData from "@/pages/app.data";
 import BrowserData from "@/pages/Modpacks/browser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
+import ModpackChangelogData from "@/pages/Modpacks/modpack.changelog";
+import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -108,6 +110,18 @@ export const routes: RouteDefinition[] = [
             path: "/versions",
             component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
             data: ModpackVersionsData,
+          },
+          {
+            path: "/changelog",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+            data: ModpackChangelogData,
+          },
+          {
+            path: "/screenshots",
+            component: lazy(
+              () => import("@/pages/Modpacks/Explore/Screenshots")
+            ),
+            data: ModpackScreenshotsData,
           },
         ],
       },

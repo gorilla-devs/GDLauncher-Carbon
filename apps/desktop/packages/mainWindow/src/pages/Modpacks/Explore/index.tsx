@@ -5,7 +5,7 @@ import { FEModResponse } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Skeleton, Tab, TabList, Tabs } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 
@@ -20,6 +20,14 @@ const Modpack = () => {
       path: `/modpacks/${params.id}`,
     },
     {
+      label: "Changelog",
+      path: `/modpacks/${params.id}/changelog`,
+    },
+    {
+      label: "Screenshots",
+      path: `/modpacks/${params.id}/screenshots`,
+    },
+    {
       label: "Versions",
       path: `/modpacks/${params.id}/versions`,
     },
@@ -30,10 +38,6 @@ const Modpack = () => {
   // let bgRef: HTMLDivElement;
   // let innerContainerRef: HTMLDivElement;
   // let refStickyContainer: HTMLDivElement;
-
-  createEffect(() => {
-    console.log("EXPLORE", routeData.modpackDetails.isFetching);
-  });
 
   return (
     <ContentWrapper>
@@ -95,15 +99,7 @@ const Modpack = () => {
                   }}
                 />
                 <div class="flex flex-1 flex-col max-w-185">
-                  <div
-                    class="flex gap-4 items-center cursor-pointer"
-                    onClick={() => {
-                      window.openExternalLink(
-                        routeData.modpackDetails?.data?.data.links.websiteUrl ||
-                          ""
-                      );
-                    }}
-                  >
+                  <div class="flex gap-4 items-center cursor-pointer">
                     <Switch>
                       <Match when={!routeData.modpackDetails.isFetching}>
                         <h1 class="m-0">
@@ -117,7 +113,6 @@ const Modpack = () => {
                         <Skeleton />
                       </Match>
                     </Switch>
-                    <div class="text-2xl i-ri:external-link-line" />
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">

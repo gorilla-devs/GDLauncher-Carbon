@@ -97,6 +97,39 @@ Skeleton.modpackOverviewPage = () => {
   );
 };
 
+Skeleton.modpackScreenshotsPage = () => {
+  return (
+    <div class="mt-5 flex flex-wrap gap-4">
+      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+    </div>
+  );
+};
+Skeleton.modpackChangelogPage = () => {
+  return (
+    <div class="flex flex-col gap-2 w-full">
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
+      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+    </div>
+  );
+};
+
 Skeleton.modpackSidebarCategories = () => {
   return (
     <div class="flex flex-col gap-4 w-full py-2 mt-4">
