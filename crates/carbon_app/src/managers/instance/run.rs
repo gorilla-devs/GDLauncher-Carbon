@@ -1,4 +1,4 @@
-use crate::domain::instance::info::Modpack;
+use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
@@ -89,7 +89,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instances()
             .get_instance_path(&instance.shortpath);
 
-        let version = match config.game_configuration.version {
+        let mut version = match config.game_configuration.version {
             Some(GameVersion::Standard(v)) => v,
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
             None => bail!("Instance has no associated game version and cannot be launched"),
@@ -224,6 +224,18 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?;
 
                         downloads.extend(modpack_info.downloadables);
+                        version = modpack_info.manifest.minecraft.try_into()?;
+
+                        app.instance_manager()
+                            .update_instance(
+                                instance_id,
+                                None,
+                                None,
+                                Some(GameVersion::Standard(version.clone())),
+                                None,
+                                None,
+                            )
+                            .await?;
                     }
                 }
 

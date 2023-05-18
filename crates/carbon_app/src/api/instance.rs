@@ -121,6 +121,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.instance.into(),
                     details.name.into(),
                     details.use_loaded_icon.into(),
+                    None,
                     details.notes.into(),
                     details.memory.into_option()
                         .map(|m| m.map(|(xms, xmx)| (xms, xmx))),

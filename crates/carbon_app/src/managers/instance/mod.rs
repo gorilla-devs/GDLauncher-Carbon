@@ -917,6 +917,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instance_id: InstanceId,
         name: Option<String>,
         use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
+        version: Option<GameVersion>,
         notes: Option<String>,
         memory: Option<Option<(u16, u16)>>,
     ) -> anyhow::Result<()> {
@@ -958,6 +959,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(name) = name.clone() {
             info.name = name;
+        }
+
+        if let Some(version) = version {
+            info.game_configuration.version = Some(version);
         }
 
         if let Some(notes) = notes {
