@@ -1,11 +1,6 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt;
-#[cfg(windows)]
-use std::os::windows::ffi::OsStrExt;
-
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
@@ -163,7 +158,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                     while let Some(entry) = reader.next_entry().await? {
                         mod_futures.push(async move {
-                            let path = entry.path();
+                            let mut path = entry.path();
                             let is_jar = path.ends_with(".jar");
                             let is_jar_disabled = path.ends_with(".jar.disabled");
 
@@ -182,9 +177,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                             .expect("this path cannot end in .. since we have used it as a file");
 
                                         if is_jar_disabled {
-                                            let bytes = filename.as_bytes();
-                                            // ".disabled".len() == 9
-                                            filename = OsStr::from_bytes(&bytes[..bytes.len() - 9]);
+                                            // remove the .disabled extension
+                                            path = path.with_extension("");
+                                            filename = path.file_name()
+                                                .expect("this path cannot end in .. or the above expect would've failed");
                                         }
 
                                         Mod {
