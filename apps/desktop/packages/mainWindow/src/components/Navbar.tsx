@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -11,7 +11,7 @@ import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port, rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
-import { getRunningState, getValideInstance } from "@/utils/instances";
+import { getRunningState } from "@/utils/instances";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
@@ -29,12 +29,18 @@ interface AccountsStatus {
   key: string;
 }
 
+type RunningInstances = {
+  [instanceId: number]: boolean;
+};
+
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
-  const [activeInstances, setActiveInstances] = createSignal(0);
+  const [activeInstances, setActiveInstances] = createStore<RunningInstances>(
+    {}
+  );
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -75,13 +81,28 @@ const AppNavbar = () => {
 
   createEffect(() => {
     instances.data?.forEach((instance) => {
-      // console.log("instances", instance);
+      const isRunning = getRunningState(instance.status);
 
-      const isPreparingState = () => getRunningState(instance.status);
+      setActiveInstances((prev) => {
+        const newState: RunningInstances = { ...prev };
 
-      const logId = isPreparingState()?.log_id;
+        if (isRunning) {
+          if (!newState[instance.id]) {
+            newState[instance.id] = true;
+          }
+        } else {
+          if (newState[instance.id]) {
+            newState[instance.id] = false;
+          }
+        }
+
+        return newState;
+      });
     });
   });
+
+  const runningInstances = () =>
+    Object.values(activeInstances).filter((running) => running).length;
 
   return (
     <Show when={!isLogin()}>
@@ -125,16 +146,24 @@ const AppNavbar = () => {
                 </div>
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
-                  <Tab ignored>
+                  <Tab ignored noPointer={runningInstances() === 0}>
                     <div class="relative">
-                      <div class="absolute w-4 h-4 -top-1 -right-1 rounded-full bg-red-500 z-30 text-white flex justify-center items-center text-xs">
-                        2
-                      </div>
+                      <Show when={runningInstances() > 0}>
+                        <div class="absolute w-4 h-4 -top-1 -right-1 rounded-full bg-red-500 z-30 text-white flex justify-center items-center text-xs">
+                          {runningInstances()}
+                        </div>
+                      </Show>
                       <div
-                        class="cursor-pointer text-2xl text-dark-slate-50 i-ri:terminal-box-fill z-20"
-                        onClick={() =>
-                          modalsContext?.openModal({ name: "logViewer" })
-                        }
+                        class="text-2xl i-ri:terminal-box-fill z-20"
+                        classList={{
+                          "text-dark-slate-50 cursor-pointer":
+                            runningInstances() > 0,
+                          "text-dark-slate-500": runningInstances() === 0,
+                        }}
+                        onClick={() => {
+                          if (runningInstances() > 0)
+                            modalsContext?.openModal({ name: "logViewer" });
+                        }}
                       />
                     </div>
                   </Tab>

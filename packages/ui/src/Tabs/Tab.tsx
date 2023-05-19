@@ -15,6 +15,7 @@ interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   children: JSXElement | string | number;
   onClick?: () => void;
   ignored?: boolean;
+  noPointer?: boolean;
 }
 
 const Tab = (_props: Props) => {
@@ -60,11 +61,10 @@ const Tab = (_props: Props) => {
 
   return (
     <div
-      class="cursor-pointer"
       classList={{
-        "w-full":
-          tabsContext?.variant === "block" ||
-          tabsContext?.variant === "traditional",
+        "w-full": tabsContext?.variant === "block",
+        "min-w-32": tabsContext?.variant === "traditional",
+        "cursor-pointer": !props.noPointer,
       }}
       ref={(el) => {
         ref = el;
@@ -78,7 +78,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant === "underline"}>
           <div
-            class={`cursor-pointer bg-darkSlate-800 font-500 capitalize ${
+            class={`bg-darkSlate-800 font-500 capitalize ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{
@@ -126,7 +126,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 max-w-52 h-full font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX || ""
             } ${tabsContext?.paddingY || ""}`}
             classList={{

@@ -7,57 +7,54 @@ import { port, rspc } from "@/utils/rspcClient";
 import { getRunningState } from "@/utils/instances";
 import { UngroupedInstance } from "@gd/core_module/bindings";
 import { streamToJson } from "@/utils/helpers";
+import { createStore } from "solid-js/store";
 
-const logs = [
-  {
-    type: "",
-    data: ` 
-        <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
-            <log4j:Message>
-                <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
-            <log4j:Message>
-            <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
-        </log4j:Event>
-    `,
-  },
-  {
-    type: "",
-    data: `
-          <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
-              <log4j:Message>
-                  <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
-              <log4j:Message>
-              <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
-          </log4j:Event>
-      `,
-  },
-  {
-    type: "",
-    data: `
-          <log4j:Event logger="net.minecraft.client.renderer.texture.TextureAtlas" timestamp="1665663352995" level="INFO" thread="Render thread">
-              <log4j:Message>
-                  <![CDATA[Created: 256x256x0 minecraft:textures/atlas/paintings.png-atlas]]></log4j:Message>
-              <log4j:Message>
-              <![CDATA[Created: 128x128x0 minecraft:textures/atlas/mob_effects.png-atlas]]></log4j:Message>
-          </log4j:Event>
-      `,
-  },
-];
+type RunningInstances = {
+  [instanceId: number]: UngroupedInstance | undefined;
+};
 
 const fetchLogs = async (logId: number) => {
   const log = await fetch(`http://localhost:${port}/instance/log?id=${logId}`);
-  console.log("FETCH LOGS", logId, log, log.body);
-
   if (log.body) {
-    streamToJson(log.body).then((parsed) => {
-      console.log("LOGS PARSED", parsed);
-    });
+    const parsed = await streamToJson(log.body);
+    console.log("LOGS PARSED", parsed);
+
+    return parsed;
   }
-  // return streamToJson(log.body);
 };
 
 const LogViewer = (props: ModalProps) => {
   const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
+  const [activeInstances, setActiveInstances] = createStore<RunningInstances>(
+    {}
+  );
+
+  createEffect(() => {
+    instances?.data?.forEach((instance: UngroupedInstance) => {
+      const isRunning = getRunningState(instance.status);
+
+      setActiveInstances((prev) => {
+        const newState: RunningInstances = { ...prev };
+
+        if (isRunning) {
+          if (!newState[instance.id]) {
+            newState[instance.id] = instance;
+          }
+        } else {
+          if (newState[instance.id]) {
+            newState[instance.id] = undefined;
+          }
+        }
+
+        return newState;
+      });
+    });
+  });
+
+  const runningInstances: () => UngroupedInstance[] = () =>
+    Object.values(activeInstances).filter(
+      (running) => running
+    ) as UngroupedInstance[];
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
@@ -66,23 +63,17 @@ const LogViewer = (props: ModalProps) => {
           <Tabs variant="traditional">
             <div class="flex items-center max-h-full">
               <TabList>
-                <For each={instances.data}>
+                <For each={runningInstances()}>
                   {(instance) => {
                     const runningState = getRunningState(instance.status);
-                    console.log(
-                      "INSTANCE",
-                      instance.status,
-                      runningState,
-                      runningState?.log_id
+
+                    const [logs] = createResource(
+                      runningState?.log_id,
+                      fetchLogs
                     );
 
-                    if (runningState?.log_id) {
-                      const [logs] = createResource(
-                        runningState?.log_id,
-                        fetchLogs
-                      );
-                      // console.log("runningState", logs());
-                    }
+                    console.log("RUNNING-LOGS", logs());
+
                     return (
                       <Tab>
                         <div class="w-full flex gap-2 items-center h-10 justify-start">
@@ -93,24 +84,6 @@ const LogViewer = (props: ModalProps) => {
                     );
                   }}
                 </For>
-                {/* <Tab>
-                  <div class="w-full h-10 flex gap-2 items-center justify-start">
-                    <div class="w-6 h-6 rounded-md bg-green" />
-                    <p class="my-2">Valhelsia</p>
-                  </div>
-                </Tab>
-                <Tab>
-                  <div class="w-full h-10 flex gap-2 items-center justify-start">
-                    <div class="w-6 h-6 rounded-md bg-green" />
-                    <p class="my-2">Valhelsia</p>
-                  </div>
-                </Tab>
-                <Tab>
-                  <div class="w-full h-10 flex gap-2 items-center justify-start">
-                    <div class="w-6 h-6 rounded-md bg-green" />
-                    <p class="my-2">Valhelsia</p>
-                  </div>
-                </Tab> */}
               </TabList>
               <div class="flex gap-4 px-5">
                 <div class="cursor-pointer text-darkSlate-50 i-ri:upload-2-line" />
@@ -120,7 +93,7 @@ const LogViewer = (props: ModalProps) => {
             <div class="bg-darkSlate-700 overflow-y-auto max-h-130">
               <TabPanel>
                 <div class="overflow-y-auto divide-y divide-darkSlate-500">
-                  <For each={logs}>
+                  {/* <For each={logs()}>
                     {(log) => (
                       <div class="flex flex-col justify-center items-center">
                         <pre class="m-0 leading-8 whitespace-pre-wrap pl-4">
@@ -128,7 +101,7 @@ const LogViewer = (props: ModalProps) => {
                         </pre>
                       </div>
                     )}
-                  </For>
+                  </For> */}
                 </div>
               </TabPanel>
               <TabPanel>2</TabPanel>
