@@ -9,13 +9,14 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, createEffect, createSignal } from "solid-js";
+import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import { formatDistance } from "date-fns";
 import { InstanceDetails, UngroupedInstance } from "@gd/core_module/bindings";
+import { getPreparingState, getRunningState } from "@/utils/instances";
 
 type InstancePage = {
   label: string;
@@ -133,6 +134,25 @@ const Instance = () => {
   const selectedIndex = () =>
     getRouteIndex(instancePages(), location.pathname, true);
 
+  const launchInstanceMutation = rspc.createMutation([
+    "instance.launchInstance",
+  ]);
+
+  const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
+
+  const getInstanceDetailsQuery = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    parseInt(params.id, 10),
+  ]);
+
+  getInstanceDetailsQuery.data?.state;
+  const isRunning = () =>
+    getInstanceDetailsQuery.data?.state &&
+    getRunningState(getInstanceDetailsQuery.data?.state);
+  const isPreparing = () =>
+    getInstanceDetailsQuery.data?.state &&
+    getPreparingState(getInstanceDetailsQuery.data?.state);
+
   let containerRef: HTMLDivElement;
   let bgRef: HTMLDivElement;
   let innerContainerRef: HTMLDivElement;
@@ -193,7 +213,7 @@ const Instance = () => {
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
               size="small"
-              variant="transparent"
+              type="transparent"
             >
               <Trans
                 key="instance.step_back"
@@ -311,13 +331,42 @@ const Instance = () => {
                             }}
                           />
                         </div>
-                        <Button uppercase variant="glow" size="large">
-                          <Trans
-                            key="instance.play"
-                            options={{
-                              defaultValue: "play",
-                            }}
-                          />
+                        <Button
+                          uppercase
+                          type="glow"
+                          size="large"
+                          variant={isRunning() && "red"}
+                          loading={isPreparing() !== undefined}
+                          onClick={() => {
+                            if (isRunning()) {
+                              killInstanceMutation.mutate(
+                                parseInt(params.id, 10)
+                              );
+                            } else {
+                              launchInstanceMutation.mutate(
+                                parseInt(params.id, 10)
+                              );
+                            }
+                          }}
+                        >
+                          <Switch>
+                            <Match when={!isRunning()}>
+                              <Trans
+                                key="instance.play"
+                                options={{
+                                  defaultValue: "play",
+                                }}
+                              />
+                            </Match>
+                            <Match when={isRunning()}>
+                              <Trans
+                                key="instance.stop"
+                                options={{
+                                  defaultValue: "stop",
+                                }}
+                              />
+                            </Match>
+                          </Switch>
                         </Button>
                       </div>
                     </div>
@@ -340,7 +389,7 @@ const Instance = () => {
               onClick={() => navigate("/library")}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
               size="small"
-              variant="transparent"
+              type="transparent"
             >
               <Trans
                 key="instance.step_back"
@@ -407,13 +456,38 @@ const Instance = () => {
                     }
                   />
                 </div>
-                <Button uppercase variant="glow" size="small">
-                  <Trans
-                    key="instance.play"
-                    options={{
-                      defaultValue: "play",
-                    }}
-                  />
+                <Button
+                  uppercase
+                  type="glow"
+                  size="small"
+                  variant={isRunning() && "red"}
+                  loading={isPreparing() !== undefined}
+                  onClick={() => {
+                    if (isRunning()) {
+                      killInstanceMutation.mutate(parseInt(params.id, 10));
+                    } else {
+                      launchInstanceMutation.mutate(parseInt(params.id, 10));
+                    }
+                  }}
+                >
+                  <Switch>
+                    <Match when={!isRunning()}>
+                      <Trans
+                        key="instance.play"
+                        options={{
+                          defaultValue: "play",
+                        }}
+                      />
+                    </Match>
+                    <Match when={isRunning()}>
+                      <Trans
+                        key="instance.stop"
+                        options={{
+                          defaultValue: "stop",
+                        }}
+                      />
+                    </Match>
+                  </Switch>
                 </Button>
               </div>
             </div>

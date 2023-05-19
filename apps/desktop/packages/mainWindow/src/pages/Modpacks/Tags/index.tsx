@@ -20,7 +20,7 @@ const Tags = () => {
       </div>
       <Button
         class="h-8"
-        variant="secondary"
+        type="secondary"
         textColor="text-red-500"
         rounded={false}
       >

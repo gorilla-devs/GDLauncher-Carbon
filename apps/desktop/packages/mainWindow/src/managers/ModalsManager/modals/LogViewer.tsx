@@ -2,26 +2,24 @@
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
-import { For, createEffect, createResource } from "solid-js";
+import { For, createEffect, createResource, createSignal } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import { getRunningState } from "@/utils/instances";
 import { UngroupedInstance } from "@gd/core_module/bindings";
 import { streamToJson } from "@/utils/helpers";
 import { createStore } from "solid-js/store";
 
+type Log = {
+  line: string;
+  type_: string;
+};
+
 type RunningInstances = {
   [instanceId: number]: UngroupedInstance | undefined;
 };
 
-const fetchLogs = async (logId: number) => {
-  const log = await fetch(`http://localhost:${port}/instance/log?id=${logId}`);
-  if (log.body) {
-    const parsed = await streamToJson(log.body);
-    console.log("LOGS PARSED", parsed);
-
-    return parsed;
-  }
-};
+const fetchLogs = async (logId: number) =>
+  fetch(`http://localhost:${port}/instance/log?id=${logId}`);
 
 const LogViewer = (props: ModalProps) => {
   const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
@@ -60,7 +58,7 @@ const LogViewer = (props: ModalProps) => {
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 overflow-hidden">
         <div class="bg-darkSlate-800 max-h-full">
-          <Tabs variant="traditional">
+          <Tabs type="traditional" onChange={(num) => console.log("NUM", num)}>
             <div class="flex items-center max-h-full">
               <TabList>
                 <For each={runningInstances()}>
@@ -72,7 +70,29 @@ const LogViewer = (props: ModalProps) => {
                       fetchLogs
                     );
 
-                    console.log("RUNNING-LOGS", logs());
+                    async function processStream(
+                      stream: ReadableStream<Uint8Array>
+                    ) {
+                      for await (const jsonObject of streamToJson(stream)) {
+                        // Do something with jsonObject
+                        console.log("PARSED RESPONSE AAAAAA", jsonObject);
+
+                        // if (runningState?.log_id) {
+                        //   setLogsArray(runningState?.log_id, (prev) => [
+                        //     // ...(prev || []),
+                        //     jsonObject as Log,
+                        //   ]);
+                        // }
+                      }
+                    }
+
+                    createEffect(() => {
+                      if (logs()?.body) {
+                        processStream((logs() as any).body).then((res) => {
+                          console.log("PARSED RESPONSE", res);
+                        });
+                      }
+                    });
 
                     return (
                       <Tab>
@@ -91,22 +111,59 @@ const LogViewer = (props: ModalProps) => {
               </div>
             </div>
             <div class="bg-darkSlate-700 overflow-y-auto max-h-130">
-              <TabPanel>
-                <div class="overflow-y-auto divide-y divide-darkSlate-500">
-                  {/* <For each={logs()}>
-                    {(log) => (
-                      <div class="flex flex-col justify-center items-center">
-                        <pre class="m-0 leading-8 whitespace-pre-wrap pl-4">
-                          {log.data}
-                        </pre>
+              <For each={runningInstances()}>
+                {(instance) => {
+                  const [logsArray, setLogsArray] = createSignal<Log[]>([]);
+
+                  const runningState = getRunningState(instance.status);
+
+                  const [logs] = createResource(
+                    runningState?.log_id,
+                    fetchLogs
+                  );
+
+                  async function processStream(
+                    stream: ReadableStream<Uint8Array>
+                  ) {
+                    for await (const jsonObject of streamToJson(stream)) {
+                      // Do something with jsonObject
+                      console.log("PARSED RESPONSE AAAAAA", jsonObject);
+
+                      setLogsArray((prev) => [...prev, jsonObject as Log]);
+                    }
+                  }
+
+                  createEffect(() => {
+                    console.log("RUNNING-LOGS", logsArray());
+                  });
+
+                  createEffect(() => {
+                    if (logs()?.body) {
+                      processStream((logs() as any).body).then((res) => {
+                        console.log("PARSED RESPONSE", res);
+                      });
+                    }
+                  });
+
+                  return (
+                    <TabPanel>
+                      <div class="overflow-y-auto divide-y divide-darkSlate-500">
+                        <For each={logsArray()}>
+                          {(log) => {
+                            return (
+                              <div class="flex flex-col justify-center items-center">
+                                <pre class="m-0 leading-8 whitespace-pre-wrap pl-4 w-full box-border">
+                                  <code>{log.line}</code>
+                                </pre>
+                              </div>
+                            );
+                          }}
+                        </For>
                       </div>
-                    )}
-                  </For> */}
-                </div>
-              </TabPanel>
-              <TabPanel>2</TabPanel>
-              <TabPanel>3</TabPanel>
-              <TabPanel>4</TabPanel>
+                    </TabPanel>
+                  );
+                }}
+              </For>
             </div>
           </Tabs>
         </div>

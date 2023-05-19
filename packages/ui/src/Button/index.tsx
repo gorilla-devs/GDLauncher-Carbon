@@ -10,13 +10,14 @@ import {
 import { Spinner } from "../Spinner";
 
 type Size = "small" | "medium" | "large";
-type Variant = "primary" | "secondary" | "glow" | "outline" | "transparent";
+type Type = "primary" | "secondary" | "glow" | "outline" | "transparent";
 
-interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
+interface Props
+  extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
   children: HTMLElement | string | JSX.Element;
   style?: any;
   textColor?: string;
-  variant?: Variant;
+  type?: Type;
   rounded?: boolean;
   disabled?: boolean;
   icon?: Element | any;
@@ -25,16 +26,18 @@ interface Props extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
   size?: Size;
   percentage?: number;
+  variant?: string;
 }
 
 const getVariant = (
-  variant: Variant,
+  type: Type,
   rounded: boolean,
   size: Size,
   isDisabled: boolean,
   uppercase: boolean,
   iconRight: boolean,
   isLoading: boolean,
+  variant: string,
   textColor?: string
 ) => {
   const isLarge = size === "large";
@@ -76,8 +79,8 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      "bg-primary-500": true,
-      "hover:bg-primary-300": !isDisabled,
+      [`bg-${variant}-500`]: true,
+      [`hover:bg-${variant}-300`]: !isDisabled,
       "bg-darkSlate-800": isDisabled,
       "text-darkSlate-500": isDisabled,
       "border-0": true,
@@ -105,8 +108,8 @@ const getVariant = (
     },
     glow: {
       ...commonStyle,
-      "bg-primary-500": !isDisabled,
-      "drop-shadow-[0_0px_12px_var(--primary-500)]": !isDisabled,
+      [`bg-${variant}-500`]: !isDisabled,
+      [`drop-shadow-[0_0px_12px_var(--${variant}-500)]`]: !isDisabled,
       "bg-darkSlate-500": isDisabled,
       "text-darkSlate-50": isDisabled,
       "border-0": true,
@@ -120,7 +123,7 @@ const getVariant = (
     },
   };
 
-  return variants[variant];
+  return variants[type];
 };
 
 const Loading = (props: {
@@ -165,7 +168,7 @@ function Button(props: Props) {
 
   const mergedProps = mergeProps(
     {
-      variant: "primary",
+      type: "primary",
       size: "large",
       uppercase: false,
       iconRight: false,
@@ -177,18 +180,19 @@ function Button(props: Props) {
   return (
     <button
       classList={getVariant(
-        props.variant || "primary",
+        props.type || "primary",
         mergedProps.rounded,
         props.size || "medium",
         !!props.disabled,
         mergedProps.uppercase,
         !!props.iconRight,
         !!props.loading,
+        props.variant || "primary",
         props.textColor
       )}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
       style={{
-        ...(mergedProps.variant === "transparent" && {
+        ...(mergedProps.type === "transparent" && {
           background: "rgba(0, 0, 0, 0.4)",
         }),
         ...props.style,

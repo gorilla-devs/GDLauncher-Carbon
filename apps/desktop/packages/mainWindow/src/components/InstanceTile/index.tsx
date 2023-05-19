@@ -46,7 +46,6 @@ const InstanceTile = (props: {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
     createEffect(() => {
-      // console.log("TASK", task.data, task.data?.download_total);
       if (task.data) {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);
@@ -74,7 +73,7 @@ const InstanceTile = (props: {
         modloader={modloader}
         version={validInstance()?.mc_version}
         invalid={!isListInstanceValid(props.instance.status)}
-        variant={type()}
+        type={type()}
         img={image()}
         selected={props.selected}
         isLoading={isLoading()}

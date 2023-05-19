@@ -85,17 +85,9 @@ const Tile = (props: Props) => {
     }
   );
 
-  const launchInstanceMutation = rspc.createMutation(
-    ["instance.launchInstance"],
-    {
-      onSuccess() {
-        console.log("SUCCESS PLAY");
-      },
-      onError(error) {
-        console.log("ERROR PLAY", error);
-      },
-    }
-  );
+  const launchInstanceMutation = rspc.createMutation([
+    "instance.launchInstance",
+  ]);
 
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",

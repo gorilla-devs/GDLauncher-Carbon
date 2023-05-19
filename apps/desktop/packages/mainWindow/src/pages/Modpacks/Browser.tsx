@@ -134,7 +134,7 @@ export default function Browser() {
             />
           </div>
           <Button
-            variant="outline"
+            type="outline"
             size="medium"
             icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
           >
@@ -180,7 +180,7 @@ export default function Browser() {
             </span>
             <div class="flex gap-3">
               <Button
-                variant="glow"
+                type="glow"
                 onClick={() =>
                   modalsContext?.openModal({ name: "instanceCreation" })
                 }

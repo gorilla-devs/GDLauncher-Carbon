@@ -378,7 +378,7 @@ const InstanceCreation = (props: ModalProps) => {
           </Show>
           <div class="flex w-full justify-between">
             <Button
-              variant="secondary"
+              type="secondary"
               style={{ width: "100%", "max-width": "200px" }}
               onClick={() => modalsContext?.closeModal()}
             >
@@ -390,7 +390,7 @@ const InstanceCreation = (props: ModalProps) => {
               />
             </Button>
             <Button
-              variant="primary"
+              type="primary"
               style={{ width: "100%", "max-width": "200px" }}
               onClick={() => {
                 handleCreate();

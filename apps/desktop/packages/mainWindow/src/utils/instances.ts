@@ -40,29 +40,69 @@ export const getLaunchState = (
   return undefined;
 };
 
-export const getPreparingState = (status: ListInstanceStatus) => {
-  const isValidState = getValideInstance(status);
+export const isLaunchState = (input: any): input is LaunchState => {
+  if (input === "Inactive") {
+    return true;
+  }
 
-  if (
-    isValidState &&
-    isValidState.state &&
-    typeof isValidState.state === "object" &&
-    "Preparing" in isValidState.state
-  ) {
-    return isValidState.state.Preparing;
+  if (typeof input === "object") {
+    // Check for the Preparing state
+    if ("Preparing" in input) {
+      return typeof input.Preparing === "number";
+    }
+
+    // Check for the Running state
+    if ("Running" in input) {
+      return (
+        typeof input.Running === "object" &&
+        "start_time" in input.Running &&
+        typeof input.Running.start_time === "string" &&
+        "log_id" in input.Running &&
+        typeof input.Running.log_id === "number"
+      );
+    }
+  }
+
+  return false;
+};
+
+export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
+  const launchState = isLaunchState(status);
+
+  if (launchState) {
+    if (typeof status === "object" && "Preparing" in status) {
+      return status.Preparing;
+    }
+  } else {
+    const isValidState = getValideInstance(status);
+    if (
+      isValidState &&
+      isValidState.state &&
+      typeof isValidState.state === "object" &&
+      "Preparing" in isValidState.state
+    ) {
+      return isValidState.state.Preparing;
+    }
   }
 };
 
-export const getRunningState = (status: ListInstanceStatus) => {
-  const isValidState = getValideInstance(status);
+export const getRunningState = (status: ListInstanceStatus | LaunchState) => {
+  const launchState = isLaunchState(status);
 
-  if (
-    isValidState &&
-    isValidState.state &&
-    typeof isValidState.state === "object" &&
-    "Running" in isValidState.state
-  ) {
-    return isValidState.state.Running;
+  if (launchState) {
+    if (typeof status === "object" && "Running" in status) {
+      return status.Running;
+    }
+  } else {
+    const isValidState = getValideInstance(status);
+    if (
+      isValidState &&
+      isValidState.state &&
+      typeof isValidState.state === "object" &&
+      "Running" in isValidState.state
+    ) {
+      return isValidState.state.Running;
+    }
   }
 };
 

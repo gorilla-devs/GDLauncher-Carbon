@@ -135,7 +135,7 @@ const NoResourcePacks = () => {
             }}
           />
         </p>
-        <Button variant="outline" size="medium">
+        <Button type="outline" size="medium">
           <Trans
             key="instance.add_resource_pack"
             options={{
@@ -178,7 +178,7 @@ const ResourcePacks = () => {
               rounded
             />
           </div>
-          <Button variant="outline" size="medium">
+          <Button type="outline" size="medium">
             <Trans
               key="instance.add_resource_pack_pack"
               options={{

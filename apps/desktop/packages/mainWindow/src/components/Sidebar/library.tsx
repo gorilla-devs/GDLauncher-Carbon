@@ -168,7 +168,7 @@ const Sidebar = () => {
         </div>
         <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
-            variant="outline"
+            type="outline"
             onClick={() => {
               modalsContext?.openModal({
                 name: "instanceCreation",

@@ -62,33 +62,28 @@ export const bytesToMB = (bytes: number) => {
   return bytes / bytesInMB;
 };
 
-export const streamToJson = async (
+export const streamToJson = async function* (
   stream: ReadableStream<Uint8Array>
-): Promise<Array<unknown>> => {
-  // Step 1: Read all data from the stream
+  // eslint-disable-next-line no-undef
+): AsyncIterable<unknown> {
   const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
+  const decoder = new TextDecoder();
   let done: boolean | undefined, value: Uint8Array | undefined;
 
   try {
     while (!done) {
       ({ done, value } = await reader.read());
       if (value) {
-        chunks.push(value);
+        const string = decoder.decode(value, { stream: !done });
+        const jsonObjects = safeJsonParse(string);
+        for (const jsonObject of jsonObjects) {
+          yield jsonObject;
+        }
       }
     }
   } finally {
     reader.releaseLock();
   }
-
-  // Step 2: Convert the Uint8Array to a string
-  const decoder = new TextDecoder();
-  const string = chunks.map((chunk) => decoder.decode(chunk)).join("");
-
-  // Step 3: Parse the string into JSON
-  const json = safeJsonParse(string);
-
-  return json;
 };
 
 export const safeJsonParse = (str: string): Array<unknown> => {

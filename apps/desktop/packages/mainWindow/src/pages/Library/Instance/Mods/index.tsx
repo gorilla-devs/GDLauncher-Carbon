@@ -20,7 +20,7 @@ const NoMods = () => {
             }}
           />
         </p>
-        <Button variant="outline" size="medium">
+        <Button type="outline" size="medium">
           <Trans
             key="instance.add_pack"
             options={{
@@ -70,7 +70,7 @@ const Mods = () => {
               rounded
             />
           </div>
-          <Button variant="outline" size="medium">
+          <Button type="outline" size="medium">
             <Trans
               key="instance.add_mod"
               options={{

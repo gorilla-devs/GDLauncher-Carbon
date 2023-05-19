@@ -146,7 +146,7 @@ const AppNavbar = () => {
                 </div>
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
-                  <Tab ignored noPointer={runningInstances() === 0}>
+                  <Tab ignored noPointer={true}>
                     <div class="relative">
                       <Show when={runningInstances() > 0}>
                         <div class="absolute w-4 h-4 -top-1 -right-1 rounded-full bg-red-500 z-30 text-white flex justify-center items-center text-xs">
@@ -161,8 +161,14 @@ const AppNavbar = () => {
                           "text-dark-slate-500": runningInstances() === 0,
                         }}
                         onClick={() => {
-                          if (runningInstances() > 0)
+                          console.log(
+                            "OPEN",
+                            runningInstances(),
+                            runningInstances() > 0
+                          );
+                          if (runningInstances() > 0) {
                             modalsContext?.openModal({ name: "logViewer" });
+                          }
                         }}
                       />
                     </div>

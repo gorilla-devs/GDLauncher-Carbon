@@ -73,7 +73,7 @@ const Java = () => {
         </h5>
         <div class="flex w-full gap-4 items-center">
           <Input class="w-full" />
-          <Button rounded={false} variant="secondary" class="h-10">
+          <Button rounded={false} type="secondary" class="h-10">
             <Trans
               key="java.reset_java_args"
               options={{
@@ -95,7 +95,7 @@ const Java = () => {
           </h5>
           <Button
             rounded={false}
-            variant="secondary"
+            type="secondary"
             onClick={() => {
               modalsContext?.openModal({ name: "addJava" });
             }}

@@ -44,7 +44,7 @@ const OnBoarding = (props: ModalProps) => {
         </div>
         <div class="flex flex-col items-center gap-6">
           <Button
-            variant="outline"
+            type="outline"
             style={{ width: "100%", "max-width": "200px" }}
           >
             <Trans

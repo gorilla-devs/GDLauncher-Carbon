@@ -326,7 +326,7 @@ const General = () => {
           />
         </div>
       </div>
-      <Button rounded={false} variant="secondary" textColor="text-red-500">
+      <Button rounded={false} type="secondary" textColor="text-red-500">
         <Trans
           key="settings.reset"
           options={{

@@ -102,7 +102,7 @@ const NoVersions = () => {
             }}
           />
         </p>
-        <Button variant="outline" size="medium">
+        <Button type="outline" size="medium">
           <Trans
             key="instance.add_pack"
             options={{

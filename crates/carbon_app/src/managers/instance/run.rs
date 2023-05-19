@@ -334,7 +334,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .data
                                 .as_ref()
                                 .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from("java"),
+                            PathBuf::from("/usr/bin/java"),
                             instance_path.clone(),
                             client_path,
                             game_version,
@@ -351,7 +351,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
-                            PathBuf::from("java"),
+                            PathBuf::from("/usr/bin/java"),
                             account,
                             xms_memory,
                             xmx_memory,

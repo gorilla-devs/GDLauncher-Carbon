@@ -78,7 +78,7 @@ const Settings = () => {
         </div>
         <div class="flex w-full gap-4 items-center">
           <Input class="w-full" />
-          <Button rounded={false} variant="secondary" class="h-10">
+          <Button rounded={false} type="secondary" class="h-10">
             <Trans
               key="java.reset_java_args"
               options={{

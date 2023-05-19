@@ -32,12 +32,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
-      <Tabs
-        orientation="vertical"
-        variant="underline"
-        gap={0}
-        paddingY="p-y-3.5"
-      >
+      <Tabs orientation="vertical" type="underline" gap={0} paddingY="p-y-3.5">
         <TabList>
           <For each={settings}>
             {(item) => (
