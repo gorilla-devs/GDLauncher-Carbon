@@ -58,7 +58,10 @@ const LogViewer = (props: ModalProps) => {
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 overflow-hidden">
         <div class="bg-darkSlate-800 max-h-full">
-          <Tabs type="traditional" onChange={(num) => console.log("NUM", num)}>
+          <Tabs
+            variant="traditional"
+            onChange={(num) => console.log("NUM", num)}
+          >
             <div class="flex items-center max-h-full">
               <TabList>
                 <For each={runningInstances()}>
