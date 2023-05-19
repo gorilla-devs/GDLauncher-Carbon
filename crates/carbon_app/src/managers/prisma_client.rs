@@ -41,7 +41,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
     }
     #[cfg(feature = "production")]
     {
-        try_migrate.map_err(DatabaseError::MigrationError)?;
+        try_migrate.map_err(DatabaseError::Migration)?;
     }
 
     seed_init_db(&db_client).await?;
