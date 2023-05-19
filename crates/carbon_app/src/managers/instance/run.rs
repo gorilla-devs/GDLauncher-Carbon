@@ -96,8 +96,12 @@ impl ManagerRef<'_, InstanceManager> {
         };
 
         let task = VisualTask::new(match &launch_account {
-            Some(_) => Translation::InstanceTaskLaunch(config.name.clone()),
-            None => Translation::InstanceTaskPrepare(config.name.clone()),
+            Some(_) => Translation::InstanceTaskLaunch {
+                name: config.name.clone(),
+            },
+            None => Translation::InstanceTaskPrepare {
+                name: config.name.clone(),
+            },
         });
 
         let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting).await;
