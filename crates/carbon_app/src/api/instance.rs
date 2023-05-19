@@ -274,6 +274,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 
                     #[derive(Serialize)]
                     enum LogEntryType {
+                        System,
                         StdOut,
                         StdErr,
                     }
@@ -295,6 +296,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                                     let entry = LogEntry {
                                         line: line.text,
                                         type_: match line.type_ {
+                                            EntryType::System => LogEntryType::System,
                                             EntryType::StdOut => LogEntryType::StdOut,
                                             EntryType::StdErr => LogEntryType::StdErr,
                                         }

@@ -512,6 +512,10 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = read_logs => {},
                     }
 
+                    if let Ok(exitcode) = child.wait().await {
+                        log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
+                    }
+
                     let _ = app
                         .instance_manager()
                         .change_launch_state(instance_id, LaunchState::Inactive)
