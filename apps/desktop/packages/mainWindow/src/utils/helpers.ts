@@ -61,3 +61,53 @@ export const bytesToMB = (bytes: number) => {
   const bytesInMB = 1024 * 1024;
   return bytes / bytesInMB;
 };
+
+export const streamToJson = async (
+  stream: ReadableStream<Uint8Array>
+): Promise<Array<unknown>> => {
+  // Step 1: Read all data from the stream
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let done: boolean | undefined, value: Uint8Array | undefined;
+
+  try {
+    while (!done) {
+      ({ done, value } = await reader.read());
+      if (value) {
+        chunks.push(value);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  // Step 2: Convert the Uint8Array to a string
+  const decoder = new TextDecoder();
+  const string = chunks.map((chunk) => decoder.decode(chunk)).join("");
+
+  // Step 3: Parse the string into JSON
+  const json = safeJsonParse(string);
+
+  return json;
+};
+
+export const safeJsonParse = (str: string): Array<unknown> => {
+  const jsonStrings = str.split(/\}\s*\{/).map((jsonStr, index, array) => {
+    if (index === 0 && array.length > 1) {
+      jsonStr += "}";
+    } else if (index === array.length - 1 && array.length > 1) {
+      jsonStr = "{" + jsonStr;
+    } else if (array.length > 1) {
+      jsonStr = "{" + jsonStr + "}";
+    }
+    return jsonStr;
+  });
+
+  return jsonStrings.map((jsonStr) => {
+    try {
+      return JSON.parse(jsonStr);
+    } catch (error) {
+      console.error("Failed to parse JSON:", error);
+    }
+  });
+};

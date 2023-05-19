@@ -75,7 +75,7 @@ const AppNavbar = () => {
 
   createEffect(() => {
     instances.data?.forEach((instance) => {
-      console.log("instances", instance);
+      // console.log("instances", instance);
 
       const isPreparingState = () => getRunningState(instance.status);
 

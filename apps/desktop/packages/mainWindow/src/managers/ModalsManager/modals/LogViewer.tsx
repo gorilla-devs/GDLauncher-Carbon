@@ -2,10 +2,11 @@
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
-import { For, createEffect } from "solid-js";
+import { For, createEffect, createResource } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import { getRunningState } from "@/utils/instances";
 import { UngroupedInstance } from "@gd/core_module/bindings";
+import { streamToJson } from "@/utils/helpers";
 
 const logs = [
   {
@@ -43,28 +44,17 @@ const logs = [
   },
 ];
 
-async function streamToJson(stream) {
-  // Step 1: Read all data from the stream
-  const reader = stream.getReader();
-  const chunks = [];
-  let done, value;
+const fetchLogs = async (logId: number) => {
+  const log = await fetch(`http://localhost:${port}/instance/log?id=${logId}`);
+  console.log("FETCH LOGS", logId, log, log.body);
 
-  while (!done) {
-    ({ done, value } = await reader.read());
-    if (value) {
-      chunks.push(value);
-    }
+  if (log.body) {
+    streamToJson(log.body).then((parsed) => {
+      console.log("LOGS PARSED", parsed);
+    });
   }
-
-  // Step 2: Convert the Uint8Array to a string
-  const decoder = new TextDecoder();
-  const string = chunks.map((chunk) => decoder.decode(chunk)).join("");
-
-  // Step 3: Parse the string into JSON
-  const json = JSON.parse(string);
-
-  return json;
-}
+  // return streamToJson(log.body);
+};
 
 const LogViewer = (props: ModalProps) => {
   const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
@@ -79,17 +69,20 @@ const LogViewer = (props: ModalProps) => {
                 <For each={instances.data}>
                   {(instance) => {
                     const runningState = getRunningState(instance.status);
-                    if (runningState) {
-                      fetch(
-                        `http://localhost:${port}/instance/log?id=${runningState?.log_id}`
-                      ).then(async (log) => {
-                        console.log("LOG", log, log.body);
-                        streamToJson(log.body).then((AA) => {
-                          console.log("AAA", AA);
-                        });
-                      });
-                    }
+                    console.log(
+                      "INSTANCE",
+                      instance.status,
+                      runningState,
+                      runningState?.log_id
+                    );
 
+                    if (runningState?.log_id) {
+                      const [logs] = createResource(
+                        runningState?.log_id,
+                        fetchLogs
+                      );
+                      // console.log("runningState", logs());
+                    }
                     return (
                       <Tab>
                         <div class="w-full flex gap-2 items-center h-10 justify-start">
