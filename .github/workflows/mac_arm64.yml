@@ -51,4 +51,4 @@ jobs:
       - name: Test
         env:
           CARGO_INCREMENTAL: 0
-        run: pnpm test -- --include-ignored
+        run: pnpm test
