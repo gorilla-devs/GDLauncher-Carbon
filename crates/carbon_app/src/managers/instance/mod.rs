@@ -14,7 +14,7 @@ use anyhow::{anyhow, Context};
 use chrono::Utc;
 use futures::future::BoxFuture;
 
-use md5::{Md5, Digest};
+use md5::{Digest, Md5};
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
