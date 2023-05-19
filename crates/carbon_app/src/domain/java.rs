@@ -336,10 +336,10 @@ mod test {
             TestCase {
                 output: "1.8.0_352-b08",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(8),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("352".to_owned()),
+                    major: 8,
+                    minor: Some(0),
+                    patch: Some("352".to_owned()),
+                    update_number: None,
                     prerelease: Some("b08".to_owned()),
                     build_metadata: None,
                 }),
@@ -358,10 +358,10 @@ mod test {
             TestCase {
                 output: "1.4.0_03-b04",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(4),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("03".to_owned()),
+                    major: 4,
+                    minor: Some(0),
+                    patch: Some("03".to_owned()),
+                    update_number: None,
                     prerelease: Some("b04".to_owned()),
                     build_metadata: None,
                 }),
@@ -380,10 +380,10 @@ mod test {
             TestCase {
                 output: "1.8.0_362-beta-202211161809-b03+152",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(8),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("362".to_owned()),
+                    major: 8,
+                    minor: Some(0),
+                    patch: Some("362".to_owned()),
+                    update_number: None,
                     prerelease: Some("beta-202211161809-b03".to_owned()),
                     build_metadata: Some("152".to_owned()),
                 }),

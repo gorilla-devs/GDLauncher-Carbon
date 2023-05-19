@@ -189,11 +189,11 @@ impl AzulAPI {
         arch: &JavaArch,
     ) -> anyhow::Result<Vec<AzulZuluVersion>> {
         let mut results: Vec<AzulZuluVersion> = Vec::new();
-        let mut page = 0;
+        let mut page = 1;
 
         loop {
             let url = format!(
-                "{AZUL_BASE_URL}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&include_fields=os%2C%20arch&page={}&os={}&arch={}",
+                "{AZUL_BASE_URL}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&page={}&os={}&arch={}",
                 page,
                 match os {
                     JavaOs::Windows => "windows",
@@ -211,7 +211,7 @@ impl AzulAPI {
 
             let pagination: Pagination = serde_json::from_str(
                 req.headers()
-                    .get("x-pagination")
+                    .get("X-Pagination")
                     .ok_or_else(|| anyhow::anyhow!("No pagination header"))?
                     .to_str()?,
             )?;
@@ -233,9 +233,9 @@ impl AzulAPI {
 pub struct Pagination {
     total: u64,
     total_pages: u64,
-    first_page: u64,
-    last_page: u64,
-    page: u64,
+    first_page: Option<u64>,
+    last_page: Option<u64>,
+    page: Option<u64>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -243,14 +243,12 @@ pub struct AzulZuluVersion {
     package_uuid: String,
     name: String,
     java_version: Vec<u16>,
-    openjdk_build_number: u32,
+    openjdk_build_number: Option<u32>,
     latest: bool,
     download_url: String,
     product: String,
     distro_version: Vec<u8>,
     availability_type: String,
-    os: String,
-    arch: String,
 }
 
 #[cfg(test)]

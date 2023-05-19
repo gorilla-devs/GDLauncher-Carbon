@@ -23,7 +23,9 @@ CREATE TABLE "Java" (
     "major" INTEGER NOT NULL,
     "fullVersion" TEXT NOT NULL,
     "type" TEXT NOT NULL,
+    "os" TEXT NOT NULL,
     "arch" TEXT NOT NULL,
+    "vendor" TEXT NOT NULL,
     "isValid" BOOLEAN NOT NULL DEFAULT false
 );
 

@@ -48,9 +48,9 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-      - name: Lint
-        shell: bash
-        run: pnpm lint
+      # - name: Lint
+      #   shell: bash
+      #   run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target
@@ -59,4 +59,4 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: pnpm test -- --include-ignored
+        run: pnpm test

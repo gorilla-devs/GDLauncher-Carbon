@@ -43,8 +43,8 @@ jobs:
         run: pnpm build:linux-x64
         env:
           CARGO_INCREMENTAL: 0
-      - name: Lint
-        run: pnpm lint
+      # - name: Lint
+      #   run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target

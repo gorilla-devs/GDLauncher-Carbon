@@ -267,11 +267,11 @@ mod test {
 
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
 
-        // Since the db only contains one component, it should be set as invalid.
+        // Since the db only contains one component, it should be set as invalid, even tho
+        // given that it's not used in any profile, it will be silently removed.
         // The other 2, since they don't already exist, are not added nor updated.
 
-        assert_eq!(java_components.len(), 1);
-        assert!(!java_components[0].is_valid);
+        assert_eq!(java_components.len(), 0);
     }
 
     #[tokio::test]

@@ -2,6 +2,7 @@ use anyhow::bail;
 
 use crate::domain::java::{JavaArch, JavaVersion};
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct JavaCmdParsedOutput {
     pub version: JavaVersion,
     pub arch: JavaArch,
@@ -46,83 +47,68 @@ pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOu
 
 #[cfg(test)]
 mod test {
-    use crate::domain::java::JavaVersion;
-
-    #[test]
-    fn test_parse_cmd_output_java_version() {
-        struct TestCase {
-            output: &'static str,
-            expected: Option<JavaVersion>,
-        }
-
-        let expected = [
-            TestCase {
-                output: "java.version=19.0.1",
-                expected: Some(JavaVersion {
-                    major: 19,
-                    minor: Some(0),
-                    patch: Some("1".to_owned()),
-                    update_number: None,
-                    prerelease: None,
-                    build_metadata: None,
-                }),
-            },
-            TestCase {
-                output: "os.arch=amd64",
-                expected: None,
-            },
-            TestCase {
-                output: "java.version=",
-                expected: None,
-            },
-        ];
-
-        for test_case in expected.iter() {
-            let actual = super::parse_cmd_output_java(test_case.output)
-                .map(|x| x.version)
-                .ok();
-            assert_eq!(actual, test_case.expected);
-        }
-    }
+    use crate::{domain::java::JavaVersion, managers::java::parser::JavaCmdParsedOutput};
 
     #[test]
     fn test_parse_cmd_output_java_arch() {
         struct TestCase {
             output: &'static str,
-            expected: Option<super::JavaArch>,
+            expected: Option<JavaCmdParsedOutput>,
         }
 
         let expected = [
             TestCase {
-                output: "os.arch=amd64",
-                expected: Some(super::JavaArch::X64),
+                output: "os.arch=amd64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("19.0.1").unwrap(),
+                    arch: "amd64".into(),
+                    vendor: "AdoptOpenJDK".into(),
+                }),
             },
             TestCase {
-                output: "os.arch=x64",
-                expected: Some(super::JavaArch::X64),
+                output: "os.arch=x64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("19.0.1").unwrap(),
+                    arch: super::JavaArch::X64,
+                    vendor: "AdoptOpenJDK".to_string(),
+                }),
             },
             TestCase {
-                output: "os.arch=x86_64",
-                expected: Some(super::JavaArch::X64),
+                output: "os.arch=x86_64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("19.0.1").unwrap(),
+                    arch: super::JavaArch::X64,
+                    vendor: "AdoptOpenJDK".to_string(),
+                }),
             },
             TestCase {
-                output: "os.arch=x86",
-                expected: Some(super::JavaArch::X86),
+                output: "os.arch=x86\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("19.0.1").unwrap(),
+                    arch: super::JavaArch::X86,
+                    vendor: "AdoptOpenJDK".to_string(),
+                }),
             },
             TestCase {
-                output: "os.arch=aarch64",
-                expected: Some(super::JavaArch::Aarch64),
+                output: "os.arch=aarch64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("19.0.1").unwrap(),
+                    arch: super::JavaArch::Aarch64,
+                    vendor: "AdoptOpenJDK".to_string(),
+                }),
             },
             TestCase {
-                output: "java.version=19.0.1",
+                output: "java.version=19.0.1\njava.vendor=AdoptOpenJDK",
+                expected: None,
+            },
+            TestCase {
+                output: "java.version=19.0.1\nos.arch=aarch64",
                 expected: None,
             },
         ];
 
         for test_case in expected.iter() {
-            let actual = super::parse_cmd_output_java(test_case.output)
-                .map(|x| x.arch)
-                .ok();
+            let actual = super::parse_cmd_output_java(test_case.output).ok();
             assert_eq!(actual, test_case.expected);
         }
     }
