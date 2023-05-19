@@ -426,6 +426,7 @@ dependencies = [
  "dotenvy",
  "env_logger",
  "futures",
+ "hex",
  "http",
  "httpdate",
  "hyper",
@@ -433,6 +434,7 @@ dependencies = [
  "iridium",
  "jsonwebtoken",
  "log",
+ "md-5",
  "ntest",
  "opener",
  "prisma-client-rust",
@@ -1961,6 +1963,15 @@ name = "matchit"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b87248edafb776e59e6ee64a79086f65890d3510f2c656c000bf2a7e8a0aea40"
+
+[[package]]
+name = "md-5"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6365506850d44bff6e2fbcb5176cf63650e48bd45ef2fe2665ae1570e0f4b9ca"
+dependencies = [
+ "digest 0.10.6",
+]
 
 [[package]]
 name = "memchr"

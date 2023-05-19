@@ -1,6 +1,7 @@
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
+use std::io::Cursor;
 use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
@@ -13,6 +14,7 @@ use anyhow::{anyhow, Context};
 use chrono::Utc;
 use futures::future::BoxFuture;
 
+use md5::{Md5, Digest};
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
@@ -163,15 +165,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                             let is_jar_disabled = path.ends_with(".jar.disabled");
 
                             if (is_jar || is_jar_disabled) && entry.file_type().await?.is_file() {
-                                let path2 = path.clone();
+                                let mut md5 = Md5::new();
+                                let file = tokio::fs::read(&path).await?;
+                                md5.update(&file);
+                                let hash = md5.finalize();
+
                                 let mod_ = tokio::task::spawn_blocking(|| {
-                                    let file = std::fs::File::open(path2)?;
-                                    mods::meta::parse_metadata(file)
+                                    mods::meta::parse_metadata(Cursor::new(file))
                                 })
                                     .await??
                                     .map(|metadata| {
-                                        static GLOBAL_MOD_INDEX: AtomicUsize = AtomicUsize::new(0);
-                                        let id = GLOBAL_MOD_INDEX.fetch_add(1, atomic::Ordering::Relaxed).to_string();
+                                        let id = hex::encode(hash);
 
                                         let mut filename = path.file_name()
                                             .expect("this path cannot end in .. since we have used it as a file");
