@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, slice};
 
 use crate::domain::{
     maven::MavenCoordinates,
@@ -210,6 +210,7 @@ pub async fn generate_startup_command(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
     instance_path: InstancePath,
@@ -251,6 +252,88 @@ pub async fn generate_startup_command(
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
         .unwrap();
 
+    let regex =
+        Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
+            .unwrap();
+
+    let extra_args_regex = Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
+
+    let player_token = match full_account.type_ {
+        FullAccountType::Offline => "offline".to_owned(),
+        FullAccountType::Microsoft { access_token, .. } => access_token,
+    };
+
+    let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
+        "{}.jar",
+        version.downloads.get(&DownloadType::Client).unwrap().sha1
+    ));
+
+    let replacer_args = ReplacerArgs {
+        player_name: full_account.username,
+        player_token: player_token.clone(),
+        version_name: version.id.clone(),
+        game_directory: instance_path,
+        game_assets: runtime_path.get_assets().to_path(),
+        target_directory: PathBuf::new(),
+        natives_path: runtime_path.get_natives().get_versioned(&version.id),
+        assets_root: runtime_path.get_assets().to_path(),
+        assets_index_name: version.assets.clone(),
+        // Patch libraries adding client jar at the end
+        libraries: format!(
+            "{}{}{}",
+            libraries,
+            CLASSPATH_SEPARATOR,
+            client_jar_path.display()
+        ),
+        auth_uuid: full_account.uuid,
+        auth_access_token: player_token.clone(),
+        auth_session: player_token,
+        user_type: "mojang".to_owned(),
+        version_type: version.type_.as_str().to_string(),
+        user_properties: "{}".to_owned(),
+    };
+
+    let substitute_argument = |argument: &str| {
+        regex
+            .replace_all(argument, |caps: &Captures| {
+                if let Some(value) = caps.name("value") {
+                    let value = replace_placeholder(&replacer_args, value.as_str().into());
+                    return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
+                } else if let Some(standalone) = caps.name("standalone") {
+                    let value = replace_placeholder(&replacer_args, standalone.as_str().into());
+                    return value;
+                }
+                if let Some(arg) = caps.name("arg") {
+                    return arg.as_str().to_string();
+                } else {
+                    unreachable!("No capturing group matched")
+                }
+            })
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
+    };
+
+    let substitute_arguments = |command: &mut Vec<String>, arguments: &Vec<Argument>| {
+        for arg in arguments {
+            match arg {
+                Argument::Normal(arg) => command.push(substitute_argument(arg)),
+                Argument::Ruled { rules, value } => {
+                    let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
+
+                    match (is_allowed, value) {
+                        (false, _) => {}
+                        (true, ArgumentValue::Single(arg)) => {
+                            command.push(substitute_argument(arg))
+                        }
+                        (true, ArgumentValue::Many(arr)) => {
+                            command.extend(arr.iter().map(|arg| substitute_argument(arg)))
+                        }
+                    }
+                }
+            }
+        }
+    };
+
     let mut command = Vec::with_capacity(15);
 
     command.push(format!("-Xmx{xmx_memory}m"));
@@ -273,114 +356,17 @@ pub async fn generate_startup_command(
         arguments
     });
 
-    let game_arguments = arguments.get(&ArgumentType::Game).unwrap();
-    let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
+    substitute_arguments(&mut command, arguments.get(&ArgumentType::Jvm).unwrap());
 
-    for arg in jvm_arguments.clone() {
-        match arg {
-            Argument::Normal(string) => command.push(string),
-            Argument::Ruled { rules, value } => {
-                let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
-
-                if is_allowed {
-                    match value {
-                        ArgumentValue::Single(string) => command.push(string),
-                        ArgumentValue::Many(arr) => command.extend(arr),
-                    }
-                }
-            }
-        }
+    for cap in extra_args_regex.captures_iter(extra_java_args) {
+        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };
+        command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
     }
 
     command.push(version.main_class.clone());
-
-    for arg in game_arguments.clone() {
-        match arg {
-            Argument::Normal(string) => command.push(string),
-            Argument::Ruled { rules, value } => {
-                let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
-
-                if is_allowed {
-                    match value {
-                        ArgumentValue::Single(string) => command.push(string),
-                        ArgumentValue::Many(arr) => command.extend(arr),
-                    }
-                }
-            }
-        }
-    }
-
-    let regex =
-        Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
-            .unwrap();
-
-    let player_name = full_account.username;
-    let player_uuid = full_account.uuid;
-    let player_token = match full_account.type_ {
-        FullAccountType::Offline => "offline".to_owned(),
-        FullAccountType::Microsoft { access_token, .. } => access_token,
-    };
-
-    let version_name = version.id.clone();
-    let game_directory = instance_path;
-    let assets_root = runtime_path.get_assets().to_path();
-    let game_assets = runtime_path.get_assets().to_path();
-    let assets_index_name = version.assets.clone();
-    let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
-        "{}.jar",
-        version.downloads.get(&DownloadType::Client).unwrap().sha1
-    ));
-
-    let replacer_args = ReplacerArgs {
-        player_name,
-        player_token: player_token.clone(),
-        version_name,
-        game_directory,
-        game_assets,
-        target_directory: PathBuf::new(),
-        natives_path: runtime_path.get_natives().get_versioned(&version.id),
-        assets_root,
-        assets_index_name,
-        // Patch libraries adding client jar at the end
-        libraries: format!(
-            "{}{}{}",
-            libraries,
-            CLASSPATH_SEPARATOR,
-            client_jar_path.display()
-        ),
-        auth_uuid: player_uuid,
-        auth_access_token: player_token.clone(),
-        auth_session: player_token,
-        user_type: "mojang".to_owned(),
-        version_type: version.type_.as_str().to_string(),
-        user_properties: "{}".to_owned(),
-    };
+    substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
 
     command
-        .into_iter()
-        .map(|argument| {
-            regex
-                .replace_all(&argument, |caps: &Captures| {
-                    if let Some(value) = caps.name("value") {
-                        let value = replace_placeholder(&replacer_args, value.as_str().into());
-                        return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
-                    } else if let Some(standalone) = caps.name("standalone") {
-                        let value = replace_placeholder(&replacer_args, standalone.as_str().into());
-                        return value;
-                    }
-                    if let Some(arg) = caps.name("arg") {
-                        return arg.as_str().to_string();
-                    } else {
-                        unreachable!("No capturing group matched")
-                    }
-                })
-                .to_string()
-        })
-        .map(|argument| {
-            // unescape " and \ characters
-            argument.replace("\\\"", "\"").replace("\\\\", "\\")
-        })
-        .collect()
 }
 
 pub async fn launch_minecraft(
@@ -388,6 +374,7 @@ pub async fn launch_minecraft(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
     instance_path: InstancePath,
@@ -396,6 +383,7 @@ pub async fn launch_minecraft(
         full_account,
         xmx_memory,
         xms_memory,
+        extra_java_args,
         runtime_path,
         version,
         instance_path,
@@ -518,6 +506,7 @@ mod tests {
             full_account,
             2048,
             2048,
+            "",
             &runtime_path,
             version,
             instance_id,

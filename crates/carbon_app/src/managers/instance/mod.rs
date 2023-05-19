@@ -1829,7 +1829,14 @@ mod test {
 
         // update
         app.instance_manager()
-            .update_instance(instance_id, Some(String::from("test2")), None, None, None)
+            .update_instance(
+                instance_id,
+                Some(String::from("test2")),
+                None,
+                None,
+                None,
+                None,
+            )
             .await?;
 
         expected[0].instances[0].name = String::from("test2");

@@ -84,6 +84,21 @@ impl ManagerRef<'_, InstanceManager> {
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
 
+        let extra_java_args = self
+            .app
+            .settings_manager()
+            .get()
+            .await
+            .map(|c| c.java_custom_args)
+            .unwrap_or(String::new())
+            + " "
+            + config
+                .game_configuration
+                .extra_java_args
+                .as_ref()
+                .map(|s| s as &str)
+                .unwrap_or("");
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
@@ -371,6 +386,7 @@ impl ManagerRef<'_, InstanceManager> {
                             account,
                             xms_memory,
                             xmx_memory,
+                            &extra_java_args,
                             &runtime_path,
                             version_info,
                             instance_path,
