@@ -34,6 +34,7 @@ pub struct LogEntry<'a> {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EntryType {
+    System,
     StdOut,
     StdErr,
     // more entries once log levels are handled

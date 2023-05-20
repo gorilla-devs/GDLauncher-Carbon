@@ -60,6 +60,8 @@ tempdir = { workspace = true }
 trash = { workspace = true }
 toml = { workspace = true }
 opener = { workspace = true }
+md-5 = { workspace = true }
+hex = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

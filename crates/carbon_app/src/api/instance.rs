@@ -121,6 +121,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.instance.into(),
                     details.name.into(),
                     details.use_loaded_icon.into(),
+                    None,
                     details.notes.into(),
                     details.memory.into_option()
                         .map(|m| m.map(|(xms, xmx)| (xms, xmx))),
@@ -273,6 +274,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 
                     #[derive(Serialize)]
                     enum LogEntryType {
+                        System,
                         StdOut,
                         StdErr,
                     }
@@ -294,6 +296,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                                     let entry = LogEntry {
                                         line: line.text,
                                         type_: match line.type_ {
+                                            EntryType::System => LogEntryType::System,
                                             EntryType::StdOut => LogEntryType::StdOut,
                                             EntryType::StdErr => LogEntryType::StdErr,
                                         }

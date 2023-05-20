@@ -1,4 +1,4 @@
-use crate::domain::instance::info::Modpack;
+use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
@@ -84,20 +84,39 @@ impl ManagerRef<'_, InstanceManager> {
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
 
+        let extra_java_args = self
+            .app
+            .settings_manager()
+            .get()
+            .await
+            .map(|c| c.java_custom_args)
+            .unwrap_or(String::new())
+            + " "
+            + config
+                .game_configuration
+                .extra_java_args
+                .as_ref()
+                .map(|s| s as &str)
+                .unwrap_or("");
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
             .get_instance_path(&instance.shortpath);
 
-        let version = match config.game_configuration.version {
+        let mut version = match config.game_configuration.version {
             Some(GameVersion::Standard(v)) => v,
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
             None => bail!("Instance has no associated game version and cannot be launched"),
         };
 
         let task = VisualTask::new(match &launch_account {
-            Some(_) => Translation::InstanceTaskLaunch(config.name.clone()),
-            None => Translation::InstanceTaskPrepare(config.name.clone()),
+            Some(_) => Translation::InstanceTaskLaunch {
+                name: config.name.clone(),
+            },
+            None => Translation::InstanceTaskPrepare {
+                name: config.name.clone(),
+            },
         });
 
         let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting).await;
@@ -224,6 +243,18 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?;
 
                         downloads.extend(modpack_info.downloadables);
+                        version = modpack_info.manifest.minecraft.try_into()?;
+
+                        app.instance_manager()
+                            .update_instance(
+                                instance_id,
+                                None,
+                                None,
+                                Some(GameVersion::Standard(version.clone())),
+                                None,
+                                None,
+                            )
+                            .await?;
                     }
                 }
 
@@ -334,7 +365,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .data
                                 .as_ref()
                                 .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from("/usr/bin/java"),
+                            PathBuf::from("java"),
                             instance_path.clone(),
                             client_path,
                             game_version,
@@ -355,6 +386,7 @@ impl ManagerRef<'_, InstanceManager> {
                             account,
                             xms_memory,
                             xmx_memory,
+                            &extra_java_args,
                             &runtime_path,
                             version_info,
                             instance_path,
@@ -478,6 +510,10 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = kill_rx.recv() => drop(child.kill().await),
                         // canceled by one of the others being selected
                         _ = read_logs => {},
+                    }
+
+                    if let Ok(exitcode) = child.wait().await {
+                        log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
                     }
 
                     let _ = app

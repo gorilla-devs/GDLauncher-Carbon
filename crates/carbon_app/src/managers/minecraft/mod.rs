@@ -223,6 +223,7 @@ mod tests {
             full_account,
             2048,
             2048,
+            "",
             runtime_path,
             version_info,
             instance_path,
