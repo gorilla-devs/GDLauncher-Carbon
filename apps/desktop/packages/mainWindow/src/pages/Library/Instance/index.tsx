@@ -145,10 +145,10 @@ const Instance = () => {
     parseInt(params.id, 10),
   ]);
 
-  getInstanceDetailsQuery.data?.state;
   const isRunning = () =>
     getInstanceDetailsQuery.data?.state &&
     getRunningState(getInstanceDetailsQuery.data?.state);
+
   const isPreparing = () =>
     getInstanceDetailsQuery.data?.state &&
     getPreparingState(getInstanceDetailsQuery.data?.state);

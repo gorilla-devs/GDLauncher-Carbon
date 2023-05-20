@@ -7,6 +7,7 @@ import {
   isProgressFailed,
   getValideInstance,
   getPreparingState,
+  getRunningState,
 } from "@/utils/instances";
 import { ListInstance, UngroupedInstance } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -18,6 +19,7 @@ type InstanceDownloadProgress = {
   totalDownload: number;
   downloaded: number;
   percentage: number;
+  subTask: string;
 };
 
 const InstanceTile = (props: {
@@ -30,6 +32,7 @@ const InstanceTile = (props: {
     totalDownload: 0,
     downloaded: 0,
     percentage: 0,
+    subTask: "",
   });
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
@@ -42,6 +45,8 @@ const InstanceTile = (props: {
 
   const taskId = isPreparingState();
 
+  const isRunning = () => getRunningState(props.instance.status);
+
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
@@ -50,6 +55,12 @@ const InstanceTile = (props: {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);
         if (isProgressKnown(task.data.progress)) {
+          console.log(
+            "PROGRESS",
+            task.data.active_subtasks,
+            task.data.progress.Known
+          );
+          // setProgress("subTask", task.data.active_subtasks);
           setProgress("percentage", task.data.progress.Known);
           setIsLoading(true);
         } else if (isProgressFailed(task.data.progress)) {
@@ -73,6 +84,8 @@ const InstanceTile = (props: {
         modloader={modloader}
         version={validInstance()?.mc_version}
         invalid={!isListInstanceValid(props.instance.status)}
+        isRunning={!!isRunning()}
+        isPreparing={isPreparingState() !== undefined}
         variant={type()}
         img={image()}
         selected={props.selected}

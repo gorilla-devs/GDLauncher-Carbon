@@ -23,6 +23,8 @@ type Props = {
   instanceId: number;
   downloaded?: number;
   totalDownload?: number;
+  isRunning?: boolean;
+  isPreparing?: boolean;
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -88,6 +90,8 @@ const Tile = (props: Props) => {
   const launchInstanceMutation = rspc.createMutation([
     "instance.launchInstance",
   ]);
+
+  const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
 
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
@@ -166,12 +170,24 @@ const Tile = (props: Props) => {
                   "group-hover:flex": !props.isLoading,
                 }}
               >
-                <div class="rounded-full flex justify-center items-center cursor-pointer h-12 bg-primary-500 w-12">
+                <div
+                  class="rounded-full flex justify-center items-center cursor-pointer h-12 w-12"
+                  classList={{
+                    "bg-primary-500": !props.isRunning,
+                    "bg-red-500": props.isRunning,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (props.isRunning) {
+                      killInstanceMutation.mutate(props.instanceId);
+                    } else launchInstanceMutation.mutate(props.instanceId);
+                  }}
+                >
                   <div
-                    class="text-white text-2xl i-ri:play-fill"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      launchInstanceMutation.mutate(props.instanceId);
+                    class="text-white text-2xl"
+                    classList={{
+                      "i-ri:play-fill": !props.isRunning,
+                      "i-ri:pause-mini-fill": props.isRunning,
                     }}
                   />
                 </div>
