@@ -43,6 +43,8 @@ keys! {
         GET_MANAGED_OS                          = "getManagedOS";
         GET_MANAGED_ARCH                        = "getManagedArch";
         GET_MANAGED_VERSIONS_BY_VENDOR          = "getManagedVersionsByVendor";
+        SETUP_MANAGED_JAVA                      = "setupManagedJava";
+        GET_SETUP_MANAGED_JAVA_PROGRESS         = "getSetupManagedJavaProgress";
     }
 
     mc {

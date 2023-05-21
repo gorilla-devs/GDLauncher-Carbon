@@ -145,3 +145,21 @@ impl From<crate::managers::java::managed::ManagedJavaOsMap> for FEManagedJavaOsM
         Self(v.0.into_iter().map(|(k, v)| (k.into(), v.into())).collect())
     }
 }
+
+#[derive(Type, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEManagedJavaSetupArgs {
+    os: FEManagedJavaOs,
+    arch: FEManagedJavaArch,
+    vendor: FEVendor,
+    id: String,
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FEManagedJavaSetupProgress {
+    Idle,
+    Downloading(String, String),
+    Extracting(String, String),
+    Done,
+}

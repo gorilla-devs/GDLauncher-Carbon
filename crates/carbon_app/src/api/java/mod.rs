@@ -1,3 +1,4 @@
+use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
 use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::{JavaComponentType, Vendor};
@@ -30,6 +31,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_MANAGED_VERSIONS_BY_VENDOR[app, args: FEVendor] {
             get_managed_versions_by_vendor(app, args).await
+        }
+
+        mutation SETUP_MANAGED_JAVA[app, args: FEManagedJavaSetupArgs] {
+            setup_managed_java(app, args).await
+        }
+
+        query GET_SETUP_MANAGED_JAVA_PROGRESS[app, args: ()] {
+            get_setup_managed_java_progress(app, args).await
         }
     }
 }
@@ -80,6 +89,17 @@ async fn get_managed_versions_by_vendor(
         .await?;
 
     Ok(managed_java_map_os.into())
+}
+
+async fn setup_managed_java(app: App, _args: FEManagedJavaSetupArgs) -> anyhow::Result<()> {
+    todo!()
+}
+
+async fn get_setup_managed_java_progress(
+    app: App,
+    _args: (),
+) -> anyhow::Result<FEManagedJavaSetupProgress> {
+    todo!()
 }
 
 #[derive(Type, Serialize)]

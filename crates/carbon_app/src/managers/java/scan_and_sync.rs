@@ -7,7 +7,10 @@ use crate::{
 
 use super::{discovery::Discovery, java_checker::JavaChecker};
 
-async fn get_java_component_from_db(db: &PrismaClient, path: String) -> anyhow::Result<Option<()>> {
+async fn get_java_component_from_db(
+    db: &PrismaClient,
+    path: String,
+) -> anyhow::Result<Option<crate::db::java::Data>> {
     let res = db
         .java()
         .find_unique(crate::db::java::UniqueWhereParam::PathEquals(path))
@@ -105,6 +108,7 @@ where
                         )
                         .await?;
                     } else {
+                        // only remove if it's LOCAL
                         db.java()
                             .delete(crate::db::java::UniqueWhereParam::PathEquals(
                                 local_java.display().to_string(),
@@ -143,6 +147,7 @@ where
         if is_used_in_profile && !auto_manage_java {
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
+            // ONLY REMOVE IF IT"S LOCAL
             db.java()
                 .delete(crate::db::java::UniqueWhereParam::PathEquals(
                     local_java_from_db.path,

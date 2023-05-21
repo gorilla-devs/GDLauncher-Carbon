@@ -92,12 +92,14 @@ pub trait Managed {
 
 pub struct ManagedService {
     azul_zulu: AzulZulu,
+    setup_progress: Step,
 }
 
 impl ManagedService {
     pub fn new() -> Self {
         Self {
             azul_zulu: AzulZulu::default(),
+            setup_progress: Step::Idle,
         }
     }
 

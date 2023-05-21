@@ -86,14 +86,4 @@ impl ManagerRef<'_, JavaManager> {
 
         Ok(all_profiles)
     }
-
-    // async fn setup_managed_java(
-    //     distribution: Vendor,
-    //     os: Os,
-    //     major_version: u8,
-    // ) -> anyhow::Result<()> {
-    //     match distribution {
-    //         Vendor::Azul => AzulZulu::setup().await?,
-    //     }
-    // }
 }
