@@ -6,7 +6,7 @@ import {
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -157,6 +157,12 @@ const Tile = (props: Props) => {
     return {};
   };
 
+  const handlePlayClick = () => {
+    if (props.isRunning) {
+      killInstanceMutation.mutate(props.instanceId);
+    } else launchInstanceMutation.mutate(props.instanceId);
+  };
+
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
@@ -172,10 +178,19 @@ const Tile = (props: Props) => {
                 "background-image": `url("${props.img as string}")`,
               }}
             >
+              <Show when={props.invalid}>
+                <h2 class="text-center z-20 text-sm">
+                  <Trans key="instance.error_invalid" />
+                </h2>
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                <div class="i-ri:alert-fill text-yellow-500 absolute top-1 right-1 z-10 text-2xl" />
+              </Show>
               <div
                 class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
                 classList={{
-                  "group-hover:flex": !props.isLoading && !props.isInQueue,
+                  "group-hover:flex":
+                    !props.isLoading && !props.isInQueue && !props.invalid,
                   flex: props.isRunning,
                 }}
               >
@@ -187,9 +202,7 @@ const Tile = (props: Props) => {
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (props.isRunning) {
-                      killInstanceMutation.mutate(props.instanceId);
-                    } else launchInstanceMutation.mutate(props.instanceId);
+                    handlePlayClick();
                   }}
                 >
                   <div
@@ -231,7 +244,8 @@ const Tile = (props: Props) => {
               <div
                 class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
                 classList={{
-                  "group-hover:flex": !props.isLoading && !props.isInQueue,
+                  "group-hover:flex":
+                    !props.isLoading && !props.isInQueue && !props.invalid,
                 }}
               >
                 <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
@@ -290,12 +304,15 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems}>
           <div
-            class="relative group select-none flex items-center w-full gap-4 box-border px-3 h-14 erelative"
+            class="relative group select-none flex items-center w-full gap-4 box-border px-3 h-14 erelative cursor-pointer"
             onClick={(e) => props?.onClick?.(e)}
             classList={{
               grayscale: props.isLoading || props.isInQueue,
             }}
           >
+            <Show when={props.invalid}>
+              <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+            </Show>
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
               <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
@@ -305,7 +322,12 @@ const Tile = (props: Props) => {
               <div class="absolute right-0 top-0 bottom-0 bg-green-500 w-1" />
             </Show>
 
-            <div class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5 group-hover:flex">
+            <div
+              class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5"
+              classList={{
+                "group-hover:flex": !props.invalid,
+              }}
+            >
               <div
                 class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer"
                 classList={{
@@ -321,7 +343,7 @@ const Tile = (props: Props) => {
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    launchInstanceMutation.mutate(props.instanceId);
+                    handlePlayClick();
                   }}
                 />
               </div>
@@ -374,10 +396,18 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar-small"}>
         <div
           onClick={(e) => props?.onClick?.(e)}
-          class="h-14 px-3 flex justify-center items-center relative"
+          class="h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
         >
+          <Show when={props.selected && !props.isLoading}>
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
+            <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+          </Show>
+          <Show when={props.isRunning && !props.isLoading}>
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-green-500" />
+            <div class="absolute right-0 top-0 bottom-0 bg-green-500 w-1" />
+          </Show>
           <div
-            class="group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center bg-green-600"
+            class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center bg-green-600"
             style={{
               "background-image": `url("${props.img as string}")`,
             }}
@@ -386,18 +416,32 @@ const Tile = (props: Props) => {
               "bg-green-600": !props.img,
             }}
           >
+            <Show when={props.invalid}>
+              <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+            </Show>
             <div
               class="gap-2 duration-100 ease-in-out right-5 hidden transition-all"
               classList={{
-                "group-hover:flex": !props.isLoading,
+                "group-hover:flex":
+                  !props.isLoading && !props.isInQueue && !props.invalid,
               }}
             >
-              <div class="h-7 w-7 bg-primary-500 rounded-full flex justify-center items-center cursor-pointer">
+              <div
+                class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer"
+                classList={{
+                  "bg-primary-500": !props.isRunning,
+                  "bg-red-500": props.isRunning,
+                }}
+              >
                 <div
-                  class="text-white text-lg i-ri:play-fill"
+                  class="text-white text-lg"
+                  classList={{
+                    "i-ri:play-fill": !props.isRunning,
+                    "i-ri:pause-mini-fill": props.isRunning,
+                  }}
                   onClick={(e) => {
                     e.preventDefault();
-                    launchInstanceMutation.mutate(props.instanceId);
+                    handlePlayClick();
                   }}
                 />
               </div>

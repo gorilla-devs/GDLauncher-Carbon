@@ -116,6 +116,7 @@
   "instance.action_play": "Play",
   "instance.action_settings": "Settings",
   "instance.action_duplicate": "Duplicate",
+  "instance.error_invalid": "Instance Invalid or corrupted, try repairing it!",
   "java.java_major": "Java Major",
   "java.java_distribution": "Java Distirbution",
   "java.install": "Install",
