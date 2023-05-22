@@ -74,6 +74,8 @@ const InstanceTile = (props: {
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
 
+  const isInQueue = () => Boolean(isPreparingState() && taskId !== undefined);
+
   return (
     <div>
       <Tile
@@ -84,7 +86,7 @@ const InstanceTile = (props: {
         version={validInstance()?.mc_version}
         invalid={!isListInstanceValid(props.instance.status)}
         isRunning={!!isRunning()}
-        isPreparing={isPreparingState() !== undefined}
+        isInQueue={isInQueue()}
         variant={type()}
         img={image()}
         selected={props.selected}

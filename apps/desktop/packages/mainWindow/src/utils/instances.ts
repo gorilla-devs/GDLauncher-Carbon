@@ -87,6 +87,26 @@ export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
   }
 };
 
+export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
+  const launchState = isLaunchState(status);
+
+  if (launchState) {
+    if (typeof status === "string" && status === "Inactive") {
+      return status;
+    }
+  } else {
+    const isValidState = getValideInstance(status);
+    if (
+      isValidState &&
+      isValidState.state &&
+      typeof isValidState.state === "string" &&
+      isValidState.state === "Inactive"
+    ) {
+      return isValidState.state;
+    }
+  }
+};
+
 export const isSubTaskDownload = (input: Subtask): input is Subtask => {
   return typeof input === "object" && "download" in input;
 };
