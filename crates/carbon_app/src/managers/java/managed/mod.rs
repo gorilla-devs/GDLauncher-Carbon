@@ -1,27 +1,29 @@
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
-    path::PathBuf,
     sync::Arc,
 };
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
 use tokio::sync::{watch::Sender, Mutex};
 
 use crate::{
+    api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
     db::PrismaClient,
-    domain::java::{JavaArch, JavaOs, Vendor},
+    domain::{
+        java::{JavaArch, JavaOs, JavaVendor},
+        runtime_path::{ManagedJavasPath, TempPath},
+    },
 };
 
 use self::azul_zulu::AzulZulu;
 
-use super::java_checker::JavaChecker;
+use super::java_checker::{JavaChecker, RealJavaChecker};
 
 // mod adoptopenjdk;
 // mod mojang;
 pub mod azul_zulu;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum Step {
     #[default]
     Idle,
@@ -73,13 +75,11 @@ impl DerefMut for ManagedJavaOsMap {
 
 #[async_trait::async_trait]
 pub trait Managed {
-    type VersionType;
-
     async fn setup<G>(
         &self,
-        version: Self::VersionType,
-        tmp_path: PathBuf,
-        base_managed_java_path: PathBuf,
+        version: &ManagedJavaVersion,
+        tmp_path: TempPath,
+        base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
@@ -92,14 +92,14 @@ pub trait Managed {
 
 pub struct ManagedService {
     azul_zulu: AzulZulu,
-    setup_progress: Step,
+    pub setup_progress: Arc<Mutex<Step>>,
 }
 
 impl ManagedService {
     pub fn new() -> Self {
         Self {
             azul_zulu: AzulZulu::default(),
-            setup_progress: Step::Idle,
+            setup_progress: Arc::new(Mutex::new(Step::Idle)),
         }
     }
 
@@ -111,18 +111,73 @@ impl ManagedService {
         JavaArch::iter().collect()
     }
 
-    pub fn get_all_vendors(&self) -> Vec<Vendor> {
-        Vendor::iter().collect()
+    pub fn get_all_vendors(&self) -> Vec<JavaVendor> {
+        JavaVendor::iter().collect()
     }
 
     pub async fn get_versions_for_vendor(
         &self,
-        vendor: Vendor,
+        vendor: JavaVendor,
     ) -> anyhow::Result<ManagedJavaOsMap> {
         let versions = match vendor {
-            Vendor::Azul => self.azul_zulu.fetch_all_versions().await?,
+            JavaVendor::Azul => self.azul_zulu.fetch_all_versions().await?,
         };
 
         Ok(versions)
+    }
+
+    pub async fn setup_managed(
+        &mut self,
+        os: JavaOs,
+        arch: JavaArch,
+        vendor: JavaVendor,
+        id: String,
+        app: crate::App,
+    ) -> anyhow::Result<()> {
+        match vendor {
+            JavaVendor::Azul => {
+                let versions = self.azul_zulu.fetch_all_versions().await?;
+                let version = versions
+                    .get(&os)
+                    .ok_or_else(|| anyhow::anyhow!("No versions for os: {:?}", os))?
+                    .get(&arch)
+                    .ok_or_else(|| anyhow::anyhow!("No versions for arch: {:?}", arch))?
+                    .iter()
+                    .find(|v| v.id == id)
+                    .ok_or_else(|| anyhow::anyhow!("No version for id: {}", id))?;
+
+                let tmp_path = app.settings_manager().runtime_path.get_temp();
+                let base_managed_java_path =
+                    app.settings_manager().runtime_path.get_managed_javas();
+                let db_client = &app.prisma_client.clone();
+
+                let (sender, mut recv) = tokio::sync::watch::channel(Step::Idle);
+
+                let progress_ref = Arc::clone(&self.setup_progress);
+
+                tokio::spawn(async move {
+                    let mut progress_ref = progress_ref.lock().await;
+
+                    while recv.changed().await.is_ok() {
+                        let borrowed_progress = recv.borrow().clone();
+                        *progress_ref = borrowed_progress;
+                        app.invalidate(GET_SETUP_MANAGED_JAVA_PROGRESS, None);
+                    }
+                });
+
+                self.azul_zulu
+                    .setup(
+                        version,
+                        tmp_path,
+                        base_managed_java_path,
+                        &RealJavaChecker,
+                        db_client,
+                        sender,
+                    )
+                    .await?;
+            }
+        };
+
+        Ok(())
     }
 }

@@ -14,7 +14,10 @@ use tokio::{
 
 use crate::{
     db::PrismaClient,
-    domain::java::{JavaArch, JavaOs},
+    domain::{
+        java::{JavaArch, JavaOs},
+        runtime_path::{ManagedJavasPath, TempPath},
+    },
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
 };
 
@@ -25,23 +28,21 @@ pub struct AzulZulu;
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
-    type VersionType = AzulZuluVersion;
-
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
-        version: AzulZuluVersion,
-        tmp_path: PathBuf,
-        base_managed_java_path: PathBuf,
+        version: &ManagedJavaVersion,
+        tmp_path: TempPath,
+        base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
     ) -> anyhow::Result<()> {
         let progress_report = Arc::new(progress_report);
 
-        let download_temp_path = tmp_path.join(&version.name);
-        let download_url = version.download_url;
+        let download_temp_path = tmp_path.to_path().join(&version.name);
+        let download_url = &version.download_url;
 
-        let content_length = reqwest::get(&download_url).await?.content_length();
+        let content_length = reqwest::get(download_url).await?.content_length();
 
         let downloadable = if let Some(content_length) = content_length {
             Downloadable::new(download_url, download_temp_path).with_size(content_length)
@@ -71,7 +72,7 @@ impl Managed for AzulZulu {
         let file_handle = std::fs::File::open(&downloadable.path)?;
         let mut archive = zip::ZipArchive::new(file_handle)?;
 
-        let java_managed_path = base_managed_java_path.join(&version.name);
+        let java_managed_path = base_managed_java_path.to_path().join(&version.name);
 
         tokio::fs::create_dir_all(&java_managed_path).await?;
 

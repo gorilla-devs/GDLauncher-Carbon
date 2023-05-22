@@ -61,17 +61,18 @@ impl From<&str> for JavaComponentType {
         match &*s.to_lowercase() {
             "local" => Self::Local,
             "managed" => Self::Managed,
+            "custom" => Self::Custom,
             _ => unreachable!("Uh oh, this shouldn't happen"),
         }
     }
 }
 
-impl From<JavaComponentType> for String {
-    fn from(t: JavaComponentType) -> Self {
-        match t {
-            JavaComponentType::Local => "local",
-            JavaComponentType::Managed => "managed",
-            JavaComponentType::Custom => "custom",
+impl ToString for JavaComponentType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Local => "local",
+            Self::Managed => "managed",
+            Self::Custom => "custom",
         }
         .to_string()
     }
@@ -139,11 +140,11 @@ impl ToString for JavaOs {
 }
 
 #[derive(Debug, EnumIter)]
-pub enum Vendor {
+pub enum JavaVendor {
     Azul,
 }
 
-impl Vendor {
+impl JavaVendor {
     pub fn from_java_dot_vendor(vendor: &str) -> Option<Self> {
         match vendor {
             "Azul Systems, Inc." => Some(Self::Azul),

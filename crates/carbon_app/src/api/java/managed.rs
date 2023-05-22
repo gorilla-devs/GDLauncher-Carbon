@@ -8,16 +8,16 @@ pub enum FEVendor {
     Azul,
 }
 
-impl From<crate::domain::java::Vendor> for FEVendor {
-    fn from(v: crate::domain::java::Vendor) -> Self {
-        use crate::domain::java::Vendor;
+impl From<crate::domain::java::JavaVendor> for FEVendor {
+    fn from(v: crate::domain::java::JavaVendor) -> Self {
+        use crate::domain::java::JavaVendor;
         match v {
-            Vendor::Azul => Self::Azul,
+            JavaVendor::Azul => Self::Azul,
         }
     }
 }
 
-impl From<FEVendor> for crate::domain::java::Vendor {
+impl From<FEVendor> for crate::domain::java::JavaVendor {
     fn from(v: FEVendor) -> Self {
         match v {
             FEVendor::Azul => Self::Azul,
@@ -149,10 +149,10 @@ impl From<crate::managers::java::managed::ManagedJavaOsMap> for FEManagedJavaOsM
 #[derive(Type, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEManagedJavaSetupArgs {
-    os: FEManagedJavaOs,
-    arch: FEManagedJavaArch,
-    vendor: FEVendor,
-    id: String,
+    pub os: FEManagedJavaOs,
+    pub arch: FEManagedJavaArch,
+    pub vendor: FEVendor,
+    pub id: String,
 }
 
 #[derive(Type, Serialize)]
@@ -162,4 +162,17 @@ pub enum FEManagedJavaSetupProgress {
     Downloading(String, String),
     Extracting(String, String),
     Done,
+}
+
+impl From<crate::managers::java::managed::Step> for FEManagedJavaSetupProgress {
+    fn from(v: crate::managers::java::managed::Step) -> Self {
+        use crate::managers::java::managed::Step;
+
+        match v {
+            Step::Idle => Self::Idle,
+            Step::Downloading(a, b) => Self::Downloading(a.to_string(), b.to_string()),
+            Step::Extracting(a, b) => Self::Extracting(a.to_string(), b.to_string()),
+            Step::Done => Self::Done,
+        }
+    }
 }

@@ -6,7 +6,7 @@ use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
 
 use std::mem::MaybeUninit;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
@@ -183,6 +183,13 @@ impl<T> Deref for ManagerRef<'_, T> {
 
     fn deref(&self) -> &Self::Target {
         self.manager
+    }
+}
+
+impl<T> DerefMut for ManagerRef<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // &mut self.manager
+        todo!("FIX ME")
     }
 }
 
