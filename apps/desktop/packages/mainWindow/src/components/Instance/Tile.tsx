@@ -167,7 +167,13 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems}>
-          <div class="select-none group flex justify-center flex-col z-50 items-start">
+          <div
+            class="select-none group flex justify-center flex-col z-50 items-start"
+            onClick={(e) => {
+              e.stopPropagation();
+              props?.onClick?.(e);
+            }}
+          >
             <div
               class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38"
               classList={{
@@ -241,7 +247,7 @@ const Tile = (props: Props) => {
               <Show when={props.isInQueue}>
                 <Spinner />
               </Show>
-              <div
+              {/* <div
                 class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
                 classList={{
                   "group-hover:flex":
@@ -251,13 +257,10 @@ const Tile = (props: Props) => {
                 <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
                   <div
                     class="text-white i-ri:more-2-fill text-lg"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      props?.onClick?.(e);
-                    }}
+                 
                   />
                 </div>
-              </div>
+              </div> */}
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
                   class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
