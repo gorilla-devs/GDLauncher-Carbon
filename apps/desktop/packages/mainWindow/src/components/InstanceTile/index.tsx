@@ -9,7 +9,11 @@ import {
   getPreparingState,
   getRunningState,
 } from "@/utils/instances";
-import { ListInstance, UngroupedInstance } from "@gd/core_module/bindings";
+import {
+  ListInstance,
+  UngroupedInstance,
+  Subtask,
+} from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
@@ -19,7 +23,7 @@ type InstanceDownloadProgress = {
   totalDownload: number;
   downloaded: number;
   percentage: number;
-  subTask: string;
+  subTasks: Subtask[] | undefined;
 };
 
 const InstanceTile = (props: {
@@ -32,7 +36,7 @@ const InstanceTile = (props: {
     totalDownload: 0,
     downloaded: 0,
     percentage: 0,
-    subTask: "",
+    subTasks: undefined,
   });
   const [imageResource] = createResource(() => props.instance.id, fetchImage);
   const navigate = useGDNavigate();
@@ -55,12 +59,7 @@ const InstanceTile = (props: {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);
         if (isProgressKnown(task.data.progress)) {
-          console.log(
-            "PROGRESS",
-            task.data.active_subtasks,
-            task.data.progress.Known
-          );
-          // setProgress("subTask", task.data.active_subtasks);
+          setProgress("subTasks", task.data.active_subtasks);
           setProgress("percentage", task.data.progress.Known);
           setIsLoading(true);
         } else if (isProgressFailed(task.data.progress)) {
@@ -93,6 +92,7 @@ const InstanceTile = (props: {
         percentage={progress.percentage * 100}
         totalDownload={bytesToMB(progress.totalDownload)}
         downloaded={bytesToMB(progress.downloaded)}
+        subTasks={progress.subTasks}
       />
     </div>
   );

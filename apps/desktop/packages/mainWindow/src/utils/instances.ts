@@ -4,6 +4,7 @@ import {
   LaunchState,
   ListInstanceStatus,
   Progress,
+  Subtask,
   TaskId,
   UngroupedInstance,
   ValidListInstance,
@@ -84,6 +85,14 @@ export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
       return isValidState.state.Preparing;
     }
   }
+};
+
+export const isSubTaskDownload = (input: Subtask): input is Subtask => {
+  return typeof input === "object" && "download" in input;
+};
+
+export const isSubTaskItem = (input: Subtask): input is Subtask => {
+  return typeof input === "object" && "item" in input;
 };
 
 export const getRunningState = (status: ListInstanceStatus | LaunchState) => {

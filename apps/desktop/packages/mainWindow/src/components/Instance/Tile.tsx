@@ -1,9 +1,14 @@
 /* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
-import { ModLoaderType, UngroupedInstance } from "@gd/core_module/bindings";
-import { Match, Show, Switch, mergeProps } from "solid-js";
+import {
+  ModLoaderType,
+  Subtask,
+  Translation,
+  UngroupedInstance,
+} from "@gd/core_module/bindings";
+import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
-import { useTransContext } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { createNotification } from "@gd/ui";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -25,6 +30,7 @@ type Props = {
   totalDownload?: number;
   isRunning?: boolean;
   isPreparing?: boolean;
+  subTasks?: Subtask[] | undefined;
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -144,6 +150,13 @@ const Tile = (props: Props) => {
     },
   ];
 
+  const getTranslationArgs = (translation: Translation) => {
+    if ("args" in translation) {
+      return translation.args;
+    }
+    return {};
+  };
+
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
@@ -168,6 +181,7 @@ const Tile = (props: Props) => {
                 class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
                 classList={{
                   "group-hover:flex": !props.isLoading,
+                  flex: props.isRunning,
                 }}
               >
                 <div
@@ -192,6 +206,7 @@ const Tile = (props: Props) => {
                   />
                 </div>
               </div>
+
               <Show
                 when={
                   props.isLoading &&
@@ -203,6 +218,16 @@ const Tile = (props: Props) => {
                   <h3 class="m-0 text-center">
                     {Math.round(props.percentage as number)}%
                   </h3>
+                  <For each={props.subTasks}>
+                    {(subTask) => (
+                      <div>
+                        <Trans
+                          key={subTask.name.translation}
+                          options={getTranslationArgs(subTask.name)}
+                        />
+                      </div>
+                    )}
+                  </For>
                 </div>
               </Show>
               <div
