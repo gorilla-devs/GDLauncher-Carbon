@@ -412,7 +412,7 @@ const Tile = (props: Props) => {
               "background-image": `url("${props.img as string}")`,
             }}
             classList={{
-              grayscale: props.isLoading,
+              grayscale: props.isLoading || props.isInQueue,
               "bg-green-600": !props.img,
             }}
           >
