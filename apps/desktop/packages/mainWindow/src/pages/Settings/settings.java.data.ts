@@ -1,8 +1,9 @@
 import { rspc } from "@/utils/rspcClient";
 
 const SettingsJavaData = () => {
-  let data = rspc.createQuery(() => ["java.getAvailableJavas"]);
-  return { data };
+  let availableJavas = rspc.createQuery(() => ["java.getAvailableJavas"]);
+  let javaProfiles = rspc.createQuery(() => ["java.getJavaProfiles"]);
+  return { availableJavas, javaProfiles };
 };
 
 export default SettingsJavaData;

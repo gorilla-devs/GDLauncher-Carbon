@@ -1,15 +1,22 @@
-import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Button, Input, Slider, Tab, TabList, TabPanel, Tabs } from "@gd/ui";
+import {
+  Button,
+  Input,
+  Slider,
+  Switch,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+} from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 
 const Java = () => {
-  const [defaultJavasIds, setDefaultJavasIds] = createSignal<string[]>([]);
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
-  const javasData = () => routeData?.data;
+  const javasData = () => routeData?.availableJavas;
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
@@ -20,7 +27,7 @@ const Java = () => {
   // });
 
   createEffect(() => {
-    console.log("JAVAS", javas());
+    console.log("JAVAS", javas(), routeData.javaProfiles.data);
   });
 
   return (
@@ -79,6 +86,17 @@ const Java = () => {
           </Button>
         </div>
       </div>
+      <div class="h-full flex justify-between mb-6 mt-10">
+        <h2 class="mt-0 text-sm">
+          <Trans
+            key="java.auto_handle_java"
+            options={{
+              defaultValue: "Auto handle java",
+            }}
+          />
+        </h2>
+        <Switch />
+      </div>
       <div class="flex flex-col">
         <div class="flex justify-between mb-4">
           <h5 class="m-0 flex items-center">
@@ -125,18 +143,18 @@ const Java = () => {
                   key="java.found_java_text"
                   options={{
                     defaultValue:
-                      "We found the following java versions on your pc.",
+                      "We found the following java versions on your pc:",
                   }}
                 />
               </h2>
               <For each={Object.entries(javas())}>
                 {([javaVersion, obj]) => (
-                  <div class="rounded-xl border-1 border-solid border-darkSlate-500 p-4">
+                  <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4">
                     <h3 class="m-0 mb-4">{javaVersion}</h3>
                     <div class="flex flex-col gap-4">
                       <For each={obj}>
                         {(java) => (
-                          <div class="rounded-lg border-1 border-solid border-darkSlate-500 px-4 flex justify-between items-center py-2">
+                          <div class="rounded-lg border-1 border-solid border-darkSlate-600 px-4 flex justify-between items-center py-2 bg-darkSlate-700">
                             <span class="text-sm">{java.path}</span>
                             <span>{java.type}</span>
                           </div>
@@ -149,7 +167,15 @@ const Java = () => {
             </div>
           </TabPanel>
           <TabPanel>
-            <div class="bg-darkSlate-900 h-full p-4"></div>
+            <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4">
+              <For each={routeData.javaProfiles.data}>
+                {(profile) => (
+                  <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4">
+                    <h3 class="m-0">{profile.name}</h3>
+                  </div>
+                )}
+              </For>
+            </div>
           </TabPanel>
         </Tabs>
       </div>
