@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::bail;
 use carbon_net::{Downloadable, Progress};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
@@ -14,7 +15,10 @@ use tokio::{
 
 use crate::{
     db::PrismaClient,
-    domain::java::{JavaArch, JavaOs},
+    domain::{
+        java::{JavaArch, JavaOs},
+        runtime_path::{ManagedJavasPath, TempPath},
+    },
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
 };
 
@@ -25,23 +29,21 @@ pub struct AzulZulu;
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
-    type VersionType = AzulZuluVersion;
-
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
-        version: AzulZuluVersion,
-        tmp_path: PathBuf,
-        base_managed_java_path: PathBuf,
+        version: &ManagedJavaVersion,
+        tmp_path: TempPath,
+        base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
     ) -> anyhow::Result<()> {
         let progress_report = Arc::new(progress_report);
 
-        let download_temp_path = tmp_path.join(&version.name);
-        let download_url = version.download_url;
+        let download_temp_path = tmp_path.to_path().join(&version.name);
+        let download_url = &version.download_url;
 
-        let content_length = reqwest::get(&download_url).await?.content_length();
+        let content_length = reqwest::get(download_url).await?.content_length();
 
         let downloadable = if let Some(content_length) = content_length {
             Downloadable::new(download_url, download_temp_path).with_size(content_length)
@@ -71,19 +73,57 @@ impl Managed for AzulZulu {
         let file_handle = std::fs::File::open(&downloadable.path)?;
         let mut archive = zip::ZipArchive::new(file_handle)?;
 
-        let java_managed_path = base_managed_java_path.join(&version.name);
-
-        tokio::fs::create_dir_all(&java_managed_path).await?;
-
         let progress_report_clone = progress_report.clone();
-        spawn_blocking(move || {
+        let version_name = version.name.clone();
+        let main_binary_path = spawn_blocking(move || {
             let total_archive_files = archive.len() as u64;
+
+            let root_dir = {
+                let root: PathBuf = archive
+                    .by_index(0)?
+                    .enclosed_name()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("Invalid zip. Cannot get enclosed name for item 0 of zip")
+                    })?
+                    .to_owned();
+
+                root.components()
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("No root component"))?
+                    .as_os_str()
+                    .to_owned()
+            };
+
+            let is_single_root_dir = archive.file_names().all(|file_name| {
+                let path = Path::new(file_name);
+                let Some(os_str) = path.components().next() else {
+                    return false;
+                };
+                os_str.as_os_str() == root_dir
+            });
+
+            let java_managed_path = if is_single_root_dir {
+                base_managed_java_path.to_path()
+            } else {
+                let removed_extension = PathBuf::from(version_name).with_extension("");
+                base_managed_java_path.to_path().join(removed_extension)
+            };
+
+            std::fs::create_dir_all(&java_managed_path)?;
+
+            let mut main_binary_path = None;
+
             for i in 0..archive.len() {
                 let mut file = archive.by_index(i)?;
                 let outpath = match file.enclosed_name() {
                     Some(path) => Path::new(&java_managed_path).join(path),
                     None => continue,
                 };
+
+                if (*file.name()).ends_with("bin/java") || (*file.name()).ends_with("bin/java.exe")
+                {
+                    main_binary_path = Some(outpath.clone());
+                }
 
                 if (*file.name()).ends_with('/') {
                     std::fs::create_dir_all(&outpath)?;
@@ -93,6 +133,7 @@ impl Managed for AzulZulu {
                             std::fs::create_dir_all(p)?;
                         }
                     }
+
                     let mut outfile = std::fs::File::create(&outpath)?;
                     std::io::copy(&mut file, &mut outfile)?;
                 }
@@ -110,17 +151,15 @@ impl Managed for AzulZulu {
                 progress_report_clone.send(Step::Extracting(i as u64, total_archive_files))?;
             }
 
-            Ok::<(), anyhow::Error>(())
+            main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))
         })
         .await??;
 
         progress_report.send(Step::Done)?;
 
-        let java_bin_path = PathBuf::new();
-
         let java_component = java_checker
             .get_bin_info(
-                &java_bin_path,
+                &main_binary_path,
                 crate::domain::java::JavaComponentType::Managed,
             )
             .await?;

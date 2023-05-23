@@ -102,15 +102,11 @@ fn read_registry_key(
     additional_keypath: Option<&str>,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-    println!("Trying to analyze main key: {}", key);
     let key_reg = hkcu.open_subkey(key)?;
     let mut results = vec![];
-    println!("Analyzing main key: {}", key);
-
     if let Some(additional_keypath) = additional_keypath {
         let subkeys = key_reg.enum_keys();
         for subkey in subkeys.flatten() {
-            println!("Analyzing subkey: {}", subkey);
             let joined_subkey = format!("{}\\{}\\{}", key, subkey, additional_keypath);
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
             let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);

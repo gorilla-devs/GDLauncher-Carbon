@@ -17,7 +17,7 @@ async fn get_java_component_from_db(
         .exec()
         .await?;
 
-    Ok(if res.is_some() { Some(()) } else { None })
+    Ok(res)
 }
 
 pub async fn add_java_component_to_db(
@@ -29,7 +29,7 @@ pub async fn add_java_component_to_db(
             java_component.path,
             java_component.version.major as i32,
             java_component.version.try_into().unwrap(),
-            java_component._type.into(),
+            java_component._type.to_string(),
             java_component.os.to_string(),
             Into::<&str>::into(java_component.arch).to_string(),
             java_component.vendor,
@@ -75,12 +75,19 @@ where
             .get_bin_info(local_java, JavaComponentType::Local)
             .await;
 
+        let db_entry =
+            get_java_component_from_db(db, local_java.to_string_lossy().to_string()).await?;
+
+        if let Some(db_entry) = &db_entry {
+            if JavaComponentType::from(&*db_entry.r#type) != JavaComponentType::Local {
+                continue;
+            }
+        }
+
         match java_bin_info {
             // If it is valid, check whether it's in the DB
             Ok(java_component) => {
-                let java = get_java_component_from_db(db, java_component.path.clone()).await?;
-
-                match java {
+                match db_entry {
                     // If it is in the db, update it to valid. Also make sure the version is in sync. If Major is not in sync, that is a problem
                     Some(_) => {
                         // TODO
@@ -93,14 +100,13 @@ where
             }
             // If it isn't valid, check whether it's in the DB
             Err(_) => {
-                let java = get_java_component_from_db(db, local_java.display().to_string()).await?;
                 let is_java_used_in_profile = java_profiles.iter().any(|profile| {
                     let Some(ref java_path) = profile.java_path else { return false; };
                     java_path == &local_java.display().to_string()
                 });
 
                 // If it is in the db, update it to invalid
-                if java.is_some() {
+                if db_entry.is_some() {
                     if is_java_used_in_profile && !auto_manage_java {
                         update_java_component_in_db_to_invalid(
                             db,
@@ -108,7 +114,6 @@ where
                         )
                         .await?;
                     } else {
-                        // only remove if it's LOCAL
                         db.java()
                             .delete(crate::db::java::UniqueWhereParam::PathEquals(
                                 local_java.display().to_string(),
@@ -125,7 +130,7 @@ where
     let local_javas_from_db = db
         .java()
         .find_many(vec![crate::db::java::WhereParam::Type(
-            StringFilter::Equals(JavaComponentType::Local.into()),
+            StringFilter::Equals(JavaComponentType::Local.to_string()),
         )])
         .exec()
         .await?;
@@ -147,7 +152,6 @@ where
         if is_used_in_profile && !auto_manage_java {
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
-            // ONLY REMOVE IF IT"S LOCAL
             db.java()
                 .delete(crate::db::java::UniqueWhereParam::PathEquals(
                     local_java_from_db.path,
@@ -167,7 +171,7 @@ where
     let custom_javas = db
         .java()
         .find_many(vec![crate::db::java::WhereParam::Type(
-            StringFilter::Equals(JavaComponentType::Local.into()),
+            StringFilter::Equals(JavaComponentType::Custom.to_string()),
         )])
         .exec()
         .await?;
@@ -182,6 +186,37 @@ where
 
         if java_bin_info.is_err() {
             update_java_component_in_db_to_invalid(db, custom_java.path).await?;
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn scan_and_sync_managed<G>(
+    db: &Arc<PrismaClient>,
+    java_checker: &G,
+) -> anyhow::Result<()>
+where
+    G: JavaChecker,
+{
+    let managed_javas = db
+        .java()
+        .find_many(vec![crate::db::java::WhereParam::Type(
+            StringFilter::Equals(JavaComponentType::Managed.to_string()),
+        )])
+        .exec()
+        .await?;
+
+    for managed_java in managed_javas {
+        let java_bin_info = java_checker
+            .get_bin_info(
+                &PathBuf::from(managed_java.path.clone()),
+                JavaComponentType::Managed,
+            )
+            .await;
+
+        if java_bin_info.is_err() {
+            update_java_component_in_db_to_invalid(db, managed_java.path).await?;
         }
     }
 

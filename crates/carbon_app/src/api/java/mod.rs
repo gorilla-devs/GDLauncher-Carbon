@@ -1,7 +1,7 @@
 use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
 use crate::api::managers::App;
 use crate::api::router::router;
-use crate::domain::java::{JavaComponentType, Vendor};
+use crate::domain::java::{JavaComponentType, JavaVendor};
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -85,21 +85,38 @@ async fn get_managed_versions_by_vendor(
     let managed_java_map_os = app
         .java_manager()
         .managed_service
-        .get_versions_for_vendor(Vendor::from(args))
+        .get_versions_for_vendor(JavaVendor::from(args))
         .await?;
 
     Ok(managed_java_map_os.into())
 }
 
-async fn setup_managed_java(app: App, _args: FEManagedJavaSetupArgs) -> anyhow::Result<()> {
-    todo!()
+async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::Result<()> {
+    app.java_manager()
+        .managed_service
+        .setup_managed(
+            args.os.into(),
+            args.arch.into(),
+            args.vendor.into(),
+            args.id,
+            app.clone(),
+        )
+        .await
 }
 
 async fn get_setup_managed_java_progress(
     app: App,
     _args: (),
 ) -> anyhow::Result<FEManagedJavaSetupProgress> {
-    todo!()
+    let res = app
+        .java_manager()
+        .managed_service
+        .setup_progress
+        .lock()
+        .await
+        .clone();
+
+    Ok(res.into())
 }
 
 #[derive(Type, Serialize)]

@@ -61,17 +61,18 @@ impl From<&str> for JavaComponentType {
         match &*s.to_lowercase() {
             "local" => Self::Local,
             "managed" => Self::Managed,
+            "custom" => Self::Custom,
             _ => unreachable!("Uh oh, this shouldn't happen"),
         }
     }
 }
 
-impl From<JavaComponentType> for String {
-    fn from(t: JavaComponentType) -> Self {
-        match t {
-            JavaComponentType::Local => "local",
-            JavaComponentType::Managed => "managed",
-            JavaComponentType::Custom => "custom",
+impl ToString for JavaComponentType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Local => "local",
+            Self::Managed => "managed",
+            Self::Custom => "custom",
         }
         .to_string()
     }
@@ -82,6 +83,20 @@ pub enum JavaArch {
     X64,
     X86,
     Aarch64,
+}
+
+impl JavaArch {
+    pub fn get_current_arch() -> Self {
+        if cfg!(target_arch = "x86_64") {
+            Self::X64
+        } else if cfg!(target_arch = "x86") {
+            Self::X86
+        } else if cfg!(target_arch = "aarch64") {
+            Self::Aarch64
+        } else {
+            unreachable!("Unsupported architecture")
+        }
+    }
 }
 
 impl<'a> From<JavaArch> for &'a str {
@@ -114,6 +129,17 @@ pub enum JavaOs {
     MacOs,
 }
 
+impl JavaOs {
+    pub fn get_current_os() -> Self {
+        match std::env::consts::OS {
+            "windows" => Self::Windows,
+            "linux" => Self::Linux,
+            "macos" => Self::MacOs,
+            _ => panic!("Unknown OS"),
+        }
+    }
+}
+
 impl TryFrom<String> for JavaOs {
     type Error = anyhow::Error;
 
@@ -139,11 +165,11 @@ impl ToString for JavaOs {
 }
 
 #[derive(Debug, EnumIter)]
-pub enum Vendor {
+pub enum JavaVendor {
     Azul,
 }
 
-impl Vendor {
+impl JavaVendor {
     pub fn from_java_dot_vendor(vendor: &str) -> Option<Self> {
         match vendor {
             "Azul Systems, Inc." => Some(Self::Azul),

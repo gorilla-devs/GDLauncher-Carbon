@@ -185,7 +185,6 @@ impl<T> Deref for ManagerRef<'_, T> {
         self.manager
     }
 }
-
 pub struct AppRef(pub Weak<AppInner>);
 
 impl AppRef {

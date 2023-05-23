@@ -233,7 +233,7 @@ pub async fn generate_startup_command(
                     let Some(native_name) = library
                         .natives
                         .as_ref()
-                        .map(|natives| natives.get(&get_current_os())).flatten() else {
+                        .and_then(|natives| natives.get(&get_current_os())) else {
                             return None;
                         };
 
