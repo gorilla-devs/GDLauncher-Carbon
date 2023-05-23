@@ -1,9 +1,13 @@
 import { Trans } from "@gd/i18n";
 import { ModalProps } from "@/managers/ModalsManager";
 import ModalLayout from "@/managers/ModalsManager/ModalLayout";
-import { Button, Input } from "@gd/ui";
+import { Button, Dropdown, Input } from "@gd/ui";
+import { rspc } from "@/utils/rspcClient";
+import { Show } from "solid-js";
 
 const AddJava = (props: ModalProps) => {
+  let javaVendors = rspc.createQuery(() => ["java.getManagedVendors"]);
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="flex items-center h-full flex-col justify-center">
@@ -29,11 +33,20 @@ const AddJava = (props: ModalProps) => {
                   }}
                 />
               </h5>
-              <Input value={"adoptOpenJDK"} />
+              <Show when={!javaVendors.isLoading}>
+                <Dropdown
+                  options={
+                    javaVendors?.data?.map((vendors) => ({
+                      key: vendors as string,
+                      label: vendors as string,
+                    })) || []
+                  }
+                />
+              </Show>
             </div>
           </div>
           <div class="flex w-full justify-end">
-            <Button rounded={false} loading={true} percentage={0}>
+            <Button rounded={false}>
               <Trans
                 key="java.install"
                 options={{

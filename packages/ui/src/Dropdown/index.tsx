@@ -8,7 +8,7 @@ export type Option = {
 
 export type Props = {
   options: Option[];
-  value: string;
+  value?: string;
   error?: boolean;
   disabled?: boolean;
   rounded?: boolean;
@@ -63,6 +63,10 @@ const Dropdown = (props: Props) => {
   return (
     <div
       class={`inline-block relative ${props.containerClass || ""}`}
+      classList={{
+        "border-1 border-solid border-darkSlate-600 rounded-lg":
+          !props.btnDropdown,
+      }}
       id={props.id}
     >
       <Show when={!props.rounded && props.label}>
