@@ -96,6 +96,11 @@ pub async fn download_file(
 
     let mut response = client.get(&downloadable_file.url).send().await?;
 
+    // Ensure the parent directory exists
+    if let Some(parent) = downloadable_file.path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)

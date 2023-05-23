@@ -85,6 +85,20 @@ pub enum JavaArch {
     Aarch64,
 }
 
+impl JavaArch {
+    pub fn get_current_arch() -> Self {
+        if cfg!(target_arch = "x86_64") {
+            Self::X64
+        } else if cfg!(target_arch = "x86") {
+            Self::X86
+        } else if cfg!(target_arch = "aarch64") {
+            Self::Aarch64
+        } else {
+            unreachable!("Unsupported architecture")
+        }
+    }
+}
+
 impl<'a> From<JavaArch> for &'a str {
     fn from(arch: JavaArch) -> Self {
         match arch {
@@ -113,6 +127,17 @@ pub enum JavaOs {
     Windows,
     Linux,
     MacOs,
+}
+
+impl JavaOs {
+    pub fn get_current_os() -> Self {
+        match std::env::consts::OS {
+            "windows" => Self::Windows,
+            "linux" => Self::Linux,
+            "macos" => Self::MacOs,
+            _ => panic!("Unknown OS"),
+        }
+    }
 }
 
 impl TryFrom<String> for JavaOs {

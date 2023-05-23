@@ -90,6 +90,7 @@ pub trait Managed {
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap>;
 }
 
+#[derive(Debug, Default)]
 pub struct ManagedService {
     azul_zulu: AzulZulu,
     pub setup_progress: Arc<Mutex<Step>>,
@@ -97,10 +98,7 @@ pub struct ManagedService {
 
 impl ManagedService {
     pub fn new() -> Self {
-        Self {
-            azul_zulu: AzulZulu::default(),
-            setup_progress: Arc::new(Mutex::new(Step::Idle)),
-        }
+        Self::default()
     }
 
     pub fn get_all_os(&self) -> Vec<JavaOs> {
@@ -127,7 +125,7 @@ impl ManagedService {
     }
 
     pub async fn setup_managed(
-        &mut self,
+        &self,
         os: JavaOs,
         arch: JavaArch,
         vendor: JavaVendor,
@@ -156,12 +154,15 @@ impl ManagedService {
                 let progress_ref = Arc::clone(&self.setup_progress);
 
                 tokio::spawn(async move {
-                    let mut progress_ref = progress_ref.lock().await;
+                    let app = app.clone();
 
                     while recv.changed().await.is_ok() {
+                        let mut progress_ref = progress_ref.lock().await;
                         let borrowed_progress = recv.borrow().clone();
                         *progress_ref = borrowed_progress;
                         app.invalidate(GET_SETUP_MANAGED_JAVA_PROGRESS, None);
+                        drop(progress_ref);
+                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     }
                 });
 
@@ -179,5 +180,49 @@ impl ManagedService {
         };
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::setup_managers_for_test;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_managed_service() {
+        let app = setup_managers_for_test().await;
+
+        let versions = app
+            .java_manager()
+            .managed_service
+            .get_versions_for_vendor(JavaVendor::Azul)
+            .await
+            .unwrap();
+
+        assert!(versions.contains_key(&JavaOs::Linux));
+        assert!(versions.contains_key(&JavaOs::Windows));
+        assert!(versions.contains_key(&JavaOs::MacOs));
+
+        app.java_manager()
+            .managed_service
+            .setup_managed(
+                JavaOs::get_current_os(),
+                JavaArch::get_current_arch(),
+                JavaVendor::Azul,
+                versions
+                    .get(&JavaOs::get_current_os())
+                    .unwrap()
+                    .get(&JavaArch::get_current_arch())
+                    .unwrap()[0]
+                    .id
+                    .clone(),
+                app.app.clone(),
+            )
+            .await
+            .unwrap();
+
+        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        assert_eq!(count, 1);
     }
 }
