@@ -13,5 +13,9 @@ pub enum DownloadError {
     #[error("Join error {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Send error {0}")]
-    SendError2(#[from] tokio::sync::watch::error::SendError<crate::Progress>),
+    SendError(#[from] tokio::sync::watch::error::SendError<crate::Progress>),
+    #[error("Size mismatch")]
+    SizeMismatch { expected: u64, actual: u64 },
+    #[error("Checksum mismatch")]
+    ChecksumMismatch { expected: String, actual: String },
 }

@@ -27,24 +27,23 @@ model AppConfiguration {
 }
 
 model Java {
-  path        String              @id @unique
+  id          String              @id @unique @default(uuid())
+  path        String              @unique
   major       Int
   fullVersion String
   type        String
   os          String
   arch        String
   vendor      String
-  isValid     Boolean             @default(false)
+  isValid     Boolean             @default(true)
   JavaProfile JavaSystemProfile[]
 }
 
 model JavaSystemProfile {
-  name                      String  @unique
-  supportedJavaVersionRegex String?
-  autodetect                Boolean @default(true)
-  useManagedAsFallback      Boolean @default(true)
-  java                      Java?   @relation(fields: [javaPath], references: [path])
-  javaPath                  String?
+  id     String  @id @unique @default(uuid())
+  name   String  @unique
+  java   Java?   @relation(fields: [javaId], references: [id])
+  javaId String?
 }
 
 model Account {

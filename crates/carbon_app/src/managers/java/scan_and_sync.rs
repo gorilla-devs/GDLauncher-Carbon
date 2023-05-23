@@ -28,7 +28,7 @@ pub async fn add_java_component_to_db(
         .create(
             java_component.path,
             java_component.version.major as i32,
-            java_component.version.try_into().unwrap(),
+            java_component.version.try_into()?,
             java_component._type.to_string(),
             java_component.os.to_string(),
             Into::<&str>::into(java_component.arch).to_string(),
@@ -79,7 +79,7 @@ where
             get_java_component_from_db(db, local_java.to_string_lossy().to_string()).await?;
 
         if let Some(db_entry) = &db_entry {
-            if JavaComponentType::from(&*db_entry.r#type) != JavaComponentType::Local {
+            if JavaComponentType::try_from(&*db_entry.r#type)? != JavaComponentType::Local {
                 continue;
             }
         }
@@ -101,8 +101,10 @@ where
             // If it isn't valid, check whether it's in the DB
             Err(_) => {
                 let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-                    let Some(ref java_path) = profile.java_path else { return false; };
-                    java_path == &local_java.display().to_string()
+                    let Some(java) = profile.java.as_ref() else { return false; };
+                    let Some(java) = java.as_ref() else { return false; };
+                    let java_path = java.path.clone();
+                    java_path == local_java.display().to_string()
                 });
 
                 // If it is in the db, update it to invalid
@@ -146,7 +148,11 @@ where
 
         let is_used_in_profile = java_profiles
             .iter()
-            .filter_map(|profile| profile.java_path.clone())
+            .filter_map(|profile| {
+                let Some(java) = profile.java.as_ref() else { return None; };
+                let Some(java) = java else { return None; };
+                return Some(java.path.clone());
+            })
             .any(|java_profile_path| local_java_from_db.path == java_profile_path);
 
         if is_used_in_profile && !auto_manage_java {

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use anyhow::bail;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -5,17 +7,21 @@ use strum_macros::EnumIter;
 
 // TODO: This does not handle the case where the same path still exists between executions but changes the version
 pub struct Java {
+    pub id: String,
     pub component: JavaComponent,
     pub is_valid: bool,
 }
 
-impl From<crate::db::java::Data> for Java {
-    fn from(value: crate::db::java::Data) -> Self {
+impl TryFrom<crate::db::java::Data> for Java {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
         let is_valid = value.is_valid;
-        Self {
-            component: JavaComponent::from(value),
+        Ok(Self {
+            id: value.id.clone(),
+            component: JavaComponent::try_from(value)?,
             is_valid,
-        }
+        })
     }
 }
 
@@ -36,16 +42,18 @@ pub struct JavaComponent {
     pub vendor: String,
 }
 
-impl From<crate::db::java::Data> for JavaComponent {
-    fn from(value: crate::db::java::Data) -> Self {
-        Self {
+impl TryFrom<crate::db::java::Data> for JavaComponent {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
             path: value.path,
-            arch: JavaArch::from(&*value.arch),
-            _type: JavaComponentType::from(&*value.r#type),
-            version: JavaVersion::try_from(&*value.full_version).unwrap(),
-            os: JavaOs::try_from(value.os).unwrap(),
+            arch: JavaArch::try_from(&*value.arch)?,
+            _type: JavaComponentType::try_from(&*value.r#type)?,
+            version: JavaVersion::try_from(&*value.full_version)?,
+            os: JavaOs::try_from(value.os)?,
             vendor: value.vendor,
-        }
+        })
     }
 }
 
@@ -56,13 +64,15 @@ pub enum JavaComponentType {
     Custom,
 }
 
-impl From<&str> for JavaComponentType {
-    fn from(s: &str) -> Self {
+impl TryFrom<&str> for JavaComponentType {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match &*s.to_lowercase() {
-            "local" => Self::Local,
-            "managed" => Self::Managed,
-            "custom" => Self::Custom,
-            _ => unreachable!("Uh oh, this shouldn't happen"),
+            "local" => Ok(Self::Local),
+            "managed" => Ok(Self::Managed),
+            "custom" => Ok(Self::Custom),
+            _ => bail!("Uh oh, this shouldn't happen"),
         }
     }
 }
@@ -86,16 +96,8 @@ pub enum JavaArch {
 }
 
 impl JavaArch {
-    pub fn get_current_arch() -> Self {
-        if cfg!(target_arch = "x86_64") {
-            Self::X64
-        } else if cfg!(target_arch = "x86") {
-            Self::X86
-        } else if cfg!(target_arch = "aarch64") {
-            Self::Aarch64
-        } else {
-            unreachable!("Unsupported architecture")
-        }
+    pub fn get_current_arch() -> anyhow::Result<Self> {
+        Self::try_from(std::env::consts::ARCH)
     }
 }
 
@@ -109,15 +111,17 @@ impl<'a> From<JavaArch> for &'a str {
     }
 }
 
-impl<'a> From<&'a str> for JavaArch {
-    fn from(s: &'a str) -> Self {
+impl<'a> TryFrom<&'a str> for JavaArch {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
-            "amd64" => JavaArch::X64,
-            "x64" => JavaArch::X64,
-            "x86_64" => JavaArch::X64,
-            "x86" => JavaArch::X86,
-            "aarch64" => JavaArch::Aarch64,
-            _ => panic!("Unknown JavaArch: {s}"),
+            "amd64" => Ok(JavaArch::X64),
+            "x64" => Ok(JavaArch::X64),
+            "x86_64" => Ok(JavaArch::X64),
+            "x86" => Ok(JavaArch::X86),
+            "aarch64" => Ok(JavaArch::Aarch64),
+            _ => bail!("Unknown JavaArch: {s}"),
         }
     }
 }
@@ -129,14 +133,22 @@ pub enum JavaOs {
     MacOs,
 }
 
-impl JavaOs {
-    pub fn get_current_os() -> Self {
-        match std::env::consts::OS {
-            "windows" => Self::Windows,
-            "linux" => Self::Linux,
-            "macos" => Self::MacOs,
-            _ => panic!("Unknown OS"),
+impl TryFrom<&str> for JavaOs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "windows" => Ok(Self::Windows),
+            "linux" => Ok(Self::Linux),
+            "macos" => Ok(Self::MacOs),
+            _ => bail!("Unknown JavaOs: {}", value),
         }
+    }
+}
+
+impl JavaOs {
+    pub fn get_current_os() -> anyhow::Result<Self> {
+        JavaOs::try_from(std::env::consts::OS)
     }
 }
 
@@ -290,45 +302,52 @@ impl JavaVersion {
     }
 }
 
-pub enum SystemProfile {
+#[derive(Serialize, Deserialize, Debug, Clone, EnumIter)]
+pub enum SystemJavaProfileName {
     Legacy,
     Alpha,
     Beta,
     Gamma,
 }
 
-impl SystemProfile {
-    pub fn get_system_profiles() -> Vec<Self> {
-        vec![
-            SystemProfile::Legacy,
-            SystemProfile::Alpha,
-            SystemProfile::Beta,
-            SystemProfile::Gamma,
-        ]
-    }
-}
-
-impl std::str::FromStr for SystemProfile {
+impl std::str::FromStr for SystemJavaProfileName {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "legacy" => Ok(SystemProfile::Legacy),
-            "alpha" => Ok(SystemProfile::Alpha),
-            "beta" => Ok(SystemProfile::Beta),
-            "gamma" => Ok(SystemProfile::Gamma),
+            "legacy" => Ok(SystemJavaProfileName::Legacy),
+            "alpha" => Ok(SystemJavaProfileName::Alpha),
+            "beta" => Ok(SystemJavaProfileName::Beta),
+            "gamma" => Ok(SystemJavaProfileName::Gamma),
             _ => bail!("Unknown system profile: {}", s),
         }
     }
 }
 
-impl From<SystemProfile> for String {
-    fn from(profile: SystemProfile) -> Self {
+impl From<SystemJavaProfileName> for String {
+    fn from(profile: SystemJavaProfileName) -> Self {
         match profile {
-            SystemProfile::Legacy => "legacy".to_string(),
-            SystemProfile::Alpha => "alpha".to_string(),
-            SystemProfile::Beta => "beta".to_string(),
-            SystemProfile::Gamma => "gamma".to_string(),
+            SystemJavaProfileName::Legacy => "legacy".to_string(),
+            SystemJavaProfileName::Alpha => "alpha".to_string(),
+            SystemJavaProfileName::Beta => "beta".to_string(),
+            SystemJavaProfileName::Gamma => "gamma".to_string(),
         }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SystemJavaProfile {
+    pub name: SystemJavaProfileName,
+    pub java: Option<crate::db::java::Data>,
+}
+
+impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
+    type Error = anyhow::Error;
+
+    fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: data.name.parse()?,
+            java: data.java.flatten().map(|j| *j),
+        })
     }
 }
 
