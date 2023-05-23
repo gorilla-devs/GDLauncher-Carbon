@@ -4,6 +4,7 @@ import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
+import { useTransContext } from "@gd/i18n";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -15,6 +16,8 @@ export default function Login() {
   const [step, setStep] = createSignal<number>(0);
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
+
+  const [, { changeLanguage }] = useTransContext();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
@@ -40,11 +43,8 @@ export default function Login() {
                 { label: "italian", key: "it" },
               ]}
               value={"asc"}
-              onChange={() => {
-                // getTranslationByLanguage(lang.key).then((translations) => {
-                //   add(lang.key, translations);
-                //   locale(lang.key);
-                // });
+              onChange={(lang) => {
+                changeLanguage(lang.key as string);
               }}
               rounded
             />
