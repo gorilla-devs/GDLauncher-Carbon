@@ -39,6 +39,8 @@ const Modpack = () => {
   // let innerContainerRef: HTMLDivElement;
   // let refStickyContainer: HTMLDivElement;
 
+  const isFetching = () => routeData.modpackDetails?.isFetching;
+
   return (
     <ContentWrapper>
       <div
@@ -101,16 +103,18 @@ const Modpack = () => {
                 <div class="flex flex-1 flex-col max-w-185">
                   <div class="flex gap-4 items-center cursor-pointer">
                     <Switch>
-                      <Match when={!routeData.modpackDetails.isFetching}>
-                        <h1 class="m-0">
+                      <Match when={!isFetching()}>
+                        <h1 class="m-0 h-9">
                           {
                             (routeData.modpackDetails?.data as FEModResponse)
                               ?.data.name
                           }
                         </h1>
                       </Match>
-                      <Match when={routeData.modpackDetails.isFetching}>
-                        <Skeleton />
+                      <Match when={isFetching()}>
+                        <div class="w-full h-9">
+                          <Skeleton />
+                        </div>
                       </Match>
                     </Switch>
                   </div>
@@ -118,13 +122,13 @@ const Modpack = () => {
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                         <Switch>
-                          <Match when={!routeData.modpackDetails.isFetching}>
+                          <Match when={!isFetching()}>
                             {
                               routeData.modpackDetails.data?.data
                                 .latestFilesIndexes[0].gameVersion
                             }
                           </Match>
-                          <Match when={routeData.modpackDetails.isFetching}>
+                          <Match when={isFetching()}>
                             <Skeleton />
                           </Match>
                         </Switch>
@@ -133,7 +137,7 @@ const Modpack = () => {
                         <div class="i-ri:time-fill" />
 
                         <Switch>
-                          <Match when={!routeData.modpackDetails.isFetching}>
+                          <Match when={!isFetching()}>
                             <Show
                               when={
                                 routeData.modpackDetails.data?.data.dateCreated
@@ -150,7 +154,7 @@ const Modpack = () => {
                               )}
                             </Show>
                           </Match>
-                          <Match when={routeData.modpackDetails.isFetching}>
+                          <Match when={isFetching()}>
                             <Skeleton />
                           </Match>
                         </Switch>
@@ -159,7 +163,7 @@ const Modpack = () => {
                         <div class="i-ri:user-fill" />
                         <div class="text-sm flex gap-2 overflow-x-auto whitespace-nowrap max-w-52">
                           <Switch>
-                            <Match when={!routeData.modpackDetails.isFetching}>
+                            <Match when={!isFetching()}>
                               <For
                                 each={
                                   routeData.modpackDetails.data?.data.authors
@@ -168,7 +172,7 @@ const Modpack = () => {
                                 {(author) => <p class="m-0">{author.name}</p>}
                               </For>
                             </Match>
-                            <Match when={routeData.modpackDetails.isFetching}>
+                            <Match when={isFetching()}>
                               <Skeleton />
                             </Match>
                           </Switch>
