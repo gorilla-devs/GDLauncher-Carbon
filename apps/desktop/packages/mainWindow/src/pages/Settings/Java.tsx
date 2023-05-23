@@ -1,6 +1,6 @@
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Button, Input, Slider } from "@gd/ui";
+import { Button, Input, Slider, Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
@@ -13,18 +13,14 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
-  let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
-    onMutate: (newTheme) => {
-      queryClient.setQueryData(["java.setDefault", null], newTheme);
-    },
-  });
+  // let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
+  //   onMutate: (newTheme) => {
+  //     queryClient.setQueryData(["java.setDefault", null], newTheme);
+  //   },
+  // });
 
   createEffect(() => {
-    Object.entries(javas()).forEach((java) => {
-      const javaObj = java[1];
-      const defaultId = javaObj.defaultId;
-      setDefaultJavasIds((prev) => [...prev, defaultId]);
-    });
+    console.log("JAVAS", javas());
   });
 
   return (
@@ -103,55 +99,59 @@ const Java = () => {
             <div class="text-darkSlate-500 text-xl i-ri:add-fill" />
           </Button>
         </div>
-        <div class="flex flex-col gap-4 border-2 border-solid border-darkSlate-700 p-4">
-          <For each={Object.entries(javas())}>
-            {(javas) => (
-              <div class="flex flex-col justify-start">
-                <h5 class="mt-0 mb-4 text-darkSlate-500">{javas[0]}</h5>
-                <div class="flex flex-col gap-4">
-                  <For each={javas[1].javas}>
-                    {(j) => (
-                      <div class="flex justify-between py-5 px-6 bg-darkSlate-900 rounded-md">
-                        <p class="m-0">
-                          <Trans
-                            key="java.java"
-                            options={{
-                              defaultValue: "Java",
-                            }}
-                          />
-                          {j?.version}
-                        </p>
-                        <p class="m-0 overflow-hidden text-ellipsis max-w-[245px]">
-                          {j?.path}
-                        </p>
-                        <p class="m-0">{j?.type}</p>
-                        {/* TODO fix id logic */}
-                        <div
-                          class="cursor-pointer"
-                          onChange={() => {
-                            setDefaultJavaMutation.mutate({
-                              majorVersion: parseInt(javas[0], 10),
-                              id: j?.path,
-                            });
-                          }}
-                        >
-                          <Show
-                            when={defaultJavasIds().includes(j?.path)}
-                            fallback={
-                              <div class="text-darkSlate-500 text-xl i-ri:star-line" />
-                            }
-                          >
-                            <div class="text-xl i-ri:star-fill text-yellow-500" />
-                          </Show>
-                        </div>
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
+        <Tabs variant="block">
+          <TabList>
+            <Tab>
+              <Trans
+                key="java.manage"
+                options={{
+                  defaultValue: "Manage",
+                }}
+              />
+            </Tab>
+            <Tab>
+              <Trans
+                key="java.profiles"
+                options={{
+                  defaultValue: "Profiles",
+                }}
+              />
+            </Tab>
+          </TabList>
+          <TabPanel>
+            <div class="bg-darkSlate-900 h-full p-4">
+              <h2 class="mt-0 mb-6 text-sm">
+                <Trans
+                  key="java.found_java_text"
+                  options={{
+                    defaultValue:
+                      "We found the following java versions on your pc.",
+                  }}
+                />
+              </h2>
+              <For each={Object.entries(javas())}>
+                {([javaVersion, obj]) => (
+                  <div class="rounded-xl border-1 border-solid border-darkSlate-500 p-4">
+                    <h3 class="m-0 mb-4">{javaVersion}</h3>
+                    <div class="flex flex-col gap-4">
+                      <For each={obj}>
+                        {(java) => (
+                          <div class="rounded-lg border-1 border-solid border-darkSlate-500 px-4 flex justify-between items-center py-2">
+                            <span class="text-sm">{java.path}</span>
+                            <span>{java.type}</span>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+          </TabPanel>
+          <TabPanel>
+            <div class="bg-darkSlate-900 h-full p-4"></div>
+          </TabPanel>
+        </Tabs>
       </div>
     </div>
   );
