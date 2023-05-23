@@ -131,6 +131,47 @@ pub async fn download_file(
         }
     }
 
+    // Check size and checksum when provided
+    if let Some(size) = downloadable_file.size {
+        if size != buf.len() as u64 {
+            return Err(DownloadError::SizeMismatch {
+                expected: size,
+                actual: buf.len() as u64,
+            });
+        }
+    }
+
+    if let Some(checksum) = &downloadable_file.checksum {
+        match checksum {
+            Checksum::Sha1(expected) => {
+                let mut hasher = Sha1::new();
+                hasher.update(&buf);
+                let actual = hasher.finalize();
+                let actual = hex::encode(actual);
+
+                if expected != &actual {
+                    return Err(DownloadError::ChecksumMismatch {
+                        expected: expected.clone(),
+                        actual,
+                    });
+                }
+            }
+            Checksum::Sha256(expected) => {
+                let mut hasher = Sha256::new();
+                hasher.update(&buf);
+                let actual = hasher.finalize();
+                let actual = hex::encode(actual);
+
+                if expected != &actual {
+                    return Err(DownloadError::ChecksumMismatch {
+                        expected: expected.clone(),
+                        actual,
+                    });
+                }
+            }
+        }
+    }
+
     if let Some(progress) = &progress {
         progress.send(Progress {
             total_count: 1,
