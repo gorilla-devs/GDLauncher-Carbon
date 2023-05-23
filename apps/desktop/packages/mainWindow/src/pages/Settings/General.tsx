@@ -12,7 +12,7 @@ import { FESettings } from "@gd/core_module/bindings";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
-  const [t] = useTransContext();
+  const [t, { changeLanguage }] = useTransContext();
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -21,6 +21,7 @@ const General = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
+      if (newSettings.language) changeLanguage(newSettings.language as string);
       queryClient.setQueryData(["settings.getSettings"], newSettings);
     },
   });

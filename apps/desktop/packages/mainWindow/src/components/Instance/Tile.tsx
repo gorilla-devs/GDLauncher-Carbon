@@ -24,7 +24,7 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="flex justify-center cursor-pointer flex-col items-start snap-start"
+          class="flex cursor-pointer flex-col justify-center items-start snap-start"
           onClick={(e) => props?.onClick?.(e)}
           classList={{
             grayscale: props.isLoading,
@@ -90,7 +90,7 @@ const Tile = (props: Props) => {
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="absolute right-0 ease-in-out transition duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500" />
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500 right-0 transition" />
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
 
@@ -123,7 +123,7 @@ const Tile = (props: Props) => {
             />
           </Show>
           <div
-            class="h-10 bg-green-600 rounded-lg w-10"
+            class="bg-green-600 h-10 rounded-lg w-10"
             classList={{
               grayscale: props.isLoading,
             }}

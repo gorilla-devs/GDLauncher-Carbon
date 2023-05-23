@@ -11,10 +11,15 @@ import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
+import { DEFAULT_LANG, LANGUAGES } from "./constants";
 
 queueMicrotask(() => {
   initAnalytics();
 });
+
+interface Translations {
+  [translationKey: string]: string;
+}
 
 render(() => {
   const [coreModuleLoaded] = createResource(async () => {
@@ -29,17 +34,28 @@ render(() => {
   });
 
   const [i18nInstance] = createResource(async () => {
-    const DEFAULT_LANG = "en";
-    const langFile = await loadLanguageFile(DEFAULT_LANG);
+    const buildResources = async (langs: string[]) => {
+      const langFilesPromises = langs.map(loadLanguageFile);
+      const langFiles: Translations = (await Promise.all(
+        langFilesPromises
+      )) as any;
+
+      const resources: { [translationKey: string]: Translations } = {};
+      for (let i = 0; i < langs.length; i++) {
+        resources[langs[i]] = {
+          common: langFiles[i],
+        };
+      }
+
+      return resources;
+    };
+
+    const resources = await buildResources(LANGUAGES);
 
     const instance = await i18n.use(icu).createInstance({
       defaultNS: "common",
       fallbackLng: DEFAULT_LANG,
-      resources: {
-        [DEFAULT_LANG]: {
-          common: langFile,
-        },
-      },
+      resources: resources,
     });
 
     return instance;
@@ -72,7 +88,7 @@ const InnerApp = (props: InnerAppProps) => {
     <rspc.Provider client={client as any} queryClient={queryClient}>
       <Router source={hashIntegration()}>
         <NavigationManager>
-          <TransProvider instance={props.i18nInstance}>
+          <TransProvider instance={props.i18nInstance} options={{ lng: "en" }}>
             <NotificationsProvider>
               <ModalProvider>
                 <App createInvalidateQuery={createInvalidateQuery} />
