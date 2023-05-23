@@ -17,6 +17,7 @@ declare global {
     getCoreModulePort: () => Promise<number>;
   }
 }
+
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
@@ -24,4 +25,5 @@ declare module "solid-js" {
     }
   }
 }
+
 export {};

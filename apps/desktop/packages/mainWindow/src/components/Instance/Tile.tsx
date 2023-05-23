@@ -24,7 +24,7 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <div
-          class="flex justify-center cursor-pointer flex-col items-start snap-start"
+          class="flex cursor-pointer flex-col justify-center items-start snap-start"
           onClick={(e) => props?.onClick?.(e)}
           classList={{
             grayscale: props.isLoading,

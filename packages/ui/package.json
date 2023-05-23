@@ -18,6 +18,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.12",
+    "@floating-ui/dom": "^1.2.8",
     "@gd/config": "workspace:*",
     "@storybook/addon-essentials": "^7.0.12",
     "@storybook/addon-interactions": "^7.0.12",
@@ -37,6 +38,7 @@
     "eslint-plugin-storybook": "^0.6.12",
     "jsdom": "^20.0.3",
     "prettier": "^2.8.1",
+    "solid-floating-ui": "^0.2.1",
     "solid-js": "1.7.3",
     "solid-testing-library": "^0.5.0",
     "storybook": "^7.0.12",

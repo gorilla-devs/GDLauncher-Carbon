@@ -193,6 +193,9 @@ importers:
       '@babel/core':
         specifier: ^7.20.12
         version: 7.20.12
+      '@floating-ui/dom':
+        specifier: ^1.2.8
+        version: 1.2.8
       '@gd/config':
         specifier: workspace:*
         version: link:../config
@@ -250,6 +253,9 @@ importers:
       prettier:
         specifier: ^2.8.1
         version: 2.8.1
+      solid-floating-ui:
+        specifier: ^0.2.1
+        version: 0.2.1(@floating-ui/dom@1.2.8)(solid-js@1.7.3)
       solid-js:
         specifier: 1.7.3
         version: 1.7.3
@@ -12965,6 +12971,10 @@ packages:
   /uuid@9.0.0:
     resolution: {integrity: sha512-MXcSTerfPa4uqyzStbRoTgt5XIe3x5+42+q1sDuy3R5MDk66URdLMOZe5aPX/SQd+kuYAh0FdP/pO28IkQyTeg==}
     hasBin: true
+    dev: true
+
+  /validate-html-nesting@1.2.2:
+    resolution: {integrity: sha512-hGdgQozCsQJMyfK5urgFcWEqsSSrK63Awe0t/IMR0bZ0QMtnuaiHzThW81guu3qx9abLi99NEuiaN6P9gVYsNg==}
     dev: true
 
   /validate-html-nesting@1.2.2:
