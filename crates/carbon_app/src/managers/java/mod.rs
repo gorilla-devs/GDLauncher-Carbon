@@ -1,9 +1,11 @@
+use strum::IntoEnumIterator;
+
 use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
 
 use super::ManagerRef;
 use crate::{
     db::PrismaClient,
-    domain::java::{Java, SystemProfile},
+    domain::java::{Java, SystemJavaProfile, SystemJavaProfileName},
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -28,7 +30,7 @@ impl JavaManager {
 
     pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
         if db_client.java_system_profile().count(vec![]).exec().await? == 0 {
-            for profile in SystemProfile::get_system_profiles() {
+            for profile in SystemJavaProfileName::iter() {
                 db_client
                     .java_system_profile()
                     .create(String::from(profile), vec![])
@@ -67,15 +69,13 @@ impl ManagerRef<'_, JavaManager> {
         for java in all_javas {
             let major_version = java.major as u8;
             let javas = result.entry(major_version).or_insert_with(Vec::new);
-            javas.push(Java::from(java));
+            javas.push(Java::try_from(java)?);
         }
 
         Ok(result)
     }
 
-    pub async fn get_java_profiles(
-        &self,
-    ) -> anyhow::Result<Vec<crate::db::java_system_profile::Data>> {
+    pub async fn get_system_java_profiles(&self) -> anyhow::Result<Vec<SystemJavaProfile>> {
         let db = &self.app.prisma_client;
         let all_profiles = db
             .java_system_profile()
@@ -83,7 +83,8 @@ impl ManagerRef<'_, JavaManager> {
             .exec()
             .await?
             .into_iter()
-            .collect();
+            .map(|profile| SystemJavaProfile::try_from(profile))
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(all_profiles)
     }

@@ -75,7 +75,7 @@ impl DerefMut for ManagedJavaOsMap {
 
 #[async_trait::async_trait]
 pub trait Managed {
-    async fn setup<G>(
+    async fn setup<G: JavaChecker + Send + Sync>(
         &self,
         version: &ManagedJavaVersion,
         tmp_path: TempPath,
@@ -83,9 +83,7 @@ pub trait Managed {
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
-    ) -> anyhow::Result<()>
-    where
-        G: JavaChecker + Send + Sync;
+    ) -> anyhow::Result<()>;
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap>;
 }
@@ -207,13 +205,13 @@ mod test {
         app.java_manager()
             .managed_service
             .setup_managed(
-                JavaOs::get_current_os(),
-                JavaArch::get_current_arch(),
+                JavaOs::get_current_os().unwrap(),
+                JavaArch::get_current_arch().unwrap(),
                 JavaVendor::Azul,
                 versions
-                    .get(&JavaOs::get_current_os())
+                    .get(&JavaOs::get_current_os().unwrap())
                     .unwrap()
-                    .get(&JavaArch::get_current_arch())
+                    .get(&JavaArch::get_current_arch().unwrap())
                     .unwrap()[0]
                     .id
                     .clone(),

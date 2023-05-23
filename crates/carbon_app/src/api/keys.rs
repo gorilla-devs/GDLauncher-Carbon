@@ -45,6 +45,7 @@ keys! {
         GET_MANAGED_VERSIONS_BY_VENDOR          = "getManagedVersionsByVendor";
         SETUP_MANAGED_JAVA                      = "setupManagedJava";
         GET_SETUP_MANAGED_JAVA_PROGRESS         = "getSetupManagedJavaProgress";
+        GET_SYSTEM_JAVA_PROFILES                       = "getJavaProfiles";
     }
 
     mc {

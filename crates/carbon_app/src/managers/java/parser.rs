@@ -20,28 +20,28 @@ pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOu
                 line.replace("java.version=", "").trim(),
             )?);
         } else if line.trim().starts_with("os.arch=") {
-            arch = Some(JavaArch::from(line.replace("os.arch=", "").trim()));
+            arch = Some(JavaArch::try_from(line.replace("os.arch=", "").trim())?);
         } else if line.trim().starts_with("java.vendor=") {
             vendor = Some(line.replace("java.vendor=", "").trim().to_string());
         }
     }
 
-    if version.is_none() {
+    let Some(version) = version else {
         bail!("Could not parse java version from output");
-    }
+    };
 
-    if arch.is_none() {
+    let Some(arch) = arch else {
         bail!("Could not parse java arch from output");
-    }
+    };
 
-    if vendor.is_none() {
+    let Some(vendor) = vendor else {
         bail!("Could not parse java vendor from output");
-    }
+    };
 
     Ok(JavaCmdParsedOutput {
-        version: version.unwrap(),
-        arch: arch.unwrap(),
-        vendor: vendor.unwrap(),
+        version,
+        arch,
+        vendor,
     })
 }
 
@@ -61,7 +61,7 @@ mod test {
                 output: "os.arch=amd64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: Some(JavaCmdParsedOutput {
                     version: JavaVersion::try_from("19.0.1").unwrap(),
-                    arch: "amd64".into(),
+                    arch: "amd64".try_into().unwrap(),
                     vendor: "AdoptOpenJDK".into(),
                 }),
             },

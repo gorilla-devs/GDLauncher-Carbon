@@ -40,6 +40,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_SETUP_MANAGED_JAVA_PROGRESS[app, args: ()] {
             get_setup_managed_java_progress(app, args).await
         }
+
+        query GET_SYSTEM_JAVA_PROFILES[app, args: ()] {
+            get_system_java_profiles(app, args).await
+        }
     }
 }
 
@@ -119,6 +123,15 @@ async fn get_setup_managed_java_progress(
     Ok(res.into())
 }
 
+async fn get_system_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FESystemJavaProfile>> {
+    let profiles = app.java_manager().get_system_java_profiles().await?;
+
+    Ok(profiles
+        .into_iter()
+        .map(FESystemJavaProfile::from)
+        .collect())
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Javas(HashMap<u8, Vec<FEJavaComponent>>);
@@ -126,6 +139,7 @@ struct Javas(HashMap<u8, Vec<FEJavaComponent>>);
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FEJavaComponent {
+    id: String,
     path: String,
     version: String,
     #[serde(rename = "type")]
@@ -136,6 +150,7 @@ struct FEJavaComponent {
 impl From<Java> for FEJavaComponent {
     fn from(java: Java) -> Self {
         Self {
+            id: java.id,
             path: java.component.path,
             version: String::from(java.component.version),
             _type: FEJavaComponentType::from(java.component._type),
@@ -167,4 +182,41 @@ impl From<JavaComponentType> for FEJavaComponentType {
 struct SetDefaultArgs {
     major_version: u8,
     id: String,
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FESystemJavaProfileName {
+    Legacy,
+    Alpha,
+    Beta,
+    Gamma,
+}
+
+impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileName {
+    fn from(name: crate::domain::java::SystemJavaProfileName) -> Self {
+        use crate::domain::java::SystemJavaProfileName;
+        match name {
+            SystemJavaProfileName::Legacy => Self::Legacy,
+            SystemJavaProfileName::Alpha => Self::Alpha,
+            SystemJavaProfileName::Beta => Self::Beta,
+            SystemJavaProfileName::Gamma => Self::Gamma,
+        }
+    }
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FESystemJavaProfile {
+    name: FESystemJavaProfileName,
+    java_id: Option<String>,
+}
+
+impl From<crate::domain::java::SystemJavaProfile> for FESystemJavaProfile {
+    fn from(profile: crate::domain::java::SystemJavaProfile) -> Self {
+        Self {
+            name: profile.name.into(),
+            java_id: profile.java.map(|j| j.id),
+        }
+    }
 }
