@@ -108,6 +108,36 @@ async function createWindow() {
       win?.show();
     });
 
+    function UpsertKeyValue(obj: any, keyToChange: string, value: any) {
+      const keyToChangeLower = keyToChange.toLowerCase();
+      for (const key of Object.keys(obj)) {
+        if (key.toLowerCase() === keyToChangeLower) {
+          return;
+        }
+      }
+      // Insert at end instead
+      obj[keyToChange] = value;
+    }
+
+    win?.webContents.session.webRequest.onBeforeSendHeaders(
+      (details, callback) => {
+        const { requestHeaders } = details;
+        UpsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"]);
+        callback({ requestHeaders });
+      }
+    );
+
+    win?.webContents.session.webRequest.onHeadersReceived(
+      (details, callback) => {
+        const { responseHeaders } = details;
+        UpsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"]);
+        UpsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"]);
+        callback({
+          responseHeaders,
+        });
+      }
+    );
+
     if (import.meta.env.DEV) {
       win?.webContents.openDevTools();
     }
