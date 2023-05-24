@@ -14,16 +14,16 @@ impl SystemInfoManager {
         }
     }
 
-    pub async fn get_total_ram(&self) -> u32 {
+    pub async fn get_total_ram(&self) -> u64 {
         let mut lock = self.system.lock().await;
         lock.refresh_memory();
-        lock.total_memory() as u32
+        lock.total_memory()
     }
 
-    pub async fn get_used_ram(&self) -> u32 {
+    pub async fn get_used_ram(&self) -> u64 {
         let mut lock = self.system.lock().await;
         lock.refresh_memory();
-        lock.used_memory() as u32
+        lock.used_memory()
     }
 }
 
