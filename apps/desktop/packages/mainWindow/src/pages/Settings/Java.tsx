@@ -3,18 +3,17 @@ import {
   Button,
   Input,
   Slider,
-  Switch,
+  Switch as GDSwitch,
   Tab,
   TabList,
   TabPanel,
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
-import { FESettings } from "@gd/core_module/bindings";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -23,10 +22,12 @@ const Java = () => {
   const modalsContext = useModal();
 
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"], {
-    // onMutate: (newTheme) => {
-    //   // queryClient.setQueryData(["java.setDefault", null], newTheme);
-    // },
+    onMutate: (newTheme) => {
+      queryClient.setQueryData(["settings.setSettings"], newTheme);
+    },
   });
+
+  const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
 
   const generateSequence = (
     min: number,
@@ -42,6 +43,14 @@ const Java = () => {
 
     return sequence;
   };
+
+  const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
+
+  const flattenedAvailableJavas = () =>
+    Object.values(routeData.availableJavas.data || {}).reduce(
+      (acc, curr) => acc.concat(curr),
+      []
+    );
 
   return (
     <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
@@ -67,22 +76,14 @@ const Java = () => {
           <div class="flex justify-center px-3">
             <Slider
               min={0}
-              // min={(routeData.settings.data as FESettings).xms}
-              // max={(routeData.settings.data as FESettings).xmx}
-              max={16384}
+              max={mbTotalRAM()}
               steps={1}
-              marks={
-                //   {
-                //   1024: "1024 MB",
-                //   2048: "2048 MB",
-                //   4096: "4096 MB",
-                //   8192: "8192 MB",
-                //   16384: "16384 MB",
-                // },
-                generateSequence(
-                  (routeData.settings.data as FESettings).xms,
-                  (routeData.settings.data as FESettings).xmx
-                )
+              value={routeData.settings.data?.xmx}
+              marks={generateSequence(1024, mbTotalRAM())}
+              onChange={(val) =>
+                setSettingsMutation.mutate({
+                  xmx: val,
+                })
               }
             />
           </div>
@@ -101,8 +102,23 @@ const Java = () => {
           <Input
             class="w-full"
             value={routeData.settings.data?.javaCustomArgs}
+            onChange={(e) => {
+              setSettingsMutation.mutate({
+                javaCustomArgs: e.target.value,
+              });
+            }}
           />
-          <Button rounded={false} variant="secondary" class="h-10">
+          <Button
+            rounded={false}
+            variant="secondary"
+            class="h-10"
+            textColor="text-red-500"
+            onClick={() => {
+              setSettingsMutation.mutate({
+                javaCustomArgs: initailJavaArgs,
+              });
+            }}
+          >
             <Trans
               key="java.reset_java_args"
               options={{
@@ -121,7 +137,8 @@ const Java = () => {
             }}
           />
         </h2>
-        <Switch
+        <GDSwitch
+          checked={routeData.settings.data?.autoManageJava}
           onChange={(e) => {
             console.log("EEEE", e.target.checked);
             setSettingsMutation.mutate({ autoManageJava: e.target.checked });
@@ -194,12 +211,22 @@ const Java = () => {
             <TabPanel>
               <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
                 <For each={routeData.javaProfiles.data}>
-                  {(profile) => (
-                    <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4">
-                      <h3 class="m-0">{profile.name}</h3>
-                      <h3 class="m-0">{profile.javaId}</h3>
-                    </div>
-                  )}
+                  {(profile) => {
+                    const path = flattenedAvailableJavas()?.find(
+                      (java) => java.id === profile.javaId
+                    )?.path;
+                    return (
+                      <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
+                        <h3 class="m-0">{profile.name}</h3>
+                        <span class="m-0">
+                          <Switch>
+                            <Match when={path}>{path}</Match>
+                            <Match when={!path}>-</Match>
+                          </Switch>
+                        </span>
+                      </div>
+                    );
+                  }}
                 </For>
               </div>
             </TabPanel>
