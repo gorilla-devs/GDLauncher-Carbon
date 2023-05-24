@@ -45,7 +45,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             get_system_java_profiles(app, args).await
         }
 
-        query UPDATE_SYSTEM_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
+        mutation UPDATE_SYSTEM_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
             update_system_java_profile_path(app, args).await
         }
     }
