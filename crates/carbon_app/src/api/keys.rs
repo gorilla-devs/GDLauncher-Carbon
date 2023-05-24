@@ -88,6 +88,11 @@ keys! {
         SEND_PAGEVIEW                               = "sendPageview";
     }
 
+    systeminfo {
+        GET_TOTAL_RAM                               = "getTotalRAM";
+        GET_USED_RAM                                = "getUsedRAM";
+    }
+
     modplatforms {
         CURSEFORGE_GET_CATEGORIES                   = "curseforgeGetCategories";
         CURSEFORGE_SEARCH                           = "curseforgeSearch";
