@@ -250,7 +250,7 @@ impl From<crate::domain::java::SystemJavaProfile> for FESystemJavaProfile {
     fn from(profile: crate::domain::java::SystemJavaProfile) -> Self {
         Self {
             name: profile.name.into(),
-            java_id: profile.java.map(|j| j.id),
+            java_id: profile.java_id,
         }
     }
 }
