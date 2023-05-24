@@ -82,7 +82,7 @@ pub async fn prepare_modpack(
         let mut i = 0;
         let mut downloadables = Vec::new();
         loop {
-            if i > archive_len {
+            if i >= archive_len {
                 break Err(anyhow::anyhow!("Failed to find manifest"));
             }
 

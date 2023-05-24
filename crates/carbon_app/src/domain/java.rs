@@ -90,9 +90,10 @@ impl ToString for JavaComponentType {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Clone, EnumIter)]
 pub enum JavaArch {
-    X64,
-    X86,
-    Aarch64,
+    X86_64,
+    X86_32,
+    Arm32,
+    Arm64,
 }
 
 impl JavaArch {
@@ -104,9 +105,10 @@ impl JavaArch {
 impl<'a> From<JavaArch> for &'a str {
     fn from(arch: JavaArch) -> Self {
         match arch {
-            JavaArch::X64 => "x64",
-            JavaArch::X86 => "x86",
-            JavaArch::Aarch64 => "aarch64",
+            JavaArch::X86_64 => "x64",
+            JavaArch::X86_32 => "x86",
+            JavaArch::Arm32 => "arm32",
+            JavaArch::Arm64 => "arm64",
         }
     }
 }
@@ -116,11 +118,14 @@ impl<'a> TryFrom<&'a str> for JavaArch {
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
-            "amd64" => Ok(JavaArch::X64),
-            "x64" => Ok(JavaArch::X64),
-            "x86_64" => Ok(JavaArch::X64),
-            "x86" => Ok(JavaArch::X86),
-            "aarch64" => Ok(JavaArch::Aarch64),
+            "amd64" => Ok(JavaArch::X86_64),
+            "x64" => Ok(JavaArch::X86_64),
+            "x86_64" => Ok(JavaArch::X86_64),
+            "x86_32" => Ok(JavaArch::X86_32),
+            "arm32" => Ok(JavaArch::Arm32),
+            "arm64" => Ok(JavaArch::Arm64),
+            "aarch32" => Ok(JavaArch::Arm32),
+            "aarch64" => Ok(JavaArch::Arm64),
             _ => bail!("Unknown JavaArch: {s}"),
         }
     }
@@ -308,6 +313,19 @@ pub enum SystemJavaProfileName {
     Alpha,
     Beta,
     Gamma,
+    MinecraftJavaExe,
+}
+
+impl SystemJavaProfileName {
+    pub fn is_java_version_compatible(&self, java_version: JavaVersion) -> bool {
+        match self {
+            SystemJavaProfileName::Legacy => java_version.major == 8,
+            SystemJavaProfileName::Alpha => java_version.major == 16,
+            SystemJavaProfileName::Beta => java_version.major == 17,
+            SystemJavaProfileName::Gamma => java_version.major == 17,
+            SystemJavaProfileName::MinecraftJavaExe => java_version.major == 14,
+        }
+    }
 }
 
 impl std::str::FromStr for SystemJavaProfileName {
@@ -318,18 +336,20 @@ impl std::str::FromStr for SystemJavaProfileName {
             "alpha" => Ok(SystemJavaProfileName::Alpha),
             "beta" => Ok(SystemJavaProfileName::Beta),
             "gamma" => Ok(SystemJavaProfileName::Gamma),
+            "minecraft-java-exe" => Ok(SystemJavaProfileName::MinecraftJavaExe),
             _ => bail!("Unknown system profile: {}", s),
         }
     }
 }
 
-impl From<SystemJavaProfileName> for String {
-    fn from(profile: SystemJavaProfileName) -> Self {
-        match profile {
+impl ToString for SystemJavaProfileName {
+    fn to_string(&self) -> String {
+        match self {
             SystemJavaProfileName::Legacy => "legacy".to_string(),
             SystemJavaProfileName::Alpha => "alpha".to_string(),
             SystemJavaProfileName::Beta => "beta".to_string(),
             SystemJavaProfileName::Gamma => "gamma".to_string(),
+            SystemJavaProfileName::MinecraftJavaExe => "minecraft_java_exe".to_string(),
         }
     }
 }

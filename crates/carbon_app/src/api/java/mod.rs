@@ -44,6 +44,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_SYSTEM_JAVA_PROFILES[app, args: ()] {
             get_system_java_profiles(app, args).await
         }
+
+        query UPDATE_SYSTEM_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
+            update_system_java_profile_path(app, args).await
+        }
     }
 }
 
@@ -132,6 +136,22 @@ async fn get_system_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FES
         .collect())
 }
 
+#[derive(Type, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FEUpdateSystemJavaProfileArgs {
+    pub profile_name: FESystemJavaProfileName,
+    pub java_id: String,
+}
+
+async fn update_system_java_profile_path(
+    app: App,
+    args: FEUpdateSystemJavaProfileArgs,
+) -> anyhow::Result<()> {
+    app.java_manager()
+        .update_system_java_profile_path(args.profile_name.into(), args.java_id)
+        .await
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Javas(HashMap<u8, Vec<FEJavaComponent>>);
@@ -184,13 +204,14 @@ struct SetDefaultArgs {
     id: String,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FESystemJavaProfileName {
     Legacy,
     Alpha,
     Beta,
     Gamma,
+    MinecraftJavaExe,
 }
 
 impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileName {
@@ -201,6 +222,19 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
             SystemJavaProfileName::Alpha => Self::Alpha,
             SystemJavaProfileName::Beta => Self::Beta,
             SystemJavaProfileName::Gamma => Self::Gamma,
+            SystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
+        }
+    }
+}
+
+impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileName {
+    fn from(name: FESystemJavaProfileName) -> Self {
+        match name {
+            FESystemJavaProfileName::Legacy => Self::Legacy,
+            FESystemJavaProfileName::Alpha => Self::Alpha,
+            FESystemJavaProfileName::Beta => Self::Beta,
+            FESystemJavaProfileName::Gamma => Self::Gamma,
+            FESystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
 }

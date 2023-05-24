@@ -25,7 +25,9 @@ use crate::{
 use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
 
 #[derive(Debug, Default)]
-pub struct AzulZulu;
+pub struct AzulZulu {
+    versions: Arc<RwLock<ManagedJavaOsMap>>,
+}
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
@@ -170,8 +172,13 @@ impl Managed for AzulZulu {
     }
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap> {
-        let results = AzulAPI::get_all_versions().await?;
-        Ok(results)
+        let mut versions = self.versions.write().await;
+        if versions.is_empty() {
+            let results = AzulAPI::get_all_versions().await?;
+            *versions = results;
+        }
+
+        Ok(versions.clone())
     }
 }
 
@@ -240,9 +247,10 @@ impl AzulAPI {
                     JavaOs::MacOs => "macos",
                 },
                 match arch {
-                    JavaArch::X64 => "amd64",
-                    JavaArch::X86 => "x86",
-                    JavaArch::Aarch64 => "aarch64",
+                    JavaArch::X86_64 => "amd64",
+                    JavaArch::X86_32 => "i686",
+                    JavaArch::Arm32 => "aarch32",
+                    JavaArch::Arm64 => "aarch64",
                 }
             );
 

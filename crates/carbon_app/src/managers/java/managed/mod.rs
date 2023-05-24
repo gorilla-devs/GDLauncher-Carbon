@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::{
     collections::HashMap,
     ops::{Deref, DerefMut},
@@ -32,14 +33,14 @@ pub enum Step {
     Done,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize)]
 pub struct ManagedJavaVersion {
     pub id: String,
     pub name: String,
     pub download_url: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ManagedJavaArchMap(pub HashMap<JavaArch, Vec<ManagedJavaVersion>>);
 
 impl Deref for ManagedJavaArchMap {
@@ -56,7 +57,7 @@ impl DerefMut for ManagedJavaArchMap {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ManagedJavaOsMap(pub HashMap<JavaOs, ManagedJavaArchMap>);
 
 impl Deref for ManagedJavaOsMap {
