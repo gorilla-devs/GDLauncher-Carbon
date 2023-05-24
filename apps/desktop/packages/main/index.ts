@@ -14,6 +14,7 @@ import {
 } from "electron";
 import { release } from "os";
 import { join, resolve } from "path";
+import os from "os";
 import "./cli";
 import coreModule from "./core_module_loader";
 import "./preloadListeners";
@@ -81,6 +82,10 @@ async function createWindow() {
   // Handlers
   ipcMain.handle("getAdSize", async () => {
     return getAdSize().adSize;
+  });
+
+  ipcMain.handle("getCurrentOS", async () => {
+    return { platform: os.platform(), arch: os.arch() };
   });
 
   if (app.isPackaged) {

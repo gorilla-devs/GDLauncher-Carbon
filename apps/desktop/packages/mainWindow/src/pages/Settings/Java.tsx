@@ -10,7 +10,7 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, createEffect, createSignal } from "solid-js";
+import { For } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 
@@ -25,10 +25,6 @@ const Java = () => {
   //     queryClient.setQueryData(["java.setDefault", null], newTheme);
   //   },
   // });
-
-  createEffect(() => {
-    console.log("JAVAS", javas(), routeData.javaProfiles.data);
-  });
 
   return (
     <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">

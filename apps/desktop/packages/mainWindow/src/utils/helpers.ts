@@ -13,3 +13,8 @@ export const msToMinutes = (ms: number) => {
 export const strToMs = (string: string) => {
   return new Date(string)?.getTime();
 };
+
+export const hasKey = <O extends object>(
+  obj: O,
+  key: PropertyKey
+): key is keyof O => key in obj;

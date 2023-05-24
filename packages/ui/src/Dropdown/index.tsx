@@ -1,4 +1,4 @@
-import { createSignal, For, Show, JSX } from "solid-js";
+import { createSignal, For, Show, JSX, createEffect } from "solid-js";
 import { Button } from "../Button";
 
 export type Option = {
@@ -63,10 +63,6 @@ const Dropdown = (props: Props) => {
   return (
     <div
       class={`inline-block relative ${props.containerClass || ""}`}
-      classList={{
-        "border-1 border-solid border-darkSlate-600 rounded-lg":
-          !props.btnDropdown,
-      }}
       id={props.id}
     >
       <Show when={!props.rounded && props.label}>
@@ -128,7 +124,6 @@ const Dropdown = (props: Props) => {
           }}
         />
       </button>
-
       <ul
         class="absolute max-h-40 scrollbar-hide overflow-y-auto scrollbar-none text-darkSlate-50 pt-1 z-20 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20"
         onMouseOut={() => {
