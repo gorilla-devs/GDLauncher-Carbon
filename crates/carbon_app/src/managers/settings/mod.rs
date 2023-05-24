@@ -129,6 +129,16 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
+        if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetAutoManageJava(
+                    auto_manage_java,
+                )],
+            ));
+            something_changed = true;
+        }
+
         if something_changed {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);

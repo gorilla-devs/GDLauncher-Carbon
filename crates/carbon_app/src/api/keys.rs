@@ -38,14 +38,15 @@ keys! {
     }
 
     java {
-        GET_AVAILABLE_JAVAS                     = "getAvailableJavas";
-        GET_MANAGED_VENDORS                     = "getManagedVendors";
-        GET_MANAGED_OS                          = "getManagedOS";
-        GET_MANAGED_ARCH                        = "getManagedArch";
-        GET_MANAGED_VERSIONS_BY_VENDOR          = "getManagedVersionsByVendor";
-        SETUP_MANAGED_JAVA                      = "setupManagedJava";
-        GET_SETUP_MANAGED_JAVA_PROGRESS         = "getSetupManagedJavaProgress";
-        GET_SYSTEM_JAVA_PROFILES                       = "getJavaProfiles";
+        GET_AVAILABLE_JAVAS                         = "getAvailableJavas";
+        GET_MANAGED_VENDORS                         = "getManagedVendors";
+        GET_MANAGED_OS                              = "getManagedOS";
+        GET_MANAGED_ARCH                            = "getManagedArch";
+        GET_MANAGED_VERSIONS_BY_VENDOR              = "getManagedVersionsByVendor";
+        SETUP_MANAGED_JAVA                          = "setupManagedJava";
+        GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
+        GET_SYSTEM_JAVA_PROFILES                    = "getSystemJavaProfiles";
+        UPDATE_SYSTEM_JAVA_PROFILE_PATH             = "updateSystemJavaProfilePath";
     }
 
     mc {

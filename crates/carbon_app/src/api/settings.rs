@@ -90,4 +90,6 @@ pub struct FESettingsUpdate {
     pub startup_resolution: Option<String>,
     #[specta(optional)]
     pub java_custom_args: Option<String>,
+    #[specta(optional)]
+    pub auto_manage_java: Option<bool>,
 }

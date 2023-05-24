@@ -323,9 +323,9 @@ impl std::str::FromStr for SystemJavaProfileName {
     }
 }
 
-impl From<SystemJavaProfileName> for String {
-    fn from(profile: SystemJavaProfileName) -> Self {
-        match profile {
+impl ToString for SystemJavaProfileName {
+    fn to_string(&self) -> String {
+        match self {
             SystemJavaProfileName::Legacy => "legacy".to_string(),
             SystemJavaProfileName::Alpha => "alpha".to_string(),
             SystemJavaProfileName::Beta => "beta".to_string(),

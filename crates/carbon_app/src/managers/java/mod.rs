@@ -1,9 +1,11 @@
+use anyhow::Ok;
 use strum::IntoEnumIterator;
 
 use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
 
 use super::ManagerRef;
 use crate::{
+    api::keys::java::GET_SYSTEM_JAVA_PROFILES,
     db::PrismaClient,
     domain::java::{Java, SystemJavaProfile, SystemJavaProfileName},
 };
@@ -33,7 +35,7 @@ impl JavaManager {
             for profile in SystemJavaProfileName::iter() {
                 db_client
                     .java_system_profile()
-                    .create(String::from(profile), vec![])
+                    .create(profile.to_string(), vec![])
                     .exec()
                     .await?;
             }
@@ -54,6 +56,8 @@ impl JavaManager {
         scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
         scan_and_sync::scan_and_sync_managed(db, java_checker).await?;
+
+        scan_and_sync::sync_system_java_profiles(db).await?;
 
         Ok(())
     }
@@ -83,9 +87,39 @@ impl ManagerRef<'_, JavaManager> {
             .exec()
             .await?
             .into_iter()
-            .map(|profile| SystemJavaProfile::try_from(profile))
+            .map(SystemJavaProfile::try_from)
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(all_profiles)
+    }
+
+    pub async fn update_system_java_profile_path(
+        &self,
+        profile_name: SystemJavaProfileName,
+        java_id: String,
+    ) -> anyhow::Result<()> {
+        let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
+
+        if !auto_manage_java {
+            anyhow::bail!("Auto manage java is disabled");
+        }
+
+        self.app
+            .prisma_client
+            .java_system_profile()
+            .update(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    profile_name.to_string(),
+                ),
+                vec![crate::db::java_system_profile::SetParam::ConnectJava(
+                    crate::db::java::UniqueWhereParam::IdEquals(java_id),
+                )],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+
+        Ok(())
     }
 }

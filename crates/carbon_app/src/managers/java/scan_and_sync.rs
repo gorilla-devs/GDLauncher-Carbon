@@ -229,6 +229,11 @@ where
     Ok(())
 }
 
+pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
+    // TODO: complete
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
