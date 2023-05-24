@@ -66,7 +66,7 @@ module.exports = {
   },
   linux: {
     target: isDockerBuild ? ["dir"] : ["dir", "zip"],
-    artifactName: "${productName}-5.0.0-${arch}-Installer.${ext}",
+    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
   },
   afterAllArtifactBuild: () => {
     const path = require("path");
