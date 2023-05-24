@@ -12,7 +12,7 @@ import { FESettings } from "@gd/core_module/bindings";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
-  const [t] = useTransContext();
+  const [t, { changeLanguage }] = useTransContext();
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -21,6 +21,7 @@ const General = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
+      if (newSettings.language) changeLanguage(newSettings.language as string);
       queryClient.setQueryData(["settings.getSettings"], newSettings);
     },
   });
@@ -65,7 +66,7 @@ const General = () => {
               { label: t("languages.italian"), key: "it" },
             ]}
             onChange={(lang) => {
-              settingsMutation.mutate({ language: lang.key });
+              settingsMutation.mutate({ language: lang.key as string });
             }}
           />
         </div>
@@ -96,7 +97,9 @@ const General = () => {
               { label: t("settings.release_channel_alpha"), key: "alpha" },
             ]}
             onChange={(channel) => {
-              settingsMutation.mutate({ releaseChannel: channel.key });
+              settingsMutation.mutate({
+                releaseChannel: channel.key as string,
+              });
             }}
           />
         </div>
@@ -128,7 +131,7 @@ const General = () => {
             }))}
             onChange={(downloads) => {
               settingsMutation.mutate({
-                concurrentDownloads: parseInt(downloads.key, 10),
+                concurrentDownloads: parseInt(downloads.key as string, 10),
               });
             }}
           />
