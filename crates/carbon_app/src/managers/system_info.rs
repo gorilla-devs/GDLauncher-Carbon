@@ -1,32 +1,29 @@
 use super::ManagerRef;
-use crate::{
-    api::{keys::settings::*, settings::FESettingsUpdate},
-    db::app_configuration,
-    domain::runtime_path,
-};
-use anyhow::anyhow;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use sysinfo::{System, SystemExt};
+use tokio::sync::Mutex;
 
 pub(crate) struct SystemInfoManager {
-    system: System,
+    system: Arc<Mutex<System>>,
 }
 
 impl SystemInfoManager {
     pub fn new() -> Self {
         Self {
-            system: System::new_all(),
+            system: Arc::new(Mutex::new(System::new_all())),
         }
     }
 
-    pub fn get_total_ram(&self) -> u32 {
-        self.system.refresh_memory();
-        self.system.total_memory() as u32
+    pub async fn get_total_ram(&self) -> u32 {
+        let mut lock = self.system.lock().await;
+        lock.refresh_memory();
+        lock.total_memory() as u32
     }
 
-    pub fn get_used_ram(&self) -> u32 {
-        self.system.refresh_memory();
-        self.system.used_memory() as u32
+    pub async fn get_used_ram(&self) -> u32 {
+        let mut lock = self.system.lock().await;
+        lock.refresh_memory();
+        lock.used_memory() as u32
     }
 }
 
