@@ -4,6 +4,7 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum FEVendor {
     Azul,
 }
@@ -26,6 +27,7 @@ impl From<FEVendor> for crate::domain::java::JavaVendor {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum FEManagedJavaOs {
     Windows,
     Linux,
@@ -54,19 +56,22 @@ impl From<FEManagedJavaOs> for crate::domain::java::JavaOs {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
 pub enum FEManagedJavaArch {
     X64,
     X86,
-    Aarch64,
+    Arm32,
+    Arm64,
 }
 
 impl From<crate::domain::java::JavaArch> for FEManagedJavaArch {
     fn from(v: crate::domain::java::JavaArch) -> Self {
         use crate::domain::java::JavaArch;
         match v {
-            JavaArch::X64 => Self::X64,
-            JavaArch::X86 => Self::X64,
-            JavaArch::Aarch64 => Self::Aarch64,
+            JavaArch::X86_64 => Self::X64,
+            JavaArch::X86_32 => Self::X64,
+            JavaArch::Arm32 => Self::Arm32,
+            JavaArch::Arm64 => Self::Arm64,
         }
     }
 }
@@ -74,14 +79,16 @@ impl From<crate::domain::java::JavaArch> for FEManagedJavaArch {
 impl From<FEManagedJavaArch> for crate::domain::java::JavaArch {
     fn from(v: FEManagedJavaArch) -> Self {
         match v {
-            FEManagedJavaArch::X64 => Self::X64,
-            FEManagedJavaArch::X86 => Self::X64,
-            FEManagedJavaArch::Aarch64 => Self::Aarch64,
+            FEManagedJavaArch::X64 => Self::X86_64,
+            FEManagedJavaArch::X86 => Self::X86_64,
+            FEManagedJavaArch::Arm32 => Self::Arm32,
+            FEManagedJavaArch::Arm64 => Self::Arm64,
         }
     }
 }
 
 #[derive(Type, Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEManagedJavaVersion {
     id: String,
     name: String,
@@ -109,6 +116,7 @@ impl From<FEManagedJavaVersion> for crate::managers::java::managed::ManagedJavaV
 }
 
 #[derive(Type, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEManagedJavaArchMap(pub HashMap<FEManagedJavaArch, Vec<FEManagedJavaVersion>>);
 
 impl Deref for FEManagedJavaArchMap {
@@ -130,6 +138,7 @@ impl From<crate::managers::java::managed::ManagedJavaArchMap> for FEManagedJavaA
 }
 
 #[derive(Type, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEManagedJavaOsMap(pub HashMap<FEManagedJavaOs, FEManagedJavaArchMap>);
 
 impl Deref for FEManagedJavaOsMap {

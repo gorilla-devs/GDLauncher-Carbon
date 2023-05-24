@@ -80,7 +80,7 @@ impl JavaChecker for MockJavaChecker {
                 prerelease: None,
                 build_metadata: Some("10".to_owned()),
             },
-            arch: JavaArch::X86,
+            arch: JavaArch::X86_32,
             _type: JavaComponentType::Local,
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),

@@ -1,8 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
+use strum::IntoEnumIterator;
+
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
-    domain::java::{JavaComponent, JavaComponentType},
+    domain::java::{JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName},
 };
 
 use super::{discovery::Discovery, java_checker::JavaChecker};
@@ -151,7 +153,7 @@ where
             .filter_map(|profile| {
                 let Some(java) = profile.java.as_ref() else { return None; };
                 let Some(java) = java else { return None; };
-                return Some(java.path.clone());
+                Some(java.path.clone())
             })
             .any(|java_profile_path| local_java_from_db.path == java_profile_path);
 
@@ -230,18 +232,81 @@ where
 }
 
 pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
-    // TODO: complete
+    let all_javas = db.java().find_many(vec![]).exec().await?;
+
+    for profile in SystemJavaProfileName::iter() {
+        println!("Syncing system java profile: {}", profile.to_string());
+        let java_in_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(profile.to_string()),
+            )
+            .exec()
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Java system profile {} not found in DB",
+                    profile.to_string()
+                )
+            })?
+            .java_id;
+
+        if java_in_profile.is_some() {
+            println!(
+                "Java system profile {} already has a java",
+                profile.to_string()
+            );
+            continue;
+        }
+
+        // Scan for a compatible java
+        for java in all_javas.iter() {
+            println!("Checking java {}", java.path);
+            if !java.is_valid {
+                println!("Java {} is invalid, skipping", java.path);
+                continue;
+            }
+
+            let java_version = JavaVersion::try_from(java.full_version.as_str())?;
+            if profile.is_java_version_compatible(java_version) {
+                println!(
+                    "Java {} is compatible with profile {}",
+                    java.path,
+                    profile.to_string()
+                );
+                db.java_system_profile()
+                    .update(
+                        crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                            profile.to_string(),
+                        ),
+                        vec![crate::db::java_system_profile::SetParam::ConnectJava(
+                            crate::db::java::UniqueWhereParam::IdEquals(java.id.clone()),
+                        )],
+                    )
+                    .exec()
+                    .await?;
+                break;
+            }
+        }
+    }
+
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion},
+        domain::java::{
+            JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion, SystemJavaProfileName,
+        },
         managers::java::{
             discovery::MockDiscovery,
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
-            scan_and_sync::{add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local},
+            scan_and_sync::{
+                add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local,
+                sync_system_java_profiles,
+            },
+            JavaManager,
         },
         setup_managers_for_test,
     };
@@ -259,7 +324,7 @@ mod test {
             path: "/usr/bin/java2".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86,
+            arch: JavaArch::X86_32,
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
@@ -271,7 +336,7 @@ mod test {
             path: "/usr/bin/java".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86,
+            arch: JavaArch::X86_32,
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
@@ -303,7 +368,7 @@ mod test {
             path: "/usr/bin/java".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
-            arch: JavaArch::X86,
+            arch: JavaArch::X86_32,
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
@@ -335,7 +400,7 @@ mod test {
             path: "/my/custom/path".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Custom,
-            arch: JavaArch::X86,
+            arch: JavaArch::X86_32,
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
@@ -353,5 +418,141 @@ mod test {
 
         assert_eq!(java_components.len(), 1);
         assert!(!java_components[0].is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_sync_system_java_profiles_no_profiles() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+
+        let res = sync_system_java_profiles(db).await;
+
+        // Expect this to fail since profiles are not seeded
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_sync_system_java_profiles_with_profiles() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+
+        JavaManager::ensure_profiles_in_db(db).await.unwrap();
+
+        db.java()
+            .create_many(vec![
+                (
+                    "my_path1".to_string(),
+                    8,
+                    "1.8.0_282".to_string(),
+                    "local".to_string(),
+                    "linux".to_string(),
+                    "x86_64".to_string(),
+                    "Azul Systems, Inc.".to_string(),
+                    vec![],
+                ),
+                (
+                    "my_path2".to_string(),
+                    17,
+                    "17.0.1".to_string(),
+                    "local".to_string(),
+                    "linux".to_string(),
+                    "x86_64".to_string(),
+                    "Azul Systems, Inc.".to_string(),
+                    vec![],
+                ),
+                (
+                    "my_path3".to_string(),
+                    14,
+                    "17.0.1".to_string(),
+                    "local".to_string(),
+                    "linux".to_string(),
+                    "x86_64".to_string(),
+                    "Azul Systems, Inc.".to_string(),
+                    vec![crate::db::java::SetParam::SetIsValid(false)],
+                ),
+            ])
+            .exec()
+            .await
+            .unwrap();
+
+        sync_system_java_profiles(db).await.unwrap();
+
+        // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
+        let legacy_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+            )
+            .with(crate::db::java_system_profile::java::fetch())
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        println!("{:?}", legacy_profile);
+
+        assert!(legacy_profile.java.flatten().is_some());
+
+        let alpha_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Alpha.to_string(),
+                ),
+            )
+            .with(crate::db::java_system_profile::java::fetch())
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(alpha_profile.java.flatten().is_none());
+
+        let beta_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Beta.to_string(),
+                ),
+            )
+            .with(crate::db::java_system_profile::java::fetch())
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(beta_profile.java.flatten().is_some());
+
+        let gamma_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Gamma.to_string(),
+                ),
+            )
+            .with(crate::db::java_system_profile::java::fetch())
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(gamma_profile.java.flatten().is_some());
+
+        let minecraft_exe_profile = db
+            .java_system_profile()
+            .find_unique(
+                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::MinecraftJavaExe.to_string(),
+                ),
+            )
+            .with(crate::db::java_system_profile::java::fetch())
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(minecraft_exe_profile.java.flatten().is_none());
     }
 }

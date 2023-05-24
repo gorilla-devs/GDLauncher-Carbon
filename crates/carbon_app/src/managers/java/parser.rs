@@ -69,7 +69,7 @@ mod test {
                 output: "os.arch=x64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: Some(JavaCmdParsedOutput {
                     version: JavaVersion::try_from("19.0.1").unwrap(),
-                    arch: super::JavaArch::X64,
+                    arch: super::JavaArch::X86_64,
                     vendor: "AdoptOpenJDK".to_string(),
                 }),
             },
@@ -77,7 +77,7 @@ mod test {
                 output: "os.arch=x86_64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: Some(JavaCmdParsedOutput {
                     version: JavaVersion::try_from("19.0.1").unwrap(),
-                    arch: super::JavaArch::X64,
+                    arch: super::JavaArch::X86_64,
                     vendor: "AdoptOpenJDK".to_string(),
                 }),
             },
@@ -85,7 +85,7 @@ mod test {
                 output: "os.arch=x86\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: Some(JavaCmdParsedOutput {
                     version: JavaVersion::try_from("19.0.1").unwrap(),
-                    arch: super::JavaArch::X86,
+                    arch: super::JavaArch::X86_32,
                     vendor: "AdoptOpenJDK".to_string(),
                 }),
             },
@@ -93,7 +93,7 @@ mod test {
                 output: "os.arch=aarch64\njava.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: Some(JavaCmdParsedOutput {
                     version: JavaVersion::try_from("19.0.1").unwrap(),
-                    arch: super::JavaArch::Aarch64,
+                    arch: super::JavaArch::Arm64,
                     vendor: "AdoptOpenJDK".to_string(),
                 }),
             },
