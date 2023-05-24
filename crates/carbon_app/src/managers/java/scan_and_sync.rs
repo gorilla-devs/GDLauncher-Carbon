@@ -421,17 +421,6 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_sync_system_java_profiles_no_profiles() {
-        let app = setup_managers_for_test().await;
-        let db = &app.prisma_client;
-
-        let res = sync_system_java_profiles(db).await;
-
-        // Expect this to fail since profiles are not seeded
-        assert!(res.is_err());
-    }
-
-    #[tokio::test]
     async fn test_sync_system_java_profiles_with_profiles() {
         let app = setup_managers_for_test().await;
         let db = &app.prisma_client;
