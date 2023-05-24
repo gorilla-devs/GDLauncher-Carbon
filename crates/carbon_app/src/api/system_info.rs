@@ -10,11 +10,11 @@ use rspc::RouterBuilderLike;
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_TOTAL_RAM[app, _args: ()] {
-            Ok(app.system_info_manager().get_total_ram().await)
+            Ok(app.system_info_manager().get_total_ram().await.to_string())
         }
 
         query GET_USED_RAM[app, _args: ()] {
-            Ok(app.system_info_manager().get_used_ram().await)
+            Ok(app.system_info_manager().get_used_ram().await.to_string())
         }
     }
 }
