@@ -15,25 +15,17 @@ import { hasKey } from "@/utils/helpers";
 type mappedOS = {
   [name: string]: FEManagedJavaOs;
 };
-type mappedARCH = {
-  [name: string]: FEManagedJavaArch;
-};
 
 const osMappedNames: mappedOS = {
-  win32: "Windows",
-  darwin: "MacOs",
-  linux: "Linux",
-};
-
-const archMappedNames: mappedARCH = {
-  x64: "X64",
-  arm64: "Aarch64",
+  win32: "windows",
+  darwin: "macOs",
+  linux: "linux",
 };
 
 const AddJava = (props: ModalProps) => {
   let javaVendors = rspc.createQuery(() => ["java.getManagedVendors"]);
 
-  const [vendor, setVendor] = createSignal<FEVendor>("Azul");
+  const [vendor, setVendor] = createSignal<FEVendor>("azul");
   const [currentOs, setCurrentOs] = createSignal<{
     platform: FEManagedJavaOs | undefined;
     arch: FEManagedJavaArch | undefined;
@@ -52,7 +44,7 @@ const AddJava = (props: ModalProps) => {
     window.getCurrentOS().then((currentOs) => {
       setCurrentOs({
         platform: osMappedNames[currentOs.platform],
-        arch: archMappedNames[currentOs.arch],
+        arch: currentOs.arch as FEManagedJavaArch,
       });
     });
   });

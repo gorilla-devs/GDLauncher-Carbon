@@ -10,9 +10,11 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
+import { FESettings } from "@gd/core_module/bindings";
+import { rspc } from "@/utils/rspcClient";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -20,11 +22,26 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
-  // let setDefaultJavaMutation = rspc.createMutation(["java.setDefault"], {
-  //   onMutate: (newTheme) => {
-  //     queryClient.setQueryData(["java.setDefault", null], newTheme);
-  //   },
-  // });
+  let setSettingsMutation = rspc.createMutation(["settings.setSettings"], {
+    // onMutate: (newTheme) => {
+    //   // queryClient.setQueryData(["java.setDefault", null], newTheme);
+    // },
+  });
+
+  const generateSequence = (
+    min: number,
+    max: number
+  ): Record<number, string> => {
+    let current = min;
+    const sequence: Record<number, string> = {};
+
+    while (current <= max) {
+      sequence[current] = `${current} MB`;
+      current *= 2;
+    }
+
+    return sequence;
+  };
 
   return (
     <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
@@ -37,30 +54,40 @@ const Java = () => {
         />
       </h2>
 
-      <div class="mb-4">
-        <h5 class="m-0 mb-4">
-          <Trans
-            key="java.java_memory_title"
-            options={{
-              defaultValue: "Java Memory",
-            }}
-          />
-        </h5>
-        <div class="flex justify-center px-3">
-          <Slider
-            min={0}
-            max={16384}
-            steps={1}
-            marks={{
-              1024: "1024 MB",
-              2048: "2048 MB",
-              4096: "4096 MB",
-              8192: "8192 MB",
-              16384: "16384 MB",
-            }}
-          />
+      <Show when={routeData.settings.data}>
+        <div class="mb-4">
+          <h5 class="m-0 mb-4">
+            <Trans
+              key="java.java_memory_title"
+              options={{
+                defaultValue: "Java Memory",
+              }}
+            />
+          </h5>
+          <div class="flex justify-center px-3">
+            <Slider
+              min={0}
+              // min={(routeData.settings.data as FESettings).xms}
+              // max={(routeData.settings.data as FESettings).xmx}
+              max={16384}
+              steps={1}
+              marks={
+                //   {
+                //   1024: "1024 MB",
+                //   2048: "2048 MB",
+                //   4096: "4096 MB",
+                //   8192: "8192 MB",
+                //   16384: "16384 MB",
+                // },
+                generateSequence(
+                  (routeData.settings.data as FESettings).xms,
+                  (routeData.settings.data as FESettings).xmx
+                )
+              }
+            />
+          </div>
         </div>
-      </div>
+      </Show>
       <div class="mb-4">
         <h5 class="m-0 mb-4">
           <Trans
@@ -71,7 +98,10 @@ const Java = () => {
           />
         </h5>
         <div class="flex w-full gap-4 items-center">
-          <Input class="w-full" />
+          <Input
+            class="w-full"
+            value={routeData.settings.data?.javaCustomArgs}
+          />
           <Button rounded={false} variant="secondary" class="h-10">
             <Trans
               key="java.reset_java_args"
@@ -91,7 +121,12 @@ const Java = () => {
             }}
           />
         </h2>
-        <Switch />
+        <Switch
+          onChange={(e) => {
+            console.log("EEEE", e.target.checked);
+            setSettingsMutation.mutate({ autoManageJava: e.target.checked });
+          }}
+        />
       </div>
       <div class="flex flex-col">
         <div class="overflow-hidden rounded-2xl">
@@ -115,7 +150,7 @@ const Java = () => {
               </Tab>
             </TabList>
             <TabPanel>
-              <div class="bg-darkSlate-900 h-full p-4">
+              <div class="bg-darkSlate-900 h-full p-4 min-h-96">
                 <div class="flex justify-between items-center mb-4">
                   <h2 class="m-0 text-sm font-normal">
                     <Trans
@@ -157,11 +192,12 @@ const Java = () => {
               </div>
             </TabPanel>
             <TabPanel>
-              <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4">
+              <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
                 <For each={routeData.javaProfiles.data}>
                   {(profile) => (
                     <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4">
                       <h3 class="m-0">{profile.name}</h3>
+                      <h3 class="m-0">{profile.javaId}</h3>
                     </div>
                   )}
                 </For>
