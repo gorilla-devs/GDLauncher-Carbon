@@ -336,7 +336,7 @@ impl std::str::FromStr for SystemJavaProfileName {
             "alpha" => Ok(SystemJavaProfileName::Alpha),
             "beta" => Ok(SystemJavaProfileName::Beta),
             "gamma" => Ok(SystemJavaProfileName::Gamma),
-            "minecraft-java-exe" => Ok(SystemJavaProfileName::MinecraftJavaExe),
+            "minecraft_java_exe" => Ok(SystemJavaProfileName::MinecraftJavaExe),
             _ => bail!("Unknown system profile: {}", s),
         }
     }
@@ -357,7 +357,7 @@ impl ToString for SystemJavaProfileName {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SystemJavaProfile {
     pub name: SystemJavaProfileName,
-    pub java: Option<crate::db::java::Data>,
+    pub java_id: Option<String>,
 }
 
 impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
@@ -366,7 +366,7 @@ impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
     fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
         Ok(Self {
             name: data.name.parse()?,
-            java: data.java.flatten().map(|j| *j),
+            java_id: data.java_id,
         })
     }
 }
