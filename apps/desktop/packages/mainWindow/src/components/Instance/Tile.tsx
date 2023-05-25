@@ -30,14 +30,14 @@ const Tile = (props: Props) => {
             grayscale: props.isLoading,
           }}
         >
-          <div class="group relative rounded-2xl h-38 w-38 bg-green-600">
+          <div class="relative group rounded-2xl h-38 w-38 bg-green-600">
             <div
-              class="absolute ease-in-out top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 duration-100 hidden transition-all"
+              class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
               classList={{
                 "group-hover:flex": !props.isLoading,
               }}
             >
-              <div class="flex justify-center items-center cursor-pointer rounded-full h-12 bg-primary-500 w-12">
+              <div class="rounded-full flex justify-center items-center cursor-pointer h-12 bg-primary-500 w-12">
                 <div
                   class="text-white text-2xl i-ri:play-fill"
                   onClick={(e) => e.preventDefault()}
@@ -52,14 +52,14 @@ const Tile = (props: Props) => {
             >
               <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
                 <div
-                  class="text-white i-ri:more-2-fill text-lg"
+                  class="text-white text-lg i-ri:more-2-fill"
                   onClick={(e) => e.preventDefault()}
                 />
               </div>
             </div>
             <Show when={props.isLoading && props.percentage !== undefined}>
               <div
-                class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
+                class="absolute top-0 left-0 bottom-0 opacity-10 bg-white"
                 style={{
                   width: `${props.percentage}%`,
                 }}
@@ -90,7 +90,7 @@ const Tile = (props: Props) => {
           onClick={(e) => props?.onClick?.(e)}
         >
           <Show when={props.selected && !props.isLoading}>
-            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500 right-0 transition" />
+            <div class="absolute right-0 ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 bg-primary-500 transition" />
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
 

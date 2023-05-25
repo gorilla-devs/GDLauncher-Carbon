@@ -1,26 +1,28 @@
 import { Switch } from "./index";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Switch> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Switch",
   component: Switch,
 };
 
-const Template = ((args) => <Switch {...args} />) as StoryFn<
-  ComponentProps<typeof Switch>
->;
+export default meta;
 
-export const Checked = Template.bind({});
+type Story = StoryObj<typeof Switch>;
 
-Checked.args = {
-  disabled: false,
-  checked: true,
+export const Checked: Story = {
+  args: {
+    disabled: false,
+    checked: true,
+  },
 };
-
-export const UnChecked = Template.bind({});
-
-UnChecked.args = {
-  disabled: false,
-  checked: false,
+export const UnChecked: Story = {
+  args: {
+    disabled: false,
+    checked: false,
+  },
 };
