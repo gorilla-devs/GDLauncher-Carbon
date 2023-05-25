@@ -1,47 +1,50 @@
 import { News } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof News> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "News",
   component: News,
 };
 
-const Template = ((args) => <News {...args} />) as StoryFn<
-  ComponentProps<typeof News>
->;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof News>;
 
-Main.args = {
-  rtl: true,
-  disableAutoRotation: false,
-  showArrows: true,
-  showIndicators: true,
-  slides: [
-    {
-      title: "title",
-      description: "this is a nice and fair description",
-      image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-      url: "https://randomurl.com",
-    },
-    {
-      title: "title1",
-      description: "this is a nice and fair description",
-      image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-      url: "https://randomurl.com",
-    },
-    {
-      title: "title2",
-      description: "this is a nice and fair description",
-      image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-      url: "https://randomurl.com",
-    },
-    {
-      title: "title3",
-      description: "this is a nice and fair description",
-      image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
-      url: "https://randomurl.com",
-    },
-  ],
+export const Main: Story = {
+  args: {
+    rtl: true,
+    disableAutoRotation: false,
+    showArrows: true,
+    showIndicators: true,
+    slides: [
+      {
+        title: "title",
+        description: "this is a nice and fair description",
+        image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+        url: "https://randomurl.com",
+      },
+      {
+        title: "title1",
+        description: "this is a nice and fair description",
+        image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+        url: "https://randomurl.com",
+      },
+      {
+        title: "title2",
+        description: "this is a nice and fair description",
+        image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+        url: "https://randomurl.com",
+      },
+      {
+        title: "title3",
+        description: "this is a nice and fair description",
+        image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
+        url: "https://randomurl.com",
+      },
+    ],
+  },
 };

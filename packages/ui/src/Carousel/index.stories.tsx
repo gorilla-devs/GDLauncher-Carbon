@@ -1,24 +1,22 @@
 import { Carousel } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Carousel> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Carousel",
   component: Carousel,
-  argTypes: {
-    type: {
-      options: ["primary", "secondary", "outline"],
-      control: { type: "radio" },
-    },
-  },
+  argTypes: {},
 };
 
-const Template = ((args) => <Carousel {...args} />) as StoryFn<
-  ComponentProps<typeof Carousel>
->;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof Carousel>;
 
-Main.args = {
-  title: "Recent Played",
+export const Primary: Story = {
+  args: {
+    title: "Recent Played",
+  },
 };

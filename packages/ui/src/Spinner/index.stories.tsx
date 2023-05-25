@@ -1,14 +1,17 @@
 import { Spinner } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Spinner> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Spinner",
   component: Spinner,
 };
 
-const Template = (() => <Spinner />) as StoryFn<ComponentProps<typeof Spinner>>;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof Spinner>;
 
-Main.args = {};
+export const Main: Story = {};
