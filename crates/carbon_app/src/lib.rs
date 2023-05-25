@@ -5,6 +5,7 @@ use crate::managers::{
     java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
     App, AppInner,
 };
+use api::InvalidationEvent;
 use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
@@ -47,7 +48,7 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let listener = if !cfg!(feature = "production") {
+    let listener = if cfg!(debug_assertions) {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
         get_available_port().await
@@ -136,6 +137,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 struct TestEnv {
     tmpdir: PathBuf,
     app: App,
+    invalidation_recv: tokio::sync::broadcast::Receiver<InvalidationEvent>,
 }
 
 #[cfg(test)]
@@ -167,10 +169,11 @@ async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
     println!("Test RTP: {}", temp_path.to_str().unwrap());
-    let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
+    let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
     TestEnv {
         tmpdir: temp_path.clone(),
+        invalidation_recv,
         app: AppInner::new(invalidation_sender, temp_path).await,
     }
 }

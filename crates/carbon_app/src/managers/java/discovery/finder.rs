@@ -99,16 +99,15 @@ fn search_java_binary_in_path(path: PathBuf) -> Vec<PathBuf> {
 fn read_registry_key(
     key: &str,
     value: &str,
-    subkey_suffix: Option<&str>,
+    additional_keypath: Option<&str>,
 ) -> anyhow::Result<Vec<PathBuf>> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
     let key_reg = hkcu.open_subkey(key)?;
     let mut results = vec![];
-
-    if let Some(subkey_suffix) = subkey_suffix {
+    if let Some(additional_keypath) = additional_keypath {
         let subkeys = key_reg.enum_keys();
         for subkey in subkeys.flatten() {
-            let joined_subkey = format!("{}\\{}\\{}", key, subkey, subkey_suffix);
+            let joined_subkey = format!("{}\\{}\\{}", key, subkey, additional_keypath);
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
             let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);
             if let Ok(registry_str) = subkey_reg_value {
@@ -138,12 +137,15 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
         (
             r"SOFTWARE\JavaSoft\Java Runtime Environment",
             "JavaHome",
-            None,
+            Some(r#"\\"#),
         ),
-        (r"SOFTWARE\JavaSoft\Java Development Kit", "JavaHome", None),
+        (
+            r"SOFTWARE\JavaSoft\Java Development Kit",
+            "JavaHome",
+            Some(r#"\\"#),
+        ),
         // Oracle for Java 9 and newer
-        (r"SOFTWARE\JavaSoft\JRE", "JavaHome", None),
-        (r"SOFTWARE\JavaSoft\JDK", "JavaHome", None),
+        (r"SOFTWARE\JavaSoft\JRE", "JavaHome", Some(r#"\\"#)),
         (r"SOFTWARE\JavaSoft\JDK", "JavaHome", Some(r#"\\"#)),
         // AdoptOpenJDK
         (r"SOFTWARE\AdoptOpenJDK\JRE", "Path", Some(r#"hotspot\MSI"#)),
@@ -168,15 +170,23 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
         // Microsoft
         (r"SOFTWARE\Microsoft\JDK", "Path", Some(r#"hotspot\MSI"#)),
         // Azul Zulu
-        (r"SOFTWARE\Azul Systems\Zulu", "InstallationPath", None),
+        (
+            r"SOFTWARE\Azul Systems\Zulu",
+            "InstallationPath",
+            Some(r#"\\"#),
+        ),
         // BellSoft Liberica
-        (r"SOFTWARE\BellSoft\Liberica", "InstallationPath", None),
+        (
+            r"SOFTWARE\BellSoft\Liberica",
+            "InstallationPath",
+            Some(r#"\\"#),
+        ),
     ];
 
-    for (key, value, subkey_suffix) in reg_paths {
-        match read_registry_key(key, value, subkey_suffix) {
+    for (key, value, additional_keypath) in reg_paths {
+        match read_registry_key(key, value, additional_keypath) {
             Ok(paths) => {
-                javas.extend(paths.into_iter().map(|path| PathBuf::from(path)));
+                javas.extend(paths.into_iter().map(PathBuf::from));
             }
             Err(_) => continue,
         }

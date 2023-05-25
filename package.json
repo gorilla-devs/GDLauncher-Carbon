@@ -6,8 +6,8 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "init": "npm i -g pnpm@8.1.1 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
-    "sudo-init": "sudo npm i -g pnpm@8.1.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
+    "init": "npm i -g pnpm@8.5.1 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
+    "sudo-init": "sudo npm i -g pnpm@8.5.1 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "codegen": "node iridium_patchfix.js && pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev ",
     "watch:core": "cargo run -p core_module",
@@ -17,10 +17,10 @@
     "prepare-release:linux-x64-prod": "cd target/x86_64-unknown-linux-gnu/production && cp ./core_module ./core_module.debug && strip -S ./core_module",
     "prepare-release:mac-x64-prod": "cd target/x86_64-apple-darwin/production && dsymutil ./core_module && strip -S ./core_module",
     "prepare-release:mac-arm64-prod": "cd target/aarch64-apple-darwin/production && dsymutil ./core_module && strip -S ./core_module",
-    "build:linux-x64": "cargo build -p core_module --release --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64 && turbo run build -- --x64 --linux -- --release",
-    "build:win-x64": "cargo build -p core_module --release --features production --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --release",
-    "build:mac-x64": "cargo build -p core_module --release --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64 && turbo run build -- --x64 --mac -- --release",
-    "build:mac-arm64": "cargo build -p core_module --release --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64 && turbo run build -- --arm64 --mac -- --release",
+    "build:linux-x64": "cargo build -p core_module --release --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64 && turbo run build -- --x64 --linux -- --release",
+    "build:win-x64": "cargo build -p core_module --release --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --release",
+    "build:mac-x64": "cargo build -p core_module --release --target x86_64-apple-darwin && pnpm prepare-release:mac-x64 && turbo run build -- --x64 --mac -- --release",
+    "build:mac-arm64": "cargo build -p core_module --release --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64 && turbo run build -- --arm64 --mac -- --release",
     "build:linux-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64-prod && turbo run build -- --x64 -- --linux --production",
     "build:win-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --production",
     "build:mac-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && turbo run build -- --x64 --mac -- --production",
@@ -43,8 +43,8 @@
     "turbo": "^1.7.0"
   },
   "engines": {
-    "pnpm": "8.1.1",
-    "node": ">=16.17.0"
+    "pnpm": "8.5.1",
+    "node": ">=18.16.0"
   },
-  "packageManager": "pnpm@8.1.1"
+  "packageManager": "pnpm@8.5.1"
 }

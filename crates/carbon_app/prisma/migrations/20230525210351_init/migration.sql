@@ -14,23 +14,29 @@ CREATE TABLE "AppConfiguration" (
     "xmx" INTEGER NOT NULL DEFAULT 1024,
     "xms" INTEGER NOT NULL DEFAULT 1024,
     "defaultInstanceGroup" INTEGER,
-    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true
+    "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
+    "autoManageJava" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable
 CREATE TABLE "Java" (
-    "path" TEXT NOT NULL PRIMARY KEY,
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "path" TEXT NOT NULL,
     "major" INTEGER NOT NULL,
     "fullVersion" TEXT NOT NULL,
     "type" TEXT NOT NULL,
+    "os" TEXT NOT NULL,
     "arch" TEXT NOT NULL,
-    "isValid" BOOLEAN NOT NULL DEFAULT false
+    "vendor" TEXT NOT NULL,
+    "isValid" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable
-CREATE TABLE "DefaultJava" (
-    "path" TEXT NOT NULL PRIMARY KEY,
-    "major" INTEGER NOT NULL
+CREATE TABLE "JavaSystemProfile" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "javaId" TEXT,
+    CONSTRAINT "JavaSystemProfile_javaId_fkey" FOREIGN KEY ("javaId") REFERENCES "Java" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -84,14 +90,50 @@ CREATE TABLE "InstanceGroup" (
     "groupIndex" INTEGER NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "ModFileCache" (
+    "path" TEXT NOT NULL PRIMARY KEY,
+    "filesize" INTEGER NOT NULL,
+    "md5" BLOB NOT NULL,
+    CONSTRAINT "ModFileCache_md5_fkey" FOREIGN KEY ("md5") REFERENCES "ModMetadata" ("md5") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModMetadata" (
+    "md5" BLOB NOT NULL PRIMARY KEY,
+    "murmur2" INTEGER NOT NULL,
+    "name" TEXT,
+    "modid" TEXT,
+    "version" TEXT,
+    "description" TEXT,
+    "authors" TEXT,
+    CONSTRAINT "ModMetadata_murmur2_fkey" FOREIGN KEY ("murmur2") REFERENCES "CurseForgeModCache" ("murmur2") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CurseForgeModCache" (
+    "murmur2" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "project_id" INTEGER NOT NULL,
+    "file_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "urlslug" TEXT NOT NULL,
+    "summary" TEXT NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "AppConfiguration_id_key" ON "AppConfiguration"("id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Java_id_key" ON "Java"("id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Java_path_key" ON "Java"("path");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DefaultJava_major_key" ON "DefaultJava"("major");
+CREATE UNIQUE INDEX "JavaSystemProfile_id_key" ON "JavaSystemProfile"("id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "JavaSystemProfile_name_key" ON "JavaSystemProfile"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");

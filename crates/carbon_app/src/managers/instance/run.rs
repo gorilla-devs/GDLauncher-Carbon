@@ -216,14 +216,14 @@ impl ManagerRef<'_, InstanceManager> {
                                     let progress = modpack_progress_rx.borrow();
                                     match *progress {
                                         ProgressState::Idle => {}
-                                        ProgressState::DownloadingAddonZip((downloaded, total)) => {
+                                        ProgressState::DownloadingAddonZip(downloaded, total) => {
                                             t_download_files
                                                 .update_download(downloaded as u32, total as u32)
                                         }
-                                        ProgressState::ExtractingAddonOverrides((count, total)) => {
+                                        ProgressState::ExtractingAddonOverrides(count, total) => {
                                             t_extract_files.update_items(count as u32, total as u32)
                                         }
-                                        ProgressState::AcquiringAddonsMetadata((count, total)) => {
+                                        ProgressState::AcquiringAddonsMetadata(count, total) => {
                                             t_addon_metadata
                                                 .update_items(count as u32, total as u32)
                                         }
@@ -316,7 +316,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 downloads.extend(
                     app.minecraft_manager()
-                        .get_all_vanilla_files(version_info.clone())
+                        .get_all_version_info_files(version_info.clone())
                         .await?,
                 );
 

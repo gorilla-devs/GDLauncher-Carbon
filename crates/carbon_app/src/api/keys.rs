@@ -46,11 +46,16 @@ keys! {
     }
 
     java {
-        GET_AVAILABLE                               = "getAvailable";
-        SET_DEFAULT                                 = "setDefault";
-        SETUP_CONTROLLED                            = "setupControlled";
-        GET_CONTROLLED_INSTALL_STATUS               = "getControlledInstallStatus";
-        DELETE_CONTROLLED                           = "deleteControlled";
+        GET_AVAILABLE_JAVAS                         = "getAvailableJavas";
+        GET_MANAGED_VENDORS                         = "getManagedVendors";
+        GET_MANAGED_OS                              = "getManagedOS";
+        GET_MANAGED_ARCH                            = "getManagedArch";
+        GET_MANAGED_VERSIONS_BY_VENDOR              = "getManagedVersionsByVendor";
+        SETUP_MANAGED_JAVA                          = "setupManagedJava";
+        GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
+        GET_SYSTEM_JAVA_PROFILES                    = "getSystemJavaProfiles";
+        UPDATE_SYSTEM_JAVA_PROFILE_PATH             = "updateSystemJavaProfilePath";
+        DELETE_JAVA_VERSION                         = "deleteJavaVersion";
     }
 
     mc {
@@ -96,6 +101,11 @@ keys! {
     metrics {
         SEND_EVENT                                  = "sendEvent";
         SEND_PAGEVIEW                               = "sendPageview";
+    }
+
+    systeminfo {
+        GET_TOTAL_RAM                               = "getTotalRAM";
+        GET_USED_RAM                                = "getUsedRAM";
     }
 
     modplatforms {

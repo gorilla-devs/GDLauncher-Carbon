@@ -99,9 +99,11 @@ enum ArgPlaceholder {
     LauncherVersion,
 }
 
-impl From<&str> for ArgPlaceholder {
-    fn from(arg: &str) -> Self {
-        match arg {
+impl TryFrom<&str> for ArgPlaceholder {
+    type Error = anyhow::Error;
+
+    fn try_from(arg: &str) -> Result<Self, Self::Error> {
+        let res = match arg {
             "auth_player_name" => ArgPlaceholder::AuthPlayerName,
             "version_name" => ArgPlaceholder::VersionName,
             "game_directory" => ArgPlaceholder::GameDirectory,
@@ -118,8 +120,10 @@ impl From<&str> for ArgPlaceholder {
             "natives_directory" => ArgPlaceholder::NativesDirectory,
             "launcher_name" => ArgPlaceholder::LauncherName,
             "launcher_version" => ArgPlaceholder::LauncherVersion,
-            _ => panic!("Unknown argument placeholder: {arg}"),
-        }
+            _ => anyhow::bail!("Unknown argument placeholder: {arg}"),
+        };
+
+        Ok(res)
     }
 }
 
@@ -214,7 +218,7 @@ pub async fn generate_startup_command(
     runtime_path: &RuntimePath,
     version: VersionInfo,
     instance_path: InstancePath,
-) -> Vec<String> {
+) -> anyhow::Result<Vec<String>> {
     let mut libraries = version
         .libraries
         .iter()
@@ -230,8 +234,7 @@ pub async fn generate_startup_command(
                     let Some(native_name) = library
                         .natives
                         .as_ref()
-                        .expect("No natives specified")
-                        .get(&get_current_os()) else {
+                        .and_then(|natives| natives.get(&get_current_os())) else {
                             return None;
                         };
 
@@ -297,11 +300,16 @@ pub async fn generate_startup_command(
         regex
             .replace_all(argument, |caps: &Captures| {
                 if let Some(value) = caps.name("value") {
-                    let value = replace_placeholder(&replacer_args, value.as_str().into());
+                    let value = match value.as_str().try_into() {
+                        Ok(value) => replace_placeholder(&replacer_args, value),
+                        Err(_) => return String::new(),
+                    };
                     return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
                 } else if let Some(standalone) = caps.name("standalone") {
-                    let value = replace_placeholder(&replacer_args, standalone.as_str().into());
-                    return value;
+                    return match standalone.as_str().try_into() {
+                        Ok(standalone) => replace_placeholder(&replacer_args, standalone),
+                        Err(_) => return String::new(),
+                    };
                 }
                 if let Some(arg) = caps.name("arg") {
                     return arg.as_str().to_string();
@@ -345,7 +353,7 @@ pub async fn generate_startup_command(
             ArgumentType::Game,
             version
                 .minecraft_arguments
-                .unwrap()
+                .unwrap_or_default()
                 .split(' ')
                 .map(|s| Argument::Normal(s.to_string()))
                 .collect(),
@@ -366,7 +374,7 @@ pub async fn generate_startup_command(
     command.push(version.main_class.clone());
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
 
-    command
+    Ok(command)
 }
 
 pub async fn launch_minecraft(
@@ -388,7 +396,7 @@ pub async fn launch_minecraft(
         version,
         instance_path,
     )
-    .await;
+    .await?;
 
     println!(
         "Starting Minecraft with command: {:?}",
@@ -511,7 +519,8 @@ mod tests {
             version,
             instance_id,
         )
-        .await;
+        .await
+        .unwrap();
 
         // generate a json file with the command
         let command = serde_json::to_string(&command).unwrap();
