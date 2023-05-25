@@ -109,6 +109,16 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
+        if let Some(is_first_launch) = incoming_settings.is_first_launch {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetIsFirstLaunch(
+                    is_first_launch,
+                )],
+            ));
+            something_changed = true;
+        }
+
         if let Some(startup_resolution) = incoming_settings.startup_resolution {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::UniqueWhereParam::IdEquals(0),
@@ -124,6 +134,16 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::UniqueWhereParam::IdEquals(0),
                 vec![app_configuration::SetParam::SetJavaCustomArgs(
                     java_custom_args,
+                )],
+            ));
+            something_changed = true;
+        }
+
+        if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetAutoManageJava(
+                    auto_manage_java,
                 )],
             ));
             something_changed = true;
@@ -159,14 +179,5 @@ impl ManagerRef<'_, SettingsManager> {
             .exec()
             .await?
             .ok_or(anyhow!("Can't find this key"))
-    }
-
-    pub async fn get_is_first_launch(&self) -> anyhow::Result<bool> {
-        self.get().await.map(|x| x.is_first_launch)
-    }
-
-    pub async fn set_is_first_launch(&self, value: bool) -> anyhow::Result<()> {
-        self.set(app_configuration::SetParam::SetIsFirstLaunch(value))
-            .await
     }
 }

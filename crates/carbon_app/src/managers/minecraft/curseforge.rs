@@ -17,9 +17,9 @@ use crate::managers::App;
 #[derive(Debug)]
 pub enum ProgressState {
     Idle,
-    DownloadingAddonZip((u64, u64)),
-    ExtractingAddonOverrides((u64, u64)),
-    AcquiringAddonsMetadata((u64, u64)),
+    DownloadingAddonZip(u64, u64),
+    ExtractingAddonOverrides(u64, u64),
+    AcquiringAddonsMetadata(u64, u64),
 }
 
 #[derive(Debug)]
@@ -62,10 +62,10 @@ pub async fn prepare_modpack(
 
     tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
-            progress_percentage_sender_clone.send(ProgressState::DownloadingAddonZip((
+            progress_percentage_sender_clone.send(ProgressState::DownloadingAddonZip(
                 download_progress_recv.borrow().current_size,
                 download_progress_recv.borrow().total_size,
-            )))?;
+            ))?;
         }
 
         Ok::<(), anyhow::Error>(())
@@ -82,7 +82,7 @@ pub async fn prepare_modpack(
         let mut i = 0;
         let mut downloadables = Vec::new();
         loop {
-            if i > archive_len {
+            if i >= archive_len {
                 break Err(anyhow::anyhow!("Failed to find manifest"));
             }
 
@@ -130,10 +130,10 @@ pub async fn prepare_modpack(
                         )
                         .with_size(mod_file.file_length as u64);
                         progress_percentage_sender_clone.send(
-                            ProgressState::AcquiringAddonsMetadata((
+                            ProgressState::AcquiringAddonsMetadata(
                                 atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
                                 files_len,
-                            )),
+                            ),
                         )?;
 
                         Ok::<Downloadable, anyhow::Error>(downloadable)
@@ -196,10 +196,10 @@ pub async fn prepare_modpack(
                 }
             }
 
-            progress_percentage_sender.send(ProgressState::ExtractingAddonOverrides((
+            progress_percentage_sender.send(ProgressState::ExtractingAddonOverrides(
                 i as u64,
                 total_archive_files,
-            )))?;
+            ))?;
         }
 
         Ok::<(), anyhow::Error>(())

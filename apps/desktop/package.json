@@ -27,8 +27,8 @@
     "@overwolf/ow-electron": "^22.3.2",
     "@overwolf/ow-electron-builder": "^23.6.0",
     "@playwright/test": "^1.29.1",
-    "@rspc/client": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
-    "@rspc/solid": "^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba",
+    "@rspc/client": "git://github.com/oscartbeaumont/rspc.git#60a4fa93187c20bc5cb565cc6ee30b2f0903840e",
+    "@rspc/solid": "git://github.com/oscartbeaumont/rspc.git#60a4fa93187c20bc5cb565cc6ee30b2f0903840e",
     "@sentry/electron": "^4.4.0",
     "@solidjs/router": "^0.8.2",
     "@tanstack/solid-query": "^4.22.0",
@@ -59,5 +59,6 @@
   "env": {
     "//": "Used in build scripts",
     "PORT": 3344
-  }
+  },
+  "version": "0.5.0+4a05f0af"
 }

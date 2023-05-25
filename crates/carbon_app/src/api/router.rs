@@ -27,7 +27,7 @@ macro_rules! router {
             router = router.$type($endpoint.local, |t| {
                 t(|$app: $crate::managers::App, $args: $args_ty| async move {
                     let block: ::core::result::Result::<_, $crate::api::router::router_rt_helper!($($rtmarker)?)>
-                        = (|| async move { $block })().await;
+                        = async move { $block }.await;
 
                     block.map_err(|e| {
                         let mut e = core::convert::Into::<$crate::error::FeError>::into(e);
