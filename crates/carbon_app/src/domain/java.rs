@@ -1,20 +1,27 @@
+use std::path::PathBuf;
+
 use anyhow::bail;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 // TODO: This does not handle the case where the same path still exists between executions but changes the version
 pub struct Java {
+    pub id: String,
     pub component: JavaComponent,
     pub is_valid: bool,
 }
 
-impl From<crate::db::java::Data> for Java {
-    fn from(value: crate::db::java::Data) -> Self {
+impl TryFrom<crate::db::java::Data> for Java {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
         let is_valid = value.is_valid;
-        Self {
-            component: JavaComponent::from(value),
+        Ok(Self {
+            id: value.id.clone(),
+            component: JavaComponent::try_from(value)?,
             is_valid,
-        }
+        })
     }
 }
 
@@ -27,20 +34,26 @@ pub enum JavaMajorVer {
 pub struct JavaComponent {
     pub path: String,
     pub arch: JavaArch,
+    pub os: JavaOs,
     /// Indicates whether the component has manually been added by the user
     #[serde(rename = "type")]
     pub _type: JavaComponentType,
     pub version: JavaVersion,
+    pub vendor: String,
 }
 
-impl From<crate::db::java::Data> for JavaComponent {
-    fn from(value: crate::db::java::Data) -> Self {
-        Self {
+impl TryFrom<crate::db::java::Data> for JavaComponent {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
             path: value.path,
-            arch: JavaArch::from(&*value.arch),
-            _type: JavaComponentType::from(&*value.r#type),
-            version: JavaVersion::try_from(&*value.full_version).unwrap(),
-        }
+            arch: JavaArch::try_from(&*value.arch)?,
+            _type: JavaComponentType::try_from(&*value.r#type)?,
+            version: JavaVersion::try_from(&*value.full_version)?,
+            os: JavaOs::try_from(value.os)?,
+            vendor: value.vendor,
+        })
     }
 }
 
@@ -51,53 +64,134 @@ pub enum JavaComponentType {
     Custom,
 }
 
-impl From<&str> for JavaComponentType {
-    fn from(s: &str) -> Self {
+impl TryFrom<&str> for JavaComponentType {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
         match &*s.to_lowercase() {
-            "local" => Self::Local,
-            "managed" => Self::Managed,
-            _ => unreachable!("Uh oh, this shouldn't happen"),
+            "local" => Ok(Self::Local),
+            "managed" => Ok(Self::Managed),
+            "custom" => Ok(Self::Custom),
+            _ => bail!("Uh oh, this shouldn't happen"),
         }
     }
 }
 
-impl From<JavaComponentType> for String {
-    fn from(t: JavaComponentType) -> Self {
-        match t {
-            JavaComponentType::Local => "local",
-            JavaComponentType::Managed => "managed",
-            JavaComponentType::Custom => "custom",
+impl ToString for JavaComponentType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Local => "local",
+            Self::Managed => "managed",
+            Self::Custom => "custom",
         }
         .to_string()
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Clone, EnumIter)]
 pub enum JavaArch {
-    X64,
-    X86,
-    Aarch64,
+    X86_64,
+    X86_32,
+    Arm32,
+    Arm64,
+}
+
+impl JavaArch {
+    pub fn get_current_arch() -> anyhow::Result<Self> {
+        Self::try_from(std::env::consts::ARCH)
+    }
 }
 
 impl<'a> From<JavaArch> for &'a str {
     fn from(arch: JavaArch) -> Self {
         match arch {
-            JavaArch::X64 => "x64",
-            JavaArch::X86 => "x86",
-            JavaArch::Aarch64 => "aarch64",
+            JavaArch::X86_64 => "x64",
+            JavaArch::X86_32 => "x86",
+            JavaArch::Arm32 => "arm32",
+            JavaArch::Arm64 => "arm64",
         }
     }
 }
 
-impl<'a> From<&'a str> for JavaArch {
-    fn from(s: &'a str) -> Self {
+impl<'a> TryFrom<&'a str> for JavaArch {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
-            "amd64" => JavaArch::X64,
-            "x64" => JavaArch::X64,
-            "x86_64" => JavaArch::X64,
-            "x86" => JavaArch::X86,
-            "aarch64" => JavaArch::Aarch64,
-            _ => panic!("Unknown JavaArch: {s}"),
+            "amd64" => Ok(JavaArch::X86_64),
+            "x64" => Ok(JavaArch::X86_64),
+            "x86" => Ok(JavaArch::X86_32),
+            "x86_64" => Ok(JavaArch::X86_64),
+            "x86_32" => Ok(JavaArch::X86_32),
+            "arm32" => Ok(JavaArch::Arm32),
+            "arm64" => Ok(JavaArch::Arm64),
+            "aarch32" => Ok(JavaArch::Arm32),
+            "aarch64" => Ok(JavaArch::Arm64),
+            _ => bail!("Unknown JavaArch: {s}"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Clone)]
+pub enum JavaOs {
+    Windows,
+    Linux,
+    MacOs,
+}
+
+impl TryFrom<&str> for JavaOs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value.to_lowercase().as_str() {
+            "windows" => Ok(Self::Windows),
+            "linux" => Ok(Self::Linux),
+            "macos" => Ok(Self::MacOs),
+            _ => bail!("Unknown JavaOs: {}", value),
+        }
+    }
+}
+
+impl JavaOs {
+    pub fn get_current_os() -> anyhow::Result<Self> {
+        JavaOs::try_from(std::env::consts::OS)
+    }
+}
+
+impl TryFrom<String> for JavaOs {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "windows" => Ok(Self::Windows),
+            "linux" => Ok(Self::Linux),
+            "macos" => Ok(Self::MacOs),
+            _ => Err(anyhow::anyhow!("Unknown OS: {}", value)),
+        }
+    }
+}
+
+impl ToString for JavaOs {
+    fn to_string(&self) -> String {
+        match self {
+            JavaOs::Windows => "windows",
+            JavaOs::Linux => "linux",
+            JavaOs::MacOs => "macos",
+        }
+        .to_string()
+    }
+}
+
+#[derive(Debug, EnumIter)]
+pub enum JavaVendor {
+    Azul,
+}
+
+impl JavaVendor {
+    pub fn from_java_dot_vendor(vendor: &str) -> Option<Self> {
+        match vendor {
+            "Azul Systems, Inc." => Some(Self::Azul),
+            _ => None,
         }
     }
 }
@@ -167,6 +261,17 @@ impl TryFrom<&str> for JavaVersion {
                     }
                 }
             }
+
+            // 1.8.0_832 -> 8.0.832
+            if version.major == 1 {
+                version.major = version.minor.ok_or(anyhow::anyhow!(
+                    "No minor version found, but 1.x format found"
+                ))?;
+                version.minor = version.patch.map(|p| p.parse().unwrap_or(0));
+                version.patch = version.update_number;
+                version.update_number = None;
+            }
+
             return Ok(version);
         }
 
@@ -203,6 +308,70 @@ impl JavaVersion {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, EnumIter)]
+pub enum SystemJavaProfileName {
+    Legacy,
+    Alpha,
+    Beta,
+    Gamma,
+    MinecraftJavaExe,
+}
+
+impl SystemJavaProfileName {
+    pub fn is_java_version_compatible(&self, java_version: JavaVersion) -> bool {
+        match self {
+            SystemJavaProfileName::Legacy => java_version.major == 8,
+            SystemJavaProfileName::Alpha => java_version.major == 16,
+            SystemJavaProfileName::Beta => java_version.major == 17,
+            SystemJavaProfileName::Gamma => java_version.major == 17,
+            SystemJavaProfileName::MinecraftJavaExe => java_version.major == 14,
+        }
+    }
+}
+
+impl std::str::FromStr for SystemJavaProfileName {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "legacy" => Ok(SystemJavaProfileName::Legacy),
+            "alpha" => Ok(SystemJavaProfileName::Alpha),
+            "beta" => Ok(SystemJavaProfileName::Beta),
+            "gamma" => Ok(SystemJavaProfileName::Gamma),
+            "minecraft_java_exe" => Ok(SystemJavaProfileName::MinecraftJavaExe),
+            _ => bail!("Unknown system profile: {}", s),
+        }
+    }
+}
+
+impl ToString for SystemJavaProfileName {
+    fn to_string(&self) -> String {
+        match self {
+            SystemJavaProfileName::Legacy => "legacy".to_string(),
+            SystemJavaProfileName::Alpha => "alpha".to_string(),
+            SystemJavaProfileName::Beta => "beta".to_string(),
+            SystemJavaProfileName::Gamma => "gamma".to_string(),
+            SystemJavaProfileName::MinecraftJavaExe => "minecraft_java_exe".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SystemJavaProfile {
+    pub name: SystemJavaProfileName,
+    pub java_id: Option<String>,
+}
+
+impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
+    type Error = anyhow::Error;
+
+    fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
+            name: data.name.parse()?,
+            java_id: data.java_id,
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::domain::java::JavaVersion;
@@ -233,10 +402,10 @@ mod test {
             TestCase {
                 output: "1.8.0_352-b08",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(8),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("352".to_owned()),
+                    major: 8,
+                    minor: Some(0),
+                    patch: Some("352".to_owned()),
+                    update_number: None,
                     prerelease: Some("b08".to_owned()),
                     build_metadata: None,
                 }),
@@ -255,10 +424,10 @@ mod test {
             TestCase {
                 output: "1.4.0_03-b04",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(4),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("03".to_owned()),
+                    major: 4,
+                    minor: Some(0),
+                    patch: Some("03".to_owned()),
+                    update_number: None,
                     prerelease: Some("b04".to_owned()),
                     build_metadata: None,
                 }),
@@ -277,10 +446,10 @@ mod test {
             TestCase {
                 output: "1.8.0_362-beta-202211161809-b03+152",
                 expected: Some(JavaVersion {
-                    major: 1,
-                    minor: Some(8),
-                    patch: Some("0".to_owned()),
-                    update_number: Some("362".to_owned()),
+                    major: 8,
+                    minor: Some(0),
+                    patch: Some("362".to_owned()),
+                    update_number: None,
                     prerelease: Some("beta-202211161809-b03".to_owned()),
                     build_metadata: Some("152".to_owned()),
                 }),

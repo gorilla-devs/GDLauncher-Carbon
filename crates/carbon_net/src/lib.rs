@@ -96,6 +96,15 @@ pub async fn download_file(
 
     let mut response = client.get(&downloadable_file.url).send().await?;
 
+    if !response.status().is_success() {
+        return Err(DownloadError::Non200StatusCode(response.status().as_u16()));
+    }
+
+    // Ensure the parent directory exists
+    if let Some(parent) = downloadable_file.path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -123,6 +132,47 @@ pub async fn download_file(
                 total_size: downloadable_file.size.unwrap_or(0),
                 size_progress: size_progress as u8,
             })?;
+        }
+    }
+
+    // Check size and checksum when provided
+    if let Some(size) = downloadable_file.size {
+        if size != buf.len() as u64 {
+            return Err(DownloadError::SizeMismatch {
+                expected: size,
+                actual: buf.len() as u64,
+            });
+        }
+    }
+
+    if let Some(checksum) = &downloadable_file.checksum {
+        match checksum {
+            Checksum::Sha1(expected) => {
+                let mut hasher = Sha1::new();
+                hasher.update(&buf);
+                let actual = hasher.finalize();
+                let actual = hex::encode(actual);
+
+                if expected != &actual {
+                    return Err(DownloadError::ChecksumMismatch {
+                        expected: expected.clone(),
+                        actual,
+                    });
+                }
+            }
+            Checksum::Sha256(expected) => {
+                let mut hasher = Sha256::new();
+                hasher.update(&buf);
+                let actual = hasher.finalize();
+                let actual = hex::encode(actual);
+
+                if expected != &actual {
+                    return Err(DownloadError::ChecksumMismatch {
+                        expected: expected.clone(),
+                        actual,
+                    });
+                }
+            }
         }
     }
 

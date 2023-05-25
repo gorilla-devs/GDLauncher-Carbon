@@ -27,6 +27,7 @@ mod minecraft;
 mod modplatforms;
 mod prisma_client;
 mod settings;
+pub mod system_info;
 pub mod vtask;
 
 pub type App = Arc<AppInner>;
@@ -40,7 +41,10 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = "https://api.gdlauncher.com";
 
 mod app {
-    use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
+    use super::{
+        java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager,
+        system_info::SystemInfoManager, *,
+    };
 
     pub struct AppInner {
         settings_manager: SettingsManager,
@@ -54,6 +58,7 @@ mod app {
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_manager: VisualTaskManager,
+        pub(crate) system_info_manager: SystemInfoManager,
     }
 
     macro_rules! manager_getter {
@@ -97,6 +102,7 @@ mod app {
                     reqwest_client: reqwest,
                     prisma_client: Arc::new(db_client),
                     task_manager: VisualTaskManager::new(),
+                    system_info_manager: SystemInfoManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -117,6 +123,7 @@ mod app {
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
+        manager_getter!(system_info_manager: SystemInfoManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
@@ -185,7 +192,6 @@ impl<T> Deref for ManagerRef<'_, T> {
         self.manager
     }
 }
-
 pub struct AppRef(pub Weak<AppInner>);
 
 impl AppRef {
