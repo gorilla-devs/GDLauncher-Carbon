@@ -18,13 +18,6 @@ importers:
         version: 1.7.0
 
   apps/desktop:
-    dependencies:
-      '@solid-primitives/deep':
-        specifier: ^0.0.102
-        version: 0.0.102(solid-js@1.7.3)
-      '@tanstack/solid-virtual':
-        specifier: 3.0.0-beta.6
-        version: 3.0.0-beta.6
     devDependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.241.0
@@ -59,12 +52,18 @@ importers:
       '@sentry/electron':
         specifier: ^4.4.0
         version: 4.4.0
+      '@solid-primitives/deep':
+        specifier: ^0.0.102
+        version: 0.0.102(solid-js@1.7.3)
       '@solidjs/router':
         specifier: ^0.8.2
         version: 0.8.2(solid-js@1.7.3)
       '@tanstack/solid-query':
         specifier: ^4.22.0
         version: 4.22.0(solid-js@1.7.3)
+      '@tanstack/solid-virtual':
+        specifier: 3.0.0-beta.6
+        version: 3.0.0-beta.6
       '@typescript-eslint/parser':
         specifier: ^5.48.0
         version: 5.48.0(eslint@8.31.0)(typescript@4.9.4)
@@ -3634,7 +3633,7 @@ packages:
 
   /@reach/observe-rect@1.2.0:
     resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
-    dev: false
+    dev: true
 
   /@rollup/pluginutils@4.2.1:
     resolution: {integrity: sha512-iKnFXr7NkdZAIHiIWE+BX5ULi/ucVFYWD6TbAV+rZctiRTY2PL6tsIKhoIOaoskiWAkgu+VsbXgUVDNLHf+InQ==}
@@ -3815,7 +3814,7 @@ packages:
       solid-js: ^1.6.12
     dependencies:
       solid-js: 1.7.3
-    dev: false
+    dev: true
 
   /@solidjs/router@0.8.2(solid-js@1.7.3):
     resolution: {integrity: sha512-gUKW+LZqxtX6y/Aw6JKyy4gQ9E7dLqp513oB9pSYJR1HM5c56Pf7eijzyXX+b3WuXig18Cxqah4tMtF0YGu80w==}
@@ -5606,7 +5605,7 @@ packages:
     engines: {node: '>=12'}
     dependencies:
       '@reach/observe-rect': 1.2.0
-    dev: false
+    dev: true
 
   /@testing-library/dom@8.20.0:
     resolution: {integrity: sha512-d9ULIT+a4EXLX3UU8FBjauG9NnsZHkHztXoIcTsOKoOw030fyjheN9svkTULjJxtYag9DZz5Jz5qkWZDPxTFwA==}
@@ -8600,6 +8599,7 @@ packages:
 
   /csstype@3.1.2:
     resolution: {integrity: sha512-I7K1Uu0MBPzaFKg4nI5Q7Vs2t+3gWWW648spaF+Rg7pI9ds18Ugn+lvg4SHczUdKlHI5LWBXyqfS8+DufyBsgQ==}
+    dev: true
 
   /currently-unhandled@0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
@@ -14568,6 +14568,7 @@ packages:
   /seroval@0.5.1:
     resolution: {integrity: sha512-ZfhQVB59hmIauJG5Ydynupy8KHyr5imGNtdDhbZG68Ufh1Ynkv9KOYOAABf71oVbQxJ8VkWnMHAjEHE7fWkH5g==}
     engines: {node: '>=10'}
+    dev: true
 
   /serve-favicon@2.5.0:
     resolution: {integrity: sha512-FMW2RvqNr03x+C0WxTyu6sOv21oOjkq5j8tjquWccwa6ScNyGFOGJVpuS1NmTVGBAHS07xnSKotgf2ehQmf9iA==}
@@ -14763,6 +14764,7 @@ packages:
     dependencies:
       csstype: 3.1.2
       seroval: 0.5.1
+    dev: true
 
   /solid-refresh@0.4.3(solid-js@1.7.3):
     resolution: {integrity: sha512-7+4/gYsVi0BlM4PzT1PU1TB5nW3Hv8FWuB+Kw/ofWui7KQkWBf+dVZOrReQYHEmLCzytHUa2JysUXgzVALJmSw==}
