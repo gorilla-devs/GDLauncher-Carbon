@@ -5616,6 +5616,13 @@ packages:
       solid-js: 1.7.3
     dev: true
 
+  /@tanstack/solid-virtual@3.0.0-beta.6:
+    resolution: {integrity: sha512-/HjeHZb4UZxxFSAkICUEWOozGwHQpKlvtnUoS5uSMSuLOz0XM5vFq6zR6ENwAczKWDtkh8ntddk+zXAhyXOlEw==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@reach/observe-rect': 1.2.0
+    dev: false
+
   /@testing-library/dom@8.20.0:
     resolution: {integrity: sha512-d9ULIT+a4EXLX3UU8FBjauG9NnsZHkHztXoIcTsOKoOw030fyjheN9svkTULjJxtYag9DZz5Jz5qkWZDPxTFwA==}
     engines: {node: '>=12'}
@@ -7306,19 +7313,6 @@ packages:
       validate-html-nesting: 1.2.2
     dev: true
 
-  /babel-plugin-jsx-dom-expressions@0.36.10(@babel/core@7.20.12):
-    resolution: {integrity: sha512-QA2k/14WGw+RgcGGnEuLWwnu4em6CGhjeXtjvgOYyFHYS2a+CzPeaVQHDOlfuiBcjq/3hWMspHMIMnPEOIzdBg==}
-    peerDependencies:
-      '@babel/core': ^7.20.12
-    dependencies:
-      '@babel/core': 7.20.12
-      '@babel/helper-module-imports': 7.18.6
-      '@babel/plugin-syntax-jsx': 7.18.6(@babel/core@7.20.12)
-      '@babel/types': 7.20.7
-      html-entities: 2.3.3
-      validate-html-nesting: 1.2.2
-    dev: true
-
   /babel-plugin-macros@3.1.0:
     resolution: {integrity: sha512-Cg7TFGpIr01vOQNODXOOaGz2NpCU5gl8x1qJFbb6hbZxR7XrcE2vtbAsTAbJ7/xwJtUuJEw8K8Zr/AE0LHlesg==}
     engines: {node: '>=10', npm: '>=6'}
@@ -7374,15 +7368,6 @@ packages:
       '@babel/helper-define-polyfill-provider': 0.3.3(@babel/core@7.20.12)
     transitivePeerDependencies:
       - supports-color
-    dev: true
-
-  /babel-preset-solid@1.7.4(@babel/core@7.20.12):
-    resolution: {integrity: sha512-0mbHNYkbOVYhH6L95VlHVkBEVQjOXSzUqLDiFxUcsg/tU4yTM/qx7FI8C+kmos9LHckQBSm3wtwoe1BZLNJR1w==}
-    peerDependencies:
-      '@babel/core': ^7.0.0
-    dependencies:
-      '@babel/core': 7.20.12
-      babel-plugin-jsx-dom-expressions: 0.36.10(@babel/core@7.20.12)
     dev: true
 
   /babel-preset-solid@1.7.4(@babel/core@7.20.12):
@@ -7635,7 +7620,7 @@ packages:
     hasBin: true
     dependencies:
       caniuse-lite: 1.0.30001489
-      electron-to-chromium: 1.4.405
+      electron-to-chromium: 1.4.407
       node-releases: 2.0.12
       update-browserslist-db: 1.0.11(browserslist@4.21.5)
     dev: true
@@ -8630,7 +8615,6 @@ packages:
 
   /csstype@3.1.2:
     resolution: {integrity: sha512-I7K1Uu0MBPzaFKg4nI5Q7Vs2t+3gWWW648spaF+Rg7pI9ds18Ugn+lvg4SHczUdKlHI5LWBXyqfS8+DufyBsgQ==}
-    dev: true
 
   /currently-unhandled@0.4.1:
     resolution: {integrity: sha512-/fITjgjGU50vjQ4FH6eUoYu+iUoUKIXws2hL15JJpIR+BbTxaXQsMuuyjtNh2WqsSBS5nsaZHFsFecyw5CCAng==}
@@ -9129,8 +9113,8 @@ packages:
       - supports-color
     dev: true
 
-  /electron-to-chromium@1.4.405:
-    resolution: {integrity: sha512-JdDgnwU69FMZURoesf9gNOej2Cms1XJFfLk24y1IBtnAdhTcJY/mXnokmpmxHN59PcykBP4bgUU98vLY44Lhuw==}
+  /electron-to-chromium@1.4.407:
+    resolution: {integrity: sha512-5smEvFSFYMv90tICOzRVP7Opp98DAC4KW7RRipg3BuNpGbbV3N+x24Zh3sbLb1T5haGtOSy/hrBfXsWnIM9aCg==}
     dev: true
 
   /electron-updater@5.3.0:
