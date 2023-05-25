@@ -51,11 +51,11 @@ importers:
         specifier: ^1.29.1
         version: 1.29.1
       '@rspc/client':
-        specifier: ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
-        version: 0.0.0-main-7c0a67c1
+        specifier: git://github.com/oscartbeaumont/rspc.git#60a4fa93187c20bc5cb565cc6ee30b2f0903840e
+        version: github.com/oscartbeaumont/rspc/60a4fa93187c20bc5cb565cc6ee30b2f0903840e
       '@rspc/solid':
-        specifier: ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
-        version: 0.0.0-main-7c0a67c1(@tanstack/solid-query@4.22.0)(solid-js@1.7.3)
+        specifier: git://github.com/oscartbeaumont/rspc.git#60a4fa93187c20bc5cb565cc6ee30b2f0903840e
+        version: github.com/oscartbeaumont/rspc/60a4fa93187c20bc5cb565cc6ee30b2f0903840e
       '@sentry/electron':
         specifier: ^4.4.0
         version: 4.4.0
@@ -3656,21 +3656,6 @@ packages:
       '@types/estree': 1.0.1
       estree-walker: 2.0.2
       picomatch: 2.3.1
-    dev: true
-
-  /@rspc/client@0.0.0-main-7c0a67c1:
-    resolution: {integrity: sha512-PpFkqhp8KlfdFSa8f/Ff5nOg8jhHNq12q8p0ZLYU/1K68JVPQRIk432zpXg48QT/MQbMrogx/PF5E7refhEtvw==}
-    dev: true
-
-  /@rspc/solid@0.0.0-main-7c0a67c1(@tanstack/solid-query@4.22.0)(solid-js@1.7.3):
-    resolution: {integrity: sha512-z4CJQX+Ci5/p/fC9XAN8x7aWMfm7chMSICQ4ks/PVC2IB1NZ5NYvOfzWA28KxHXJijBOAV45z2RRuxPR57+dqQ==}
-    peerDependencies:
-      '@tanstack/solid-query': ^4.6.0
-      solid-js: ^1.5.5
-    dependencies:
-      '@rspc/client': 0.0.0-main-7c0a67c1
-      '@tanstack/solid-query': 4.22.0(solid-js@1.7.3)
-      solid-js: 1.7.3
     dev: true
 
   /@rushstack/node-core-library@3.59.1:
@@ -16775,4 +16760,11 @@ packages:
 
   /zwitch@1.0.5:
     resolution: {integrity: sha512-V50KMwwzqJV0NpZIZFwfOD5/lyny3WlSzRiXgA0G7VUnRlqttta1L6UQIHzd6EuBY/cHGfwTIck7w1yH6Q5zUw==}
+    dev: true
+
+  github.com/oscartbeaumont/rspc/60a4fa93187c20bc5cb565cc6ee30b2f0903840e:
+    resolution: {tarball: https://codeload.github.com/oscartbeaumont/rspc/tar.gz/60a4fa93187c20bc5cb565cc6ee30b2f0903840e}
+    name: rspc
+    version: 0.0.0
+    engines: {node: '>=16.0.0', npm: pnpm, pnpm: '>=7.0.0', yarn: pnpm}
     dev: true

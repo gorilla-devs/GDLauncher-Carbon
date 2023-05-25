@@ -47,6 +47,7 @@ keys! {
         GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
         GET_SYSTEM_JAVA_PROFILES                    = "getSystemJavaProfiles";
         UPDATE_SYSTEM_JAVA_PROFILE_PATH             = "updateSystemJavaProfilePath";
+        DELETE_JAVA_VERSION                         = "deleteJavaVersion";
     }
 
     mc {
