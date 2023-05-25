@@ -62,6 +62,7 @@ toml = { workspace = true }
 opener = { workspace = true }
 md-5 = { workspace = true }
 hex = { workspace = true }
+murmurhash32 = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

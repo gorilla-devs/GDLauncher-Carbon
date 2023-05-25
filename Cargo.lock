@@ -435,6 +435,7 @@ dependencies = [
  "jsonwebtoken",
  "log",
  "md-5",
+ "murmurhash32",
  "ntest",
  "opener",
  "prisma-client-rust",
@@ -2220,6 +2221,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "murmurhash32"
+version = "0.2.0"
+source = "git+https://github.com/gorilla-devs/murmurhash32#401640895f352c88ccc61670993eec49c10e730b"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]

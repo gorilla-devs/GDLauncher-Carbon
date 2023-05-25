@@ -6,6 +6,9 @@ use serde::Serialize;
 pub enum Translation {
     #[cfg(test)]
     Test,
+    ModCacheTaskUpdate,
+    ModCacheTaskUpdateScanFiles,
+    ModCacheTaskUpdateQueryApis,
     InstanceTaskLaunch {
         name: String,
     },

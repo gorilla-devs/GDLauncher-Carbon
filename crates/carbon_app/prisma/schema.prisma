@@ -87,3 +87,32 @@ model InstanceGroup {
   groupIndex Int
   instances  Instance[]
 }
+
+model ModFileCache {
+  path     String      @id
+  filesize Int
+  md5      Bytes
+  metadata ModMetadata @relation(fields: [md5], references: [md5])
+}
+
+model ModMetadata {
+  md5         Bytes @id
+  murmur2     Int
+  name        String?
+  modid       String?
+  version     String?
+  description String?
+  authors     String?
+  curseforge  CurseForgeModCache? @relation(fields: [murmur2], references: [murmur2])
+  cachedFiles ModFileCache[]
+}
+
+model CurseForgeModCache {
+  murmur2     Int @id
+  project_id  Int
+  file_id     Int
+  name        String
+  urlslug     String
+  summary     String
+  metadata    ModMetadata[]
+}

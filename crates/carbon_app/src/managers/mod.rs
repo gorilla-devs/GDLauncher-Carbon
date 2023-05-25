@@ -24,6 +24,7 @@ mod cache_manager;
 pub mod download;
 pub mod instance;
 pub mod java;
+mod metadata;
 mod metrics;
 mod minecraft;
 mod modplatforms;
@@ -42,7 +43,10 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = "https://api.gdlauncher.com";
 
 mod app {
-    use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
+    use super::{
+        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
+        modplatforms::ModplatformsManager, *,
+    };
 
     pub struct AppInner {
         settings_manager: SettingsManager,
@@ -52,6 +56,7 @@ mod app {
         invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
         instance_manager: InstanceManager,
+        meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
@@ -96,6 +101,7 @@ mod app {
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
+                    meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
@@ -128,6 +134,7 @@ mod app {
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
         manager_getter!(instance_manager: InstanceManager);
+        manager_getter!(meta_cache_manager: MetaCacheManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
