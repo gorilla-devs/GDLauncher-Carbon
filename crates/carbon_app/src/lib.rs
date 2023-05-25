@@ -48,7 +48,7 @@ pub async fn init() {
     println!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
     println!("Scanning ports");
-    let listener = if !cfg!(feature = "production") {
+    let listener = if cfg!(debug_assertions) {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
         get_available_port().await

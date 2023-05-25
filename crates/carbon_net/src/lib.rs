@@ -96,6 +96,10 @@ pub async fn download_file(
 
     let mut response = client.get(&downloadable_file.url).send().await?;
 
+    if !response.status().is_success() {
+        return Err(DownloadError::Non200StatusCode(response.status().as_u16()));
+    }
+
     // Ensure the parent directory exists
     if let Some(parent) = downloadable_file.path.parent() {
         tokio::fs::create_dir_all(parent).await?;

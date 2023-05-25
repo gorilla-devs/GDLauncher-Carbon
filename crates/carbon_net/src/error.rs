@@ -18,4 +18,6 @@ pub enum DownloadError {
     SizeMismatch { expected: u64, actual: u64 },
     #[error("Checksum mismatch")]
     ChecksumMismatch { expected: String, actual: String },
+    #[error("Non 200 status code {0}")]
+    Non200StatusCode(u16),
 }

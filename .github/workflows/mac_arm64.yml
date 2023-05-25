@@ -15,7 +15,7 @@ jobs:
       run:
         working-directory: ./GDLauncher
     if: contains(github.ref, 'refs/heads/develop') || contains(github.ref, 'refs/heads/release') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/release') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
-    runs-on: macos-13
+    runs-on: macos-12
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
@@ -23,7 +23,7 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.68.2

@@ -120,6 +120,7 @@ impl<'a> TryFrom<&'a str> for JavaArch {
         match s.to_lowercase().as_str() {
             "amd64" => Ok(JavaArch::X86_64),
             "x64" => Ok(JavaArch::X86_64),
+            "x86" => Ok(JavaArch::X86_32),
             "x86_64" => Ok(JavaArch::X86_64),
             "x86_32" => Ok(JavaArch::X86_32),
             "arm32" => Ok(JavaArch::Arm32),

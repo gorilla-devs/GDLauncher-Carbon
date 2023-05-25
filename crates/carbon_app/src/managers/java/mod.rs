@@ -7,9 +7,13 @@ use super::ManagerRef;
 use crate::{
     api::keys::java::GET_SYSTEM_JAVA_PROFILES,
     db::PrismaClient,
-    domain::java::{Java, SystemJavaProfile, SystemJavaProfileName},
+    domain::java::{Java, JavaComponentType, SystemJavaProfile, SystemJavaProfileName},
 };
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Component, PathBuf},
+    sync::Arc,
+};
 
 mod constants;
 pub mod discovery;
@@ -131,5 +135,144 @@ impl ManagerRef<'_, JavaManager> {
         self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
 
         Ok(())
+    }
+
+    pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
+        let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
+
+        if !auto_manage_java {
+            anyhow::bail!("Auto manage java is disabled");
+        }
+
+        let java_from_db = self
+            .app
+            .prisma_client
+            .java()
+            .find_unique(crate::db::java::id::equals(java_id.clone()))
+            .exec()
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
+
+        let java_component_type = JavaComponentType::try_from(&*java_from_db.r#type)?;
+
+        match java_component_type {
+            JavaComponentType::Custom => {
+                self.app
+                    .prisma_client
+                    .java()
+                    .delete(crate::db::java::id::equals(java_id))
+                    .exec()
+                    .await?;
+            }
+            JavaComponentType::Managed => {
+                let root_managed_path = self
+                    .app
+                    .settings_manager()
+                    .runtime_path
+                    .get_managed_javas()
+                    .to_path();
+                let java_bin_path = PathBuf::from(java_from_db.path);
+
+                let managed_java_dir_name = java_bin_path
+                    .strip_prefix(&root_managed_path)?
+                    .components()
+                    .next()
+                    .ok_or_else(|| anyhow::anyhow!("Could not strip prefix"))?;
+
+                let managed_java_dir = root_managed_path.join(managed_java_dir_name);
+
+                if managed_java_dir.exists() {
+                    std::fs::remove_dir_all(managed_java_dir)?;
+                }
+
+                self.app
+                    .prisma_client
+                    .java()
+                    .delete(crate::db::java::id::equals(java_id))
+                    .exec()
+                    .await?;
+            }
+            JavaComponentType::Local => {
+                anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        domain::java::{JavaArch, JavaOs, JavaVendor},
+        setup_managers_for_test,
+    };
+
+    #[tokio::test]
+    async fn test_managed_service() {
+        let app = setup_managers_for_test().await;
+
+        let versions = app
+            .java_manager()
+            .managed_service
+            .get_versions_for_vendor(JavaVendor::Azul)
+            .await
+            .unwrap();
+
+        assert!(versions.contains_key(&JavaOs::Linux));
+        assert!(versions.contains_key(&JavaOs::Windows));
+        assert!(versions.contains_key(&JavaOs::MacOs));
+
+        app.java_manager()
+            .managed_service
+            .setup_managed(
+                JavaOs::get_current_os().unwrap(),
+                JavaArch::get_current_arch().unwrap(),
+                JavaVendor::Azul,
+                versions
+                    .get(&JavaOs::get_current_os().unwrap())
+                    .unwrap()
+                    .get(&JavaArch::get_current_arch().unwrap())
+                    .unwrap()[0]
+                    .id
+                    .clone(),
+                app.app.clone(),
+            )
+            .await
+            .unwrap();
+
+        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        assert_eq!(count, 1);
+
+        let from_db = app
+            .prisma_client
+            .java()
+            .find_first(vec![])
+            .exec()
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert!(std::path::Path::new(&from_db.path).exists());
+
+        app.java_manager()
+            .delete_java_version(from_db.id.clone())
+            .await
+            .unwrap();
+
+        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        assert_eq!(count, 0);
+
+        assert!(!std::path::Path::new(&from_db.path).exists());
+
+        let managed_javas_root = app
+            .settings_manager()
+            .runtime_path
+            .get_managed_javas()
+            .to_path();
+
+        let children = std::fs::read_dir(managed_javas_root).unwrap();
+
+        assert_eq!(children.count(), 0);
     }
 }
