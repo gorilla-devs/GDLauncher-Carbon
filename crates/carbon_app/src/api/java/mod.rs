@@ -48,6 +48,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation UPDATE_SYSTEM_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
             update_system_java_profile_path(app, args).await
         }
+
+        mutation DELETE_JAVA_VERSION[app, args: String] {
+            delete_java_version(app, args).await
+        }
     }
 }
 
@@ -150,6 +154,10 @@ async fn update_system_java_profile_path(
     app.java_manager()
         .update_system_java_profile_path(args.profile_name.into(), args.java_id)
         .await
+}
+
+async fn delete_java_version(app: App, args: String) -> anyhow::Result<()> {
+    app.java_manager().delete_java_version(args).await
 }
 
 #[derive(Type, Serialize)]
