@@ -1,3 +1,4 @@
+import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
 
@@ -6,10 +7,11 @@ type Props = {
 };
 
 const SecondStep = (props: Props) => {
+  let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
   return (
     <div class="flex flex-col items-center justify-between w-120 h-80">
       <div class="flex flex-col h-full justify-center items-center">
-        <h2 class="text-center font-normal text-sm">
+        <p class="text-center font-normal">
           <Trans
             key="onboarding.java_title"
             options={{
@@ -17,10 +19,17 @@ const SecondStep = (props: Props) => {
                 "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
             }}
           />
-        </h2>
+        </p>
       </div>
       <div class="flex justify-between w-full">
-        <Button variant="secondary" size="large">
+        <Button
+          variant="secondary"
+          size="large"
+          onClick={() => {
+            setSettingsMutation.mutate({ autoManageJava: false });
+            props.nextStep();
+          }}
+        >
           <Trans
             key="onboarding.java_no"
             options={{
@@ -28,7 +37,13 @@ const SecondStep = (props: Props) => {
             }}
           />
         </Button>
-        <Button onClick={() => props.nextStep()} size="large">
+        <Button
+          onClick={() => {
+            setSettingsMutation.mutate({ autoManageJava: true });
+            props.nextStep();
+          }}
+          size="large"
+        >
           <Trans
             key="onboarding.java_yes"
             options={{

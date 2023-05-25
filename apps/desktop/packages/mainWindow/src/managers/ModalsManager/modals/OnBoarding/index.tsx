@@ -27,7 +27,7 @@ const OnBoarding = (props: ModalProps) => {
     >
       <div class="select-none">
         <div
-          class="mx-auto max-w-60"
+          class="mx-auto max-w-70"
           classList={{
             hidden: currentStep() === 2,
           }}
