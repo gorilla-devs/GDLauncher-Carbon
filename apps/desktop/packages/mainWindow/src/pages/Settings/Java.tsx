@@ -14,6 +14,7 @@ import { For, Match, Show, Switch } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
+import { FEJavaComponentType } from "@gd/core_module/bindings";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -51,9 +52,28 @@ const Java = () => {
       (acc, curr) => acc.concat(curr),
       []
     );
+  const DeleteIcon = () => (
+    <div class="i-ri:delete-bin-7-fill text-darkSlate-50 hover:text-red-500 transition-color ease-in-out duration-100 text-xl cursor-pointer" />
+  );
+
+  const mapJavaTypeToAction = (type: FEJavaComponentType) => {
+    return (
+      <div class="flex gap-2 ml-4">
+        <Switch>
+          <Match when={type === "custom"}>
+            <DeleteIcon />
+            <div class="text-darkSlate-50 transition-color ease-in-out duration-100 text-xl cursor-pointer i-ri:pencil-fill hover:darkSlate-200" />
+          </Match>
+          <Match when={type === "managed"}>
+            <DeleteIcon />
+          </Match>
+        </Switch>
+      </div>
+    );
+  };
 
   return (
-    <div class="bg-darkSlate-800 w-full h-auto flex flex-col pt-5 px-6 box-border pb-10">
+    <div class="flex bg-darkSlate-800 w-full h-auto flex-col pt-5 px-6 box-border pb-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="java.java"
@@ -89,7 +109,7 @@ const Java = () => {
           </div>
         </div>
       </Show>
-      <div class="mb-4">
+      <div>
         <h5 class="m-0 mb-4">
           <Trans
             key="java.java_arguments_title"
@@ -128,7 +148,7 @@ const Java = () => {
           </Button>
         </div>
       </div>
-      <div class="h-full flex justify-between mb-4 mt-10">
+      <div class="flex mb-4 h-full justify-between mt-10">
         <h2 class="mt-0 text-sm">
           <Trans
             key="java.auto_handle_java"
@@ -140,7 +160,6 @@ const Java = () => {
         <GDSwitch
           checked={routeData.settings.data?.autoManageJava}
           onChange={(e) => {
-            console.log("EEEE", e.target.checked);
             setSettingsMutation.mutate({ autoManageJava: e.target.checked });
           }}
         />
@@ -167,7 +186,7 @@ const Java = () => {
               </Tab>
             </TabList>
             <TabPanel>
-              <div class="bg-darkSlate-900 h-full p-4 min-h-96">
+              <div class="h-full bg-darkSlate-900 p-4 min-h-96">
                 <div class="flex justify-between items-center mb-4">
                   <h2 class="m-0 text-sm font-normal">
                     <Trans
@@ -186,19 +205,20 @@ const Java = () => {
                       modalsContext?.openModal({ name: "addJava" });
                     }}
                   >
-                    <div class="text-darkSlate-500 text-xl i-ri:add-fill" />
+                    <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
                   </Button>
                 </div>
                 <For each={Object.entries(javas())}>
                   {([javaVersion, obj]) => (
-                    <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4">
+                    <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
                       <h3 class="m-0 mb-4">{javaVersion}</h3>
                       <div class="flex flex-col gap-4">
                         <For each={obj}>
                           {(java) => (
-                            <div class="rounded-lg border-1 border-solid border-darkSlate-600 px-4 flex justify-between items-center py-2 bg-darkSlate-700">
+                            <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
                               <span class="text-sm">{java.path}</span>
                               <span>{java.type}</span>
+                              {mapJavaTypeToAction(java.type)}
                             </div>
                           )}
                         </For>
