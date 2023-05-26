@@ -108,7 +108,7 @@ async function createWindow() {
       win?.show();
     });
 
-    function UpsertKeyValue(obj: any, keyToChange: string, value: any) {
+    function upsertKeyValue(obj: any, keyToChange: string, value: any) {
       const keyToChangeLower = keyToChange.toLowerCase();
       for (const key of Object.keys(obj)) {
         if (key.toLowerCase() === keyToChangeLower) {
@@ -122,7 +122,7 @@ async function createWindow() {
     win?.webContents.session.webRequest.onBeforeSendHeaders(
       (details, callback) => {
         const { requestHeaders } = details;
-        UpsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"]);
+        upsertKeyValue(requestHeaders, "Access-Control-Allow-Origin", ["*"]);
         callback({ requestHeaders });
       }
     );
@@ -130,8 +130,8 @@ async function createWindow() {
     win?.webContents.session.webRequest.onHeadersReceived(
       (details, callback) => {
         const { responseHeaders } = details;
-        UpsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"]);
-        UpsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"]);
+        upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"]);
+        upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"]);
         callback({
           responseHeaders,
         });
