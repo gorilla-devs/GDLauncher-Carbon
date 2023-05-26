@@ -7,7 +7,7 @@ import {
   onMount,
 } from "solid-js";
 
-interface Props {
+export interface Props {
   children?: JSX.Element;
   class?: string;
   title: string;
@@ -18,7 +18,6 @@ const Carousel = (props: Props) => {
   const [prevPageX, setPrevPageX] = createSignal(0);
   const [prevScrollLeft, setPrevScrollLeft] = createSignal(0);
   const [isMouseDown, setIsMouseDown] = createSignal(false);
-  const [isMouseMoving, setIsMouseMoving] = createSignal(false);
 
   let horizontalSlider: HTMLDivElement;
   let scrollRightArrowContainer: HTMLSpanElement;
@@ -82,37 +81,32 @@ const Carousel = (props: Props) => {
   };
 
   const mousedown = (e: MouseEvent) => {
-    if (e.button === 2) return;
     setIsMouseDown(true);
     horizontalSlider.classList.remove("snap-x", "snap-mandatory");
+    horizontalSlider?.classList.add("cursor-grab");
     setPrevPageX(e.pageX);
     setPrevScrollLeft(horizontalSlider.scrollLeft);
   };
 
   const mouseup = () => {
     setIsMouseDown(false);
-    setTimeout(() => {
-      setIsMouseMoving(false);
-    }, 100);
     horizontalSlider.classList.remove("snap-x", "snap-mandatory");
-    horizontalSlider?.classList.remove("cursor-grabbing");
+    horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
     horizontalSlider?.classList.add("scroll-smooth");
     autoSlide();
   };
 
   const mouseleave = () => {
     setIsMouseDown(false);
-    setIsMouseMoving(false);
     horizontalSlider.classList.remove("snap-x", "snap-mandatory");
-    horizontalSlider?.classList.remove("cursor-grabbing");
+    horizontalSlider?.classList.remove("cursor-grabbing", "cursor-grab");
     horizontalSlider?.classList.add("scroll-smooth");
   };
 
   const mousemove = (e: MouseEvent) => {
     if (!isMouseDown()) return;
     e.preventDefault();
-    setIsMouseMoving(true);
-    horizontalSlider?.classList.remove("scroll-smooth");
+    horizontalSlider?.classList.remove("scroll-smooth", "cursor-grab");
     horizontalSlider?.classList.add("cursor-grabbing");
     setPositionDiff(e.pageX - prevPageX());
     horizontalSlider.scrollLeft = prevScrollLeft() - positionDiff();
@@ -162,11 +156,9 @@ const Carousel = (props: Props) => {
   createEffect(() => {
     (mappedChildren() as JSX.Element[])?.forEach((item) => {
       (item as HTMLElement).classList.add("slide", "snap-start");
-      if (isMouseMoving()) {
+      (item as HTMLElement).onmouseover = () => {
         (item as HTMLElement).classList.add("pointer-events-none");
-      } else {
-        (item as HTMLElement).classList.remove("pointer-events-none");
-      }
+      };
     });
   });
 
@@ -225,7 +217,7 @@ const Carousel = (props: Props) => {
           onScroll={() => {
             showHideArrows();
           }}
-          class="scrollbar-hide w-full flex items-start gap-4 overflow-x-scroll scroll-smooth cursor-pointer"
+          class="scrollbar-hide w-full flex gap-4 overflow-x-scroll scroll-smooth"
         >
           {mappedChildren()}
         </div>

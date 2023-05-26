@@ -83,13 +83,6 @@ async function createWindow() {
     return getAdSize().adSize;
   });
 
-  ipcMain.handle("openFileDialog", async (_, filters) => {
-    return dialog.showOpenDialog({
-      properties: ["openFile"],
-      filters,
-    });
-  });
-
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {

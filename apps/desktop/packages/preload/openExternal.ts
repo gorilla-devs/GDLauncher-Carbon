@@ -7,7 +7,3 @@ contextBridge.exposeInMainWorld("openExternalLink", async (link: string) =>
 contextBridge.exposeInMainWorld("copyToClipboard", async (link: string) =>
   ipcRenderer.invoke("copyToClipboard", link)
 );
-
-contextBridge.exposeInMainWorld("openFileDialog", async (filters?: any) =>
-  ipcRenderer.invoke("openFileDialog", filters)
-);

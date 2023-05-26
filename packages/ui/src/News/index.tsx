@@ -24,7 +24,7 @@ type SliderProps = {
   onSlideClick?: (_news: SlideProps) => void;
 };
 
-interface CarouselProps {
+export interface CarouselProps {
   slides: SlideProps[];
   speed?: number;
   rtl?: boolean;
@@ -64,7 +64,7 @@ const News = (props: CarouselProps) => {
                     "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
                 }}
               />
-              <div class="absolute bottom-10 left-5 flex flex-col select-none">
+              <div class="absolute bottom-10 left-5 flex flex-col">
                 <h2 class="mb-0">{slide.title}</h2>
                 <p class="mt-2 text-darkSlate-50">{slide.description}</p>
               </div>
