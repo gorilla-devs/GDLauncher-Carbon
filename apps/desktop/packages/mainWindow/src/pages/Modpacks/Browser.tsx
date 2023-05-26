@@ -79,7 +79,7 @@ const modpacks = [
 
 const NoModpacks = () => {
   return (
-    <div class="w-full flex h-full justify-center items-center min-h-90">
+    <div class="flex w-full justify-center items-center h-full min-h-90">
       <div class="flex justify-center items-center flex-col text-center">
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
@@ -98,9 +98,10 @@ const NoModpacks = () => {
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
+
   return (
     <div class="w-full relative box-border">
-      <div class="flex flex-col sticky top-0 left-0 right-0 bg-darkSlate-800 z-10 px-5 pt-5">
+      <div class="flex flex-col left-0 right-0 sticky top-0 bg-darkSlate-800 z-10 px-5 pt-5">
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -178,18 +179,6 @@ export default function Browser() {
               </div>
             </span>
             <div class="flex gap-3">
-              <Dropdown
-                options={[
-                  { label: "1.16.5", key: "1.16.5" },
-                  { label: "1.16.4", key: "1.16.4" },
-                  { label: "1.16.3", key: "1.16.3" },
-                  { label: "1.16.2", key: "1.16.2" },
-                ]}
-                icon={<div class="i-ri:price-tag-3-fill" />}
-                rounded
-                bgColorClass="bg-darkSlate-400"
-                value="1.16.2"
-              />
               <Button
                 type="glow"
                 onClick={() =>

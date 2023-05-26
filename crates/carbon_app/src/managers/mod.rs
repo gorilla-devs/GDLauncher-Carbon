@@ -54,7 +54,7 @@ mod app {
         java_manager: JavaManager,
         pub(crate) minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
-        pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
         instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
@@ -150,6 +150,10 @@ mod app {
                     println!("Error sending invalidation request: {e}");
                 }
             }
+        }
+
+        pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
+            self.invalidation_channel.subscribe().recv().await
         }
     }
 }

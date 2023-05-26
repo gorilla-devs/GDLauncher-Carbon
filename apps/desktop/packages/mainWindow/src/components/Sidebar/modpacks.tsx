@@ -12,14 +12,14 @@ const Sidebar = () => {
             <div class="flex items-center gap-3">
               <Checkbox checked={true} disabled={false} />
               <div class="flex items-center gap-2">
-                <img class="w-4 h-4" src={getModloaderIcon("vanilla")} />
+                <img class="w-4 h-4" src={getModloaderIcon()} />
                 <p class="m-0">Vanilla</p>
               </div>
             </div>
             <div class="flex items-center gap-3">
               <Checkbox checked={true} disabled={false} />
               <div class="flex items-center gap-2">
-                <img class="w-4 h-4" src={getModloaderIcon("forge")} />
+                <img class="w-4 h-4" src={getModloaderIcon("Forge")} />
                 <p class="m-0">Forge</p>
               </div>
             </div>

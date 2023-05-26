@@ -48,10 +48,8 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
             // XD
             t(move |app, _args: ()| {
                 stream! {
-                    let mut channel = app.invalidation_channel.subscribe();
-
                     loop {
-                        match channel.recv().await {
+                        match app.wait_for_invalidation().await {
                             Ok(event) => {
                                 yield event;
                             }
