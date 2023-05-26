@@ -6,7 +6,7 @@ import {
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -121,10 +121,10 @@ const Tile = (props: Props) => {
 
   const handleDuplicate = () => {};
 
-  const menuItems = [
+  const menuItems = () => [
     {
-      icon: "i-ri:play-fill",
-      label: t("instance.action_play"),
+      icon: props.isRunning ? "i-ri:pause-mini-fill" : "i-ri:play-fill",
+      label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
     },
     {
@@ -166,7 +166,7 @@ const Tile = (props: Props) => {
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
-        <ContextMenu menuItems={menuItems}>
+        <ContextMenu menuItems={menuItems()}>
           <div
             class="select-none group flex justify-center flex-col z-50 items-start"
             onClick={(e) => {
@@ -305,7 +305,7 @@ const Tile = (props: Props) => {
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
-        <ContextMenu menuItems={menuItems}>
+        <ContextMenu menuItems={menuItems()}>
           <div
             class="relative group select-none flex items-center w-full gap-4 box-border px-3 h-14 erelative cursor-pointer"
             onClick={(e) => props?.onClick?.(e)}
