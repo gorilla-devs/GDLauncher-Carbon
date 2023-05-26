@@ -1,5 +1,4 @@
-use anyhow::Context;
-use carbon_net::{Downloadable, Progress};
+use carbon_net::Downloadable;
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,
@@ -46,7 +45,7 @@ impl ManagerRef<'_, MinecraftManager> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
-    pub async fn get_all_vanilla_files(
+    pub async fn get_all_version_info_files(
         self,
         version_info: VersionInfo,
     ) -> anyhow::Result<Vec<Downloadable>> {
@@ -89,7 +88,7 @@ impl ManagerRef<'_, MinecraftManager> {
 #[cfg(test)]
 mod tests {
 
-    use std::{io::Write, path::PathBuf};
+    use std::path::PathBuf;
 
     use carbon_net::Progress;
     use chrono::Utc;
@@ -139,25 +138,25 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-        //     &app.reqwest_client.clone(),
-        //     &app.minecraft_manager.meta_base_url,
-        // )
-        // .await
-        // .unwrap()
-        // .game_versions
-        // .into_iter()
-        // .find(|v| v.id == version)
-        // .unwrap()
-        // .loaders[0]
-        //     .clone();
+        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+            &app.reqwest_client.clone(),
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap()
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == version)
+        .unwrap()
+        .loaders[0]
+            .clone();
 
-        // let forge_version_info =
-        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-        //         .await
-        //         .unwrap();
+        let forge_version_info =
+            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+                .await
+                .unwrap();
 
-        // let version_info = merge_partial_version(forge_version_info, version_info);
+        let version_info = merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
@@ -172,7 +171,7 @@ mod tests {
 
         let vanilla_files = app
             .minecraft_manager()
-            .get_all_vanilla_files(version_info.clone())
+            .get_all_version_info_files(version_info.clone())
             .await
             .unwrap();
 
@@ -219,7 +218,7 @@ mod tests {
         };
 
         let mut child = launch_minecraft(
-            PathBuf::from("/Users/davideceschia/.sdkman/candidates/java/current/bin/java"),
+            PathBuf::from("java"),
             full_account,
             2048,
             2048,

@@ -18,14 +18,6 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(Into::<FESettings>::into(response))
         }
 
-        query GET_IS_FIRST_LAUNCH [app, _args: ()] {
-            app.settings_manager().get_is_first_launch().await
-        }
-
-        mutation SET_IS_FIRST_LAUNCH [app, value: bool] {
-            app.settings_manager().set_is_first_launch(value).await
-        }
-
         mutation SET_SETTINGS[app, new_settings: FESettingsUpdate] {
             app.settings_manager()
                 .set_settings(new_settings)
@@ -46,6 +38,10 @@ struct FESettings {
     show_news: bool,
     xmx: i32,
     xms: i32,
+    is_first_launch: bool,
+    startup_resolution: String,
+    java_custom_args: String,
+    auto_manage_java: bool,
 }
 
 impl From<crate::db::app_configuration::Data> for FESettings {
@@ -60,6 +56,10 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             show_news: data.show_news,
             xmx: data.xmx,
             xms: data.xms,
+            is_first_launch: data.is_first_launch,
+            startup_resolution: data.startup_resolution,
+            java_custom_args: data.java_custom_args,
+            auto_manage_java: data.auto_manage_java,
         }
     }
 }
@@ -87,7 +87,11 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub xms: Option<i32>,
     #[specta(optional)]
+    pub is_first_launch: Option<bool>,
+    #[specta(optional)]
     pub startup_resolution: Option<String>,
     #[specta(optional)]
     pub java_custom_args: Option<String>,
+    #[specta(optional)]
+    pub auto_manage_java: Option<bool>,
 }

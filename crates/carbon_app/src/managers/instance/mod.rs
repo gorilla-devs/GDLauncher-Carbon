@@ -6,6 +6,7 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
+use super::metadata::mods as mod_meta;
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
@@ -168,14 +169,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                 let mut md5 = Md5::new();
                                 let file = tokio::fs::read(&path).await?;
                                 md5.update(&file);
-                                let hash = md5.finalize();
+                                let md5hash = md5.finalize();
+                                let murmur2hash = murmurhash32::murmurhash2(&file[..]);
 
                                 let mod_ = tokio::task::spawn_blocking(|| {
-                                    mods::meta::parse_metadata(Cursor::new(file))
+                                    mod_meta::parse_metadata(Cursor::new(file))
                                 })
                                     .await??
                                     .map(|metadata| {
-                                        let id = hex::encode(hash);
+                                        let id = hex::encode(md5hash);
 
                                         let mut filename = path.file_name()
                                             .expect("this path cannot end in .. since we have used it as a file");

@@ -55,6 +55,7 @@ httpdate = { workspace = true }
 daedalus = { workspace = true }
 url = { workspace = true }
 serde_repr = { workspace = true }
+sysinfo = { workspace = true }
 iridium = { path = "../iridium", optional = true }
 tempdir = { workspace = true }
 trash = { workspace = true }
@@ -62,6 +63,7 @@ toml = { workspace = true }
 opener = { workspace = true }
 md-5 = { workspace = true }
 hex = { workspace = true }
+murmurhash32 = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

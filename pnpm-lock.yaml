@@ -44,10 +44,10 @@ importers:
         specifier: ^1.29.1
         version: 1.29.1
       '@rspc/client':
-        specifier: ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
+        specifier: ^0.0.0-main-60a4fa93187c20bc5cb565cc6ee30b2f0903840e
         version: 0.0.0-main-7c0a67c1
       '@rspc/solid':
-        specifier: ^0.0.0-main-32fe3d8a6ca525f048e84b78451c493e25e9eeba
+        specifier: ^0.0.0-main-60a4fa93187c20bc5cb565cc6ee30b2f0903840e
         version: 0.0.0-main-7c0a67c1(@tanstack/solid-query@4.22.0)(solid-js@1.7.3)
       '@sentry/electron':
         specifier: ^4.4.0

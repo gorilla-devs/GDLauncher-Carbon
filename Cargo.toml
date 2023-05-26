@@ -38,6 +38,7 @@ libc = "0.2"
 log = "0.4.17"
 md-5 = "0.10.5"
 mockall = "0.11.3"
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
 ntest = "0.9.0"
 opener = "0.6.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
@@ -83,3 +84,4 @@ quote = "1.0.26"
 url = "2.3.1"
 serde_repr = "0.1"
 proc-macro2 = "1.0.56"
+sysinfo = "0.29.0"

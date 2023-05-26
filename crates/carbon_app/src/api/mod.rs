@@ -15,6 +15,7 @@ mod metrics;
 mod modplatforms;
 pub mod router;
 pub mod settings;
+mod system_info;
 pub mod translation;
 mod vtask;
 
@@ -41,15 +42,14 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
         .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
+        .yolo_merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
             t(move |app, _args: ()| {
                 stream! {
-                    let mut invalidation_receiver = app.invalidation_channel.subscribe();
-
                     loop {
-                        match invalidation_receiver.recv().await {
+                        match app.wait_for_invalidation().await {
                             Ok(event) => {
                                 yield event;
                             }

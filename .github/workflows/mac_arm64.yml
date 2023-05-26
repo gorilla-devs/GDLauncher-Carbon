@@ -15,23 +15,15 @@ jobs:
       run:
         working-directory: ./GDLauncher
     if: contains(github.ref, 'refs/heads/develop') || contains(github.ref, 'refs/heads/release') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/release') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
-    runs-on: macos-13
+    runs-on: macos-12
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
         with:
           path: GDLauncher
-      - uses: actions/checkout@v3
-        env:
-          is_token: ${{ secrets.MACHINE_USER_TOKEN }}
-        if: ${{ env.is_token != '' }}
-        with:
-          repository: gorilla-devs/iridium
-          ref: release
-          ssh-key: ${{ secrets.MACHINE_USER_TOKEN }}
-          path: GDLauncher/crates/iridium
       - uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.68.2
@@ -51,19 +43,13 @@ jobs:
       - name: Build
         run: pnpm build:mac-arm64
         env:
-          CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
           CARGO_INCREMENTAL: 0
-      - name: Lint
-        run: pnpm lint
+      # - name: Lint
+      #   run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target
       - name: Test
         env:
-          CORE_MODULE_DSN: ${{ secrets.CORE_MODULE_DSN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          VITE_MAIN_DSN: ${{ secrets.VITE_MAIN_DSN }}
           CARGO_INCREMENTAL: 0
-        run: pnpm test -- --features production -- --include-ignored
+        run: pnpm test

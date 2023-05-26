@@ -24,11 +24,13 @@ mod cache_manager;
 pub mod download;
 pub mod instance;
 pub mod java;
+mod metadata;
 mod metrics;
 mod minecraft;
 mod modplatforms;
 mod prisma_client;
 mod settings;
+pub mod system_info;
 pub mod vtask;
 
 pub type App = Arc<AppInner>;
@@ -42,21 +44,26 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = "https://api.gdlauncher.com";
 
 mod app {
-    use super::{java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager, *};
+    use super::{
+        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
+        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+    };
 
     pub struct AppInner {
         settings_manager: SettingsManager,
         java_manager: JavaManager,
         pub(crate) minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
-        pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
         instance_manager: InstanceManager,
+        meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_manager: VisualTaskManager,
+        pub(crate) system_info_manager: SystemInfoManager,
     }
 
     macro_rules! manager_getter {
@@ -96,11 +103,13 @@ mod app {
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
+                    meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
                     prisma_client: Arc::new(db_client),
                     task_manager: VisualTaskManager::new(),
+                    system_info_manager: SystemInfoManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -128,6 +137,8 @@ mod app {
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
         manager_getter!(instance_manager: InstanceManager);
+        manager_getter!(meta_cache_manager: MetaCacheManager);
+        manager_getter!(system_info_manager: SystemInfoManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
@@ -139,6 +150,10 @@ mod app {
                     println!("Error sending invalidation request: {e}");
                 }
             }
+        }
+
+        pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
+            self.invalidation_channel.subscribe().recv().await
         }
     }
 }
@@ -192,7 +207,6 @@ impl<T> Deref for ManagerRef<'_, T> {
         self.manager
     }
 }
-
 pub struct AppRef(pub Weak<AppInner>);
 
 impl AppRef {

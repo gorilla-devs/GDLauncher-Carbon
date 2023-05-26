@@ -7,8 +7,6 @@ use crate::managers::ManagerRef;
 
 use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
-pub mod meta;
-
 impl ManagerRef<'_, InstanceManager> {
     pub async fn enable_mod(
         self,
