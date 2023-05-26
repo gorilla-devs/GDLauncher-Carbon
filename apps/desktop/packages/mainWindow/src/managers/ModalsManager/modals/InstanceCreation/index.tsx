@@ -262,7 +262,7 @@ const InstanceCreation = (props: ModalProps) => {
                   class="w-full"
                   placement="bottom"
                   onChange={(loader) => {
-                    setMcVersion(loader.key);
+                    setMcVersion(loader.key as string);
                   }}
                 />
               </Show>
@@ -371,7 +371,7 @@ const InstanceCreation = (props: ModalProps) => {
                 value={loaderVersions()?.[0]?.key}
                 placement="bottom"
                 onChange={(loader) => {
-                  setLoaderVersion(loader.key);
+                  setLoaderVersion(loader.key as string);
                 }}
               />
             </div>
