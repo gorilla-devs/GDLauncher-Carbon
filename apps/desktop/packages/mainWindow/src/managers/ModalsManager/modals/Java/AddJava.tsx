@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n";
-import { ModalProps } from "@/managers/ModalsManager";
+import { ModalProps, useModal } from "@/managers/ModalsManager";
 import ModalLayout from "@/managers/ModalsManager/ModalLayout";
-import { Button, Dropdown } from "@gd/ui";
+import { Button, Dropdown, createNotification } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import { Show, createEffect, createSignal, onMount } from "solid-js";
 import {
@@ -33,12 +33,29 @@ const AddJava = (props: ModalProps) => {
   const [javaVersions, setJavaVersions] = createSignal<FEManagedJavaVersion[]>(
     []
   );
+  const [selectedJavaVersion, setSelectedJavaVersion] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
+  const modalsContext = useModal();
+  const addNotification = createNotification();
 
   // eslint-disable-next-line solid/reactivity
   let versionsByVendor = rspc.createQuery(() => [
     "java.getManagedVersionsByVendor",
     vendor(),
   ]);
+
+  let addJavaMutation = rspc.createMutation(["java.setupManagedJava"], {
+    onMutate() {
+      setLoading(true);
+    },
+    onSuccess() {
+      addNotification("Java added successfully");
+    },
+    onSettled() {
+      modalsContext?.closeModal();
+      setLoading(false);
+    },
+  });
 
   onMount(() => {
     window.getCurrentOS().then((currentOs) => {
@@ -60,6 +77,18 @@ const AddJava = (props: ModalProps) => {
     } else setJavaVersions([]);
   });
 
+  const mappedJavaVersions = () =>
+    javaVersions()?.map((versions) => ({
+      key: versions.id as string,
+      label: versions.name as string,
+    })) || [];
+
+  const mappedVendors = () =>
+    javaVendors?.data?.map((vendors) => ({
+      key: vendors as string,
+      label: vendors as string,
+    })) || [];
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="flex items-center h-full flex-col justify-center">
@@ -80,12 +109,7 @@ const AddJava = (props: ModalProps) => {
                     setVendor(javaVendor.key as FEVendor);
                   }}
                   containerClass="border-1 border-solid border-darkSlate-600 rounded-lg"
-                  options={
-                    javaVendors?.data?.map((vendors) => ({
-                      key: vendors as string,
-                      label: vendors as string,
-                    })) || []
-                  }
+                  options={mappedVendors()}
                 />
               </Show>
             </div>
@@ -102,13 +126,11 @@ const AddJava = (props: ModalProps) => {
                 when={!versionsByVendor.isLoading && javaVersions().length > 0}
               >
                 <Dropdown
-                  containerClass="border-1 border-solid border-darkSlate-600 rounded-lg w-full"
-                  options={
-                    javaVersions()?.map((versions) => ({
-                      key: versions.id as string,
-                      label: versions.name as string,
-                    })) || []
+                  onChange={(version) =>
+                    setSelectedJavaVersion(version.key as string)
                   }
+                  containerClass="border-1 border-solid border-darkSlate-600 rounded-lg w-full"
+                  options={mappedJavaVersions()}
                 />
               </Show>
               <Show when={javaVersions().length === 0}>
@@ -122,7 +144,23 @@ const AddJava = (props: ModalProps) => {
             </div>
           </div>
           <div class="flex w-full justify-end">
-            <Button rounded={false}>
+            <Button
+              rounded={false}
+              loading={loading()}
+              onClick={() => {
+                const id = selectedJavaVersion() || mappedJavaVersions()[0].key;
+                const vend = vendor() || mappedVendors()[0].key;
+
+                if (currentOs().arch && currentOs().platform && id && vend) {
+                  addJavaMutation.mutate({
+                    arch: currentOs().arch as FEManagedJavaArch,
+                    os: currentOs().platform as FEManagedJavaOs,
+                    id,
+                    vendor: vend,
+                  });
+                }
+              }}
+            >
               <Trans
                 key="java.install"
                 options={{

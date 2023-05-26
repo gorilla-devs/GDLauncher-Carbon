@@ -12,7 +12,7 @@ const ThirdStep = () => {
       <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto -top-15">
         <img class="w-40" src={Logo} />
       </div>
-      <div class="max-w-70 w-full mt-4">
+      <div class="w-full mt-4 max-w-70">
         <Steps steps={onBoardingSteps} currentStep={2} />
       </div>
       <div class="absolute right-5 top-5">

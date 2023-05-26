@@ -10,7 +10,7 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch, createEffect } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -27,6 +27,8 @@ const Java = () => {
       queryClient.setQueryData(["settings.setSettings"], newTheme);
     },
   });
+
+  let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
 
@@ -52,28 +54,42 @@ const Java = () => {
       (acc, curr) => acc.concat(curr),
       []
     );
-  const DeleteIcon = () => (
-    <div class="i-ri:delete-bin-7-fill text-darkSlate-50 hover:text-red-500 transition-color ease-in-out duration-100 text-xl cursor-pointer" />
+
+  const javaInProfile = (id: string) => {
+    return (routeData.javaProfiles.data || []).some(
+      (item) => item.javaId === id
+    );
+  };
+
+  const DeleteIcon = (props: { id: string }) => (
+    <div
+      class="i-ri:delete-bin-7-fill text-darkSlate-50 hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
+      onClick={() => deleteJavaMutation.mutate(props.id)}
+    />
   );
 
-  const mapJavaTypeToAction = (type: FEJavaComponentType) => {
+  const mapJavaTypeToAction = (type: FEJavaComponentType, id: string) => {
     return (
-      <div class="flex gap-2 ml-4">
-        <Switch>
-          <Match when={type === "custom"}>
-            <DeleteIcon />
-            <div class="text-darkSlate-50 transition-color ease-in-out duration-100 text-xl cursor-pointer i-ri:pencil-fill hover:darkSlate-200" />
-          </Match>
-          <Match when={type === "managed"}>
-            <DeleteIcon />
-          </Match>
-        </Switch>
-      </div>
+      <>
+        <Show when={type === "custom" || type === "managed"}>
+          <div class="flex gap-2">
+            <Switch>
+              <Match when={type === "custom"}>
+                <DeleteIcon id={id} />
+                <div class="text-darkSlate-50 transition-color ease-in-out duration-100 text-xl cursor-pointer i-ri:pencil-fill hover:darkSlate-200" />
+              </Match>
+              <Match when={type === "managed"}>
+                <DeleteIcon id={id} />
+              </Match>
+            </Switch>
+          </div>
+        </Show>
+      </>
     );
   };
 
   return (
-    <div class="flex bg-darkSlate-800 w-full h-auto flex-col pt-5 px-6 box-border pb-10">
+    <div class="flex bg-darkSlate-800 w-full h-auto flex-col pt-5 px-5 box-border pb-10">
       <h2 class="m-0 mb-7 text-4">
         <Trans
           key="java.java"
@@ -208,24 +224,33 @@ const Java = () => {
                     <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
                   </Button>
                 </div>
-                <For each={Object.entries(javas())}>
-                  {([javaVersion, obj]) => (
-                    <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
-                      <h3 class="m-0 mb-4">{javaVersion}</h3>
-                      <div class="flex flex-col gap-4">
-                        <For each={obj}>
-                          {(java) => (
-                            <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
-                              <span class="text-sm">{java.path}</span>
-                              <span>{java.type}</span>
-                              {mapJavaTypeToAction(java.type)}
-                            </div>
-                          )}
-                        </For>
+                <div class="flex flex-col gap-4">
+                  <For each={Object.entries(javas())}>
+                    {([javaVersion, obj]) => (
+                      <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
+                        <h3 class="m-0 mb-4">{javaVersion}</h3>
+                        <div class="flex flex-col gap-4">
+                          <For each={obj}>
+                            {(java) => (
+                              <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
+                                <span class="text-xs text-darkSlate-100">
+                                  {java.path}
+                                </span>
+                                <div class="flex gap-2 justify-center items-center">
+                                  <span>{java.type}</span>
+                                  {mapJavaTypeToAction(java.type, java.id)}
+                                  <Show when={javaInProfile(java.id)}>
+                                    <div class="i-ri:checkbox-circle-fill text-green-500" />
+                                  </Show>
+                                </div>
+                              </div>
+                            )}
+                          </For>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </For>
+                    )}
+                  </For>
+                </div>
               </div>
             </TabPanel>
             <TabPanel>

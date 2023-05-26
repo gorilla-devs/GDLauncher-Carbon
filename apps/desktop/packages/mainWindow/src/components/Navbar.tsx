@@ -9,7 +9,7 @@ import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
-import { port, rspc } from "@/utils/rspcClient";
+import { port } from "@/utils/rspcClient";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
