@@ -150,7 +150,7 @@ export default function Browser() {
           <Tags />
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 overflow-y-hidden">
+      <div class="px-5 flex flex-col gap-2 pb-5 overflow-y-hidden">
         <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
