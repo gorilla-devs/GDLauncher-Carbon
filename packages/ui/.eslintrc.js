@@ -6,14 +6,27 @@ module.exports = {
   },
   overrides: [],
   rules: {
-    "prettier/prettier": ["error", { endOfLine: "lf" }],
+    "prettier/prettier": [
+      "error",
+      {
+        endOfLine: "lf",
+      },
+    ],
     "no-unused-vars": [
       "error",
-      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
+      {
+        varsIgnorePattern: "^_",
+        argsIgnorePattern: "^_",
+      },
     ],
   },
   parser: "@typescript-eslint/parser",
   plugins: ["solid", "prettier", "@unocss"],
-  extends: ["eslint:recommended", "plugin:solid/typescript", "prettier"],
+  extends: [
+    "eslint:recommended",
+    "plugin:solid/typescript",
+    "prettier",
+    "plugin:storybook/recommended",
+  ],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"],
 };

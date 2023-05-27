@@ -73,74 +73,71 @@ pub async fn prepare_modpack(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    let file_handle = std::fs::File::open(&file_path)?;
-    let mut archive = zip::ZipArchive::new(file_handle)?;
-
-    let (manifest, downloadables) = {
-        let (manifest, handles) = {
-            let Ok(file) = archive.by_name("manifest.json") else {
-                anyhow::bail!("Failed to find manifest");
-            };
-
-            let manifest: curseforge::manifest::Manifest = serde_json::from_reader(file)?;
-
-            let mut handles = Vec::new();
-
-            let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
-            let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
-
-            let files_len = manifest.files.len() as u64;
-
-            for file in &manifest.files {
-                let semaphore = semaphore.clone();
-                let app = app.clone();
-                let instance_path = instance_path.clone();
-                let progress_percentage_sender_clone = progress_percentage_sender.clone();
-                let atomic_counter = atomic_counter_download_metadata.clone();
-
-                let mod_id = file.project_id;
-                let file_id = file.file_id;
-
-                let handle = tokio::spawn(async move {
-                    let _ = semaphore.acquire().await?;
-
-                    let cf_manager = &app.modplatforms_manager().curseforge;
-
-                    let CurseForgeResponse { data: mod_file, .. } = cf_manager
-                        .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
-                        .await?;
-
-                    let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
-                    let downloadable = Downloadable::new(
-                        mod_file
-                            .download_url
-                            .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
-                        instance_path.join(mod_file.file_name),
-                    )
-                    .with_size(mod_file.file_length as u64);
-                    progress_percentage_sender_clone.send(
-                        ProgressState::AcquiringAddonsMetadata(
-                            atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-                            files_len,
-                        ),
-                    )?;
-
-                    Ok::<Downloadable, anyhow::Error>(downloadable)
-                });
-
-                handles.push(handle);
-            }
-
-            (manifest, handles)
+    let (mut archive, manifest) = spawn_blocking(move || {
+        let file = std::fs::File::open(file_path)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+        let manifest: curseforge::manifest::Manifest = {
+            let file = archive.by_name("manifest.json")?;
+            serde_json::from_reader(file)?
         };
 
-        let downloadables2 = futures::future::join_all(handles)
+        Ok::<_, anyhow::Error>((archive, manifest))
+    })
+    .await??;
+
+    let downloadables = {
+        let mut handles = Vec::new();
+
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
+        let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
+
+        let files_len = manifest.files.len() as u64;
+
+        for file in &manifest.files {
+            let semaphore = semaphore.clone();
+            let app = app.clone();
+            let instance_path = instance_path.clone();
+            let progress_percentage_sender_clone = progress_percentage_sender.clone();
+            let atomic_counter = atomic_counter_download_metadata.clone();
+
+            let mod_id = file.project_id;
+            let file_id = file.file_id;
+
+            let handle = tokio::spawn(async move {
+                let _ = semaphore.acquire().await?;
+
+                let cf_manager = &app.modplatforms_manager().curseforge;
+
+                let CurseForgeResponse { data: mod_file, .. } = cf_manager
+                    .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
+                    .await?;
+
+                let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
+                let downloadable = Downloadable::new(
+                    mod_file
+                        .download_url
+                        .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
+                    instance_path.join(mod_file.file_name),
+                )
+                .with_size(mod_file.file_length as u64);
+                progress_percentage_sender_clone.send(ProgressState::AcquiringAddonsMetadata(
+                    atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+                    files_len,
+                ))?;
+
+                Ok::<Downloadable, anyhow::Error>(downloadable)
+            });
+
+            handles.push(handle);
+        }
+
+        let downloadables = futures::future::join_all(handles)
             .await
             .into_iter()
             .flatten()
             .collect::<Result<Vec<_>, _>>()?;
 
-        (manifest, downloadables2)
+        downloadables
     };
 
     let override_folder_name = manifest.overrides.clone();
