@@ -76,24 +76,10 @@ pub async fn prepare_modpack(
     let (mut archive, manifest) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path)?;
         let mut archive = zip::ZipArchive::new(file)?;
-        let archive_len = archive.len() as u64;
-
-        let mut i = 0;
-        let manifest = loop {
-            if i >= archive_len {
-                break Err(anyhow::anyhow!("Failed to find manifest"));
-            }
-
-            let file = archive.by_index(i as usize)?;
-
-            if file.name() == "manifest.json" {
-                let manifest: curseforge::manifest::Manifest = serde_json::from_reader(file)?;
-
-                break Ok(manifest);
-            }
-
-            i += 1;
-        }?;
+        let manifest: curseforge::manifest::Manifest = {
+            let file = archive.by_name("manifest.json")?;
+            serde_json::from_reader(file)?
+        };
 
         Ok::<_, anyhow::Error>((archive, manifest))
     })
