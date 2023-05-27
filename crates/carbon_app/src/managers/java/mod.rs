@@ -114,8 +114,8 @@ impl ManagerRef<'_, JavaManager> {
     ) -> anyhow::Result<()> {
         let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
 
-        if !auto_manage_java {
-            anyhow::bail!("Auto manage java is disabled");
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
         }
 
         self.app
@@ -140,8 +140,8 @@ impl ManagerRef<'_, JavaManager> {
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
         let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
 
-        if !auto_manage_java {
-            anyhow::bail!("Auto manage java is disabled");
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
         }
 
         let java_from_db = self
