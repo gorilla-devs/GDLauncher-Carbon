@@ -1,18 +1,21 @@
 import { Progressbar } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Progressbar> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Progressbar",
   component: Progressbar,
 };
 
-const Template = ((args) => <Progressbar {...args} />) as StoryFn<
-  ComponentProps<typeof Progressbar>
->;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof Progressbar>;
 
-Main.args = {
-  percentage: 0,
+export const Main: Story = {
+  args: {
+    percentage: 0,
+  },
 };

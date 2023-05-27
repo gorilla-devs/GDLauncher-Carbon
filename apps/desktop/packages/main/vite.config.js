@@ -3,7 +3,6 @@ import { resolve } from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig(() => {
-  console.log("ENVPATH", resolve(__dirname, "../../../../"));
   return {
     root: __dirname,
     plugins: [],

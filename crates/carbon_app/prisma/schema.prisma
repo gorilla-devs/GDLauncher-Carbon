@@ -23,21 +23,27 @@ model AppConfiguration {
   xmx                 Int     @default(1024)
   xms                 Int     @default(1024)
   isFirstLaunch       Boolean @default(true)
+  autoManageJava      Boolean @default(true)
 }
 
-// Can't really use relations between java and defaultJava because external instances could refer to java as well
 model Java {
-  path        String  @id @unique
+  id          String              @id @unique @default(uuid())
+  path        String              @unique
   major       Int
   fullVersion String
   type        String
+  os          String
   arch        String
-  isValid     Boolean @default(false)
+  vendor      String
+  isValid     Boolean             @default(true)
+  JavaProfile JavaSystemProfile[]
 }
 
-model DefaultJava {
-  path  String @id
-  major Int    @unique
+model JavaSystemProfile {
+  id     String  @id @unique @default(uuid())
+  name   String  @unique
+  java   Java?   @relation(fields: [javaId], references: [id])
+  javaId String?
 }
 
 model Account {

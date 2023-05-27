@@ -1,20 +1,23 @@
 import { Slider } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Slider> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Slider",
   component: Slider,
 };
 
-const Template = ((args) => <Slider {...args} />) as StoryFn<
-  ComponentProps<typeof Slider>
->;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof Slider>;
 
-Main.args = {
-  min: 0,
-  max: 100,
-  onChange: (val) => console.log("onChange", val),
+export const Main: Story = {
+  args: {
+    min: 0,
+    max: 100,
+    onChange: (val) => console.log("onChange", val),
+  },
 };
