@@ -181,102 +181,104 @@ const Java = () => {
         />
       </div>
       <div class="flex flex-col">
-        <div class="overflow-hidden rounded-2xl">
-          <Tabs variant="block">
-            <TabList>
-              <Tab>
-                <Trans
-                  key="java.manage"
-                  options={{
-                    defaultValue: "Manage",
-                  }}
-                />
-              </Tab>
-              <Tab>
-                <Trans
-                  key="java.profiles"
-                  options={{
-                    defaultValue: "Profiles",
-                  }}
-                />
-              </Tab>
-            </TabList>
-            <TabPanel>
-              <div class="h-full bg-darkSlate-900 p-4 min-h-96">
-                <div class="flex justify-between items-center mb-4">
-                  <h2 class="m-0 text-sm font-normal">
-                    <Trans
-                      key="java.found_java_text"
-                      options={{
-                        defaultValue:
-                          "We found the following java versions on your pc:",
-                      }}
-                    />
-                  </h2>
-                  <Button
-                    rounded={false}
-                    variant="secondary"
-                    size="small"
-                    onClick={() => {
-                      modalsContext?.openModal({ name: "addJava" });
+        <Show when={!routeData.settings.data?.autoManageJava}>
+          <div class="overflow-hidden rounded-2xl">
+            <Tabs variant="block">
+              <TabList>
+                <Tab>
+                  <Trans
+                    key="java.manage"
+                    options={{
+                      defaultValue: "Manage",
                     }}
-                  >
-                    <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
-                  </Button>
-                </div>
-                <div class="flex flex-col gap-4">
-                  <For each={Object.entries(javas())}>
-                    {([javaVersion, obj]) => (
-                      <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
-                        <h3 class="m-0 mb-4">{javaVersion}</h3>
-                        <div class="flex flex-col gap-4">
-                          <For each={obj}>
-                            {(java) => (
-                              <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
-                                <span class="text-xs text-darkSlate-100">
-                                  {java.path}
-                                </span>
-                                <div class="flex gap-2 justify-center items-center">
-                                  <span>{java.type}</span>
-                                  {mapJavaTypeToAction(java.type, java.id)}
-                                  <Show when={javaInProfile(java.id)}>
-                                    <div class="i-ri:checkbox-circle-fill text-green-500" />
-                                  </Show>
+                  />
+                </Tab>
+                <Tab>
+                  <Trans
+                    key="java.profiles"
+                    options={{
+                      defaultValue: "Profiles",
+                    }}
+                  />
+                </Tab>
+              </TabList>
+              <TabPanel>
+                <div class="h-full bg-darkSlate-900 p-4 min-h-96">
+                  <div class="flex justify-between items-center mb-4">
+                    <h2 class="m-0 text-sm font-normal">
+                      <Trans
+                        key="java.found_java_text"
+                        options={{
+                          defaultValue:
+                            "We found the following java versions on your pc",
+                        }}
+                      />
+                    </h2>
+                    <Button
+                      rounded={false}
+                      variant="secondary"
+                      size="small"
+                      onClick={() => {
+                        modalsContext?.openModal({ name: "addJava" });
+                      }}
+                    >
+                      <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
+                    </Button>
+                  </div>
+                  <div class="flex flex-col gap-4">
+                    <For each={Object.entries(javas())}>
+                      {([javaVersion, obj]) => (
+                        <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
+                          <h3 class="m-0 mb-4">{javaVersion}</h3>
+                          <div class="flex flex-col gap-4">
+                            <For each={obj}>
+                              {(java) => (
+                                <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
+                                  <span class="text-xs text-darkSlate-100">
+                                    {java.path}
+                                  </span>
+                                  <div class="flex gap-2 justify-center items-center">
+                                    <span>{java.type}</span>
+                                    {mapJavaTypeToAction(java.type, java.id)}
+                                    <Show when={javaInProfile(java.id)}>
+                                      <div class="i-ri:checkbox-circle-fill text-green-500" />
+                                    </Show>
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </For>
+                              )}
+                            </For>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </For>
+                  </div>
+                </div>
+              </TabPanel>
+              <TabPanel>
+                <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
+                  <For each={routeData.javaProfiles.data}>
+                    {(profile) => {
+                      const path = flattenedAvailableJavas()?.find(
+                        (java) => java.id === profile.javaId
+                      )?.path;
+                      return (
+                        <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
+                          <h3 class="m-0">{profile.name}</h3>
+                          <span class="m-0">
+                            <Switch>
+                              <Match when={path}>{path}</Match>
+                              <Match when={!path}>-</Match>
+                            </Switch>
+                          </span>
+                        </div>
+                      );
+                    }}
                   </For>
                 </div>
-              </div>
-            </TabPanel>
-            <TabPanel>
-              <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
-                <For each={routeData.javaProfiles.data}>
-                  {(profile) => {
-                    const path = flattenedAvailableJavas()?.find(
-                      (java) => java.id === profile.javaId
-                    )?.path;
-                    return (
-                      <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
-                        <h3 class="m-0">{profile.name}</h3>
-                        <span class="m-0">
-                          <Switch>
-                            <Match when={path}>{path}</Match>
-                            <Match when={!path}>-</Match>
-                          </Switch>
-                        </span>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
-            </TabPanel>
-          </Tabs>
-        </div>
+              </TabPanel>
+            </Tabs>
+          </div>
+        </Show>
       </div>
     </div>
   );

@@ -133,7 +133,11 @@ const AddJava = (props: ModalProps) => {
                   options={mappedJavaVersions()}
                 />
               </Show>
-              <Show when={javaVersions().length === 0}>
+              <Show
+                when={
+                  javaVersions().length === 0 && !versionsByVendor.isLoading
+                }
+              >
                 <Trans
                   key="java.no_available_javas"
                   options={{
