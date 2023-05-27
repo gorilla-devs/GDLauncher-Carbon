@@ -150,7 +150,7 @@ impl ManagerRef<'_, VisualTaskManager> {
             }
 
             if let domain::Progress::Failed(e) = &domain.progress {
-                println!("Failure: {e} {e:#?}");
+                println!("Failure: {e:?}");
                 break;
             }
         }

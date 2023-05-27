@@ -399,7 +399,8 @@ pub async fn launch_minecraft(
     .await?;
 
     println!(
-        "Starting Minecraft with command: {:?}",
+        "Starting Minecraft with command: {} {}",
+        java_binary.to_string_lossy(),
         startup_command.join(" ")
     );
 

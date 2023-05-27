@@ -89,7 +89,7 @@ impl ToString for JavaComponentType {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Clone, EnumIter)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Copy, Clone, EnumIter)]
 pub enum JavaArch {
     X86_64,
     X86_32,
@@ -133,7 +133,7 @@ impl<'a> TryFrom<&'a str> for JavaArch {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Copy, Clone)]
 pub enum JavaOs {
     Windows,
     Linux,
@@ -309,7 +309,7 @@ impl JavaVersion {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, EnumIter)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, EnumIter, Eq, PartialEq)]
 pub enum SystemJavaProfileName {
     Legacy,
     Alpha,

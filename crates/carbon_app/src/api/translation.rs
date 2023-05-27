@@ -21,6 +21,7 @@ pub enum Translation {
     InstanceTaskLaunchDownloadModpackFiles,
     InstanceTaskLaunchExtractModpackFiles,
     InstanceTaskLaunchDownloadAddonMetadata,
+    InstanceTaskLaunchInstallJava,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskLaunchExtractNatives,
     InstanceTaskLaunchRunForgeProcessors,

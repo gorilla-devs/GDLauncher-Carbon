@@ -1,9 +1,11 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
+use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
@@ -275,6 +277,41 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_request_version_info.update_items(2, 3);
 
+                let java_path = {
+                    let required_java = SystemJavaProfileName::from(
+                        daedalus::minecraft::MinecraftJavaProfile::try_from(
+                            &version_info
+                                .java_version
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    anyhow::anyhow!("instance java version unsupported")
+                                })?
+                                .component as &str,
+                        )?,
+                    );
+
+                    match app.java_manager().get_usable_java(required_java).await? {
+                        Some(path) => path,
+                        None => {
+                            let t_install_java = task
+                                .subtask(Translation::InstanceTaskLaunchInstallJava)
+                                .await;
+                            t_install_java.set_weight(0.0);
+                            t_install_java.start_opaque();
+                            let path = app
+                                .java_manager()
+                                .require_java_install(required_java)
+                                .await?;
+                            t_install_java.complete_opaque();
+
+                            match path {
+                                Some(path) => path,
+                                None => return Ok(None),
+                            }
+                        }
+                    }
+                };
+
                 match version.modloaders.iter().next() {
                     Some(ModLoader {
                         type_: ModLoaderType::Forge,
@@ -382,7 +419,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
-                            PathBuf::from("java"),
+                            java_path,
                             account,
                             xms_memory,
                             xmx_memory,
