@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::bail;
+use daedalus::minecraft::MinecraftJavaProfile;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -320,25 +321,23 @@ pub enum SystemJavaProfileName {
 impl SystemJavaProfileName {
     pub fn is_java_version_compatible(&self, java_version: JavaVersion) -> bool {
         match self {
-            SystemJavaProfileName::Legacy => java_version.major == 8,
-            SystemJavaProfileName::Alpha => java_version.major == 16,
-            SystemJavaProfileName::Beta => java_version.major == 17,
-            SystemJavaProfileName::Gamma => java_version.major == 17,
-            SystemJavaProfileName::MinecraftJavaExe => java_version.major == 14,
+            Self::Legacy => java_version.major == 8,
+            Self::Alpha => java_version.major == 16,
+            Self::Beta => java_version.major == 17,
+            Self::Gamma => java_version.major == 17,
+            Self::MinecraftJavaExe => java_version.major == 14,
         }
     }
 }
 
-impl std::str::FromStr for SystemJavaProfileName {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "legacy" => Ok(SystemJavaProfileName::Legacy),
-            "alpha" => Ok(SystemJavaProfileName::Alpha),
-            "beta" => Ok(SystemJavaProfileName::Beta),
-            "gamma" => Ok(SystemJavaProfileName::Gamma),
-            "minecraft_java_exe" => Ok(SystemJavaProfileName::MinecraftJavaExe),
-            _ => bail!("Unknown system profile: {}", s),
+impl From<MinecraftJavaProfile> for SystemJavaProfileName {
+    fn from(value: MinecraftJavaProfile) -> Self {
+        match value {
+            MinecraftJavaProfile::JRELegacy => Self::Legacy,
+            MinecraftJavaProfile::JavaRuntimeAlpha => Self::Alpha,
+            MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
+            MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,
+            MinecraftJavaProfile::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
 }
@@ -346,11 +345,26 @@ impl std::str::FromStr for SystemJavaProfileName {
 impl ToString for SystemJavaProfileName {
     fn to_string(&self) -> String {
         match self {
-            SystemJavaProfileName::Legacy => "legacy".to_string(),
-            SystemJavaProfileName::Alpha => "alpha".to_string(),
-            SystemJavaProfileName::Beta => "beta".to_string(),
-            SystemJavaProfileName::Gamma => "gamma".to_string(),
-            SystemJavaProfileName::MinecraftJavaExe => "minecraft_java_exe".to_string(),
+            Self::Legacy => "legacy".to_string(),
+            Self::Alpha => "alpha".to_string(),
+            Self::Beta => "beta".to_string(),
+            Self::Gamma => "gamma".to_string(),
+            Self::MinecraftJavaExe => "mc_java_exe".to_string(),
+        }
+    }
+}
+
+impl TryFrom<&str> for SystemJavaProfileName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "legacy" => Ok(Self::Legacy),
+            "alpha" => Ok(Self::Alpha),
+            "beta" => Ok(Self::Beta),
+            "gamma" => Ok(Self::Gamma),
+            "mc_java_exe" => Ok(Self::MinecraftJavaExe),
+            _ => bail!("Unknown system java profile name: {}", value),
         }
     }
 }
@@ -366,7 +380,7 @@ impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
 
     fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
         Ok(Self {
-            name: data.name.parse()?,
+            name: data.name.as_str().try_into()?,
             java_id: data.java_id,
         })
     }
