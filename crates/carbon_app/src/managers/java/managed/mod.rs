@@ -84,7 +84,7 @@ pub trait Managed {
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
-    ) -> anyhow::Result<()>;
+    ) -> anyhow::Result<String>;
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap>;
 }
@@ -130,8 +130,8 @@ impl ManagedService {
         vendor: JavaVendor,
         id: String,
         app: crate::App,
-    ) -> anyhow::Result<()> {
-        match vendor {
+    ) -> anyhow::Result<String> {
+        let java_id = match vendor {
             JavaVendor::Azul => {
                 let versions = self.azul_zulu.fetch_all_versions().await?;
                 let version = versions
@@ -174,10 +174,10 @@ impl ManagedService {
                         db_client,
                         sender,
                     )
-                    .await?;
+                    .await?
             }
         };
 
-        Ok(())
+        Ok(java_id)
     }
 }
