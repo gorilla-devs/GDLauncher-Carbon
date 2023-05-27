@@ -1,22 +1,25 @@
 import { Input } from "./index.jsx";
-import type { StoryFn } from "@storybook/html";
-import type { ComponentProps } from "solid-js";
+import type { Meta, StoryObj } from "storybook-solidjs";
 
-export default {
+const meta: Meta<typeof Input> = {
+  /* 👇 The title prop is optional.
+   * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
+   * to learn how to generate automatic titles
+   */
   title: "Input",
   component: Input,
 };
 
-const Template = ((args) => <Input {...args} />) as StoryFn<
-  ComponentProps<typeof Input>
->;
+export default meta;
 
-export const Main = Template.bind({});
+type Story = StoryObj<typeof Input>;
 
-Main.args = {
-  value: "Value",
-  placeholder: "Type here",
-  error: "",
-  disabled: false,
-  icon: <div class="i-ri:refresh-line" />,
+export const Main: Story = {
+  args: {
+    value: "Value",
+    placeholder: "Type here",
+    error: "",
+    disabled: false,
+    icon: <div class="i-ri:refresh-line" />,
+  },
 };

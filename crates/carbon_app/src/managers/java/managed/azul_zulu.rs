@@ -39,7 +39,7 @@ impl Managed for AzulZulu {
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<String> {
         let progress_report = Arc::new(progress_report);
 
         let download_temp_path = tmp_path.to_path().join(&version.name);
@@ -166,9 +166,9 @@ impl Managed for AzulZulu {
             )
             .await?;
 
-        add_java_component_to_db(db_client, java_component).await?;
+        let java_id = add_java_component_to_db(db_client, java_component).await?;
 
-        Ok(())
+        Ok(java_id)
     }
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap> {

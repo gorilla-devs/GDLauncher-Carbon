@@ -103,7 +103,7 @@ async fn get_managed_versions_by_vendor(
     Ok(managed_java_map_os.into())
 }
 
-async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::Result<()> {
+async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::Result<String> {
     app.java_manager()
         .managed_service
         .setup_managed(
