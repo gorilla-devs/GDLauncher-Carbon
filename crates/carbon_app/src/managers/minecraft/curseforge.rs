@@ -73,17 +73,13 @@ pub async fn prepare_modpack(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    let mut archive = spawn_blocking(move || {
+    let (mut archive, manifest) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path)?;
-        zip::ZipArchive::new(file)
-    })
-    .await??;
+        let mut archive = zip::ZipArchive::new(file)?;
+        let archive_len = archive.len() as u64;
 
-    let archive_len = archive.len() as u64;
-
-    let manifest = {
         let mut i = 0;
-        loop {
+        let manifest = loop {
             if i >= archive_len {
                 break Err(anyhow::anyhow!("Failed to find manifest"));
             }
@@ -97,8 +93,11 @@ pub async fn prepare_modpack(
             }
 
             i += 1;
-        }
-    }?;
+        }?;
+
+        Ok::<_, anyhow::Error>((archive, manifest))
+    })
+    .await??;
 
     let downloadables = {
         let mut downloadables = Vec::new();
