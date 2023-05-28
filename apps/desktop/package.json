@@ -19,7 +19,6 @@
     "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.241.0",
     "@gd/config": "workspace:*",
     "@gd/core_module": "workspace:*",
     "@gd/i18n": "workspace:*",

@@ -27,7 +27,6 @@
     "build:mac-arm64-prod": "cargo build -p core_module --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --arm64 --mac -- --production",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
     "test": "turbo run test && cargo test",
-    "check-bundle": "bundlewatch --config bundlewatch.config.js",
     "lint-desktop": "turbo run lint --filter @gd/desktop",
     "rspc-bindings:generate": "cargo test -p core_module generate_rspc_ts_bindings -- --exact",
     "prisma:studio": "npx prisma studio --schema ./crates/carbon_app/prisma/schema.prisma",
@@ -37,6 +36,7 @@
     "sentry-cli": "sentry-cli"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.341.0",
     "@sentry/cli": "^2.17.3",
     "bundlewatch": "^0.3.3",
     "cross-env": "^7.0.3",
