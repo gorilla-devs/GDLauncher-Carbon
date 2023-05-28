@@ -1,14 +1,3 @@
-/**
- * @type {import('electron-builder').Configuration}
- * @see https://www.electron.build/configuration/configuration
- */
-
-const isDockerBuild = process.env.IS_DOCKER_TEST === "true";
-console.log(
-  "Only generating dir executable for test docker build",
-  isDockerBuild
-);
-
 let arch = process.argv[4].replace(/-/g, "");
 let os = process.argv[5].replace(/-/g, "");
 let profile = process.argv[7].replace(/-/g, "");
@@ -24,10 +13,20 @@ let targetTripleLookup = {
 
 let targetTriple = targetTripleLookup[`${os}-${arch}`];
 
+let appChannel = require("../../packages/config/version.json").channel;
+let publish =
+  appChannel === "snapshot"
+    ? undefined
+    : {
+        provider: "generic",
+        url: process.env.GENERIC_PUBLISH_URL,
+      };
+
 module.exports = {
   productName: "GDLauncher",
   appId: "org.gorilladevs.GDLauncher",
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
+  publish,
   asar: true,
   directories: {
     output: "release",
@@ -49,8 +48,9 @@ module.exports = {
     },
   ],
   win: {
-    target: isDockerBuild ? ["dir", "zip"] : ["dir", "zip", "nsis"],
+    target: ["dir", "zip", "nsis"],
     artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
+    verifyUpdateCodeSignature: false,
   },
   nsis: {
     oneClick: false,
@@ -59,13 +59,13 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: isDockerBuild ? ["dir", "zip", "dmg"] : ["dir", "zip", "dmg"],
+    target: ["dir", "zip", "dmg"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
-    target: isDockerBuild ? ["dir"] : ["dir", "zip"],
+    target: ["dir", "zip"],
     artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
   },
   afterAllArtifactBuild: () => {

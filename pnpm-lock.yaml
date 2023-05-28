@@ -5567,7 +5567,7 @@ packages:
   /@types/fs-extra@9.0.13:
     resolution: {integrity: sha512-nEnwB++1u5lVDM2UI4c1+5R+FYaKfaAzS4OococimjVm3nQw3TuzH5UNsocrcTBbhnerblyHj4A49qXbIiZdpA==}
     dependencies:
-      '@types/node': 18.11.9
+      '@types/node': 18.15.11
     dev: true
 
   /@types/glob@7.2.0:
@@ -6769,7 +6769,7 @@ packages:
       read-config-file: 6.2.0
       sanitize-filename: 1.6.3
       semver: 7.3.8
-      tar: 6.1.11
+      tar: 6.1.15
       temp-file: 3.4.0
     transitivePeerDependencies:
       - supports-color

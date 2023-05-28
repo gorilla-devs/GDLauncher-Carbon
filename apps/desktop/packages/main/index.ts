@@ -15,8 +15,8 @@ import {
 import { release } from "os";
 import { join, resolve } from "path";
 import "./cli";
-import { autoUpdater } from "electron-updater";
-import coreModule from "./core_module_loader";
+import coreModule from "./CoreModuleLoaded";
+// import autoUpdater from "./autoUpdater";
 import "./preloadListeners";
 import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
@@ -84,43 +84,6 @@ async function createWindow() {
     return getAdSize().adSize;
   });
 
-  // if (app.isPackaged) {
-
-  let allowUnstableReleases = false;
-
-  autoUpdater.autoDownload = false;
-  autoUpdater.allowDowngrade =
-    !allowUnstableReleases && app.getVersion().includes("beta");
-  autoUpdater.allowPrerelease = allowUnstableReleases;
-  autoUpdater.setFeedURL({
-    owner: "gorilla-devs",
-    repo: "GDLauncher",
-    provider: "github",
-  });
-
-  ipcMain.handle("checkUpdate", async () => {
-    autoUpdater.checkForUpdates();
-  });
-
-  ipcMain.handle("installUpdate", async () => {
-    // INSTALL THE UPDATE
-    autoUpdater.quitAndInstall(true, false);
-  });
-
-  autoUpdater.on("update-available", () => {
-    autoUpdater.downloadUpdate();
-  });
-
-  autoUpdater.on("update-downloaded", () => {
-    win?.webContents.send("updateAvailable");
-  });
-
-  ipcMain.on("releaseChannel", async (_, releaseChannel) => {
-    if (releaseChannel === "beta" || releaseChannel === "alpha") {
-      allowUnstableReleases = true;
-    }
-  });
-
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
@@ -144,7 +107,6 @@ async function createWindow() {
   win.on("ready-to-show", () => {
     coreModule.finally(() => {
       win?.show();
-      autoUpdater.checkForUpdates();
     });
 
     if (import.meta.env.DEV) {
