@@ -230,24 +230,36 @@ const Java = () => {
                       {([javaVersion, obj]) => (
                         <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
                           <h3 class="m-0 mb-4">{javaVersion}</h3>
-                          <div class="flex flex-col gap-4">
-                            <For each={obj}>
-                              {(java) => (
-                                <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
-                                  <span class="text-xs text-darkSlate-100">
-                                    {java.path}
-                                  </span>
-                                  <div class="flex gap-2 justify-center items-center">
-                                    <span>{java.type}</span>
-                                    {mapJavaTypeToAction(java.type, java.id)}
-                                    <Show when={javaInProfile(java.id)}>
-                                      <div class="i-ri:checkbox-circle-fill text-green-500" />
-                                    </Show>
+                          <Show when={obj.length > 0}>
+                            <div class="flex flex-col gap-4">
+                              <For each={obj}>
+                                {(java) => (
+                                  <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
+                                    <span class="text-xs text-darkSlate-100">
+                                      {java.path}
+                                    </span>
+                                    <div class="flex gap-2 justify-center items-center">
+                                      <span>{java.type}</span>
+                                      {mapJavaTypeToAction(java.type, java.id)}
+                                      <Show when={javaInProfile(java.id)}>
+                                        <div class="i-ri:checkbox-circle-fill text-green-500" />
+                                      </Show>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </For>
-                          </div>
+                                )}
+                              </For>
+                            </div>
+                          </Show>
+                          <Show when={obj.length === 0}>
+                            <p>
+                              <Trans
+                                key="java.no_found_java_text"
+                                options={{
+                                  defaultValue: "No java available",
+                                }}
+                              />
+                            </p>
+                          </Show>
                         </div>
                       )}
                     </For>
