@@ -11,7 +11,7 @@ use crate::{
     api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
     db::PrismaClient,
     domain::{
-        java::{JavaArch, JavaOs, JavaVendor},
+        java::{JavaArch, JavaOs, JavaVendor, JavaVersion},
         runtime_path::{ManagedJavasPath, TempPath},
     },
 };
@@ -38,6 +38,7 @@ pub struct ManagedJavaVersion {
     pub id: String,
     pub name: String,
     pub download_url: String,
+    pub java_version: JavaVersion,
 }
 
 #[derive(Debug, Clone, Serialize)]
