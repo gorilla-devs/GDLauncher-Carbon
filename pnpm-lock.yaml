@@ -38,8 +38,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^22.3.2
-        version: 22.3.2
+        specifier: ^22.3.3
+        version: 22.3.3
       '@overwolf/ow-electron-builder':
         specifier: ^23.6.0
         version: 23.6.0
@@ -55,12 +55,18 @@ importers:
       '@sentry/electron':
         specifier: ^4.4.0
         version: 4.4.0
+      '@solid-primitives/deep':
+        specifier: ^0.0.102
+        version: 0.0.102(solid-js@1.7.3)
       '@solidjs/router':
         specifier: ^0.8.2
         version: 0.8.2(solid-js@1.7.3)
       '@tanstack/solid-query':
         specifier: ^4.22.0
         version: 4.22.0(solid-js@1.7.3)
+      '@tanstack/solid-virtual':
+        specifier: 3.0.0-beta.6
+        version: 3.0.0-beta.6
       '@typescript-eslint/parser':
         specifier: ^5.48.0
         version: 5.48.0(eslint@8.31.0)(typescript@4.9.4)
@@ -4037,8 +4043,8 @@ packages:
       - supports-color
     dev: true
 
-  /@overwolf/ow-electron@22.3.2:
-    resolution: {integrity: sha512-LObtvM/qaoTylEkP3RDbuLYxJNfu38mUtmL9MTrUcHlky5SUIP94OwwB8ep00g6rWOJC0H3ofU+zUuuw0PFOYA==}
+  /@overwolf/ow-electron@22.3.3:
+    resolution: {integrity: sha512-nwUom1oBSLjMFPbwHxiL7FXk0EaholnI1IRutpoCFWZ4tG/6EALIYqCtGxXaqMNeWh+LeEvwSOnVYkN4R2KbCA==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
     requiresBuild: true
@@ -4073,6 +4079,10 @@ packages:
 
   /@polka/url@1.0.0-next.21:
     resolution: {integrity: sha512-a5Sab1C4/icpTZVzZc5Ghpz88yQtGOyNqYXcZgOssB2uuAr+wF/MvN6bgtW32q7HHrvBki+BsZ0OuNv6EV3K9g==}
+    dev: true
+
+  /@reach/observe-rect@1.2.0:
+    resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
     dev: true
 
   /@rollup/pluginutils@5.0.2:
@@ -4268,6 +4278,14 @@ packages:
     engines: {node: '>=14.0.0'}
     dependencies:
       tslib: 2.5.0
+    dev: true
+
+  /@solid-primitives/deep@0.0.102(solid-js@1.7.3):
+    resolution: {integrity: sha512-qD4J69VUDnnjwe4zlU3yEyZoa04wF8atytU88i80+CZ4pi7qNKEjTiU1DQg6lMTtx9znZrhChz349sRfHViVPQ==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      solid-js: 1.7.3
     dev: true
 
   /@solidjs/router@0.8.2(solid-js@1.7.3):
@@ -5094,6 +5112,16 @@ packages:
       '@storybook/preview-api': 7.0.12
     dev: true
 
+  /@storybook/instrumenter@7.0.17:
+    resolution: {integrity: sha512-TQkoYMbwmCQXAUgNhwAglXxTJTwtSKbDNRlpccZVIywFvnyiXZNns2NG7VE3xIV3WLcFCg3SAtj52yFGArMnuA==}
+    dependencies:
+      '@storybook/channels': 7.0.17
+      '@storybook/client-logger': 7.0.17
+      '@storybook/core-events': 7.0.17
+      '@storybook/global': 5.0.0
+      '@storybook/preview-api': 7.0.17
+    dev: true
+
   /@storybook/manager-api@7.0.12(react-dom@18.2.0)(react@16.14.0):
     resolution: {integrity: sha512-3QXARtxpc6Xxqf5pviUw2UuhK53+IsINSljeWhAqdQ1Gzbywl67TpibTd7xVN6NKxhUH5Bzo9bIZTAzMZGqaKw==}
     peerDependencies:
@@ -5294,8 +5322,8 @@ packages:
   /@storybook/testing-library@0.0.14-next.2:
     resolution: {integrity: sha512-i/SLSGm0o978ELok/SB4Qg1sZ3zr+KuuCkzyFqcCD0r/yf+bG35aQGkFqqxfSAdDxuQom0NO02FE+qys5Eapdg==}
     dependencies:
-      '@storybook/client-logger': 7.0.12
-      '@storybook/instrumenter': 7.0.12
+      '@storybook/client-logger': 7.0.17
+      '@storybook/instrumenter': 7.0.17
       '@testing-library/dom': 8.19.0
       '@testing-library/user-event': 13.5.0(@testing-library/dom@8.19.0)
       ts-dedent: 2.2.0
@@ -5381,6 +5409,13 @@ packages:
     dependencies:
       '@tanstack/query-core': 4.22.0
       solid-js: 1.7.3
+    dev: true
+
+  /@tanstack/solid-virtual@3.0.0-beta.6:
+    resolution: {integrity: sha512-/HjeHZb4UZxxFSAkICUEWOozGwHQpKlvtnUoS5uSMSuLOz0XM5vFq6zR6ENwAczKWDtkh8ntddk+zXAhyXOlEw==}
+    engines: {node: '>=12'}
+    dependencies:
+      '@reach/observe-rect': 1.2.0
     dev: true
 
   /@testing-library/dom@8.19.0:

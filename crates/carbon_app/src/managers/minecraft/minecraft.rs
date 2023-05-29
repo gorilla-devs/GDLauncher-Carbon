@@ -258,6 +258,7 @@ pub async fn generate_startup_command(
 
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
+    command.push(format!("-XstartOnFirstThread"));
 
     let arguments = version.arguments.clone().unwrap_or_else(|| {
         let mut arguments = HashMap::new();

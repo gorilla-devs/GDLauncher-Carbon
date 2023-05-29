@@ -146,7 +146,7 @@ impl From<crate::domain::modplatforms::curseforge::FileHash> for FEFileHash {
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEFileReleaseType {
-    Release,
+    Stable,
     Beta,
     Alpha,
 }
@@ -154,8 +154,8 @@ pub enum FEFileReleaseType {
 impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for FEFileReleaseType {
     fn from(release_type: crate::domain::modplatforms::curseforge::FileReleaseType) -> Self {
         match release_type {
-            crate::domain::modplatforms::curseforge::FileReleaseType::Release => {
-                FEFileReleaseType::Release
+            crate::domain::modplatforms::curseforge::FileReleaseType::Stable => {
+                FEFileReleaseType::Stable
             }
             crate::domain::modplatforms::curseforge::FileReleaseType::Beta => {
                 FEFileReleaseType::Beta
@@ -946,7 +946,6 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEModLoaderType {
-    Any,
     Forge,
     Cauldron,
     LiteLoader,
@@ -959,7 +958,6 @@ impl From<crate::domain::modplatforms::curseforge::ModLoaderType> for FEModLoade
         minecraft_mod_loader_type: crate::domain::modplatforms::curseforge::ModLoaderType,
     ) -> Self {
         match minecraft_mod_loader_type {
-            crate::domain::modplatforms::curseforge::ModLoaderType::Any => FEModLoaderType::Any,
             crate::domain::modplatforms::curseforge::ModLoaderType::Forge => FEModLoaderType::Forge,
             crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron => {
                 FEModLoaderType::Cauldron
@@ -980,7 +978,6 @@ impl From<FEModLoaderType> for crate::domain::modplatforms::curseforge::ModLoade
         minecraft_mod_loader_type: FEModLoaderType,
     ) -> crate::domain::modplatforms::curseforge::ModLoaderType {
         match minecraft_mod_loader_type {
-            FEModLoaderType::Any => crate::domain::modplatforms::curseforge::ModLoaderType::Any,
             FEModLoaderType::Forge => crate::domain::modplatforms::curseforge::ModLoaderType::Forge,
             FEModLoaderType::Cauldron => {
                 crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron
@@ -1093,7 +1090,7 @@ pub struct FECategory {
     pub url: String,
     pub icon_url: String,
     pub date_modified: String,
-    pub is_class: bool,
+    pub is_class: Option<bool>,
     pub class_id: Option<i32>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
