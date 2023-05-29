@@ -402,7 +402,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .data
                                 .as_ref()
                                 .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from("java"),
+                            java_path.clone(),
                             instance_path.clone(),
                             client_path,
                             game_version,
@@ -661,7 +661,7 @@ mod test {
 
     use crate::{
         domain::instance::info::{self, StandardVersion},
-        managers::{account::FullAccount, instance::InstanceVersionSouce},
+        managers::{account::FullAccount, instance::InstanceVersionSouce}, api::keys,
     };
 
     //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
@@ -699,8 +699,28 @@ mod test {
         };
 
         app.task_manager().wait_with_log(task).await?;
+        app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS).await?;
         println!("Task exited");
-        tokio::time::sleep(std::time::Duration::from_secs(10000)).await;
+        let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
+            domain::LaunchState::Inactive => {
+                println!("Game not running");
+                return Ok(())
+            },
+            domain::LaunchState::Running { log_id, .. } => log_id,
+            _ => unreachable!(),
+        };
+
+        let mut log = app.instance_manager().get_log(log_id).await?;
+
+        let mut idx = 0;
+        while log.changed().await.is_ok() {
+            let log = log.borrow();
+            let new_lines = log.get_region(idx..);
+            idx = log.len();
+            for line in new_lines {
+                println!("[{:?}]: {}", line.type_, line.text);
+            }
+        }
 
         Ok(())
     }

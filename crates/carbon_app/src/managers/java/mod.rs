@@ -246,7 +246,7 @@ impl ManagerRef<'_, JavaManager> {
         Ok(java.map(|java| PathBuf::from(java.path)))
     }
 
-    /// Wwill return Some(path) if configured to automatically install.
+    /// Will return Some(path) if configured to automatically install.
     /// Will return None if user intervention is required.
     pub async fn require_java_install(
         self,
@@ -272,9 +272,9 @@ impl ManagerRef<'_, JavaManager> {
                 JavaVendor::Azul,
                 versions
                     .get(&current_os)
-                    .map(|v| v.get(&current_arch))
+                    .map(|for_arch| for_arch.get(&current_arch))
                     .flatten()
-                    .map(|v| v.get(0))
+                    .map(|versions| versions.iter().find(|v| target_profile.is_java_version_compatible(&v.java_version)))
                     .flatten()
                     .ok_or_else(|| {
                         anyhow::anyhow!("unable to find automatically installable java version")

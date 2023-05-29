@@ -21,8 +21,8 @@ mod vtask;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
-    key: &'static str,
-    args: Option<serde_json::Value>,
+    pub key: &'static str,
+    pub args: Option<serde_json::Value>,
 }
 
 impl InvalidationEvent {

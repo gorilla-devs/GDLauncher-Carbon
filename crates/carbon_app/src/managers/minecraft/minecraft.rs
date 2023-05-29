@@ -364,7 +364,8 @@ pub async fn generate_startup_command(
         arguments
     });
 
-    substitute_arguments(&mut command, arguments.get(&ArgumentType::Jvm).unwrap());
+    let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
+    substitute_arguments(&mut command, &jvm_arguments);
 
     for cap in extra_args_regex.captures_iter(extra_java_args) {
         let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };

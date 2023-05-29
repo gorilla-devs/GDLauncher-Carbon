@@ -325,7 +325,7 @@ pub enum SystemJavaProfileName {
 }
 
 impl SystemJavaProfileName {
-    pub fn is_java_version_compatible(&self, java_version: JavaVersion) -> bool {
+    pub fn is_java_version_compatible(&self, java_version: &JavaVersion) -> bool {
         match self {
             Self::Legacy => java_version.major == 8,
             Self::Alpha => java_version.major == 16,
