@@ -1,4 +1,3 @@
-import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
@@ -11,6 +10,15 @@ type Props = { mod: FEMod };
 
 const Mod = (props: Props) => {
   const modalsContext = useModal();
+
+  const latestFIlesIndexes = () => props.mod.latestFilesIndexes;
+
+  const mappedVersions = () =>
+    latestFIlesIndexes().map((version) => ({
+      key: version.gameVersion,
+      label: version.gameVersion,
+    }));
+
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
@@ -76,7 +84,7 @@ const Mod = (props: Props) => {
               }}
             />
           </Button>
-          <Dropdown.button
+          {/* <Dropdown.button
             options={[
               { label: "1.16.5", key: "1.16.5" },
               { label: "1.16.4", key: "1.16.4" },
@@ -85,6 +93,18 @@ const Mod = (props: Props) => {
             ]}
             rounded
             value="1.16.2"
+          >
+            <Trans
+              key="instance.download_modpacks"
+              options={{
+                defaultValue: "Download",
+              }}
+            />
+          </Dropdown.button> */}
+          <Dropdown.button
+            options={mappedVersions()}
+            rounded
+            value={mappedVersions()[0]?.key}
           >
             <Trans
               key="instance.download_modpacks"
