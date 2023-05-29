@@ -78,10 +78,6 @@ const AddMod = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    console.log("allRows", allRows());
-  });
-
-  createEffect(() => {
     rowVirtualizer.setOptions({
       getScrollElement: () => parentRef(),
     });

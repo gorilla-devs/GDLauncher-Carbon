@@ -60,7 +60,14 @@ const Mod = (props: Props) => {
         <div class="flex gap-3">
           <Button
             variant="outline"
-            onClick={() => modalsContext?.openModal({ name: "modDetails" })}
+            onClick={() =>
+              modalsContext?.openModal(
+                {
+                  name: "modDetails",
+                },
+                { mod: props.mod }
+              )
+            }
           >
             <Trans
               key="instance.explore_modpack"

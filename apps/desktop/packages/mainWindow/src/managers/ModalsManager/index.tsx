@@ -15,6 +15,7 @@ import { useGDNavigate } from "../NavigationManager";
 export type ModalProps = {
   title: string;
   noHeader?: boolean;
+  data?: any;
 };
 
 type Hash = {
@@ -76,7 +77,7 @@ type ModalName = string;
 type Modal = { name: ModalName; url?: string };
 
 type Context = {
-  openModal: (_modal: Modal) => void;
+  openModal: (_modal: Modal, _data?: any) => void;
   closeModal: () => void;
   isVisible: Accessor<boolean>;
 };
@@ -90,6 +91,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const queryParams = () => location.search as ModalName;
   const urlSearchParams = () => new URLSearchParams(queryParams());
   const mParam = () => urlSearchParams().get("m");
+  const [data, setData] = createSignal<any>(undefined);
 
   const [_searchParams, setSearchParams] = useSearchParams();
 
@@ -101,9 +103,10 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const title = () => defaultModals[modalTypeIndex()]?.title;
 
   const manager = {
-    openModal: (modal: Modal) => {
+    openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
+      setData(data);
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
         url.append("m", modal.name);
@@ -144,6 +147,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 noHeader,
                 title,
               })}
+              data={data()}
               noHeader={noHeader()}
               title={title()}
             />
