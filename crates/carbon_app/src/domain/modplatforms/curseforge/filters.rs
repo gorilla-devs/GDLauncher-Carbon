@@ -1,19 +1,21 @@
 use carbon_macro::into_query_parameters;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use super::{ClassId, ModLoaderType};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[serde(rename_all = "camelCase")]
+#[repr(u8)]
 pub enum ModSearchSortField {
-    Featured,
-    Popularity,
-    LastUpdated,
-    Name,
-    Author,
-    TotalDownloads,
-    Category,
-    GameVersion,
+    Featured = 1,
+    Popularity = 2,
+    LastUpdated = 3,
+    Name = 4,
+    Author = 5,
+    TotalDownloads = 6,
+    Category = 7,
+    GameVersion = 8,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,7 +37,6 @@ pub struct ModSearchParameters {
 #[serde(rename_all = "camelCase")]
 pub struct ModSearchParametersQuery {
     pub game_id: i32,
-    pub page: Option<i32>,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
     pub category_id: Option<i32>,

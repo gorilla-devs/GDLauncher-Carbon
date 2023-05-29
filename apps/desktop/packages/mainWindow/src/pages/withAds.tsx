@@ -1,8 +1,18 @@
 import { AdsBanner } from "@/components/AdBanner";
 import AppNavbar from "@/components/Navbar";
-import { Outlet } from "@solidjs/router";
+import { Outlet, useRouteData } from "@solidjs/router";
+import { createEffect } from "solid-js";
+import fetchData from "./app.data";
+import { setForgeVersions } from "@/utils/mcVersion";
 
 function withAdsLayout() {
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  createEffect(() => {
+    if (routeData.forgeVersions.data)
+      setForgeVersions(routeData.forgeVersions.data);
+  });
+
   return (
     <>
       <AppNavbar />

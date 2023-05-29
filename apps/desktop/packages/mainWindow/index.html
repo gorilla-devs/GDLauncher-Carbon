@@ -13,6 +13,7 @@
         script-src 'self' 'unsafe-inline';
         img-src 'self' data: https: http://localhost:*;
         default-src 'unsafe-inline' 'self';
+        frame-src 'self' https: https://youtube.com;
         connect-src 'self' ws://localhost:* https://www.minecraft.net http://localhost:*
       "
     />
@@ -95,7 +96,7 @@
       };
     </script>
   </head>
-  <body style="margin: 0; padding: 0">
+  <body style="margin: 0; padding: 0; overflow: hidden">
     <div
       id="overlay"
       style="
