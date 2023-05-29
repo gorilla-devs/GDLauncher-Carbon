@@ -3,7 +3,6 @@ let os = process.argv[5].replace(/-/g, "");
 let profile = process.argv[7].replace(/-/g, "");
 
 let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
-
 let targetTripleLookup = {
   "win-x64": "x86_64-pc-windows-msvc",
   "linux-x64": "x86_64-unknown-linux-gnu",
@@ -19,7 +18,7 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: process.env.GENERIC_PUBLISH_URL,
+        url: process.env.GENERIC_PUBLISH_URL.replace("${arch}", arch),
       };
 
 module.exports = {
@@ -49,7 +48,7 @@ module.exports = {
   ],
   win: {
     target: ["dir", "zip", "nsis"],
-    artifactName: "${productName}-${version}-${arch}-Setup.${ext}",
+    artifactName: "${productName}-${version}-" + arch + "-Setup.${ext}",
     verifyUpdateCodeSignature: false,
   },
   nsis: {
@@ -60,15 +59,15 @@ module.exports = {
   },
   mac: {
     target: ["dir", "zip", "dmg"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    artifactName: "${productName}-${version}-" + arch + "-Installer.${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
     target: ["dir", "zip"],
-    artifactName: "${productName}-${version}-${arch}-Installer.${ext}",
+    artifactName: "${productName}-${version}-" + arch + "-Installer.${ext}",
   },
-  afterAllArtifactBuild: () => {
+  afterAllArtifactBuild: (buildResult) => {
     const path = require("path");
     const fs = require("fs");
 
