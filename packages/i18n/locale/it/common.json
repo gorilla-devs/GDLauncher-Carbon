@@ -114,7 +114,7 @@
   "instance.download_modpacks": "Download",
   "instance.explore_modpack": "Explore",
   "java.java_major": "Java Major",
-  "java.java_distribution": "Java Distirbution",
+  "java.java_vendors": "Java Distirbution",
   "java.install": "Install",
   "java.java_missing": "Java {{version}} missing",
   "java.missing_java_text": "For an optimal experience, we sugges letting us take care of java for you. Only manually manage java if you know what yur're doing, it may result in GDLauncher not working!",

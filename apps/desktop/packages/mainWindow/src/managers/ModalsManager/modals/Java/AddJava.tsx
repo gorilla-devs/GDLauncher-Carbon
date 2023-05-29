@@ -97,9 +97,9 @@ const AddJava = (props: ModalProps) => {
             <div class="flex justify-between items-center gap-4">
               <h5 class="m-0">
                 <Trans
-                  key="java.java_distribution"
+                  key="java.java_vendors"
                   options={{
-                    defaultValue: "Distribution",
+                    defaultValue: "Vendors",
                   }}
                 />
               </h5>

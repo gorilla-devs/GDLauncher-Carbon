@@ -1,11 +1,17 @@
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { useModal } from "../..";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { Button, Steps } from "@gd/ui";
-import { onBoardingSteps } from ".";
 
 const ThirdStep = () => {
   const modalsContext = useModal();
+  const [t] = useTransContext();
+
+  const onBoardingSteps = [
+    { label: t("introduction"), icon: <div>1</div> },
+    { label: t("handle_java"), icon: <div>2</div> },
+    { label: t("import_instances"), icon: <div>3</div> },
+  ];
 
   return (
     <div class="flex flex-col items-center justify-around w-120 pt-20 h-90">

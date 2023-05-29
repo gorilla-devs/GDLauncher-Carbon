@@ -17,7 +17,7 @@ const FirstStep = (props: Props) => {
   return (
     <div class="flex flex-col items-center justify-around w-160 h-140">
       <div class="flex flex-col mt-12">
-        <h1 class="text-center font-bold text-lg m-0 mt-10">
+        <h1 class="text-center text-lg m-0 mt-10 font-bold">
           <Trans
             key="onboarding.welcome_gdlauncher_title"
             options={{
@@ -25,7 +25,7 @@ const FirstStep = (props: Props) => {
             }}
           />
         </h1>
-        <pre class="text-left text-darkSlate-100 leading-6 mb-8 max-w-140 whitespace-pre-line">
+        <pre class="text-darkSlate-100 text-left leading-6 mb-8 max-w-140 whitespace-pre-line">
           <Trans
             key="onboarding.welcome_gdlauncher_text"
             options={{

@@ -5,14 +5,16 @@ import { Match, Switch, createSignal } from "solid-js";
 import SecondStep from "./SecondStep";
 import ThirdStep from "./ThirdStep";
 import FirstStep from "./FirstStep";
-
-export const onBoardingSteps = [
-  { label: "Introduction", icon: <div>1</div> },
-  { label: "handle java", icon: <div>2</div> },
-  { label: "Import instances", icon: <div>3</div> },
-];
+import { useTransContext } from "@gd/i18n";
 
 const OnBoarding = (props: ModalProps) => {
+  const [t] = useTransContext();
+
+  const onBoardingSteps = [
+    { label: t("introduction"), icon: <div>1</div> },
+    { label: t("handle_java"), icon: <div>2</div> },
+    { label: t("import_instances"), icon: <div>3</div> },
+  ];
   const [currentStep, setCurrentStep] = createSignal(0);
 
   const nextStep = () => {
