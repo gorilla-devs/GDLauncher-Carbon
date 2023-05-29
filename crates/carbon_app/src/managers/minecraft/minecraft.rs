@@ -7,7 +7,7 @@ use crate::domain::{
     },
 };
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, DownloadType, Library, Version, VersionInfo,
+    Argument, ArgumentType, ArgumentValue, DownloadType, Library, Os, Version, VersionInfo,
     VersionManifest,
 };
 use prisma_client_rust::QueryError;
@@ -258,7 +258,6 @@ pub async fn generate_startup_command(
 
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
-    command.push(format!("-XstartOnFirstThread"));
 
     let arguments = version.arguments.clone().unwrap_or_else(|| {
         let mut arguments = HashMap::new();
@@ -293,6 +292,16 @@ pub async fn generate_startup_command(
                     }
                 }
             }
+        }
+    }
+
+    if get_current_os() == Os::Osx || get_current_os() == Os::OsxArm64 {
+        let can_find_start_on_first_thread = jvm_arguments
+            .iter()
+            .any(|arg| matches!(arg, Argument::Normal(s) if s == "-XstartOnFirstThread"));
+
+        if !can_find_start_on_first_thread {
+            command.push("-XstartOnFirstThread".to_string());
         }
     }
 
