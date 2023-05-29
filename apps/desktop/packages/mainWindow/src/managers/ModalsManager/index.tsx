@@ -41,6 +41,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/Java/AddJava")),
     title: "Add java version",
   },
+  addMod: {
+    component: lazy(() => import("./modals/AddMod")),
+    title: "Add mod",
+  },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: "Java Setup",

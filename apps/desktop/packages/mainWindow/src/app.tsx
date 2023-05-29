@@ -22,14 +22,14 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getIsFirstLaunch"]);
-  const setIsFirstRun = rspc.createMutation(["settings.setIsFirstLaunch"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
+  const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
 
   createEffect(() => {
-    if (isFirstRun.data && currentRoute.pathname !== "/") {
+    if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {
       untrack(() => {
         modalsContext?.openModal({ name: "onBoarding" });
-        setIsFirstRun.mutate(false);
+        setIsFirstRun.mutate({ isFirstLaunch: false });
       });
     }
   });

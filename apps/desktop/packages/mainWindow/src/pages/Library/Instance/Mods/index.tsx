@@ -4,6 +4,7 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { ModloaderType } from "@/utils/sidebar";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
+import { useModal } from "@/managers/ModalsManager";
 
 type ModType = {
   title: string;
@@ -150,6 +151,7 @@ const NoMods = () => {
 
 const Mods = () => {
   const [t] = useTransContext();
+  const modalsContext = useModal();
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out pt-10 sticky top-30">
@@ -178,7 +180,13 @@ const Mods = () => {
               rounded
             />
           </div>
-          <Button variant="outline" size="medium">
+          <Button
+            variant="outline"
+            size="medium"
+            onClick={() => {
+              modalsContext?.openModal({ name: "addMod" });
+            }}
+          >
             <Trans
               key="instance.add_mod"
               options={{
