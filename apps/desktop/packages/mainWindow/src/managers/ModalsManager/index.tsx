@@ -45,6 +45,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/AddMod")),
     title: "Add mod",
   },
+  modDetails: {
+    component: lazy(() => import("./modals/ModDetails")),
+    title: "Mod Details",
+  },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: "Java Setup",
@@ -133,18 +137,18 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
         <Show when={mParam()}>
-          <Suspense fallback={<p>Loading...</p>}>
-            <div class="h-screen w-screen">
-              <Dynamic
-                component={ModalComponent({
-                  noHeader,
-                  title,
-                })}
-                noHeader={noHeader()}
-                title={title()}
-              />
-            </div>
-          </Suspense>
+          {/* <Suspense fallback={<p>Loading...</p>}> */}
+          <div class="h-screen w-screen">
+            <Dynamic
+              component={ModalComponent({
+                noHeader,
+                title,
+              })}
+              noHeader={noHeader()}
+              title={title()}
+            />
+          </div>
+          {/* </Suspense> */}
         </Show>
       </Portal>
     </ModalsContext.Provider>

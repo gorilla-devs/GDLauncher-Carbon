@@ -5,11 +5,12 @@ import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tag } from "@gd/ui";
 import { format } from "date-fns";
 import { For } from "solid-js";
+import { useModal } from "../..";
 
 type Props = { mod: FEMod };
 
 const Mod = (props: Props) => {
-  const navigate = useGDNavigate();
+  const modalsContext = useModal();
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
@@ -59,7 +60,7 @@ const Mod = (props: Props) => {
         <div class="flex gap-3">
           <Button
             variant="outline"
-            // onClick={() => navigate(`/mod/${props.mod.id}`)}
+            onClick={() => modalsContext?.openModal({ name: "modDetails" })}
           >
             <Trans
               key="instance.explore_modpack"

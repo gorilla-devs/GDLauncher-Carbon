@@ -8,6 +8,7 @@ import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
+import { SortFields } from "@/utils/constants";
 
 const NoMoreModpacks = () => {
   return (
@@ -63,17 +64,6 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
     </div>
   );
 };
-
-const sortFields: Array<FEModSearchSortField> = [
-  "featured",
-  "popularity",
-  "lastUpdated",
-  "name",
-  "author",
-  "totalDownloads",
-  "category",
-  "gameVersion",
-];
 
 export default function Browser() {
   const modalsContext = useModal();
@@ -135,7 +125,7 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={sortFields.map((field) => ({
+              options={SortFields.map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}

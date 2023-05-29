@@ -1,7 +1,7 @@
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { ModalProps } from "@/managers/ModalsManager";
 import ModalLayout from "@/managers/ModalsManager/ModalLayout";
-import { Spinner } from "@gd/ui";
+import { Skeleton, Spinner, Input, Dropdown } from "@gd/ui";
 import {
   For,
   Match,
@@ -15,8 +15,17 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import Mod from "./Mod";
+import {
+  FEModLoaderType,
+  FEModSearchParametersQuery,
+  FEModSearchSortField,
+} from "@gd/core_module/bindings";
+import { RSPCError } from "@rspc/client";
+import { SortFields } from "@/utils/constants";
 
 const AddMod = (props: ModalProps) => {
+  const [t] = useTransContext();
+
   const [query, setQuery] = useModsQuery({
     categoryId: null,
     classId: "mods",
@@ -78,12 +87,12 @@ const AddMod = (props: ModalProps) => {
     });
   });
 
-  //   const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
-  //     setQuery(newValue);
-  //     infiniteQuery.remove();
-  //     infiniteQuery.refetch();
-  //     rowVirtualizer.scrollToIndex(0);
-  //   };
+  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+    setQuery(newValue);
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    rowVirtualizer.scrollToIndex(0);
+  };
 
   const mods = () =>
     infiniteQuery?.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
@@ -118,6 +127,24 @@ const AddMod = (props: ModalProps) => {
   onMount(() => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
+
+  const modloaders: (FEModLoaderType | "Any")[] = [
+    "Any",
+    "forge",
+    "cauldron",
+    "liteLoader",
+    "fabric",
+    "quilt",
+  ];
+
+  const mappedModloader: { [modloader: string]: number | null } = {
+    Any: null,
+    forge: 1,
+    cauldron: 2,
+    liteLoader: 3,
+    fabric: 4,
+    quilt: 5,
+  };
 
   const NoMoreMods = () => {
     return (
@@ -154,9 +181,92 @@ const AddMod = (props: ModalProps) => {
     );
   };
 
+  const ErrorFetchingMods = (props: { error: RSPCError | null }) => {
+    const parsedError = () =>
+      props.error?.message && JSON.parse(props.error?.message);
+    return (
+      <div class="w-full flex h-full justify-center items-center min-h-90">
+        <div class="flex justify-center items-center flex-col text-center">
+          <p class="text-darkSlate-50 max-w-100">
+            <Trans
+              key="instance.fetching_modpacks_error"
+              options={{
+                defaultValue: "There was an error while fetching modpacks",
+              }}
+            />
+            {parsedError().cause[0].display}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="h-130 w-190">
+    <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
+      <div class="h-130 w-190 bg-darkSlate-800 p-5">
+        <div class="flex flex-col bg-darkSlate-800 sticky top-0 left-0 right-0 z-10">
+          <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
+            <Input
+              placeholder="Type Here"
+              icon={<div class="i-ri:search-line" />}
+              class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
+              onInput={(e) => {
+                const target = e.target as HTMLInputElement;
+                setQueryWrapper({ searchFilter: target.value });
+              }}
+            />
+            <div class="flex items-center gap-3">
+              <p class="text-darkSlate-50">
+                <Trans
+                  key="instance.sort_by"
+                  options={{
+                    defaultValue: "Sort by:",
+                  }}
+                />
+              </p>
+              <Dropdown
+                options={SortFields.map((field) => ({
+                  label: t(`instance.sort_by_${field}`),
+                  key: field,
+                }))}
+                onChange={(val) => {
+                  setQueryWrapper({
+                    sortField: val.key as FEModSearchSortField,
+                  });
+                }}
+                value={0}
+                rounded
+              />
+              <Dropdown
+                options={modloaders.map((modloader) => ({
+                  label: t(modloader),
+                  key: modloader,
+                }))}
+                onChange={(val) => {
+                  const mappedValue = mappedModloader[val.key];
+                  setQueryWrapper({
+                    modLoaderType: mappedValue as FEModLoaderType | null,
+                  });
+                }}
+                value={query.query.modLoaderType}
+                rounded
+              />
+            </div>
+            <div
+              class="cursor-pointer text-2xl"
+              classList={{
+                "i-ri:sort-asc": query.query.sortOrder === "ascending",
+                "i-ri:sort-desc": query.query.sortOrder === "descending",
+              }}
+              onClick={() => {
+                const isAsc = query.query.sortOrder === "ascending";
+                setQueryWrapper({
+                  sortOrder: isAsc ? "descending" : "ascending",
+                });
+              }}
+            />
+          </div>
+        </div>
         <Switch>
           <Match when={mods().length > 0 && !infiniteQuery?.isInitialLoading}>
             <div
@@ -222,12 +332,12 @@ const AddMod = (props: ModalProps) => {
               infiniteQuery?.isInitialLoading
             }
           >
-            {/* <Skeleton.modpacksList /> */}
+            <Skeleton.modpacksList />
           </Match>
           <Match when={infiniteQuery?.isError}>
-            {/* <ErrorFetchingModpacks
-              error={infiniteQuery?.infiniteQuery.error as RSPCError | null}
-            /> */}
+            <ErrorFetchingMods
+              error={infiniteQuery?.error as RSPCError | null}
+            />
           </Match>
         </Switch>
       </div>
