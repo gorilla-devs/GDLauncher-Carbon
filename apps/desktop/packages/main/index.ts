@@ -15,7 +15,8 @@ import {
 import { release } from "os";
 import { join, resolve } from "path";
 import "./cli";
-import coreModule from "./core_module_loader";
+import coreModule from "./CoreModuleLoaded";
+// import autoUpdater from "./autoUpdater";
 import "./preloadListeners";
 import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
