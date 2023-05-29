@@ -6,7 +6,7 @@ import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteQuery } from ".";
+import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
 
 const NoMoreModpacks = () => {
@@ -79,7 +79,7 @@ export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
 
-  const infiniteQuery = useInfiniteQuery();
+  const infiniteQuery = useInfiniteModpacksQuery();
 
   const modpacks = () =>
     infiniteQuery?.infiniteQuery.data

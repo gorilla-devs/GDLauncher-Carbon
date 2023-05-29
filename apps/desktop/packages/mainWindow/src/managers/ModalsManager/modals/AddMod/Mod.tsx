@@ -6,39 +6,39 @@ import { Button, Dropdown, Tag } from "@gd/ui";
 import { format } from "date-fns";
 import { For } from "solid-js";
 
-type Props = { modpack: FEMod };
+type Props = { mod: FEMod };
 
-const Modpack = (props: Props) => {
+const Mod = (props: Props) => {
   const navigate = useGDNavigate();
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
         <img
           class="rounded-xl select-none h-30 w-30"
-          src={props.modpack.logo.thumbnailUrl}
+          src={props.mod.logo.thumbnailUrl}
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
             <h2 class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92">
-              {props.modpack.name}
+              {props.mod.name}
             </h2>
             <div class="flex gap-4 items-center">
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:time-fill" />
                 <div class="whitespace-nowrap text-sm">
-                  {format(new Date(props.modpack.dateCreated).getTime(), "P")}
+                  {format(new Date(props.mod.dateCreated).getTime(), "P")}
                 </div>
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:download-fill" />
                 <div class="text-sm whitespace-nowrap">
-                  {formatDownloadCount(props.modpack.downloadCount)}
+                  {formatDownloadCount(props.mod.downloadCount)}
                 </div>
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:user-fill" />
                 <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
-                  <For each={props.modpack.authors}>
+                  <For each={props.mod.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
                   </For>
                 </div>
@@ -46,20 +46,20 @@ const Modpack = (props: Props) => {
             </div>
           </div>
           <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15">
-            {truncateText(props.modpack?.summary, 137)}
+            {truncateText(props.mod?.summary, 137)}
           </p>
         </div>
       </div>
       <div class="flex justify-between items-center gap-3">
         <div class="flex gap-2 overflow-x-auto max-w-100 scrollbar-hide">
-          <For each={props.modpack.categories}>
+          <For each={props.mod.categories}>
             {(tag) => <Tag name={tag.name} img={tag.iconUrl} type="fixed" />}
           </For>
         </div>
         <div class="flex gap-3">
           <Button
             variant="outline"
-            onClick={() => navigate(`/modpacks/${props.modpack.id}`)}
+            // onClick={() => navigate(`/mod/${props.mod.id}`)}
           >
             <Trans
               key="instance.explore_modpack"
@@ -91,4 +91,4 @@ const Modpack = (props: Props) => {
   );
 };
 
-export default Modpack;
+export default Mod;
