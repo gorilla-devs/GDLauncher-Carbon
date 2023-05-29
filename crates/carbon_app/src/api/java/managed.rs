@@ -3,6 +3,8 @@ use std::{collections::HashMap, ops::Deref};
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
+use crate::domain::java::JavaVersion;
+
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum FEVendor {
@@ -93,6 +95,7 @@ pub struct FEManagedJavaVersion {
     id: String,
     name: String,
     download_url: String,
+    java_version: String,
 }
 
 impl From<crate::managers::java::managed::ManagedJavaVersion> for FEManagedJavaVersion {
@@ -101,17 +104,21 @@ impl From<crate::managers::java::managed::ManagedJavaVersion> for FEManagedJavaV
             id: v.id,
             name: v.name,
             download_url: v.download_url,
+            java_version: v.java_version.to_string(),
         }
     }
 }
 
-impl From<FEManagedJavaVersion> for crate::managers::java::managed::ManagedJavaVersion {
-    fn from(v: FEManagedJavaVersion) -> Self {
-        Self {
+impl TryFrom<FEManagedJavaVersion> for crate::managers::java::managed::ManagedJavaVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(v: FEManagedJavaVersion) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: v.id,
             name: v.name,
             download_url: v.download_url,
-        }
+            java_version: JavaVersion::try_from(&*v.java_version)?,
+        })
     }
 }
 

@@ -197,10 +197,10 @@ impl JavaVendor {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Hash)]
 pub struct JavaVersion {
-    pub major: u8,
-    pub minor: Option<u8>,
+    pub major: u16,
+    pub minor: Option<u16>,
     pub patch: Option<String>,
     pub update_number: Option<String>,
     pub prerelease: Option<String>,
@@ -296,8 +296,14 @@ impl From<JavaVersion> for String {
     }
 }
 
+impl ToString for JavaVersion {
+    fn to_string(&self) -> String {
+        String::from(self.clone())
+    }
+}
+
 impl JavaVersion {
-    pub fn from_major(major: u8) -> Self {
+    pub fn from_major(major: u16) -> Self {
         Self {
             major,
             minor: None,

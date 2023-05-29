@@ -16,7 +16,7 @@ use tokio::{
 use crate::{
     db::PrismaClient,
     domain::{
-        java::{JavaArch, JavaOs},
+        java::{JavaArch, JavaOs, JavaVersion},
         runtime_path::{ManagedJavasPath, TempPath},
     },
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
@@ -212,6 +212,16 @@ impl AzulAPI {
                             name: version.name.clone(),
                             download_url: version.download_url.clone(),
                             id: version.package_uuid.clone(),
+                            java_version: JavaVersion {
+                                major: version.java_version.get(0).cloned().ok_or(
+                                    anyhow::anyhow!("No major version found for {}", version.name),
+                                )?,
+                                minor: version.java_version.get(1).cloned(),
+                                patch: version.java_version.get(2).cloned().map(|v| v.to_string()),
+                                build_metadata: None,
+                                prerelease: None,
+                                update_number: None,
+                            },
                         });
                     }
 
