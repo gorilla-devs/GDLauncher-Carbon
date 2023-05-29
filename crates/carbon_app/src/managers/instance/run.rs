@@ -660,8 +660,9 @@ mod test {
     use chrono::Utc;
 
     use crate::{
+        api::keys,
         domain::instance::info::{self, StandardVersion},
-        managers::{account::FullAccount, instance::InstanceVersionSouce}, api::keys,
+        managers::{account::FullAccount, instance::InstanceVersionSouce},
     };
 
     //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
@@ -699,13 +700,14 @@ mod test {
         };
 
         app.task_manager().wait_with_log(task).await?;
-        app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS).await?;
+        app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
+            .await?;
         println!("Task exited");
         let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
             domain::LaunchState::Inactive => {
                 println!("Game not running");
-                return Ok(())
-            },
+                return Ok(());
+            }
             domain::LaunchState::Running { log_id, .. } => log_id,
             _ => unreachable!(),
         };

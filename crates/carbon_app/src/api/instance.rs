@@ -472,13 +472,24 @@ impl<T> Into<Option<T>> for Update<T> {
 #[derive(Type, Deserialize)]
 enum CreateInstanceVersion {
     Version(GameVersion),
-    // Modpack
+    Modpack(Modpack),
 }
 
 #[derive(Type, Deserialize)]
 enum GameVersion {
     Standard(StandardVersion),
     // Custom(json)
+}
+
+#[derive(Type, Deserialize)]
+enum Modpack {
+    Curseforge(CurseforgeModpack),
+}
+
+#[derive(Type, Deserialize)]
+struct CurseforgeModpack {
+    project_id: u32,
+    file_id: u32,
 }
 
 #[derive(Type, Deserialize)]
@@ -605,6 +616,7 @@ impl From<CreateInstanceVersion> for manager::InstanceVersionSouce {
     fn from(value: CreateInstanceVersion) -> Self {
         match value {
             CreateInstanceVersion::Version(v) => Self::Version(v.into()),
+            CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
         }
     }
 }
@@ -613,6 +625,23 @@ impl From<GameVersion> for domain::info::GameVersion {
     fn from(value: GameVersion) -> Self {
         match value {
             GameVersion::Standard(v) => Self::Standard(v.into()),
+        }
+    }
+}
+
+impl From<Modpack> for domain::info::Modpack {
+    fn from(value: Modpack) -> Self {
+        match value {
+            Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+        }
+    }
+}
+
+impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
+    fn from(value: CurseforgeModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            file_id: value.file_id,
         }
     }
 }

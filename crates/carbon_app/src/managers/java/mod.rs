@@ -274,7 +274,11 @@ impl ManagerRef<'_, JavaManager> {
                     .get(&current_os)
                     .map(|for_arch| for_arch.get(&current_arch))
                     .flatten()
-                    .map(|versions| versions.iter().find(|v| target_profile.is_java_version_compatible(&v.java_version)))
+                    .map(|versions| {
+                        versions
+                            .iter()
+                            .find(|v| target_profile.is_java_version_compatible(&v.java_version))
+                    })
                     .flatten()
                     .ok_or_else(|| {
                         anyhow::anyhow!("unable to find automatically installable java version")
