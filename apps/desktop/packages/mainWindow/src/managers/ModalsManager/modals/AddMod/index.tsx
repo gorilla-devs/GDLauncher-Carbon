@@ -137,15 +137,6 @@ const AddMod = (props: ModalProps) => {
     "quilt",
   ];
 
-  const mappedModloader: { [modloader: string]: number | null } = {
-    Any: null,
-    forge: 1,
-    cauldron: 2,
-    liteLoader: 3,
-    fabric: 4,
-    quilt: 5,
-  };
-
   const NoMoreMods = () => {
     return (
       <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
@@ -243,7 +234,7 @@ const AddMod = (props: ModalProps) => {
                   key: modloader,
                 }))}
                 onChange={(val) => {
-                  const mappedValue = mappedModloader[val.key];
+                  const mappedValue = val.key === "Any" ? null : val.key;
                   setQueryWrapper({
                     modLoaderType: mappedValue as FEModLoaderType | null,
                   });
