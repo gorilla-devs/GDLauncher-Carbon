@@ -33,7 +33,8 @@
     "prisma:generate": "cargo run -p prisma-cli -- generate --schema=./crates/carbon_app/prisma/schema.prisma",
     "prisma:migrate": "cargo run -p prisma-cli -- migrate dev --schema=./crates/carbon_app/prisma/schema.prisma",
     "prisma:reset": "cargo run -p prisma-cli -- migrate reset --force --schema=./crates/carbon_app/prisma/schema.prisma",
-    "sentry-cli": "sentry-cli"
+    "sentry-cli": "sentry-cli",
+    "release": "turbo run release --filter @gd/desktop"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.341.0",

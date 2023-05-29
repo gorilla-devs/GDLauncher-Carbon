@@ -16,7 +16,8 @@
     "build-electron": "cross-env-shell DEBUG=electron-builder ow-electron-builder --config .electron-builder.config.cjs",
     "build": "pnpm patch-version && pnpm build-vite && pnpm build-electron",
     "clean": "node scripts/cleanReleaseFolder.mjs",
-    "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\""
+    "lint": "tsc && eslint --ext .js,.jsx,.ts,.tsx,.mjs,.cjs . && prettier --check \"**/*.{js,jsx,ts,tsx,mjs,cjs}\"",
+    "release": "node scripts/releaseDraft.mjs"
   },
   "devDependencies": {
     "@gd/config": "workspace:*",
