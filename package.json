@@ -21,7 +21,7 @@
     "build:win-x64": "cargo build -p core_module --release --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --release",
     "build:mac-x64": "cargo build -p core_module --release --target x86_64-apple-darwin && pnpm prepare-release:mac-x64 && turbo run build -- --x64 --mac -- --release",
     "build:mac-arm64": "cargo build -p core_module --release --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64 && turbo run build -- --arm64 --mac -- --release",
-    "build:linux-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64-prod && turbo run build -- --x64 -- --linux --production",
+    "build:linux-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64-prod && turbo run build -- --x64 --linux -- --production",
     "build:win-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --production",
     "build:mac-x64-prod": "cargo build -p core_module --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && turbo run build -- --x64 --mac -- --production",
     "build:mac-arm64-prod": "cargo build -p core_module --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --arm64 --mac -- --production",
@@ -40,6 +40,7 @@
     "@sentry/cli": "^2.17.3",
     "bundlewatch": "^0.3.3",
     "cross-env": "^7.0.3",
+    "semver": "^7.5.1",
     "turbo": "^1.7.0"
   },
   "engines": {
