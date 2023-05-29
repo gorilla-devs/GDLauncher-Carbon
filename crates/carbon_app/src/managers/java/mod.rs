@@ -118,8 +118,8 @@ impl ManagerRef<'_, JavaManager> {
     ) -> anyhow::Result<()> {
         let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
 
-        if !auto_manage_java {
-            anyhow::bail!("Auto manage java is disabled");
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
         }
 
         self.app
@@ -144,8 +144,8 @@ impl ManagerRef<'_, JavaManager> {
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
         let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
 
-        if !auto_manage_java {
-            anyhow::bail!("Auto manage java is disabled");
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
         }
 
         let java_from_db = self
@@ -361,10 +361,29 @@ mod test {
 
         assert!(std::path::Path::new(&from_db.path).exists());
 
-        app.java_manager()
+        let result_first_delete = app
+            .java_manager()
             .delete_java_version(from_db.id.clone())
+            .await;
+
+        assert!(!result_first_delete.is_ok());
+
+        app.prisma_client
+            .app_configuration()
+            .update(
+                crate::db::app_configuration::id::equals(0),
+                vec![crate::db::app_configuration::auto_manage_java::set(false)],
+            )
+            .exec()
             .await
             .unwrap();
+
+        let result_second_delete = app
+            .java_manager()
+            .delete_java_version(from_db.id.clone())
+            .await;
+
+        assert!(result_second_delete.is_ok());
 
         let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
         assert_eq!(count, 0);

@@ -13,3 +13,22 @@ export const msToMinutes = (ms: number) => {
 export const strToMs = (string: string) => {
   return new Date(string)?.getTime();
 };
+
+export const formatDownloadCount = (count: number) => {
+  let formattedCount;
+
+  if (count >= 1000000) {
+    formattedCount = (count / 1000000).toFixed(1);
+  } else if (count >= 1000) {
+    formattedCount = (count / 1000).toFixed(1);
+  } else {
+    return count;
+  }
+
+  // Remove the decimal point and trailing zero if the number is a whole number
+  if (formattedCount.endsWith(".0")) {
+    formattedCount = formattedCount.slice(0, -2);
+  }
+
+  return formattedCount + (count >= 1000000 ? "M" : "K");
+};

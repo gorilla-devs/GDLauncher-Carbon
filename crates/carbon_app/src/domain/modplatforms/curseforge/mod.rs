@@ -60,7 +60,7 @@ pub struct FileHash {
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FileReleaseType {
-    Release = 1,
+    Stable = 1,
     Beta = 2,
     Alpha = 3,
 }
@@ -351,7 +351,6 @@ pub enum GameVersionTypeStatus {
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum ModLoaderType {
-    Any = 0,
     Forge = 1,
     Cauldron = 2,
     LiteLoader = 3,
@@ -400,7 +399,7 @@ pub struct Category {
     pub url: String,
     pub icon_url: String,
     pub date_modified: String,
-    pub is_class: bool,
+    pub is_class: Option<bool>,
     pub class_id: Option<i32>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
