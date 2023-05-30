@@ -69,7 +69,7 @@ impl ManagerRef<'_, InstanceManager> {
                 bail!("mod is already disabled");
             }
 
-            if enabled_path.exists() {
+            if !enabled_path.exists() {
                 bail!("mod does not exist on disk");
             }
 
