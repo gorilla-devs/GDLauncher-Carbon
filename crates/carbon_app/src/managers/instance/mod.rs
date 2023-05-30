@@ -216,7 +216,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
-                    state: run::LaunchState::Inactive,
+                    state: run::LaunchState::Inactive { failed_task: None },
                     mods,
                 };
 
@@ -906,7 +906,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 type_: InstanceType::Valid(InstanceData {
                     favorite: false,
                     config: info,
-                    state: run::LaunchState::Inactive,
+                    state: run::LaunchState::Inactive { failed_task: None },
                     mods: Vec::new(),
                 }),
             },
@@ -1817,7 +1817,7 @@ mod test {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,
                     modpack_platform: None,
-                    state: domain::LaunchState::Inactive,
+                    state: domain::LaunchState::Inactive { failed_task: None },
                 }),
             }],
         }];

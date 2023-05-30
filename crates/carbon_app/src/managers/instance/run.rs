@@ -58,7 +58,7 @@ impl ManagerRef<'_, InstanceManager> {
         };
 
         match &data.state {
-            LaunchState::Inactive => {}
+            LaunchState::Inactive { .. } => {}
             LaunchState::Preparing(task_id) => {
                 // dismiss the existing task if its a failure, return if its still in progress.
                 let r = self.app.task_manager().dismiss_task(*task_id).await;
@@ -438,7 +438,10 @@ impl ManagerRef<'_, InstanceManager> {
                     None => {
                         let _ = app
                             .instance_manager()
-                            .change_launch_state(instance_id, LaunchState::Inactive)
+                            .change_launch_state(
+                                instance_id,
+                                LaunchState::Inactive { failed_task: None },
+                            )
                             .await;
 
                         Ok(None)
@@ -453,7 +456,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let _ = app
                         .instance_manager()
-                        .change_launch_state(instance_id, LaunchState::Inactive)
+                        .change_launch_state(
+                            instance_id,
+                            LaunchState::Inactive {
+                                failed_task: Some(id),
+                            },
+                        )
                         .await;
                 }
                 Ok(None) => {}
@@ -560,7 +568,10 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let _ = app
                         .instance_manager()
-                        .change_launch_state(instance_id, LaunchState::Inactive)
+                        .change_launch_state(
+                            instance_id,
+                            LaunchState::Inactive { failed_task: None },
+                        )
                         .await;
                 }
             }
@@ -630,7 +641,7 @@ impl ManagerRef<'_, InstanceManager> {
 }
 
 pub enum LaunchState {
-    Inactive,
+    Inactive { failed_task: Option<VisualTaskId> },
     Preparing(VisualTaskId),
     Running(RunningInstance),
 }
@@ -645,7 +656,9 @@ pub struct RunningInstance {
 impl From<&LaunchState> for domain::LaunchState {
     fn from(value: &LaunchState) -> Self {
         match value {
-            LaunchState::Inactive => Self::Inactive,
+            LaunchState::Inactive { failed_task } => Self::Inactive {
+                failed_task: failed_task.clone(),
+            },
             LaunchState::Preparing(t) => Self::Preparing(*t),
             LaunchState::Running(RunningInstance {
                 start_time, log, ..
@@ -709,7 +722,7 @@ mod test {
             .await?;
         println!("Task exited");
         let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
-            domain::LaunchState::Inactive => {
+            domain::LaunchState::Inactive { .. } => {
                 println!("Game not running");
                 return Ok(());
             }

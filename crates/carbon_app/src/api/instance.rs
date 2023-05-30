@@ -563,7 +563,9 @@ pub enum ModLoaderType {
 
 #[derive(Type, Serialize)]
 pub enum LaunchState {
-    Inactive,
+    Inactive {
+        failed_task: Option<TaskId>,
+    },
     Preparing(TaskId),
     Running {
         start_time: DateTime<Utc>,
@@ -782,7 +784,9 @@ impl From<domain::LaunchState> for LaunchState {
         use domain::LaunchState as domain;
 
         match value {
-            domain::Inactive => Self::Inactive,
+            domain::Inactive { failed_task } => Self::Inactive {
+                failed_task: failed_task.map(Into::into),
+            },
             domain::Preparing(task) => Self::Preparing(task.into()),
             domain::Running { start_time, log_id } => Self::Running {
                 start_time,
