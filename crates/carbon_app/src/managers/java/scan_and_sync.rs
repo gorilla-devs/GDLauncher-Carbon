@@ -34,7 +34,7 @@ pub async fn add_java_component_to_db(
             java_component.version.try_into()?,
             java_component._type.to_string(),
             java_component.os.to_string(),
-            Into::<&str>::into(java_component.arch).to_string(),
+            java_component.arch.to_string(),
             java_component.vendor,
             vec![],
         )

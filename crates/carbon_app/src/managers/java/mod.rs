@@ -8,7 +8,7 @@ use crate::{
     api::keys::java::GET_SYSTEM_JAVA_PROFILES,
     db::PrismaClient,
     domain::java::{
-        Java, JavaArch, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
+        Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
         SystemJavaProfileName,
     },
     managers::java::java_checker::RealJavaChecker,
@@ -207,7 +207,7 @@ impl ManagerRef<'_, JavaManager> {
     pub async fn get_usable_java(
         self,
         target_profile: SystemJavaProfileName,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    ) -> anyhow::Result<Option<JavaComponent>> {
         use crate::db::java::UniqueWhereParam;
 
         let profile = self
@@ -243,7 +243,7 @@ impl ManagerRef<'_, JavaManager> {
             None => None,
         };
 
-        Ok(java.map(|java| PathBuf::from(java.path)))
+        Ok(java)
     }
 
     /// Will return Some(path) if configured to automatically install.
@@ -251,7 +251,7 @@ impl ManagerRef<'_, JavaManager> {
     pub async fn require_java_install(
         self,
         target_profile: SystemJavaProfileName,
-    ) -> anyhow::Result<Option<PathBuf>> {
+    ) -> anyhow::Result<Option<JavaComponent>> {
         use crate::db::java::UniqueWhereParam;
 
         let versions = self
@@ -308,7 +308,7 @@ impl ManagerRef<'_, JavaManager> {
             None => anyhow::bail!("downloaded java was not present in db"),
         };
 
-        Ok(Some(PathBuf::from(java.path)))
+        Ok(Some(java))
     }
 }
 
