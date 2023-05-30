@@ -200,6 +200,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation INSTALL_MOD[app, imod: InstallMod] {
+            let task = app.instance_manager()
+                .install_curseforge_mod(
+                    imod.instance_id.into(),
+                    imod.project_id,
+                    imod.file_id,
+                )
+                .await?;
+
+            Ok(super::vtask::TaskId::from(task))
+        }
+
         mutation OPEN_INSTANCE_FOLDER[app, id: InstanceId] {
             app.instance_manager().open_folder(id.into()).await
         }
@@ -452,6 +464,13 @@ enum Update<T> {
 struct InstanceMod {
     instance_id: InstanceId,
     mod_id: String,
+}
+
+#[derive(Type, Deserialize)]
+struct InstallMod {
+    instance_id: InstanceId,
+    project_id: u32,
+    file_id: u32,
 }
 
 impl<T> Update<T> {
