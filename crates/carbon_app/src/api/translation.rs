@@ -25,4 +25,9 @@ pub enum Translation {
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskLaunchExtractNatives,
     InstanceTaskLaunchRunForgeProcessors,
+    InstanceTaskInstallMod {
+        mod_name: String,
+        instance_name: String,
+    },
+    InstanceTaskInstallModDownloadFile,
 }

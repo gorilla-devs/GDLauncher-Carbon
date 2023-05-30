@@ -83,6 +83,7 @@ keys! {
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
+        INSTALL_MOD                                 = "installMod";
     }
 
     vtask {
