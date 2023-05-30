@@ -20,7 +20,9 @@ pub struct InstanceDetails {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LaunchState {
-    Inactive,
+    Inactive {
+        failed_task: Option<VisualTaskId>,
+    },
     Preparing(VisualTaskId),
     Running {
         start_time: DateTime<Utc>,
