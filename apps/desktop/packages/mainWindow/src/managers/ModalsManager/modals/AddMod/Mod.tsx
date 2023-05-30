@@ -3,8 +3,10 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tag } from "@gd/ui";
 import { format } from "date-fns";
-import { For } from "solid-js";
+import { For, Match, Switch, createEffect } from "solid-js";
 import { useModal } from "../..";
+import { rspc } from "@/utils/rspcClient";
+import { lastInstanceOpened } from "@/utils/routes";
 
 type Props = { mod: FEMod };
 
@@ -12,12 +14,24 @@ const Mod = (props: Props) => {
   const modalsContext = useModal();
 
   const latestFIlesIndexes = () => props.mod.latestFilesIndexes;
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    parseInt(lastInstanceOpened(), 10),
+  ]);
 
   const mappedVersions = () =>
     latestFIlesIndexes().map((version) => ({
       key: version.gameVersion,
       label: version.gameVersion,
     }));
+
+  const installModMutation = rspc.createMutation(["instance.installMod"]);
+
+  const isModInstalled = () =>
+    instanceDetails.data?.mods.find(
+      (mod) => parseInt(mod.id, 10) === props.mod.id
+    ) !== undefined;
+
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
@@ -84,18 +98,47 @@ const Mod = (props: Props) => {
               }}
             />
           </Button>
-          <Dropdown.button
-            options={mappedVersions()}
-            rounded
-            value={mappedVersions()[0]?.key}
-          >
-            <Trans
-              key="instance.download_modpacks"
-              options={{
-                defaultValue: "Download",
-              }}
-            />
-          </Dropdown.button>
+          <Switch>
+            <Match when={!isModInstalled()}>
+              <Dropdown.button
+                options={mappedVersions()}
+                rounded
+                value={mappedVersions()[0]?.key}
+                onClick={() => {
+                  installModMutation.mutate({
+                    file_id: props.mod.mainFileId,
+                    instance_id: parseInt(lastInstanceOpened(), 10),
+                    project_id: props.mod.id,
+                  });
+                }}
+                onChange={(val) => {
+                  console.log("CHANFE", val, props.mod);
+                  // installModMutation.mutate({
+                  //   file_id: props.mod.mainFileId,
+                  //   instance_id: parseInt(lastInstanceOpened(), 10),
+                  //   project_id: props.mod.id,
+                  // });
+                }}
+              >
+                <Trans
+                  key="instance.download_modpacks"
+                  options={{
+                    defaultValue: "Download",
+                  }}
+                />
+              </Dropdown.button>
+            </Match>
+            <Match when={isModInstalled()}>
+              <Button>
+                <Trans
+                  key="mod.downloaded"
+                  options={{
+                    defaultValue: "Downloaded",
+                  }}
+                />
+              </Button>
+            </Match>
+          </Switch>
         </div>
       </div>
     </div>

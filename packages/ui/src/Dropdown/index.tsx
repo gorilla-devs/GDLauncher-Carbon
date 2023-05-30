@@ -43,6 +43,7 @@ interface DropDownButtonProps {
   rounded?: boolean;
   label?: string;
   onChange?: (_value: string) => void;
+  onClick?: () => void;
   class?: string;
   id?: string;
   bgColorClass?: string;
@@ -205,7 +206,10 @@ const DropDownButton = (props: DropDownButtonProps) => {
 
   return (
     <div class="flex">
-      <Button class="rounded-r-0 pr-4 pl-4 flex gap-1">
+      <Button
+        class="rounded-r-0 pr-4 pl-4 flex gap-1"
+        onClick={() => props?.onClick?.()}
+      >
         <span>{props.children}</span>
       </Button>
       <Dropdown

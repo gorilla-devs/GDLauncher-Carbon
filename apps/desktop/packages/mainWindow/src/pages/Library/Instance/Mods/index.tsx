@@ -7,33 +7,6 @@ import { useParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 
-const NoMods = () => {
-  return (
-    <div class="h-full w-full flex justify-center items-center min-h-90">
-      <div class="flex flex-col justify-center items-center text-center">
-        <img src={glassBlock} class="w-16 h-16" />
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.no_mods_text"
-            options={{
-              defaultValue:
-                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
-            }}
-          />
-        </p>
-        <Button type="outline" size="medium">
-          <Trans
-            key="instance.add_pack"
-            options={{
-              defaultValue: "+ Add pack",
-            }}
-          />
-        </Button>
-      </div>
-    </div>
-  );
-};
-
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
@@ -43,6 +16,37 @@ const Mods = () => {
     "instance.getInstanceDetails",
     parseInt(params.id, 10),
   ]);
+
+  const NoMods = () => {
+    return (
+      <div class="h-full w-full flex justify-center items-center min-h-90">
+        <div class="flex flex-col justify-center items-center text-center">
+          <img src={glassBlock} class="w-16 h-16" />
+          <p class="text-darkSlate-50 max-w-100">
+            <Trans
+              key="instance.no_mods_text"
+              options={{
+                defaultValue:
+                  "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+              }}
+            />
+          </p>
+          <Button
+            type="outline"
+            size="medium"
+            onClick={() => modalsContext?.openModal({ name: "addMod" })}
+          >
+            <Trans
+              key="instance.add_mod"
+              options={{
+                defaultValue: "+ Add mod",
+              }}
+            />
+          </Button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>

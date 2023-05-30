@@ -1,8 +1,9 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
+import { rspc } from "@/utils/rspcClient";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Tag } from "@gd/ui";
+import { Button, Dropdown, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
 import { For } from "solid-js";
 
@@ -10,6 +11,21 @@ type Props = { modpack: FEMod };
 
 const Modpack = (props: Props) => {
   const navigate = useGDNavigate();
+
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const addNotification = createNotification();
+
+  const createInstanceMutation = rspc.createMutation(
+    ["instance.createInstance"],
+    {
+      onSuccess() {
+        addNotification("Instance successfully downloaded");
+      },
+      onError() {
+        addNotification("Error while downloading the modpack.", "error");
+      },
+    }
+  );
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
@@ -77,6 +93,22 @@ const Modpack = (props: Props) => {
             ]}
             rounded
             value="1.16.2"
+            onClick={() => {
+              createInstanceMutation.mutate({
+                group: defaultGroup.data || 1,
+                use_loaded_icon: true,
+                notes: "",
+                name: props.modpack.name,
+                version: {
+                  Modpack: {
+                    Curseforge: {
+                      file_id: props.modpack.mainFileId,
+                      project_id: props.modpack.id,
+                    },
+                  },
+                },
+              });
+            }}
           >
             <Trans
               key="instance.download_modpacks"

@@ -53,22 +53,6 @@ const Home = () => {
             }}
           />
         </Show>
-        {/* <div class="mt-4">
-          <Carousel title={t("recent_played")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div> */}
         <Switch>
           <Match
             when={
@@ -79,7 +63,6 @@ const Home = () => {
               <Carousel title={t("your_instances")}>
                 <For each={instances}>
                   {(instance) => (
-                    //TODO: SKELETON
                     <Suspense fallback={<Skeleton.instance />}>
                       <InstanceTile instance={instance} />
                     </Suspense>
@@ -110,23 +93,6 @@ const Home = () => {
             </div>
           </Match>
         </Switch>
-
-        {/* <div class="mt-4">
-          <Carousel title={t("popular_modpacks")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div> */}
       </div>
     </div>
   );
