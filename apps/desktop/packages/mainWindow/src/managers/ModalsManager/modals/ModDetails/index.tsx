@@ -1,5 +1,4 @@
 /* eslint-disable solid/no-innerhtml */
-/* eslint-disable i18next/no-literal-string */
 import { Button } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
@@ -107,7 +106,7 @@ const ModDetails = (props: ModalProps) => {
                           <div class="flex items-center gap-2 mt-2 lg:mt-0">
                             <Button uppercase variant="glow" size="large">
                               <Trans
-                                key="modpack.download"
+                                key="mod.download"
                                 options={{
                                   defaultValue: "Download",
                                 }}

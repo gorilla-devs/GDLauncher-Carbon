@@ -133,5 +133,9 @@
   "onboarding.welcome_gdlauncher_title": "Welcome to GDLauncher",
   "onboarding.welcome_gdlauncher_text": "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
   "onboarding.add_instance": "+ Add Instance",
-  "onboarding.import_instance_or_zip": "Import instance / Zip"
+  "onboarding.import_instance_or_zip": "Import instance / Zip",
+  "mods.fetching_no_more_mods": "No more mods to load",
+  "mods.fetching_mods_text": "Loading mods",
+  "mods.fetching_mods_error": "There was an error while fetching mods",
+  "mod.download": "Download"
 }

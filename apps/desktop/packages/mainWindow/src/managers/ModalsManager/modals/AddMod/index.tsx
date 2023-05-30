@@ -139,9 +139,9 @@ const AddMod = (props: ModalProps) => {
         <div class="flex justify-center items-center flex-col text-center">
           <p class="text-darkSlate-50 max-w-100">
             <Trans
-              key="instance.fetching_no_more_modpacks"
+              key="mods.fetching_no_more_mods"
               options={{
-                defaultValue: "No more modpacks to load",
+                defaultValue: "No more mods to load",
               }}
             />
           </p>
@@ -156,7 +156,7 @@ const AddMod = (props: ModalProps) => {
         <div class="flex justify-center items-center flex-col text-center">
           <p class="text-darkSlate-50 max-w-100">
             <Trans
-              key="instance.fetching_modpacks_text"
+              key="mods.fetching_mods_text"
               options={{
                 defaultValue: "Loading mods",
               }}
@@ -176,9 +176,9 @@ const AddMod = (props: ModalProps) => {
         <div class="flex justify-center items-center flex-col text-center">
           <p class="text-darkSlate-50 max-w-100">
             <Trans
-              key="instance.fetching_modpacks_error"
+              key="mods.fetching_mods_error"
               options={{
-                defaultValue: "There was an error while fetching modpacks",
+                defaultValue: "There was an error while fetching mods",
               }}
             />
             {parsedError().cause[0].display}
