@@ -1,5 +1,5 @@
 import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show, createEffect, onMount } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
@@ -12,6 +12,7 @@ import { createStore } from "solid-js/store";
 import { port, rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 import { getRunningState } from "@/utils/instances";
+import updateAvailable, { checkForUpdates } from "@/utils/updaterhelper";
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
@@ -104,9 +105,13 @@ const AppNavbar = () => {
   const runningInstances = () =>
     Object.values(activeInstances).filter((running) => running).length;
 
+  onMount(() => {
+    checkForUpdates();
+  });
+
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center text-white px-5 bg-dark-slate-800 h-15">
+      <nav class="flex items-center text-white bg-darkSlate-800 px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -146,6 +151,16 @@ const AppNavbar = () => {
                 </div>
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
+                   <Show when={updateAvailable()}>
+                    <Tab ignored>
+                      <div
+                        class="cursor-pointer text-2xl i-ri:download-fill text-green-500"
+                        onClick={() => {
+                          window.checkUpdate();
+                        }}
+                      />
+                    </Tab>
+                  </Show>
                   <Tab ignored noPointer={true}>
                     <div class="relative">
                       <Show when={runningInstances() > 0}>
@@ -176,7 +191,7 @@ const AppNavbar = () => {
                   <Link href="/settings" class="no-underline">
                     <Tab>
                       <div
-                        class="text-dark-slate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
+                        class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
                         classList={{
                           "bg-primary-500":
                             !!isSettings() || !!isSettingsNested(),

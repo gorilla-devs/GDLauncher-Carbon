@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use crate::managers;
 use crate::managers::{App, AppInner};
+use crate::{app_version, managers};
 use async_stream::stream;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -21,8 +21,8 @@ mod vtask;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
-    key: &'static str,
-    args: Option<serde_json::Value>,
+    pub key: &'static str,
+    pub args: Option<serde_json::Value>,
 }
 
 impl InvalidationEvent {
@@ -34,6 +34,9 @@ impl InvalidationEvent {
 pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
     rspc::Router::<App>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
+        .query("getAppVersion", |t| {
+            t(|_ctx, _: ()| async move { Ok(app_version::APP_VERSION) })
+        })
         .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())

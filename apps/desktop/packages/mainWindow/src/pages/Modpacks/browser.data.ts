@@ -1,5 +1,12 @@
+import { rspc } from "@/utils/rspcClient";
+
 const fetchData = () => {
-  console.log("fetch browser data...");
+  let forgeCategories = rspc.createQuery(() => [
+    "modplatforms.curseforgeGetCategories",
+  ]);
+  const minecraftVersions = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
+
+  return { forgeCategories, minecraftVersions };
 };
 
 export default fetchData;

@@ -1,9 +1,11 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
+use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
@@ -275,6 +277,41 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_request_version_info.update_items(2, 3);
 
+                let java_path = {
+                    let required_java = SystemJavaProfileName::from(
+                        daedalus::minecraft::MinecraftJavaProfile::try_from(
+                            &version_info
+                                .java_version
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    anyhow::anyhow!("instance java version unsupported")
+                                })?
+                                .component as &str,
+                        )?,
+                    );
+
+                    match app.java_manager().get_usable_java(required_java).await? {
+                        Some(path) => path,
+                        None => {
+                            let t_install_java = task
+                                .subtask(Translation::InstanceTaskLaunchInstallJava)
+                                .await;
+                            t_install_java.set_weight(0.0);
+                            t_install_java.start_opaque();
+                            let path = app
+                                .java_manager()
+                                .require_java_install(required_java)
+                                .await?;
+                            t_install_java.complete_opaque();
+
+                            match path {
+                                Some(path) => path,
+                                None => return Ok(None),
+                            }
+                        }
+                    }
+                };
+
                 match version.modloaders.iter().next() {
                     Some(ModLoader {
                         type_: ModLoaderType::Forge,
@@ -365,7 +402,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .data
                                 .as_ref()
                                 .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from("java"),
+                            java_path.clone(),
                             instance_path.clone(),
                             client_path,
                             game_version,
@@ -382,7 +419,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
-                            PathBuf::from("java"),
+                            java_path,
                             account,
                             xms_memory,
                             xmx_memory,
@@ -623,6 +660,7 @@ mod test {
     use chrono::Utc;
 
     use crate::{
+        api::keys,
         domain::instance::info::{self, StandardVersion},
         managers::{account::FullAccount, instance::InstanceVersionSouce},
     };
@@ -662,8 +700,29 @@ mod test {
         };
 
         app.task_manager().wait_with_log(task).await?;
+        app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
+            .await?;
         println!("Task exited");
-        tokio::time::sleep(std::time::Duration::from_secs(10000)).await;
+        let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
+            domain::LaunchState::Inactive => {
+                println!("Game not running");
+                return Ok(());
+            }
+            domain::LaunchState::Running { log_id, .. } => log_id,
+            _ => unreachable!(),
+        };
+
+        let mut log = app.instance_manager().get_log(log_id).await?;
+
+        let mut idx = 0;
+        while log.changed().await.is_ok() {
+            let log = log.borrow();
+            let new_lines = log.get_region(idx..);
+            idx = log.len();
+            for line in new_lines {
+                println!("[{:?}]: {}", line.type_, line.text);
+            }
+        }
 
         Ok(())
     }

@@ -15,10 +15,10 @@ export { LoadingBar } from "./Loadingbar";
 export { Steps } from "./Steps";
 export { Radio } from "./Radio";
 export { TextArea } from "./TextArea";
+export { Skeleton } from "./Skeleton";
 export {
   NotificationsProvider,
   createNotification,
 } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
-export { Skeleton } from "./Skeleton";
 export * from "./themes";

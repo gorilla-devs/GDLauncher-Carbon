@@ -48,7 +48,7 @@ const getVariant = (
     ...(textColor && { [textColor]: true }),
     "transition-all": true,
     "overflow-hidden": true,
-    "duration-300": true,
+    "duration-100": true,
     "ease-in-out": true,
     "font-main": true,
     "max-w-max": !isLoading,

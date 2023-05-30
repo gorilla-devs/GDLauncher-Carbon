@@ -25,8 +25,9 @@ async fn get_java_component_from_db(
 pub async fn add_java_component_to_db(
     db: &Arc<PrismaClient>,
     java_component: JavaComponent,
-) -> anyhow::Result<()> {
-    db.java()
+) -> anyhow::Result<String> {
+    let res = db
+        .java()
         .create(
             java_component.path,
             java_component.version.major as i32,
@@ -40,7 +41,7 @@ pub async fn add_java_component_to_db(
         .exec()
         .await?;
 
-    Ok(())
+    Ok(res.id)
 }
 
 async fn update_java_component_in_db_to_invalid(
@@ -268,7 +269,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
             }
 
             let java_version = JavaVersion::try_from(java.full_version.as_str())?;
-            if profile.is_java_version_compatible(java_version) {
+            if profile.is_java_version_compatible(&java_version) {
                 println!(
                     "Java {} is compatible with profile {}",
                     java.path,

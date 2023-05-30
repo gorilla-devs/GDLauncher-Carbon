@@ -16,7 +16,7 @@ use tokio::{
 use crate::{
     db::PrismaClient,
     domain::{
-        java::{JavaArch, JavaOs},
+        java::{JavaArch, JavaOs, JavaVersion},
         runtime_path::{ManagedJavasPath, TempPath},
     },
     managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
@@ -39,7 +39,7 @@ impl Managed for AzulZulu {
         java_checker: &G,
         db_client: &Arc<PrismaClient>,
         progress_report: Sender<Step>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<String> {
         let progress_report = Arc::new(progress_report);
 
         let download_temp_path = tmp_path.to_path().join(&version.name);
@@ -166,9 +166,9 @@ impl Managed for AzulZulu {
             )
             .await?;
 
-        add_java_component_to_db(db_client, java_component).await?;
+        let java_id = add_java_component_to_db(db_client, java_component).await?;
 
-        Ok(())
+        Ok(java_id)
     }
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap> {
@@ -212,6 +212,16 @@ impl AzulAPI {
                             name: version.name.clone(),
                             download_url: version.download_url.clone(),
                             id: version.package_uuid.clone(),
+                            java_version: JavaVersion {
+                                major: version.java_version.get(0).cloned().ok_or(
+                                    anyhow::anyhow!("No major version found for {}", version.name),
+                                )?,
+                                minor: version.java_version.get(1).cloned(),
+                                patch: version.java_version.get(2).cloned().map(|v| v.to_string()),
+                                build_metadata: None,
+                                prerelease: None,
+                                update_number: None,
+                            },
                         });
                     }
 

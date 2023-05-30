@@ -4,13 +4,14 @@ use crate::managers::java::utils::PATH_SEPARATOR;
 
 async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     let env_path = std::env::var("PATH")?;
-    let paths = env_path.split(PATH_SEPARATOR).collect::<Vec<&str>>();
+    let env_path = env_path.split(PATH_SEPARATOR);
+    let gdl_env_path = std::env::var("GDL_JAVA_PATH")?;
+    let gdl_env_path = gdl_env_path.split(PATH_SEPARATOR);
+
+    let paths: Vec<_> = env_path.chain(gdl_env_path).map(PathBuf::from).collect();
     let mut java_paths = Vec::new();
     for path in paths {
-        let path = path.to_string();
-        if path.contains("java") {
-            java_paths.extend(search_java_binary_in_path(PathBuf::from(path)));
-        }
+        java_paths.extend(search_java_binary_in_path(path));
     }
 
     Ok(java_paths)

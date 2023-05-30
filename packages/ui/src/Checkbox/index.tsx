@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 
 interface Props {
   checked?: boolean;
@@ -9,6 +9,10 @@ interface Props {
 function Checkbox(props: Props) {
   const isChecked = () => props.checked;
   const [checked, setChecked] = createSignal(isChecked());
+
+  createEffect(() => {
+    setChecked(props.checked);
+  });
 
   return (
     <div

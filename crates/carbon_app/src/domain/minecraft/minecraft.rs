@@ -2,6 +2,7 @@ use daedalus::minecraft::{
     Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
 use std::path::{Path, PathBuf};
+use sysinfo::SystemExt;
 
 use crate::domain::maven::MavenCoordinates;
 
@@ -59,13 +60,37 @@ pub fn is_rule_allowed(rule: Rule) -> bool {
     let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os()
         || os.name.clone().unwrap_or(get_current_os_base_arch()) == get_current_os_base_arch();
 
+    let is_version_allowed = {
+        if is_os_allowed {
+            let system = sysinfo::System::new();
+            let Some(os_version) = system.os_version() else {
+                return true;
+            };
+
+            let Some(rule_os_version) = os.version.clone() else {
+                return true;
+            };
+
+            let Ok(regex) = regex::Regex::new(&rule_os_version) else {
+                return true;
+            };
+
+            regex.is_match(&os_version)
+        } else {
+            false
+        }
+    };
+
     let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
     let is_feature_allowed = rule.features.is_none();
-    // TODO: Check version
 
     match rule.action {
-        RuleAction::Allow => is_os_allowed && is_arch_allowed && is_feature_allowed,
-        RuleAction::Disallow => !(is_os_allowed && is_arch_allowed && is_feature_allowed),
+        RuleAction::Allow => {
+            is_os_allowed && is_arch_allowed && is_feature_allowed && is_version_allowed
+        }
+        RuleAction::Disallow => {
+            !is_os_allowed && !is_arch_allowed && !is_feature_allowed && !is_version_allowed
+        }
     }
 }
 

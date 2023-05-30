@@ -151,6 +151,19 @@ mod app {
                 }
             }
         }
+
+        pub async fn wait_for_invalidation(
+            &self,
+            key: Key,
+        ) -> Result<InvalidationEvent, RecvError> {
+            let mut recv = self.invalidation_channel.subscribe();
+            loop {
+                let event = recv.recv().await?;
+                if event.key == key.full {
+                    return Ok(event);
+                }
+            }
+        }
     }
 }
 

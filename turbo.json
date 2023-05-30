@@ -34,7 +34,7 @@
     "lint": {
       "cache": false
     },
-    "check-bundle": {
+    "release": {
       "cache": false
     }
   },
