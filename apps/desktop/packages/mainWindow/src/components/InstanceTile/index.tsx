@@ -8,6 +8,7 @@ import {
   getValideInstance,
   getPreparingState,
   getRunningState,
+  getInValideInstance,
 } from "@/utils/instances";
 import {
   ListInstance,
@@ -42,6 +43,7 @@ const InstanceTile = (props: {
   const navigate = useGDNavigate();
 
   const validInstance = () => getValideInstance(props.instance.status);
+  const invalidInstance = () => getInValideInstance(props.instance.status);
 
   const isPreparingState = () => getPreparingState(props.instance.status);
 
@@ -50,6 +52,9 @@ const InstanceTile = (props: {
   const taskId = isPreparingState();
 
   const isRunning = () => getRunningState(props.instance.status);
+  const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
+  const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
+
 
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
@@ -65,6 +70,11 @@ const InstanceTile = (props: {
         } else if (isProgressFailed(task.data.progress)) {
           setIsLoading(false);
         }
+      }
+    });
+    createEffect(() => {
+      if (validInstance() || invalidInstance()) {
+        dismissTaskMutation.mutate(taskId);
       }
     });
   }

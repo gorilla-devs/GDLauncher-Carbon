@@ -18,10 +18,22 @@ export const isListInstanceValid = (
   return "Valid" in status;
 };
 
+export const isListInstanceInValid = (
+  status: ListInstanceStatus
+): status is { Invalid: InvalidListInstance } => {
+  return "Invalid" in status;
+};
+
 export const getValideInstance = (
   status: ListInstanceStatus
 ): ValidListInstance | undefined => {
   if (isListInstanceValid(status)) return status.Valid;
+};
+
+export const getInValideInstance = (
+  status: ListInstanceStatus
+): InvalidListInstance | undefined => {
+  if (isListInstanceInValid(status)) return status.Invalid;
 };
 
 export const isListInstanceInvalid = (

@@ -175,7 +175,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38"
+              class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38 max-w-38"
               classList={{
                 grayscale: props.isLoading || props.isInQueue,
                 "bg-green-600": !props.img,
@@ -271,7 +271,7 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="text-ellipsis overflow-hidden mt-2 mb-1"
+              class="text-ellipsis overflow-hidden max-w-38 whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading,
                 "text-lightGray-900": props.isLoading,
