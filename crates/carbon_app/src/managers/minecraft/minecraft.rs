@@ -1,9 +1,10 @@
 use std::{collections::HashMap, path::PathBuf, slice};
 
 use crate::domain::{
+    java::{JavaArch, JavaComponent},
     maven::MavenCoordinates,
     minecraft::minecraft::{
-        get_current_os, get_default_jvm_args, is_rule_allowed, library_is_allowed,
+        get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
     },
 };
 use daedalus::minecraft::{
@@ -211,6 +212,7 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
 }
 
 pub async fn generate_startup_command(
+    java_component: JavaComponent,
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
@@ -223,7 +225,9 @@ pub async fn generate_startup_command(
         .libraries
         .iter()
         .filter_map(|library| {
-            if !library_is_allowed(library.clone()) || !library.include_in_classpath {
+            if !library_is_allowed(library.clone(), &java_component.arch)
+                || !library.include_in_classpath
+            {
                 return None;
             }
 
@@ -234,7 +238,7 @@ pub async fn generate_startup_command(
                     let Some(native_name) = library
                         .natives
                         .as_ref()
-                        .and_then(|natives| natives.get(&get_current_os())) else {
+                        .and_then(|natives| natives.get(&Os::native())) else {
                             return None;
                         };
 
@@ -326,7 +330,9 @@ pub async fn generate_startup_command(
             match arg {
                 Argument::Normal(arg) => command.push(substitute_argument(arg)),
                 Argument::Ruled { rules, value } => {
-                    let is_allowed = rules.iter().all(|rule| is_rule_allowed(rule.clone()));
+                    let is_allowed = rules
+                        .iter()
+                        .all(|rule| is_rule_allowed(rule.clone(), &java_component.arch));
 
                     match (is_allowed, value) {
                         (false, _) => {}
@@ -372,15 +378,17 @@ pub async fn generate_startup_command(
         command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
     }
 
-    if get_current_os() == Os::Osx || get_current_os() == Os::OsxArm64 {
-        let can_find_start_on_first_thread = jvm_arguments
-            .iter()
-            .any(|arg| matches!(arg, Argument::Normal(s) if s == "-XstartOnFirstThread"));
+    // if get_current_os() == Os::Osx || get_current_os() == Os::OsxArm64 {
+    //     let can_find_start_on_first_thread = jvm_arguments
+    //         .iter()
+    //         .any(|arg| matches!(arg, Argument::Normal(s) if s == "-XstartOnFirstThread"));
 
-        if !can_find_start_on_first_thread {
-            command.push("-XstartOnFirstThread".to_string());
-        }
-    }
+    //     if !can_find_start_on_first_thread {
+    //         command.push("-XstartOnFirstThread".to_string());
+    //     }
+    // }
+
+    // command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class.clone());
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
@@ -389,7 +397,7 @@ pub async fn generate_startup_command(
 }
 
 pub async fn launch_minecraft(
-    java_binary: PathBuf,
+    java_component: JavaComponent,
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
@@ -399,23 +407,25 @@ pub async fn launch_minecraft(
     instance_path: InstancePath,
 ) -> anyhow::Result<Child> {
     let startup_command = generate_startup_command(
+        java_component.clone(),
         full_account,
         xmx_memory,
         xms_memory,
         extra_java_args,
         runtime_path,
         version,
-        instance_path,
+        instance_path.clone(),
     )
     .await?;
 
     println!(
         "Starting Minecraft with command: {} {}",
-        java_binary.to_string_lossy(),
+        java_component.path,
         startup_command.join(" ")
     );
 
-    let mut command_exec = tokio::process::Command::new(java_binary);
+    let mut command_exec = tokio::process::Command::new(java_component.path);
+    command_exec.current_dir(instance_path.get_root());
 
     command_exec
         .stdout(std::process::Stdio::piped())
@@ -426,13 +436,18 @@ pub async fn launch_minecraft(
     Ok(child.spawn()?)
 }
 
-pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) {
+pub async fn extract_natives(
+    runtime_path: &RuntimePath,
+    version: &VersionInfo,
+    java_arch: &JavaArch,
+) {
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
         version_id: &str,
         native_name: &str,
     ) {
+        let native_name = native_name.replace("${arch}", ARCH_WIDTH);
         let path = runtime_path.get_libraries().get_library_path({
             library
                 .downloads
@@ -441,7 +456,7 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
                 .classifiers
                 .as_ref()
                 .unwrap()
-                .get(native_name)
+                .get(&native_name)
                 .unwrap()
                 .path
                 .clone()
@@ -457,11 +472,11 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
     for library in version
         .libraries
         .iter()
-        .filter(|&lib| library_is_allowed(lib.clone()))
+        .filter(|&lib| library_is_allowed(lib.clone(), java_arch))
     {
         match &library.natives {
             Some(natives) => {
-                if let Some(native_name) = natives.get(&get_current_os()) {
+                if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
                     extract_single_library_natives(runtime_path, library, &version.id, native_name)
                         .await;
                 }
@@ -474,7 +489,9 @@ pub async fn extract_natives(runtime_path: &RuntimePath, version: &VersionInfo) 
 #[cfg(test)]
 mod tests {
     use crate::{
-        domain::minecraft::minecraft::library_into_natives_downloadable, setup_managers_for_test,
+        domain::minecraft::minecraft::library_into_natives_downloadable,
+        managers::java::java_checker::{JavaChecker, RealJavaChecker},
+        setup_managers_for_test,
     };
 
     use super::*;
@@ -522,7 +539,16 @@ mod tests {
 
         let instance_id = InstancePath::new(PathBuf::from("something"));
 
+        let java_component = RealJavaChecker
+            .get_bin_info(
+                &PathBuf::from("java"),
+                crate::domain::java::JavaComponentType::Local,
+            )
+            .await
+            .unwrap();
+
         let command = generate_startup_command(
+            java_component,
             full_account,
             2048,
             2048,
@@ -580,6 +606,7 @@ mod tests {
             downloadables.extend(library_into_natives_downloadable(
                 native.clone(),
                 &libraries_path,
+                &JavaArch::X86_64,
             ));
         }
         let progress = tokio::sync::watch::channel(Progress::new());
@@ -588,6 +615,6 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version).await;
+        extract_natives(runtime_path, &version, &JavaArch::X86_64).await;
     }
 }

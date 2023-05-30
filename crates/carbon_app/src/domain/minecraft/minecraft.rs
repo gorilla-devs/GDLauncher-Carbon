@@ -4,16 +4,17 @@ use daedalus::minecraft::{
 use std::path::{Path, PathBuf};
 use sysinfo::SystemExt;
 
-use crate::domain::maven::MavenCoordinates;
+use crate::domain::{java::JavaArch, maven::MavenCoordinates, runtime_path::AssetsPath};
 
 pub fn libraries_into_vec_downloadable(
     libraries: Vec<Library>,
     base_path: &std::path::Path,
+    java_arch: &JavaArch,
 ) -> Vec<carbon_net::Downloadable> {
     let mut files = vec![];
 
     for library in libraries {
-        if !library_is_allowed(library.clone()) {
+        if !library_is_allowed(library.clone(), java_arch) {
             continue;
         }
 
@@ -21,7 +22,9 @@ pub fn libraries_into_vec_downloadable(
             files.push(downloadable);
         }
 
-        if let Some(downloadable) = library_into_natives_downloadable(library.clone(), base_path) {
+        if let Some(downloadable) =
+            library_into_natives_downloadable(library.clone(), base_path, java_arch)
+        {
             files.push(downloadable);
         }
 
@@ -48,50 +51,48 @@ pub fn libraries_into_vec_downloadable(
     files
 }
 
-pub fn is_rule_allowed(rule: Rule) -> bool {
-    let current_arch = std::env::consts::ARCH;
-
-    let os = rule.os.as_ref().unwrap_or(&OsRule {
-        name: None,
-        version: None,
-        arch: None,
-    });
-
-    let is_os_allowed = os.name.clone().unwrap_or(get_current_os()) == get_current_os()
-        || os.name.clone().unwrap_or(get_current_os_base_arch()) == get_current_os_base_arch();
-
-    let is_version_allowed = {
-        if is_os_allowed {
-            let system = sysinfo::System::new();
-            let Some(os_version) = system.os_version() else {
-                return true;
-            };
-
-            let Some(rule_os_version) = os.version.clone() else {
-                return true;
-            };
-
-            let Ok(regex) = regex::Regex::new(&rule_os_version) else {
-                return true;
-            };
-
-            regex.is_match(&os_version)
-        } else {
-            false
-        }
+// Use java arch instead of system arch
+pub fn is_rule_allowed(rule: Rule, java_arch: &JavaArch) -> bool {
+    let res = match rule {
+        Rule {
+            os: Some(ref os), ..
+        } => os_rule(os, java_arch),
+        Rule {
+            features: Some(ref features),
+            ..
+        } => features.has_demo_resolution.unwrap_or(false),
+        _ => false,
     };
 
-    let is_arch_allowed = os.arch.clone().unwrap_or(current_arch.to_string()) == current_arch;
-    let is_feature_allowed = rule.features.is_none();
-
     match rule.action {
-        RuleAction::Allow => {
-            is_os_allowed && is_arch_allowed && is_feature_allowed && is_version_allowed
-        }
-        RuleAction::Disallow => {
-            !is_os_allowed && !is_arch_allowed && !is_feature_allowed && !is_version_allowed
+        RuleAction::Allow => res,
+        RuleAction::Disallow => !res,
+    }
+}
+
+pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
+    let mut rule_match = true;
+
+    if let Some(ref arch) = rule.arch {
+        rule_match &= !matches!(arch.as_str(), "x86" | "arm");
+    }
+
+    if let Some(name) = &rule.name {
+        rule_match &= &Os::native() == name || &Os::native_arch(java_arch) == name;
+    }
+
+    if let Some(version) = &rule.version {
+        let system = sysinfo::System::new();
+        let Some(os_version) = system.os_version() else {
+            return true;
+        };
+
+        if let Ok(regex) = regex::Regex::new(version.as_str()) {
+            rule_match &= regex.is_match(&os_version);
         }
     }
+
+    rule_match
 }
 
 pub fn library_into_lib_downloadable(
@@ -117,6 +118,7 @@ pub fn library_into_lib_downloadable(
 pub fn library_into_natives_downloadable(
     library: Library,
     base_path: &std::path::Path,
+    java_arch: &JavaArch,
 ) -> Option<carbon_net::Downloadable> {
     let Some(classifiers) = library.downloads.and_then(|v| v.classifiers) else {
         return None;
@@ -126,7 +128,7 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
-    let Some(natives_name) = natives.get(&get_current_os()) else {
+    let Some(natives_name) = natives.get(&Os::native_arch(java_arch)) else {
         return None;
     };
 
@@ -157,13 +159,17 @@ pub fn version_download_into_downloadable(
 
 pub fn assets_index_into_vec_downloadable(
     assets_index: AssetsIndex,
-    base_path: &Path,
+    assets_path: &AssetsPath,
 ) -> Vec<carbon_net::Downloadable> {
     let mut files: Vec<carbon_net::Downloadable> = vec![];
 
-    for (_, object) in assets_index.objects.iter() {
+    for (key, object) in assets_index.objects.iter() {
         // TODO: handle directories for different versions (virtual legacy)
-        let asset_path = base_path.join(&object.hash[0..2]).join(&object.hash);
+        let asset_path = assets_path
+            .get_objects_path()
+            .join(&object.hash[0..2])
+            .join(&object.hash);
+        let virtual_asset_path = assets_path.get_legacy_path().join(key);
 
         files.push(
             carbon_net::Downloadable::new(
@@ -177,78 +183,38 @@ pub fn assets_index_into_vec_downloadable(
             .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
             .with_size(object.size as u64),
         );
+        files.push(
+            carbon_net::Downloadable::new(
+                format!(
+                    "https://resources.download.minecraft.net/{}/{}",
+                    &object.hash[0..2],
+                    &object.hash
+                ),
+                virtual_asset_path,
+            )
+            .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
+            .with_size(object.size as u64),
+        );
     }
 
     files
 }
 
-pub fn library_is_allowed(library: Library) -> bool {
+pub fn library_is_allowed(library: Library, java_arch: &JavaArch) -> bool {
     let Some(rules) = library.rules else {
         return true;
     };
 
-    for rule in rules {
-        if !is_rule_allowed(rule) {
-            return false;
-        }
-    }
-
-    true
+    rules
+        .iter()
+        .any(|rule| is_rule_allowed(rule.clone(), java_arch))
 }
 
-pub fn get_current_os() -> Os {
-    #[cfg(target_os = "macos")]
-    {
-        if cfg!(target_arch = "x86_64") {
-            Os::Osx
-        } else {
-            Os::OsxArm64
-        }
-    }
-    #[cfg(target_os = "windows")]
-    {
-        if cfg!(target_arch = "x86_64") {
-            Os::Windows
-        } else {
-            Os::WindowsArm64
-        }
-    }
-    #[cfg(target_os = "linux")]
-    {
-        if cfg!(target_arch = "x86_64") {
-            Os::Linux
-        } else if cfg!(target_arch = "arm64") {
-            Os::LinuxArm64
-        } else if cfg!(target_arch = "arm") {
-            Os::LinuxArm32
-        } else {
-            panic!("Unsupported architecture")
-        }
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    {
-        panic!("Unsupported OS")
-    }
-}
+#[cfg(target_pointer_width = "64")]
+pub const ARCH_WIDTH: &str = "64";
 
-pub fn get_current_os_base_arch() -> Os {
-    #[cfg(target_os = "macos")]
-    {
-        Os::Osx
-    }
-    #[cfg(target_os = "windows")]
-    {
-        Os::Windows
-    }
-    #[cfg(target_os = "linux")]
-    {
-        Os::Linux
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
-    {
-        panic!("Unsupported OS")
-    }
-}
+#[cfg(target_pointer_width = "32")]
+pub const ARCH_WIDTH: &str = "32";
 
 pub fn get_default_jvm_args() -> Vec<Argument> {
     vec![
@@ -326,4 +292,46 @@ pub fn get_default_jvm_args() -> Vec<Argument> {
         Argument::Normal("-cp".to_string()),
         Argument::Normal("${classpath}".to_string()),
     ]
+}
+
+pub trait OsExt {
+    fn native() -> Self;
+    fn native_arch(java_arch: &JavaArch) -> Self;
+}
+
+impl OsExt for Os {
+    fn native_arch(java_arch: &JavaArch) -> Self {
+        if std::env::consts::OS == "windows" {
+            if java_arch == &JavaArch::Arm64 {
+                Os::WindowsArm64
+            } else {
+                Os::Windows
+            }
+        } else if std::env::consts::OS == "linux" {
+            if java_arch == &JavaArch::Arm64 {
+                Os::LinuxArm64
+            } else if java_arch == &JavaArch::Arm32 {
+                Os::LinuxArm32
+            } else {
+                Os::Linux
+            }
+        } else if std::env::consts::OS == "macos" {
+            if java_arch == &JavaArch::Arm64 {
+                Os::OsxArm64
+            } else {
+                Os::Osx
+            }
+        } else {
+            Os::Unknown
+        }
+    }
+
+    fn native() -> Self {
+        match std::env::consts::OS {
+            "windows" => Self::Windows,
+            "macos" => Self::Osx,
+            "linux" => Self::Linux,
+            _ => Self::Unknown,
+        }
+    }
 }

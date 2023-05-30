@@ -277,7 +277,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_request_version_info.update_items(2, 3);
 
-                let java_path = {
+                let java = {
                     let required_java = SystemJavaProfileName::from(
                         daedalus::minecraft::MinecraftJavaProfile::try_from(
                             &version_info
@@ -353,7 +353,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 downloads.extend(
                     app.minecraft_manager()
-                        .get_all_version_info_files(version_info.clone())
+                        .get_all_version_info_files(version_info.clone(), &java.arch)
                         .await?,
                 );
 
@@ -378,7 +378,12 @@ impl ManagerRef<'_, InstanceManager> {
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
 
                 t_extract_natives.start_opaque();
-                managers::minecraft::minecraft::extract_natives(&runtime_path, &version_info).await;
+                managers::minecraft::minecraft::extract_natives(
+                    &runtime_path,
+                    &version_info,
+                    &java.arch,
+                )
+                .await;
                 t_extract_natives.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
@@ -402,7 +407,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .data
                                 .as_ref()
                                 .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            java_path.clone(),
+                            PathBuf::from(&java.path),
                             instance_path.clone(),
                             client_path,
                             game_version,
@@ -419,7 +424,7 @@ impl ManagerRef<'_, InstanceManager> {
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
-                            java_path,
+                            java,
                             account,
                             xms_memory,
                             xmx_memory,
@@ -665,7 +670,7 @@ mod test {
         managers::{account::FullAccount, instance::InstanceVersionSouce},
     };
 
-    //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_launch() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
