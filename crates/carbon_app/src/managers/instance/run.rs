@@ -107,8 +107,9 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instance_path(&instance.shortpath);
 
         let mut version = match config.game_configuration.version {
-            Some(GameVersion::Standard(v)) => v,
+            Some(GameVersion::Standard(v)) => Some(v),
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
+            None if config.modpack.is_some() => None,
             None => bail!("Instance has no associated game version and cannot be launched"),
         };
 
@@ -245,20 +246,26 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?;
 
                         downloads.extend(modpack_info.downloadables);
-                        version = modpack_info.manifest.minecraft.try_into()?;
+                        let v: StandardVersion = modpack_info.manifest.minecraft.try_into()?;
+                        version = Some(v.clone());
 
                         app.instance_manager()
                             .update_instance(
                                 instance_id,
                                 None,
                                 None,
-                                Some(GameVersion::Standard(version.clone())),
+                                Some(GameVersion::Standard(v)),
                                 None,
                                 None,
                             )
                             .await?;
                     }
                 }
+
+                let version = match version {
+                    Some(v) => v,
+                    None => bail!("Instance has no associated game version and cannot be launched"),
+                };
 
                 t_request_version_info.update_items(0, 3);
                 let manifest = app.minecraft_manager().get_minecraft_manifest().await?;
