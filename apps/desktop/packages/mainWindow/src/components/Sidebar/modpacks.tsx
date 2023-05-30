@@ -6,7 +6,7 @@ import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
-import { useInfiniteQuery } from "@/pages/Modpacks";
+import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 
 const Sidebar = () => {
@@ -15,7 +15,7 @@ const Sidebar = () => {
     FECategory[]
   >([]);
 
-  const infiniteQuery = useInfiniteQuery();
+  const infiniteQuery = useInfiniteModpacksQuery();
 
   createEffect(() => {
     if (routeData.forgeCategories.data?.data) {

@@ -6,8 +6,9 @@ import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteQuery } from ".";
+import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
+import { SortFields } from "@/utils/constants";
 
 const NoMoreModpacks = () => {
   return (
@@ -64,22 +65,11 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
-const sortFields: Array<FEModSearchSortField> = [
-  "featured",
-  "popularity",
-  "lastUpdated",
-  "name",
-  "author",
-  "totalDownloads",
-  "category",
-  "gameVersion",
-];
-
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
 
-  const infiniteQuery = useInfiniteQuery();
+  const infiniteQuery = useInfiniteModpacksQuery();
 
   const modpacks = () =>
     infiniteQuery?.infiniteQuery.data
@@ -135,7 +125,7 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={sortFields.map((field) => ({
+              options={SortFields.map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}

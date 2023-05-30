@@ -5,6 +5,7 @@ import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import { useParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
+import { useModal } from "@/managers/ModalsManager";
 
 const NoMods = () => {
   return (
@@ -36,6 +37,7 @@ const NoMods = () => {
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
+  const modalsContext = useModal();
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
@@ -70,7 +72,13 @@ const Mods = () => {
               rounded
             />
           </div>
-          <Button type="outline" size="medium">
+          <Button
+            type="outline"
+            size="medium"
+            onClick={() => {
+              modalsContext?.openModal({ name: "addMod" });
+            }}
+          >
             <Trans
               key="instance.add_mod"
               options={{

@@ -15,6 +15,7 @@ import { useGDNavigate } from "../NavigationManager";
 export type ModalProps = {
   title: string;
   noHeader?: boolean;
+  data?: any;
 };
 
 type Hash = {
@@ -40,6 +41,14 @@ const defaultModals: Hash = {
   addJava: {
     component: lazy(() => import("./modals/Java/AddJava")),
     title: "Add java version",
+  },
+  addMod: {
+    component: lazy(() => import("./modals/AddMod")),
+    title: "Add mod",
+  },
+  modDetails: {
+    component: lazy(() => import("./modals/ModDetails")),
+    title: "Mod Details",
   },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
@@ -72,7 +81,7 @@ type ModalName = string;
 type Modal = { name: ModalName; url?: string };
 
 type Context = {
-  openModal: (_modal: Modal) => void;
+  openModal: (_modal: Modal, _data?: any) => void;
   closeModal: () => void;
   isVisible: Accessor<boolean>;
 };
@@ -86,6 +95,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const queryParams = () => location.search as ModalName;
   const urlSearchParams = () => new URLSearchParams(queryParams());
   const mParam = () => urlSearchParams().get("m");
+  const [data, setData] = createSignal<any>(undefined);
 
   const [_searchParams, setSearchParams] = useSearchParams();
 
@@ -97,9 +107,10 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const title = () => defaultModals[modalTypeIndex()]?.title;
 
   const manager = {
-    openModal: (modal: Modal) => {
+    openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
+      setData(data);
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
         url.append("m", modal.name);
@@ -133,18 +144,19 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
         <Show when={mParam()}>
-          <Suspense fallback={<p>Loading...</p>}>
-            <div class="h-screen w-screen">
-              <Dynamic
-                component={ModalComponent({
-                  noHeader,
-                  title,
-                })}
-                noHeader={noHeader()}
-                title={title()}
-              />
-            </div>
-          </Suspense>
+          {/* <Suspense fallback={<p>Loading...</p>}> */}
+          <div class="h-screen w-screen">
+            <Dynamic
+              component={ModalComponent({
+                noHeader,
+                title,
+              })}
+              data={data()}
+              noHeader={noHeader()}
+              title={title()}
+            />
+          </div>
+          {/* </Suspense> */}
         </Show>
       </Portal>
     </ModalsContext.Provider>
