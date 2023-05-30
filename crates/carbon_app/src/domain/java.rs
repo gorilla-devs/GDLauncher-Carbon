@@ -103,14 +103,15 @@ impl JavaArch {
     }
 }
 
-impl<'a> From<JavaArch> for &'a str {
-    fn from(arch: JavaArch) -> Self {
-        match arch {
+impl ToString for JavaArch {
+    fn to_string(&self) -> String {
+        match self {
             JavaArch::X86_64 => "x64",
             JavaArch::X86_32 => "x86",
             JavaArch::Arm32 => "arm32",
             JavaArch::Arm64 => "arm64",
         }
+        .to_string()
     }
 }
 

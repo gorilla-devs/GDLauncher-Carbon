@@ -5,9 +5,12 @@ use daedalus::{
 };
 use reqwest::Url;
 
-use crate::domain::minecraft::minecraft::{
-    assets_index_into_vec_downloadable, libraries_into_vec_downloadable,
-    version_download_into_downloadable,
+use crate::domain::{
+    java::JavaArch,
+    minecraft::minecraft::{
+        assets_index_into_vec_downloadable, libraries_into_vec_downloadable,
+        version_download_into_downloadable,
+    },
 };
 
 use super::ManagerRef;
@@ -48,6 +51,7 @@ impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_all_version_info_files(
         self,
         version_info: VersionInfo,
+        java_arch: &JavaArch,
     ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
@@ -56,6 +60,7 @@ impl ManagerRef<'_, MinecraftManager> {
         let libraries = libraries_into_vec_downloadable(
             version_info.libraries,
             &runtime_path.get_libraries().to_path(),
+            java_arch,
         );
 
         let client_main_jar = version_download_into_downloadable(
@@ -74,7 +79,7 @@ impl ManagerRef<'_, MinecraftManager> {
                 runtime_path.get_assets().get_indexes_path(),
             )
             .await?,
-            &runtime_path.get_assets().get_objects_path(),
+            &runtime_path.get_assets(),
         );
 
         all_files.push(client_main_jar);
@@ -92,22 +97,34 @@ mod tests {
 
     use carbon_net::Progress;
     use chrono::Utc;
-    use daedalus::{minecraft::DownloadType, modded::merge_partial_version};
+    use daedalus::minecraft::DownloadType;
 
-    use crate::managers::{
-        account::{FullAccount, FullAccountType},
-        minecraft::{
-            forge::execute_processors,
-            minecraft::{extract_natives, launch_minecraft},
+    use crate::{
+        domain::java::JavaArch,
+        managers::{
+            account::{FullAccount, FullAccountType},
+            java::java_checker::{JavaChecker, RealJavaChecker},
+            minecraft::{
+                forge::execute_processors,
+                minecraft::{extract_natives, launch_minecraft},
+            },
         },
     };
 
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
-        let version = "1.16.5";
+        let version = "1.12.2";
 
         let app = crate::setup_managers_for_test().await;
+
+        let java_component = RealJavaChecker
+            .get_bin_info(
+                &PathBuf::from("/Users/davideceschia/.sdkman/candidates/java/current/bin/java"),
+                crate::domain::java::JavaComponentType::Local,
+            )
+            .await
+            .unwrap();
 
         let runtime_path = &app.app.settings_manager().runtime_path;
         let instance_path = runtime_path
@@ -140,40 +157,40 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-            &app.reqwest_client.clone(),
-            &app.minecraft_manager.meta_base_url,
-        )
-        .await
-        .unwrap()
-        .game_versions
-        .into_iter()
-        .find(|v| v.id == version)
-        .unwrap()
-        .loaders[0]
-            .clone();
+        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+        //     &app.reqwest_client.clone(),
+        //     &app.minecraft_manager.meta_base_url,
+        // )
+        // .await
+        // .unwrap()
+        // .game_versions
+        // .into_iter()
+        // .find(|v| v.id == version)
+        // .unwrap()
+        // .loaders[0]
+        //     .clone();
 
-        let forge_version_info =
-            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-                .await
-                .unwrap();
+        // let forge_version_info =
+        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+        //         .await
+        //         .unwrap();
 
-        let version_info = merge_partial_version(forge_version_info, version_info);
+        // let version_info = merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
         let mut progress = tokio::sync::watch::channel(Progress::new());
 
-        tokio::spawn(async move {
-            while progress.1.changed().await.is_ok() {
-                let progress_value = progress.1.borrow().clone();
-                println!("{:?}", progress_value);
-            }
-        });
+        // tokio::spawn(async move {
+        //     while progress.1.changed().await.is_ok() {
+        //         let progress_value = progress.1.borrow().clone();
+        //         println!("{:?}", progress_value);
+        //     }
+        // });
 
         let vanilla_files = app
             .minecraft_manager()
-            .get_all_version_info_files(version_info.clone())
+            .get_all_version_info_files(version_info.clone(), &java_component.arch)
             .await
             .unwrap();
 
@@ -181,7 +198,7 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version_info).await;
+        extract_natives(runtime_path, &version_info, &JavaArch::X86_64).await;
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();
@@ -220,7 +237,7 @@ mod tests {
         };
 
         let mut child = launch_minecraft(
-            PathBuf::from("java"),
+            java_component,
             full_account,
             2048_u16,
             2048_u16,
