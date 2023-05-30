@@ -1,0 +1,4 @@
+[submodule "crates/iridium"]
+	path = crates/iridium
+	url = ssh://git@github.com/gorilla-devs/iridium.git
+	branch = release

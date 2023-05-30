@@ -13,6 +13,7 @@ CREATE TABLE "AppConfiguration" (
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
     "xmx" INTEGER NOT NULL DEFAULT 1024,
     "xms" INTEGER NOT NULL DEFAULT 1024,
+    "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true
 );
@@ -71,6 +72,54 @@ CREATE TABLE "ActiveDownloads" (
     "file_id" TEXT NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "Instance" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "shortpath" TEXT NOT NULL,
+    "favorite" BOOLEAN NOT NULL DEFAULT false,
+    "index" INTEGER NOT NULL,
+    "groupId" INTEGER NOT NULL,
+    CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "InstanceGroup" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "name" TEXT NOT NULL,
+    "groupIndex" INTEGER NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "ModFileCache" (
+    "path" TEXT NOT NULL PRIMARY KEY,
+    "filesize" INTEGER NOT NULL,
+    "md5" BLOB NOT NULL,
+    CONSTRAINT "ModFileCache_md5_fkey" FOREIGN KEY ("md5") REFERENCES "ModMetadata" ("md5") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModMetadata" (
+    "md5" BLOB NOT NULL PRIMARY KEY,
+    "murmur2" INTEGER NOT NULL,
+    "name" TEXT,
+    "modid" TEXT,
+    "version" TEXT,
+    "description" TEXT,
+    "authors" TEXT,
+    CONSTRAINT "ModMetadata_murmur2_fkey" FOREIGN KEY ("murmur2") REFERENCES "CurseForgeModCache" ("murmur2") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CurseForgeModCache" (
+    "murmur2" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "project_id" INTEGER NOT NULL,
+    "file_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "urlslug" TEXT NOT NULL,
+    "summary" TEXT NOT NULL
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "AppConfiguration_id_key" ON "AppConfiguration"("id");
 
@@ -88,3 +137,6 @@ CREATE UNIQUE INDEX "JavaSystemProfile_name_key" ON "JavaSystemProfile"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");

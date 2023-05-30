@@ -14,7 +14,7 @@ use crate::managers::App;
 // Download mods
 // Extract overrides
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ProgressState {
     Idle,
     DownloadingAddonZip(u64, u64),
@@ -86,7 +86,6 @@ pub async fn prepare_modpack(
     .await??;
 
     let downloadables = {
-        let mut downloadables = Vec::new();
         let mut handles = Vec::new();
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
@@ -132,22 +131,17 @@ pub async fn prepare_modpack(
             handles.push(handle);
         }
 
-        for handle in handles {
-            match handle.await? {
-                Ok(downloadable) => {
-                    downloadables.push(downloadable);
-                }
-                Err(e) => {
-                    println!("Failed to download mod: {:?}", e);
-                }
-            }
-        }
+        let downloadables = futures::future::join_all(handles)
+            .await
+            .into_iter()
+            .flatten()
+            .collect::<Result<Vec<_>, _>>()?;
 
         downloadables
     };
 
     let override_folder_name = manifest.overrides.clone();
-    let override_full_path = instance_path.get_root();
+    let override_full_path = instance_path.get_data_path();
     tokio::fs::create_dir_all(&override_full_path).await?;
     spawn_blocking(move || {
         let total_archive_files = archive.len() as u64;
@@ -169,16 +163,6 @@ pub async fn prepare_modpack(
                     }
                     let mut outfile = std::fs::File::create(&outpath)?;
                     std::io::copy(&mut file, &mut outfile)?;
-                }
-
-                // Get and Set permissions
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-
-                    if let Some(mode) = file.unix_mode() {
-                        std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
-                    }
                 }
             }
 

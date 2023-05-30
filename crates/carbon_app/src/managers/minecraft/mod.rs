@@ -13,9 +13,9 @@ use crate::domain::minecraft::minecraft::{
 use super::ManagerRef;
 
 mod assets;
-mod curseforge;
-mod forge;
-mod minecraft;
+pub mod curseforge;
+pub mod forge;
+pub mod minecraft;
 
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,
@@ -35,7 +35,7 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 
     pub async fn get_minecraft_version(
-        &self,
+        self,
         manifest_version_meta: Version,
     ) -> anyhow::Result<VersionInfo> {
         minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
@@ -110,9 +110,7 @@ mod tests {
         let app = crate::setup_managers_for_test().await;
 
         let runtime_path = &app.app.settings_manager().runtime_path;
-        let instance_path = runtime_path
-            .get_instances()
-            .get_instance_path("test".to_owned());
+        let instance_path = runtime_path.get_instances().get_instance_path("test");
 
         std::fs::create_dir_all(instance_path.get_root()).unwrap();
 
@@ -222,8 +220,9 @@ mod tests {
         let mut child = launch_minecraft(
             PathBuf::from("java"),
             full_account,
-            2048_u16,
-            2048_u16,
+            2048,
+            2048,
+            "",
             runtime_path,
             version_info,
             instance_path,

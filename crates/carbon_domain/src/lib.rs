@@ -1,9 +1,7 @@
 // allow dead code during development to keep warning outputs meaningful
 #![allow(dead_code)]
 
-pub mod account;
 mod minecraft_mod;
-pub mod vtask;
 
 #[macro_export]
 macro_rules! try_path_fmt {

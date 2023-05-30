@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use reqwest_middleware::ClientWithMiddleware;
+use serde_json::json;
 use url::Url;
 
 use crate::{
@@ -8,7 +11,7 @@ use crate::{
             ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
             ModsParameters,
         },
-        Category, CurseForgeResponse, File, Mod,
+        Category, CurseForgeResponse, File, FingerprintMatch, FingerprintsMatchesResult, Mod,
     },
     managers::GDL_API_BASE,
 };
@@ -91,6 +94,24 @@ impl CurseForge {
             .send()
             .await?
             .json::<CurseForgeResponse<Vec<Mod>>>()
+            .await?;
+
+        Ok(resp)
+    }
+
+    pub async fn get_fingerprints(
+        &self,
+        hashes: &[u32],
+    ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
+        let url = self.base_url.join("v1/fingerprints")?;
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .body(json!({ "fingerprints": hashes }).to_string())
+            .send()
+            .await?
+            .json::<CurseForgeResponse<FingerprintsMatchesResult>>()
             .await?;
 
         Ok(resp)
