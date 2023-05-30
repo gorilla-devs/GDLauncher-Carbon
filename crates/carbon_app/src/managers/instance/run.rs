@@ -335,12 +335,13 @@ impl ManagerRef<'_, InstanceManager> {
                             })?
                             .loaders
                             .into_iter()
-                            .find(|v| &v.id == forge_version)
+                            .find(|v| v.id == format!("{}-{}", version.release, forge_version))
                             .ok_or_else(|| {
                                 anyhow!(
-                                    "Could not find forge version {} for minecraft version {}",
+                                    "Could not find forge version {}-{} for minecraft version {}",
+                                    version.release,
                                     forge_version,
-                                    version.release
+                                    version.release,
                                 )
                             })?;
 
