@@ -67,7 +67,7 @@ const Mod = (props: Props) => {
         </div>
         <div class="flex gap-3">
           <Button
-            variant="outline"
+            type="outline"
             onClick={() =>
               modalsContext?.openModal(
                 {
@@ -84,23 +84,6 @@ const Mod = (props: Props) => {
               }}
             />
           </Button>
-          {/* <Dropdown.button
-            options={[
-              { label: "1.16.5", key: "1.16.5" },
-              { label: "1.16.4", key: "1.16.4" },
-              { label: "1.16.3", key: "1.16.3" },
-              { label: "1.16.2", key: "1.16.2" },
-            ]}
-            rounded
-            value="1.16.2"
-          >
-            <Trans
-              key="instance.download_modpacks"
-              options={{
-                defaultValue: "Download",
-              }}
-            />
-          </Dropdown.button> */}
           <Dropdown.button
             options={mappedVersions()}
             rounded
