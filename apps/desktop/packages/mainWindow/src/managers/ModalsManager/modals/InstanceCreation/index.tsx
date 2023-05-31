@@ -99,8 +99,9 @@ const InstanceCreation = (props: ModalProps) => {
         addNotification("Instance successfully created.");
         modalsContext?.closeModal();
       },
+
       onError() {
-        addNotification("Error while creating the instance.");
+        addNotification("Error while creating the instance.", "error");
         modalsContext?.closeModal();
       },
     }

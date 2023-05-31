@@ -207,12 +207,14 @@ const DropDownButton = (props: DropDownButtonProps) => {
   return (
     <div class="flex">
       <Button
+        disabled={props.disabled}
         class="rounded-r-0 pr-4 pl-4 flex gap-1"
         onClick={() => props?.onClick?.()}
       >
         <span>{props.children}</span>
       </Button>
       <Dropdown
+        disabled={props.disabled}
         btnDropdown
         class="rounded-l-0 h-11 pl-0"
         options={props.options}

@@ -1,9 +1,9 @@
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Tag } from "@gd/ui";
+import { Button, Dropdown, Spinner, Tag } from "@gd/ui";
 import { format } from "date-fns";
-import { For, Match, Switch } from "solid-js";
+import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { useModal } from "../..";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
@@ -12,6 +12,7 @@ type Props = { mod: FEMod };
 
 const Mod = (props: Props) => {
   const modalsContext = useModal();
+  const [loading, setLoading] = createSignal(false);
 
   const latestFIlesIndexes = () => props.mod.latestFilesIndexes;
   const instanceDetails = rspc.createQuery(() => [
@@ -25,7 +26,14 @@ const Mod = (props: Props) => {
       label: version.gameVersion,
     }));
 
-  const installModMutation = rspc.createMutation(["instance.installMod"]);
+  const installModMutation = rspc.createMutation(["instance.installMod"], {
+    onMutate() {
+      setLoading(true);
+    },
+    onSettled() {
+      setLoading(false);
+    },
+  });
 
   const isModInstalled = () =>
     instanceDetails.data?.mods.find(
@@ -100,6 +108,7 @@ const Mod = (props: Props) => {
           <Switch>
             <Match when={!isModInstalled()}>
               <Dropdown.button
+                disabled={loading()}
                 options={mappedVersions()}
                 rounded
                 value={mappedVersions()[0]?.key}
@@ -119,12 +128,17 @@ const Mod = (props: Props) => {
                   // });
                 }}
               >
-                <Trans
-                  key="instance.download_modpacks"
-                  options={{
-                    defaultValue: "Download",
-                  }}
-                />
+                <Show when={loading()}>
+                  <Spinner />
+                </Show>
+                <Show when={!loading()}>
+                  <Trans
+                    key="instance.download_modpacks"
+                    options={{
+                      defaultValue: "Download",
+                    }}
+                  />
+                </Show>
               </Dropdown.button>
             </Match>
             <Match when={isModInstalled()}>

@@ -1,17 +1,17 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
-import { FEMod } from "@gd/core_module/bindings";
+import { FEMod, Task } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Tag, createNotification } from "@gd/ui";
+import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 
 type Props = { modpack: FEMod };
 
 const Modpack = (props: Props) => {
   const navigate = useGDNavigate();
-
+  const [loading, setLoading] = createSignal(false);
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
   const addNotification = createNotification();
 
@@ -22,7 +22,11 @@ const Modpack = (props: Props) => {
         addNotification("Instance successfully created.");
       },
       onError() {
+        setLoading(false);
         addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        navigate(`/library`);
       },
     }
   );
@@ -32,11 +36,12 @@ const Modpack = (props: Props) => {
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
-      onMutate() {},
       onSuccess(instanceId) {
+        setLoading(true);
         prepareInstanceMutation.mutate(instanceId);
       },
       onError() {
+        setLoading(false);
         addNotification("Error while downloading the modpack.", "error");
       },
     }
@@ -107,35 +112,48 @@ const Modpack = (props: Props) => {
               }}
             />
           </Button>
-          <Dropdown.button
-            options={mappedVersions()}
-            rounded
-            value={mappedVersions()[0].key}
-            onClick={() => {
-              loadIconMutation.mutate(props.modpack.logo.url);
-              createInstanceMutation.mutate({
-                group: defaultGroup.data || 1,
-                use_loaded_icon: true,
-                notes: "",
-                name: props.modpack.name,
-                version: {
-                  Modpack: {
-                    Curseforge: {
-                      file_id: props.modpack.mainFileId,
-                      project_id: props.modpack.id,
+          <Show when={loading()}>
+            <Button>
+              <Spinner />
+            </Button>
+          </Show>
+          <Show when={!loading()}>
+            <Dropdown.button
+              disabled={loading()}
+              options={mappedVersions()}
+              rounded
+              value={mappedVersions()[0].key}
+              onClick={() => {
+                loadIconMutation.mutate(props.modpack.logo.url);
+                createInstanceMutation.mutate({
+                  group: defaultGroup.data || 1,
+                  use_loaded_icon: true,
+                  notes: "",
+                  name: props.modpack.name,
+                  version: {
+                    Modpack: {
+                      Curseforge: {
+                        file_id: props.modpack.mainFileId,
+                        project_id: props.modpack.id,
+                      },
                     },
                   },
-                },
-              });
-            }}
-          >
-            <Trans
-              key="instance.download_modpacks"
-              options={{
-                defaultValue: "Download",
+                });
               }}
-            />
-          </Dropdown.button>
+            >
+              <Show when={loading()}>
+                <Spinner />
+              </Show>
+              <Show when={!loading()}>
+                <Trans
+                  key="instance.download_modpacks"
+                  options={{
+                    defaultValue: "Download",
+                  }}
+                />
+              </Show>
+            </Dropdown.button>
+          </Show>
         </div>
       </div>
     </div>

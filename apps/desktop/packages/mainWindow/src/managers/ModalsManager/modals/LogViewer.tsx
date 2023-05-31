@@ -60,7 +60,7 @@ const LogViewer = (props: ModalProps) => {
         <div class="bg-darkSlate-800 max-h-full">
           <Tabs
             variant="traditional"
-            onChange={(num) => console.log("NUM", num)}
+            // onChange={(num) => {}}
           >
             <div class="flex items-center max-h-full">
               <TabList>
@@ -68,6 +68,7 @@ const LogViewer = (props: ModalProps) => {
                   {(instance) => {
                     const runningState = getRunningState(instance.status);
 
+                    console.log("runningState", runningState);
                     const [logs] = createResource(
                       runningState?.log_id,
                       fetchLogs
@@ -78,7 +79,7 @@ const LogViewer = (props: ModalProps) => {
                     ) {
                       for await (const jsonObject of streamToJson(stream)) {
                         // Do something with jsonObject
-                        console.log("PARSED RESPONSE AAAAAA", jsonObject);
+                        console.log("PARSED RESPONSE", jsonObject);
 
                         // if (runningState?.log_id) {
                         //   setLogsArray(runningState?.log_id, (prev) => [
