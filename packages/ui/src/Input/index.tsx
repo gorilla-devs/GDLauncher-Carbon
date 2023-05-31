@@ -11,7 +11,7 @@ export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
 }
 
 function Input(props: Props) {
-  const [_, others] = splitProps(props, [
+  const [local, others] = splitProps(props, [
     "error",
     "inputClass",
     "class",
