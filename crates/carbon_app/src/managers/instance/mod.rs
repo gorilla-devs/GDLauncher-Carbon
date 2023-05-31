@@ -153,7 +153,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
-                let mods_path = path.join("mods");
+                let mods_path = path.join("instance/mods");
                 let mut mod_futures = Vec::new();
 
                 if mods_path.is_dir() {
@@ -162,15 +162,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     while let Some(entry) = reader.next_entry().await? {
                         mod_futures.push(async move {
                             let mut path = entry.path();
-                            let is_jar = path.ends_with(".jar");
-                            let is_jar_disabled = path.ends_with(".jar.disabled");
+                            let is_jar = path.extension() == Some(OsStr::new("jar"));
+                            let is_jar_disabled = path.extension() == Some(OsStr::new("disabled"));
 
                             if (is_jar || is_jar_disabled) && entry.file_type().await?.is_file() {
                                 let mut md5 = Md5::new();
                                 let file = tokio::fs::read(&path).await?;
                                 md5.update(&file);
                                 let md5hash = md5.finalize();
-                                let murmur2hash = murmurhash32::murmurhash2(&file[..]);
 
                                 let mod_ = tokio::task::spawn_blocking(|| {
                                     mod_meta::parse_metadata(Cursor::new(file))
