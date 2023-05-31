@@ -326,6 +326,11 @@ impl ManagerRef<'_, InstanceManager> {
                     }) => {
                         let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
+                        let forge_version = match forge_version.strip_prefix(&format!("{}-", version.release)) {
+                            None => forge_version.clone(),
+                            Some(sub) => sub.to_string(),
+                        };
+
                         let forge_manifest_version = forge_manifest
                             .game_versions
                             .into_iter()
