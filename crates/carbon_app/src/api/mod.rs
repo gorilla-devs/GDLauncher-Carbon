@@ -1,8 +1,11 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::managers::{App, AppInner};
 use crate::{app_version, managers};
 use async_stream::stream;
+use futures::Stream;
+use pin_project::{pin_project, pinned_drop};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +53,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
             t(move |app, _args: ()| {
-                stream! {
+                let s = stream! {
                     let mut channel = app.invalidation_channel.subscribe();
 
                     loop {
@@ -63,7 +66,30 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                             }
                         }
                     }
+                };
+
+                #[pin_project(PinnedDrop)]
+                struct Dropcheck<T: Stream<Item = InvalidationEvent>>(#[pin] T);
+
+                impl<T: Stream<Item = InvalidationEvent>> Stream for Dropcheck<T> {
+                    type Item = InvalidationEvent;
+
+                    fn poll_next(
+                        self: Pin<&mut Self>,
+                        cx: &mut std::task::Context<'_>,
+                    ) -> std::task::Poll<Option<Self::Item>> {
+                        self.project().0.poll_next(cx)
+                    }
                 }
+
+                #[pinned_drop]
+                impl<T: Stream<Item = InvalidationEvent>> PinnedDrop for Dropcheck<T> {
+                    fn drop(self: Pin<&mut Self>) {
+                        panic!("Invalidation stream was dropped!")
+                    }
+                }
+
+                Dropcheck(s)
             })
         })
 }
