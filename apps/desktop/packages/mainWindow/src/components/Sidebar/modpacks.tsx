@@ -53,8 +53,9 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
+                const mappedValue = val === "any" ? null : val;
                 infiniteQuery?.setQuery({
-                  modLoaderType: val as FEModLoaderType,
+                  modLoaderType: mappedValue as FEModLoaderType,
                 });
               }}
               value={infiniteQuery?.query.query.modLoaderType || "any"}
