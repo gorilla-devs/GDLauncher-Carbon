@@ -26,10 +26,6 @@ const LogViewer = (props: ModalProps) => {
 
   const logs = rspc.createQuery(() => ["instance.getLogs"]);
 
-  createEffect(() => {
-    console.log("LOGS", logs, instances);
-  });
-
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 overflow-hidden">
@@ -88,7 +84,7 @@ const LogViewer = (props: ModalProps) => {
                             {(log) => {
                               return (
                                 <div class="flex flex-col justify-center items-center">
-                                  <pre class="m-0 leading-8 whitespace-pre-wrap pl-4 w-full box-border">
+                                  <pre class="m-0 leading-8 whitespace-pre-wrap pl-4 py-2 w-full box-border">
                                     <code>{log?.line}</code>
                                   </pre>
                                 </div>
