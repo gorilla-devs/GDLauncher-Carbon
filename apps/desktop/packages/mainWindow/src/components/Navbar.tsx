@@ -58,10 +58,7 @@ const AppNavbar = () => {
 
   createEffect(() => {
     const mappedAccounts = routeData.accounts.data?.map((account) => {
-      const accountStatusQuery = rspc.createQuery(() => [
-        "account.getAccountStatus",
-        account.uuid,
-      ]);
+      const accountStatusQuery = {} as any;
 
       return {
         label: {

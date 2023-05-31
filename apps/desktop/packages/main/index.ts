@@ -14,6 +14,7 @@ import {
 } from "electron";
 import { release } from "os";
 import { join, resolve } from "path";
+import os from "os";
 import "./cli";
 import coreModule from "./CoreModuleLoaded";
 // import autoUpdater from "./autoUpdater";
@@ -89,6 +90,10 @@ async function createWindow() {
       properties: ["openFile"],
       filters,
     });
+  });
+
+  ipcMain.handle("getCurrentOS", async () => {
+    return { platform: os.platform(), arch: os.arch() };
   });
 
   if (app.isPackaged) {

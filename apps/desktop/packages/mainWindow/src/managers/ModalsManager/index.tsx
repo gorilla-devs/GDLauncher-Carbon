@@ -106,6 +106,15 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const title = () => defaultModals[modalTypeIndex()]?.title;
 
+  const closeModal = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      urlSearchParams()?.delete("m");
+      const overlay = document.getElementById("overlay") as HTMLElement;
+      overlay.style.display = "none";
+    }, 100);
+  };
+
   const manager = {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
@@ -116,8 +125,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         url.append("m", modal.name);
 
         const decodedParamString = decodeURIComponent(url.toString());
-
         navigate(decodedParamString.replace("=&", "?"));
+        setIsVisible(false);
         setTimeout(() => {
           setIsVisible(true);
         }, 100);
@@ -128,14 +137,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         }, 100);
       }
     },
-    closeModal: () => {
-      setIsVisible(false);
-      setTimeout(() => {
-        urlSearchParams()?.delete("m");
-        const overlay = document.getElementById("overlay") as HTMLElement;
-        overlay.style.display = "none";
-      }, 100);
-    },
+    closeModal,
     isVisible,
   };
 

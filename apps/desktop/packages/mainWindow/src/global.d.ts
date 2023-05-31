@@ -22,6 +22,7 @@ declare global {
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
     getCoreModulePort: () => Promise<number>;
+    getCurrentOS: () => Promise<{ platform: string; arch: string }>;
   }
 }
 
