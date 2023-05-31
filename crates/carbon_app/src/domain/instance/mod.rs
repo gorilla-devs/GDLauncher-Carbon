@@ -23,6 +23,7 @@ pub struct InstanceDetails {
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,
+    pub modpack: Option<info::Modpack>,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
     pub modloaders: Vec<ModLoader>,
