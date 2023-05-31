@@ -490,7 +490,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
-                    let (log_id, log) = app.instance_manager().create_log().await;
+                    let (log_id, log) = app.instance_manager().create_log(instance_id).await;
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,

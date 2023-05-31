@@ -4,10 +4,13 @@ use std::{
 };
 
 use thiserror::Error;
-use tokio::sync::watch::{self, error::RecvError};
+use tokio::sync::watch;
 
-use crate::api::keys::instance::*;
-use crate::{domain::instance::GameLogId, managers::ManagerRef};
+use crate::{api::keys::instance::*, domain::instance::GameLogEntry};
+use crate::{
+    domain::instance::{GameLogId, InstanceId},
+    managers::ManagerRef,
+};
 
 use super::InstanceManager;
 
@@ -186,11 +189,14 @@ impl GameLog {
 }
 
 impl ManagerRef<'_, InstanceManager> {
-    pub async fn create_log(self) -> (GameLogId, watch::Sender<GameLog>) {
+    pub async fn create_log(self, instance_id: InstanceId) -> (GameLogId, watch::Sender<GameLog>) {
         static LOG_ID: AtomicI32 = AtomicI32::new(0);
         let (log_tx, log_rx) = watch::channel(GameLog::new());
         let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
-        self.game_logs.write().await.insert(id, log_rx);
+        self.game_logs
+            .write()
+            .await
+            .insert(id, (instance_id, log_rx));
         self.app.invalidate(GET_LOGS, None);
 
         (id, log_tx)
@@ -200,11 +206,11 @@ impl ManagerRef<'_, InstanceManager> {
         let mut logs = self.game_logs.write().await;
 
         match logs.get(&id) {
-            Some(rx) => {
+            Some((_, rx)) => {
                 // sender dropped
                 match rx.has_changed() {
                     Ok(_) => Err(anyhow::anyhow!("cannot delete active log")),
-                    Err(RecvError) => {
+                    Err(_) => {
                         let _ = logs.remove(&id);
                         self.app.invalidate(GET_LOGS, None);
                         Ok(())
@@ -220,17 +226,21 @@ impl ManagerRef<'_, InstanceManager> {
         id: GameLogId,
     ) -> Result<watch::Receiver<GameLog>, InvalidGameLogIdError> {
         match self.game_logs.read().await.get(&id) {
-            Some(log) => Ok(log.clone()),
+            Some((_, log)) => Ok(log.clone()),
             None => Err(InvalidGameLogIdError),
         }
     }
 
-    pub async fn get_logs(self) -> Vec<(GameLogId, bool)> {
+    pub async fn get_logs(self) -> Vec<GameLogEntry> {
         self.game_logs
             .read()
             .await
             .iter()
-            .map(|(k, v)| (k.clone(), v.has_changed().is_ok()))
+            .map(|(id, (instance_id, rx))| GameLogEntry {
+                id: *id,
+                instance_id: *instance_id,
+                active: rx.has_changed().is_ok(),
+            })
             .collect()
     }
 }
