@@ -4,12 +4,12 @@ use regex::Regex;
 use thiserror::Error;
 
 pub struct MavenCoordinates {
-    group_id: String,
-    artifact_id: String,
-    version: String,
-    identifier: Option<String>,
-    additional: Option<String>,
-    extension: String,
+    pub group_id: String,
+    pub artifact_id: String,
+    pub version: String,
+    pub identifier: Option<String>,
+    pub additional: Option<String>,
+    pub extension: String,
 }
 
 impl MavenCoordinates {

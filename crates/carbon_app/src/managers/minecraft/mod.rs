@@ -99,22 +99,19 @@ mod tests {
     use chrono::Utc;
     use daedalus::minecraft::DownloadType;
 
-    use crate::{
-        domain::java::JavaArch,
-        managers::{
-            account::{FullAccount, FullAccountType},
-            java::java_checker::{JavaChecker, RealJavaChecker},
-            minecraft::{
-                forge::execute_processors,
-                minecraft::{extract_natives, launch_minecraft},
-            },
+    use crate::managers::{
+        account::{FullAccount, FullAccountType},
+        java::java_checker::{JavaChecker, RealJavaChecker},
+        minecraft::{
+            forge::execute_processors,
+            minecraft::{extract_natives, launch_minecraft},
         },
     };
 
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
-        let version = "1.12.2";
+        let version = "1.16.5";
 
         let app = crate::setup_managers_for_test().await;
 
@@ -198,7 +195,7 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version_info, &JavaArch::X86_64).await;
+        extract_natives(runtime_path, &version_info, &java_component.arch).await;
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();
@@ -219,7 +216,7 @@ mod tests {
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Data entries missing"))
                     .unwrap(),
-                PathBuf::from("java"),
+                PathBuf::from(java_component.path.clone()),
                 instance_path.clone(),
                 client_path,
                 game_version,
@@ -258,8 +255,8 @@ mod tests {
                 .unwrap();
         });
 
-        let _ = child.wait().await;
+        let res = child.wait().await.unwrap();
 
-        // assert!(status.success());
+        assert!(res.success());
     }
 }
