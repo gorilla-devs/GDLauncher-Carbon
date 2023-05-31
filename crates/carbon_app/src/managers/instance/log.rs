@@ -4,8 +4,9 @@ use std::{
 };
 
 use thiserror::Error;
-use tokio::sync::watch;
+use tokio::sync::watch::{self, error::RecvError};
 
+use crate::api::keys::instance::*;
 use crate::{domain::instance::GameLogId, managers::ManagerRef};
 
 use super::InstanceManager;
@@ -190,14 +191,27 @@ impl ManagerRef<'_, InstanceManager> {
         let (log_tx, log_rx) = watch::channel(GameLog::new());
         let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
         self.game_logs.write().await.insert(id, log_rx);
+        self.app.invalidate(GET_LOGS, None);
 
         (id, log_tx)
     }
 
-    pub async fn delete_log(self, id: GameLogId) -> Result<(), InvalidGameLogIdError> {
-        match self.game_logs.write().await.remove(&id) {
-            Some(_) => Ok(()),
-            None => Err(InvalidGameLogIdError),
+    pub async fn delete_log(self, id: GameLogId) -> anyhow::Result<()> {
+        let mut logs = self.game_logs.write().await;
+
+        match logs.get(&id) {
+            Some(rx) => {
+                // sender dropped
+                match rx.has_changed() {
+                    Ok(_) => Err(anyhow::anyhow!("cannot delete active log")),
+                    Err(RecvError) => {
+                        let _ = logs.remove(&id);
+                        self.app.invalidate(GET_LOGS, None);
+                        Ok(())
+                    }
+                }
+            }
+            None => Err(anyhow::anyhow!(InvalidGameLogIdError)),
         }
     }
 
@@ -211,12 +225,12 @@ impl ManagerRef<'_, InstanceManager> {
         }
     }
 
-    pub async fn get_log_ids(self) -> Vec<GameLogId> {
+    pub async fn get_logs(self) -> Vec<(GameLogId, bool)> {
         self.game_logs
             .read()
             .await
-            .keys()
-            .map(Clone::clone)
+            .iter()
+            .map(|(k, v)| (k.clone(), v.has_changed().is_ok()))
             .collect()
     }
 }

@@ -23,7 +23,7 @@ use super::keys::instance::*;
 use super::router::router;
 use super::vtask::TaskId;
 
-use crate::domain::instance::{self as domain, GameLogId};
+use crate::domain::instance as domain;
 use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -177,6 +177,21 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        query GET_LOGS[app, _: ()] {
+            Ok(app.instance_manager()
+                .get_logs()
+               .await
+               .into_iter()
+               .map(GameLogEntry::from)
+               .collect::<Vec<_>>())
+        }
+
+        mutation DELETE_LOG[app, id: GameLogId] {
+            app.instance_manager()
+                .delete_log(id.into())
+                .await
+        }
+
         mutation ENABLE_MOD[app, imod: InstanceMod] {
             app.instance_manager()
                 .enable_mod(
@@ -283,7 +298,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
                     let log_rx = app.instance_manager()
-                        .get_log(GameLogId(query.id))
+                        .get_log(domain::GameLogId(query.id))
                         .await;
 
                     let Ok(mut log_rx) = log_rx else {
@@ -477,6 +492,15 @@ struct InstallMod {
     instance_id: InstanceId,
     project_id: u32,
     file_id: u32,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+struct GameLogId(i32);
+
+#[derive(Type, Serialize)]
+struct GameLogEntry {
+    id: GameLogId,
+    active: bool,
 }
 
 impl<T> Update<T> {
@@ -822,6 +846,27 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors,
+        }
+    }
+}
+
+impl From<domain::GameLogId> for GameLogId {
+    fn from(value: domain::GameLogId) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<GameLogId> for domain::GameLogId {
+    fn from(value: GameLogId) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<(domain::GameLogId, bool)> for GameLogEntry {
+    fn from(value: (domain::GameLogId, bool)) -> Self {
+        Self {
+            id: value.0.into(),
+            active: value.1,
         }
     }
 }
