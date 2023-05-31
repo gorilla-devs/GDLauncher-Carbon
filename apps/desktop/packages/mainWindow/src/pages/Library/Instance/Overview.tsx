@@ -1,6 +1,6 @@
 import Card from "@/components/Card";
 import { Trans } from "@gd/i18n";
-import { For, Show, createEffect } from "solid-js";
+import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
@@ -8,13 +8,6 @@ import { format } from "date-fns";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-
-  createEffect(() => {
-    console.log(
-      "routeData.instanceDetails.data",
-      routeData.instanceDetails.data
-    );
-  });
 
   return (
     <div class="flex flex-col gap-4 mt-10 max-w-185">

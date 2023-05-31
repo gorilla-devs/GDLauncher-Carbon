@@ -146,7 +146,7 @@
   "onboarding.import_instance_text": "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
   "onboarding.add_instance": "+ Add Instance",
   "onboarding.import_instance_or_zip": "Import instance / Zip",
-"onboarding.java_title": "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
+  "onboarding.java_title": "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
   "onboarding.java_no": "No",
   "onboarding.java_yes": "Yes",
   "onboarding.continue": "Continue",
@@ -159,5 +159,4 @@
   "mods.fetching_mods_text": "Loading mods",
   "mods.fetching_mods_error": "There was an error while fetching mods",
   "mod.download": "Download"
-
 }

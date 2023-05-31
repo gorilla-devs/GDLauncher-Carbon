@@ -148,7 +148,7 @@ const AppNavbar = () => {
                 </div>
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
-                   <Show when={updateAvailable()}>
+                  <Show when={updateAvailable()}>
                     <Tab ignored>
                       <div
                         class="cursor-pointer text-2xl i-ri:download-fill text-green-500"
@@ -166,21 +166,9 @@ const AppNavbar = () => {
                         </div>
                       </Show>
                       <div
-                        class="text-2xl i-ri:terminal-box-fill z-20"
-                        classList={{
-                          "text-dark-slate-50 cursor-pointer":
-                            runningInstances() > 0,
-                          "text-dark-slate-500": runningInstances() === 0,
-                        }}
+                        class="text-2xl i-ri:terminal-box-fill z-20 text-dark-slate-50 cursor-pointer"
                         onClick={() => {
-                          console.log(
-                            "OPEN",
-                            runningInstances(),
-                            runningInstances() > 0
-                          );
-                          if (runningInstances() > 0) {
-                            modalsContext?.openModal({ name: "logViewer" });
-                          }
+                          modalsContext?.openModal({ name: "logViewer" });
                         }}
                       />
                     </div>

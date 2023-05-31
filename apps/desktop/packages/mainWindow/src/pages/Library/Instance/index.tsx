@@ -494,7 +494,7 @@ const Instance = () => {
           </div>
         </div>
       </div>
-      <div class="bg-darkSlate-800 min-h-2xl">
+      <div class="bg-darkSlate-800">
         <div class="flex justify-center p-6">
           <div class="bg-darkSlate-800 max-w-full w-185">
             <div class="sticky z-20 flex flex-col bg-darkSlate-800 mb-4 top-20">
