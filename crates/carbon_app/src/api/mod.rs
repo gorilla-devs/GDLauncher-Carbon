@@ -55,6 +55,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
             t(move |app, _args: ()| {
                 let s = stream! {
                     let mut channel = app.invalidation_channel.subscribe();
+                    println!("Invalidation channel connected");
 
                     loop {
                         match channel.recv().await {
