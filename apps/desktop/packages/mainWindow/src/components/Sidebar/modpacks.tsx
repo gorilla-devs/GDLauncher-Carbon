@@ -61,13 +61,13 @@ const Sidebar = () => {
             >
               <Radio name="modloader" value="any">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("vanilla")} />
+                  <img class="h-4 w-4" src={getModloaderIcon()} />
                   <p class="m-0">Vanilla</p>
                 </div>
               </Radio>
               <Radio name="modloader" value="forge">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("forge")} />
+                  <img class="h-4 w-4" src={getModloaderIcon("Forge")} />
                   <p class="m-0">Forge</p>
                 </div>
               </Radio>

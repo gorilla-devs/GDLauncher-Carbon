@@ -37,54 +37,17 @@ const OnBoarding = (props: ModalProps) => {
         >
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
         </div>
-        <div class="absolute right-5 top-5">
-          <div
-            class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
-            onClick={() => modalsContext?.closeModal()}
-          />
-        </div>
-        <div class="flex flex-col">
-          <h2 class="text-center font-normal text-sm">
-            <Trans
-              key="onboarding.welcome_gdlauncher_title"
-              options={{
-                defaultValue: "Welcome to GDLauncher",
-              }}
-            />
-          </h2>
-          <p class="text-center text-darkSlate-50 leading-6 mb-8">
-            <Trans
-              key="onboarding.welcome_gdlauncher_text"
-              options={{
-                defaultValue:
-                  "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
-              }}
-            />
-          </p>
-        </div>
-        <div class="flex flex-col items-center gap-6">
-          <Button
-            type="outline"
-            style={{ width: "100%", "max-width": "200px" }}
-          >
-            <Trans
-              key="onboarding.add_instance"
-              options={{
-                defaultValue: "+ Add Instance",
-              }}
-            />
-          </Button>
-
-          <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
-            <div class="text-2xl i-ri:download-2-line" />
-            <Trans
-              key="onboarding.import_instance_or_zip"
-              options={{
-                defaultValue: "Import instance / Zip",
-              }}
-            />
-          </div>
-        </div>
+        <Switch>
+          <Match when={currentStep() === 0}>
+            <FirstStep nextStep={nextStep} />
+          </Match>
+          <Match when={currentStep() === 1}>
+            <SecondStep nextStep={nextStep} />
+          </Match>
+          <Match when={currentStep() === 2}>
+            <ThirdStep />
+          </Match>
+        </Switch>
       </div>
     </ModalLayout>
   );
