@@ -154,7 +154,7 @@ const Dropdown = (props: Props) => {
         <Portal>
           <ul
             ref={setMenuRef}
-            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-20 min-w-32 max-w-fit"
+            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-[100] min-w-32 max-w-fit"
             onMouseOut={() => {
               setFocusIn(false);
             }}
