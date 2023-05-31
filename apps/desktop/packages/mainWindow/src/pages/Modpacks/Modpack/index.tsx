@@ -15,11 +15,23 @@ const Modpack = (props: Props) => {
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
   const addNotification = createNotification();
 
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        addNotification("Instance saccessfully created.");
+      },
+      onError() {
+        addNotification("Error while creating the instance.", "error");
+      },
+    }
+  );
+
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
-      onSuccess() {
-        addNotification("Instance successfully downloaded");
+      onSuccess(instanceId) {
+        prepareInstanceMutation.mutate(instanceId);
       },
       onError() {
         addNotification("Error while downloading the modpack.", "error");

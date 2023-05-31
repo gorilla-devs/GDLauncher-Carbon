@@ -54,14 +54,14 @@ export const getLaunchState = (
 };
 
 export const isLaunchState = (input: any): input is LaunchState => {
-  if (input === "Inactive") {
-    return true;
-  }
-
   if (typeof input === "object") {
     // Check for the Preparing state
     if ("Preparing" in input) {
       return typeof input.Preparing === "number";
+    }
+
+    if ("Inactive" in input) {
+      return input.Inactive.failed_task === null;
     }
 
     // Check for the Running state
@@ -103,18 +103,17 @@ export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
   const launchState = isLaunchState(status);
 
   if (launchState) {
-    if (typeof status === "string" && status === "Inactive") {
-      return status;
+    if (typeof status === "object" && "Inactive" in status) {
+      return status.Inactive.failed_task;
     }
   } else {
     const isValidState = getValideInstance(status);
     if (
       isValidState &&
       isValidState.state &&
-      typeof isValidState.state === "string" &&
-      isValidState.state === "Inactive"
+      "Inactive" in isValidState.state
     ) {
-      return isValidState.state;
+      return isValidState.state.Inactive.failed_task;
     }
   }
 };
