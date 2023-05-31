@@ -391,6 +391,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
 
+                // scan instances again offtask to pick up modpack mods
+                let app2 = app.clone();
+                tokio::spawn(async move {
+                    let _ = app2.instance_manager().scan_instances();
+                });
+
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(
                     &runtime_path,
