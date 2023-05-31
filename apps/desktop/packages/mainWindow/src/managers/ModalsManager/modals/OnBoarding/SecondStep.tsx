@@ -23,7 +23,7 @@ const SecondStep = (props: Props) => {
       </div>
       <div class="flex justify-between w-full">
         <Button
-          variant="secondary"
+          type="secondary"
           size="large"
           onClick={() => {
             setSettingsMutation.mutate({ autoManageJava: false });

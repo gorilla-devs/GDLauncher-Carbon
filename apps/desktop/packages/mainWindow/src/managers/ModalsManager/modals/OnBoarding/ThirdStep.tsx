@@ -40,7 +40,7 @@ const ThirdStep = () => {
       </div>
       <div class="flex flex-col items-center gap-6">
         <Button
-          variant="outline"
+          type="outline"
           style={{ width: "100%", "max-width": "200px" }}
           onClick={() => {
             modalsContext?.openModal({
