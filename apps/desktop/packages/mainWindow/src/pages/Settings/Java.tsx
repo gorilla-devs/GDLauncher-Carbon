@@ -10,7 +10,7 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -146,7 +146,7 @@ const Java = () => {
           />
           <Button
             rounded={false}
-            variant="secondary"
+            type="secondary"
             class="h-10"
             textColor="text-red-500"
             onClick={() => {
@@ -216,7 +216,7 @@ const Java = () => {
                     </h2>
                     <Button
                       rounded={false}
-                      variant="secondary"
+                      type="secondary"
                       size="small"
                       onClick={() => {
                         modalsContext?.openModal({ name: "addJava" });
