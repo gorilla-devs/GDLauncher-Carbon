@@ -127,11 +127,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .update_instance(
                     details.instance.into(),
-                    details.name.into(),
-                    details.use_loaded_icon.into(),
+                    details.name.map(|x| x.inner()),
+                    details.use_loaded_icon.map(|x| x.inner()),
                     None,
-                    details.notes.into(),
-                    details.memory.into_option()
+                    details.notes.map(|x| x.inner()),
+                    details.memory.map(|x| x.inner())
                         .map(|m| m.map(|(xms, xmx)| (xms, xmx))),
                 )
                 .await
@@ -465,10 +465,10 @@ struct CreateInstance {
 #[derive(Type, Deserialize)]
 struct UpdateInstance {
     instance: InstanceId,
-    name: Update<String>,
-    use_loaded_icon: Update<bool>,
-    notes: Update<String>,
-    memory: Update<Option<(u16, u16)>>,
+    name: Option<Set<String>>,
+    use_loaded_icon: Option<Set<bool>>,
+    notes: Option<Set<String>>,
+    memory: Option<Set<Option<(u16, u16)>>>,
 }
 
 #[derive(Type, Deserialize)]
@@ -478,9 +478,16 @@ struct SetFavorite {
 }
 
 #[derive(Type, Deserialize)]
-enum Update<T> {
-    Changed(T),
-    Unchanged,
+enum Set<T> {
+    Set(T),
+}
+
+impl<T> Set<T> {
+    fn inner(self) -> T {
+        match self {
+            Self::Set(t) => t,
+        }
+    }
 }
 
 #[derive(Type, Deserialize)]
@@ -504,21 +511,6 @@ struct GameLogEntry {
     id: GameLogId,
     instance_id: InstanceId,
     active: bool,
-}
-
-impl<T> Update<T> {
-    fn into_option(self) -> Option<T> {
-        self.into()
-    }
-}
-
-impl<T> Into<Option<T>> for Update<T> {
-    fn into(self) -> Option<T> {
-        match self {
-            Self::Unchanged => None,
-            Self::Changed(v) => Some(v),
-        }
-    }
 }
 
 #[derive(Type, Deserialize)]
