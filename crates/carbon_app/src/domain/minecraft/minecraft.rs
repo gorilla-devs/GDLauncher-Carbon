@@ -61,7 +61,7 @@ pub fn is_rule_allowed(rule: Rule, java_arch: &JavaArch) -> bool {
             features: Some(ref features),
             ..
         } => features.has_demo_resolution.unwrap_or(false),
-        _ => false,
+        _ => true,
     };
 
     match rule.action {
@@ -78,7 +78,7 @@ pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
     }
 
     if let Some(name) = &rule.name {
-        rule_match &= &Os::native() == name || &Os::native_arch(java_arch) == name;
+        rule_match &= &Os::native_arch(java_arch) == name;
     }
 
     if let Some(version) = &rule.version {
@@ -183,18 +183,18 @@ pub fn assets_index_into_vec_downloadable(
             .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
             .with_size(object.size as u64),
         );
-        files.push(
-            carbon_net::Downloadable::new(
-                format!(
-                    "https://resources.download.minecraft.net/{}/{}",
-                    &object.hash[0..2],
-                    &object.hash
-                ),
-                virtual_asset_path,
-            )
-            .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
-            .with_size(object.size as u64),
-        );
+        // files.push(
+        //     carbon_net::Downloadable::new(
+        //         format!(
+        //             "https://resources.download.minecraft.net/{}/{}",
+        //             &object.hash[0..2],
+        //             &object.hash
+        //         ),
+        //         virtual_asset_path,
+        //     )
+        //     .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
+        //     .with_size(object.size as u64),
+        // );
     }
 
     files
@@ -205,9 +205,18 @@ pub fn library_is_allowed(library: Library, java_arch: &JavaArch) -> bool {
         return true;
     };
 
-    rules
-        .iter()
-        .any(|rule| is_rule_allowed(rule.clone(), java_arch))
+    let mut is_allowed = false;
+    for rule in rules {
+        match is_allowed {
+            true if rule.action == RuleAction::Disallow => {
+                is_allowed = is_rule_allowed(rule, java_arch)
+            }
+            true => continue,
+            false => is_allowed = is_rule_allowed(rule, java_arch),
+        }
+    }
+
+    is_allowed
 }
 
 #[cfg(target_pointer_width = "64")]

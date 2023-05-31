@@ -2,8 +2,6 @@ use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
 use std::io::Cursor;
-use std::sync::atomic;
-use std::sync::atomic::AtomicUsize;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use super::metadata::mods as mod_meta;
@@ -31,7 +29,7 @@ use self::run::PersistenceManager;
 
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId};
+use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceId};
 use domain::info;
 
 pub mod log;
@@ -46,7 +44,7 @@ pub struct InstanceManager {
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
-    game_logs: RwLock<HashMap<GameLogId, watch::Receiver<GameLog>>>,
+    game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
 impl InstanceManager {
@@ -1308,14 +1306,6 @@ struct IdLock<'a, V: Copy + Clone> {
     value: V,
     guard: MutexGuard<'a, ()>,
 }
-
-// Typed group id to avoid dealing with a raw integer ids.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize)]
-pub struct GroupId(pub i32);
-
-// Typed instance id to avoid dealing with a raw integer ids.
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Type, Serialize, Hash)]
-pub struct InstanceId(pub i32);
 
 impl Display for GroupId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

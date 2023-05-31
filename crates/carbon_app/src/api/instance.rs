@@ -64,6 +64,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .create_group(name)
                 .await
+                .map(GroupId::from)
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
@@ -76,6 +77,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.notes,
                 )
                 .await
+                .map(InstanceId::from)
         }
 
         mutation LOAD_ICON_URL[app, url: String] {
@@ -262,7 +264,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
                     let icon = app
                         .instance_manager()
-                        .instance_icon(manager::InstanceId(query.id))
+                        .instance_icon(domain::InstanceId(query.id))
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
@@ -364,25 +366,25 @@ struct GroupId(i32);
 #[derive(Type, Serialize, Deserialize)]
 struct InstanceId(i32);
 
-impl From<manager::GroupId> for GroupId {
-    fn from(value: manager::GroupId) -> Self {
+impl From<domain::GroupId> for GroupId {
+    fn from(value: domain::GroupId) -> Self {
         Self(*value)
     }
 }
 
-impl From<manager::InstanceId> for InstanceId {
-    fn from(value: manager::InstanceId) -> Self {
+impl From<domain::InstanceId> for InstanceId {
+    fn from(value: domain::InstanceId) -> Self {
         Self(*value)
     }
 }
 
-impl From<GroupId> for manager::GroupId {
+impl From<GroupId> for domain::GroupId {
     fn from(value: GroupId) -> Self {
         Self(value.0)
     }
 }
 
-impl From<InstanceId> for manager::InstanceId {
+impl From<InstanceId> for domain::InstanceId {
     fn from(value: InstanceId) -> Self {
         Self(value.0)
     }
@@ -500,6 +502,7 @@ struct GameLogId(i32);
 #[derive(Type, Serialize)]
 struct GameLogEntry {
     id: GameLogId,
+    instance_id: InstanceId,
     active: bool,
 }
 
@@ -862,11 +865,12 @@ impl From<GameLogId> for domain::GameLogId {
     }
 }
 
-impl From<(domain::GameLogId, bool)> for GameLogEntry {
-    fn from(value: (domain::GameLogId, bool)) -> Self {
+impl From<domain::GameLogEntry> for GameLogEntry {
+    fn from(value: domain::GameLogEntry) -> Self {
         Self {
-            id: value.0.into(),
-            active: value.1,
+            id: value.id.into(),
+            instance_id: value.instance_id.into(),
+            active: value.active,
         }
     }
 }

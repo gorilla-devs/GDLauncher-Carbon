@@ -3,8 +3,21 @@ use chrono::{DateTime, Utc};
 
 pub mod info;
 
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct GroupId(pub i32);
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
+pub struct InstanceId(pub i32);
+
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct GameLogId(pub i32);
+
+#[derive(Clone, Debug)]
+pub struct GameLogEntry {
+    pub id: GameLogId,
+    pub instance_id: InstanceId,
+    pub active: bool,
+}
 
 pub struct InstanceDetails {
     pub favorite: bool,
