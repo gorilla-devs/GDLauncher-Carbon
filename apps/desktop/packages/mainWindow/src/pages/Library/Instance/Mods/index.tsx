@@ -15,7 +15,7 @@ const Mods = () => {
   const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
-
+  const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const disableModMutation = rspc.createMutation(["instance.disableMod"]);
 
   const openFolderMutation = rspc.createMutation([
@@ -44,7 +44,9 @@ const Mods = () => {
           <Button
             type="outline"
             size="medium"
-            onClick={() => modalsContext?.openModal({ name: "addMod" })}
+            onClick={() =>
+              modalsContext?.openModal({ name: "addMod" }, params.id)
+            }
           >
             <Trans
               key="instance.add_mod"
@@ -90,7 +92,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal({ name: "addMod" });
+              modalsContext?.openModal({ name: "addMod" }, params.id);
             }}
           >
             <Trans
@@ -154,7 +156,17 @@ const Mods = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div
+              class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
+              onClick={() => {
+                Object.keys(selectedMods).forEach((mod) => {
+                  deleteModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: mod,
+                  });
+                });
+              }}
+            >
               <span class="text-2xl i-ri:delete-bin-2-fill" />
               <Trans
                 key="instance.delete_mod"
