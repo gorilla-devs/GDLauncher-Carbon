@@ -43,7 +43,9 @@ const LogViewer = (props: ModalProps) => {
                         <Tab>
                           <div class="w-full flex gap-2 items-center h-10 justify-start">
                             <div class="w-6 rounded-md bg-green h-6" />
-                            <p class="my-2">{instance?.name}</p>
+                            <p class="my-2 whitespace-nowrap">
+                              {instance?.name}
+                            </p>
                           </div>
                         </Tab>
                       );
@@ -79,11 +81,11 @@ const LogViewer = (props: ModalProps) => {
 
                     return (
                       <TabPanel>
-                        <div class="overflow-y-auto divide-y divide-darkSlate-500">
+                        <div class="overflow-y-auto divide-y divide-darkSlate-500 pb-4">
                           <For each={logsArray()}>
                             {(log) => {
                               return (
-                                <div class="flex flex-col justify-center items-center">
+                                <div class="flex flex-col justify-center items-center w-full">
                                   <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
                                     <code>{log?.line}</code>
                                   </pre>
