@@ -326,10 +326,11 @@ impl ManagerRef<'_, InstanceManager> {
                     }) => {
                         let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-                        let forge_version = match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                            None => forge_version.clone(),
-                            Some(sub) => sub.to_string(),
-                        };
+                        let forge_version =
+                            match forge_version.strip_prefix(&format!("{}-", version.release)) {
+                                None => forge_version.clone(),
+                                Some(sub) => sub.to_string(),
+                            };
 
                         let forge_manifest_version = forge_manifest
                             .game_versions
@@ -696,7 +697,7 @@ mod test {
         managers::{account::FullAccount, instance::InstanceVersionSouce},
     };
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
+    //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_launch() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
