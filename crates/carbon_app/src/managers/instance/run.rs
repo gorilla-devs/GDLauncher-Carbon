@@ -394,7 +394,7 @@ impl ManagerRef<'_, InstanceManager> {
                 // scan instances again offtask to pick up modpack mods
                 let app2 = app.clone();
                 tokio::spawn(async move {
-                    let _ = app2.instance_manager().scan_instances();
+                    let _ = app2.instance_manager().scan_instances().await;
                 });
 
                 t_extract_natives.start_opaque();
