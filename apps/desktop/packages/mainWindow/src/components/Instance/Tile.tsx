@@ -176,7 +176,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38 max-w-38 overflow-hidden"
+              class="flex justify-center relative rounded-2xl items-center overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
               classList={{
                 grayscale: props.isLoading || props.isInQueue,
                 "bg-green-600": !props.img,
@@ -186,18 +186,18 @@ const Tile = (props: Props) => {
               }}
             >
               <Show when={props.invalid}>
-                <h2 class="text-center z-20 text-sm">
+                <h2 class="text-sm text-center z-20">
                   <Trans key="instance.error_invalid" />
                 </h2>
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-                <div class="i-ri:alert-fill text-yellow-500 absolute top-1 right-1 z-10 text-2xl" />
+                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
+                <div class="i-ri:alert-fill absolute z-10 text-2xl text-yellow-500 top-1 right-1" />
               </Show>
               <Show when={props.failError}>
                 <h2 class="text-center z-20 text-sm">{props.failError}</h2>
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-                <div class="i-ri:alert-fill text-red-500 absolute top-1 right-1 z-10 text-2xl" />
+                <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
               </Show>
               <div
                 class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
@@ -317,14 +317,14 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="relative group select-none flex items-center w-full gap-4 box-border px-3 h-14 erelative cursor-pointer"
+            class="relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
             onClick={(e) => props?.onClick?.(e)}
             classList={{
               grayscale: props.isLoading || props.isInQueue,
             }}
           >
             <Show when={props.invalid}>
-              <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+              <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 z-10 text-2xl right-2" />
             </Show>
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
@@ -345,7 +345,7 @@ const Tile = (props: Props) => {
               }}
             >
               <div
-                class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer"
+                class="rounded-full flex justify-center items-center cursor-pointer h-7 w-7"
                 classList={{
                   "bg-primary-500": !props.isRunning,
                   "bg-red-500": props.isRunning,

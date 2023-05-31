@@ -242,7 +242,7 @@ const Java = () => {
                                       <span>{java.type}</span>
                                       {mapJavaTypeToAction(java.type, java.id)}
                                       <Show when={javaInProfile(java.id)}>
-                                        <div class="i-ri:checkbox-circle-fill text-green-500" />
+                                        <div class="text-green-500 i-ri:checkbox-circle-fill" />
                                       </Show>
                                     </div>
                                   </div>

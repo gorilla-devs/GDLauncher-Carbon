@@ -48,7 +48,7 @@ const Mod = (props: Props) => {
         <span class="flex gap-4 justify-center items-center">
           {/* //TODO: ADD CONFIRMATION MODAL */}
           <div
-            class="text-2xl i-ri:delete-bin-2-fill text-darkSlate-500 hover:text-red-500 duration-100 ease-in-out transition-color cursor-pointer"
+            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:delete-bin-2-fill hover:text-red-500 transition-color"
             onClick={() => {
               deleteModMutation.mutate({
                 instance_id: parseInt(params.id, 10),

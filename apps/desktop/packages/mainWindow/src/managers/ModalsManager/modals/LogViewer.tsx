@@ -84,7 +84,7 @@ const LogViewer = (props: ModalProps) => {
                             {(log) => {
                               return (
                                 <div class="flex flex-col justify-center items-center">
-                                  <pre class="m-0 leading-8 whitespace-pre-wrap pl-4 py-2 w-full box-border">
+                                  <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
                                     <code>{log?.line}</code>
                                   </pre>
                                 </div>

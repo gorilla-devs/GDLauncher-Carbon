@@ -154,7 +154,7 @@ const Sidebar = () => {
           >
             <div class="w-full h-full flex flex-col justify-center items-center">
               <img src={glassBlock} class="w-16 h-16" />
-              <p class="text-darkSlate-50 text-center max-w-100 text-xs">
+              <p class="text-darkSlate-50 text-center text-xs max-w-100">
                 <Trans
                   key="instance.no_mods_text"
                   options={{

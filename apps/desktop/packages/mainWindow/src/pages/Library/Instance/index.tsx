@@ -224,7 +224,7 @@ const Instance = () => {
             </Button>
           </div>
           <div
-            class="flex justify-center sticky px-6 h-24 top-52 z-20"
+            class="flex justify-center sticky h-24 top-52 z-20 px-6"
             style={{
               background:
                 "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
@@ -259,7 +259,7 @@ const Instance = () => {
                       </h1>
                       <div class="flex gap-2">
                         <div
-                          class="text-2xl cursor-pointer transition ease-in-out text-darkSlate-50 i-ri:delete-bin-7-fill duration-50 hover:text-red-500"
+                          class="text-2xl cursor-pointer transition ease-in-out text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 duration-50"
                           classList={{
                             hidden: !editableName(),
                           }}

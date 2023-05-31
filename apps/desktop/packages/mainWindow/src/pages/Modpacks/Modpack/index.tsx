@@ -1,11 +1,11 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
-import { FEMod, Task } from "@gd/core_module/bindings";
+import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 
 type Props = { modpack: FEMod };
 

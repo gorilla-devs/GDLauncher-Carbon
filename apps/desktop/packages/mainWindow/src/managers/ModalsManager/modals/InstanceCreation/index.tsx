@@ -170,7 +170,7 @@ const InstanceCreation = (props: ModalProps) => {
       <div class="flex flex-col justify-between overflow-y-scroll max-h-128 w-120">
         <div class="flex flex-col justify-between gap-4 p-5">
           <div
-            class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover w-20 rounded-xl h-20"
+            class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
             style={{
               "background-image": `url("${bgPreview()}")`,
             }}

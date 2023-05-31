@@ -161,12 +161,12 @@ const AppNavbar = () => {
                   <Tab ignored noPointer={true}>
                     <div class="relative">
                       <Show when={runningInstances() > 0}>
-                        <div class="absolute w-4 h-4 -top-1 -right-1 rounded-full bg-red-500 z-30 text-white flex justify-center items-center text-xs">
+                        <div class="absolute w-4 h-4 rounded-full text-white flex justify-center items-center text-xs -top-1 -right-1 bg-red-500 z-30">
                           {runningInstances()}
                         </div>
                       </Show>
                       <div
-                        class="text-2xl i-ri:terminal-box-fill z-20 text-dark-slate-50 cursor-pointer"
+                        class="text-2xl z-20 cursor-pointer i-ri:terminal-box-fill text-dark-slate-50"
                         onClick={() => {
                           modalsContext?.openModal({ name: "logViewer" });
                         }}

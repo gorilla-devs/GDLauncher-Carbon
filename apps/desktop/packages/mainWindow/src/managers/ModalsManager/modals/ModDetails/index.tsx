@@ -39,13 +39,13 @@ const ModDetails = (props: ModalProps) => {
               <div class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch">
                 <div class="relative h-full">
                   <div
-                    class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
+                    class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
                     style={{
                       "background-image": `url("${modDetails()?.logo?.url}")`,
                       "background-position": "right-5rem",
                     }}
                   />
-                  <div class="z-10 top-5 sticky left-5 w-fit">
+                  <div class="z-10 sticky top-5 left-5 w-fit">
                     <Button
                       onClick={() => {
                         modalsContext?.openModal({ name: "addMod" });
@@ -62,7 +62,7 @@ const ModDetails = (props: ModalProps) => {
                       />
                     </Button>
                   </div>
-                  <div class="flex justify-center sticky px-4 h-24 top-52 z-20 bg-gradient-to-t from-darkSlate-800 from-10%">
+                  <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10%">
                     <div class="flex gap-4 w-full lg:flex-row">
                       <div
                         class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
