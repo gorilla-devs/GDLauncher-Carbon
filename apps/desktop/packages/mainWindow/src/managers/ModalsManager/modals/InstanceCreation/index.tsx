@@ -96,7 +96,7 @@ const InstanceCreation = (props: ModalProps) => {
     ["instance.prepareInstance"],
     {
       onSuccess() {
-        addNotification("Instance saccessfully created.");
+        addNotification("Instance successfully created.");
         modalsContext?.closeModal();
       },
       onError() {
@@ -113,7 +113,7 @@ const InstanceCreation = (props: ModalProps) => {
         prepareInstanceMutation.mutate(instanceId);
       },
       onError() {
-        addNotification("Error while creating the instance.");
+        addNotification("Error while creating the instance.", "error");
         modalsContext?.closeModal();
       },
       onSettled() {

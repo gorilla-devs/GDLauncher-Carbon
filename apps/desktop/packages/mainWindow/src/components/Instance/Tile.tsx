@@ -176,7 +176,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38 max-w-38"
+              class="flex justify-center relative rounded-2xl items-center bg-cover bg-center h-38 w-38 max-w-38 overflow-hidden"
               classList={{
                 grayscale: props.isLoading || props.isInQueue,
                 "bg-green-600": !props.img,

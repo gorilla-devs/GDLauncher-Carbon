@@ -5,7 +5,7 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For, createSignal } from "solid-js";
+import { For } from "solid-js";
 
 type Props = { modpack: FEMod };
 
@@ -19,7 +19,7 @@ const Modpack = (props: Props) => {
     ["instance.prepareInstance"],
     {
       onSuccess() {
-        addNotification("Instance saccessfully created.");
+        addNotification("Instance successfully created.");
       },
       onError() {
         addNotification("Error while creating the instance.", "error");

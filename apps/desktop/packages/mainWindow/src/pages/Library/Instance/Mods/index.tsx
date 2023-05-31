@@ -1,16 +1,20 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
 import { useParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
+import { createStore } from "solid-js/store";
 
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
   const modalsContext = useModal();
+  const [selectedMods, setSelectMods] = createStore<{ [id: string]: boolean }>(
+    {}
+  );
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
@@ -150,7 +154,13 @@ const Mods = () => {
           fallback={<NoMods />}
         >
           <For each={instanceDetails.data?.mods}>
-            {(props) => <Mod mod={props} />}
+            {(props) => (
+              <Mod
+                mod={props}
+                setSelectMods={setSelectMods}
+                selectedMods={selectedMods}
+              />
+            )}
           </For>
         </Show>
       </div>
