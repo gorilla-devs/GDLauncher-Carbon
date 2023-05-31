@@ -78,6 +78,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation LOAD_ICON_URL[app, url: String] {
+            app.instance_manager()
+                .download_icon(url)
+                .await
+        }
+
         mutation DELETE_GROUP[app, id: GroupId] {
             app.instance_manager()
                 .delete_group(id.into())

@@ -820,6 +820,28 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(data)
     }
 
+    pub async fn download_icon(self, url: String) -> anyhow::Result<()> {
+        let extension = url
+            .rsplit_once('/')
+            .map(|(_, name)| name.rsplit_once('.'))
+            .flatten()
+            .map(|(_, ext)| ext)
+            .unwrap_or("png");
+
+        let data = self
+            .app
+            .reqwest_client
+            .get(&url)
+            .send()
+            .await?
+            .bytes()
+            .await?;
+
+        *self.loaded_icon.lock().await = Some((format!("icon.{extension}"), data.to_vec()));
+
+        Ok(())
+    }
+
     pub async fn create_instance(
         self,
         group: GroupId,
