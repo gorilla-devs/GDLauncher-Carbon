@@ -155,6 +155,7 @@
   "InstanceTaskLaunchRequestVersions": "InstanceTaskLaunchRequestVersions",
   "InstanceTaskLaunchDownloadFiles": "InstanceTaskLaunchDownloadFiles",
   "InstanceTaskLaunchExtractNatives": "InstanceTaskLaunchExtractNatives",
+  "InstanceTaskInstallMod": "{{mod_name}} mod installing in {{instance_name}}",
   "mods.fetching_no_more_mods": "No more mods to load",
   "mods.fetching_mods_text": "Loading mods",
   "mods.fetching_mods_error": "There was an error while fetching mods",

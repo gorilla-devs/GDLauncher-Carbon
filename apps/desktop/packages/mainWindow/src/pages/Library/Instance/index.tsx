@@ -9,7 +9,7 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, Match, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -28,6 +28,7 @@ const Instance = () => {
   const params = useParams();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
+  const [newName, setNewName] = createSignal("");
   const [isFavorite, setIsFavorite] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -138,6 +139,10 @@ const Instance = () => {
     "instance.launchInstance",
   ]);
 
+  const updateInstanceMutation = rspc.createMutation([
+    "instance.updateInstance",
+  ]);
+
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
 
   const getInstanceDetailsQuery = rspc.createQuery(() => [
@@ -157,6 +162,19 @@ const Instance = () => {
   let bgRef: HTMLDivElement;
   let innerContainerRef: HTMLDivElement;
   let refStickyContainer: HTMLDivElement;
+
+  const handleNameChange = () => {
+    if (newName()) {
+      updateInstanceMutation.mutate({
+        name: { Set: newName() },
+        use_loaded_icon: null,
+        memory: null,
+        notes: null,
+        instance: parseInt(params.id, 10),
+      });
+    }
+    setEditableName(false);
+  };
 
   return (
     <div
@@ -245,28 +263,30 @@ const Instance = () => {
 
                   <div class="flex flex-col max-w-185 flex-1">
                     <div class="flex gap-4 items-center">
-                      <h1
-                        class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
-                        contentEditable
-                        onFocusIn={() => {
-                          setEditableName(true);
-                        }}
-                        onFocusOut={() => {
-                          setEditableName(false);
-                        }}
-                      >
-                        {routeData.instanceDetails.data?.name}
-                      </h1>
+                      <span class="flex gap-2 cursor-pointer">
+                        <h1
+                          onInput={(e) => {
+                            setNewName(e.target.innerHTML);
+                          }}
+                          class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text cursor-pointer"
+                          contentEditable
+                          onFocusIn={() => {
+                            setEditableName(true);
+                          }}
+                          onFocusOut={() => {
+                            handleNameChange();
+                          }}
+                        >
+                          {routeData.instanceDetails.data?.name}
+                        </h1>
+                        <Show when={!editableName()}>
+                          <div
+                            class="i-ri:pencil-fill"
+                            onClick={() => setEditableName(true)}
+                          />
+                        </Show>
+                      </span>
                       <div class="flex gap-2">
-                        <div
-                          class="text-2xl cursor-pointer transition ease-in-out text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 duration-50"
-                          classList={{
-                            hidden: !editableName(),
-                          }}
-                          onClick={() => {
-                            setEditableName(false);
-                          }}
-                        />
                         <div
                           class="cursor-pointer transition ease-in-out duration-50 text-darkSlate-50 i-ri:check-fill text-3xl hover:text-green-500"
                           classList={{
