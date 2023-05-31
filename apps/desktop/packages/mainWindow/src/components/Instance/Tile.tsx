@@ -31,6 +31,7 @@ type Props = {
   isRunning?: boolean;
   isInQueue?: boolean;
   subTasks?: Subtask[] | undefined;
+  failError?: string;
   onClick?: (_e: MouseEvent) => void;
 };
 
@@ -192,11 +193,20 @@ const Tile = (props: Props) => {
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 <div class="i-ri:alert-fill text-yellow-500 absolute top-1 right-1 z-10 text-2xl" />
               </Show>
+              <Show when={props.failError}>
+                <h2 class="text-center z-20 text-sm">{props.failError}</h2>
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                <div class="i-ri:alert-fill text-red-500 absolute top-1 right-1 z-10 text-2xl" />
+              </Show>
               <div
                 class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
                 classList={{
                   "group-hover:flex":
-                    !props.isLoading && !props.isInQueue && !props.invalid,
+                    !props.isLoading &&
+                    !props.isInQueue &&
+                    !props.invalid &&
+                    !props.failError,
                   flex: props.isRunning,
                 }}
               >
@@ -283,7 +293,7 @@ const Tile = (props: Props) => {
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-2">
-                    <Show when={!props.invalid}>
+                    <Show when={!props.invalid && !props.failError}>
                       <img
                         class="w-4 h-4"
                         src={getModloaderIcon(props.modloader as ModLoaderType)}
@@ -316,6 +326,9 @@ const Tile = (props: Props) => {
             <Show when={props.invalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
+            <Show when={props.failError}>
+              <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+            </Show>
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
               <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
@@ -328,7 +341,7 @@ const Tile = (props: Props) => {
             <div
               class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5"
               classList={{
-                "group-hover:flex": !props.invalid,
+                "group-hover:flex": !props.invalid || !props.failError,
               }}
             >
               <div
@@ -382,7 +395,7 @@ const Tile = (props: Props) => {
               </h4>
               <div class="flex gap-4 text-darkSlate-50">
                 <span class="flex gap-2">
-                  <Show when={!props.invalid}>
+                  <Show when={!props.invalid && !props.failError}>
                     <img
                       class="w-4 h-4"
                       src={getModloaderIcon(props.modloader as ModLoaderType)}
@@ -422,11 +435,17 @@ const Tile = (props: Props) => {
             <Show when={props.invalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
+            <Show when={props.failError}>
+              <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+            </Show>
             <div
               class="gap-2 duration-100 ease-in-out right-5 hidden transition-all"
               classList={{
                 "group-hover:flex":
-                  !props.isLoading && !props.isInQueue && !props.invalid,
+                  !props.isLoading &&
+                  !props.isInQueue &&
+                  !props.invalid &&
+                  !props.failError,
               }}
             >
               <div

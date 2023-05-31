@@ -34,6 +34,7 @@ const InstanceTile = (props: {
   selected?: boolean;
 }) => {
   const [isLoading, setIsLoading] = createSignal(false);
+  const [failError, setFailError] = createSignal("");
   const [progress, setProgress] = createStore<InstanceDownloadProgress>({
     totalDownload: 0,
     downloaded: 0,
@@ -61,6 +62,7 @@ const InstanceTile = (props: {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
     createEffect(() => {
+      setFailError("");
       if (task.data) {
         setProgress("totalDownload", task.data.download_total);
         setProgress("downloaded", task.data.downloaded);
@@ -73,9 +75,23 @@ const InstanceTile = (props: {
         }
       }
     });
+
     createEffect(() => {
       if ((validInstance() || invalidInstance()) && taskId === undefined) {
         dismissTaskMutation.mutate(taskId);
+      }
+    });
+  }
+
+  if (failedTaskId()) {
+    const failedTask = rspc.createQuery(() => [
+      "vtask.getTask",
+      failedTaskId() as number,
+    ]);
+
+    createEffect(() => {
+      if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+        setFailError(failedTask.data.progress.Failed.cause[0].display);
       }
     });
   }
@@ -95,10 +111,8 @@ const InstanceTile = (props: {
         instanceId={props.instance.id}
         modloader={modloader}
         version={validInstance()?.mc_version}
-        invalid={
-          !isListInstanceValid(props.instance.status) ||
-          (failedTaskId() !== null && failedTaskId() !== undefined)
-        }
+        invalid={!isListInstanceValid(props.instance.status)}
+        failError={failError()}
         isRunning={!!isRunning()}
         isInQueue={isInQueue()}
         variant={type()}

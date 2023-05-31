@@ -6,7 +6,6 @@ import {
   JSX,
   lazy,
   Show,
-  Suspense,
   useContext,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
