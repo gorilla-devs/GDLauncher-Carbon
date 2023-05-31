@@ -128,7 +128,7 @@ const Auth = (props: Props) => {
             }}
           />
         </Button>
-        <p class="text-darkSlate-50 max-w-90 text-sm">
+        <p class="text-darkSlate-50 text-sm max-w-90">
           <Trans
             key="login.sign_in_with_microsoft_text"
             options={{

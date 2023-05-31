@@ -41,7 +41,7 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
-pub const GDL_API_BASE: &str = "https://api.gdlauncher.com";
+pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
     use super::{

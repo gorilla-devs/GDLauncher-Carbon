@@ -348,7 +348,7 @@ pub async fn generate_startup_command(
         }
     };
 
-    let mut command = Vec::with_capacity(15);
+    let mut command = Vec::with_capacity(100);
 
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
@@ -378,17 +378,30 @@ pub async fn generate_startup_command(
         command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
     }
 
-    // if get_current_os() == Os::Osx || get_current_os() == Os::OsxArm64 {
-    //     let can_find_start_on_first_thread = jvm_arguments
-    //         .iter()
-    //         .any(|arg| matches!(arg, Argument::Normal(s) if s == "-XstartOnFirstThread"));
+    if Os::native() == Os::Osx {
+        let lwjgl_version = version
+            .libraries
+            .iter()
+            .find(|&library| library.name.contains("org.lwjgl"))
+            .map(|library| MavenCoordinates::try_from(library.name.clone(), None))
+            .ok_or(anyhow::anyhow!("LWJGL not found"))??;
+        let lwjgl_version = lwjgl_version
+            .version
+            .get(0..1)
+            .ok_or(anyhow::anyhow!("LWJGL version not found"))?;
 
-    //     if !can_find_start_on_first_thread {
-    //         command.push("-XstartOnFirstThread".to_string());
-    //     }
-    // }
+        let is_x_start_on_first_thread_needed = lwjgl_version.parse::<u8>()? >= 3;
 
-    // command.push("-Dorg.lwjgl.util.Debug=true".to_string());
+        let can_find_start_on_first_thread = command
+            .iter()
+            .any(|arg| arg.contains("XstartOnFirstThread"));
+
+        if !can_find_start_on_first_thread && is_x_start_on_first_thread_needed {
+            command.push("-XstartOnFirstThread".to_string());
+        }
+    }
+
+    command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class.clone());
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());

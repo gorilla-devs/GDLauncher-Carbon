@@ -73,8 +73,9 @@ pub async fn prepare_modpack(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
+    let file_path_clone = file_path.clone();
     let (mut archive, manifest) = spawn_blocking(move || {
-        let file = std::fs::File::open(file_path)?;
+        let file = std::fs::File::open(file_path_clone)?;
         let mut archive = zip::ZipArchive::new(file)?;
         let manifest: curseforge::manifest::Manifest = {
             let file = archive.by_name("manifest.json")?;
@@ -147,23 +148,28 @@ pub async fn prepare_modpack(
         let total_archive_files = archive.len() as u64;
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
+
+            if !(*file.name()).starts_with(&override_folder_name) {
+                continue;
+            }
+
             let outpath = match file.enclosed_name() {
-                Some(path) => Path::new(&override_full_path).join(path),
+                Some(path) => Path::new(&override_full_path)
+                    .join(path.strip_prefix(&override_folder_name).unwrap()),
                 None => continue,
             };
 
-            if (*file.name()).starts_with(&override_folder_name) {
-                if (*file.name()).ends_with('/') {
-                    std::fs::create_dir_all(&outpath)?;
-                } else {
-                    if let Some(p) = outpath.parent() {
-                        if !p.exists() {
-                            std::fs::create_dir_all(p)?;
-                        }
+            if (*file.name()).ends_with('/') {
+                continue;
+            } else {
+                if let Some(p) = outpath.parent() {
+                    if !p.exists() {
+                        std::fs::create_dir_all(p)?;
                     }
-                    let mut outfile = std::fs::File::create(&outpath)?;
-                    std::io::copy(&mut file, &mut outfile)?;
                 }
+
+                let mut outfile = std::fs::File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
             }
 
             progress_percentage_sender.send(ProgressState::ExtractingAddonOverrides(
@@ -175,6 +181,8 @@ pub async fn prepare_modpack(
         Ok::<(), anyhow::Error>(())
     })
     .await??;
+
+    tokio::fs::remove_file(&file_path).await?;
 
     Ok(ModpackInfo {
         manifest,

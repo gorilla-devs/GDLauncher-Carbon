@@ -1,7 +1,6 @@
-import { Show } from "solid-js";
+import { Show, JSX, splitProps } from "solid-js";
 
-export interface Props {
-  value?: string | number;
+export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
   placeholder?: string;
   error?: string;
   disabled?: boolean;
@@ -9,10 +8,17 @@ export interface Props {
   inputClass?: string;
   inputColor?: string;
   icon?: Element | any;
-  onInput?: (_e: InputEvent) => void;
 }
 
 function Input(props: Props) {
+  const [_, others] = splitProps(props, [
+    "error",
+    "inputClass",
+    "class",
+    "inputColor",
+    "icon",
+  ]);
+
   return (
     <>
       <div
@@ -44,9 +50,7 @@ function Input(props: Props) {
             "border-red-500": !!props.error,
             "bg-darkSlate-600": !props.inputColor,
           }}
-          placeholder={props.placeholder}
-          value={props.value || ""}
-          onInput={(e: InputEvent) => props?.onInput?.(e)}
+          {...others}
         />
       </div>
 
