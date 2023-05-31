@@ -5,7 +5,7 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For } from "solid-js";
+import { For, createSignal } from "solid-js";
 
 type Props = { modpack: FEMod };
 
@@ -32,6 +32,7 @@ const Modpack = (props: Props) => {
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
+      onMutate() {},
       onSuccess(instanceId) {
         prepareInstanceMutation.mutate(instanceId);
       },
@@ -40,6 +41,13 @@ const Modpack = (props: Props) => {
       },
     }
   );
+  const latestFIlesIndexes = () => props.modpack.latestFilesIndexes;
+
+  const mappedVersions = () =>
+    latestFIlesIndexes().map((version) => ({
+      key: version.gameVersion,
+      label: version.gameVersion,
+    }));
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
@@ -100,14 +108,9 @@ const Modpack = (props: Props) => {
             />
           </Button>
           <Dropdown.button
-            options={[
-              { label: "1.16.5", key: "1.16.5" },
-              { label: "1.16.4", key: "1.16.4" },
-              { label: "1.16.3", key: "1.16.3" },
-              { label: "1.16.2", key: "1.16.2" },
-            ]}
+            options={mappedVersions()}
             rounded
-            value="1.16.2"
+            value={mappedVersions()[0].key}
             onClick={() => {
               loadIconMutation.mutate(props.modpack.logo.url);
               createInstanceMutation.mutate({

@@ -9,6 +9,7 @@ import {
   getPreparingState,
   getRunningState,
   getInValideInstance,
+  getInactiveState,
 } from "@/utils/instances";
 import {
   ListInstance,
@@ -44,7 +45,9 @@ const InstanceTile = (props: {
 
   const validInstance = () => getValideInstance(props.instance.status);
   const invalidInstance = () => getInValideInstance(props.instance.status);
+  const inactiveState = () => getInactiveState(props.instance.status);
 
+  const failedTaskId = () => inactiveState();
   const isPreparingState = () => getPreparingState(props.instance.status);
 
   const modloader = validInstance()?.modloader;
@@ -53,7 +56,6 @@ const InstanceTile = (props: {
 
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
-  const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
 
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
@@ -93,7 +95,10 @@ const InstanceTile = (props: {
         instanceId={props.instance.id}
         modloader={modloader}
         version={validInstance()?.mc_version}
-        invalid={!isListInstanceValid(props.instance.status)}
+        invalid={
+          !isListInstanceValid(props.instance.status) ||
+          (failedTaskId() !== null && failedTaskId() !== undefined)
+        }
         isRunning={!!isRunning()}
         isInQueue={isInQueue()}
         variant={type()}

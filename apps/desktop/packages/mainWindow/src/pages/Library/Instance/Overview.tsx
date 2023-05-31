@@ -11,7 +11,7 @@ const Overview = () => {
 
   createEffect(() => {
     console.log(
-      "routeData.instanceDetails.data?.notes",
+      "routeData.instanceDetails.data",
       routeData.instanceDetails.data
     );
   });
@@ -28,46 +28,60 @@ const Overview = () => {
             icon="vanilla"
           />
         </Show>
-        <For
-          each={(routeData.instanceDetails.data as InstanceDetails).modloaders}
-        >
-          {(modloader, index) => (
-            <>
-              <Card
-                title={`Modloader ${index()}`}
-                text={modloader.type_}
-                icon="book"
-              />
-              <Card
-                title={`Modloader ${index()} version`}
-                text={modloader.version}
-                icon="pickaxe"
-              />
-            </>
-          )}
-        </For>
-        <Card
-          title="Mods"
-          text={(routeData.instanceDetails.data as InstanceDetails).mods.length}
-          icon="cart"
-        />
-        <Card
-          title="Played time"
-          text={
-            (routeData.instanceDetails.data as InstanceDetails).seconds_played
-          }
-          icon="clock"
-        />
-        <Card
-          title="Last played"
-          text={format(
-            new Date(
-              (routeData.instanceDetails.data as InstanceDetails).last_played
-            ),
-            "dd-MM-yyyy"
-          )}
-          icon="sign"
-        />
+        <Show when={routeData.instanceDetails.data?.modloaders}>
+          <For
+            each={
+              (routeData.instanceDetails.data as InstanceDetails).modloaders
+            }
+          >
+            {(modloader, index) => (
+              <>
+                <Card
+                  title={`Modloader ${index()}`}
+                  text={modloader.type_}
+                  icon="book"
+                />
+                <Card
+                  title={`Modloader ${index()} version`}
+                  text={modloader.version}
+                  icon="pickaxe"
+                />
+              </>
+            )}
+          </For>
+        </Show>
+
+        <Show when={routeData.instanceDetails.data?.mods}>
+          <Card
+            title="Mods"
+            text={
+              (routeData.instanceDetails.data as InstanceDetails)?.mods.length
+            }
+            icon="cart"
+          />
+        </Show>
+        <Show when={routeData.instanceDetails.data?.seconds_played}>
+          <Card
+            title="Played time"
+            text={
+              (routeData.instanceDetails.data as InstanceDetails)
+                ?.seconds_played
+            }
+            icon="clock"
+          />
+        </Show>
+        <Show when={routeData.instanceDetails.data?.last_played}>
+          <Card
+            title="Last played"
+            text={format(
+              new Date(
+                (routeData.instanceDetails.data as InstanceDetails)?.last_played
+              ),
+              "dd-MM-yyyy"
+            )}
+            icon="sign"
+          />
+        </Show>
       </div>
       <Show when={routeData.instanceDetails.data?.notes}>
         <div class="flex flex-col items-start justify-between gap-2 p-5 bg-darkSlate-700 rounded-xl box-border w-full w-59">

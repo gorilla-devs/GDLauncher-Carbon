@@ -3,7 +3,7 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Tag } from "@gd/ui";
 import { format } from "date-fns";
-import { For, Match, Switch, createEffect } from "solid-js";
+import { For, Match, Switch } from "solid-js";
 import { useModal } from "../..";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
@@ -31,7 +31,6 @@ const Mod = (props: Props) => {
     instanceDetails.data?.mods.find(
       (mod) => parseInt(mod.id, 10) === props.mod.id
     ) !== undefined;
-
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
@@ -112,7 +111,7 @@ const Mod = (props: Props) => {
                   });
                 }}
                 onChange={(val) => {
-                  console.log("CHANFE", val, props.mod);
+                  console.log("OnChange", val, props.mod);
                   // installModMutation.mutate({
                   //   file_id: props.mod.mainFileId,
                   //   instance_id: parseInt(lastInstanceOpened(), 10),

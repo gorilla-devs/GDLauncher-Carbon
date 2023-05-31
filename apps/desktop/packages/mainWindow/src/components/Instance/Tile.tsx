@@ -6,7 +6,7 @@ import {
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
