@@ -525,12 +525,12 @@ enum GameVersion {
     // Custom(json)
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Serialize, Deserialize)]
 struct CurseforgeModpack {
     project_id: u32,
     file_id: u32,
@@ -562,32 +562,33 @@ enum MoveInstanceTarget {
 }
 
 #[derive(Type, Serialize)]
-pub struct InstanceDetails {
-    pub name: String,
-    pub favorite: bool,
-    pub version: Option<String>,
-    pub last_played: DateTime<Utc>,
-    pub seconds_played: u32,
-    pub modloaders: Vec<ModLoader>,
-    pub notes: String,
-    pub state: LaunchState,
+struct InstanceDetails {
+    name: String,
+    favorite: bool,
+    version: Option<String>,
+    modpack: Option<Modpack>,
+    last_played: DateTime<Utc>,
+    seconds_played: u32,
+    modloaders: Vec<ModLoader>,
+    notes: String,
+    state: LaunchState,
     mods: Vec<Mod>,
 }
 
 #[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct ModLoader {
-    pub type_: ModLoaderType,
-    pub version: String,
+struct ModLoader {
+    type_: ModLoaderType,
+    version: String,
 }
 
 #[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub enum ModLoaderType {
+enum ModLoaderType {
     Forge,
     Fabric,
 }
 
 #[derive(Type, Serialize)]
-pub enum LaunchState {
+enum LaunchState {
     Inactive {
         failed_task: Option<TaskId>,
     },
@@ -608,12 +609,12 @@ struct Mod {
 }
 
 #[derive(Type, Serialize)]
-pub struct ModFileMetadata {
-    pub modid: String,
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub description: Option<String>,
-    pub authors: Option<String>,
+struct ModFileMetadata {
+    modid: String,
+    name: Option<String>,
+    version: Option<String>,
+    description: Option<String>,
+    authors: Option<String>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -622,6 +623,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             favorite: value.favorite,
             name: value.name,
             version: value.version,
+            modpack: value.modpack.map(Into::into),
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
@@ -685,6 +687,23 @@ impl From<Modpack> for domain::info::Modpack {
 
 impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
     fn from(value: CurseforgeModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            file_id: value.file_id,
+        }
+    }
+}
+
+impl From<domain::info::Modpack> for Modpack {
+    fn from(value: domain::info::Modpack) -> Self {
+        match value {
+            domain::info::Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+        }
+    }
+}
+
+impl From<domain::info::CurseforgeModpack> for CurseforgeModpack {
+    fn from(value: domain::info::CurseforgeModpack) -> Self {
         Self {
             project_id: value.project_id,
             file_id: value.file_id,

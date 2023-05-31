@@ -1165,6 +1165,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
                 None => None,
             },
+            modpack: instance.config.modpack.clone(),
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
             modloaders: match &instance.config.game_configuration.version {
