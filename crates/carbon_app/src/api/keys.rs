@@ -80,6 +80,8 @@ keys! {
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";
+        GET_LOGS                                    = "getLogs";
+        DELETE_LOG                                  = "deleteLog";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
