@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
@@ -12,9 +12,15 @@ const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
   const modalsContext = useModal();
-  const [selectedMods, setSelectMods] = createStore<{ [id: string]: boolean }>(
-    {}
-  );
+  const [selectedMods, setSelectedMods] = createStore<{
+    [id: string]: boolean;
+  }>({});
+
+  const disableModMutation = rspc.createMutation(["instance.disableMod"]);
+
+  const openFolderMutation = rspc.createMutation([
+    "instance.openInstanceFolder",
+  ]);
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
@@ -98,7 +104,16 @@ const Mods = () => {
         <div class="flex justify-between text-darkSlate-50 z-10 mb-6">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
-              <Checkbox checked={true} disabled={false} />
+              <Checkbox
+                onChange={(checked) => {
+                  instanceDetails.data?.mods.forEach((mod) => {
+                    if (checked) {
+                      setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
+                    } else
+                      setSelectedMods((prev) => ({ ...prev, [mod.id]: false }));
+                  });
+                }}
+              />
               <Trans
                 key="instance.select_all_mods"
                 options={{
@@ -106,7 +121,12 @@ const Mods = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white">
+            <div
+              class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white"
+              onClick={() => {
+                openFolderMutation.mutate(parseInt(params.id, 10));
+              }}
+            >
               <span class="text-2xl i-ri:folder-open-fill" />
               <Trans
                 key="instance.open_mods_folder"
@@ -115,7 +135,17 @@ const Mods = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div
+              class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
+              onClick={() => {
+                Object.keys(selectedMods).forEach((mod) => {
+                  disableModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: mod,
+                  });
+                });
+              }}
+            >
               <span class="text-2xl i-ri:forbid-line" />
               <Trans
                 key="instance.disable_mod"
@@ -157,7 +187,7 @@ const Mods = () => {
             {(props) => (
               <Mod
                 mod={props}
-                setSelectMods={setSelectMods}
+                setSelectedMods={setSelectedMods}
                 selectedMods={selectedMods}
               />
             )}

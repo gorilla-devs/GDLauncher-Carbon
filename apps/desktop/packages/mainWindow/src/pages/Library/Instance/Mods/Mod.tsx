@@ -8,7 +8,7 @@ import { SetStoreFunction } from "solid-js/store";
 
 type Props = {
   mod: ModType;
-  setSelectMods: SetStoreFunction<{
+  setSelectedMods: SetStoreFunction<{
     [id: string]: boolean;
   }>;
   selectedMods: {
@@ -29,7 +29,7 @@ const Mod = (props: Props) => {
           <Checkbox
             checked={props.selectedMods[props.mod.id]}
             onChange={(e) => {
-              props.setSelectMods(props.mod.id, e);
+              props.setSelectedMods(props.mod.id, e);
             }}
           />
           <div class="flex items-center gap-2">
