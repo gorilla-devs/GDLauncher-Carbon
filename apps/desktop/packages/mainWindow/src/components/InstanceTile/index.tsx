@@ -55,7 +55,6 @@ const InstanceTile = (props: {
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
   const tasks = rspc.createQuery(() => ["vtask.getTasks"]);
 
-
   if (taskId !== undefined) {
     const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
 
@@ -73,7 +72,7 @@ const InstanceTile = (props: {
       }
     });
     createEffect(() => {
-      if (validInstance() || invalidInstance()) {
+      if ((validInstance() || invalidInstance()) && taskId === undefined) {
         dismissTaskMutation.mutate(taskId);
       }
     });
@@ -84,7 +83,7 @@ const InstanceTile = (props: {
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
 
-  const isInQueue = () => Boolean(isPreparingState() && taskId !== undefined);
+  const isInQueue = () => Boolean(isPreparingState() && taskId === undefined);
 
   return (
     <div>

@@ -27,6 +27,8 @@ const Modpack = (props: Props) => {
     }
   );
 
+  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
@@ -38,6 +40,7 @@ const Modpack = (props: Props) => {
       },
     }
   );
+
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
@@ -106,6 +109,7 @@ const Modpack = (props: Props) => {
             rounded
             value="1.16.2"
             onClick={() => {
+              loadIconMutation.mutate(props.modpack.logo.url);
               createInstanceMutation.mutate({
                 group: defaultGroup.data || 1,
                 use_loaded_icon: true,

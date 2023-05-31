@@ -130,8 +130,9 @@ const Mods = () => {
               />
             </div>
           </div>
-          <div>
-            {instanceDetails.data?.mods.length}
+          <div class="flex gap-1">
+            <span>{instanceDetails.data?.mods.length}</span>
+
             <Trans
               key="instance.mods"
               options={{
