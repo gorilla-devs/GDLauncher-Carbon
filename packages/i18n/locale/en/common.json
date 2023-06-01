@@ -71,6 +71,7 @@
   "instance.play": "Play",
   "instance.notes": "notes",
   "instance.no_mods_text": "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+  "instance.no_instances_text": "At the moment there are not instances. Add one to start playing!",
   "instance.add_pack": "+ Add pack",
   "instance.sort_by": "Sort by:",
   "instance.sort_by_asc": "A to Z",

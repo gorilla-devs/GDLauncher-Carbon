@@ -155,7 +155,7 @@ const Dropdown = (props: Props) => {
         <Portal>
           <ul
             ref={setMenuRef}
-            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 w-full z-100 min-w-32 max-w-fit"
+            class="absolute max-h-40 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
             onMouseOut={() => {
               setFocusIn(false);
             }}
@@ -171,6 +171,7 @@ const Dropdown = (props: Props) => {
               // "bottom-auto": props.placement === "top" || !props.placement,
             }}
             style={{
+              width: buttonRef()?.offsetWidth + "px" || "auto",
               top: `${position.y ?? 0}px`,
               left: `${position.x ?? 0}px`,
             }}

@@ -83,10 +83,10 @@ const Home = () => {
               <img src={glassBlock} class="w-16 h-16" />
               <p class="text-darkSlate-50 max-w-100 text-center">
                 <Trans
-                  key="instance.no_mods_text"
+                  key="instance.no_instances_text"
                   options={{
                     defaultValue:
-                      "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                      "At the moment there are not instances. Add one to start playing!",
                   }}
                 />
               </p>
