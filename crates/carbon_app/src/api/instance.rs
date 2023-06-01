@@ -235,8 +235,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(super::vtask::TaskId::from(task))
         }
 
-        mutation OPEN_INSTANCE_FOLDER[app, id: InstanceId] {
-            app.instance_manager().open_folder(id.into()).await
+        mutation OPEN_INSTANCE_FOLDER[app, folder: OpenInstanceFolder] {
+            app.instance_manager().open_folder(
+                folder.instance_id.into(),
+                folder.folder.into(),
+            )
+            .await
         }
     }
 }
@@ -575,6 +579,27 @@ struct InstanceDetails {
     mods: Vec<Mod>,
 }
 
+#[derive(Type, Deserialize)]
+struct OpenInstanceFolder {
+    instance_id: InstanceId,
+    folder: InstanceFolder,
+}
+
+#[derive(Type, Deserialize)]
+enum InstanceFolder {
+    Root,
+    Data,
+    Mods,
+    Configs,
+    Screenshots,
+    Saves,
+    Logs,
+    CrashReports,
+    ResourcePacks,
+    TexturePacks,
+    ShaderPacks,
+}
+
 #[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
     type_: ModLoaderType,
@@ -882,6 +907,24 @@ impl From<domain::GameLogEntry> for GameLogEntry {
             id: value.id.into(),
             instance_id: value.instance_id.into(),
             active: value.active,
+        }
+    }
+}
+
+impl From<InstanceFolder> for domain::InstanceFolder {
+    fn from(value: InstanceFolder) -> Self {
+        match value {
+            InstanceFolder::Root => Self::Root,
+            InstanceFolder::Data => Self::Data,
+            InstanceFolder::Mods => Self::Mods,
+            InstanceFolder::Configs => Self::Configs,
+            InstanceFolder::Screenshots => Self::Screenshots,
+            InstanceFolder::Saves => Self::Saves,
+            InstanceFolder::Logs => Self::Logs,
+            InstanceFolder::CrashReports => Self::CrashReports,
+            InstanceFolder::ResourcePacks => Self::ResourcePacks,
+            InstanceFolder::TexturePacks => Self::TexturePacks,
+            InstanceFolder::ShaderPacks => Self::ShaderPacks,
         }
     }
 }

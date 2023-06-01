@@ -29,7 +29,7 @@ use self::run::PersistenceManager;
 
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceId};
+use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
 pub mod log;
@@ -1057,7 +1057,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn open_folder(self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn open_folder(
+        self,
+        instance_id: InstanceId,
+        folder: InstanceFolder,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -1068,8 +1072,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_instances()
-            .to_path()
-            .join(&instance.shortpath as &str);
+            .get_instance_path(&instance.shortpath);
+
+        let path = match folder {
+            InstanceFolder::Root => path.get_root().to_path_buf(),
+            InstanceFolder::Data => path.get_data_path().to_path_buf(),
+            InstanceFolder::Mods => path.get_mods_path().to_path_buf(),
+            InstanceFolder::Configs => path.get_config_path().to_path_buf(),
+            InstanceFolder::Screenshots => path.get_screenshots_path().to_path_buf(),
+            InstanceFolder::Saves => path.get_saves_path().to_path_buf(),
+            InstanceFolder::Logs => path.get_logs_path().to_path_buf(),
+            InstanceFolder::CrashReports => path.get_crash_reports_path().to_path_buf(),
+            InstanceFolder::ResourcePacks => path.get_resourcepacks_path().to_path_buf(),
+            InstanceFolder::TexturePacks => path.get_texturepacks_path().to_path_buf(),
+            InstanceFolder::ShaderPacks => path.get_shaderpacks_path().to_path_buf(),
+        };
+
+        if !path.is_dir() {
+            bail!("folder does not exist");
+        }
 
         opener::open(path)?;
 

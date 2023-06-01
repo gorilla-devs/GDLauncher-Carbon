@@ -71,3 +71,18 @@ pub struct ModFileMetadata {
     pub description: Option<String>,
     pub authors: Option<String>,
 }
+
+#[derive(Debug, Copy, Clone)]
+pub enum InstanceFolder {
+    Root,
+    Data,
+    Mods,
+    Configs,
+    Screenshots,
+    Saves,
+    Logs,
+    CrashReports,
+    ResourcePacks,
+    TexturePacks,
+    ShaderPacks,
+}
