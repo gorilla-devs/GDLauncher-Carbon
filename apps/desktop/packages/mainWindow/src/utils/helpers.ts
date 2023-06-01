@@ -138,3 +138,18 @@ export const truncateText = (text: string, maxLength: number): string => {
 
   return text.slice(0, maxLength) + "...";
 };
+
+export const generateSequence = (
+  min: number,
+  max: number
+): Record<number, string> => {
+  let current = min;
+  const sequence: Record<number, string> = {};
+
+  while (current <= max) {
+    sequence[current] = `${current} MB`;
+    current *= 2;
+  }
+
+  return sequence;
+};

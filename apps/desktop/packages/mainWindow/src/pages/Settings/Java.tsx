@@ -15,6 +15,7 @@ import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
+import { generateSequence } from "@/utils/helpers";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -31,21 +32,6 @@ const Java = () => {
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
-
-  const generateSequence = (
-    min: number,
-    max: number
-  ): Record<number, string> => {
-    let current = min;
-    const sequence: Record<number, string> = {};
-
-    while (current <= max) {
-      sequence[current] = `${current} MB`;
-      current *= 2;
-    }
-
-    return sequence;
-  };
 
   const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
 

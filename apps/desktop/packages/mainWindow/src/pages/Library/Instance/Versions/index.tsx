@@ -6,12 +6,7 @@ import glassBlock from "/assets/images/icons/glassBlock.png";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../instance.data";
 import { rspc } from "@/utils/rspcClient";
-import {
-  FEFile,
-  FEFileIndex,
-  InstanceDetails,
-  Modpack,
-} from "@gd/core_module/bindings";
+import { FEFile, InstanceDetails, Modpack } from "@gd/core_module/bindings";
 
 const NoVersions = () => {
   return (
@@ -20,18 +15,18 @@ const NoVersions = () => {
         <img src={glassBlock} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
-            key="instance.no_resource_packs_text"
+            key="modpack.no_versions_text"
             options={{
               defaultValue:
-                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                "At the moment this modpack does not contain any other versions",
             }}
           />
         </p>
         <Button type="outline" size="medium">
           <Trans
-            key="instance.add_pack"
+            key="modpack.no_versions"
             options={{
-              defaultValue: "+ Add pack",
+              defaultValue: "No versions",
             }}
           />
         </Button>
@@ -60,7 +55,6 @@ const Versions = () => {
     ]);
 
     createEffect(() => {
-      console.log("TEST", instanceDetails.data?.data);
       setMainFileId(instanceDetails.data?.data.mainFileId);
       if (instanceDetails.data?.data.latestFilesIndexes) {
         instanceDetails.data?.data.latestFiles.forEach((latestFile) => {

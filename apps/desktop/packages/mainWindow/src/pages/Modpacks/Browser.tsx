@@ -239,7 +239,7 @@ export default function Browser() {
             }
           >
             <div
-              class="w-full h-full scrollbar-hide overflow-auto"
+              class="w-full h-full overflow-y-auto overflow-x-hidden"
               ref={(el) => {
                 infiniteQuery?.setParentRef(el);
               }}
