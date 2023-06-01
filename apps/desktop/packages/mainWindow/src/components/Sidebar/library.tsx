@@ -125,7 +125,6 @@ const Sidebar = () => {
               >
                 <For each={values}>
                   {(instance) => (
-                    //TODO: SKELETON
                     <Suspense
                       fallback={
                         isSidebarOpened() ? (

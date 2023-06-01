@@ -29,6 +29,7 @@ type Props = {
   downloaded?: number;
   totalDownload?: number;
   isRunning?: boolean;
+  isPreparing?: boolean;
   isInQueue?: boolean;
   subTasks?: Subtask[] | undefined;
   failError?: string;
@@ -105,7 +106,10 @@ const Tile = (props: Props) => {
   ]);
 
   const handleOpenFolder = () => {
-    openFolderMutation.mutate(props.instanceId);
+    openFolderMutation.mutate({
+      instance_id: props.instanceId,
+      folder: "Root",
+    });
   };
 
   const handlePlay = () => {
@@ -159,6 +163,7 @@ const Tile = (props: Props) => {
   };
 
   const handlePlayClick = () => {
+    if (props.isPreparing) return;
     if (props.isRunning) {
       killInstanceMutation.mutate(props.instanceId);
     } else launchInstanceMutation.mutate(props.instanceId);
@@ -385,7 +390,7 @@ const Tile = (props: Props) => {
             />
             <div class="flex flex-col">
               <h4
-                class="m-0 text-ellipsis max-w-40"
+                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
                 classList={{
                   "text-darkSlate-50": mergedProps.isLoading,
                   "text-white": !mergedProps.isLoading,

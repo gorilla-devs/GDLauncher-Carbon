@@ -63,7 +63,7 @@ const Tab = (_props: Props) => {
     <div
       classList={{
         "w-full": tabsContext?.variant === "block",
-        "min-w-32": tabsContext?.variant === "traditional",
+        "w-auto": tabsContext?.variant === "traditional",
         "cursor-pointer": !props.noPointer,
       }}
       ref={(el) => {

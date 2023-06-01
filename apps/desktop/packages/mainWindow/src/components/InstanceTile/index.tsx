@@ -114,6 +114,7 @@ const InstanceTile = (props: {
         invalid={!isListInstanceValid(props.instance.status)}
         failError={failError()}
         isRunning={!!isRunning()}
+        isPreparing={isPreparingState() !== undefined}
         isInQueue={isInQueue()}
         variant={type()}
         img={image()}

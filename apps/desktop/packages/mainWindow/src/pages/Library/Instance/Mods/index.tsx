@@ -126,7 +126,10 @@ const Mods = () => {
             <div
               class="flex items-center gap-2 cursor-pointer transition duration-100 ease-in-out hover:text-white"
               onClick={() => {
-                openFolderMutation.mutate(parseInt(params.id, 10));
+                openFolderMutation.mutate({
+                  folder: "Mods",
+                  instance_id: parseInt(params.id, 10),
+                });
               }}
             >
               <span class="text-2xl i-ri:folder-open-fill" />

@@ -82,7 +82,7 @@ const Dropdown = (props: Props) => {
   };
 
   const position = useFloating(buttonRef, menuRef, {
-    placement: "bottom",
+    placement: "bottom-end",
     middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: autoUpdate,
   });
