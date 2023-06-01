@@ -11,7 +11,7 @@ use tokio::{io::AsyncReadExt, sync::mpsc};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
-use crate::domain::instance::{self as domain, GameLogId};
+use crate::domain::instance::{self as domain, GameLogId, InstanceSettingsUpdate};
 use crate::managers::instance::log::EntryType;
 use chrono::{DateTime, Utc};
 use tokio::sync::Semaphore;
@@ -86,13 +86,18 @@ impl ManagerRef<'_, InstanceManager> {
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
 
-        let extra_java_args = self
-            .app
-            .settings_manager()
-            .get()
-            .await
-            .map(|c| c.java_custom_args)
-            .unwrap_or(String::new())
+        let global_java_args = match config.game_configuration.global_java_args {
+            true => self
+                .app
+                .settings_manager()
+                .get()
+                .await
+                .map(|c| c.java_custom_args)
+                .unwrap_or(String::new()),
+            false => String::new(),
+        };
+
+        let extra_java_args = global_java_args
             + " "
             + config
                 .game_configuration
@@ -250,14 +255,17 @@ impl ManagerRef<'_, InstanceManager> {
                         version = Some(v.clone());
 
                         app.instance_manager()
-                            .update_instance(
+                            .update_instance(InstanceSettingsUpdate {
                                 instance_id,
-                                None,
-                                None,
-                                Some(GameVersion::Standard(v)),
-                                None,
-                                None,
-                            )
+                                version: Some(v.release.clone()),
+                                modloader: Some(v.modloaders.iter().next().cloned()),
+                                name: None,
+                                use_loaded_icon: None,
+                                notes: None,
+                                global_java_args: None,
+                                extra_java_args: None,
+                                memory: None,
+                            })
                             .await?;
                     }
                 }

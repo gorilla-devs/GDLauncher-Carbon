@@ -24,12 +24,27 @@ pub struct InstanceDetails {
     pub name: String,
     pub version: Option<String>,
     pub modpack: Option<info::Modpack>,
+    pub global_java_args: bool,
+    pub extra_java_args: Option<String>,
+    pub memory: Option<(u16, u16)>,
     pub last_played: DateTime<Utc>,
     pub seconds_played: u32,
-    pub modloaders: Vec<ModLoader>,
+    pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
     pub mods: Vec<Mod>,
+}
+
+pub struct InstanceSettingsUpdate {
+    pub instance_id: InstanceId,
+    pub name: Option<String>,
+    pub use_loaded_icon: Option<bool>,
+    pub notes: Option<String>,
+    pub version: Option<String>,
+    pub modloader: Option<Option<info::ModLoader>>,
+    pub global_java_args: Option<bool>,
+    pub extra_java_args: Option<Option<String>>,
+    pub memory: Option<Option<(u16, u16)>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -44,22 +59,11 @@ pub enum LaunchState {
     },
 }
 
-pub struct ModLoader {
-    pub type_: ModLoaderType,
-    pub version: String,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum ModLoaderType {
-    Forge,
-    Fabirc,
-}
-
 pub struct Mod {
     pub id: String,
     pub filename: String,
     pub enabled: bool,
-    pub modloader: ModLoaderType,
+    pub modloader: info::ModLoaderType,
     pub metadata: ModFileMetadata,
 }
 

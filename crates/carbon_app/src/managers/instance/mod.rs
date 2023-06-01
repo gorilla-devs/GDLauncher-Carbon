@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
@@ -190,7 +191,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                             id,
                                             filename: filename.to_owned(),
                                             enabled: !is_jar_disabled,
-                                            modloader: domain::ModLoaderType::Forge,
+                                            modloader: info::ModLoaderType::Forge,
                                             metadata,
                                         }
                                     });
@@ -939,19 +940,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     pub async fn update_instance(
         self,
-        instance_id: InstanceId,
-        name: Option<String>,
-        use_loaded_icon: Option<bool>, // version not yet supported due to mod version concerns
-        version: Option<GameVersion>,
-        notes: Option<String>,
-        memory: Option<Option<(u16, u16)>>,
+        update: domain::InstanceSettingsUpdate,
     ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
         let mut instances = self.instances.write().await;
         let mut instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
+            .get_mut(&update.instance_id)
+            .ok_or(InvalidInstanceIdError(update.instance_id))?;
 
         let Instance { shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
             bail!("update_instance called on invalid instance")
@@ -967,7 +963,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let mut info = data.config.clone();
 
-        if let Some(use_loaded_icon) = use_loaded_icon {
+        if let Some(use_loaded_icon) = update.use_loaded_icon {
             let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
                 (true, Some((ipath, data))) => {
                     tokio::fs::write(path.join(&ipath), data)
@@ -982,19 +978,54 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.icon = icon;
         }
 
-        if let Some(name) = name.clone() {
+        if let Some(name) = update.name.clone() {
             info.name = name;
         }
 
-        if let Some(version) = version {
-            info.game_configuration.version = Some(version);
-        }
-
-        if let Some(notes) = notes {
+        if let Some(notes) = update.notes {
             info.notes = notes;
         }
 
-        if let Some(memory) = memory {
+        if let Some(version) = update.version {
+            info.game_configuration.version =
+                Some(info::GameVersion::Standard(info::StandardVersion {
+                    release: version,
+                    modloaders: match &info.game_configuration.version {
+                        Some(info::GameVersion::Standard(info::StandardVersion {
+                            modloaders,
+                            ..
+                        })) => modloaders.clone(),
+                        _ => HashSet::new(),
+                    },
+                }));
+        }
+
+        if let Some(modloader) = update.modloader {
+            info.game_configuration.version =
+                Some(info::GameVersion::Standard(info::StandardVersion {
+                    release: match &info.game_configuration.version {
+                        Some(info::GameVersion::Standard(info::StandardVersion {
+                            release,
+                            ..
+                        })) => release.clone(),
+                        _ => bail!("custom versions are not yet supported"),
+                    },
+                    modloaders: match modloader {
+                        Some(modloader) => HashSet::from([modloader]),
+                        None => HashSet::new(),
+                    },
+                }));
+        }
+
+        if let Some(global_java_args) = update.global_java_args {
+            info.game_configuration.global_java_args = global_java_args;
+        }
+
+        if let Some(extra_java_args) = update.extra_java_args {
+            info.game_configuration.extra_java_args = extra_java_args;
+        }
+
+        if let Some(memory) = update.memory {
             info.game_configuration.memory = memory;
         }
 
@@ -1002,7 +1033,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         tokio::fs::write(path.join("instance.json"), json).await?;
         data.config = info;
 
-        if let Some(name) = name {
+        if let Some(name) = update.name {
             let _lock = self.path_lock.lock().await;
             let (new_shortpath, new_path) = self.next_folder(&name).await?;
             tokio::fs::rename(path, new_path).await?;
@@ -1012,7 +1043,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .prisma_client
                 .instance()
                 .update(
-                    UniqueWhereParam::IdEquals(*instance_id),
+                    UniqueWhereParam::IdEquals(*update.instance_id),
                     vec![
                         SetParam::SetName(name),
                         SetParam::SetShortpath(new_shortpath),
@@ -1025,7 +1056,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         Ok(())
     }
@@ -1187,20 +1218,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 None => None,
             },
             modpack: instance.config.modpack.clone(),
+            global_java_args: instance.config.game_configuration.global_java_args,
+            extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
+            memory: instance.config.game_configuration.memory,
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
             modloaders: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => version
-                    .modloaders
-                    .iter()
-                    .map(|loader| domain::ModLoader {
-                        version: loader.version.clone(),
-                        type_: match loader.type_ {
-                            info::ModLoaderType::Forge => domain::ModLoaderType::Forge,
-                            info::ModLoaderType::Fabric => domain::ModLoaderType::Fabirc,
-                        },
-                    })
-                    .collect::<Vec<_>>(),
+                Some(info::GameVersion::Standard(version)) => {
+                    version.modloaders.iter().map(Clone::clone).collect()
+                }
                 Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
                 None => Vec::new(),
             },
@@ -1415,7 +1441,7 @@ pub struct Mod {
     id: String,
     filename: OsString,
     enabled: bool,
-    modloader: domain::ModLoaderType,
+    modloader: info::ModLoaderType,
     metadata: domain::ModFileMetadata,
 }
 
@@ -1441,7 +1467,7 @@ mod test {
 
     use crate::{
         db::{self, read_filters::IntFilter, PrismaClient},
-        domain::instance::info,
+        domain::instance::{info, InstanceSettingsUpdate},
         managers::instance::{
             GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
             ValidListInstance,
@@ -1868,14 +1894,17 @@ mod test {
 
         // update
         app.instance_manager()
-            .update_instance(
+            .update_instance(InstanceSettingsUpdate {
                 instance_id,
-                Some(String::from("test2")),
-                None,
-                None,
-                None,
-                None,
-            )
+                name: Some(String::from("test2")),
+                use_loaded_icon: None,
+                notes: None,
+                version: None,
+                modloader: None,
+                global_java_args: None,
+                extra_java_args: None,
+                memory: None,
+            })
             .await?;
 
         expected[0].instances[0].name = String::from("test2");

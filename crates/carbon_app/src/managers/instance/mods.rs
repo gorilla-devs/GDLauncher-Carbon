@@ -230,7 +230,7 @@ impl ManagerRef<'_, InstanceManager> {
                     id,
                     filename: OsString::from(file.file_name),
                     enabled: true,
-                    modloader: domain::ModLoaderType::Forge,
+                    modloader: domain::info::ModLoaderType::Forge,
                     metadata,
                 });
 
