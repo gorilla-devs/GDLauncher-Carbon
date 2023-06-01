@@ -125,15 +125,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
-                .update_instance(
-                    details.instance.into(),
-                    details.name.map(|x| x.inner()),
-                    details.use_loaded_icon.map(|x| x.inner()),
-                    None,
-                    details.notes.map(|x| x.inner()),
-                    details.memory.map(|x| x.inner())
-                        .map(|m| m.map(|(xms, xmx)| (xms, xmx))),
-                )
+                .update_instance(details.into())
                 .await
         }
 
@@ -472,7 +464,11 @@ struct UpdateInstance {
     name: Option<Set<String>>,
     use_loaded_icon: Option<Set<bool>>,
     notes: Option<Set<String>>,
-    memory: Option<Set<Option<(u16, u16)>>>,
+    version: Option<Set<String>>,
+    modloader: Option<Set<Option<ModLoader>>>,
+    global_java_args: Option<Set<bool>>,
+    extra_java_args: Option<Set<Option<String>>>,
+    memory: Option<Set<Option<MemoryRange>>>,
 }
 
 #[derive(Type, Deserialize)]
@@ -571,12 +567,21 @@ struct InstanceDetails {
     favorite: bool,
     version: Option<String>,
     modpack: Option<Modpack>,
+    global_java_args: bool,
+    extra_java_args: Option<String>,
+    memory: Option<MemoryRange>,
     last_played: DateTime<Utc>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
     mods: Vec<Mod>,
+}
+
+#[derive(Type, Serialize, Deserialize)]
+pub struct MemoryRange {
+    pub min_mb: u16,
+    pub max_mb: u16,
 }
 
 #[derive(Type, Deserialize)]
@@ -649,6 +654,9 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             name: value.name,
             version: value.version,
             modpack: value.modpack.map(Into::into),
+            global_java_args: value.global_java_args,
+            extra_java_args: value.extra_java_args,
+            memory: value.memory.map(Into::into),
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
@@ -667,8 +675,8 @@ impl From<domain::info::ModpackPlatform> for ModpackPlatform {
     }
 }
 
-impl From<domain::ModLoader> for ModLoader {
-    fn from(value: domain::ModLoader) -> Self {
+impl From<domain::info::ModLoader> for ModLoader {
+    fn from(value: domain::info::ModLoader) -> Self {
         Self {
             type_: value.type_.into(),
             version: value.version,
@@ -676,11 +684,13 @@ impl From<domain::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::ModLoaderType> for ModLoaderType {
-    fn from(value: domain::ModLoaderType) -> Self {
+impl From<domain::info::ModLoaderType> for ModLoaderType {
+    fn from(value: domain::info::ModLoaderType) -> Self {
+        use domain::info::ModLoaderType as domain;
+
         match value {
-            domain::ModLoaderType::Forge => Self::Forge,
-            domain::ModLoaderType::Fabirc => Self::Fabric,
+            domain::Forge => Self::Forge,
+            domain::Fabric => Self::Fabric,
         }
     }
 }
@@ -759,15 +769,6 @@ impl From<ModLoaderType> for domain::info::ModLoaderType {
         match value {
             ModLoaderType::Forge => Self::Forge,
             ModLoaderType::Fabric => Self::Fabric,
-        }
-    }
-}
-
-impl From<domain::info::ModLoaderType> for ModLoaderType {
-    fn from(value: domain::info::ModLoaderType) -> Self {
-        match value {
-            domain::info::ModLoaderType::Forge => Self::Forge,
-            domain::info::ModLoaderType::Fabric => Self::Fabric,
         }
     }
 }
@@ -925,6 +926,37 @@ impl From<InstanceFolder> for domain::InstanceFolder {
             InstanceFolder::ResourcePacks => Self::ResourcePacks,
             InstanceFolder::TexturePacks => Self::TexturePacks,
             InstanceFolder::ShaderPacks => Self::ShaderPacks,
+        }
+    }
+}
+
+impl From<(u16, u16)> for MemoryRange {
+    fn from(value: (u16, u16)) -> Self {
+        Self {
+            min_mb: value.0,
+            max_mb: value.1,
+        }
+    }
+}
+
+impl From<MemoryRange> for (u16, u16) {
+    fn from(value: MemoryRange) -> Self {
+        (value.min_mb, value.max_mb)
+    }
+}
+
+impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
+    fn from(value: UpdateInstance) -> Self {
+        Self {
+            instance_id: value.instance.into(),
+            name: value.name.map(|x| x.inner()),
+            use_loaded_icon: value.use_loaded_icon.map(|x| x.inner()),
+            notes: value.notes.map(|x| x.inner()),
+            version: value.version.map(|x| x.inner()),
+            modloader: value.modloader.map(|x| x.inner().map(Into::into)),
+            global_java_args: value.global_java_args.map(|x| x.inner()),
+            extra_java_args: value.extra_java_args.map(|x| x.inner()),
+            memory: value.memory.map(|x| x.inner().map(Into::into)),
         }
     }
 }
