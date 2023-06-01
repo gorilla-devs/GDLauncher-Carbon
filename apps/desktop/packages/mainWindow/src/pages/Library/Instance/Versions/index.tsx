@@ -1,92 +1,17 @@
 import { Button } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
 import Version from "./Version";
 import glassBlock from "/assets/images/icons/glassBlock.png";
-
-type VersionType = {
-  title: string;
-  mcversion: string;
-  modloader: string;
-  date: string;
-  stable: string;
-  isActive: boolean;
-};
-
-const versions: VersionType[] = [
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: true,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "beta",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "stable",
-    isActive: false,
-  },
-  {
-    title: "Mods1",
-    mcversion: "1.19.2",
-    modloader: "fabric",
-    date: "2023-01-31T09:20:53.513Z",
-    stable: "alpha",
-    isActive: false,
-  },
-];
+import { useRouteData } from "@solidjs/router";
+import fetchData from "../instance.data";
+import { rspc } from "@/utils/rspcClient";
+import {
+  FEFile,
+  FEFileIndex,
+  InstanceDetails,
+  Modpack,
+} from "@gd/core_module/bindings";
 
 const NoVersions = () => {
   return (
@@ -116,11 +41,47 @@ const NoVersions = () => {
 };
 
 const Versions = () => {
+  const [versions, setVersions] = createSignal<FEFile[]>([]);
+  const [mainFileId, setMainFileId] = createSignal<undefined | number>(
+    undefined
+  );
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const modId = () =>
+    ((routeData.instanceDetails.data as InstanceDetails).modpack as Modpack)
+      .Curseforge.project_id;
+
+  if (routeData.instanceDetails.data?.modpack?.Curseforge.project_id) {
+    const instanceDetails = rspc.createQuery(() => [
+      "modplatforms.curseforgeGetMod",
+      {
+        modId: modId(),
+      },
+    ]);
+
+    createEffect(() => {
+      console.log("TEST", instanceDetails.data?.data);
+      setMainFileId(instanceDetails.data?.data.mainFileId);
+      if (instanceDetails.data?.data.latestFilesIndexes) {
+        instanceDetails.data?.data.latestFiles.forEach((latestFile) => {
+          setVersions((prev) => [...prev, latestFile]);
+        });
+      }
+    });
+  }
+
   return (
     <div>
       <div class="h-full overflow-y-hidden">
-        <Show when={versions.length > 0} fallback={<NoVersions />}>
-          <For each={versions}>{(props) => <Version version={props} />}</For>
+        <Show
+          when={versions().length > 0 && mainFileId()}
+          fallback={<NoVersions />}
+        >
+          <For each={versions()}>
+            {(props) => (
+              <Version version={props} mainFileId={mainFileId() as number} />
+            )}
+          </For>
         </Show>
       </div>
     </div>

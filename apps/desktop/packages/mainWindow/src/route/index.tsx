@@ -47,9 +47,6 @@ export const routes: RouteDefinition[] = [
               {
                 path: "/mods",
                 component: lazy(() => import("@/pages/Library/Instance/Mods")),
-                data: () => {
-                  console.log("Fetching mods data...");
-                },
               },
               {
                 path: "/settings",

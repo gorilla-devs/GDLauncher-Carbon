@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
