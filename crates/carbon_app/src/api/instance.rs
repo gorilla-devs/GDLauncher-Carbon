@@ -461,13 +461,21 @@ struct CreateInstance {
 #[derive(Type, Deserialize)]
 struct UpdateInstance {
     instance: InstanceId,
+    #[specta(optional)]
     name: Option<Set<String>>,
+    #[specta(optional)]
     use_loaded_icon: Option<Set<bool>>,
+    #[specta(optional)]
     notes: Option<Set<String>>,
+    #[specta(optional)]
     version: Option<Set<String>>,
+    #[specta(optional)]
     modloader: Option<Set<Option<ModLoader>>>,
+    #[specta(optional)]
     global_java_args: Option<Set<bool>>,
+    #[specta(optional)]
     extra_java_args: Option<Set<Option<String>>>,
+    #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
 }
 
