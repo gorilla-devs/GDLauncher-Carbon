@@ -346,7 +346,7 @@ const Tile = (props: Props) => {
             <div
               class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5"
               classList={{
-                "group-hover:flex": !props.invalid || !props.failError,
+                "group-hover:flex": !props.invalid && !props.failError,
               }}
             >
               <div
