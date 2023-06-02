@@ -140,6 +140,28 @@ const Modpack = (props: Props) => {
                   },
                 });
               }}
+              onChange={(val) => {
+                loadIconMutation.mutate(props.modpack.logo.url);
+                const file = props.modpack.latestFilesIndexes.find(
+                  (file) => file.gameVersion === val
+                );
+                if (file) {
+                  createInstanceMutation.mutate({
+                    group: defaultGroup.data || 1,
+                    use_loaded_icon: true,
+                    notes: "",
+                    name: props.modpack.name,
+                    version: {
+                      Modpack: {
+                        Curseforge: {
+                          file_id: file.fileId,
+                          project_id: props.modpack.id,
+                        },
+                      },
+                    },
+                  });
+                }
+              }}
             >
               <Show when={loading()}>
                 <Spinner />

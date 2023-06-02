@@ -262,20 +262,6 @@ const Tile = (props: Props) => {
               <Show when={props.isInQueue}>
                 <Spinner />
               </Show>
-              {/* <div
-                class="absolute duration-100 ease-in-out hidden transition-all top-2 right-2"
-                classList={{
-                  "group-hover:flex":
-                    !props.isLoading && !props.isInQueue && !props.invalid,
-                }}
-              >
-                <div class="flex justify-center items-center cursor-pointer rounded-full h-7 w-7 bg-darkSlate-500">
-                  <div
-                    class="text-white i-ri:more-2-fill text-lg"
-                 
-                  />
-                </div>
-              </div> */}
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
                   class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
@@ -288,8 +274,8 @@ const Tile = (props: Props) => {
             <h4
               class="text-ellipsis overflow-hidden max-w-38 whitespace-nowrap mt-2 mb-1"
               classList={{
-                "text-white": !props.isLoading,
-                "text-lightGray-900": props.isLoading,
+                "text-white": !props.isLoading && !props.isInQueue,
+                "text-lightGray-900": props.isLoading || props.isInQueue,
               }}
             >
               {props.title}

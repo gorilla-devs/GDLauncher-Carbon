@@ -119,6 +119,8 @@ const Dropdown = (props: Props) => {
             "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300":
               props.btnDropdown,
             "group px-4": !props.btnDropdown,
+            "bg-primary-500 duration-100": props.btnDropdown,
+            "hover:bg-primary-300": props.btnDropdown && !props.disabled,
           }}
         >
           <Show when={!props.btnDropdown}>
@@ -130,7 +132,8 @@ const Dropdown = (props: Props) => {
                 "text-white": !!props.error,
                 "text-darkSlate-50 hover:text-white group-hover:text-white":
                   !props.disabled && !props.error && !props.textColorClass,
-                "text-darkSlate-500": props.disabled && !props.textColorClass,
+                "text-darkSlate-500":
+                  props.disabled && !props.textColorClass && !props.btnDropdown,
               }}
             >
               {selectedValue()}
@@ -146,7 +149,8 @@ const Dropdown = (props: Props) => {
                 !props.textColorClass,
               "text-white":
                 !!props.error || (props.btnDropdown && !props.textColorClass),
-              "text-darkSlate-500": props.disabled,
+              "text-darkSlate-500": props.disabled && !props.btnDropdown,
+              "text-primary-200": props.disabled && props.btnDropdown,
               "rotate-0": menuOpened(),
               "rotate-180": !menuOpened(),
             }}
@@ -220,7 +224,6 @@ const DropDownButton = (props: DropDownButtonProps) => {
         class="rounded-l-0 h-11 pl-0"
         options={props.options}
         rounded
-        bgColorClass="bg-primary-500 hover:bg-primary-300 duration-100"
         value={props.value}
         onChange={(option) => handleChange(option)}
       />

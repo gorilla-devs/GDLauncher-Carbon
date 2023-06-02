@@ -120,12 +120,16 @@ const Mod = (props: Props) => {
                   });
                 }}
                 onChange={(val) => {
-                  console.log("OnChange", val, props.mod);
-                  // installModMutation.mutate({
-                  //   file_id: props.mod.mainFileId,
-                  //   instance_id: parseInt(lastInstanceOpened(), 10),
-                  //   project_id: props.mod.id,
-                  // });
+                  const file = props.mod.latestFilesIndexes.find(
+                    (file) => file.gameVersion === val
+                  );
+                  if (file) {
+                    installModMutation.mutate({
+                      file_id: file?.fileId,
+                      instance_id: parseInt(lastInstanceOpened(), 10),
+                      project_id: props.mod.id,
+                    });
+                  }
                 }}
               >
                 <Show when={loading()}>

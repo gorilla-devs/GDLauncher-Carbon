@@ -167,216 +167,218 @@ const InstanceCreation = (props: ModalProps) => {
       overflowHiddenDisabled={true}
       noPadding={true}
     >
-      <div class="flex flex-col justify-between overflow-y-scroll max-h-128 w-120">
-        <div class="flex flex-col justify-between gap-4 p-5">
-          <div
-            class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
-            style={{
-              "background-image": `url("${bgPreview()}")`,
-            }}
-            onClick={() => {
-              if (bgPreview()) return;
-              window
-                .openFileDialog([
-                  { name: "Image", extensions: ["png", "jpg", "jpeg"] },
-                ])
-                .then((files) => {
-                  if (!files.filePaths[0]) return;
-                  fetch(
-                    `http://localhost:${port}/instance/loadIcon?path=${files.filePaths[0]}`
-                  ).then(async (img) => {
-                    const blob = await img.blob();
-                    const b64 = (await blobToBase64(blob)) as string;
+      <div class="flex flex-col justify-between overflow-y-scroll w-120 scrollbar-hide h-136">
+        <div class="flex flex-col justify-between gap-4 p-5 h-full">
+          <span class="flex flex-col justify-between gap-4">
+            <div
+              class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
+              style={{
+                "background-image": `url("${bgPreview()}")`,
+              }}
+              onClick={() => {
+                if (bgPreview()) return;
+                window
+                  .openFileDialog([
+                    { name: "Image", extensions: ["png", "jpg", "jpeg"] },
+                  ])
+                  .then((files) => {
+                    if (!files.filePaths[0]) return;
+                    fetch(
+                      `http://localhost:${port}/instance/loadIcon?path=${files.filePaths[0]}`
+                    ).then(async (img) => {
+                      const blob = await img.blob();
+                      const b64 = (await blobToBase64(blob)) as string;
 
-                    setBgPreview(
-                      `data:image/png;base64, ${b64.substring(
-                        b64.indexOf(",") + 1
-                      )}`
-                    );
+                      setBgPreview(
+                        `data:image/png;base64, ${b64.substring(
+                          b64.indexOf(",") + 1
+                        )}`
+                      );
+                    });
                   });
-                });
-            }}
-          >
-            <Switch>
-              <Match when={!bgPreview()}>
-                <h3 class="text-center">
-                  <Trans
-                    key="instance.upload_image"
-                    options={{
-                      defaultValue: "Upload image",
-                    }}
-                  />
-                </h3>
-              </Match>
-              <Match when={bgPreview()}>
-                <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
-                  <div
-                    class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setBgPreview(null);
-                    }}
-                  />
-                </div>
-              </Match>
-            </Switch>
-          </div>
-          <div>
-            <h5 class="mt-0 mb-2">
-              <Trans
-                key="instance.instance_name"
-                options={{
-                  defaultValue: "Instance name",
-                }}
-              />
-            </h5>
-            <Input
-              required
-              placeholder="New instance"
-              inputColor="bg-darkSlate-800"
-              onInput={(e) => {
-                setTitle(e.currentTarget.value);
               }}
-              value={title()}
-              error={
-                error() &&
-                !title() &&
-                (t("error.missing_field_title") as string)
-              }
-            />
-          </div>
-          <div>
-            <h5 class="mt-0 mb-2">
-              <Trans
-                key="instance.instance_mc_version"
-                options={{
-                  defaultValue: "Minecraft Version",
-                }}
-              />
-            </h5>
-            <div>
-              <Show when={mappedMcVersions().length > 0}>
-                <Dropdown
-                  options={mappedMcVersions()}
-                  bgColorClass="bg-darkSlate-800"
-                  containerClass="w-full"
-                  class="w-full"
-                  placement="bottom"
-                  onChange={(loader) => {
-                    setMcVersion(loader.key as string);
-                  }}
-                />
-              </Show>
-              <div class="flex gap-4 mt-2">
-                <div class="flex gap-2 items-center">
-                  <Checkbox
-                    checked={snapshotVersionFilter()}
-                    onChange={(e) => setSnapshotVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
+            >
+              <Switch>
+                <Match when={!bgPreview()}>
+                  <h3 class="text-center">
                     <Trans
-                      key="instance.instance_version_snapshot"
+                      key="instance.upload_image"
                       options={{
-                        defaultValue: "Snapshot",
+                        defaultValue: "Upload image",
                       }}
                     />
-                  </h6>
-                </div>
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={releaseVersionFilter()}
-                    onChange={(e) => setReleaseVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans
-                      key="instance.instance_version_release"
-                      options={{
-                        defaultValue: "Release",
+                  </h3>
+                </Match>
+                <Match when={bgPreview()}>
+                  <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
+                    <div
+                      class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setBgPreview(null);
                       }}
                     />
-                  </h6>
-                </div>
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={oldAlphaVersionFilter()}
-                    onChange={(e) => setOldAlphaVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans
-                      key="instance.instance_version_old_alphas"
-                      options={{
-                        defaultValue: "Old alpha",
-                      }}
-                    />
-                  </h6>
-                </div>
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={oldBetaVersionFilter()}
-                    onChange={(e) => setOldBetaVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans
-                      key="instance.instance_version_old_beta"
-                      options={{
-                        defaultValue: "Old beta",
-                      }}
-                    />
-                  </h6>
-                </div>
-              </div>
+                  </div>
+                </Match>
+              </Switch>
             </div>
-          </div>
-          <div>
-            <h5 class="mt-0 mb-2">
-              <Trans
-                key="instance.instance_loader"
-                options={{
-                  defaultValue: "Loader",
-                }}
-              />
-            </h5>
-            <Dropdown
-              options={[
-                { label: t("instance.vanilla"), key: "Vanilla" },
-                { label: t("instance.forge"), key: "Forge" },
-                // { label: t("instance.fabric"), key: "Fabric" },
-              ]}
-              bgColorClass="bg-darkSlate-800"
-              containerClass="w-full"
-              class="w-full"
-              value="vanilla"
-              onChange={(loader) => {
-                if (loader.key !== "Vanilla") {
-                  setLoader(loader.key as ModLoaderType);
-                }
-              }}
-            />
-          </div>
-          <Show when={loaderVersions() && loader() === "Forge"}>
             <div>
               <h5 class="mt-0 mb-2">
                 <Trans
-                  key="instance.instance_loader_version"
+                  key="instance.instance_name"
                   options={{
-                    defaultValue: "Loader version",
+                    defaultValue: "Instance name",
+                  }}
+                />
+              </h5>
+              <Input
+                required
+                placeholder="New instance"
+                inputColor="bg-darkSlate-800"
+                onInput={(e) => {
+                  setTitle(e.currentTarget.value);
+                }}
+                value={title()}
+                error={
+                  error() &&
+                  !title() &&
+                  (t("error.missing_field_title") as string)
+                }
+              />
+            </div>
+            <div>
+              <h5 class="mt-0 mb-2">
+                <Trans
+                  key="instance.instance_mc_version"
+                  options={{
+                    defaultValue: "Minecraft Version",
+                  }}
+                />
+              </h5>
+              <div>
+                <Show when={mappedMcVersions().length > 0}>
+                  <Dropdown
+                    options={mappedMcVersions()}
+                    bgColorClass="bg-darkSlate-800"
+                    containerClass="w-full"
+                    class="w-full"
+                    placement="bottom"
+                    onChange={(loader) => {
+                      setMcVersion(loader.key as string);
+                    }}
+                  />
+                </Show>
+                <div class="flex gap-4 mt-2">
+                  <div class="flex gap-2 items-center">
+                    <Checkbox
+                      checked={snapshotVersionFilter()}
+                      onChange={(e) => setSnapshotVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_snapshot"
+                        options={{
+                          defaultValue: "Snapshot",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={releaseVersionFilter()}
+                      onChange={(e) => setReleaseVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_release"
+                        options={{
+                          defaultValue: "Release",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={oldAlphaVersionFilter()}
+                      onChange={(e) => setOldAlphaVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_old_alphas"
+                        options={{
+                          defaultValue: "Old alpha",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={oldBetaVersionFilter()}
+                      onChange={(e) => setOldBetaVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_old_beta"
+                        options={{
+                          defaultValue: "Old beta",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h5 class="mt-0 mb-2">
+                <Trans
+                  key="instance.instance_loader"
+                  options={{
+                    defaultValue: "Loader",
                   }}
                 />
               </h5>
               <Dropdown
-                options={loaderVersions() as MappedVersion[]}
+                options={[
+                  { label: t("instance.vanilla"), key: "Vanilla" },
+                  { label: t("instance.forge"), key: "Forge" },
+                  // { label: t("instance.fabric"), key: "Fabric" },
+                ]}
                 bgColorClass="bg-darkSlate-800"
                 containerClass="w-full"
                 class="w-full"
-                disabled={!loaderVersions()}
-                value={loaderVersions()?.[0]?.key}
-                placement="bottom"
+                value="vanilla"
                 onChange={(loader) => {
-                  setLoaderVersion(loader.key as string);
+                  if (loader.key !== "Vanilla") {
+                    setLoader(loader.key as ModLoaderType);
+                  }
                 }}
               />
             </div>
-          </Show>
+            <Show when={loaderVersions() && loader() === "Forge"}>
+              <div>
+                <h5 class="mt-0 mb-2">
+                  <Trans
+                    key="instance.instance_loader_version"
+                    options={{
+                      defaultValue: "Loader version",
+                    }}
+                  />
+                </h5>
+                <Dropdown
+                  options={loaderVersions() as MappedVersion[]}
+                  bgColorClass="bg-darkSlate-800"
+                  containerClass="w-full"
+                  class="w-full"
+                  disabled={!loaderVersions()}
+                  value={loaderVersions()?.[0]?.key}
+                  placement="bottom"
+                  onChange={(loader) => {
+                    setLoaderVersion(loader.key as string);
+                  }}
+                />
+              </div>
+            </Show>
+          </span>
           <div class="flex w-full justify-between">
             <Button
               type="secondary"

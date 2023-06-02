@@ -72,6 +72,8 @@ const InstanceTile = (props: {
           setIsLoading(true);
         } else if (isProgressFailed(task.data.progress)) {
           setIsLoading(false);
+        } else {
+          setIsLoading(false);
         }
       }
     });
@@ -101,8 +103,6 @@ const InstanceTile = (props: {
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
 
-  const isInQueue = () => Boolean(isPreparingState() && taskId === undefined);
-
   return (
     <div>
       <Tile
@@ -115,7 +115,7 @@ const InstanceTile = (props: {
         failError={failError()}
         isRunning={!!isRunning()}
         isPreparing={isPreparingState() !== undefined}
-        isInQueue={isInQueue()}
+        isInQueue={isPreparingState() !== undefined && !isLoading()}
         variant={type()}
         img={image()}
         selected={props.selected}
