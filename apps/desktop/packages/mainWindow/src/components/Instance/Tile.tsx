@@ -204,9 +204,12 @@ const Tile = (props: Props) => {
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
               </Show>
+
               <div
-                class="absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden"
+                class="flex justify-center items-center rounded-full cursor-pointer h-12 w-12 absolute ease-in-out duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden scale-0 group-hover:scale-100 transition-transform duration-100 ease-in-out"
                 classList={{
+                  "bg-primary-500": !props.isRunning,
+                  "bg-red-500": props.isRunning,
                   "group-hover:flex":
                     !props.isLoading &&
                     !props.isInQueue &&
@@ -214,26 +217,18 @@ const Tile = (props: Props) => {
                     !props.failError,
                   flex: props.isRunning,
                 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayClick();
+                }}
               >
                 <div
-                  class="flex justify-center items-center rounded-full cursor-pointer h-12 w-12"
+                  class="text-white text-2xl"
                   classList={{
-                    "bg-primary-500": !props.isRunning,
-                    "bg-red-500": props.isRunning,
+                    "i-ri:play-fill": !props.isRunning,
+                    "i-ri:pause-mini-fill": props.isRunning,
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                >
-                  <div
-                    class="text-white text-2xl"
-                    classList={{
-                      "i-ri:play-fill": !props.isRunning,
-                      "i-ri:pause-mini-fill": props.isRunning,
-                    }}
-                  />
-                </div>
+                />
               </div>
 
               <Show

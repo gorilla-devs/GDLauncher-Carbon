@@ -21,7 +21,6 @@ const Carousel = (props: Props) => {
   const [isMouseMoving, setIsMouseMoving] = createSignal(false);
 
   let horizontalSlider: HTMLDivElement;
-  let scrollRightArrowContainer: HTMLSpanElement;
   let scrollLeftArrowContainer: HTMLSpanElement;
   let scrollLeftArrow: HTMLDivElement;
   let scrollRightArrow: HTMLDivElement;
@@ -67,15 +66,9 @@ const Carousel = (props: Props) => {
     }
 
     if (horizontalSlider.scrollLeft === scrollWitdh) {
-      (scrollRightArrowContainer as HTMLElement).classList.remove(
-        "cursor-pointer"
-      );
       (scrollRightArrow as HTMLElement).classList.add("pointer-events-none");
       scrollRightArrowIcon?.classList.add("text-darkSlate-500");
     } else {
-      (scrollRightArrowContainer as HTMLElement).classList.add(
-        "cursor-pointer"
-      );
       (scrollRightArrow as HTMLElement).classList.remove("pointer-events-none");
       scrollRightArrowIcon?.classList.remove("text-darkSlate-500");
     }
@@ -195,11 +188,7 @@ const Carousel = (props: Props) => {
               />
             </div>
           </span>
-          <span
-            ref={(el) => {
-              scrollRightArrowContainer = el;
-            }}
-          >
+          <span>
             <div
               ref={(el) => {
                 scrollRightArrow = el;
@@ -225,7 +214,7 @@ const Carousel = (props: Props) => {
           onScroll={() => {
             showHideArrows();
           }}
-          class="scrollbar-hide w-full flex items-start gap-4 overflow-x-scroll scroll-smooth cursor-pointer"
+          class="scrollbar-hide w-full flex items-start gap-4 overflow-x-scroll scroll-smooth"
         >
           {mappedChildren()}
         </div>
