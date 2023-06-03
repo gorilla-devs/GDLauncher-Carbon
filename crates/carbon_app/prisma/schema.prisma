@@ -95,10 +95,13 @@ model InstanceGroup {
 }
 
 model ModFileCache {
-  path     String      @id
-  filesize Int
-  md5      Bytes
-  metadata ModMetadata @relation(fields: [md5], references: [md5])
+  instance_id Int
+  path        String
+  filesize    Int
+  md5         Bytes
+  metadata    ModMetadata @relation(fields: [md5], references: [md5])
+
+  @@unique([instance_id, path])
 }
 
 model ModMetadata {

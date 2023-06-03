@@ -618,13 +618,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), .. } = &mut instance else {
-            bail!("change_launch_state called on invalid instance")
-        };
-
-        data.state = state;
-
-        self.app.invalidate(GET_GROUPS, None);
+        instance.data_mut()?.state = state;
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
@@ -641,11 +635,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), .. } = &instance else {
-            bail!("get_launch_state called on invalid instance")
-        };
-
-        Ok((&data.state).into())
+        Ok((&instance.data()?.state).into())
     }
 
     pub async fn kill_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
@@ -654,11 +644,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), .. } = &instance else {
-            bail!("kill_instance called on invalid instance")
-        };
-
-        let LaunchState::Running(running) = &data.state else {
+        let LaunchState::Running(running) = &instance.data()?.state else {
             bail!("kill_instance called on instance that was not running")
         };
 

@@ -39,7 +39,7 @@ mod run;
 mod schema;
 
 pub struct InstanceManager {
-    instances: RwLock<HashMap<InstanceId, Instance>>,
+    pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
@@ -684,9 +684,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), .. } = &mut instance else {
-            bail!("set_favorite called on invalid instance")
-        };
+        let data = instance.data_mut()?;
 
         data.favorite = favorite;
         drop(instances);
@@ -949,9 +947,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_mut(&update.instance_id)
             .ok_or(InvalidInstanceIdError(update.instance_id))?;
 
-        let Instance { shortpath, type_: InstanceType::Valid(data), .. } = &mut instance else {
-            bail!("update_instance called on invalid instance")
-        };
+        let shortpath = &mut instance.shortpath;
+        let data = instance.type_.data_mut()?;
 
         let path = self
             .app
@@ -1205,7 +1202,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let instance = match &instance.type_ {
-            InstanceType::Invalid(_) => bail!("instance_details called on invalid instance"),
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
             InstanceType::Valid(x) => x,
         };
 
@@ -1389,20 +1386,43 @@ pub enum InstanceMoveTarget {
     EndOfGroup(GroupId),
 }
 
-struct Instance {
-    //name: String,
-    shortpath: String,
-    //group: GroupId,
-    // todo: icon
-    type_: InstanceType,
+pub struct Instance {
+    pub shortpath: String,
+    pub type_: InstanceType,
 }
 
-enum InstanceType {
+pub enum InstanceType {
     Valid(InstanceData),
     Invalid(InvalidConfiguration),
 }
 
-enum InvalidConfiguration {
+impl InstanceType {
+    pub fn data(&self) -> Result<&InstanceData, InvalidInstanceDataError> {
+        match self {
+            Self::Valid(data) => Ok(data),
+            Self::Invalid(_) => Err(InvalidInstanceDataError),
+        }
+    }
+
+    pub fn data_mut(&mut self) -> Result<&mut InstanceData, InvalidInstanceDataError> {
+        match self {
+            Self::Valid(data) => Ok(data),
+            Self::Invalid(_) => Err(InvalidInstanceDataError),
+        }
+    }
+}
+
+impl Instance {
+    pub fn data(&self) -> Result<&InstanceData, InvalidInstanceDataError> {
+        self.type_.data()
+    }
+
+    pub fn data_mut(&mut self) -> Result<&mut InstanceData, InvalidInstanceDataError> {
+        self.type_.data_mut()
+    }
+}
+
+pub enum InvalidConfiguration {
     NoFile,
     Invalid(ConfigurationParseError),
     IoError(String),
@@ -1451,12 +1471,16 @@ pub enum InstanceVersionSouce {
 }
 
 #[derive(Error, Debug)]
-#[error("Attempted to use invalid InstanceId {0}")]
+#[error("attempted to use invalid InstanceId {0}")]
 pub struct InvalidInstanceIdError(InstanceId);
 
 #[derive(Error, Debug)]
-#[error("Attempted to use invalid GroupId {0}")]
+#[error("attempted to use invalid GroupId {0}")]
 pub struct InvalidGroupIdError(GroupId);
+
+#[derive(Error, Debug)]
+#[error("attempted to get data of an invalid instance")]
+pub struct InvalidInstanceDataError;
 
 #[cfg(test)]
 mod test {
