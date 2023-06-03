@@ -14,7 +14,7 @@ const Mod = (props: Props) => {
   const modalsContext = useModal();
   const [loading, setLoading] = createSignal(false);
 
-  const latestFIlesIndexes = () => props.mod.latestFilesIndexes;
+  const latestFIlesIndexes = () => props.mod.latestFiles;
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
     parseInt(lastInstanceOpened(), 10),
@@ -22,8 +22,8 @@ const Mod = (props: Props) => {
 
   const mappedVersions = () =>
     latestFIlesIndexes().map((version) => ({
-      key: version.gameVersion,
-      label: version.gameVersion,
+      key: version.id,
+      label: version.displayName.replaceAll(".jar", ""),
     }));
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {
@@ -120,12 +120,12 @@ const Mod = (props: Props) => {
                   });
                 }}
                 onChange={(val) => {
-                  const file = props.mod.latestFilesIndexes.find(
-                    (file) => file.gameVersion === val
+                  const file = props.mod.latestFiles.find(
+                    (file) => file.id === parseInt(val, 10)
                   );
                   if (file) {
                     installModMutation.mutate({
-                      file_id: file?.fileId,
+                      file_id: file.id,
                       instance_id: parseInt(lastInstanceOpened(), 10),
                       project_id: props.mod.id,
                     });

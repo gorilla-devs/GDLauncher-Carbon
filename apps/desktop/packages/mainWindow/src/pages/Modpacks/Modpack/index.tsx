@@ -46,12 +46,12 @@ const Modpack = (props: Props) => {
       },
     }
   );
-  const latestFIlesIndexes = () => props.modpack.latestFilesIndexes;
+  const latestFIlesIndexes = () => props.modpack.latestFiles;
 
   const mappedVersions = () =>
     latestFIlesIndexes().map((version) => ({
-      key: version.gameVersion,
-      label: version.gameVersion,
+      key: version.id,
+      label: version.displayName,
     }));
 
   return (
@@ -142,8 +142,8 @@ const Modpack = (props: Props) => {
               }}
               onChange={(val) => {
                 loadIconMutation.mutate(props.modpack.logo.url);
-                const file = props.modpack.latestFilesIndexes.find(
-                  (file) => file.gameVersion === val
+                const file = props.modpack.latestFiles.find(
+                  (file) => file.id === parseInt(val, 10)
                 );
                 if (file) {
                   createInstanceMutation.mutate({
@@ -154,7 +154,7 @@ const Modpack = (props: Props) => {
                     version: {
                       Modpack: {
                         Curseforge: {
-                          file_id: file.fileId,
+                          file_id: file.id,
                           project_id: props.modpack.id,
                         },
                       },

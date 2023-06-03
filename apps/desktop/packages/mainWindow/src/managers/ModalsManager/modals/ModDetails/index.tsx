@@ -52,7 +52,7 @@ const ModDetails = (props: ModalProps) => {
                       }}
                       icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                       size="small"
-                      variant="transparent"
+                      type="transparent"
                     >
                       <Trans
                         key="instance.step_back"
@@ -104,7 +104,7 @@ const ModDetails = (props: ModalProps) => {
                             </div>
                           </div>
                           <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                            <Button uppercase variant="glow" size="large">
+                            <Button uppercase type="glow" size="large">
                               <Trans
                                 key="mod.download"
                                 options={{

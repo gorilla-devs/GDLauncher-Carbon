@@ -37,7 +37,7 @@ type Props = {
 interface DropDownButtonProps {
   children: JSX.Element;
   options: Option[];
-  value: string;
+  value: string | number;
   error?: boolean;
   disabled?: boolean;
   rounded?: boolean;

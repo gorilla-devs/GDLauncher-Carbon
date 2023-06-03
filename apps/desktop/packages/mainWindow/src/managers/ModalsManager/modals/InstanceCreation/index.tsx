@@ -167,7 +167,7 @@ const InstanceCreation = (props: ModalProps) => {
       overflowHiddenDisabled={true}
       noPadding={true}
     >
-      <div class="flex flex-col justify-between overflow-y-scroll w-120 scrollbar-hide h-136">
+      <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-136">
         <div class="flex flex-col justify-between gap-4 p-5 h-full">
           <span class="flex flex-col justify-between gap-4">
             <div

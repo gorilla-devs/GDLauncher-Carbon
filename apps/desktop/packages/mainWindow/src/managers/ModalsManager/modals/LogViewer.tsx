@@ -80,7 +80,7 @@ const LogViewer = (props: ModalProps) => {
 
                     return (
                       <TabPanel>
-                        <div class="overflow-y-auto divide-y divide-darkSlate-500 pb-4">
+                        <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500">
                           <For each={logsArray()}>
                             {(log) => {
                               return (

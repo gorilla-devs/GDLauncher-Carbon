@@ -118,18 +118,18 @@ const Instance = () => {
       label: "Settings",
       path: `/library/${params.id}/settings`,
     },
-    {
-      label: "Resource Packs",
-      path: `/library/${params.id}/resourcepacks`,
-    },
-    {
-      label: "Screenshots",
-      path: `/library/${params.id}/screenshots`,
-    },
-    {
-      label: "Versions",
-      path: `/library/${params.id}/versions`,
-    },
+    // {
+    //   label: "Resource Packs",
+    //   path: `/library/${params.id}/resourcepacks`,
+    // },
+    // {
+    //   label: "Screenshots",
+    //   path: `/library/${params.id}/screenshots`,
+    // },
+    // {
+    //   label: "Versions",
+    //   path: `/library/${params.id}/versions`,
+    // },
   ];
 
   const selectedIndex = () =>
@@ -158,10 +158,10 @@ const Instance = () => {
     getInstanceDetailsQuery.data?.state &&
     getPreparingState(getInstanceDetailsQuery.data?.state);
 
-  let containerRef: HTMLDivElement;
-  let bgRef: HTMLDivElement;
-  let innerContainerRef: HTMLDivElement;
-  let refStickyContainer: HTMLDivElement;
+  // let containerRef: HTMLDivElement;
+  // let bgRef: HTMLDivElement;
+  // let innerContainerRef: HTMLDivElement;
+  // let refStickyContainer: HTMLDivElement;
 
   const handleNameChange = () => {
     if (newName()) {
@@ -182,33 +182,33 @@ const Instance = () => {
       style={{
         "scrollbar-gutter": "stable",
       }}
-      onScroll={(e) => {
-        if (e.currentTarget.scrollTop > 50) {
-          innerContainerRef.style.opacity = "0";
-          containerRef.classList.remove("h-52");
-          containerRef.classList.add("h-0");
+      // onScroll={(e) => {
+      //   if (e.currentTarget.scrollTop > 50) {
+      //     innerContainerRef.style.opacity = "0";
+      //     containerRef.classList.remove("h-52");
+      //     containerRef.classList.add("h-0");
 
-          bgRef.classList.add("bg-darkSlate-900");
+      //     bgRef.classList.add("bg-darkSlate-900");
 
-          refStickyContainer.classList.remove("h-0", "opacity-0");
-          refStickyContainer.classList.add("h-20", "sticky", "top-0");
-        } else {
-          innerContainerRef.style.opacity = "1";
-          containerRef.classList.add("h-52");
-          containerRef.classList.remove("h-0");
+      //     refStickyContainer.classList.remove("h-0", "opacity-0");
+      //     refStickyContainer.classList.add("h-20", "sticky", "top-0");
+      //   } else {
+      //     innerContainerRef.style.opacity = "1";
+      //     containerRef.classList.add("h-52");
+      //     containerRef.classList.remove("h-0");
 
-          bgRef.classList.remove("bg-darkSlate-900");
+      //     bgRef.classList.remove("bg-darkSlate-900");
 
-          refStickyContainer.classList.add("h-0", "opacity-0");
-          refStickyContainer.classList.remove("h-20", "sticky", "top-0");
-        }
-      }}
+      //     refStickyContainer.classList.add("h-0", "opacity-0");
+      //     refStickyContainer.classList.remove("h-20", "sticky", "top-0");
+      //   }
+      // }}
     >
       <div
         class="relative flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
-        ref={(el) => {
-          containerRef = el;
-        }}
+        // ref={(el) => {
+        //   containerRef = el;
+        // }}
       >
         <div
           class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
@@ -216,15 +216,15 @@ const Instance = () => {
             "background-image": `url("${headerMockImage}")`,
             "background-position": "right-5rem",
           }}
-          ref={(el) => {
-            bgRef = el;
-          }}
+          // ref={(el) => {
+          //   bgRef = el;
+          // }}
         />
         <div
           class="h-full"
-          ref={(el) => {
-            innerContainerRef = el;
-          }}
+          // ref={(el) => {
+          //   innerContainerRef = el;
+          // }}
         >
           <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
@@ -250,7 +250,7 @@ const Instance = () => {
           >
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
-                <div class="flex flex-col gap-4 w-full justify-end lg:flex-row">
+                <div class="flex flex-col gap-4 w-full lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     classList={{
@@ -268,7 +268,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="m-0 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text cursor-pointer"
+                          class="m-0 cursor-pointer focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
                           contentEditable
                           onFocusIn={() => {
                             setEditableName(true);
@@ -288,7 +288,7 @@ const Instance = () => {
                       </span>
                       <div class="flex gap-2">
                         <div
-                          class="cursor-pointer transition ease-in-out duration-50 text-darkSlate-50 i-ri:check-fill text-3xl hover:text-green-500"
+                          class="cursor-pointer ease-in-out text-darkSlate-50 transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -323,7 +323,7 @@ const Instance = () => {
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <div
-                          class="rounded-full flex justify-center items-center h-8 w-8"
+                          class="flex justify-center items-center rounded-full h-8 w-8"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
@@ -398,10 +398,10 @@ const Instance = () => {
         </div>
       </div>
       <div
-        class="flex gap-4 justify-center items-center box-border w-full z-20 ease-in-out bg-darkSlate-900 px-4 h-0 opacity-0 transition-height duration-200"
-        ref={(el) => {
-          refStickyContainer = el;
-        }}
+        class="flex gap-4 justify-center items-center w-full z-20 ease-in-out px-4 box-border bg-darkSlate-900 h-0 opacity-0 transition-height duration-200"
+        // ref={(el) => {
+        //   refStickyContainer = el;
+        // }}
       >
         <div class="flex items-start w-full ease-in-out transition-opacity duration-300">
           <div class="w-fit justify-center items-center transition ease-in-out duration-100 h-fit mr-4">
