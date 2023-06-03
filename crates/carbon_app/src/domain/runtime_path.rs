@@ -85,6 +85,10 @@ impl ManagedJavasPath {
 pub struct InstancesPath(PathBuf);
 
 impl InstancesPath {
+    pub fn subpath() -> InstancesPath {
+        Self(PathBuf::new())
+    }
+
     pub fn to_path(&self) -> PathBuf {
         self.0.clone()
     }
