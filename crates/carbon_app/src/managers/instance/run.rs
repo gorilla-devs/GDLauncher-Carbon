@@ -28,7 +28,7 @@ use crate::{
     },
 };
 
-use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
+use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 pub struct PersistenceManager {
     ensure_lock: Semaphore,
@@ -240,6 +240,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 tokio::time::sleep(Duration::from_millis(200)).await;
                             }
+
+                            t_download_files.complete_download();
                         });
 
                         let modpack_info = curseforge::prepare_modpack(
@@ -395,6 +397,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                         tokio::time::sleep(Duration::from_millis(200)).await;
                     }
+
+                    t_download_files.complete_download();
                 });
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;

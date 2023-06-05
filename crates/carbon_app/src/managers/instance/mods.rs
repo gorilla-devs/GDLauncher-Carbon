@@ -199,6 +199,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                         tokio::time::sleep(Duration::from_millis(200)).await;
                     }
+
+                    t_download_file.complete_download();
                 });
 
                 carbon_net::download_file(&downloadable, Some(progress_watch_tx)).await?;

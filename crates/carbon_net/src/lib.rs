@@ -203,22 +203,18 @@ pub async fn download_multiple(
 
     let arced_progress = Arc::new(progress);
 
-    let atomic_size_counter = Arc::new(AtomicU64::new(0));
-    let atomic_file_counter = Arc::new(AtomicU64::new(0));
-    let atomic_size = Arc::new(AtomicU64::new(files.iter().map(|f| f.size).flatten().sum()));
-
-    let total_size = files
-        .iter()
-        .fold(0, |acc, file| acc + file.size.unwrap_or(0));
+    let progress_counter = Arc::new(AtomicU64::new(0));
+    let file_counter = Arc::new(AtomicU64::new(0));
+    let total_size = Arc::new(AtomicU64::new(files.iter().map(|f| f.size).flatten().sum()));
 
     let total_count = files.len() as u64;
 
     for file in files {
         let semaphore = Arc::clone(&downloads);
         let progress = Arc::clone(&arced_progress);
-        let size_counter = Arc::clone(&atomic_size_counter);
-        let file_counter = Arc::clone(&atomic_file_counter);
-        let size = Arc::clone(&atomic_size);
+        let progress_counter = Arc::clone(&progress_counter);
+        let file_counter = Arc::clone(&file_counter);
+        let size = Arc::clone(&total_size);
         let url = file.url.clone();
         let path = file.path.clone();
         let client = client.clone();
@@ -266,7 +262,7 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             // unwraps will be fine because file_looks_good can't happen without it
                             let downloaded =
-                                size_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
+                                progress_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
                             progress.send(Progress {
                                 current_count: file_counter.load(Ordering::SeqCst),
@@ -289,7 +285,7 @@ pub async fn download_multiple(
                         if hash == &format!("{finalized:x}") {
                             // unwraps will be fine because file_looks_good can't happen without it
                             let downloaded =
-                                size_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
+                                progress_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
                             progress.send(Progress {
                                 current_count: file_counter.load(Ordering::SeqCst),
@@ -341,7 +337,7 @@ pub async fn download_multiple(
 
                 tokio::io::copy(&mut res.as_ref(), &mut fs_file).await?;
 
-                let downloaded = size_counter.fetch_add(res.len() as u64, Ordering::SeqCst);
+                let downloaded = progress_counter.fetch_add(res.len() as u64, Ordering::SeqCst);
                 file_downloaded += res.len() as u64;
 
                 if file_downloaded > file_size_reported {
@@ -351,7 +347,7 @@ pub async fn download_multiple(
                 }
 
                 progress.send(Progress {
-                    current_count: size_counter.load(Ordering::SeqCst),
+                    current_count: file_counter.load(Ordering::SeqCst),
                     total_count,
                     current_size: downloaded,
                     total_size: size.load(Ordering::SeqCst),
@@ -359,7 +355,7 @@ pub async fn download_multiple(
             }
 
             let diff = file_size_reported - file_downloaded;
-            let total = size.fetch_sub(diff, Ordering::SeqCst) - diff;
+            let total = progress_counter.fetch_sub(diff, Ordering::SeqCst) - diff;
 
             progress.send(Progress {
                 current_count: file_counter.fetch_add(1, Ordering::SeqCst),
