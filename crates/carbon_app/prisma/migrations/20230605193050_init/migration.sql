@@ -92,7 +92,8 @@ CREATE TABLE "InstanceGroup" (
 
 -- CreateTable
 CREATE TABLE "ModFileCache" (
-    "path" TEXT NOT NULL PRIMARY KEY,
+    "instance_id" INTEGER NOT NULL,
+    "path" TEXT NOT NULL,
     "filesize" INTEGER NOT NULL,
     "md5" BLOB NOT NULL,
     CONSTRAINT "ModFileCache_md5_fkey" FOREIGN KEY ("md5") REFERENCES "ModMetadata" ("md5") ON DELETE RESTRICT ON UPDATE CASCADE
@@ -140,3 +141,6 @@ CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModFileCache_instance_id_path_key" ON "ModFileCache"("instance_id", "path");
