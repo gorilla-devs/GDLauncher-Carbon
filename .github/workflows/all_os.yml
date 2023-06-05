@@ -39,11 +39,13 @@ jobs:
   #     - name: Codegen
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #       run: pnpm codegen
   #     - name: Build
   #       run: pnpm build:mac-arm64
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #     # - name: Lint
   #     #   run: pnpm lint
   #     - name: Clear target before tests to avoid folder getting too big
@@ -52,6 +54,7 @@ jobs:
   #     - name: Test
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #       run: pnpm test
   # mac_x64:
   #   defaults:
@@ -82,11 +85,13 @@ jobs:
   #     - name: Codegen
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #       run: pnpm codegen
   #     - name: Build
   #       run: pnpm build:mac-x64
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #     # - name: Lint
   #     #   run: pnpm lint
   #     - name: Clear target before tests to avoid folder getting too big
@@ -95,6 +100,7 @@ jobs:
   #     - name: Test
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #       run: pnpm test
   ubuntu_x64:
     defaults:
@@ -125,11 +131,13 @@ jobs:
       - name: Codegen
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
         run: pnpm codegen
       - name: Build
         run: pnpm build:linux-x64
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
       # - name: Lint
       #   run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -138,6 +146,7 @@ jobs:
       - name: Test
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
   # windows_x64:
   #   defaults:
@@ -170,6 +179,7 @@ jobs:
   #       shell: bash
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #         CARGO_NET_GIT_FETCH_WITH_CLI: true
   #       run: pnpm codegen
   #     - name: Build
@@ -177,6 +187,7 @@ jobs:
   #       run: pnpm build:win-x64
   #       env:
   #         CARGO_INCREMENTAL: 0
+  #         BASE_API: ${{ vars.BASE_API }}
   #         CARGO_NET_GIT_FETCH_WITH_CLI: true
   #     # - name: Lint
   #     #   shell: bash
@@ -188,5 +199,6 @@ jobs:
   #       shell: bash
   #       env:
   #         CARGO_INCREMENTAL: 0
-  #         CARGO_NET_GIT_FETCH_WITH_CLI: true
-  #       run: pnpm test
+#           BASE_API: ${{ vars.BASE_API }}
+#         CARGO_NET_GIT_FETCH_WITH_CLI: true
+#       run: pnpm test
