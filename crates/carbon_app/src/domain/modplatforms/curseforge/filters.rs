@@ -39,7 +39,7 @@ pub struct ModSearchParametersQuery {
     pub game_id: i32,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
-    pub category_id: Option<i32>,
+    pub category_ids: Option<Vec<i32>>,
     pub sort_order: Option<ModSearchSortOrder>,
     pub sort_field: Option<ModSearchSortField>,
     pub class_id: Option<ClassId>,
