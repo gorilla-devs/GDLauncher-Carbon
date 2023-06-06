@@ -11,6 +11,7 @@ use thiserror::Error;
 
 use crate::domain::instance as domain;
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::{modplatforms::curseforge::filters::ModFileParameters, vtask::VisualTaskId},
     managers::{metadata, vtask::VisualTask, ManagerRef},
@@ -77,6 +78,8 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         m.enabled = !m.enabled;
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
         Ok(())
     }
 
@@ -90,10 +93,11 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("enable_mod called on invalid instance");
         };
 
-        let m = data
+        let (i, m) = data
             .mods
             .iter_mut()
-            .find(|m| m.id == id)
+            .enumerate()
+            .find(|(_, m)| m.id == id)
             .ok_or_else(|| InvalidModIdError(instance_id, id.clone()))?;
 
         let mut disabled_path = self
@@ -116,6 +120,9 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::remove_file(disabled_path).await?;
         }
 
+        data.mods.remove(i);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
         Ok(())
     }
 
@@ -236,6 +243,7 @@ impl ManagerRef<'_, InstanceManager> {
                     metadata,
                 });
 
+                app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                 Ok::<_, anyhow::Error>(())
             })()
             .await;
