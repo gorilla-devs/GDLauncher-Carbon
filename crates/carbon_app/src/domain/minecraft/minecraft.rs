@@ -1,7 +1,7 @@
 use daedalus::minecraft::{
     Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use sysinfo::SystemExt;
 
 use crate::domain::{java::JavaArch, maven::MavenCoordinates, runtime_path::AssetsPath};
@@ -169,7 +169,7 @@ pub fn assets_index_into_vec_downloadable(
             .get_objects_path()
             .join(&object.hash[0..2])
             .join(&object.hash);
-        let virtual_asset_path = assets_path.get_legacy_path().join(key);
+        let _virtual_asset_path = assets_path.get_legacy_path().join(key);
 
         files.push(
             carbon_net::Downloadable::new(

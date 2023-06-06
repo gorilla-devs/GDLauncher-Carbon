@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use anyhow::bail;
 use daedalus::minecraft::MinecraftJavaProfile;
 use regex::Regex;

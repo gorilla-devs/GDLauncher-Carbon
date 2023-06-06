@@ -8,10 +8,9 @@ use futures::StreamExt;
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use sha1::digest::core_api::CoreWrapper;
+
 use sha1::Digest as _;
 use sha1::Sha1;
-use sha2::Digest as _;
 use sha2::Sha256;
 use tokio::sync::watch;
 use tokio::{
@@ -116,11 +115,6 @@ pub async fn download_file(
         file.write_all(&chunk).await?;
         buf.extend_from_slice(&chunk);
         if let Some(progress) = &progress {
-            let size_progress = (buf.len() as f64 / downloadable_file.size.unwrap_or(1) as f64)
-                .min(1.0)
-                .max(0.0)
-                * 100.0;
-
             progress.send(Progress {
                 // Special case for single file
                 total_count: 1,

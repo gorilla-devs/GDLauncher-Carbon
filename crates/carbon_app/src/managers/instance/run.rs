@@ -5,7 +5,7 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
-use std::str::FromStr;
+
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
@@ -618,7 +618,7 @@ impl ManagerRef<'_, InstanceManager> {
         state: LaunchState,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
-        let mut instance = instances
+        let instance = instances
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
