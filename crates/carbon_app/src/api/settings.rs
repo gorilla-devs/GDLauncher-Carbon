@@ -8,7 +8,7 @@ use crate::{
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()

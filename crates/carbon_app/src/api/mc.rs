@@ -6,7 +6,7 @@ use daedalus::{minecraft, modded};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager().get_minecraft_manifest().await?.versions;

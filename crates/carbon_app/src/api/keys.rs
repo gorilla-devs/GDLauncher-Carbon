@@ -37,10 +37,10 @@ keys! {
         GET_ACCOUNTS                                = "getAccounts";
         GET_ACCOUNT_STATUS                          = "getAccountStatus";
         DELETE_ACCOUNT                              = "deleteAccount";
-        ENROLL_BEGIN                                = "enroll.begin";
-        ENROLL_CANCEL                               = "enroll.cancel";
-        ENROLL_GET_STATUS                           = "enroll.getStatus";
-        ENROLL_FINALIZE                             = "enroll.finalize";
+        ENROLL_BEGIN                                = "beginEnrollment";
+        ENROLL_CANCEL                               = "cancelEnrollment";
+        ENROLL_GET_STATUS                           = "getEnrollmentStatus";
+        ENROLL_FINALIZE                             = "finalizeEnrollment";
         REFRESH_ACCOUNT                             = "refreshAccount";
         GET_HEAD                                    = "getHead";
     }

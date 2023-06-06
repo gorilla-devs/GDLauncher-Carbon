@@ -10,7 +10,7 @@ use crate::managers::App;
 use super::router::router;
 use super::translation::Translation;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_TASKS[app, _: ()] {
             Ok(app.task_manager().get_tasks().await

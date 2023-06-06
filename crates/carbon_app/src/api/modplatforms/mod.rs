@@ -26,7 +26,7 @@ use crate::{
 
 mod curseforge;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query CURSEFORGE_SEARCH[app, filters: FEModSearchParameters] {
             let modplatforms = &app.modplatforms_manager;

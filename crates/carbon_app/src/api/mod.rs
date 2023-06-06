@@ -6,7 +6,7 @@ use crate::{app_version, managers};
 use async_stream::stream;
 use futures::Stream;
 use pin_project::{pin_project, pinned_drop};
-use rspc::{RouterBuilderLike, Type};
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 mod account;
@@ -34,21 +34,21 @@ impl InvalidationEvent {
     }
 }
 
-pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
-    rspc::Router::<App>::new()
+pub fn build_rspc_router() -> rspc::RouterBuilder<App> {
+    rspc::Router::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .query("getAppVersion", |t| {
             t(|_ctx, _: ()| async move { Ok(app_version::APP_VERSION) })
         })
-        .yolo_merge(keys::account::GROUP_PREFIX, account::mount())
-        .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
-        .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
-        .yolo_merge(keys::vtask::GROUP_PREFIX, vtask::mount())
-        .yolo_merge(keys::instance::GROUP_PREFIX, instance::mount())
-        .yolo_merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
-        .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
-        .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
-        .yolo_merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
+        .merge(keys::account::GROUP_PREFIX, account::mount())
+        .merge(keys::java::GROUP_PREFIX, java::mount())
+        .merge(keys::mc::GROUP_PREFIX, mc::mount())
+        .merge(keys::vtask::GROUP_PREFIX, vtask::mount())
+        .merge(keys::instance::GROUP_PREFIX, instance::mount())
+        .merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
+        .merge(keys::settings::GROUP_PREFIX, settings::mount())
+        .merge(keys::metrics::GROUP_PREFIX, metrics::mount())
+        .merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
         .subscription("invalidateQuery", move |t| {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD

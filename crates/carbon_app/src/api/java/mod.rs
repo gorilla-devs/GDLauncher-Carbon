@@ -11,7 +11,7 @@ use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVe
 
 mod managed;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_AVAILABLE_JAVAS[app, _args: ()] {
             get_all_available_javas(app, _args).await

@@ -5,7 +5,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         mutation SEND_EVENT[app, event: FEEvent] {
             app.metrics_manager().track_event(event.into()).await?;

@@ -12,7 +12,7 @@ use crate::error::FeError;
 use crate::managers::account::api::XboxError;
 use crate::managers::{account, App, AppInner};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_ACTIVE_UUID[app, _: ()] {
             app.account_manager().get_active_uuid().await

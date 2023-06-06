@@ -7,7 +7,7 @@ use crate::{
 };
 use rspc::RouterBuilderLike;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query GET_TOTAL_RAM[app, _args: ()] {
             Ok(app.system_info_manager().get_total_ram().await.to_string())

@@ -56,7 +56,7 @@ regex = "1.7.0"
 reqwest = { version = "0.11.13", features = ["rustls-tls", "json"] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
-rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
+rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "f781f6db2e55f565597e9c947875bdea5036c536" }
 serde = "1.0.147"
 serde_json = "1.0.89"
 daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "29a5461282cec7dbc0c148115cf499a6a15fd398" }

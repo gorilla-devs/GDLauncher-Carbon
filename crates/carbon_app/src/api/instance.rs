@@ -26,7 +26,7 @@ use super::vtask::TaskId;
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
         query DEFAULT_GROUP[app, _: ()] {
             Ok(*app.instance_manager()

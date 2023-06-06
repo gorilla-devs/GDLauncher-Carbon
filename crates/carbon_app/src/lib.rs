@@ -6,7 +6,6 @@ use crate::managers::{
     App, AppInner,
 };
 
-use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -73,7 +72,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     println!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
+    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().build().arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
