@@ -204,13 +204,17 @@ const Tile = (props: Props) => {
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
               </Show>
+              <Show when={props.isLoading || props.isInQueue}>
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+              </Show>
 
               <div
-                class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100"
+                class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100 scale-0"
                 classList={{
                   "bg-primary-500": !props.isRunning,
                   "bg-red-500 scale-100": props.isRunning,
-                  "scale-0 group-hover:scale-100":
+                  "group-hover:scale-100":
                     !props.isLoading &&
                     !props.isInQueue &&
                     !props.invalid &&
@@ -238,7 +242,7 @@ const Tile = (props: Props) => {
                   props.percentage !== null
                 }
               >
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-2 z-20">
                   <h3 class="m-0 text-center">
                     {Math.round(props.percentage as number)}%
                   </h3>
