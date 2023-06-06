@@ -1,6 +1,13 @@
 import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
-import { For, Show, Suspense, createEffect } from "solid-js";
+import {
+  For,
+  Show,
+  Suspense,
+  createEffect,
+  createMemo,
+  createSignal,
+} from "solid-js";
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
 import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
@@ -21,16 +28,25 @@ const Sidebar = () => {
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [instances, setInstances] = createStore<InstancesStore>({});
+  const [filter, setFilter] = createSignal("");
 
   createEffect(() => {
     setLastInstanceOpened(instanceId() || "");
   });
 
+  const filteredData = createMemo(() =>
+    filter()
+      ? routeData.instancesUngrouped.data?.filter((item) =>
+          item.name.toLowerCase().includes(filter().toLowerCase())
+        )
+      : routeData.instancesUngrouped.data
+  );
+
   createEffect(() => {
     setInstances(reconcile({}));
 
-    if (routeData.instancesUngrouped.data) {
-      routeData.instancesUngrouped.data.forEach((instance) => {
+    if (filteredData()) {
+      filteredData()?.forEach((instance) => {
         const validInstance = isListInstanceValid(instance.status)
           ? instance.status.Valid
           : null;
@@ -49,6 +65,7 @@ const Sidebar = () => {
     }
   });
 
+  let inputRef: HTMLInputElement | undefined;
   const favoriteInstances = () =>
     routeData.instancesUngrouped.data?.filter((inst) => inst.favorite) || [];
 
@@ -63,6 +80,7 @@ const Sidebar = () => {
                 class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700"
                 onClick={() => {
                   toggleSidebar();
+                  inputRef?.focus();
                 }}
               >
                 <div class="transition duration-100 ease-in-out i-ri:search-line text-darkSlate-500 group-hover:text-darkSlate-50" />
@@ -70,9 +88,11 @@ const Sidebar = () => {
             }
           >
             <Input
+              ref={inputRef}
               placeholder={t("general.type_here") || ""}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
+              onInput={(e) => setFilter(e.target.value)}
               disabled={(routeData.instancesUngrouped?.data || []).length === 0}
             />
           </Show>
@@ -93,7 +113,6 @@ const Sidebar = () => {
             >
               <For each={favoriteInstances()}>
                 {(instance) => (
-                  //TODO: SKELETON
                   <Suspense
                     fallback={
                       isSidebarOpened() ? (
