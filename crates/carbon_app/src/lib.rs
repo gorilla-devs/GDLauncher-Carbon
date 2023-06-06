@@ -137,7 +137,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 struct TestEnv {
     tmpdir: PathBuf,
     app: App,
-    invalidation_recv: tokio::sync::broadcast::Receiver<InvalidationEvent>,
+    invalidation_recv: tokio::sync::broadcast::Receiver<api::InvalidationEvent>,
 }
 
 #[cfg(test)]
