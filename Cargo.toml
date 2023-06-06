@@ -36,8 +36,12 @@ jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 libc = "0.2"
 log = "0.4.17"
+md-5 = "0.10.5"
 mockall = "0.11.3"
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
 ntest = "0.9.0"
+opener = "0.6.1"
+pin-project = "1.1.0"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
@@ -65,6 +69,7 @@ thiserror = "1.0.38"
 task-local-extensions = "0.1.4"
 tokio = "1.25.0"
 tokio-stream = "0.1.11"
+toml = "0.7.3"
 tower-http = "0.3.4"
 hex = "0.4"
 tracing = "0.1.37"

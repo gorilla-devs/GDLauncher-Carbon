@@ -269,7 +269,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
             }
 
             let java_version = JavaVersion::try_from(java.full_version.as_str())?;
-            if profile.is_java_version_compatible(java_version) {
+            if profile.is_java_version_compatible(&java_version) {
                 println!(
                     "Java {} is compatible with profile {}",
                     java.path,

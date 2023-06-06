@@ -1,4 +1,9 @@
+use std::collections::HashSet;
+
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
+
+use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,4 +38,39 @@ pub struct ManifestFileReference {
     #[serde(rename = "fileID")]
     pub file_id: i32,
     pub required: bool,
+}
+impl TryFrom<Minecraft> for StandardVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Minecraft) -> Result<Self, Self::Error> {
+        Ok(StandardVersion {
+            release: value.version,
+            modloaders: value
+                .mod_loaders
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, _>>()?,
+        })
+    }
+}
+
+impl TryFrom<ModLoaders> for ModLoader {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModLoaders) -> Result<Self, Self::Error> {
+        let (loader, version) = value.id.split_once('-').ok_or_else(|| {
+            anyhow::anyhow!(
+                "modloader id '{}' could not be split into a name-version pair",
+                value.id
+            )
+        })?;
+
+        Ok(ModLoader {
+            type_: match loader {
+                "forge" => ModLoaderType::Forge,
+                _ => bail!("unsupported modloader '{loader}'"),
+            },
+            version: version.to_string(),
+        })
+    }
 }

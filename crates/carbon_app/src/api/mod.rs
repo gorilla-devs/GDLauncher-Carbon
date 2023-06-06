@@ -1,12 +1,16 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::managers::{App, AppInner};
 use crate::{app_version, managers};
 use async_stream::stream;
+use futures::Stream;
+use pin_project::{pin_project, pinned_drop};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 mod account;
+mod instance;
 mod java;
 pub mod keys;
 mod mc;
@@ -15,12 +19,13 @@ mod modplatforms;
 pub mod router;
 pub mod settings;
 mod system_info;
+pub mod translation;
 mod vtask;
 
 #[derive(Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
-    key: &'static str,
-    args: Option<serde_json::Value>,
+    pub key: &'static str,
+    pub args: Option<serde_json::Value>,
 }
 
 impl InvalidationEvent {
@@ -39,6 +44,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::java::GROUP_PREFIX, java::mount())
         .yolo_merge(keys::mc::GROUP_PREFIX, mc::mount())
         .yolo_merge(keys::vtask::GROUP_PREFIX, vtask::mount())
+        .yolo_merge(keys::instance::GROUP_PREFIX, instance::mount())
         .yolo_merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
         .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
@@ -47,9 +53,12 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
             // https://twitter.com/ep0k_/status/494284207821447168
             // XD
             t(move |app, _args: ()| {
-                stream! {
+                let s = stream! {
+                    let mut channel = app.invalidation_channel.subscribe();
+                    println!("Invalidation channel connected");
+
                     loop {
-                        match app.wait_for_invalidation().await {
+                        match channel.recv().await {
                             Ok(event) => {
                                 yield event;
                             }
@@ -58,7 +67,31 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                             }
                         }
                     }
+                };
+
+                #[pin_project(PinnedDrop)]
+                struct Dropcheck<T: Stream<Item = InvalidationEvent>>(#[pin] T);
+
+                impl<T: Stream<Item = InvalidationEvent>> Stream for Dropcheck<T> {
+                    type Item = InvalidationEvent;
+
+                    fn poll_next(
+                        self: Pin<&mut Self>,
+                        cx: &mut std::task::Context<'_>,
+                    ) -> std::task::Poll<Option<Self::Item>> {
+                        self.project().0.poll_next(cx)
+                    }
                 }
+
+                #[pinned_drop]
+                impl<T: Stream<Item = InvalidationEvent>> PinnedDrop for Dropcheck<T> {
+                    fn drop(self: Pin<&mut Self>) {
+                        println!("Invalidation stream was dropped!");
+                        std::process::exit(1);
+                    }
+                }
+
+                Dropcheck(s)
             })
         })
 }
@@ -67,8 +100,8 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
         .route("/health", axum::routing::get(|| async { "OK" }))
-        .nest("/mc", mc::mount_axum_router())
         .nest("/account", account::mount_axum_router())
+        .nest("/instance", instance::mount_axum_router())
 }
 
 #[cfg(test)]

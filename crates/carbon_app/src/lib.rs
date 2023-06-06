@@ -141,6 +141,14 @@ struct TestEnv {
 }
 
 #[cfg(test)]
+impl TestEnv {
+    async fn restart_in_place(&mut self) {
+        let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
+        self.app = AppInner::new(invalidation_sender, self.tmpdir.clone()).await;
+    }
+}
+
+#[cfg(test)]
 impl std::ops::Deref for TestEnv {
     type Target = App;
 

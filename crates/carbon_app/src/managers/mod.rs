@@ -15,13 +15,16 @@ use tokio::sync::broadcast::{self, error::RecvError};
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
+use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
 mod cache_manager;
 pub mod download;
+pub mod instance;
 pub mod java;
+mod metadata;
 mod metrics;
 mod minecraft;
 mod modplatforms;
@@ -42,8 +45,8 @@ pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
     use super::{
-        java::JavaManager, metrics::MetricsManager, modplatforms::ModplatformsManager,
-        system_info::SystemInfoManager, *,
+        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
+        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
     };
 
     pub struct AppInner {
@@ -51,8 +54,10 @@ mod app {
         java_manager: JavaManager,
         pub(crate) minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
-        invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
+        instance_manager: InstanceManager,
+        meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
@@ -97,6 +102,8 @@ mod app {
                     account_manager: AccountManager::new(),
                     modplatforms_manager: ModplatformsManager::new(),
                     download_manager: DownloadManager::new(),
+                    instance_manager: InstanceManager::new(),
+                    meta_cache_manager: MetaCacheManager::new(),
                     metrics_manager: MetricsManager::new(),
                     invalidation_channel,
                     reqwest_client: reqwest,
@@ -112,6 +119,12 @@ mod app {
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
+            let app2 = app.clone();
+            tokio::spawn(async move {
+                // ignore scanning errors instead of taking down the launcher
+                let _ = app2.clone().instance_manager().scan_instances().await;
+            });
+
             app
         }
 
@@ -123,6 +136,8 @@ mod app {
         manager_getter!(account_manager: AccountManager);
         manager_getter!(download_manager: DownloadManager);
         manager_getter!(task_manager: VisualTaskManager);
+        manager_getter!(instance_manager: InstanceManager);
+        manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
@@ -137,8 +152,17 @@ mod app {
             }
         }
 
-        pub async fn wait_for_invalidation(&self) -> Result<InvalidationEvent, RecvError> {
-            self.invalidation_channel.subscribe().recv().await
+        pub async fn wait_for_invalidation(
+            &self,
+            key: Key,
+        ) -> Result<InvalidationEvent, RecvError> {
+            let mut recv = self.invalidation_channel.subscribe();
+            loop {
+                let event = recv.recv().await?;
+                if event.key == key.full {
+                    return Ok(event);
+                }
+            }
         }
     }
 }
@@ -174,7 +198,7 @@ impl Drop for AppInner {
 pub use app::AppInner;
 
 pub struct ManagerRef<'a, T> {
-    manager: &'a T,
+    pub manager: &'a T,
     pub app: &'a Arc<AppInner>,
 }
 

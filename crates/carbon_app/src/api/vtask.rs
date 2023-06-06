@@ -1,27 +1,55 @@
 use rspc::{RouterBuilderLike, Type};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::api::keys::vtask::*;
+use crate::error::FeError;
+
+use crate::domain::vtask as domain;
 use crate::managers::App;
-use carbon_domain::vtask as domain;
 
 use super::router::router;
+use super::translation::Translation;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_TASKS[app, _: ()] {
             Ok(app.task_manager().get_tasks().await
                .into_iter()
-               .map(|task| Task::from(task))
+               .map(Task::from)
                .collect::<Vec<_>>())
+        }
+
+        query GET_TASK[app, task: TaskId] {
+            Ok(app.task_manager()
+               .get_task(task.into())
+               .await
+               .map(Task::from))
+        }
+
+        mutation DISMISS_TASK[app, task: TaskId] {
+            app.task_manager().dismiss_task(task.into()).await
         }
     }
 }
 
+#[derive(Type, Serialize, Deserialize)]
+pub struct TaskId(pub i32);
+
+impl From<domain::VisualTaskId> for TaskId {
+    fn from(value: domain::VisualTaskId) -> Self {
+        Self(value.0)
+    }
+}
+
+impl From<TaskId> for domain::VisualTaskId {
+    fn from(value: TaskId) -> Self {
+        Self(value.0)
+    }
+}
+
 #[derive(Type, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Task {
-    name: String,
+    name: Translation,
     progress: Progress,
     downloaded: u32,
     download_total: u32,
@@ -29,16 +57,15 @@ pub struct Task {
 }
 
 #[derive(Type, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub enum Progress {
     Indeterminate,
     Known(f32),
+    Failed(FeError),
 }
 
 #[derive(Type, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Subtask {
-    name: String,
+    name: Translation,
     progress: SubtaskProgress,
 }
 
@@ -53,7 +80,7 @@ pub enum SubtaskProgress {
 impl From<domain::Task> for Task {
     fn from(value: domain::Task) -> Self {
         Self {
-            name: value.name,
+            name: value.name.into(),
             progress: value.progress.into(),
             downloaded: value.downloaded,
             download_total: value.download_total,
@@ -71,6 +98,7 @@ impl From<domain::Progress> for Progress {
         match value {
             domain::Progress::Indeterminate => Self::Indeterminate,
             domain::Progress::Known(x) => Self::Known(x),
+            domain::Progress::Failed(err) => Self::Failed(FeError::from_anyhow(&*err)),
         }
     }
 }
@@ -78,7 +106,7 @@ impl From<domain::Progress> for Progress {
 impl From<domain::Subtask> for Subtask {
     fn from(value: domain::Subtask) -> Self {
         Self {
-            name: value.name,
+            name: value.name.into(),
             progress: value.progress.into(),
         }
     }
