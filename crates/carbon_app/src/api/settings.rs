@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        keys::settings::{GET_IS_FIRST_LAUNCH, GET_SETTINGS, SET_IS_FIRST_LAUNCH, SET_SETTINGS},
+        keys::settings::{GET_SETTINGS, SET_SETTINGS},
         router::router,
     },
     managers::App,

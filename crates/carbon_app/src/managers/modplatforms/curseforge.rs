@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
 use url::Url;
@@ -11,7 +9,7 @@ use crate::{
             ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
             ModsParameters,
         },
-        Category, CurseForgeResponse, File, FingerprintMatch, FingerprintsMatchesResult, Mod,
+        Category, CurseForgeResponse, File, FingerprintsMatchesResult, Mod,
     },
     managers::GDL_API_BASE,
 };

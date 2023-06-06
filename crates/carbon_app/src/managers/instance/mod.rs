@@ -680,7 +680,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         use db::instance::{SetParam, UniqueWhereParam};
 
         let mut instances = self.instances.write().await;
-        let mut instance = instances
+        let instance = instances
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
@@ -943,7 +943,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         use db::instance::{SetParam, UniqueWhereParam};
 
         let mut instances = self.instances.write().await;
-        let mut instance = instances
+        let instance = instances
             .get_mut(&update.instance_id)
             .ok_or(InvalidInstanceIdError(update.instance_id))?;
 

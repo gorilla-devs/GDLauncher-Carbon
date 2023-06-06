@@ -4,7 +4,6 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::bail;
 use carbon_net::{Downloadable, Progress};
 use serde::Deserialize;
 use strum::IntoEnumIterator;

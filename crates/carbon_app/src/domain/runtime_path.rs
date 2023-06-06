@@ -6,8 +6,6 @@ use std::{
 
 use anyhow::anyhow;
 
-use super::maven::MavenCoordinates;
-
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
 

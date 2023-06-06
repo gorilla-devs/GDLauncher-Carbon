@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
