@@ -249,7 +249,7 @@ const Tile = (props: Props) => {
                   </h3>
                   <For each={props.subTasks}>
                     {(subTask) => (
-                      <div>
+                      <div class="text-center">
                         <Trans
                           key={subTask.name.translation}
                           options={getTranslationArgs(subTask.name)}
@@ -308,7 +308,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
+            class="group relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
             onClick={(e) => props?.onClick?.(e)}
             classList={{
               grayscale: props.isLoading || props.isInQueue,
@@ -330,30 +330,30 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="absolute gap-2 duration-100 ease-in-out hidden transition-all right-5"
+              class="rounded-full absolute right-5 flex justify-center items-center cursor-pointer h-7 w-7 transition-transform duration-100"
               classList={{
-                "group-hover:flex": !props.invalid && !props.failError,
+                "bg-primary-500": !props.isRunning,
+                "scale-0": !props.isRunning,
+                "bg-red-500 scale-100": props.isRunning,
+                "group-hover:scale-100":
+                  !props.isLoading &&
+                  !props.isInQueue &&
+                  !props.invalid &&
+                  !props.failError &&
+                  !props.isRunning,
               }}
             >
               <div
-                class="rounded-full flex justify-center items-center cursor-pointer h-7 w-7"
+                class="text-white text-lg"
                 classList={{
-                  "bg-primary-500": !props.isRunning,
-                  "bg-red-500": props.isRunning,
+                  "i-ri:play-fill": !props.isRunning,
+                  "i-ri:pause-mini-fill": props.isRunning,
                 }}
-              >
-                <div
-                  class="text-white text-lg"
-                  classList={{
-                    "i-ri:play-fill": !props.isRunning,
-                    "i-ri:pause-mini-fill": props.isRunning,
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayClick();
-                  }}
-                />
-              </div>
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePlayClick();
+                }}
+              />
             </div>
 
             <Show when={props.isLoading && props.percentage !== undefined}>
@@ -403,7 +403,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar-small"}>
         <div
           onClick={(e) => props?.onClick?.(e)}
-          class="h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
+          class="group h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
         >
           <Show when={props.selected && !props.isLoading}>
             <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
@@ -429,35 +429,32 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
+
             <div
-              class="gap-2 duration-100 ease-in-out right-5 hidden transition-all"
+              class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100"
               classList={{
-                "group-hover:flex":
+                "bg-primary-500": !props.isRunning,
+                "scale-0": !props.isRunning,
+                "bg-red-500 scale-100": props.isRunning,
+                "group-hover:scale-100":
                   !props.isLoading &&
                   !props.isInQueue &&
                   !props.invalid &&
-                  !props.failError,
+                  !props.failError &&
+                  !props.isRunning,
               }}
             >
               <div
-                class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer"
+                class="text-white text-lg"
                 classList={{
-                  "bg-primary-500": !props.isRunning,
-                  "bg-red-500": props.isRunning,
+                  "i-ri:play-fill": !props.isRunning,
+                  "i-ri:pause-mini-fill": props.isRunning,
                 }}
-              >
-                <div
-                  class="text-white text-lg"
-                  classList={{
-                    "i-ri:play-fill": !props.isRunning,
-                    "i-ri:pause-mini-fill": props.isRunning,
-                  }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handlePlayClick();
-                  }}
-                />
-              </div>
+                onClick={(e) => {
+                  e.preventDefault();
+                  handlePlayClick();
+                }}
+              />
             </div>
           </div>
         </div>
