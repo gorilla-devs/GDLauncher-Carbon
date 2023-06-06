@@ -210,9 +210,10 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100 scale-0"
+                class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100"
                 classList={{
                   "bg-primary-500": !props.isRunning,
+                  "scale-0": !props.isRunning,
                   "bg-red-500 scale-100": props.isRunning,
                   "group-hover:scale-100":
                     !props.isLoading &&

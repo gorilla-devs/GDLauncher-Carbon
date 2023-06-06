@@ -31,14 +31,6 @@ const Home = () => {
     setIsNewVisible(!!routeData.settings.data?.showNews);
   });
 
-  createEffect(() => {
-    console.log(
-      "routeData.instancesUngrouped.isLoading",
-      routeData.instancesUngrouped.isLoading,
-      routeData.instancesUngrouped.data
-    );
-  });
-
   return (
     <div class="p-6 pb-0">
       <div>
