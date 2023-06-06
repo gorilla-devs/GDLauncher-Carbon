@@ -262,7 +262,9 @@ impl VisualTask {
             .await
             .iter()
             .map(|task| match task.borrow().progress {
-                Progress::Download { downloaded, total } => (downloaded, total),
+                Progress::Download {
+                    downloaded, total, ..
+                } => (downloaded, total),
                 _ => (0, 0),
             })
             .fold((0, 0), |(ad, at), (d, t)| (ad + d, at + t))
@@ -323,7 +325,11 @@ impl Subtask {
     }
 
     pub fn update_download(&self, downloaded: u32, total: u32) {
-        self.update_progress(Progress::Download { downloaded, total });
+        self.update_progress(Progress::Download {
+            downloaded,
+            total,
+            complete: false,
+        });
     }
 
     pub fn update_items(&self, current: u32, total: u32) {
@@ -336,6 +342,21 @@ impl Subtask {
 
     pub fn complete_opaque(&self) {
         self.update_progress(Progress::Opaque(true));
+    }
+
+    pub fn complete_download(&self) {
+        self.update(|data| {
+            data.progress = match data.progress {
+                Progress::Download {
+                    downloaded, total, ..
+                } => Progress::Download {
+                    downloaded,
+                    total,
+                    complete: true,
+                },
+                _ => Progress::Opaque(true),
+            }
+        });
     }
 
     pub fn set_weight(&self, weight: f32) {
@@ -378,10 +399,17 @@ pub struct SubtaskData {
 pub enum Progress {
     // Download progress numbers are added to the overall task downloaded number,
     // shown after the subtask text as `(<downloaded>/<total>)` in mb.
-    Download { downloaded: u32, total: u32 },
+    Download {
+        downloaded: u32,
+        total: u32,
+        complete: bool,
+    },
 
     // Item progress numbers are shown after the subtask text as `(<current>/<total>)`.
-    Item { current: u32, total: u32 },
+    Item {
+        current: u32,
+        total: u32,
+    },
 
     // There isn't a reasonable way to represent the progress of this task, so progress is
     // represented as an opaque "is it done" boolean. `Opaque(false)` can also represent
@@ -392,7 +420,9 @@ pub enum Progress {
 impl Progress {
     pub fn as_float(self) -> f32 {
         match self {
-            Self::Download { downloaded, total } => downloaded as f32 / total as f32,
+            Self::Download {
+                downloaded, total, ..
+            } => downloaded as f32 / total as f32,
             Self::Item { current, total } => current as f32 / total as f32,
             Self::Opaque(false) => 0.0,
             Self::Opaque(true) => 1.0,
@@ -401,7 +431,7 @@ impl Progress {
 
     pub fn is_complete(self) -> bool {
         match self {
-            Self::Download { downloaded, total } => downloaded >= total,
+            Self::Download { complete, .. } => complete,
             Self::Item { current, total } => current >= total,
             Self::Opaque(complete) => complete,
         }
@@ -411,7 +441,9 @@ impl Progress {
 impl From<Progress> for domain::SubtaskProgress {
     fn from(value: Progress) -> Self {
         match value {
-            Progress::Download { downloaded, total } => Self::Download { downloaded, total },
+            Progress::Download {
+                downloaded, total, ..
+            } => Self::Download { downloaded, total },
             Progress::Item { current, total } => Self::Item { current, total },
             Progress::Opaque(_) => Self::Opaque,
         }

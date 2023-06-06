@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::LinkedList;
+
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -8,19 +8,16 @@ use std::str::FromStr;
 
 use md5::Digest;
 use md5::Md5;
-use sentry::types::ParseDsnError;
-use tokio::sync::mpsc;
+
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
-use crate::api::translation::Translation;
-use crate::db::read_filters::BytesFilter;
 use crate::db::read_filters::IntFilter;
-use crate::db::read_filters::StringFilter;
+
 use crate::domain::instance::InstanceId;
 use crate::domain::runtime_path::InstancesPath;
-use crate::managers::vtask::VisualTask;
+
 use crate::managers::ManagerRef;
 use crate::once_send::OnceSend;
 
@@ -72,13 +69,13 @@ impl MetaCacheManager {
 impl ManagerRef<'_, MetaCacheManager> {
     /// Panics if called more than once
     pub async fn launch_background_tasks(self) {
-        let (mut local_notify, mut cf_notify) = self
+        let (mut local_notify, _cf_notify) = self
             .background_watches
             .take()
             .expect("launch_background_tasks may only be called once");
 
         let app_local = self.app.clone();
-        let app_cf = self.app.clone();
+        let _app_cf = self.app.clone();
 
         tokio::spawn(async move {
             use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};

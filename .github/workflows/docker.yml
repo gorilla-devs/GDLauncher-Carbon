@@ -39,11 +39,13 @@ jobs:
       - name: Codegen
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
         run: pnpm codegen
       - name: Build
         run: IS_DOCKER_TEST=true pnpm build:linux-x64
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
       # - name: Lint
       #   run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -52,4 +54,5 @@ jobs:
       - name: Test
         env:
           CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test

@@ -521,7 +521,7 @@ mod tests {
         }
     }
 
-    async fn run_test_generate_startup_command(mc_version: &str) {
+    async fn run_test_generate_startup_command(_mc_version: &str) {
         let app = setup_managers_for_test().await;
 
         let version = app

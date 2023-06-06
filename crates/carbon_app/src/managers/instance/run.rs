@@ -5,7 +5,7 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
-use std::str::FromStr;
+
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 
@@ -28,7 +28,7 @@ use crate::{
     },
 };
 
-use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
+use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 pub struct PersistenceManager {
     ensure_lock: Semaphore,
@@ -240,6 +240,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 tokio::time::sleep(Duration::from_millis(200)).await;
                             }
+
+                            t_download_files.complete_download();
                         });
 
                         let modpack_info = curseforge::prepare_modpack(
@@ -395,6 +397,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                         tokio::time::sleep(Duration::from_millis(200)).await;
                     }
+
+                    t_download_files.complete_download();
                 });
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
@@ -614,7 +618,7 @@ impl ManagerRef<'_, InstanceManager> {
         state: LaunchState,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
-        let mut instance = instances
+        let instance = instances
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 

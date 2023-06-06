@@ -174,7 +174,7 @@ mod tests {
 
         // -----FORGE
 
-        let mut progress = tokio::sync::watch::channel(Progress::new());
+        let progress = tokio::sync::watch::channel(Progress::new());
 
         // tokio::spawn(async move {
         //     while progress.1.changed().await.is_ok() {
