@@ -1,12 +1,13 @@
-import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
+import { For, Show, createEffect } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import glassBlock from "/assets/images/icons/glassBlock.png";
-import { useParams } from "@solidjs/router";
+import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
+import fetchData from "../instance.data";
 
 const Mods = () => {
   const [t] = useTransContext();
@@ -15,16 +16,13 @@ const Mods = () => {
   const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
   const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const disableModMutation = rspc.createMutation(["instance.disableMod"]);
 
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
-  ]);
-
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    parseInt(params.id, 10),
   ]);
 
   const NoMods = () => {
@@ -108,7 +106,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 onChange={(checked) => {
-                  instanceDetails.data?.mods.forEach((mod) => {
+                  routeData.instanceDetails.data?.mods.forEach((mod) => {
                     if (checked) {
                       setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
                     } else
@@ -180,7 +178,7 @@ const Mods = () => {
             </div>
           </div>
           <div class="flex gap-1">
-            <span>{instanceDetails.data?.mods.length}</span>
+            <span>{routeData.instanceDetails.data?.mods.length}</span>
 
             <Trans
               key="instance.mods"
@@ -194,11 +192,13 @@ const Mods = () => {
       <div class="h-full overflow-y-hidden">
         <Show
           when={
-            instanceDetails.data?.mods && instanceDetails.data?.mods.length > 0
+            routeData.instanceDetails.data?.mods &&
+            routeData.instanceDetails.data?.mods.length > 0 &&
+            !routeData.instanceDetails.isLoading
           }
           fallback={<NoMods />}
         >
-          <For each={instanceDetails.data?.mods}>
+          <For each={routeData.instanceDetails.data?.mods}>
             {(props) => (
               <Mod
                 mod={props}
@@ -207,6 +207,9 @@ const Mods = () => {
               />
             )}
           </For>
+        </Show>
+        <Show when={routeData.instanceDetails.isLoading}>
+          <Skeleton.sidebarInstances />
         </Show>
       </div>
     </div>
