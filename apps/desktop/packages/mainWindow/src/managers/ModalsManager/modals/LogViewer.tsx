@@ -1,21 +1,11 @@
 import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
-import {
-  For,
-  Show,
-  createEffect,
-  createResource,
-  createSignal,
-} from "solid-js";
+import { For, Show, createEffect, createResource } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import { streamToJson } from "@/utils/helpers";
 import { Trans } from "@gd/i18n";
-
-type Log = {
-  line: string;
-  type_: string;
-};
+import { Log, logsObj, setLogsObj } from "@/utils/logs";
 
 const fetchLogs = async (logId: number) =>
   fetch(`http://localhost:${port}/instance/log?id=${logId}`);
@@ -39,7 +29,11 @@ const LogViewer = (props: ModalProps) => {
                         (instance) => instance.id === log.instance_id
                       );
                       return (
-                        <Tab>
+                        <Tab
+                          onClick={() => {
+                            console.log("log.instance_id", log.instance_id);
+                          }}
+                        >
                           <div class="w-full flex gap-2 items-center h-10 justify-start">
                             <div class="w-6 rounded-md bg-green h-6" />
                             <p class="my-2 whitespace-nowrap">
@@ -59,8 +53,6 @@ const LogViewer = (props: ModalProps) => {
               <div class="bg-darkSlate-700 overflow-y-auto max-h-130">
                 <For each={logs.data}>
                   {(instance) => {
-                    const [logsArray, setLogsArray] = createSignal<Log[]>([]);
-
                     const [logs] = createResource(instance.id, fetchLogs);
 
                     async function processStream(
@@ -68,7 +60,11 @@ const LogViewer = (props: ModalProps) => {
                     ) {
                       for await (const jsonObject of streamToJson(stream)) {
                         // Do something with jsonObject
-                        setLogsArray((prev) => [...prev, jsonObject as Log]);
+                        if (jsonObject) {
+                          setLogsObj(instance.id, (prev) => {
+                            return [...(prev || []), jsonObject as Log];
+                          });
+                        }
                       }
                     }
 
@@ -78,20 +74,26 @@ const LogViewer = (props: ModalProps) => {
                       }
                     });
 
+                    const instanceLogs = () => logsObj?.[instance.id] || [];
+
                     return (
                       <TabPanel>
-                        <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500">
-                          <For each={logsArray()}>
-                            {(log) => {
-                              return (
-                                <div class="flex flex-col justify-center items-center w-full">
-                                  <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
-                                    <code>{log?.line}</code>
-                                  </pre>
-                                </div>
-                              );
-                            }}
-                          </For>
+                        <div>
+                          <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500">
+                            {instance.id}
+                            {instanceLogs().length}
+                            <For each={instanceLogs()}>
+                              {(log) => {
+                                return (
+                                  <div class="flex flex-col justify-center items-center w-full">
+                                    <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
+                                      <code>{log?.line}</code>
+                                    </pre>
+                                  </div>
+                                );
+                              }}
+                            </For>
+                          </div>
                         </div>
                       </TabPanel>
                     );

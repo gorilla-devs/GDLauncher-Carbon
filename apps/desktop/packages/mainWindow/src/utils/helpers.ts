@@ -69,15 +69,35 @@ export const streamToJson = async function* (
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let done: boolean | undefined, value: Uint8Array | undefined;
+  let accumulatedString = "";
 
   try {
     while (!done) {
       ({ done, value } = await reader.read());
       if (value) {
-        const string = decoder.decode(value, { stream: !done });
-        const jsonObjects = safeJsonParse(string);
-        for (const jsonObject of jsonObjects) {
-          yield jsonObject;
+        const string = decoder.decode(value, { stream: true }); // keep stream: true
+
+        accumulatedString += string; // accumulate incoming strings
+
+        // Try to find complete JSON objects in the accumulated string
+        let startIndex = 0;
+        while (
+          (startIndex = accumulatedString.indexOf("{", startIndex)) !== -1
+        ) {
+          try {
+            const jsonString = accumulatedString.slice(startIndex);
+            const jsonObject = JSON.parse(jsonString);
+            yield jsonObject;
+
+            // If a JSON object was successfully parsed, remove it from the accumulated string
+            accumulatedString = accumulatedString.slice(
+              startIndex + jsonString.length
+            );
+            startIndex = 0;
+          } catch (err) {
+            // If parsing failed, continue accumulating more strings
+            startIndex++;
+          }
         }
       }
     }
