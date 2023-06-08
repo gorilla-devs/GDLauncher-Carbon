@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use strum::IntoEnumIterator;
+use tracing::{info, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
@@ -236,7 +237,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
     let all_javas = db.java().find_many(vec![]).exec().await?;
 
     for profile in SystemJavaProfileName::iter() {
-        println!("Syncing system java profile: {}", profile.to_string());
+        info!("Syncing system java profile: {}", profile.to_string());
         let java_in_profile = db
             .java_system_profile()
             .find_unique(
@@ -253,7 +254,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
             .java_id;
 
         if java_in_profile.is_some() {
-            println!(
+            info!(
                 "Java system profile {} already has a java",
                 profile.to_string()
             );
@@ -262,15 +263,15 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
 
         // Scan for a compatible java
         for java in all_javas.iter() {
-            println!("Checking java {}", java.path);
+            info!("Checking java {}", java.path);
             if !java.is_valid {
-                println!("Java {} is invalid, skipping", java.path);
+                warn!("Java {} is invalid, skipping", java.path);
                 continue;
             }
 
             let java_version = JavaVersion::try_from(java.full_version.as_str())?;
             if profile.is_java_version_compatible(&java_version) {
-                println!(
+                info!(
                     "Java {} is compatible with profile {}",
                     java.path,
                     profile.to_string()
@@ -296,6 +297,8 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
 
 #[cfg(test)]
 mod test {
+    use tracing::info;
+
     use crate::{
         domain::java::{
             JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion, SystemJavaProfileName,
@@ -481,7 +484,7 @@ mod test {
             .unwrap()
             .unwrap();
 
-        println!("{:?}", legacy_profile);
+        info!("{:?}", legacy_profile);
 
         assert!(legacy_profile.java.flatten().is_some());
 

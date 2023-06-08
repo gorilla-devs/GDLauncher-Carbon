@@ -14,8 +14,6 @@ anyhow = { workspace = true }
 derive_more = { workspace = true }
 thiserror = { workspace = true }
 sentry = { workspace = true }
-env_logger = { workspace = true }
-log = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 serde_urlencoded = "0.7.1"
@@ -26,6 +24,7 @@ futures = { workspace = true }
 tower-http = { workspace = true, default-features = false, features = ["cors"] }
 rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
 reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
@@ -35,7 +34,6 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
 carbon_compression = { path = "../carbon_compression" }
-carbon_domain = { path = "../carbon_domain" }
 carbon_net = { path = "../carbon_net" }
 uuid = { workspace = true }
 prisma-client-rust = { workspace = true, features = [

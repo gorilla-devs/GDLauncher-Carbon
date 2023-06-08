@@ -26,8 +26,11 @@ macro_rules! router {
         $(
             router = router.$type($endpoint.local, |t| {
                 t(|$app: $crate::managers::App, $args: $args_ty| async move {
+                    use tracing::Instrument;
+
+                    let span = tracing::info_span!($endpoint.span_key);
                     let block: ::core::result::Result::<_, $crate::api::router::router_rt_helper!($($rtmarker)?)>
-                        = async move { $block }.await;
+                        = async move { $block }.instrument(span).await;
 
                     block.map_err(|e| {
                         let mut e = core::convert::Into::<$crate::error::FeError>::into(e);

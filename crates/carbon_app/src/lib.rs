@@ -10,6 +10,10 @@ use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::{info, metadata::LevelFilter};
+use tracing_subscriber::{
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+};
 
 pub mod api;
 mod app_version;
@@ -27,15 +31,9 @@ mod runtime_path_override;
 pub async fn init() {
     // pprocess_keepalive::init();
 
-    println!("Starting Carbon App");
-
-    #[cfg(feature = "production")]
-    iridium::startup_check();
-
     #[cfg(feature = "production")]
     #[cfg(not(test))]
     let _guard = {
-        println!("Initializing Sentry");
         sentry::init((
             env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
@@ -45,9 +43,24 @@ pub async fn init() {
         ))
     };
 
-    println!("Initializing runtime path");
+    let filter = EnvFilter::try_new(
+        "info,carbon_app=trace,query_core::executor::pipeline=trace,reqwest::connect=debug",
+    )
+    .unwrap();
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(filter)
+        .init();
+
+    info!("Starting Carbon App");
+
+    #[cfg(feature = "production")]
+    iridium::startup_check();
+
+    info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
-    println!("Scanning ports");
+    info!("Scanning ports");
     let listener = if cfg!(debug_assertions) {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
@@ -70,7 +83,7 @@ async fn get_available_port() -> TcpListener {
 }
 
 async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
-    println!("Starting router");
+    info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -118,7 +131,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
-                println!("_STATUS_: READY|{port}");
+                info!("_STATUS_: READY|{port}");
                 break;
             }
         }
@@ -168,7 +181,7 @@ impl Drop for TestEnv {
 async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
-    println!("Test RTP: {}", temp_path.to_str().unwrap());
+    info!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
     TestEnv {
