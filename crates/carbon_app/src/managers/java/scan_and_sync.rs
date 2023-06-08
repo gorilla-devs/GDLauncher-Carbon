@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use strum::IntoEnumIterator;
-use tracing::{info, warn};
+use tracing::{info, trace, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
@@ -10,6 +10,7 @@ use crate::{
 
 use super::{discovery::Discovery, java_checker::JavaChecker};
 
+#[tracing::instrument(level = "trace", skip(db))]
 async fn get_java_component_from_db(
     db: &PrismaClient,
     path: String,
@@ -23,6 +24,7 @@ async fn get_java_component_from_db(
     Ok(res)
 }
 
+#[tracing::instrument(level = "trace", skip(db))]
 pub async fn add_java_component_to_db(
     db: &Arc<PrismaClient>,
     java_component: JavaComponent,
@@ -45,6 +47,7 @@ pub async fn add_java_component_to_db(
     Ok(res.id)
 }
 
+#[tracing::instrument(level = "trace", skip(db))]
 async fn update_java_component_in_db_to_invalid(
     db: &Arc<PrismaClient>,
     path: String,
@@ -60,6 +63,7 @@ async fn update_java_component_in_db_to_invalid(
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_local<T, G>(
     db: &Arc<PrismaClient>,
     discovery: &T,
@@ -73,7 +77,10 @@ where
     let local_javas = discovery.find_java_paths().await;
     let java_profiles = db.java_system_profile().find_many(vec![]).exec().await?;
 
+    trace!("Auto Manage Java is {}", auto_manage_java);
+
     for local_java in &local_javas {
+        trace!("Analyzing local java: {:?}", local_java);
         // Verify whether the java is valid
         let java_bin_info = java_checker
             .get_bin_info(local_java, JavaComponentType::Local)
@@ -91,6 +98,7 @@ where
         match java_bin_info {
             // If it is valid, check whether it's in the DB
             Ok(java_component) => {
+                trace!("Java is valid: {:?}", java_component);
                 match db_entry {
                     // If it is in the db, update it to valid. Also make sure the version is in sync. If Major is not in sync, that is a problem
                     Some(_) => {
@@ -103,7 +111,8 @@ where
                 }
             }
             // If it isn't valid, check whether it's in the DB
-            Err(_) => {
+            Err(err) => {
+                trace!("Java is invalid due to: {:?}", err);
                 let is_java_used_in_profile = java_profiles.iter().any(|profile| {
                     let Some(java) = profile.java.as_ref() else { return false; };
                     let Some(java) = java.as_ref() else { return false; };
@@ -174,6 +183,7 @@ where
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_custom<G>(db: &Arc<PrismaClient>, java_checker: &G) -> anyhow::Result<()>
 where
     G: JavaChecker,
@@ -202,6 +212,7 @@ where
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_managed<G>(
     db: &Arc<PrismaClient>,
     java_checker: &G,
@@ -233,11 +244,12 @@ where
     Ok(())
 }
 
+#[tracing::instrument(level = "trace", skip_all)]
 pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
     let all_javas = db.java().find_many(vec![]).exec().await?;
 
     for profile in SystemJavaProfileName::iter() {
-        info!("Syncing system java profile: {}", profile.to_string());
+        trace!("Syncing system java profile: {}", profile.to_string());
         let java_in_profile = db
             .java_system_profile()
             .find_unique(
@@ -254,7 +266,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
             .java_id;
 
         if java_in_profile.is_some() {
-            info!(
+            trace!(
                 "Java system profile {} already has a java",
                 profile.to_string()
             );
@@ -263,7 +275,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
 
         // Scan for a compatible java
         for java in all_javas.iter() {
-            info!("Checking java {}", java.path);
+            trace!("Checking java {}", java.path);
             if !java.is_valid {
                 warn!("Java {} is invalid, skipping", java.path);
                 continue;
@@ -271,7 +283,7 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
 
             let java_version = JavaVersion::try_from(java.full_version.as_str())?;
             if profile.is_java_version_compatible(&java_version) {
-                info!(
+                trace!(
                     "Java {} is compatible with profile {}",
                     java.path,
                     profile.to_string()

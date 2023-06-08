@@ -44,7 +44,7 @@ pub async fn init() {
     };
 
     let filter = EnvFilter::try_new(
-        "info,carbon_app=trace,query_core::executor::pipeline=trace,reqwest::connect=debug",
+        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
     )
     .unwrap();
 

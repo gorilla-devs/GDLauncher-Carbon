@@ -1,5 +1,6 @@
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
+use tracing::trace;
 use url::Url;
 
 use crate::{
@@ -32,9 +33,12 @@ impl CurseForge {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_categories(&self) -> anyhow::Result<CurseForgeResponse<Vec<Category>>> {
         let mut url = self.base_url.join("categories")?;
         url.set_query(Some("gameId=432"));
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -46,6 +50,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn search(
         &self,
         search_params: ModSearchParameters,
@@ -53,6 +58,8 @@ impl CurseForge {
         let mut url = self.base_url.join("mods/search")?;
         let query = search_params.query.into_query_parameters()?;
         url.set_query(Some(&query));
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -64,6 +71,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mod(
         &self,
         mod_parameters: ModParameters,
@@ -71,6 +79,8 @@ impl CurseForge {
         let url = self
             .base_url
             .join(&format!("mods/{}", &mod_parameters.mod_id.to_string()))?;
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -82,6 +92,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mods(
         &self,
         mod_parameters: ModsParameters,
@@ -89,6 +100,8 @@ impl CurseForge {
         let url = self.base_url.join("mods")?;
 
         let body = serde_json::to_string(&mod_parameters.body)?;
+
+        trace!("POST {url} - {body:?}");
 
         let resp = self
             .client
@@ -102,16 +115,21 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_fingerprints(
         &self,
         hashes: &[u32],
     ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
-        let url = self.base_url.join("v1/fingerprints")?;
+        let url = self.base_url.join("v1/fingerprints/432")?;
+
+        let body = json!({ "fingerprints": hashes });
+
+        trace!("POST {url} - {body:?}");
 
         let resp = self
             .client
-            .get(url.as_str())
-            .body(json!({ "fingerprints": hashes }).to_string())
+            .post(url.as_str())
+            .body(body.to_string())
             .send()
             .await?
             .json::<CurseForgeResponse<FingerprintsMatchesResult>>()
@@ -120,6 +138,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mod_description(
         &self,
         mod_parameters: ModDescriptionParameters,
@@ -128,6 +147,8 @@ impl CurseForge {
             "mods/{}/description",
             &mod_parameters.mod_id.to_string()
         ))?;
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -139,6 +160,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mod_file(
         &self,
         mod_parameters: ModFileParameters,
@@ -148,6 +170,8 @@ impl CurseForge {
             &mod_parameters.mod_id.to_string(),
             &mod_parameters.file_id.to_string()
         ))?;
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
@@ -159,6 +183,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mod_files(
         &self,
         mod_parameters: ModFilesParameters,
@@ -171,6 +196,8 @@ impl CurseForge {
         let query = mod_parameters.query.into_query_parameters()?;
         url.set_query(Some(&query));
 
+        trace!("GET {}", url);
+
         let resp = self
             .client
             .get(url.as_str())
@@ -181,6 +208,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_files(
         &self,
         mod_parameters: FilesParameters,
@@ -188,6 +216,8 @@ impl CurseForge {
         let url = self.base_url.join("files")?;
 
         let body = serde_json::to_string(&mod_parameters.body)?;
+
+        trace!("POST {url} - {body:?}");
 
         let resp = self
             .client
@@ -201,6 +231,7 @@ impl CurseForge {
         Ok(resp)
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_mod_file_changelog(
         &self,
         mod_parameters: ModFileChangelogParameters,
@@ -210,6 +241,8 @@ impl CurseForge {
             &mod_parameters.mod_id.to_string(),
             &mod_parameters.file_id.to_string()
         ))?;
+
+        trace!("GET {}", url);
 
         let resp = self
             .client
