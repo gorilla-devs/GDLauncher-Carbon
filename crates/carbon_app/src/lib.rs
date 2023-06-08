@@ -43,23 +43,36 @@ pub async fn init() {
         ))
     };
 
-    let filter = EnvFilter::try_new(
-        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
-    )
-    .unwrap();
-
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(filter)
-        .init();
-
-    info!("Starting Carbon App v{}", app_version::APP_VERSION);
-
     #[cfg(feature = "production")]
     iridium::startup_check();
 
     info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
+
+    let filter = EnvFilter::try_new(
+        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
+    )
+    .unwrap();
+
+    let logs_path = runtime_path.join("__gdl_logs__");
+
+    println!("Logs path: {}", logs_path.display());
+
+    if !logs_path.exists() {
+        tokio::fs::create_dir_all(&logs_path).await.unwrap();
+    }
+
+    let file_appender = tracing_appender::rolling::daily(logs_path, "logs.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+    tracing_subscriber::registry()
+        .with(tracing_forest::ForestLayer::default())
+        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
+        .with(filter)
+        .init();
+
+    info!("Starting Carbon App v{}", app_version::APP_VERSION);
+
     info!("Scanning ports");
     let listener = if cfg!(debug_assertions) {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()

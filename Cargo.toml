@@ -72,6 +72,8 @@ tower-http = "0.3.4"
 hex = "0.4"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.17"
+tracing-appender = "0.2.2"
+tracing-forest = { version = "0.1.5", features = ["full"] }
 tracing-test = "0.2.3"
 trash = "3.0.0"
 uuid = "1.2.2"

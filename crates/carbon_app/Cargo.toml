@@ -25,6 +25,8 @@ tower-http = { workspace = true, default-features = false, features = ["cors"] }
 rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-forest = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
 reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
