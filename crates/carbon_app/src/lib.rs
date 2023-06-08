@@ -53,7 +53,7 @@ pub async fn init() {
         .with(filter)
         .init();
 
-    info!("Starting Carbon App");
+    info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
     #[cfg(feature = "production")]
     iridium::startup_check();
