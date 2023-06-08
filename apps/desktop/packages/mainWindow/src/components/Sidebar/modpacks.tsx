@@ -31,6 +31,7 @@ const Sidebar = () => {
     if (routeData.minecraftVersions.data) {
       setMcVersions(routeData.minecraftVersions.data);
 
+      setMappedMcVersions([]);
       routeData.minecraftVersions.data.forEach((version) => {
         if (version.type === "release") {
           setMappedMcVersions((prev) => [
@@ -62,8 +63,7 @@ const Sidebar = () => {
             >
               <Radio name="modloader" value="any">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon()} />
-                  <p class="m-0">Vanilla</p>
+                  <p class="m-0">Any</p>
                 </div>
               </Radio>
               <Radio name="modloader" value="forge">

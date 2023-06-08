@@ -20,6 +20,7 @@ const Mods = () => {
 
   const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const disableModMutation = rspc.createMutation(["instance.disableMod"]);
+  const enableModMutation = rspc.createMutation(["instance.enableMod"]);
 
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
@@ -138,25 +139,7 @@ const Mods = () => {
                 }}
               />
             </div>
-            <div
-              class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
-              onClick={() => {
-                Object.keys(selectedMods).forEach((mod) => {
-                  disableModMutation.mutate({
-                    instance_id: parseInt(params.id, 10),
-                    mod_id: mod,
-                  });
-                });
-              }}
-            >
-              <span class="text-2xl i-ri:forbid-line" />
-              <Trans
-                key="instance.disable_mod"
-                options={{
-                  defaultValue: "disable",
-                }}
-              />
-            </div>
+
             <div
               class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
               onClick={() => {
@@ -176,6 +159,54 @@ const Mods = () => {
                 }}
               />
             </div>
+            <Show when={Object.keys(selectedMods).length > 0}>
+              <div
+                class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
+                onClick={() => {
+                  const areSelectedEnabled =
+                    routeData.instanceDetails.data?.mods
+                      .filter((mod) => selectedMods[mod.id])
+                      .every((mod) => mod.enabled);
+
+                  routeData.instanceDetails.data?.mods
+                    .filter((mod) => selectedMods[mod.id])
+                    .forEach((mod) => {
+                      if (areSelectedEnabled) {
+                        disableModMutation.mutate({
+                          instance_id: parseInt(params.id, 10),
+                          mod_id: mod.id,
+                        });
+                      } else {
+                        enableModMutation.mutate({
+                          instance_id: parseInt(params.id, 10),
+                          mod_id: mod.id,
+                        });
+                      }
+                    });
+                }}
+              >
+                <Show
+                  when={routeData.instanceDetails.data?.mods
+                    .filter((mod) => selectedMods[mod.id])
+                    .every((mod) => mod.enabled)}
+                  fallback={
+                    <Trans
+                      key="instance.enable_all_selected_mod"
+                      options={{
+                        defaultValue: "Enable selected",
+                      }}
+                    />
+                  }
+                >
+                  <Trans
+                    key="instance.disable_all_selected_mod"
+                    options={{
+                      defaultValue: "Disable selected",
+                    }}
+                  />
+                </Show>
+              </div>
+            </Show>
           </div>
           <div class="flex gap-1">
             <span>{routeData.instanceDetails.data?.mods.length}</span>

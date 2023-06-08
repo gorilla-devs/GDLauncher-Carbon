@@ -28,9 +28,11 @@ const Instance = () => {
   const params = useParams();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
-  const [newName, setNewName] = createSignal("");
   const [isFavorite, setIsFavorite] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [newName, setNewName] = createSignal(
+    routeData.instanceDetails.data?.name || ""
+  );
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -176,6 +178,8 @@ const Instance = () => {
     setEditableName(false);
   };
 
+  let nameRef: HTMLHeadingElement | undefined;
+
   return (
     <div
       class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
@@ -262,19 +266,31 @@ const Instance = () => {
                   />
 
                   <div class="flex flex-col max-w-185 flex-1">
-                    <div class="flex gap-4 items-center">
+                    <div
+                      class="flex gap-4 items-center w-fit pl-1"
+                      classList={{
+                        "border-2 border-primary-500 border-solid rounded-lg":
+                          editableName(),
+                        "border-2 border-transparent border-solid rounded-lg":
+                          !editableName(),
+                      }}
+                    >
                       <span class="flex gap-2 cursor-pointer">
                         <h1
+                          ref={nameRef}
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="m-0 cursor-pointer focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
-                          contentEditable
+                          class="m-0 border-box cursor-pointer focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text z-10"
+                          contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
                           }}
-                          onFocusOut={() => {
-                            handleNameChange();
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleNameChange();
+                            }
                           }}
                         >
                           {routeData.instanceDetails.data?.name}
@@ -286,11 +302,35 @@ const Instance = () => {
                           />
                         </Show>
                       </span>
-                      <div class="flex gap-2">
+                      <div class="relative flex items-center gap-2 h-full pr-2">
                         <div
-                          class="cursor-pointer ease-in-out text-darkSlate-50 transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
+                          classList={{
+                            "absolute right-0 bottom-0 top-0 w-[250%] z-1 bg-gradient-to-l from-10% from-primary-500":
+                              editableName(),
+                          }}
+                        />
+                        <div
+                          class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500 z-10"
                           classList={{
                             hidden: !editableName(),
+                          }}
+                          onClick={() => handleNameChange()}
+                        />
+                        <div
+                          class="cursor-pointer ease-in-out text-white transition i-ri:close-fill text-3xl duration-50 hover:text-red-500 z-10"
+                          classList={{
+                            hidden: !editableName(),
+                          }}
+                          onClick={() => {
+                            if (
+                              routeData.instanceDetails.data?.name &&
+                              nameRef
+                            ) {
+                              setNewName(routeData.instanceDetails.data?.name);
+                              nameRef.innerHTML =
+                                routeData.instanceDetails.data?.name;
+                            }
+                            setEditableName(false);
                           }}
                         />
                       </div>
@@ -322,14 +362,14 @@ const Instance = () => {
                         </div>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                        <div
+                        {/* <div
                           class="flex justify-center items-center rounded-full h-8 w-8"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}
                         >
                           <div class="i-ri:more-2-fill text-xl" />
-                        </div>
+                        </div> */}
                         <div
                           class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                           style={{
@@ -448,14 +488,14 @@ const Instance = () => {
                 </div>
               </div>
               <div class="flex items-center gap-2 mt-2 lg:mt-0 z-10">
-                <div
+                {/* <div
                   class="rounded-full w-8 h-8 flex justify-center items-center"
                   style={{
                     background: "rgba(255, 255, 255, 0.1)",
                   }}
                 >
                   <div class="i-ri:more-2-fill text-xl" />
-                </div>
+                </div> */}
                 <div
                   class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
                   style={{

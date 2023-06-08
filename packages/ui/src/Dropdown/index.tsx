@@ -42,7 +42,7 @@ interface DropDownButtonProps {
   disabled?: boolean;
   rounded?: boolean;
   label?: string;
-  onChange?: (_value: string) => void;
+  onChange?: (_value: Option) => void;
   onClick?: () => void;
   class?: string;
   id?: string;
@@ -203,7 +203,7 @@ const Dropdown = (props: Props) => {
 
 const DropDownButton = (props: DropDownButtonProps) => {
   const handleChange = (option: Option) => {
-    props.onChange?.(option.label);
+    props.onChange?.(option);
   };
 
   return (

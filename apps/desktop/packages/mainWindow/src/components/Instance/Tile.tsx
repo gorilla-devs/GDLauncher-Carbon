@@ -204,10 +204,6 @@ const Tile = (props: Props) => {
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
               </Show>
-              <Show when={props.isLoading || props.isInQueue}>
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-              </Show>
 
               <div
                 class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100"
@@ -260,7 +256,9 @@ const Tile = (props: Props) => {
                 </div>
               </Show>
               <Show when={props.isInQueue}>
-                <Spinner />
+                <div class="z-12">
+                  <Spinner />
+                </div>
               </Show>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
@@ -269,6 +267,11 @@ const Tile = (props: Props) => {
                     width: `${props.percentage}%`,
                   }}
                 />
+              </Show>
+              <Show when={props.isLoading || props.isInQueue}>
+                <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
               </Show>
             </div>
             <h4

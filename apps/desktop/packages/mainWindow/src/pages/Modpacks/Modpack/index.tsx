@@ -143,7 +143,7 @@ const Modpack = (props: Props) => {
               onChange={(val) => {
                 loadIconMutation.mutate(props.modpack.logo.url);
                 const file = props.modpack.latestFiles.find(
-                  (file) => file.id === parseInt(val, 10)
+                  (file) => file.id === parseInt(val.key as string, 10)
                 );
                 if (file) {
                   createInstanceMutation.mutate({

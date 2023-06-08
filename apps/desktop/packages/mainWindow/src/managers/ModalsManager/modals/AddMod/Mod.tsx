@@ -121,7 +121,7 @@ const Mod = (props: Props) => {
                 }}
                 onChange={(val) => {
                   const file = props.mod.latestFiles.find(
-                    (file) => file.id === parseInt(val, 10)
+                    (file) => file.id === parseInt(val.key as string, 10)
                   );
                   if (file) {
                     installModMutation.mutate({
