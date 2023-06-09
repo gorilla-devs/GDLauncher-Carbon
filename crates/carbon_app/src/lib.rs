@@ -62,16 +62,24 @@ pub async fn init() {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
 
-    let file_appender = tracing_appender::rolling::daily(logs_path, "logs.log");
+    let file_appender = tracing_appender::rolling::hourly(logs_path, "logs.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
+    // let processor = tracing_forest::Printer::new()
+    //     .formatter(tracing_forest::printer::Pretty)
+    //     // .formatter(serde_json::to_string_pretty)
+    //     .writer(non_blocking);
+    // let layer = tracing_forest::ForestLayer::from(processor);
+
     tracing_subscriber::registry()
-        .with(tracing_forest::ForestLayer::default())
+        // .with(layer.with_filter(filter))
         .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
         .with(filter)
         .init();
 
     info!("Starting Carbon App v{}", app_version::APP_VERSION);
+
+    info!("Runtime path: {}", runtime_path.display());
 
     info!("Scanning ports");
     let listener = if cfg!(debug_assertions) {
@@ -144,7 +152,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
-                info!("_STATUS_: READY|{port}");
+                println!("_STATUS_: READY|{port}");
                 break;
             }
         }
