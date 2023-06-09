@@ -80,8 +80,6 @@ tracing-forest = { version = "0.1.5", features = [
   "serde",
   "env-filter",
 ] }
-tracing-opentelemetry = "0.19.0"
-opentelemetry = "0.19.0"
 tracing-test = "0.2.3"
 trash = "3.0.0"
 uuid = "1.2.2"
