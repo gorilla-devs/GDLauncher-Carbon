@@ -281,7 +281,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="m-0 border-box cursor-pointer focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text z-10"
+                          class="m-0 border-box cursor-pointer z-10 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
@@ -310,7 +310,7 @@ const Instance = () => {
                           }}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500 z-10"
+                          class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl z-10 duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -371,7 +371,7 @@ const Instance = () => {
                           <div class="i-ri:more-2-fill text-xl" />
                         </div> */}
                         <div
-                          class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
+                          class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
                             background: "rgba(255, 255, 255, 0.1)",
                           }}

@@ -1,5 +1,5 @@
 import Card from "@/components/Card";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useRouteData } from "@solidjs/router";
@@ -8,6 +8,7 @@ import { format } from "date-fns";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [t] = useTransContext();
 
   return (
     <div class="flex flex-col gap-4 mt-10 max-w-185">
@@ -30,12 +31,12 @@ const Overview = () => {
             {(modloader, index) => (
               <>
                 <Card
-                  title={`Modloader ${index()}`}
+                  title={`Modloader ${index() || ""}`}
                   text={modloader.type_}
                   icon="book"
                 />
                 <Card
-                  title={`Modloader ${index()} version`}
+                  title={`Modloader ${index() || ""} version`}
                   text={modloader.version}
                   icon="pickaxe"
                 />
@@ -46,7 +47,7 @@ const Overview = () => {
 
         <Show when={routeData.instanceDetails.data?.mods}>
           <Card
-            title="Mods"
+            title={t("instance.overview_card_mods_title")}
             text={
               (routeData.instanceDetails.data as InstanceDetails)?.mods.length
             }
@@ -55,7 +56,7 @@ const Overview = () => {
         </Show>
         <Show when={routeData.instanceDetails.data?.seconds_played}>
           <Card
-            title="Played time"
+            title={t("instance.overview_card_played_time_title")}
             text={
               (routeData.instanceDetails.data as InstanceDetails)
                 ?.seconds_played
@@ -65,12 +66,12 @@ const Overview = () => {
         </Show>
         <Show when={routeData.instanceDetails.data?.last_played}>
           <Card
-            title="Last played"
+            title={t("instance.overview_card_last_played_title")}
             text={format(
               new Date(
                 (routeData.instanceDetails.data as InstanceDetails)?.last_played
               ),
-              "dd-MM-yyyy"
+              "PPP"
             )}
             icon="sign"
           />

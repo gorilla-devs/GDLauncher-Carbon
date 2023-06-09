@@ -9,9 +9,9 @@ type Props = {
 const SecondStep = (props: Props) => {
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
   return (
-    <div class="flex flex-col items-center justify-between w-120 h-80">
+    <div class="flex flex-col items-center justify-between w-160 h-140">
       <div class="flex flex-col h-full justify-center items-center">
-        <p class="text-center font-normal text-darkSlate-100 m-0 max-w-100">
+        <p class="text-center text-darkSlate-100 m-0 max-w-100 font-normal">
           <Trans
             key="onboarding.java_title"
             options={{

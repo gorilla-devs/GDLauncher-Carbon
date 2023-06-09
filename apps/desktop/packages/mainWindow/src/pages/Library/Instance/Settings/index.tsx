@@ -13,7 +13,7 @@ const Settings = () => {
     ["instance.updateInstance"],
     {
       onMutate: (newData) => {
-        queryClient.setQueryData(["instance.updateInstance"], newData);
+        queryClient.setQueryData(["instance.getInstanceDetails"], newData);
       },
     }
   );
@@ -37,7 +37,7 @@ const Settings = () => {
             />
           </h5>
           <Switch
-            checked={routeData?.instanceDetails?.data?.memory !== null}
+            checked={!!routeData?.instanceDetails?.data?.memory}
             onChange={(e) => {
               updateInstanceMutation.mutate({
                 memory: {

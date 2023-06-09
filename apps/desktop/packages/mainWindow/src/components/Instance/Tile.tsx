@@ -185,6 +185,12 @@ const Tile = (props: Props) => {
               classList={{
                 grayscale: props.isLoading || props.isInQueue,
                 "bg-green-600": !props.img,
+                "cursor-pointer":
+                  !props.isLoading &&
+                  !props.isInQueue &&
+                  !props.invalid &&
+                  !props.failError &&
+                  !props.isRunning,
               }}
               style={{
                 "background-image": `url("${props.img as string}")`,
@@ -206,12 +212,13 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out ease-in-out h-12 w-12 duration-100 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-transform duration-100"
+                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-all duration-100"
                 classList={{
-                  "bg-primary-500": !props.isRunning,
+                  "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
+                    !props.isRunning,
                   "scale-0": !props.isRunning,
                   "bg-red-500 scale-100": props.isRunning,
-                  "group-hover:scale-100":
+                  "group-hover:scale-100 group-hover:drop-shadow-xl":
                     !props.isLoading &&
                     !props.isInQueue &&
                     !props.invalid &&
@@ -224,7 +231,7 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-white text-2xl"
+                  class="text-white"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
                     "i-ri:pause-mini-fill": props.isRunning,
@@ -333,7 +340,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer transition-transform duration-100 right-5 h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 transition-transform right-5 h-7 w-7"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,

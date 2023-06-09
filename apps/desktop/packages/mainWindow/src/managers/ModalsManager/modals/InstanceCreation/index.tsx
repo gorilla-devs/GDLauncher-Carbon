@@ -1,8 +1,8 @@
-import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
+import { Button, Dropdown, Input, createNotification } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { forgeVersions, mcVersions } from "@/utils/mcVersion";
 import { port, rspc } from "@/utils/rspcClient";
 import { ModLoaderType } from "@gd/core_module/bindings";
@@ -33,10 +33,7 @@ const InstanceCreation = (props: ModalProps) => {
   >(undefined);
   const [mcVersion, setMcVersion] = createSignal("");
   const [loaderVersion, setLoaderVersion] = createSignal("");
-  const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
-  const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
-  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
-  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(true);
+  const [releasVersion, setReleaseVersion] = createSignal("release");
 
   const addNotification = createNotification();
   const modalsContext = useModal();
@@ -62,29 +59,10 @@ const InstanceCreation = (props: ModalProps) => {
     }));
 
     const filteredVersions = versions.filter((v) => {
-      if (
-        releaseVersionFilter() &&
-        snapshotVersionFilter() &&
-        oldAlphaVersionFilter() &&
-        oldBetaVersionFilter()
-      ) {
-        return true;
-      } else if (releaseVersionFilter()) {
-        return v.type === "release";
-      } else if (snapshotVersionFilter()) {
-        return v.type === "snapshot";
-      } else if (oldAlphaVersionFilter()) {
-        return v.type === "old_alpha";
-      } else if (oldBetaVersionFilter()) {
-        return v.type === "old_beta";
-      } else if (
-        !releaseVersionFilter() &&
-        !snapshotVersionFilter() &&
-        !oldAlphaVersionFilter() &&
-        !oldBetaVersionFilter()
-      ) {
-        return false;
-      }
+      const isOthers = releasVersion() === "others";
+      return isOthers
+        ? v.type !== "release" && v.type !== "snapshot"
+        : v.type === releasVersion();
     });
 
     setMappedMcVersions(filteredVersions);
@@ -159,6 +137,18 @@ const InstanceCreation = (props: ModalProps) => {
       });
     }
   };
+
+  const modloaders = [
+    { label: t("instance.vanilla"), key: undefined },
+    { label: t("instance.forge"), key: "Forge" },
+    // { label: t("instance.fabric"), key: "Fabric" },
+  ];
+
+  const releaseVersions = [
+    { label: t("instance.instance_version_release"), key: "release" },
+    { label: t("instance.instance_version_snapshot"), key: "snapshot" },
+    { label: t("instance.instance_version_others"), key: "others" },
+  ];
 
   return (
     <ModalLayout
@@ -249,6 +239,70 @@ const InstanceCreation = (props: ModalProps) => {
             <div>
               <h5 class="mt-0 mb-2">
                 <Trans
+                  key="instance.instance_loader"
+                  options={{
+                    defaultValue: "Loader",
+                  }}
+                />
+              </h5>
+              <div class="flex gap-2">
+                <For each={modloaders}>
+                  {(modloader) => (
+                    <div
+                      class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box"
+                      classList={{
+                        "border-2 border-solid border-transparent":
+                          loader() !== modloader.key,
+                        "border-2 border-solid border-primary-500":
+                          loader() === modloader.key,
+                      }}
+                      onClick={() => {
+                        setLoader(
+                          modloader.key === "Vanilla"
+                            ? undefined
+                            : (modloader.key as ModLoaderType)
+                        );
+                      }}
+                    >
+                      {modloader.label}
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+            <div>
+              <h5 class="mt-0 mb-2">
+                <Trans
+                  key="instance.instance_loader_version"
+                  options={{
+                    defaultValue: "Loader version",
+                  }}
+                />
+              </h5>
+              <div class="flex gap-4 mt-2">
+                <For each={releaseVersions}>
+                  {(release) => (
+                    <div
+                      class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box"
+                      classList={{
+                        "border-2 border-solid border-transparent":
+                          releasVersion() !== release.key,
+                        "border-2 border-solid border-primary-500":
+                          releasVersion() === release.key,
+                      }}
+                      onClick={() => {
+                        setReleaseVersion(release.key);
+                      }}
+                    >
+                      {release.label}
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+            <div>
+              <h5 class="mt-0 mb-2">
+                <Trans
                   key="instance.instance_mc_version"
                   options={{
                     defaultValue: "Minecraft Version",
@@ -268,91 +322,7 @@ const InstanceCreation = (props: ModalProps) => {
                     }}
                   />
                 </Show>
-                <div class="flex gap-4 mt-2">
-                  <div class="flex gap-2 items-center">
-                    <Checkbox
-                      checked={snapshotVersionFilter()}
-                      onChange={(e) => setSnapshotVersionFilter(e)}
-                    />
-                    <h6 class="m-0 flex items-center">
-                      <Trans
-                        key="instance.instance_version_snapshot"
-                        options={{
-                          defaultValue: "Snapshot",
-                        }}
-                      />
-                    </h6>
-                  </div>
-                  <div class="flex gap-2">
-                    <Checkbox
-                      checked={releaseVersionFilter()}
-                      onChange={(e) => setReleaseVersionFilter(e)}
-                    />
-                    <h6 class="m-0 flex items-center">
-                      <Trans
-                        key="instance.instance_version_release"
-                        options={{
-                          defaultValue: "Release",
-                        }}
-                      />
-                    </h6>
-                  </div>
-                  <div class="flex gap-2">
-                    <Checkbox
-                      checked={oldAlphaVersionFilter()}
-                      onChange={(e) => setOldAlphaVersionFilter(e)}
-                    />
-                    <h6 class="m-0 flex items-center">
-                      <Trans
-                        key="instance.instance_version_old_alphas"
-                        options={{
-                          defaultValue: "Old alpha",
-                        }}
-                      />
-                    </h6>
-                  </div>
-                  <div class="flex gap-2">
-                    <Checkbox
-                      checked={oldBetaVersionFilter()}
-                      onChange={(e) => setOldBetaVersionFilter(e)}
-                    />
-                    <h6 class="m-0 flex items-center">
-                      <Trans
-                        key="instance.instance_version_old_beta"
-                        options={{
-                          defaultValue: "Old beta",
-                        }}
-                      />
-                    </h6>
-                  </div>
-                </div>
               </div>
-            </div>
-            <div>
-              <h5 class="mt-0 mb-2">
-                <Trans
-                  key="instance.instance_loader"
-                  options={{
-                    defaultValue: "Loader",
-                  }}
-                />
-              </h5>
-              <Dropdown
-                options={[
-                  { label: t("instance.vanilla"), key: "Vanilla" },
-                  { label: t("instance.forge"), key: "Forge" },
-                  // { label: t("instance.fabric"), key: "Fabric" },
-                ]}
-                bgColorClass="bg-darkSlate-800"
-                containerClass="w-full"
-                class="w-full"
-                value="vanilla"
-                onChange={(loader) => {
-                  if (loader.key !== "Vanilla") {
-                    setLoader(loader.key as ModLoaderType);
-                  }
-                }}
-              />
             </div>
             <Show when={loaderVersions() && loader() === "Forge"}>
               <div>

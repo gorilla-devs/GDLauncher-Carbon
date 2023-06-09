@@ -208,7 +208,7 @@ const ResourcePacks = () => {
               />
             </div>
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
-              <span class="i-ri:forbid-line text-2xl" />
+              <span class="text-2xl i-ri:forbid-line" />
               <Trans
                 key="instance.disable_resource_pack"
                 options={{

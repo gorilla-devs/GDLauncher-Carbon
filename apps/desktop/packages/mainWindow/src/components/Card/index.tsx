@@ -39,7 +39,7 @@ const Card = (props: Props) => {
 
   return (
     <div
-      class={`flex items-center gap-2 p-5 h-23 w-59 bg-darkSlate-700 rounded-xl box-border ${
+      class={`flex items-center gap-2 p-5 h-23 min-w-59 bg-darkSlate-700 rounded-xl box-border ${
         props.class || ""
       }`}
     >

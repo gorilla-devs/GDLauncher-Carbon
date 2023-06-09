@@ -23,7 +23,6 @@ const OnBoarding = (props: ModalProps) => {
 
   return (
     <ModalLayout
-      preventClose
       noHeader={props.noHeader}
       title={props?.title}
       overflowHiddenDisabled={true}
