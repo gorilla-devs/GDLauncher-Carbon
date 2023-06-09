@@ -12,6 +12,7 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 use tokio::sync::broadcast::{self, error::RecvError};
+use tracing::{debug, error};
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
@@ -44,6 +45,8 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
+    use tracing::error;
+
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
         modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
@@ -147,7 +150,7 @@ mod app {
             {
                 Ok(_) => (),
                 Err(e) => {
-                    println!("Error sending invalidation request: {e}");
+                    error!("Error sending invalidation request: {e}");
                 }
             }
         }
@@ -184,11 +187,11 @@ impl Drop for AppInner {
             let client = get_client();
 
             tokio::runtime::Handle::current().block_on(async move {
-                println!("Collecting metric for app close");
+                debug!("Collecting metric for app close");
                 let res = self.metrics_manager.track_event(client, close_event).await;
                 match res {
-                    Ok(_) => println!("Successfully collected metric for app close"),
-                    Err(e) => println!("Error collecting metric for app close: {e}"),
+                    Ok(_) => debug!("Successfully collected metric for app close"),
+                    Err(e) => error!("Error collecting metric for app close: {e}"),
                 }
             });
         }

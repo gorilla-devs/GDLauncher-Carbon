@@ -14,6 +14,7 @@ impl MetricsManager {
         Self
     }
 
+    #[tracing::instrument(skip(self, client))]
     pub async fn track_pageview(
         &self,
         client: ClientWithMiddleware,
@@ -25,12 +26,13 @@ impl MetricsManager {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, client))]
     pub async fn track_event(
         &self,
         client: ClientWithMiddleware,
         event: Event,
     ) -> anyhow::Result<()> {
-        let endpoint = format!("{}/v1/metrics/pageview", GDL_API_BASE);
+        let endpoint = format!("{}/v1/metrics/event", GDL_API_BASE);
         client.post(endpoint).json(&event).send().await?;
 
         Ok(())

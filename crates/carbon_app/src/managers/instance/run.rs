@@ -738,10 +738,10 @@ mod test {
         app.task_manager().wait_with_log(task).await?;
         app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
             .await?;
-        println!("Task exited");
+        tracing::info!("Task exited");
         let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
             domain::LaunchState::Inactive { .. } => {
-                println!("Game not running");
+                tracing::info!("Game not running");
                 return Ok(());
             }
             domain::LaunchState::Running { log_id, .. } => log_id,
@@ -756,7 +756,7 @@ mod test {
             let new_lines = log.get_region(idx..);
             idx = log.len();
             for line in new_lines {
-                println!("[{:?}]: {}", line.type_, line.text);
+                tracing::info!("[{:?}]: {}", line.type_, line.text);
             }
         }
 

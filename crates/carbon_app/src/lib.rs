@@ -10,6 +10,7 @@ use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
+use tracing::info;
 
 pub mod api;
 mod app_version;
@@ -20,6 +21,7 @@ pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
 mod iridium_client;
+mod logger;
 mod once_send;
 mod runtime_path_override;
 
@@ -27,15 +29,9 @@ mod runtime_path_override;
 pub async fn init() {
     // pprocess_keepalive::init();
 
-    println!("Starting Carbon App");
-
-    #[cfg(feature = "production")]
-    iridium::startup_check();
-
     #[cfg(feature = "production")]
     #[cfg(not(test))]
     let _guard = {
-        println!("Initializing Sentry");
         sentry::init((
             env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
@@ -45,9 +41,19 @@ pub async fn init() {
         ))
     };
 
-    println!("Initializing runtime path");
+    #[cfg(feature = "production")]
+    iridium::startup_check();
+
+    info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
-    println!("Scanning ports");
+
+    logger::setup_logger(&runtime_path).await;
+
+    info!("Starting Carbon App v{}", app_version::APP_VERSION);
+
+    info!("Runtime path: {}", runtime_path.display());
+
+    info!("Scanning ports");
     let listener = if cfg!(debug_assertions) {
         TcpListener::bind("127.0.0.1:4650").await.unwrap()
     } else {
@@ -70,7 +76,7 @@ async fn get_available_port() -> TcpListener {
 }
 
 async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
-    println!("Starting router");
+    info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
@@ -168,7 +174,7 @@ impl Drop for TestEnv {
 async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
-    println!("Test RTP: {}", temp_path.to_str().unwrap());
+    info!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
     TestEnv {

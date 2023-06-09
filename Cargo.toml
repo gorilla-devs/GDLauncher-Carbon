@@ -25,7 +25,6 @@ derive_more = "0.99.17"
 directories = "4.0.1"
 dirs = "4.0.0"
 dotenvy = "0.15.6"
-env_logger = "0.10.0"
 flate2 = "1.0.25"
 futures = "0.3.25"
 http = "0.2.9"
@@ -35,7 +34,6 @@ image = { version = "0.24.5", features = ["png"], default-features = false }
 jsonwebtoken = "8.2.0"
 lazy_static = "1.4.0"
 libc = "0.2"
-log = "0.4.17"
 md-5 = "0.10.5"
 mockall = "0.11.3"
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
@@ -73,6 +71,15 @@ toml = "0.7.3"
 tower-http = "0.3.4"
 hex = "0.4"
 tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["ansi"] }
+tracing-appender = "0.2.2"
+tracing-forest = { version = "0.1.5", features = [
+  "smallvec",
+  "chrono",
+  "tokio",
+  "serde",
+  "env-filter",
+] }
 tracing-test = "0.2.3"
 trash = "3.0.0"
 uuid = "1.2.2"

@@ -24,6 +24,7 @@ impl ManagerRef<'_, SettingsManager> {
         self.get().await
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
         let db = &self.app.prisma_client;
         let mut queries = vec![];
