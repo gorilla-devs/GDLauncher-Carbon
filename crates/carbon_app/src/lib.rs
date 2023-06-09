@@ -10,10 +10,7 @@ use rspc::RouterBuilderLike;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{info, metadata::LevelFilter};
-use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
-};
+use tracing::info;
 
 pub mod api;
 mod app_version;
@@ -24,6 +21,7 @@ pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
 mod iridium_client;
+mod logger;
 mod once_send;
 mod runtime_path_override;
 
@@ -49,33 +47,7 @@ pub async fn init() {
     info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
 
-    let filter = EnvFilter::try_new(
-        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
-    )
-    .unwrap();
-
-    let logs_path = runtime_path.join("__gdl_logs__");
-
-    println!("Logs path: {}", logs_path.display());
-
-    if !logs_path.exists() {
-        tokio::fs::create_dir_all(&logs_path).await.unwrap();
-    }
-
-    let file_appender = tracing_appender::rolling::hourly(logs_path, "logs.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
-
-    // let processor = tracing_forest::Printer::new()
-    //     .formatter(tracing_forest::printer::Pretty)
-    //     // .formatter(serde_json::to_string_pretty)
-    //     .writer(non_blocking);
-    // let layer = tracing_forest::ForestLayer::from(processor);
-
-    tracing_subscriber::registry()
-        // .with(layer.with_filter(filter))
-        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-        .with(filter)
-        .init();
+    logger::setup_logger(&runtime_path).await;
 
     info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
