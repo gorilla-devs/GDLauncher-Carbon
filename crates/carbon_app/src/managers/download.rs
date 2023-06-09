@@ -501,6 +501,7 @@ pub enum DownloadError {
 #[cfg(not(target_os = "windows"))] // conflicts with task cleanup
 mod test {
     use ntest::timeout;
+    use tracing::error;
 
     use crate::managers::download::{DownloadError, DownloadStartError};
 
@@ -521,7 +522,7 @@ mod test {
                     .get_temp()
                     .to_path()
                     .join("gdl.html"),
-                &mut |downloaded, total| println!("Downloaded {downloaded}/{total:?}"),
+                &mut |downloaded, total| error!("Downloaded {downloaded}/{total:?}"),
             )
             .await
     }

@@ -9,6 +9,7 @@ use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, S
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::process::Command;
+use tracing::info;
 
 use crate::{
     domain::{
@@ -218,7 +219,7 @@ pub async fn execute_processors(
                 anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
             })?;
 
-        // println!("{}", String::from_utf8_lossy(&child.stdout));
+        info!("{}", String::from_utf8_lossy(&child.stdout));
 
         if !child.status.success() {
             bail!(

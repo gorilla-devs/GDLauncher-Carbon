@@ -110,9 +110,11 @@ impl ManagerRef<'_, VisualTaskManager> {
 
     #[cfg(test)]
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
+        use tracing::{error, info};
+
         let tasklist = self.tasks.read().await;
         let Some(task) = tasklist.get(&task_id) else {
-            println!("task already exited");
+            info!("task already exited");
             return Ok(())
         };
 
@@ -131,7 +133,7 @@ impl ManagerRef<'_, VisualTaskManager> {
                 domain::Progress::Failed(_) => String::from("fail"),
             };
 
-            println!(" -- Task Update ({progress}): {:?}", domain.name);
+            info!(" -- Task Update ({progress}): {:?}", domain.name);
 
             for task in domain.active_subtasks {
                 let progress = match task.progress {
@@ -146,11 +148,11 @@ impl ManagerRef<'_, VisualTaskManager> {
                     }
                 };
 
-                println!("Subtask ({progress}): {:?}", task.name);
+                info!("Subtask ({progress}): {:?}", task.name);
             }
 
             if let domain::Progress::Failed(e) = &domain.progress {
-                println!("Failure: {e:?}");
+                error!("Failure: {e:?}");
                 break;
             }
         }
