@@ -9,6 +9,7 @@ macro_rules! keys {
                 pub const $name: $crate::api::keys::Key = $crate::api::keys::Key {
                     local: $value,
                     full: concat!(stringify!($group), ".", $value),
+                    span_key: concat!("api::", stringify!($group), ".", $value)
                 };
             )*
         })*
@@ -22,6 +23,8 @@ pub struct Key {
     pub local: &'static str,
     /// full keypath `mygroup.mykey`
     pub full: &'static str,
+    /// span key `api::mygroup.mykey`
+    pub span_key: &'static str,
 }
 
 impl Display for Key {

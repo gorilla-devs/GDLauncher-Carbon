@@ -8,6 +8,7 @@ use futures::Stream;
 use pin_project::{pin_project, pinned_drop};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
 mod account;
 mod instance;
@@ -55,15 +56,14 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
             t(move |app, _args: ()| {
                 let s = stream! {
                     let mut channel = app.invalidation_channel.subscribe();
-                    println!("Invalidation channel connected");
-
+                    info!("Invalidation channel connected");
                     loop {
                         match channel.recv().await {
                             Ok(event) => {
                                 yield event;
                             }
                             Err(e) => {
-                              println!("Error receiving invalidation request: {}", e);
+                              error!("Error receiving invalidation request: {}", e);
                             }
                         }
                     }
@@ -86,7 +86,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                 #[pinned_drop]
                 impl<T: Stream<Item = InvalidationEvent>> PinnedDrop for Dropcheck<T> {
                     fn drop(self: Pin<&mut Self>) {
-                        println!("Invalidation stream was dropped!");
+                        error!("Invalidation stream was dropped!");
                         std::process::exit(1);
                     }
                 }

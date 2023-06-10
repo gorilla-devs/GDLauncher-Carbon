@@ -1,5 +1,6 @@
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
+use tracing::{debug, error, trace};
 
 use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
 
@@ -39,6 +40,7 @@ impl JavaManager {
     }
 
     pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+        debug!("Ensuring system java profiles are in db");
         for profile in SystemJavaProfileName::iter() {
             let creation: Result<crate::db::java_system_profile::Data, QueryError> = db_client
                 .java_system_profile()
@@ -48,13 +50,14 @@ impl JavaManager {
 
             match creation {
                 Err(error) if error.is_prisma_error::<UniqueKeyViolation>() => {
-                    // Good, already exists
+                    trace!("Profile {profile:?} already exists");
                 }
                 Err(error) => {
+                    error!("Error creating profile {profile:?}: {error}");
                     return Err(error.into());
                 }
                 Ok(_) => {
-                    // Good, created
+                    trace!("Profile {profile:?} created");
                 }
             }
         }

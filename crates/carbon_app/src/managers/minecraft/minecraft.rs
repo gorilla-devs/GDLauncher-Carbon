@@ -17,6 +17,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
+use tracing::info;
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -431,7 +432,7 @@ pub async fn launch_minecraft(
     )
     .await?;
 
-    println!(
+    info!(
         "Starting Minecraft with command: {} {}",
         java_component.path,
         startup_command.join(" ")
@@ -477,7 +478,7 @@ pub async fn extract_natives(
         let dest = runtime_path.get_natives().get_versioned(version_id);
         tokio::fs::create_dir_all(&dest).await.unwrap();
 
-        println!("Extracting natives from {}", path.display());
+        info!("Extracting natives from {}", path.display());
 
         carbon_compression::decompress(path, &dest).await.unwrap();
     }
