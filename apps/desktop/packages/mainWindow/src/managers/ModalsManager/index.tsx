@@ -1,8 +1,9 @@
 import { useLocation, useSearchParams } from "@solidjs/router";
 import {
-  Accessor,
   createContext,
+  createEffect,
   createSignal,
+  For,
   JSX,
   lazy,
   Show,
@@ -75,90 +76,111 @@ const defaultModals: Hash = {
   },
 };
 
-type ModalName = string;
+type ModalName = {
+  [K in keyof typeof defaultModals as string extends K ? K : never]: K;
+}[keyof typeof defaultModals];
 
 type Modal = { name: ModalName; url?: string };
 
 type Context = {
   openModal: (_modal: Modal, _data?: any) => void;
   closeModal: () => void;
-  isVisible: Accessor<boolean>;
 };
+
+type Stack = Array<{ name: ModalName; data: any }>;
 
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
   const navigate = useGDNavigate();
-  const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as ModalName;
   const urlSearchParams = () => new URLSearchParams(queryParams());
-  const mParam = () => urlSearchParams().get("m");
-  const [data, setData] = createSignal<any>(undefined);
+  const [modalStack, setModalStack] = createSignal<Stack>([]);
 
   const [_searchParams, setSearchParams] = useSearchParams();
 
-  const modalTypeIndex = () => mParam() || "";
-  const noHeader = () => defaultModals[modalTypeIndex()]?.noHeader || false;
+  const closeModal = (name?: ModalName) => {
+    setModalStack((currentStack) => {
+      if (name) {
+        // Remove the specified modal
+        return currentStack.filter((modal) => modal.name !== name);
+      } else {
+        // Remove the top modal
+        return currentStack.slice(0, currentStack.length - 1);
+      }
+    });
 
-  const ModalComponent: any = () => defaultModals[modalTypeIndex()]?.component;
-
-  const title = () => defaultModals[modalTypeIndex()]?.title;
-
-  const closeModal = () => {
-    setIsVisible(false);
-    setTimeout(() => {
+    if (modalStack().length === 0) {
       urlSearchParams()?.delete("m");
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "none";
-    }, 100);
+    }
   };
 
   const manager = {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
-      setData(data);
+      setModalStack((currentStack) => [
+        ...currentStack,
+        { name: modal.name, data },
+      ]);
+
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
         url.append("m", modal.name);
 
         const decodedParamString = decodeURIComponent(url.toString());
         navigate(decodedParamString.replace("=&", "?"));
-        setIsVisible(false);
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 100);
       } else {
         setSearchParams({ m: modal.name });
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 100);
       }
     },
     closeModal,
-    isVisible,
   };
+
+  createEffect(() => {
+    console.log("STACK", modalStack());
+  });
 
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <Show when={mParam()}>
-          {/* <Suspense fallback={<p>Loading...</p>}> */}
-          <div class="h-screen w-screen">
-            <Dynamic
-              component={ModalComponent({
-                noHeader,
-                title,
-              })}
-              data={data()}
-              noHeader={noHeader()}
-              title={title()}
-            />
+        <div class="h-screen w-screen">
+          <div
+            class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
+            classList={{
+              "opacity-100": modalStack().length > 0,
+              "opacity-0": modalStack().length > 0,
+            }}
+          >
+            <For each={modalStack()}>
+              {(modal, index) => {
+                const ModalComponent = defaultModals[modal.name].component;
+                const noHeader = defaultModals[modal.name].noHeader || false;
+                const title = defaultModals[modal.name].title || "";
+
+                return (
+                  <Show when={modal.name}>
+                    <div
+                      style={{ "z-index": `${index() + 1}` }}
+                      class="absolute top-1/2 left-1/2 -translate-1/2"
+                    >
+                      <Dynamic
+                        component={ModalComponent}
+                        data={modal.data}
+                        noHeader={noHeader}
+                        title={title}
+                      />
+                    </div>
+                  </Show>
+                );
+              }}
+            </For>
           </div>
-          {/* </Suspense> */}
-        </Show>
+        </div>
       </Portal>
     </ModalsContext.Provider>
   );

@@ -178,5 +178,11 @@
   "mods.fetching_mods_text": "Loading mods",
   "mods.fetching_mods_error": "There was an error while fetching mods",
   "mod.download": "Download",
-  "error.missing_field_title": "Title can't be empty"
+  "error.missing_field_title": "Title can't be empty",
+  "modloader_Any": "Any modloader",
+  "modloader_cauldron": "Cauldron",
+  "modloader_liteLoader": "LiteLoader",
+  "modloader_quilt": "Quilt",
+  "modloader_forge": "Forge",
+  "modloader_fabric": "Fabric"
 }

@@ -8,13 +8,17 @@ import { useModal } from "../..";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
 
-type Props = { mod: FEMod };
+type Props = { mod: FEMod; mcVersion: string };
 
 const Mod = (props: Props) => {
   const modalsContext = useModal();
   const [loading, setLoading] = createSignal(false);
 
-  const latestFIlesIndexes = () => props.mod.latestFiles;
+  const latestFIlesIndexes = () =>
+    props.mod.latestFilesIndexes.filter(
+      (file) => file.gameVersion === props.mcVersion
+    );
+
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
     parseInt(lastInstanceOpened(), 10),
@@ -22,8 +26,8 @@ const Mod = (props: Props) => {
 
   const mappedVersions = () =>
     latestFIlesIndexes().map((version) => ({
-      key: version.id,
-      label: version.displayName.replaceAll(".jar", ""),
+      key: version.fileId,
+      label: version.filename,
     }));
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {

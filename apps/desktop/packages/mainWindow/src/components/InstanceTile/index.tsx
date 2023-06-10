@@ -51,7 +51,8 @@ const InstanceTile = (props: {
   const failedTaskId = () => inactiveState();
   const isPreparingState = () => getPreparingState(props.instance.status);
 
-  const modloader = validInstance()?.modloader;
+  const modloader = () => validInstance()?.modloader;
+
 
   const taskId = isPreparingState();
 
@@ -109,7 +110,7 @@ const InstanceTile = (props: {
         onClick={() => navigate(`/library/${props.instance.id}`)}
         title={props.instance.name}
         instanceId={props.instance.id}
-        modloader={modloader}
+        modloader={modloader()}
         version={validInstance()?.mc_version}
         invalid={!isListInstanceValid(props.instance.status)}
         failError={failError()}

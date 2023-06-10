@@ -48,7 +48,7 @@ const ModDetails = (props: ModalProps) => {
                   <div class="z-10 sticky top-5 left-5 w-fit">
                     <Button
                       onClick={() => {
-                        modalsContext?.openModal({ name: "addMod" });
+                        modalsContext?.closeModal();
                       }}
                       icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                       size="small"

@@ -226,7 +226,7 @@ const AddMod = (props: ModalProps) => {
               />
               <Dropdown
                 options={modloaders.map((modloader) => ({
-                  label: t(modloader),
+                  label: t(`modloader_${modloader}`),
                   key: modloader,
                 }))}
                 onChange={(val) => {
@@ -298,7 +298,10 @@ const AddMod = (props: ModalProps) => {
                             }
                           >
                             <Match when={!isLoaderRow() && modpack()}>
-                              <Mod mod={modpack()} />
+                              <Mod
+                                mod={modpack()}
+                                mcVersion={props.data as string}
+                              />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
                               <NoMoreMods />

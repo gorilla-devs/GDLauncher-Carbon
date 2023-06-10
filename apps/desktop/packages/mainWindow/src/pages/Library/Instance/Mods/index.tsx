@@ -43,14 +43,17 @@ const Mods = () => {
           <Button
             type="outline"
             size="medium"
-            onClick={() =>
-              modalsContext?.openModal({ name: "addMod" }, params.id)
-            }
+            onClick={() => {
+              modalsContext?.openModal(
+                { name: "addMod" },
+                routeData.instanceDetails.data?.version
+              );
+            }}
           >
             <Trans
               key="instance.add_mod"
               options={{
-                defaultValue: "+ Add mod",
+                defaultValue: "+ Add Mod",
               }}
             />
           </Button>
@@ -91,7 +94,10 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal({ name: "addMod" }, params.id);
+              modalsContext?.openModal(
+                { name: "addMod" },
+                routeData.instanceDetails.data?.version
+              );
             }}
           >
             <Trans
