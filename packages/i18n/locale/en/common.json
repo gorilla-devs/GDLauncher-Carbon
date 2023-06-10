@@ -117,7 +117,8 @@
   "instance.action_open_folder": "Open folder",
   "instance.action_delete": "Delete",
   "instance.action_play": "Play",
-  "instance.action_settings": "Settings",
+  "instance.action_settings": "Se ttings",
+  "instance.select_image": "Select image",
   "instance.action_duplicate": "Duplicate",
   "instance.error_invalid": "Instance Invalid or corrupted, try repairing it!",
   "instance.instance_version_release": "Stable",
@@ -176,5 +177,6 @@
   "mods.fetching_no_more_mods": "No more mods to load",
   "mods.fetching_mods_text": "Loading mods",
   "mods.fetching_mods_error": "There was an error while fetching mods",
-  "mod.download": "Download"
+  "mod.download": "Download",
+  "error.missing_field_title": "Title can't be empty"
 }

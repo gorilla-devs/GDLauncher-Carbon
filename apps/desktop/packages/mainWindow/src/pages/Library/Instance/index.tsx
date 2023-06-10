@@ -112,10 +112,15 @@ const Instance = () => {
       label: "Overview",
       path: `/library/${params.id}`,
     },
-    {
-      label: "Mods",
-      path: `/library/${params.id}/mods`,
-    },
+
+    ...(routeData.instanceDetails.data?.modloaders[0]?.type_
+      ? [
+          {
+            label: "Mods",
+            path: `/library/${params.id}/mods`,
+          },
+        ]
+      : []),
     {
       label: "Settings",
       path: `/library/${params.id}/settings`,

@@ -14,11 +14,11 @@ const ThirdStep = () => {
   ];
 
   return (
-    <div class="flex flex-col items-center justify-around w-120 w-160 h-140 pt-20">
+    <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
       <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto top-2">
         <img class="w-40" src={Logo} />
       </div>
-      <div class="w-full max-w-70 mt-20">
+      <div class="w-full max-w-70 mt-40">
         <Steps steps={onBoardingSteps} currentStep={2} />
       </div>
       <div class="absolute right-5 top-5">
@@ -58,13 +58,13 @@ const ThirdStep = () => {
         </Button>
 
         <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
-          <div class="text-2xl i-ri:download-2-line" />
+          {/* <div class="text-2xl i-ri:download-2-line" />
           <Trans
             key="onboarding.import_instance_or_zip"
             options={{
               defaultValue: "Import instance / Zip",
             }}
-          />
+          /> */}
         </div>
       </div>
     </div>

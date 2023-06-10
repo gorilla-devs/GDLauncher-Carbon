@@ -15,7 +15,7 @@ const FirstStep = (props: Props) => {
   );
 
   return (
-    <div class="flex flex-col items-center justify-around w-160 h-140">
+    <div class="flex flex-col items-center justify-around w-160 h-140 box-border">
       <div class="flex flex-col mt-12">
         <h1 class="text-center text-lg m-0 font-bold mt-10">
           <Trans

@@ -315,7 +315,7 @@ const AddMod = (props: ModalProps) => {
           <Match
             when={
               mods().length === 0 &&
-              infiniteQuery?.isFetching &&
+              infiniteQuery?.isLoading &&
               infiniteQuery?.isInitialLoading
             }
           >

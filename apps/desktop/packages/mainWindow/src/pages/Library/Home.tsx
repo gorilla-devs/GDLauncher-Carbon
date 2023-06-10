@@ -65,7 +65,12 @@ const Home = () => {
               </Carousel>
             </div>
           </Match>
-          <Match when={routeData.instancesUngrouped.isLoading}>
+          <Match
+            when={
+              routeData.instancesUngrouped.isLoading &&
+              routeData.instancesUngrouped.isInitialLoading
+            }
+          >
             <Skeleton.instances />
           </Match>
           <Match

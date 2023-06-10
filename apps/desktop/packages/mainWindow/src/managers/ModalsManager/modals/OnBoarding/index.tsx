@@ -27,7 +27,7 @@ const OnBoarding = (props: ModalProps) => {
       title={props?.title}
       overflowHiddenDisabled={true}
     >
-      <div class="select-none">
+      <div class="select-none w-160 box-border h-145">
         <div
           class="max-w-70 mx-auto"
           classList={{

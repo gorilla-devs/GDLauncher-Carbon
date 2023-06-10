@@ -3,15 +3,26 @@ import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { FEModResponse } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Skeleton, Tab, TabList, Tabs } from "@gd/ui";
+import {
+  Button,
+  Skeleton,
+  Spinner,
+  Tab,
+  TabList,
+  Tabs,
+  createNotification,
+} from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
+import { rspc } from "@/utils/rspcClient";
 
 const Modpack = () => {
+  const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const instancePages = () => [
@@ -23,14 +34,14 @@ const Modpack = () => {
       label: "Changelog",
       path: `/modpacks/${params.id}/changelog`,
     },
-    {
-      label: "Screenshots",
-      path: `/modpacks/${params.id}/screenshots`,
-    },
-    {
-      label: "Versions",
-      path: `/modpacks/${params.id}/versions`,
-    },
+    // {
+    //   label: "Screenshots",
+    //   path: `/modpacks/${params.id}/screenshots`,
+    // },
+    // {
+    //   label: "Versions",
+    //   path: `/modpacks/${params.id}/versions`,
+    // },
   ];
 
   // eslint-disable-next-line no-unused-vars
@@ -39,7 +50,41 @@ const Modpack = () => {
   // let innerContainerRef: HTMLDivElement;
   // let refStickyContainer: HTMLDivElement;
 
-  const isFetching = () => routeData.modpackDetails?.isFetching;
+  const isFetching = () => routeData.modpackDetails?.isLoading;
+
+  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        addNotification("Instance successfully created.");
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        navigate(`/library`);
+      },
+    }
+  );
+
+  const createInstanceMutation = rspc.createMutation(
+    ["instance.createInstance"],
+    {
+      onSuccess(instanceId) {
+        setLoading(true);
+        prepareInstanceMutation.mutate(instanceId);
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while downloading the modpack.", "error");
+      },
+    }
+  );
 
   return (
     <ContentWrapper>
@@ -180,13 +225,42 @@ const Modpack = () => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <Button uppercase type="glow" size="large">
-                        <Trans
-                          key="modpack.download"
-                          options={{
-                            defaultValue: "Download",
-                          }}
-                        />
+                      <Button
+                        uppercase
+                        type="glow"
+                        size="large"
+                        onClick={() => {
+                          const modpack = routeData.modpackDetails
+                            ?.data as FEModResponse;
+
+                          loadIconMutation.mutate(modpack.data.logo.url);
+                          createInstanceMutation.mutate({
+                            group: defaultGroup.data || 1,
+                            use_loaded_icon: true,
+                            notes: "",
+                            name: modpack.data.name,
+                            version: {
+                              Modpack: {
+                                Curseforge: {
+                                  file_id: modpack.data.mainFileId,
+                                  project_id: modpack.data.id,
+                                },
+                              },
+                            },
+                          });
+                        }}
+                      >
+                        <Show when={loading()}>
+                          <Spinner />
+                        </Show>
+                        <Show when={!loading()}>
+                          <Trans
+                            key="modpack.download"
+                            options={{
+                              defaultValue: "Download",
+                            }}
+                          />
+                        </Show>
                       </Button>
                     </div>
                   </div>

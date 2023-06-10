@@ -192,9 +192,9 @@ const InstanceCreation = (props: ModalProps) => {
                 <Match when={!bgPreview()}>
                   <h3 class="text-center">
                     <Trans
-                      key="instance.upload_image"
+                      key="instance.select_image"
                       options={{
-                        defaultValue: "Upload image",
+                        defaultValue: "Select image",
                       }}
                     />
                   </h3>
