@@ -3,6 +3,7 @@ use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
+use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 
@@ -292,6 +293,13 @@ impl ManagerRef<'_, InstanceManager> {
                     .get_minecraft_version(manifest_version.clone())
                     .await?;
 
+                let lwjgl_group = get_lwjgl_meta(
+                    &app.reqwest_client,
+                    &version_info,
+                    &app.minecraft_manager().meta_base_url,
+                )
+                .await?;
+
                 t_request_version_info.update_items(2, 3);
 
                 let java = {
@@ -413,6 +421,7 @@ impl ManagerRef<'_, InstanceManager> {
                 managers::minecraft::minecraft::extract_natives(
                     &runtime_path,
                     &version_info,
+                    &lwjgl_group,
                     &java.arch,
                 )
                 .await;
@@ -463,6 +472,7 @@ impl ManagerRef<'_, InstanceManager> {
                             &extra_java_args,
                             &runtime_path,
                             version_info,
+                            &lwjgl_group,
                             instance_path,
                         )
                         .await?,

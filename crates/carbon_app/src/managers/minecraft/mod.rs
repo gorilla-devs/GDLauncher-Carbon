@@ -1,6 +1,6 @@
 use carbon_net::Downloadable;
 use daedalus::{
-    minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
+    minecraft::{DownloadType, LibraryGroup, Version, VersionInfo, VersionManifest},
     modded::Manifest,
 };
 use reqwest::Url;
@@ -12,6 +12,8 @@ use crate::domain::{
         version_download_into_downloadable,
     },
 };
+
+use self::minecraft::get_lwjgl_meta;
 
 use super::ManagerRef;
 
@@ -57,8 +59,15 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let mut all_files = vec![];
 
+        let lwjgl =
+            get_lwjgl_meta(&self.app.reqwest_client, &version_info, &self.meta_base_url).await?;
+
         let libraries = libraries_into_vec_downloadable(
-            version_info.libraries,
+            version_info
+                .libraries
+                .into_iter()
+                .chain(lwjgl.libraries.into_iter())
+                .collect(),
             &runtime_path.get_libraries().to_path(),
             java_arch,
         );
@@ -104,7 +113,7 @@ mod tests {
         java::java_checker::{JavaChecker, RealJavaChecker},
         minecraft::{
             forge::execute_processors,
-            minecraft::{extract_natives, launch_minecraft},
+            minecraft::{extract_natives, get_lwjgl_meta, launch_minecraft},
         },
     };
 
@@ -117,7 +126,7 @@ mod tests {
 
         let java_component = RealJavaChecker
             .get_bin_info(
-                &PathBuf::from("/Users/davideceschia/.sdkman/candidates/java/current/bin/java"),
+                &PathBuf::from("java"),
                 crate::domain::java::JavaComponentType::Local,
             )
             .await
@@ -145,6 +154,14 @@ mod tests {
         let version_info = crate::managers::minecraft::minecraft::get_version(
             &app.reqwest_client,
             manifest_version,
+        )
+        .await
+        .unwrap();
+
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version_info,
+            &app.minecraft_manager().meta_base_url,
         )
         .await
         .unwrap();
@@ -193,7 +210,13 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version_info, &java_component.arch).await;
+        extract_natives(
+            runtime_path,
+            &version_info,
+            &lwjgl_group,
+            &java_component.arch,
+        )
+        .await;
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();
@@ -239,6 +262,7 @@ mod tests {
             "",
             runtime_path,
             version_info,
+            &lwjgl_group,
             instance_path,
         )
         .await
