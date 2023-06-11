@@ -216,7 +216,8 @@ mod tests {
             &lwjgl_group,
             &java_component.arch,
         )
-        .await;
+        .await
+        .unwrap();
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();

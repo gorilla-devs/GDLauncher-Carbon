@@ -87,7 +87,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                 impl<T: Stream<Item = InvalidationEvent>> PinnedDrop for Dropcheck<T> {
                     fn drop(self: Pin<&mut Self>) {
                         error!("Invalidation stream was dropped!");
-                        std::process::exit(1);
+                        // std::process::exit(1);
                     }
                 }
 

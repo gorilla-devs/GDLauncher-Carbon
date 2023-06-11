@@ -483,13 +483,13 @@ pub async fn extract_natives(
     version: &VersionInfo,
     lwjgl_group: &LibraryGroup,
     java_arch: &JavaArch,
-) {
+) -> anyhow::Result<()> {
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
         version_id: &str,
         native_name: &str,
-    ) {
+    ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
         let path = runtime_path.get_libraries().get_library_path({
             library
@@ -505,11 +505,13 @@ pub async fn extract_natives(
                 .clone()
         });
         let dest = runtime_path.get_natives().get_versioned(version_id);
-        tokio::fs::create_dir_all(&dest).await.unwrap();
+        tokio::fs::create_dir_all(&dest).await?;
 
         info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, &dest).await.unwrap();
+        carbon_compression::decompress(path, &dest).await?;
+
+        Ok(())
     }
 
     for library in version
@@ -522,12 +524,14 @@ pub async fn extract_natives(
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
                     extract_single_library_natives(runtime_path, library, &version.id, native_name)
-                        .await;
+                        .await?;
                 }
             }
             None => continue,
         };
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -677,6 +681,8 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64).await;
+        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
+            .await
+            .unwrap();
     }
 }
