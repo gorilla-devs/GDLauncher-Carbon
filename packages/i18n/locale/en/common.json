@@ -158,6 +158,8 @@
   "onboarding.java_no": "No",
   "onboarding.java_yes": "Yes",
   "onboarding.continue": "Continue",
+  "onboarding.next": "Next",
+  "onboarding.prev": "Back",
   "InstanceTaskLaunch": "Launching {{name}}",
   "InstanceTaskLaunchRequestVersions": "Requesting versions",
   "InstanceTaskLaunchDownloadFiles": "Downloading files",

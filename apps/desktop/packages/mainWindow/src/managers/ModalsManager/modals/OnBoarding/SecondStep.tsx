@@ -1,17 +1,19 @@
 import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Button } from "@gd/ui";
+import { Button, Switch } from "@gd/ui";
 
 type Props = {
   nextStep: () => void;
+  prevStep: () => void;
 };
 
 const SecondStep = (props: Props) => {
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
+  let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
   return (
     <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
       <div class="flex flex-col h-full justify-center items-center">
-        <p class="text-center text-darkSlate-100 m-0 max-w-100 font-normal">
+        <p class="text-center text-darkSlate-100 mt-0 max-w-100 font-normal mb-10">
           <Trans
             key="onboarding.java_title"
             options={{
@@ -20,36 +22,30 @@ const SecondStep = (props: Props) => {
             }}
           />
         </p>
+        <Switch
+          checked={settingsQuery.data?.autoManageJava}
+          onChange={(e) => {
+            setSettingsMutation.mutate({ autoManageJava: e.target.checked });
+          }}
+        />
       </div>
       <div class="flex justify-between w-full">
         <Button
           type="secondary"
           size="large"
           onClick={() => {
-            setSettingsMutation.mutate({ autoManageJava: false });
-            props.nextStep();
+            props.prevStep();
           }}
         >
-          <Trans
-            key="onboarding.java_no"
-            options={{
-              defaultValue: "No",
-            }}
-          />
+          <Trans key="onboarding.prev" />
         </Button>
         <Button
           onClick={() => {
-            setSettingsMutation.mutate({ autoManageJava: true });
             props.nextStep();
           }}
           size="large"
         >
-          <Trans
-            key="onboarding.java_yes"
-            options={{
-              defaultValue: "Yes",
-            }}
-          />
+          <Trans key="onboarding.next" />
         </Button>
       </div>
     </div>

@@ -25,7 +25,7 @@ const FirstStep = (props: Props) => {
             }}
           />
         </h1>
-        <pre class="text-darkSlate-100 mb-8 leading-6 text-left max-w-140 whitespace-pre-line">
+        <pre class="text-darkSlate-100 leading-6 text-left max-w-140 whitespace-pre-line">
           <Trans
             key="onboarding.welcome_gdlauncher_text"
             options={{
@@ -36,19 +36,16 @@ const FirstStep = (props: Props) => {
           />
         </pre>
       </div>
-      <div class="flex flex-col items-center gap-6 w-full">
+
+      <div class="flex w-full justify-end">
         <Button
-          style={{ width: "100%", "max-width": "200px" }}
+          type="primary"
+          size="large"
           onClick={() => {
             props.nextStep();
           }}
         >
-          <Trans
-            key="onboarding.continue"
-            options={{
-              defaultValue: "Continue",
-            }}
-          />
+          <Trans key="onboarding.next" />
         </Button>
       </div>
     </div>

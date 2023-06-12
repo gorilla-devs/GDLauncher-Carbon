@@ -3,7 +3,11 @@ import { useModal } from "../..";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { Button } from "@gd/ui";
 
-const ThirdStep = () => {
+type Props = {
+  prevStep: () => void;
+};
+
+const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
   return (
     <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
@@ -46,16 +50,26 @@ const ThirdStep = () => {
             }}
           />
         </Button>
-
-        <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
-          {/* <div class="text-2xl i-ri:download-2-line" />
+        {/* <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
+          <div class="text-2xl i-ri:download-2-line" />
           <Trans
-            key="onboarding.import_instance_or_zip"
-            options={{
-              defaultValue: "Import instance / Zip",
-            }}
-          /> */}
-        </div>
+          key="onboarding.import_instance_or_zip"
+          options={{
+            defaultValue: "Import instance / Zip",
+          }}
+        />
+        </div> */}
+      </div>
+      <div class="flex align-between w-full">
+        <Button
+          type="secondary"
+          size="large"
+          onClick={() => {
+            props.prevStep();
+          }}
+        >
+          <Trans key="onboarding.prev" />
+        </Button>
       </div>
     </div>
   );

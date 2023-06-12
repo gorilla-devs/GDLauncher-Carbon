@@ -34,6 +34,10 @@ const OnBoarding = (props: ModalProps) => {
     setCurrentStep((prev) => prev + 1);
   };
 
+  const prevStep = () => {
+    setCurrentStep((prev) => prev - 1);
+  };
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -49,10 +53,10 @@ const OnBoarding = (props: ModalProps) => {
             <FirstStep nextStep={nextStep} />
           </Match>
           <Match when={currentStep() === 1}>
-            <SecondStep nextStep={nextStep} />
+            <SecondStep nextStep={nextStep} prevStep={prevStep} />
           </Match>
           <Match when={currentStep() === 2}>
-            <ThirdStep />
+            <ThirdStep prevStep={prevStep} />
           </Match>
         </Switch>
       </div>
