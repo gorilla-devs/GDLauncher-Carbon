@@ -225,7 +225,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-all duration-100"
+                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-all duration-100 will-change-transform"
                 classList={{
                   "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                     !props.isRunning,
@@ -247,7 +247,7 @@ const Tile = (props: Props) => {
                   class="text-white"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
-                    "i-ri:stop-fill": props.isRunning,
+                    "i-ri:stop-fill text-xl": props.isRunning,
                   }}
                 />
               </div>
@@ -362,7 +362,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 transition-transform right-5 h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 transition-transform right-5 h-7 w-7 will-change-transform"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
@@ -376,10 +376,10 @@ const Tile = (props: Props) => {
               }}
             >
               <div
-                class="text-white text-lg"
+                class="text-white"
                 classList={{
-                  "i-ri:play-fill": !props.isRunning,
-                  "i-ri:stop-fill": props.isRunning,
+                  "i-ri:play-fill text-lg": !props.isRunning,
+                  "i-ri:stop-fill text-md": props.isRunning,
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -474,7 +474,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100"
+              class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,

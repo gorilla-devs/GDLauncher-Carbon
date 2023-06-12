@@ -1,25 +1,14 @@
-import { Trans, useTransContext } from "@gd/i18n";
+import { Trans } from "@gd/i18n";
 import { useModal } from "../..";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
-import { Button, Steps } from "@gd/ui";
+import { Button } from "@gd/ui";
 
 const ThirdStep = () => {
   const modalsContext = useModal();
-  const [t] = useTransContext();
-
-  const onBoardingSteps = [
-    { label: t("introduction"), icon: <div>1</div> },
-    { label: t("handle_java"), icon: <div>2</div> },
-    { label: t("import_instances"), icon: <div>3</div> },
-  ];
-
   return (
     <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
-      <div class="absolute left-0 right-0 flex justify-center items-center flex-col m-auto top-2">
-        <img class="w-40" src={Logo} />
-      </div>
-      <div class="w-full max-w-70 mt-40">
-        <Steps steps={onBoardingSteps} currentStep={2} />
+      <div class="flex justify-center items-center flex-col mt-20">
+        <img class="w-50" src={Logo} />
       </div>
       <div class="absolute right-5 top-5">
         <div
@@ -43,6 +32,7 @@ const ThirdStep = () => {
           type="outline"
           style={{ width: "100%", "max-width": "200px" }}
           onClick={() => {
+            modalsContext?.closeModal();
             modalsContext?.openModal({
               name: "instanceCreation",
               url: "/modpacks",

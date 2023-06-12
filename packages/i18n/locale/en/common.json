@@ -184,5 +184,8 @@
   "modloader_liteLoader": "LiteLoader",
   "modloader_quilt": "Quilt",
   "modloader_forge": "Forge",
-  "modloader_fabric": "Fabric"
+  "modloader_fabric": "Fabric",
+  "introduction": "Introduction",
+  "handle_java": "Handle java",
+  "import_instances": "Import instances"
 }
