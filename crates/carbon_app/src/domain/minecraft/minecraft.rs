@@ -33,7 +33,7 @@ pub fn libraries_into_vec_downloadable(
             let checksum = None;
 
             // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
-            let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
+            let Ok(maven_path) = MavenCoordinates::try_from(library.name.to_string(), None) else {
                 continue
             };
 
