@@ -53,7 +53,6 @@ const InstanceTile = (props: {
 
   const modloader = () => validInstance()?.modloader;
 
-
   const taskId = isPreparingState();
 
   const isRunning = () => getRunningState(props.instance.status);

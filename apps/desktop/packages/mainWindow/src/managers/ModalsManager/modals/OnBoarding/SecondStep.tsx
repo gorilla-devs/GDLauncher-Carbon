@@ -13,21 +13,23 @@ const SecondStep = (props: Props) => {
   return (
     <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
       <div class="flex flex-col h-full justify-center items-center">
-        <p class="text-center text-darkSlate-100 mt-0 max-w-100 font-normal mb-10">
-          <Trans
-            key="onboarding.java_title"
-            options={{
-              defaultValue:
-                "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
+        <div class="flex items-center mb-10 gap-4">
+          <p class="text-left text-darkSlate-100 m-0 max-w-100 font-normal leading-7">
+            <Trans
+              key="onboarding.java_title"
+              options={{
+                defaultValue:
+                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
+              }}
+            />
+          </p>
+          <Switch
+            checked={settingsQuery.data?.autoManageJava}
+            onChange={(e) => {
+              setSettingsMutation.mutate({ autoManageJava: e.target.checked });
             }}
           />
-        </p>
-        <Switch
-          checked={settingsQuery.data?.autoManageJava}
-          onChange={(e) => {
-            setSettingsMutation.mutate({ autoManageJava: e.target.checked });
-          }}
-        />
+        </div>
       </div>
       <div class="flex justify-between w-full">
         <Button
