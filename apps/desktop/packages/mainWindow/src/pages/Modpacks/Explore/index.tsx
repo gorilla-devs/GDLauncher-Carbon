@@ -227,7 +227,6 @@ const Modpack = () => {
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
                       <Button
                         uppercase
-                        type="glow"
                         size="large"
                         onClick={() => {
                           const modpack = routeData.modpackDetails

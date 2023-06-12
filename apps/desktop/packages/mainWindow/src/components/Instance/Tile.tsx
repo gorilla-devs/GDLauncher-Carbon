@@ -6,7 +6,7 @@ import {
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -169,6 +169,10 @@ const Tile = (props: Props) => {
     } else launchInstanceMutation.mutate(props.instanceId);
   };
 
+  createEffect(() => {
+    console.log("props.modloader", props.modloader);
+  });
+
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
@@ -177,7 +181,15 @@ const Tile = (props: Props) => {
             class="select-none group flex justify-center flex-col z-50 items-start"
             onClick={(e) => {
               e.stopPropagation();
-              props?.onClick?.(e);
+              if (
+                !props.isLoading &&
+                !props.isInQueue &&
+                !props.invalid &&
+                !props.failError &&
+                !props.isRunning
+              ) {
+                props?.onClick?.(e);
+              }
             }}
           >
             <div
@@ -319,7 +331,17 @@ const Tile = (props: Props) => {
         <ContextMenu menuItems={menuItems()}>
           <div
             class="group relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
-            onClick={(e) => props?.onClick?.(e)}
+            onClick={(e) => {
+              if (
+                !props.isLoading &&
+                !props.isInQueue &&
+                !props.invalid &&
+                !props.failError &&
+                !props.isRunning
+              ) {
+                props?.onClick?.(e);
+              }
+            }}
             classList={{
               grayscale: props.isLoading || props.isInQueue,
             }}
@@ -412,7 +434,17 @@ const Tile = (props: Props) => {
       </Match>
       <Match when={mergedProps.variant === "sidebar-small"}>
         <div
-          onClick={(e) => props?.onClick?.(e)}
+          onClick={(e) => {
+            if (
+              !props.isLoading &&
+              !props.isInQueue &&
+              !props.invalid &&
+              !props.failError &&
+              !props.isRunning
+            ) {
+              props?.onClick?.(e);
+            }
+          }}
           class="group h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
         >
           <Show when={props.selected && !props.isLoading}>

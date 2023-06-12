@@ -274,7 +274,7 @@ const Instance = () => {
                     <div
                       class="flex gap-4 items-center w-fit pl-1"
                       classList={{
-                        "border-2 border-primary-500 border-solid rounded-lg":
+                        "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
                         "border-2 border-transparent border-solid rounded-lg":
                           !editableName(),
@@ -302,18 +302,15 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="i-ri:pencil-fill"
+                            class="i-ri:pencil-fill hover:text-darkSlate-50 transition-color ease-in-out duration-100"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
                       </span>
-                      <div class="relative flex items-center gap-2 h-full pr-2">
-                        <div
-                          classList={{
-                            "absolute right-0 bottom-0 top-0 w-[250%] z-1 bg-gradient-to-l from-10% from-primary-500":
-                              editableName(),
-                          }}
-                        />
+                      <div
+                        class="relative flex items-center gap-2 h-full pr-2"
+                        classList={{ "bg-darkSlate-800 pl-2": editableName() }}
+                      >
                         <div
                           class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl z-10 duration-50 hover:text-green-500"
                           classList={{

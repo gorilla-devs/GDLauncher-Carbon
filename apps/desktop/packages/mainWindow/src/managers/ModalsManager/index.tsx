@@ -1,7 +1,6 @@
 import { useLocation, useSearchParams } from "@solidjs/router";
 import {
   createContext,
-  createEffect,
   createSignal,
   For,
   JSX,
@@ -140,30 +139,29 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     closeModal,
   };
 
-  createEffect(() => {
-    console.log("STACK", modalStack());
-  });
-
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
         <div class="h-screen w-screen">
-          <div
-            class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
-            classList={{
-              "opacity-100": modalStack().length > 0,
-              "opacity-0": modalStack().length > 0,
-            }}
-          >
-            <For each={modalStack()}>
-              {(modal, index) => {
-                const ModalComponent = defaultModals[modal.name].component;
-                const noHeader = defaultModals[modal.name].noHeader || false;
-                const title = defaultModals[modal.name].title || "";
+          <For each={modalStack()}>
+            {(modal, index) => {
+              const ModalComponent = defaultModals[modal.name].component;
+              const noHeader = defaultModals[modal.name].noHeader || false;
+              const title = defaultModals[modal.name].title || "";
 
-                return (
-                  <Show when={modal.name}>
+              return (
+                <Show when={modal.name}>
+                  <div
+                    class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
+                    classList={{
+                      "opacity-100": modalStack().length > 0,
+                      "opacity-0": modalStack().length > 0,
+                    }}
+                    onClick={() => {
+                      closeModal();
+                    }}
+                  >
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       class="absolute top-1/2 left-1/2 -translate-1/2"
@@ -175,11 +173,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                  </Show>
-                );
-              }}
-            </For>
-          </div>
+                  </div>
+                </Show>
+              );
+            }}
+          </For>
         </div>
       </Portal>
     </ModalsContext.Provider>
