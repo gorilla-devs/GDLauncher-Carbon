@@ -12,9 +12,9 @@ const SecondStep = (props: Props) => {
   let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
   return (
     <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
-      <div class="flex flex-col h-full justify-center items-center">
-        <div class="flex items-center mb-10 gap-4">
-          <p class="text-left text-darkSlate-100 m-0 max-w-100 font-normal leading-7">
+      <div class="flex flex-col h-full justify-center">
+        <div class="flex items-center mb-10 gap-4 w-[35rem]">
+          <p class="text-left text-darkSlate-100 m-0 font-normal leading-7 w-fit">
             <Trans
               key="onboarding.java_title"
               options={{
