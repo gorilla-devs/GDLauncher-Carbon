@@ -135,7 +135,7 @@ const Dropdown = (props: Props) => {
               <span class="mr-2">{props.icon}</span>
             </Show>
             <span
-              class="w-full"
+              class="w-full flex justify-between"
               classList={{
                 "text-white": !!props.error,
                 "text-darkSlate-50 hover:text-white group-hover:text-white":

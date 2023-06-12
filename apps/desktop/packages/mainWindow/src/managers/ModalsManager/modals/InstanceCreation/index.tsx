@@ -71,33 +71,16 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    const filteredVersions = mcVersions().filter((v) => {
-      if (
-        releaseVersionFilter() &&
-        snapshotVersionFilter() &&
-        oldAlphaVersionFilter() &&
-        oldBetaVersionFilter()
-      ) {
-        return true;
-      } else if (releaseVersionFilter()) {
-        return v.type === "release";
-      } else if (snapshotVersionFilter()) {
-        return v.type === "snapshot";
-      } else if (oldAlphaVersionFilter()) {
-        return v.type === "old_alpha";
-      } else if (oldBetaVersionFilter()) {
-        return v.type === "old_beta";
-      } else if (
-        !releaseVersionFilter() &&
-        !snapshotVersionFilter() &&
-        !oldAlphaVersionFilter() &&
-        !oldBetaVersionFilter()
-      ) {
-        return true;
-      }
-    });
+    const filteredData = () =>
+      mcVersions().filter(
+        (item) =>
+          (item.type === "release" && releaseVersionFilter()) ||
+          (item.type === "snapshot" && snapshotVersionFilter()) ||
+          (item.type === "old_beta" && oldBetaVersionFilter()) ||
+          (item.type === "old_alpha" && oldAlphaVersionFilter())
+      );
 
-    setMappedMcVersions(filteredVersions);
+    setMappedMcVersions(filteredData());
   });
 
   const modloaders = [
@@ -326,39 +309,40 @@ const InstanceCreation = (props: ModalProps) => {
                 />
               </h5>
               <div>
-                <Show when={mappedMcVersions().length > 0}>
-                  <Dropdown
-                    disabled={Boolean(forgeVersionsQuery.isLoading && loader())}
-                    options={mappedMcVersions().map((v) => ({
-                      label: (
-                        <div class="flex justify-between w-full">
-                          <span>{v.id}</span>
-                          {mapTypeToColor(v.type)}
-                        </div>
-                      ),
-                      key: v.id,
-                    }))}
-                    bgColorClass="bg-darkSlate-800"
-                    containerClass="w-full"
-                    class="w-full"
-                    placement="bottom"
-                    value={mcVersion()}
-                    onChange={(l) => {
-                      setMcVersion(l.key as string);
+                <Dropdown
+                  disabled={Boolean(
+                    (forgeVersionsQuery.isLoading && loader()) ||
+                      mappedMcVersions().length === 0
+                  )}
+                  options={mappedMcVersions().map((v) => ({
+                    label: (
+                      <div class="flex justify-between w-full">
+                        <span>{v.id}</span>
+                        {mapTypeToColor(v.type)}
+                      </div>
+                    ),
+                    key: v.id,
+                  }))}
+                  bgColorClass="bg-darkSlate-800"
+                  containerClass="w-full"
+                  class="w-full"
+                  placement="bottom"
+                  value={mcVersion()}
+                  onChange={(l) => {
+                    setMcVersion(l.key as string);
 
-                      if (!loader) {
-                        setLoaderVersions([]);
-                      } else if (loader() === "Forge") {
-                        const versions =
-                          forgeVersionsQuery?.data?.gameVersions.find(
-                            (v) => v.id === l.key
-                          )?.loaders;
+                    if (!loader) {
+                      setLoaderVersions([]);
+                    } else if (loader() === "Forge") {
+                      const versions =
+                        forgeVersionsQuery?.data?.gameVersions.find(
+                          (v) => v.id === l.key
+                        )?.loaders;
 
-                        if (versions) setLoaderVersions(versions);
-                      }
-                    }}
-                  />
-                </Show>
+                      if (versions) setLoaderVersions(versions);
+                    }
+                  }}
+                />
                 <Show when={!loader()}>
                   <div class="flex gap-4 mt-2">
                     <div class="flex gap-2 items-center">
