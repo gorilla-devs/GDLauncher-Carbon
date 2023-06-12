@@ -1,15 +1,18 @@
 use std::{collections::HashMap, path::PathBuf, slice};
 
-use crate::domain::{
-    java::{JavaArch, JavaComponent},
-    maven::MavenCoordinates,
-    minecraft::minecraft::{
-        get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
+use crate::{
+    app_version::APP_VERSION,
+    domain::{
+        java::{JavaArch, JavaComponent},
+        maven::MavenCoordinates,
+        minecraft::minecraft::{
+            get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
+        },
     },
 };
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, DownloadType, Library, Os, Version, VersionInfo,
-    VersionManifest,
+    Argument, ArgumentType, ArgumentValue, DownloadType, Library, LibraryGroup, Os, Version,
+    VersionInfo, VersionManifest,
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -65,15 +68,42 @@ pub async fn get_version(
     Ok(version_meta)
 }
 
-pub async fn save_meta_to_disk(version: VersionInfo, clients_path: PathBuf) -> anyhow::Result<()> {
-    tokio::fs::create_dir_all(&clients_path).await?;
-    tokio::fs::write(
-        clients_path.join(format!("{}.json", version.id)),
-        serde_json::to_string(&version)?,
-    )
-    .await?;
+pub async fn get_lwjgl_meta(
+    reqwest_client: &reqwest_middleware::ClientWithMiddleware,
+    version_info: &VersionInfo,
+    meta_base_url: &Url,
+) -> anyhow::Result<LibraryGroup> {
+    // TODO: Hardcoded. Fix
+    let version_info_lwjgl_requirement = version_info
+        .requires
+        .as_ref()
+        .ok_or(anyhow::anyhow!("Version info requires not provided."))?;
+    let version_info_lwjgl_requirement = version_info_lwjgl_requirement
+        .first()
+        .ok_or(anyhow::anyhow!("Version info requires has no elements."))?;
 
-    Ok(())
+    let lwjgl_suggest = version_info_lwjgl_requirement
+        .rule
+        .as_ref()
+        .map(|rule| match rule {
+            daedalus::minecraft::DependencyRule::Equals(version) => version,
+            daedalus::minecraft::DependencyRule::Suggests(version) => version,
+        })
+        .ok_or(anyhow::anyhow!("Can't find lwjgl version."))?;
+
+    let lwjgl_json_url = meta_base_url.join(&format!(
+        "minecraft/v0/libraries/{}/{}.json",
+        version_info_lwjgl_requirement.uid, lwjgl_suggest
+    ))?;
+
+    let lwjgl = reqwest_client
+        .get(lwjgl_json_url)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(lwjgl)
 }
 
 #[cfg(target_os = "windows")]
@@ -191,8 +221,8 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::UserProperties => replacer_args.user_properties.clone(), // Not sure what this is,
         ArgPlaceholder::ClassPath => replacer_args.libraries.clone(),
         ArgPlaceholder::NativesDirectory => replacer_args.natives_path.display().to_string(),
-        ArgPlaceholder::LauncherName => "minecraft-launcher".to_string(),
-        ArgPlaceholder::LauncherVersion => "2".to_string(),
+        ArgPlaceholder::LauncherName => "GDLauncher".to_string(),
+        ArgPlaceholder::LauncherVersion => APP_VERSION.to_string(),
     }
 }
 
@@ -212,6 +242,7 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
     arg.to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_startup_command(
     java_component: JavaComponent,
     full_account: FullAccount,
@@ -220,11 +251,13 @@ pub async fn generate_startup_command(
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
+    lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Vec<String>> {
     let mut libraries = version
         .libraries
         .iter()
+        .chain(lwjgl_group.libraries.iter())
         .filter_map(|library| {
             if !library_is_allowed(library.clone(), &java_component.arch)
                 || !library.include_in_classpath
@@ -372,7 +405,7 @@ pub async fn generate_startup_command(
     });
 
     let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
-    substitute_arguments(&mut command, &jvm_arguments);
+    substitute_arguments(&mut command, jvm_arguments);
 
     for cap in extra_args_regex.captures_iter(extra_java_args) {
         let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };
@@ -380,36 +413,29 @@ pub async fn generate_startup_command(
     }
 
     if Os::native() == Os::Osx {
-        let lwjgl_version = version
-            .libraries
-            .iter()
-            .find(|&library| library.name.contains("org.lwjgl"))
-            .map(|library| MavenCoordinates::try_from(library.name.clone(), None))
-            .ok_or(anyhow::anyhow!("LWJGL not found"))??;
-        let lwjgl_version = lwjgl_version
-            .version
-            .get(0..1)
-            .ok_or(anyhow::anyhow!("LWJGL version not found"))?;
-
-        let is_x_start_on_first_thread_needed = lwjgl_version.parse::<u8>()? >= 3;
+        let lwjgl_3 = version
+            .requires
+            .map(|requires| requires.iter().any(|require| require.uid == "org.lwjgl3"))
+            .unwrap_or(false);
 
         let can_find_start_on_first_thread = command
             .iter()
             .any(|arg| arg.contains("XstartOnFirstThread"));
 
-        if !can_find_start_on_first_thread && is_x_start_on_first_thread_needed {
+        if !can_find_start_on_first_thread && lwjgl_3 {
             command.push("-XstartOnFirstThread".to_string());
         }
     }
 
     command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
-    command.push(version.main_class.clone());
+    command.push(version.main_class);
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
 
     Ok(command)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn launch_minecraft(
     java_component: JavaComponent,
     full_account: FullAccount,
@@ -418,6 +444,7 @@ pub async fn launch_minecraft(
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
+    lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Child> {
     let startup_command = generate_startup_command(
@@ -428,6 +455,7 @@ pub async fn launch_minecraft(
         extra_java_args,
         runtime_path,
         version,
+        lwjgl_group,
         instance_path.clone(),
     )
     .await?;
@@ -453,14 +481,15 @@ pub async fn launch_minecraft(
 pub async fn extract_natives(
     runtime_path: &RuntimePath,
     version: &VersionInfo,
+    lwjgl_group: &LibraryGroup,
     java_arch: &JavaArch,
-) {
+) -> anyhow::Result<()> {
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
         version_id: &str,
         native_name: &str,
-    ) {
+    ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
         let path = runtime_path.get_libraries().get_library_path({
             library
@@ -476,28 +505,33 @@ pub async fn extract_natives(
                 .clone()
         });
         let dest = runtime_path.get_natives().get_versioned(version_id);
-        tokio::fs::create_dir_all(&dest).await.unwrap();
+        tokio::fs::create_dir_all(&dest).await?;
 
         info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, &dest).await.unwrap();
+        carbon_compression::decompress(path, &dest).await?;
+
+        Ok(())
     }
 
     for library in version
         .libraries
         .iter()
+        .chain(lwjgl_group.libraries.iter())
         .filter(|&lib| library_is_allowed(lib.clone(), java_arch))
     {
         match &library.natives {
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
                     extract_single_library_natives(runtime_path, library, &version.id, native_name)
-                        .await;
+                        .await?;
                 }
             }
             None => continue,
         };
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -541,6 +575,14 @@ mod tests {
             .await
             .unwrap();
 
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version,
+            &app.minecraft_manager().meta_base_url,
+        )
+        .await
+        .unwrap();
+
         let full_account = FullAccount {
             username: "test".to_owned(),
             uuid: "test-uuid".to_owned(),
@@ -569,6 +611,7 @@ mod tests {
             "",
             &runtime_path,
             version,
+            &lwjgl_group,
             instance_id,
         )
         .await
@@ -608,9 +651,18 @@ mod tests {
             .await
             .unwrap();
 
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version,
+            &app.minecraft_manager().meta_base_url,
+        )
+        .await
+        .unwrap();
+
         let natives = version
             .libraries
             .iter()
+            .chain(lwjgl_group.libraries.iter())
             .filter(|&lib| lib.natives.is_some())
             .collect::<Vec<_>>();
 
@@ -629,6 +681,8 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version, &JavaArch::X86_64).await;
+        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
+            .await
+            .unwrap();
     }
 }
