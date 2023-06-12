@@ -142,7 +142,6 @@ export default function Browser() {
                 options={mappedMcVersions()}
                 icon={<div class="i-ri:price-tag-3-fill" />}
                 rounded
-                textColorClass="text-white"
                 value={mappedMcVersions()[0].key}
                 onChange={(val) => {
                   infiniteQuery?.setQuery({ gameVersion: val.key as string });

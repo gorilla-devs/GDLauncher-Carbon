@@ -84,7 +84,10 @@ const Dropdown = (props: Props) => {
   const position = useFloating(buttonRef, menuRef, {
     placement: "bottom-end",
     middleware: [offset(5), flip(), shift(), hide(), size()],
-    whileElementsMounted: autoUpdate,
+    whileElementsMounted: (reference, floating, update) =>
+      autoUpdate(reference, floating, update, {
+        animationFrame: true,
+      }),
   });
 
   createEffect(() => {
@@ -184,6 +187,10 @@ const Dropdown = (props: Props) => {
                 {(option) => (
                   <li
                     class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
+                    classList={{
+                      "bg-darkSlate-700": selectedValue() !== option.label,
+                      "bg-darkSlate-500": selectedValue() === option.label,
+                    }}
                     onClick={() => {
                       setSelectedValue(option.label);
                       props.onChange?.(option);
