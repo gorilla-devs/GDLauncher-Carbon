@@ -123,6 +123,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
+        mutation DUPLICATE_INSTANCE[app, details: DuplicateInstance] {
+            app.instance_manager()
+                .duplicate_instance(
+                    details.instance.into(),
+                    details.new_name,
+                )
+                .await
+                .map(InstanceId::from)
+        }
+
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
                 .update_instance(details.into())
@@ -477,6 +487,12 @@ struct UpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+}
+
+#[derive(Type, Deserialize)]
+struct DuplicateInstance {
+    instance: InstanceId,
+    new_name: String,
 }
 
 #[derive(Type, Deserialize)]

@@ -77,6 +77,7 @@ keys! {
         DELETE_INSTANCE                             = "deleteInstance";
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
+        DUPLICATE_INSTANCE                               = "duplicateInstance";
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
