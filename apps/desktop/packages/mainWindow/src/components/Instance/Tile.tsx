@@ -129,7 +129,7 @@ const Tile = (props: Props) => {
 
   const menuItems = () => [
     {
-      icon: props.isRunning ? "i-ri:pause-mini-fill" : "i-ri:play-fill",
+      icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
     },
@@ -186,8 +186,7 @@ const Tile = (props: Props) => {
                 !props.isLoading &&
                 !props.isInQueue &&
                 !props.invalid &&
-                !props.failError &&
-                !props.isRunning
+                !props.failError
               ) {
                 props?.onClick?.(e);
               }
@@ -248,7 +247,7 @@ const Tile = (props: Props) => {
                   class="text-white"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
-                    "i-ri:pause-mini-fill": props.isRunning,
+                    "i-ri:stop-fill": props.isRunning,
                   }}
                 />
               </div>
@@ -338,8 +337,7 @@ const Tile = (props: Props) => {
                 !props.isLoading &&
                 !props.isInQueue &&
                 !props.invalid &&
-                !props.failError &&
-                !props.isRunning
+                !props.failError
               ) {
                 props?.onClick?.(e);
               }
@@ -381,7 +379,7 @@ const Tile = (props: Props) => {
                 class="text-white text-lg"
                 classList={{
                   "i-ri:play-fill": !props.isRunning,
-                  "i-ri:pause-mini-fill": props.isRunning,
+                  "i-ri:stop-fill": props.isRunning,
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -442,8 +440,7 @@ const Tile = (props: Props) => {
               !props.isLoading &&
               !props.isInQueue &&
               !props.invalid &&
-              !props.failError &&
-              !props.isRunning
+              !props.failError
             ) {
               props?.onClick?.(e);
             }
@@ -494,7 +491,7 @@ const Tile = (props: Props) => {
                 class="text-white text-lg"
                 classList={{
                   "i-ri:play-fill": !props.isRunning,
-                  "i-ri:pause-mini-fill": props.isRunning,
+                  "i-ri:stop-fill": props.isRunning,
                 }}
                 onClick={(e) => {
                   e.preventDefault();
