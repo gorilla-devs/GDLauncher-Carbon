@@ -19,9 +19,10 @@ const Modpack = (props: Props) => {
     ["instance.prepareInstance"],
     {
       onSuccess() {
+        setLoading(true);
         addNotification("Instance successfully created.");
       },
-      onError() {
+      onError(error) {
         setLoading(false);
         addNotification("Error while creating the instance.", "error");
       },

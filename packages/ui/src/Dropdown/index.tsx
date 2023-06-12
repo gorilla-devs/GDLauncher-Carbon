@@ -87,6 +87,10 @@ const Dropdown = (props: Props) => {
     whileElementsMounted: autoUpdate,
   });
 
+  createEffect(() => {
+    if (position.middlewareData.hide?.referenceHidden) setMenuOpened(false);
+  });
+
   onCleanup(() => setMenuOpened(false));
 
   return (
