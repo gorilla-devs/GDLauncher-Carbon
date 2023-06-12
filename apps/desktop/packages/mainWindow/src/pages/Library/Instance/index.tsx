@@ -17,6 +17,7 @@ import fetchData from "./instance.data";
 import { formatDistance } from "date-fns";
 import { InstanceDetails, UngroupedInstance } from "@gd/core_module/bindings";
 import { getPreparingState, getRunningState } from "@/utils/instances";
+import DefaultImg from "/assets/images/default-instance-img.png";
 
 type InstancePage = {
   label: string;
@@ -222,8 +223,10 @@ const Instance = () => {
         <div
           class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
           style={{
-            "background-image": `url("${headerMockImage}")`,
-            "background-position": "right-5rem",
+            "background-image": routeData.image()
+              ? `url("${routeData.image()}")`
+              : `url("${DefaultImg}")`,
+            "background-position": routeData.image() ? "right-5rem" : "top",
           }}
           // ref={(el) => {
           //   bgRef = el;
@@ -266,7 +269,9 @@ const Instance = () => {
                       "bg-darkSlate-800": !routeData.image(),
                     }}
                     style={{
-                      "background-image": `url("${routeData.image()}")`,
+                      "background-image": routeData.image()
+                        ? `url("${routeData.image()}")`
+                        : `url("${DefaultImg}")`,
                     }}
                   />
 

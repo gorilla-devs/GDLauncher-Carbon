@@ -22,7 +22,7 @@ const Modpack = (props: Props) => {
         setLoading(false);
         addNotification("Instance successfully created.");
       },
-      onError(error) {
+      onError() {
         setLoading(false);
         addNotification("Error while creating the instance.", "error");
       },

@@ -11,6 +11,7 @@ import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Spinner, createNotification } from "@gd/ui";
+import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
@@ -196,7 +197,6 @@ const Tile = (props: Props) => {
               class="flex justify-center relative rounded-2xl items-center overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
               classList={{
                 grayscale: props.isLoading || props.isInQueue,
-                "bg-green-600": !props.img,
                 "cursor-pointer":
                   !props.isLoading &&
                   !props.isInQueue &&
@@ -205,7 +205,9 @@ const Tile = (props: Props) => {
                   !props.isRunning,
               }}
               style={{
-                "background-image": `url("${props.img as string}")`,
+                "background-image": props.img
+                  ? `url("${props.img as string}")`
+                  : `url("${DefaultImg}")`,
               }}
             >
               <Show when={props.invalid}>
@@ -399,11 +401,12 @@ const Tile = (props: Props) => {
             <div
               class="bg-cover bg-center h-10 rounded-lg w-10"
               style={{
-                "background-image": `url("${props.img as string}")`,
+                "background-image": props.img
+                  ? `url("${props.img as string}")`
+                  : `url("${DefaultImg}")`,
               }}
               classList={{
                 grayscale: props.isLoading,
-                "bg-green-600": !props.img,
               }}
             />
             <div class="flex flex-col">
@@ -458,11 +461,12 @@ const Tile = (props: Props) => {
           <div
             class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center bg-green-600"
             style={{
-              "background-image": `url("${props.img as string}")`,
+              "background-image": props.img
+                ? `url("${props.img as string}")`
+                : `url("${DefaultImg}")`,
             }}
             classList={{
               grayscale: props.isLoading || props.isInQueue,
-              "bg-green-600": !props.img,
             }}
           >
             <Show when={props.invalid}>
