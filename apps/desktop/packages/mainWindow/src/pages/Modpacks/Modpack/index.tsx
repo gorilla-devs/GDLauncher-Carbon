@@ -5,7 +5,7 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 
 type Props = { modpack: FEMod };
 
@@ -19,7 +19,7 @@ const Modpack = (props: Props) => {
     ["instance.prepareInstance"],
     {
       onSuccess() {
-        setLoading(true);
+        setLoading(false);
         addNotification("Instance successfully created.");
       },
       onError(error) {
@@ -27,6 +27,7 @@ const Modpack = (props: Props) => {
         addNotification("Error while creating the instance.", "error");
       },
       onSettled() {
+        setLoading(false);
         navigate(`/library`);
       },
     }
@@ -37,6 +38,9 @@ const Modpack = (props: Props) => {
   const createInstanceMutation = rspc.createMutation(
     ["instance.createInstance"],
     {
+      onMutate() {
+        setLoading(true);
+      },
       onSuccess(instanceId) {
         setLoading(true);
         prepareInstanceMutation.mutate(instanceId);
