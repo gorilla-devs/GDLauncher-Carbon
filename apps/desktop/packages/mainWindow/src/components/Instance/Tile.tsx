@@ -359,8 +359,8 @@ const Tile = (props: Props) => {
               <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
-              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-green-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-green-500 w-1" />
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
+              <div class="absolute right-0 top-0 bottom-0 w-1" />
             </Show>
 
             <div
@@ -455,11 +455,11 @@ const Tile = (props: Props) => {
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
           </Show>
           <Show when={props.isRunning && !props.isLoading}>
-            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-green-500" />
-            <div class="absolute right-0 top-0 bottom-0 bg-green-500 w-1" />
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
+            <div class="absolute right-0 top-0 bottom-0 w-1" />
           </Show>
           <div
-            class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center bg-green-600"
+            class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center"
             style={{
               "background-image": props.img
                 ? `url("${props.img as string}")`

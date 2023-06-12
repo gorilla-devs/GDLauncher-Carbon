@@ -10,7 +10,6 @@ import {
   useRouteData,
 } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
-import headerMockImage from "/assets/images/minecraft-forge.jpg";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
