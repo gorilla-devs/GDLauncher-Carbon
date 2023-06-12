@@ -6,8 +6,8 @@ import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
   FEModdedManifestLoaderVersion,
-  FEModdedManifestVersion,
   ManifestVersion,
+  McType,
   ModLoaderType,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
@@ -16,7 +16,7 @@ import { mcVersions } from "@/utils/mcVersion";
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
-    FEModdedManifestVersion[] | ManifestVersion[]
+    ManifestVersion[]
   >([]);
   const [title, setTitle] = createSignal("");
   const [error, setError] = createSignal("");
@@ -28,9 +28,9 @@ const InstanceCreation = (props: ModalProps) => {
     FEModdedManifestLoaderVersion[]
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal("");
-  const [mcVersionsHashMap, setMcVersionsHashMap] = createSignal<{
-    [id: string]: string;
-  }>({});
+  const [mcVersionsAvailable, setMcVersionsAvailable] = createSignal<string[]>(
+    []
+  );
   const [mcVersion, setMcVersion] = createSignal("");
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
@@ -45,15 +45,15 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    mcVersions().forEach((v) => {
-      setMcVersionsHashMap((prev) => ({ ...prev, [v.id]: v.type }));
+    forgeVersionsQuery?.data?.gameVersions?.forEach((v) => {
+      setMcVersionsAvailable((prev) => [...prev, v.id]);
     });
   });
 
   createEffect(() => {
     if (forgeVersionsQuery.data && loader() === "Forge") {
-      const filteredVersions = forgeVersionsQuery.data.gameVersions.filter(
-        (v) => mcVersionsHashMap()[v.id]
+      const filteredVersions = mcVersions().filter((v) =>
+        mcVersionsAvailable().includes(v.id)
       );
 
       setMappedMcVersions(filteredVersions);
@@ -143,6 +143,25 @@ const InstanceCreation = (props: ModalProps) => {
       },
     }
   );
+
+  const mapTypeToColor = (type: McType) => {
+    return (
+      <Switch>
+        <Match when={type === "release"}>
+          <span class="text-green-500">{`[${type}]`}</span>
+        </Match>
+        <Match when={type === "snapshot"}>
+          <span class="text-yellow-500">{`[${type}]`}</span>
+        </Match>
+        <Match when={type === "old_alpha"}>
+          <span class="text-purple-500">{`[${type}]`}</span>
+        </Match>
+        <Match when={type === "old_beta"}>
+          <span class="text-red-500">{`[${type}]`}</span>
+        </Match>
+      </Switch>
+    );
+  };
 
   const handleCreate = () => {
     if (!title()) {
@@ -311,7 +330,12 @@ const InstanceCreation = (props: ModalProps) => {
                   <Dropdown
                     disabled={Boolean(forgeVersionsQuery.isLoading && loader())}
                     options={mappedMcVersions().map((v) => ({
-                      label: v.id,
+                      label: (
+                        <div class="flex justify-between w-full">
+                          <span>{v.id}</span>
+                          {mapTypeToColor(v.type)}
+                        </div>
+                      ),
                       key: v.id,
                     }))}
                     bgColorClass="bg-darkSlate-800"

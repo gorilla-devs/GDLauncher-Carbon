@@ -12,7 +12,7 @@ import { useFloating } from "solid-floating-ui";
 import { offset, flip, shift, autoUpdate, hide, size } from "@floating-ui/dom";
 
 type Option = {
-  label: string;
+  label: string | JSX.Element;
   key: string | number;
 };
 
@@ -135,6 +135,7 @@ const Dropdown = (props: Props) => {
               <span class="mr-2">{props.icon}</span>
             </Show>
             <span
+              class="w-full"
               classList={{
                 "text-white": !!props.error,
                 "text-darkSlate-50 hover:text-white group-hover:text-white":
@@ -188,8 +189,8 @@ const Dropdown = (props: Props) => {
                   <li
                     class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
                     classList={{
-                      "bg-darkSlate-700": selectedValue() !== option.label,
-                      "bg-darkSlate-500": selectedValue() === option.label,
+                      "bg-darkSlate-700": selectedValue() !== option.key,
+                      "bg-darkSlate-500": selectedValue() === option.key,
                     }}
                     onClick={() => {
                       setSelectedValue(option.label);
