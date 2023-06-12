@@ -106,6 +106,10 @@ const Tile = (props: Props) => {
     "instance.openInstanceFolder",
   ]);
 
+  const duplicateInstanceMutation = rspc.createMutation([
+    "instance.duplicateInstance",
+  ]);
+
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: props.instanceId,
@@ -125,7 +129,14 @@ const Tile = (props: Props) => {
     navigate(`/library/${props.instanceId}/settings`);
   };
 
-  const handleDuplicate = () => {};
+  const handleDuplicate = () => {
+    if (!props.invalid) {
+      duplicateInstanceMutation.mutate({
+        instance: props.instanceId,
+        new_name: props.title,
+      });
+    }
+  };
 
   const menuItems = () => [
     {
@@ -138,11 +149,15 @@ const Tile = (props: Props) => {
       label: t("instance.action_settings"),
       action: handleSettings,
     },
-    {
-      icon: "i-ri:file-copy-fill",
-      label: t("instance.action_duplicate"),
-      action: handleDuplicate,
-    },
+    ...(!props.invalid
+      ? [
+          {
+            icon: "i-ri:file-copy-fill",
+            label: t("instance.action_duplicate"),
+            action: handleDuplicate,
+          },
+        ]
+      : []),
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
@@ -413,7 +428,7 @@ const Tile = (props: Props) => {
               >
                 {props.title}
               </h4>
-              <div class="flex gap-4 text-darkSlate-50">
+              <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">
                   <Show when={!props.invalid && !props.failError}>
                     <img
@@ -421,7 +436,9 @@ const Tile = (props: Props) => {
                       src={getModloaderIcon(props.modloader as ModLoaderType)}
                     />
                   </Show>
-                  <p class="m-0">{props.modloader}</p>
+                  <Show when={props.modloader}>
+                    <p class="m-0">{props.modloader}</p>
+                  </Show>
                 </span>
                 <p class="m-0">{props.version}</p>
               </div>

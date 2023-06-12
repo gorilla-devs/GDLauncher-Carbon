@@ -309,7 +309,7 @@ const InstanceCreation = (props: ModalProps) => {
               <div>
                 <Show when={mappedMcVersions().length > 0}>
                   <Dropdown
-                    disabled={forgeVersionsQuery.isLoading}
+                    disabled={Boolean(forgeVersionsQuery.isLoading && loader())}
                     options={mappedMcVersions().map((v) => ({
                       label: v.id,
                       key: v.id,
@@ -318,6 +318,7 @@ const InstanceCreation = (props: ModalProps) => {
                     containerClass="w-full"
                     class="w-full"
                     placement="bottom"
+                    value={mcVersion()}
                     onChange={(l) => {
                       setMcVersion(l.key as string);
 
