@@ -189,81 +189,83 @@ const InstanceCreation = (props: ModalProps) => {
       <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-136">
         <div class="flex flex-col justify-between gap-4 p-5 h-full">
           <span class="flex flex-col justify-between gap-4">
-            <div
-              class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
-              style={{
-                "background-image": `url("${bgPreview()}")`,
-              }}
-              onClick={() => {
-                if (bgPreview()) return;
-                window
-                  .openFileDialog([
-                    { name: "Image", extensions: ["png", "jpg", "jpeg"] },
-                  ])
-                  .then((files) => {
-                    if (!files.filePaths[0]) return;
-                    fetch(
-                      `http://localhost:${port}/instance/loadIcon?path=${files.filePaths[0]}`
-                    ).then(async (img) => {
-                      const blob = await img.blob();
-                      const b64 = (await blobToBase64(blob)) as string;
-
-                      setBgPreview(
-                        `data:image/png;base64, ${b64.substring(
-                          b64.indexOf(",") + 1
-                        )}`
-                      );
-                    });
-                  });
-              }}
-            >
-              <Switch>
-                <Match when={!bgPreview()}>
-                  <h3 class="text-center">
-                    <Trans
-                      key="instance.upload_image"
-                      options={{
-                        defaultValue: "Upload image",
-                      }}
-                    />
-                  </h3>
-                </Match>
-                <Match when={bgPreview()}>
-                  <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
-                    <div
-                      class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setBgPreview(null);
-                      }}
-                    />
-                  </div>
-                </Match>
-              </Switch>
-            </div>
-            <div>
-              <h5 class="mt-0 mb-2">
-                <Trans
-                  key="instance.instance_name"
-                  options={{
-                    defaultValue: "Instance name",
-                  }}
-                />
-              </h5>
-              <Input
-                required
-                placeholder="New instance"
-                inputColor="bg-darkSlate-800"
-                onInput={(e) => {
-                  setTitle(e.currentTarget.value);
+            <div class="flex gap-4 w-full">
+              <div
+                class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
+                style={{
+                  "background-image": `url("${bgPreview()}")`,
                 }}
-                value={title()}
-                error={
-                  error() &&
-                  !title() &&
-                  (t("error.missing_field_title") as string)
-                }
-              />
+                onClick={() => {
+                  if (bgPreview()) return;
+                  window
+                    .openFileDialog([
+                      { name: "Image", extensions: ["png", "jpg", "jpeg"] },
+                    ])
+                    .then((files) => {
+                      if (!files.filePaths[0]) return;
+                      fetch(
+                        `http://localhost:${port}/instance/loadIcon?path=${files.filePaths[0]}`
+                      ).then(async (img) => {
+                        const blob = await img.blob();
+                        const b64 = (await blobToBase64(blob)) as string;
+
+                        setBgPreview(
+                          `data:image/png;base64, ${b64.substring(
+                            b64.indexOf(",") + 1
+                          )}`
+                        );
+                      });
+                    });
+                }}
+              >
+                <Switch>
+                  <Match when={!bgPreview()}>
+                    <h3 class="text-center">
+                      <Trans
+                        key="instance.upload_image"
+                        options={{
+                          defaultValue: "Upload image",
+                        }}
+                      />
+                    </h3>
+                  </Match>
+                  <Match when={bgPreview()}>
+                    <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
+                      <div
+                        class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setBgPreview(null);
+                        }}
+                      />
+                    </div>
+                  </Match>
+                </Switch>
+              </div>
+              <div class="flex-1">
+                <h5 class="mt-0 mb-2">
+                  <Trans
+                    key="instance.instance_name"
+                    options={{
+                      defaultValue: "Instance name",
+                    }}
+                  />
+                </h5>
+                <Input
+                  required
+                  placeholder="New instance"
+                  inputColor="bg-darkSlate-800"
+                  onInput={(e) => {
+                    setTitle(e.currentTarget.value);
+                  }}
+                  value={title()}
+                  error={
+                    error() &&
+                    !title() &&
+                    (t("error.missing_field_title") as string)
+                  }
+                />
+              </div>
             </div>
             <div class="flex gap-2">
               <For each={modloaders}>
