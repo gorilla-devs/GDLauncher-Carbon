@@ -12,6 +12,7 @@ use crate::domain::instance::info::{GameVersion, InstanceIcon};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
+use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 
 use md5::{Digest, Md5};
@@ -1085,6 +1086,93 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    /// # Locks
+    /// - [InstanceManager::instances] (w)
+    pub async fn duplicate_instance(
+        self,
+        instance_id: InstanceId,
+        name: String,
+    ) -> anyhow::Result<InstanceId> {
+        let mut instances = self.instances.write().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let group_id = self
+            .app
+            .prisma_client
+            .instance()
+            .find_unique(db::instance::UniqueWhereParam::IdEquals(*instance_id))
+            .exec()
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "instance was not listed in db while being present in internal list"
+                )
+            })?
+            .group_id;
+
+        let data = instance.data()?;
+        let mut new_info = instance.data()?.config.clone();
+        let (new_shortpath, new_path) = self.next_folder(&instance.shortpath).await?;
+        new_info.name = name;
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&instance.shortpath)
+            .get_root();
+
+        let tmpdir = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .maketmp()
+            .await?;
+
+        let path2 = path.clone();
+        let tmpdir2 = tmpdir.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            fs_extra::dir::copy(path2, tmpdir2, &CopyOptions::new())
+        })
+        .await??;
+
+        let json = schema::make_instance_config(new_info.clone())?;
+        tokio::fs::write(&tmpdir.join("instance.json"), json).await?;
+
+        tokio::fs::rename(&*tmpdir, new_path).await?;
+        let id = self
+            .add_instance(
+                new_info.name.clone(),
+                new_shortpath.clone(),
+                GroupId(group_id),
+            )
+            .await?;
+
+        let mods = data.mods.clone();
+
+        instances.insert(
+            id,
+            Instance {
+                shortpath: new_shortpath,
+                type_: InstanceType::Valid(InstanceData {
+                    favorite: false,
+                    config: new_info,
+                    state: run::LaunchState::Inactive { failed_task: None },
+                    mods,
+                }),
+            },
+        );
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+
+        Ok(id)
+    }
+
     pub async fn open_folder(
         self,
         instance_id: InstanceId,
@@ -1456,7 +1544,7 @@ pub struct InstanceData {
     mods: Vec<Mod>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mod {
     id: String,
     filename: OsString,

@@ -65,6 +65,7 @@ md-5 = { workspace = true }
 hex = { workspace = true }
 murmurhash32 = { workspace = true }
 pin-project = { workspace = true }
+fs_extra = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
