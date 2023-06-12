@@ -2,7 +2,7 @@ import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
@@ -30,7 +30,7 @@ const Mods = () => {
     return (
       <div class="h-full w-full flex justify-center items-center min-h-90">
         <div class="flex flex-col justify-center items-center text-center">
-          <img src={glassBlock} class="w-16 h-16" />
+          <img src={skull} class="w-16 h-16" />
           <p class="text-darkSlate-50 max-w-100">
             <Trans
               key="instance.no_mods_text"

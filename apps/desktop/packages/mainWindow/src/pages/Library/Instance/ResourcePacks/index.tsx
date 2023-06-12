@@ -2,7 +2,7 @@ import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import ResourcePack from "./ResourcePack";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 
 type IResourcepack = {
   title: string;
@@ -125,7 +125,7 @@ const NoResourcePacks = () => {
   return (
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
-        <img src={glassBlock} class="w-16 h-16" />
+        <img src={skull} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="instance.no_resource_packs_text"

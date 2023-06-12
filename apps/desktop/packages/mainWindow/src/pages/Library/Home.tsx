@@ -13,7 +13,7 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import fetchData from "../Library/library.data";
 import InstanceTile from "@/components/InstanceTile";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 
 const Home = () => {
   const [t] = useTransContext();
@@ -81,7 +81,7 @@ const Home = () => {
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center mt-12">
-              <img src={glassBlock} class="w-16 h-16" />
+              <img src={skull} class="w-16 h-16" />
               <p class="text-darkSlate-50 max-w-100 text-center">
                 <Trans
                   key="instance.no_instances_text"

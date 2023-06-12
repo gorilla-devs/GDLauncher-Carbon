@@ -225,7 +225,7 @@ const Instance = () => {
             "background-image": routeData.image()
               ? `url("${routeData.image()}")`
               : `url("${DefaultImg}")`,
-            "background-position": routeData.image() ? "right-5rem" : "top",
+            "background-position": routeData.image() ? "right-5rem" : "bottom",
           }}
           // ref={(el) => {
           //   bgRef = el;
@@ -264,9 +264,6 @@ const Instance = () => {
                 <div class="flex flex-col gap-4 w-full lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
-                    classList={{
-                      "bg-darkSlate-800": !routeData.image(),
-                    }}
                     style={{
                       "background-image": routeData.image()
                         ? `url("${routeData.image()}")`

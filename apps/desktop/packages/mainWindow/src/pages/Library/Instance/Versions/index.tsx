@@ -2,7 +2,7 @@ import { Button } from "@gd/ui";
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
 import Version from "./Version";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../instance.data";
 import { rspc } from "@/utils/rspcClient";
@@ -12,7 +12,7 @@ const NoVersions = () => {
   return (
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
-        <img src={glassBlock} class="w-16 h-16" />
+        <img src={skull} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="modpack.no_versions_text"

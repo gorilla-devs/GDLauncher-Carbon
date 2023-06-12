@@ -17,7 +17,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -171,7 +171,7 @@ const Sidebar = () => {
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center">
-              <img src={glassBlock} class="w-16 h-16" />
+              <img src={skull} class="w-16 h-16" />
               <p class="text-darkSlate-50 text-center text-xs max-w-100">
                 <Trans
                   key="instance.no_instances_text"
