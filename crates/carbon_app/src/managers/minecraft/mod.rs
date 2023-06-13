@@ -1,6 +1,6 @@
 use carbon_net::Downloadable;
 use daedalus::{
-    minecraft::{DownloadType, LibraryGroup, Version, VersionInfo, VersionManifest},
+    minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,
 };
 use reqwest::Url;

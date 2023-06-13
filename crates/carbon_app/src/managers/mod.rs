@@ -12,7 +12,7 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 use tokio::sync::broadcast::{self, error::RecvError};
-use tracing::{debug, error};
+use tracing::error;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;

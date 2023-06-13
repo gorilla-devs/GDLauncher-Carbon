@@ -1,10 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, slice};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     app_version::APP_VERSION,
     domain::{
         java::{JavaArch, JavaComponent},
-        maven::MavenCoordinates,
         minecraft::minecraft::{
             get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
         },

@@ -10,7 +10,8 @@ use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
 
-use http::{HeaderMap, HeaderValue, StatusCode};
+use hyper::http::HeaderValue;
+use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 

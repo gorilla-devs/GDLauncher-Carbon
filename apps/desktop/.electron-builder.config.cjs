@@ -2,6 +2,7 @@ let arch = process.argv[4].replace(/-/g, "");
 let os = process.argv[5].replace(/-/g, "");
 let profile = process.argv[7].replace(/-/g, "");
 
+let carbonAppBinName = os === "win" ? "carbon_app.exe" : "carbon_app";
 let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
 let targetTripleLookup = {
   "win-x64": "x86_64-pc-windows-msvc",
@@ -34,7 +35,7 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: `../../target/${targetTriple}/${profile}/${coreModuleBinName}`,
+      from: `../../target/${targetTriple}/${profile}/${carbonAppBinName}`,
       to: coreModuleBinName,
     },
   ],

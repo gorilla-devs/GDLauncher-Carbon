@@ -500,7 +500,6 @@ pub enum DownloadError {
 #[cfg(test)]
 #[cfg(not(target_os = "windows"))] // conflicts with task cleanup
 mod test {
-    use ntest::timeout;
     use tracing::error;
 
     use crate::managers::download::{DownloadError, DownloadStartError};
