@@ -12,15 +12,7 @@ import { AccountType, DeviceCode, Procedures } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import {
-  createSignal,
-  For,
-  Show,
-  JSX,
-  Switch,
-  Match,
-  createEffect,
-} from "solid-js";
+import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
 
 export type Label = {
   name: string;
@@ -57,10 +49,6 @@ type ActiveUUID = Extract<
   Procedures["queries"],
   { key: "account.setActiveUuid" }
 >["result"];
-
-export interface DropDownButtonProps extends Props {
-  children: JSX.Element;
-}
 
 type EnrollStatusResult = Extract<
   Procedures["queries"],
@@ -171,6 +159,8 @@ export const AccountsDropdown = (props: Props) => {
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
 
+  let menuRef: undefined | HTMLDivElement;
+
   const navigate = useGDNavigate();
 
   const addNotification = createNotification();
@@ -181,7 +171,9 @@ export const AccountsDropdown = (props: Props) => {
 
   const resetCountDown = () => {
     setExpired(false);
-    setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    if (!isNaN(minutes()) && !isNaN(seconds())) {
+      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    }
   };
 
   const updateExpireTime = () => {
@@ -196,7 +188,9 @@ export const AccountsDropdown = (props: Props) => {
     if (expired()) {
       if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
       clearInterval(interval);
-      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+      if (!isNaN(minutes()) && !isNaN(seconds())) {
+        setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+      }
     } else {
       interval = setInterval(() => {
         updateExpireTime();
@@ -458,12 +452,19 @@ export const AccountsDropdown = (props: Props) => {
         />
       </button>
       <div
+        ref={menuRef}
+        tabindex="0"
         class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-40 min-w-80 pt-3 bg-darkSlate-900"
-        onMouseOut={() => {
+        onMouseLeave={() => {
           setFocusIn(false);
         }}
-        onMouseOver={() => {
+        onMouseEnter={() => {
           setFocusIn(true);
+        }}
+        onClick={() => menuRef?.focus()}
+        onBlur={() => {
+          setFocusIn(false);
+          setMenuOpened(false);
         }}
         classList={{
           flex: menuOpened(),

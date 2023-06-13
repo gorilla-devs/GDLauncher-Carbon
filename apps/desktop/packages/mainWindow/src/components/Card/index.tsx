@@ -3,15 +3,15 @@ import vanillaIcon from "/assets/images/icons/vanilla.png";
 import bookIcon from "/assets/images/icons/book.png";
 import clockIcon from "/assets/images/icons/clock.png";
 import pickAxeIcon from "/assets/images/icons/pickaxe.png";
-import signIcon from "/assets/images/icons/sign.png";
-import cartIcon from "/assets/images/icons/cart.png";
+import mapIcon from "/assets/images/icons/map.png";
+import questIcon from "/assets/images/icons/quest.png";
 
 type Icon = "vanilla" | "book" | "cart" | "clock" | "pickaxe" | "sign";
 
 interface Props {
   icon?: Icon;
   title: string;
-  text: string;
+  text: string | number;
   class?: string;
 }
 
@@ -25,13 +25,13 @@ const Card = (props: Props) => {
       case "book":
         return bookIcon;
       case "cart":
-        return cartIcon;
+        return questIcon;
       case "clock":
         return clockIcon;
       case "pickaxe":
         return pickAxeIcon;
       case "sign":
-        return signIcon;
+        return mapIcon;
       default:
         return vanillaIcon;
     }
@@ -39,18 +39,18 @@ const Card = (props: Props) => {
 
   return (
     <div
-      class={`flex items-center justify-between p-5 h-23 w-59 bg-darkSlate-700 rounded-xl box-border ${
+      class={`flex items-center gap-2 p-5 h-23 min-w-59 bg-darkSlate-700 rounded-xl box-border ${
         props.class || ""
       }`}
     >
       <div class="flex justify-center items-center rounded-lg bg-darkSlate-800 h-13 w-13">
-        <img src={getIcon(props.icon || "vanilla")} />
+        <img src={getIcon(props.icon || "vanilla")} class="h-10 w-10" />
       </div>
       <div>
         <h5 class="m-0 text-darkSlate-50 uppercase font-medium">
           {mergedProps.title}
         </h5>
-        <p class="uppercase m-0 text-white font-bold text-2xl">
+        <p class="m-0 text-white font-bold text-xl whitespace-nowrap">
           {mergedProps.text}
         </p>
       </div>

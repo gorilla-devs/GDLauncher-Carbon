@@ -10,11 +10,12 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
+import { generateSequence } from "@/utils/helpers";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -31,21 +32,6 @@ const Java = () => {
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
-
-  const generateSequence = (
-    min: number,
-    max: number
-  ): Record<number, string> => {
-    let current = min;
-    const sequence: Record<number, string> = {};
-
-    while (current <= max) {
-      sequence[current] = `${current} MB`;
-      current *= 2;
-    }
-
-    return sequence;
-  };
 
   const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
 
@@ -146,7 +132,7 @@ const Java = () => {
           />
           <Button
             rounded={false}
-            variant="secondary"
+            type="secondary"
             class="h-10"
             textColor="text-red-500"
             onClick={() => {
@@ -216,7 +202,7 @@ const Java = () => {
                     </h2>
                     <Button
                       rounded={false}
-                      variant="secondary"
+                      type="secondary"
                       size="small"
                       onClick={() => {
                         modalsContext?.openModal({ name: "addJava" });
@@ -242,7 +228,7 @@ const Java = () => {
                                       <span>{java.type}</span>
                                       {mapJavaTypeToAction(java.type, java.id)}
                                       <Show when={javaInProfile(java.id)}>
-                                        <div class="i-ri:checkbox-circle-fill text-green-500" />
+                                        <div class="text-green-500 i-ri:checkbox-circle-fill" />
                                       </Show>
                                     </div>
                                   </div>

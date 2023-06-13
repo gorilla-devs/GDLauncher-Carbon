@@ -1,6 +1,6 @@
 import { createEffect, createSignal, Show } from "solid-js";
 
-export interface Props {
+interface Props {
   checked?: boolean;
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;
@@ -24,8 +24,7 @@ function Checkbox(props: Props) {
       }}
       onClick={() => {
         if (!props.disabled) {
-          setChecked(!checked());
-          props.onChange?.(!checked());
+          props.onChange?.(setChecked(!checked()));
         }
       }}
     >

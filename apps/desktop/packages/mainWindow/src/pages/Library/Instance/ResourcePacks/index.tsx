@@ -2,7 +2,7 @@ import { Button, Checkbox, Dropdown, Input } from "@gd/ui";
 import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import ResourcePack from "./ResourcePack";
-import glassBlock from "/assets/images/icons/glassBlock.png";
+import skull from "/assets/images/icons/skull.png";
 
 type IResourcepack = {
   title: string;
@@ -125,7 +125,7 @@ const NoResourcePacks = () => {
   return (
     <div class="h-full min-h-90 w-full flex justify-center items-center">
       <div class="flex flex-col justify-center items-center text-center">
-        <img src={glassBlock} class="w-16 h-16" />
+        <img src={skull} class="w-16 h-16" />
         <p class="text-darkSlate-50 max-w-100">
           <Trans
             key="instance.no_resource_packs_text"
@@ -135,7 +135,7 @@ const NoResourcePacks = () => {
             }}
           />
         </p>
-        <Button variant="outline" size="medium">
+        <Button type="outline" size="medium">
           <Trans
             key="instance.add_resource_pack"
             options={{
@@ -178,7 +178,7 @@ const ResourcePacks = () => {
               rounded
             />
           </div>
-          <Button variant="outline" size="medium">
+          <Button type="outline" size="medium">
             <Trans
               key="instance.add_resource_pack_pack"
               options={{
@@ -208,7 +208,7 @@ const ResourcePacks = () => {
               />
             </div>
             <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
-              <span class="i-ri:forbid-line text-2xl" />
+              <span class="text-2xl i-ri:forbid-line" />
               <Trans
                 key="instance.disable_resource_pack"
                 options={{

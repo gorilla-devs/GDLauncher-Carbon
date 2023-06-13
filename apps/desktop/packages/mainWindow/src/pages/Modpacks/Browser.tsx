@@ -6,8 +6,9 @@ import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteQuery } from ".";
+import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
+import { SortFields } from "@/utils/constants";
 
 const NoMoreModpacks = () => {
   return (
@@ -64,22 +65,11 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
-const sortFields: Array<FEModSearchSortField> = [
-  "featured",
-  "popularity",
-  "lastUpdated",
-  "name",
-  "author",
-  "totalDownloads",
-  "category",
-  "gameVersion",
-];
-
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
 
-  const infiniteQuery = useInfiniteQuery();
+  const infiniteQuery = useInfiniteModpacksQuery();
 
   const modpacks = () =>
     infiniteQuery?.infiniteQuery.data
@@ -135,7 +125,7 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={sortFields.map((field) => ({
+              options={SortFields.map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}
@@ -152,8 +142,6 @@ export default function Browser() {
                 options={mappedMcVersions()}
                 icon={<div class="i-ri:price-tag-3-fill" />}
                 rounded
-                bgColorClass="bg-darkSlate-400"
-                textColorClass="text-white"
                 value={mappedMcVersions()[0].key}
                 onChange={(val) => {
                   infiniteQuery?.setQuery({ gameVersion: val.key as string });
@@ -180,8 +168,8 @@ export default function Browser() {
               });
             }}
           />
-          <Button
-            variant="outline"
+          {/* <Button
+            type="outline"
             size="medium"
             icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
           >
@@ -191,15 +179,15 @@ export default function Browser() {
                 defaultValue: "Import",
               }}
             />
-          </Button>
+          </Button> */}
         </div>
       </div>
       <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
+        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
               <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
-                <img class="h-14" src={LogoDark} />
+                <img class="h-12" src={LogoDark} />
               </div>
               <div class="flex flex-col justify-center">
                 <div class="flex flex-col gap-2">
@@ -224,7 +212,7 @@ export default function Browser() {
             </span>
             <div class="flex gap-3">
               <Button
-                variant="glow"
+                type="glow"
                 onClick={() =>
                   modalsContext?.openModal({ name: "instanceCreation" })
                 }
@@ -249,7 +237,7 @@ export default function Browser() {
             }
           >
             <div
-              class="w-full h-full scrollbar-hide overflow-auto"
+              class="w-full h-full overflow-y-auto overflow-x-hidden"
               ref={(el) => {
                 infiniteQuery?.setParentRef(el);
               }}
@@ -308,7 +296,7 @@ export default function Browser() {
           <Match
             when={
               modpacks().length === 0 &&
-              infiniteQuery?.infiniteQuery.isFetching &&
+              infiniteQuery?.infiniteQuery.isLoading &&
               infiniteQuery?.infiniteQuery.isInitialLoading
             }
           >

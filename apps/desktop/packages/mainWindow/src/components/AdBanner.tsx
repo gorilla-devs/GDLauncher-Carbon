@@ -12,11 +12,11 @@ export const AdsBanner = () => {
       }}
     >
       <Show when={isSnapshotRelease}>
-        <div class="flex flex-col w-full mb-8 box-border">
-          <div class="flex w-full justify-center items-center h-10 bg-yellow-900 font-bold box-border">
+        <div class="flex flex-col w-full box-border mb-8">
+          <div class="flex w-full justify-center items-center h-10 font-bold box-border bg-yellow-900">
             GDLauncher Snapshot Release
           </div>
-          <div class="flex-wrap w-full p-4 border-1 border-lightSlate-600 border-x-solid border-b-solid box-border">
+          <div class="w-full box-border flex-wrap p-4 border-1 border-lightSlate-600 border-x-solid border-b-solid">
             This is a GDLauncher snapshot release.
             <br />
             This means that it is highly unstable and does not have auto

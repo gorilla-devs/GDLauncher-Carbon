@@ -31,7 +31,7 @@ type InfiniteQueryType = {
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
 
-export const useInfiniteQuery = () => {
+export const useInfiniteModpacksQuery = () => {
   return useContext(InfiniteQueryContext);
 };
 

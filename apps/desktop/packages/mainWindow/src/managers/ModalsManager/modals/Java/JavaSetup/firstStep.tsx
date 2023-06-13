@@ -31,7 +31,7 @@ const FirstStep = (props: StepsProps) => {
         <div class="w-full flex justify-between gap-4">
           <Button
             rounded
-            variant="secondary"
+            type="secondary"
             size="large"
             style={{ width: "100%", "max-width": "100%" }}
             onClick={() => {

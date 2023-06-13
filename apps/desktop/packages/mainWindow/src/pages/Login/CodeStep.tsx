@@ -1,6 +1,6 @@
 import { Button, LoadingBar } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import DoorImage from "/assets/images/door.png";
+import DoorImage from "/assets/images/icons/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
@@ -183,7 +183,7 @@ const CodeStep = (props: Props) => {
 
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
-      <img src={DoorImage} />
+      <img src={DoorImage} class="w-20 h-20" />
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode

@@ -12,6 +12,7 @@ import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
 import { DEFAULT_LANG, LANGUAGES } from "./constants";
+import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -90,9 +91,11 @@ const InnerApp = (props: InnerAppProps) => {
         <NavigationManager>
           <TransProvider instance={props.i18nInstance} options={{ lng: "en" }}>
             <NotificationsProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={createInvalidateQuery} />
-              </ModalProvider>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
             </NotificationsProvider>
           </TransProvider>
         </NavigationManager>

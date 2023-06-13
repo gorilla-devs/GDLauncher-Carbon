@@ -1,7 +1,6 @@
 import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
-import HomeData from "@/pages/home.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
@@ -10,6 +9,8 @@ import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModpackChangelogData from "@/pages/Modpacks/modpack.changelog";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
+import InstanceData from "@/pages/Library/Instance/instance.data";
+import LibraryData from "@/pages/Library/library.data";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -26,21 +27,16 @@ export const routes: RouteDefinition[] = [
       {
         path: "/library",
         component: lazy(() => import("@/pages/Library")),
-        data: () => {
-          console.log("Fetching all instances...");
-        },
+        data: LibraryData,
         children: [
           {
             path: "/",
             component: lazy(() => import("@/pages/Library/Home")),
-            data: HomeData,
           },
           {
             path: "/:id",
             component: lazy(() => import("@/pages/Library/Instance")),
-            data: () => {
-              console.log("Fetching specific instance data...");
-            },
+            data: InstanceData,
             children: [
               {
                 path: "/",
@@ -51,18 +47,12 @@ export const routes: RouteDefinition[] = [
               {
                 path: "/mods",
                 component: lazy(() => import("@/pages/Library/Instance/Mods")),
-                data: () => {
-                  console.log("Fetching mods data...");
-                },
               },
               {
                 path: "/settings",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Settings")
                 ),
-                data: () => {
-                  console.log("Fetching instance settings data...");
-                },
               },
               {
                 path: "/resourcepacks",
@@ -94,6 +84,7 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: lazy(() => import("@/pages/Modpacks/Browser")),
+            data: BrowserData,
           },
         ],
       },

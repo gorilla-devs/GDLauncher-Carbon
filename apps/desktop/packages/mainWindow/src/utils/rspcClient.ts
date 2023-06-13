@@ -1,5 +1,10 @@
 import { QueryClient } from "@tanstack/solid-query";
-import { createClient, wsLink, createWSClient } from "@rspc/client";
+import {
+  createClient,
+  wsLink,
+  createWSClient,
+  Unsubscribable,
+} from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
 
@@ -24,14 +29,22 @@ export default function initRspc(_port: number) {
 
   const createInvalidateQuery = () => {
     const context = rspc.useContext();
-    client.subscription(["invalidateQuery"], {
-      onData: (invalidateOperation) => {
-        const key = [invalidateOperation!.key];
-        if (invalidateOperation.args !== null) {
-          key.concat(invalidateOperation.args);
-        }
-        context.queryClient.invalidateQueries(key);
-      },
+    let subscription: Unsubscribable | null = null;
+
+    wsClient.getConnection()?.addEventListener("open", (_event) => {
+      subscription = client.subscription(["invalidateQuery"], {
+        onData: (invalidateOperation) => {
+          const key = [invalidateOperation!.key];
+          if (invalidateOperation.args !== null) {
+            key.concat(invalidateOperation.args);
+          }
+          context.queryClient.invalidateQueries(key);
+        },
+      });
+    });
+
+    wsClient.getConnection()?.addEventListener("close", (_event) => {
+      subscription?.unsubscribe();
     });
   };
 

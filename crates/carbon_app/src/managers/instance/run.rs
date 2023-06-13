@@ -424,7 +424,7 @@ impl ManagerRef<'_, InstanceManager> {
                     &lwjgl_group,
                     &java.arch,
                 )
-                .await;
+                .await?;
                 t_extract_natives.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
@@ -467,8 +467,8 @@ impl ManagerRef<'_, InstanceManager> {
                         managers::minecraft::minecraft::launch_minecraft(
                             java,
                             account,
-                            xms_memory,
                             xmx_memory,
+                            xms_memory,
                             &extra_java_args,
                             &runtime_path,
                             version_info,

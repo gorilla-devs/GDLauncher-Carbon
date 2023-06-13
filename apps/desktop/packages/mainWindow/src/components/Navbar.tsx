@@ -10,6 +10,8 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountType, Procedures } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port, rspc } from "@/utils/rspcClient";
+import { useModal } from "@/managers/ModalsManager";
+import { getRunningState } from "@/utils/instances";
 import updateAvailable, { checkForUpdates } from "@/utils/updaterhelper";
 
 type EnrollStatusResult = Extract<
@@ -17,7 +19,7 @@ type EnrollStatusResult = Extract<
   { key: "account.getAccountStatus" }
 >["result"];
 
-export interface AccountsStatus {
+interface AccountsStatus {
   label: {
     name: string;
     icon: string | undefined;
@@ -28,14 +30,24 @@ export interface AccountsStatus {
   key: string;
 }
 
+type RunningInstances = {
+  [instanceId: number]: boolean;
+};
+
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
+  const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
+  const [activeInstances, setActiveInstances] = createStore<RunningInstances>(
+    {}
+  );
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
+
+  const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
@@ -64,6 +76,31 @@ const AppNavbar = () => {
       setAccounts(mappedAccounts);
     }
   });
+
+  createEffect(() => {
+    instances.data?.forEach((instance) => {
+      const isRunning = getRunningState(instance.status);
+
+      setActiveInstances((prev) => {
+        const newState: RunningInstances = { ...prev };
+
+        if (isRunning) {
+          if (!newState[instance.id]) {
+            newState[instance.id] = true;
+          }
+        } else {
+          if (newState[instance.id]) {
+            newState[instance.id] = false;
+          }
+        }
+
+        return newState;
+      });
+    });
+  });
+
+  const runningInstances = () =>
+    Object.values(activeInstances).filter((running) => running).length;
 
   onMount(() => {
     checkForUpdates();
@@ -121,8 +158,20 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </Show>
-                  <Tab ignored>
-                    <div class="cursor-pointer text-2xl text-darkSlate-50 i-ri:terminal-box-fill" />
+                  <Tab ignored noPointer={true}>
+                    <div class="relative">
+                      <Show when={runningInstances() > 0}>
+                        <div class="absolute w-4 h-4 rounded-full text-white flex justify-center items-center text-xs -top-1 -right-1 bg-red-500 z-30">
+                          {runningInstances()}
+                        </div>
+                      </Show>
+                      <div
+                        class="text-2xl z-20 cursor-pointer i-ri:terminal-box-fill text-dark-slate-50"
+                        onClick={() => {
+                          modalsContext?.openModal({ name: "logViewer" });
+                        }}
+                      />
+                    </div>
                   </Tab>
                   <Link href="/settings" class="no-underline">
                     <Tab>
@@ -135,12 +184,17 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </Link>
-                  <div class="text-darkSlate-50 text-2xl cursor-pointer i-ri:notification-2-fill" />
+                  <div
+                    class="text-dark-slate-50 text-2xl cursor-pointer i-ri:notification-2-fill"
+                    onClick={() =>
+                      modalsContext?.openModal({ name: "notification" })
+                    }
+                  />
                 </div>
               </TabList>
             </Tabs>
           </ul>
-          <div class="flex ml-4 min-w-52 justify-end">
+          <div class="flex justify-end ml-4 min-w-52">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

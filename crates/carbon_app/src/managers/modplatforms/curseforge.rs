@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
 use tracing::trace;
