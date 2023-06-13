@@ -1135,6 +1135,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let path2 = path.clone();
         let tmpdir2 = tmpdir.to_path_buf();
+        let tmppath = tmpdir.join(
+            path.file_name()
+                .expect("instance path cannot end in .. or be empty"),
+        );
         tokio::task::spawn_blocking(move || {
             fs_extra::dir::copy(path2, tmpdir2, &CopyOptions::new())
         })
@@ -1143,7 +1147,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let json = schema::make_instance_config(new_info.clone())?;
         tokio::fs::write(&tmpdir.join("instance.json"), json).await?;
 
-        tokio::fs::rename(&*tmpdir, new_path).await?;
+        tokio::fs::rename(&tmppath, new_path).await?;
         let id = self
             .add_instance(
                 new_info.name.clone(),

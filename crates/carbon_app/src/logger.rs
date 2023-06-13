@@ -19,7 +19,6 @@ pub async fn setup_logger(runtime_path: &Path) {
     .unwrap();
 
     let file_appender = tracing_appender::rolling::hourly(logs_path, "logs.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
     // let processor = tracing_forest::Printer::new()
     //     .formatter(tracing_forest::printer::Pretty)
@@ -42,6 +41,8 @@ pub async fn setup_logger(runtime_path: &Path) {
     }
     #[cfg(not(debug_assertions))]
     {
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
         let printer = tracing_subscriber::fmt::layer()
             .with_target(true)
             .with_ansi(true)
