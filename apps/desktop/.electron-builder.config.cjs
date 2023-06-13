@@ -49,7 +49,7 @@ module.exports = {
   ],
   win: {
     target: ["dir", "zip", "nsis"],
-    artifactName: "${productName}-${version}-${os}" + arch + ".${ext}",
+    artifactName: "${productName}-${version}-${os}-" + arch + ".${ext}",
     verifyUpdateCodeSignature: false,
   },
   nsis: {
@@ -60,13 +60,13 @@ module.exports = {
   },
   mac: {
     target: ["dir", "zip", "dmg"],
-    artifactName: "${productName}-${version}-${os}" + arch + ".${ext}",
+    artifactName: "${productName}-${version}-${os}-" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     entitlementsInherit: "./entitlements.mac.plist",
   },
   linux: {
     target: ["dir", "zip"],
-    artifactName: "${productName}-${version}-${os}" + arch + ".${ext}",
+    artifactName: "${productName}-${version}-${os}-" + arch + ".${ext}",
   },
   afterAllArtifactBuild: (buildResult) => {
     const path = require("path");
