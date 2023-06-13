@@ -41,7 +41,7 @@ jobs:
       - name: Prisma codegen
         env:
           CARGO_INCREMENTAL: 0
-        run: pnpm prisma:generate:mac-arm64
+        run: pnpm prisma:generate
       - name: Build
         run: pnpm build:mac-arm64
         env:
