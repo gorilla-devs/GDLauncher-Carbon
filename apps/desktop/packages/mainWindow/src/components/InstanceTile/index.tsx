@@ -47,85 +47,90 @@ const InstanceTile = (props: {
   const validInstance = () => getValideInstance(props.instance.status);
   const invalidInstance = () => getInValideInstance(props.instance.status);
   const inactiveState = () => getInactiveState(props.instance.status);
-
   const failedTaskId = () => inactiveState();
   const isPreparingState = () => getPreparingState(props.instance.status);
 
   const modloader = () => validInstance()?.modloader;
 
-  const taskId = isPreparingState();
+  const taskId = () => isPreparingState();
 
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
-  if (taskId !== undefined) {
-    const task = rspc.createQuery(() => ["vtask.getTask", taskId]);
+  const task = rspc.createQuery(() => ["vtask.getTask", taskId() as number], {
+    enabled: false,
+  });
 
-    createEffect(() => {
-      setFailError("");
-      if (task.data) {
-        setProgress("totalDownload", task.data.download_total);
-        setProgress("downloaded", task.data.downloaded);
-        if (isProgressKnown(task.data.progress)) {
-          setProgress("subTasks", task.data.active_subtasks);
-          setProgress("percentage", task.data.progress.Known);
-          setIsLoading(true);
-        } else if (isProgressFailed(task.data.progress)) {
-          setIsLoading(false);
-        } else {
-          setIsLoading(false);
-        }
+  createEffect(() => {
+    if (taskId() !== undefined) {
+      task.refetch();
+    }
+  });
+
+  createEffect(() => {
+    setFailError("");
+    if (task.data) {
+      setProgress("totalDownload", task.data.download_total);
+      setProgress("downloaded", task.data.downloaded);
+      if (isProgressKnown(task.data.progress)) {
+        setProgress("subTasks", task.data.active_subtasks);
+        setProgress("percentage", task.data.progress.Known);
+        setIsLoading(true);
+      } else if (isProgressFailed(task.data.progress)) {
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
       }
-    });
+    }
+  });
 
-    createEffect(() => {
-      if ((validInstance() || invalidInstance()) && taskId === undefined) {
-        dismissTaskMutation.mutate(taskId);
-      }
-    });
-  }
+  createEffect(() => {
+    if ((validInstance() || invalidInstance()) && taskId === undefined) {
+      dismissTaskMutation.mutate(taskId);
+    }
+  });
 
-  if (failedTaskId()) {
-    const failedTask = rspc.createQuery(() => [
-      "vtask.getTask",
-      failedTaskId() as number,
-    ]);
+  const failedTask = rspc.createQuery(
+    () => ["vtask.getTask", failedTaskId() as number],
+    { enabled: false }
+  );
 
-    createEffect(() => {
-      if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
-        setFailError(failedTask.data.progress.Failed.cause[0].display);
-      }
-    });
-  }
+  createEffect(() => {
+    if (failedTaskId() !== null && failedTaskId() !== undefined) {
+      failedTask.refetch();
+    }
+  });
 
-  const image = () => imageResource();
+  createEffect(() => {
+    if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+      setFailError(failedTask.data.progress.Failed.cause[0].display);
+    }
+  });
+
   const variant = () => (props.isSidebarOpened ? "sidebar" : "sidebar-small");
   const type = () =>
     props.isSidebarOpened === undefined ? undefined : variant();
 
   return (
-    <div>
-      <Tile
-        onClick={() => navigate(`/library/${props.instance.id}`)}
-        title={props.instance.name}
-        instanceId={props.instance.id}
-        modloader={modloader()}
-        version={validInstance()?.mc_version}
-        invalid={!isListInstanceValid(props.instance.status)}
-        failError={failError()}
-        isRunning={!!isRunning()}
-        isPreparing={isPreparingState() !== undefined}
-        isInQueue={isPreparingState() !== undefined && !isLoading()}
-        variant={type()}
-        img={image()}
-        selected={props.selected}
-        isLoading={isLoading()}
-        percentage={progress.percentage * 100}
-        totalDownload={bytesToMB(progress.totalDownload)}
-        downloaded={bytesToMB(progress.downloaded)}
-        subTasks={progress.subTasks}
-      />
-    </div>
+    <Tile
+      onClick={() => navigate(`/library/${props.instance.id}`)}
+      title={props.instance.name}
+      instanceId={props.instance.id}
+      modloader={modloader()}
+      version={validInstance()?.mc_version}
+      isInvalid={!isListInstanceValid(props.instance.status)}
+      failError={failError()}
+      isRunning={!!isRunning()}
+      isPreparing={isPreparingState() !== undefined}
+      variant={type()}
+      img={imageResource()}
+      selected={props.selected}
+      isLoading={isLoading()}
+      percentage={progress.percentage * 100}
+      totalDownload={bytesToMB(progress.totalDownload)}
+      downloaded={bytesToMB(progress.downloaded)}
+      subTasks={progress.subTasks}
+    />
   );
 };
 
