@@ -1135,7 +1135,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let path2 = path.clone();
         let tmpdir2 = tmpdir.to_path_buf();
-        let tmppath = tmpdir.join(path.file_name().expect("instance path cannot end in .. or be empty"));
+        let tmppath = tmpdir.join(
+            path.file_name()
+                .expect("instance path cannot end in .. or be empty"),
+        );
         tokio::task::spawn_blocking(move || {
             fs_extra::dir::copy(path2, tmpdir2, &CopyOptions::new())
         })
