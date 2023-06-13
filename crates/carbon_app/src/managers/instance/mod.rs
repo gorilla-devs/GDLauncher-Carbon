@@ -845,7 +845,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
         name: String,
         use_loaded_icon: bool,
-        version: InstanceVersionSouce,
+        version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
         let tmpdir = self
@@ -871,8 +871,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let (version, modpack) = match version {
-            InstanceVersionSouce::Version(version) => (Some(version), None),
-            InstanceVersionSouce::Modpack(modpack) => (None, Some(modpack)),
+            InstanceVersionSource::Version(version) => (Some(version), None),
+            InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
         };
 
         let info = info::Instance {
@@ -1557,7 +1557,7 @@ pub struct Mod {
     metadata: domain::ModFileMetadata,
 }
 
-pub enum InstanceVersionSouce {
+pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
 }
@@ -1590,7 +1590,7 @@ mod test {
         },
     };
 
-    use super::InstanceVersionSouce;
+    use super::InstanceVersionSource;
 
     #[tokio::test]
     async fn move_groups() -> anyhow::Result<()> {
@@ -1972,7 +1972,7 @@ mod test {
                 default_group_id,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
+                InstanceVersionSource::Version(info::GameVersion::Standard(info::StandardVersion {
                     release: String::from("1.7.10"),
                     modloaders: HashSet::new(),
                 })),

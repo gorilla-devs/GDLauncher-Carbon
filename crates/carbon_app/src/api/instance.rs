@@ -720,7 +720,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
     }
 }
 
-impl From<CreateInstanceVersion> for manager::InstanceVersionSouce {
+impl From<CreateInstanceVersion> for manager::InstanceVersionSource {
     fn from(value: CreateInstanceVersion) -> Self {
         match value {
             CreateInstanceVersion::Version(v) => Self::Version(v.into()),
