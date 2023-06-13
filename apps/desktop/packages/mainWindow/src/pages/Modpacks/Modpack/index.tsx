@@ -3,7 +3,7 @@ import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
+import { Button, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
 import { For, Show, createSignal } from "solid-js";
 
@@ -51,13 +51,6 @@ const Modpack = (props: Props) => {
       },
     }
   );
-  const latestFIlesIndexes = () => props.modpack.latestFiles;
-
-  const mappedVersions = () =>
-    latestFIlesIndexes().map((version) => ({
-      key: version.id,
-      label: version.displayName,
-    }));
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
@@ -123,11 +116,9 @@ const Modpack = (props: Props) => {
             </Button>
           </Show>
           <Show when={!loading()}>
-            <Dropdown.button
+            <Button
               disabled={loading()}
-              options={mappedVersions()}
               rounded
-              value={mappedVersions()[0].key}
               onClick={() => {
                 loadIconMutation.mutate(props.modpack.logo.url);
                 createInstanceMutation.mutate({
@@ -145,41 +136,19 @@ const Modpack = (props: Props) => {
                   },
                 });
               }}
-              onChange={(val) => {
-                loadIconMutation.mutate(props.modpack.logo.url);
-                const file = props.modpack.latestFiles.find(
-                  (file) => file.id === parseInt(val.key as string, 10)
-                );
-                if (file) {
-                  createInstanceMutation.mutate({
-                    group: defaultGroup.data || 1,
-                    use_loaded_icon: true,
-                    notes: "",
-                    name: props.modpack.name,
-                    version: {
-                      Modpack: {
-                        Curseforge: {
-                          file_id: file.id,
-                          project_id: props.modpack.id,
-                        },
-                      },
-                    },
-                  });
-                }
-              }}
             >
               <Show when={loading()}>
                 <Spinner />
               </Show>
               <Show when={!loading()}>
                 <Trans
-                  key="instance.download_modpacks"
+                  key="instance.download_latest"
                   options={{
-                    defaultValue: "Download",
+                    defaultValue: "Download Latest",
                   }}
                 />
               </Show>
-            </Dropdown.button>
+            </Button>
           </Show>
         </div>
       </div>

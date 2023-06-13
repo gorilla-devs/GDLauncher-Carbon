@@ -1,12 +1,55 @@
-import { FEFile } from "@gd/core_module/bindings";
+import { FEFile, FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
+import { rspc } from "@/utils/rspcClient";
+import { useGDNavigate } from "@/managers/NavigationManager";
+import { Spinner, createNotification } from "@gd/ui";
+import { Match, Switch, createSignal } from "solid-js";
 
 type Props = {
   modVersion: FEFile;
+  project: FEMod;
 };
 
 const VersionRow = (props: Props) => {
+  const [loading, setLoading] = createSignal(false);
+  const navigate = useGDNavigate();
+  const addNotification = createNotification();
+
+  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        addNotification("Instance successfully created.");
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        navigate(`/library`);
+      },
+    }
+  );
+
+  const createInstanceMutation = rspc.createMutation(
+    ["instance.createInstance"],
+    {
+      onSuccess(instanceId) {
+        setLoading(true);
+        prepareInstanceMutation.mutate(instanceId);
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while downloading the modpack.", "error");
+      },
+    }
+  );
+
   return (
     <div class="flex flex-col py-2">
       <h4 class="font-medium m-0">{props.modVersion.displayName}</h4>
@@ -29,14 +72,46 @@ const VersionRow = (props: Props) => {
             </span>
           </div>
         </div>
-        <span class="flex gap-2 text-lightGray-800 cursor-pointer select-none">
-          <Trans
-            key="modpack.version_download"
-            options={{
-              defaultValue: "Download version",
-            }}
-          />
-          <div class="i-ri:download-2-line" />
+        <span
+          class="flex gap-2 text-lightGray-800 cursor-pointer select-none"
+          onClick={() => {
+            loadIconMutation.mutate(props.project.logo.url);
+            createInstanceMutation.mutate({
+              group: defaultGroup.data || 1,
+              use_loaded_icon: true,
+              notes: "",
+              name: props.modVersion.displayName,
+              version: {
+                Modpack: {
+                  Curseforge: {
+                    file_id: props.modVersion.id,
+                    project_id: props.modVersion.modId,
+                  },
+                },
+              },
+            });
+          }}
+        >
+          <Switch>
+            <Match when={loading()}>
+              <Trans
+                key="modpack.version_downloading"
+                options={{
+                  defaultValue: "Downloading...",
+                }}
+              />
+              <Spinner class="w-5 h-5" />
+            </Match>
+            <Match when={!loading()}>
+              <Trans
+                key="modpack.version_download"
+                options={{
+                  defaultValue: "Download version",
+                }}
+              />
+              <div class="i-ri:download-2-line" />
+            </Match>
+          </Switch>
         </span>
       </div>
     </div>

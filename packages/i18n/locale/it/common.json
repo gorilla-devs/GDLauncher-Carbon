@@ -111,7 +111,7 @@
   "instance.create_new_instance_text": "Create your own empty instance",
   "instance.create_instance_btn": "Create",
   "instance.clear_filters_modpacks": "Clear filters",
-  "instance.download_modpacks": "Download",
+  "instance.download_latest": "Download Latest",
   "instance.explore_modpack": "Explore",
   "java.java_major": "Java Major",
   "java.java_vendors": "Java Distirbution",

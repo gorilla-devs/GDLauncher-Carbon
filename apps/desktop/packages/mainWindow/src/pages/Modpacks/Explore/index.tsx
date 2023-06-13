@@ -38,10 +38,10 @@ const Modpack = () => {
     //   label: "Screenshots",
     //   path: `/modpacks/${params.id}/screenshots`,
     // },
-    // {
-    //   label: "Versions",
-    //   path: `/modpacks/${params.id}/versions`,
-    // },
+    {
+      label: "Versions",
+      path: `/modpacks/${params.id}/versions`,
+    },
   ];
 
   // eslint-disable-next-line no-unused-vars

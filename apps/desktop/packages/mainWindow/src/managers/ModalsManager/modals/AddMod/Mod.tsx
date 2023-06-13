@@ -141,9 +141,9 @@ const Mod = (props: Props) => {
                 </Show>
                 <Show when={!loading()}>
                   <Trans
-                    key="instance.download_modpacks"
+                    key="instance.download_latest"
                     options={{
-                      defaultValue: "Download",
+                      defaultValue: "Download Latest",
                     }}
                   />
                 </Show>
