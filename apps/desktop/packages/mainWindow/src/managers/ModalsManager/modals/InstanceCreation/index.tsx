@@ -28,9 +28,6 @@ const InstanceCreation = (props: ModalProps) => {
     FEModdedManifestLoaderVersion[]
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal("");
-  const [mcVersionsAvailable, setMcVersionsAvailable] = createSignal<string[]>(
-    []
-  );
   const [mcVersion, setMcVersion] = createSignal("");
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
@@ -45,25 +42,12 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    forgeVersionsQuery?.data?.gameVersions?.forEach((v) => {
-      setMcVersionsAvailable((prev) => [...prev, v.id]);
-    });
-  });
-
-  createEffect(() => {
     if (forgeVersionsQuery.data && loader() === "Forge") {
-      const filteredVersions = mcVersions().filter((v) =>
-        mcVersionsAvailable().includes(v.id)
-      );
-
-      setMappedMcVersions(filteredVersions);
-
-      const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
       const versions = forgeVersionsQuery?.data?.gameVersions.find(
-        (v) => v.id === mcVers.id
+        (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
 
-      if (versions) setLoaderVersions(versions);
+      setLoaderVersions(versions || []);
     } else if (!loader()) {
       setMappedMcVersions(mcVersions());
       setLoaderVersions([]);
@@ -339,73 +323,71 @@ const InstanceCreation = (props: ModalProps) => {
                           (v) => v.id === l.key
                         )?.loaders;
 
-                      if (versions) setLoaderVersions(versions);
+                      setLoaderVersions(versions || []);
                     }
                   }}
                 />
-                <Show when={!loader()}>
-                  <div class="flex gap-4 mt-2">
-                    <div class="flex gap-2 items-center">
-                      <Checkbox
-                        checked={snapshotVersionFilter()}
-                        onChange={(e) => setSnapshotVersionFilter(e)}
+                <div class="flex gap-4 mt-2">
+                  <div class="flex gap-2 items-center">
+                    <Checkbox
+                      checked={snapshotVersionFilter()}
+                      onChange={(e) => setSnapshotVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_snapshot"
+                        options={{
+                          defaultValue: "Snapshot",
+                        }}
                       />
-                      <h6 class="m-0 flex items-center">
-                        <Trans
-                          key="instance.instance_version_snapshot"
-                          options={{
-                            defaultValue: "Snapshot",
-                          }}
-                        />
-                      </h6>
-                    </div>
-                    <div class="flex gap-2">
-                      <Checkbox
-                        checked={releaseVersionFilter()}
-                        onChange={(e) => setReleaseVersionFilter(e)}
-                      />
-                      <h6 class="m-0 flex items-center">
-                        <Trans
-                          key="instance.instance_version_release"
-                          options={{
-                            defaultValue: "Release",
-                          }}
-                        />
-                      </h6>
-                    </div>
-                    <div class="flex gap-2">
-                      <Checkbox
-                        checked={oldAlphaVersionFilter()}
-                        onChange={(e) => setOldAlphaVersionFilter(e)}
-                      />
-                      <h6 class="m-0 flex items-center">
-                        <Trans
-                          key="instance.instance_version_old_alphas"
-                          options={{
-                            defaultValue: "Old alpha",
-                          }}
-                        />
-                      </h6>
-                    </div>
-                    <div class="flex gap-2">
-                      <Checkbox
-                        checked={oldBetaVersionFilter()}
-                        onChange={(e) => setOldBetaVersionFilter(e)}
-                      />
-                      <h6 class="m-0 flex items-center">
-                        <Trans
-                          key="instance.instance_version_old_beta"
-                          options={{
-                            defaultValue: "Old beta",
-                          }}
-                        />
-                      </h6>
-                    </div>
+                    </h6>
                   </div>
-                </Show>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={releaseVersionFilter()}
+                      onChange={(e) => setReleaseVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_release"
+                        options={{
+                          defaultValue: "Release",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={oldAlphaVersionFilter()}
+                      onChange={(e) => setOldAlphaVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_old_alphas"
+                        options={{
+                          defaultValue: "Old alpha",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2">
+                    <Checkbox
+                      checked={oldBetaVersionFilter()}
+                      onChange={(e) => setOldBetaVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_old_beta"
+                        options={{
+                          defaultValue: "Old beta",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                </div>
               </div>
             </div>
-            <Show when={loaderVersions().length > 0}>
+            <Show when={loader()}>
               <div>
                 <h5 class="mt-0 mb-2">
                   <Trans
@@ -415,28 +397,53 @@ const InstanceCreation = (props: ModalProps) => {
                     }}
                   />
                 </h5>
-                <Dropdown
-                  disabled={!loaderVersions()}
-                  options={loaderVersions()?.map((v) => ({
-                    label: v.id,
-                    key: v.id,
-                  }))}
-                  bgColorClass="bg-darkSlate-800"
-                  containerClass="w-full"
-                  class="w-full"
-                  value={loaderVersions()[0].id}
-                  placement="bottom"
-                  onChange={(l) => {
-                    if (loader() === "Forge") {
-                      const key = l.key as string;
-                      const versions =
-                        forgeVersionsQuery?.data?.gameVersions.find(
-                          (v) => v.id === key
-                        )?.loaders;
-                      if (versions) setLoaderVersions(versions);
-                    }
-                  }}
-                />
+                <Switch>
+                  <Match when={loaderVersions().length > 0}>
+                    <Dropdown
+                      disabled={!loaderVersions()}
+                      options={loaderVersions()?.map((v) => ({
+                        label: v.id,
+                        key: v.id,
+                      }))}
+                      bgColorClass="bg-darkSlate-800"
+                      containerClass="w-full"
+                      class="w-full"
+                      value={loaderVersions()[0].id}
+                      placement="bottom"
+                      onChange={(l) => {
+                        if (loader() === "Forge") {
+                          const key = l.key as string;
+                          const versions =
+                            forgeVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === key
+                            )?.loaders;
+                          if (versions) setLoaderVersions(versions);
+                        }
+                      }}
+                    />
+                  </Match>
+                  <Match when={loaderVersions().length === 0}>
+                    <Dropdown
+                      disabled={true}
+                      options={[{ label: "No elements", key: "none" }]}
+                      bgColorClass="bg-darkSlate-800"
+                      containerClass="w-full"
+                      class="w-full"
+                      value={"noneZ"}
+                      placement="bottom"
+                      onChange={(l) => {
+                        if (loader() === "Forge") {
+                          const key = l.key as string;
+                          const versions =
+                            forgeVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === key
+                            )?.loaders;
+                          if (versions) setLoaderVersions(versions);
+                        }
+                      }}
+                    />
+                  </Match>
+                </Switch>
               </div>
             </Show>
           </span>
@@ -454,6 +461,7 @@ const InstanceCreation = (props: ModalProps) => {
               />
             </Button>
             <Button
+              disabled={Boolean(loaderVersions().length === 0 && loader())}
               type="primary"
               style={{ width: "100%", "max-width": "200px" }}
               onClick={() => {
