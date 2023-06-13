@@ -46,8 +46,8 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
-      # - name: Lint
-      #   run: pnpm lint
+      - name: Lint
+        run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target
