@@ -1,5 +1,5 @@
 /* eslint-disable solid/no-innerhtml */
-import { Button } from "@gd/ui";
+import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { FEMod } from "@gd/core_module/bindings";
@@ -7,12 +7,23 @@ import { Trans } from "@gd/i18n";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
+import { lastInstanceOpened } from "@/utils/routes";
 
 const ModDetails = (props: ModalProps) => {
+  const [loading, setLoading] = createSignal(false);
   const modDetails = () => props.data?.mod as FEMod;
   const modId = () => modDetails()?.id;
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
+
+  const installModMutation = rspc.createMutation(["instance.installMod"], {
+    onMutate() {
+      setLoading(true);
+    },
+    onSettled() {
+      setLoading(false);
+    },
+  });
 
   createEffect(() => {
     if (modId()) {
@@ -104,13 +115,33 @@ const ModDetails = (props: ModalProps) => {
                             </div>
                           </div>
                           <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                            <Button uppercase type="glow" size="large">
-                              <Trans
-                                key="mod.download"
-                                options={{
-                                  defaultValue: "Download",
-                                }}
-                              />
+                            <Button
+                              disabled={loading()}
+                              uppercase
+                              type="glow"
+                              size="large"
+                              onClick={() => {
+                                installModMutation.mutate({
+                                  file_id: modDetails().mainFileId,
+                                  instance_id: parseInt(
+                                    lastInstanceOpened(),
+                                    10
+                                  ),
+                                  project_id: modDetails().id,
+                                });
+                              }}
+                            >
+                              <Show when={loading()}>
+                                <Spinner />
+                              </Show>
+                              <Show when={!loading()}>
+                                <Trans
+                                  key="mod.download"
+                                  options={{
+                                    defaultValue: "Download",
+                                  }}
+                                />
+                              </Show>
                             </Button>
                           </div>
                         </div>

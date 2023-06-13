@@ -261,7 +261,7 @@ const Instance = () => {
           >
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
-                <div class="flex flex-col gap-4 w-full lg:flex-row justify-end">
+                <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
