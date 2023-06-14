@@ -178,6 +178,7 @@ impl Drop for AppInner {
             use crate::domain::metrics::{Event, EventName};
             use crate::iridium_client::get_client;
             use std::collections::HashMap;
+            use tracing::debug;
 
             let close_event = Event {
                 name: EventName::AppClosed,
