@@ -5,7 +5,6 @@ import {
   For,
   JSX,
   lazy,
-  Show,
   useContext,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
@@ -167,7 +166,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <div class="h-screen w-screen">
+        <div class="w-screen h-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component;
@@ -176,7 +175,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
               return (
                 <div
-                  class="h-screen w-screen absolute text-white backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 origin-center transition-all duration-100 ease-in-out"
+                  class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 origin-center"
                   classList={{
                     "opacity-100": !!modal.name,
                     "opacity-0": !modal.name,
@@ -187,7 +186,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 >
                   <div
                     style={{ "z-index": `${index() + 1}` }}
-                    class="absolute top-1/2 left-1/2 -translate-1/2 duration-100 ease-in-out"
+                    class="absolute top-1/2 left-1/2 duration-100 ease-in-out -translate-1/2"
                     classList={{
                       "scale-100": !!modal.name,
                       "scale-0": !modal.name,
