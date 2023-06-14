@@ -10,13 +10,14 @@
     <meta
       http-equiv="Content-Security-Policy"
       content="
-        script-src 'self' 'unsafe-inline';
-        img-src 'self' data: https: http://localhost:* http://i.imgur.com;
-        default-src 'unsafe-inline' 'self';
-        frame-src 'self' https: https://youtube.com;
-        connect-src 'self' ws://localhost:* https://www.minecraft.net http://localhost:*
-      "
+      script-src 'self' 'unsafe-inline' 'unsafe-eval';
+      img-src 'self' data: https: http://localhost:* http://i.imgur.com;
+      default-src 'unsafe-inline' 'self';
+      frame-src 'self' https: https://youtube.com;
+      connect-src 'self' ws://localhost:* https://www.minecraft.net http://localhost:* https://unpkg.com https://public.rive.app
+    "
     />
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
       @font-face {
