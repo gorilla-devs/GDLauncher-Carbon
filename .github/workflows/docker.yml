@@ -38,10 +38,6 @@ jobs:
           chmod -R a+x node_modules
       - name: Iridium patchfix
         run: node iridium_patchfix.js
-      - name: Rspc bindings
-        env:
-          CARGO_INCREMENTAL: 0
-        run: pnpm rspc-bindings:generate:linux-x64
       - name: Prisma codegen
         env:
           CARGO_INCREMENTAL: 0
