@@ -99,14 +99,9 @@ const Dropdown = (props: Props) => {
         (option) => option.key === selectedValue().key
       );
       if (selectedOptionIndex !== -1) {
-        // slight delay to allow the dropdown to fully open before scrolling
-        setTimeout(() => {
-          (menuRef() as HTMLUListElement).children[
-            selectedOptionIndex
-          ].scrollIntoView({
-            behavior: "smooth",
-          });
-        }, 50);
+        (menuRef() as HTMLUListElement).children[
+          selectedOptionIndex
+        ].scrollIntoView();
       }
     }
   });
