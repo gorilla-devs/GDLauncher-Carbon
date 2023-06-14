@@ -2,8 +2,7 @@ use std::mem;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, Utc};
-use http::{Method, StatusCode};
-use reqwest::{Client, Request, Response};
+use reqwest::{Client, Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
 use task_local_extensions::Extensions;
 
@@ -48,7 +47,7 @@ impl Middleware for CacheMiddleware {
             body: Vec<u8>,
             cached: bool,
         ) -> std::result::Result<Response, ()> {
-            let mut response = http::Response::builder()
+            let mut response = hyper::Response::builder()
                 .status(StatusCode::from_u16(status.try_into().map_err(|_| ())?).map_err(|_| ())?);
 
             if cached {

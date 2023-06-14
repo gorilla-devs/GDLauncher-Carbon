@@ -2,9 +2,7 @@
   "name": "@gd/core_module",
   "main": "./index.ts",
   "files": [
-    "bindings.d.ts",
-    "core.node",
-    "JavaCheck.class"
+    "bindings.d.ts"
   ],
   "napi": {
     "name": "core"

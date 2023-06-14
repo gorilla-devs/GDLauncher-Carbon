@@ -17,7 +17,6 @@ mod app_version;
 pub(crate) mod db;
 pub mod domain;
 mod error;
-pub mod generate_rspc_ts_bindings;
 pub mod managers;
 // mod pprocess_keepalive;
 mod iridium_client;
@@ -26,8 +25,32 @@ mod once_send;
 mod runtime_path_override;
 
 #[tokio::main]
-pub async fn init() {
+pub async fn main() {
     // pprocess_keepalive::init();
+    #[cfg(debug_assertions)]
+    {
+        let mut args = std::env::args();
+        if args.any(|arg| arg == "--generate-ts-bindings") {
+            crate::api::build_rspc_router()
+                .expose()
+                .config(
+                    rspc::Config::new().export_ts_bindings(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .parent()
+                            .unwrap()
+                            .parent()
+                            .unwrap()
+                            .join("packages")
+                            .join("core_module")
+                            .join("bindings.d.ts"),
+                    ),
+                )
+                .build();
+
+            // exit process with ok status
+            std::process::exit(0);
+        }
+    }
 
     #[cfg(feature = "production")]
     #[cfg(not(test))]

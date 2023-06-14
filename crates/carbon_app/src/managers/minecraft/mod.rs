@@ -1,6 +1,6 @@
 use carbon_net::Downloadable;
 use daedalus::{
-    minecraft::{DownloadType, LibraryGroup, Version, VersionInfo, VersionManifest},
+    minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
     modded::Manifest,
 };
 use reqwest::Url;
@@ -120,7 +120,7 @@ mod tests {
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
-        let version = "1.16.5";
+        let version = "1.20.1";
 
         let app = crate::setup_managers_for_test().await;
 
@@ -169,25 +169,26 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-        //     &app.reqwest_client.clone(),
-        //     &app.minecraft_manager.meta_base_url,
-        // )
-        // .await
-        // .unwrap()
-        // .game_versions
-        // .into_iter()
-        // .find(|v| v.id == version)
-        // .unwrap()
-        // .loaders[0]
-        //     .clone();
+        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+            &app.reqwest_client.clone(),
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap()
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == version)
+        .unwrap()
+        .loaders[0]
+            .clone();
 
-        // let forge_version_info =
-        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-        //         .await
-        //         .unwrap();
+        let forge_version_info =
+            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+                .await
+                .unwrap();
 
-        // let version_info = merge_partial_version(forge_version_info, version_info);
+        let version_info =
+            daedalus::modded::merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
@@ -273,8 +274,15 @@ mod tests {
         let stdout = child.stdout.take().unwrap();
         let mut reader = tokio::io::BufReader::new(stdout);
 
+        let stderr = child.stderr.take().unwrap();
+        let mut reader_err = tokio::io::BufReader::new(stderr);
+
         tokio::spawn(async move {
             tokio::io::copy(&mut reader, &mut tokio::io::stdout())
+                .await
+                .unwrap();
+
+            tokio::io::copy(&mut reader_err, &mut tokio::io::stderr())
                 .await
                 .unwrap();
         });

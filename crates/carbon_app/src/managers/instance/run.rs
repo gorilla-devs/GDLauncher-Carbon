@@ -538,6 +538,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stdout.read(&mut outbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stdout: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdOut, &*utf8);
                                             false
@@ -566,6 +570,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stderr.read(&mut errbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stderr: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdErr, &*utf8);
                                             false

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
 
 pub async fn setup_logger(runtime_path: &Path) {
@@ -14,11 +14,9 @@ pub async fn setup_logger(runtime_path: &Path) {
     }
 
     let filter = EnvFilter::try_new(
-        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
+        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn,hyper::proto::h1::conn=warn,quaint::connector::metrics=warn,hyper::client::connect::http=warn,hyper::client::connect::dns=warn",
     )
     .unwrap();
-
-    let file_appender = tracing_appender::rolling::hourly(logs_path, "logs.log");
 
     // let processor = tracing_forest::Printer::new()
     //     .formatter(tracing_forest::printer::Pretty)
@@ -41,6 +39,8 @@ pub async fn setup_logger(runtime_path: &Path) {
     }
     #[cfg(not(debug_assertions))]
     {
+        let file_appender = tracing_appender::rolling::hourly(logs_path, "logs.log");
+
         let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
         let printer = tracing_subscriber::fmt::layer()

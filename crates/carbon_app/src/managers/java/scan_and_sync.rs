@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use strum::IntoEnumIterator;
-use tracing::{info, trace, warn};
+use tracing::{trace, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},

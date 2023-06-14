@@ -1,10 +1,9 @@
-use std::{collections::HashMap, path::PathBuf, slice};
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     app_version::APP_VERSION,
     domain::{
         java::{JavaArch, JavaComponent},
-        maven::MavenCoordinates,
         minecraft::minecraft::{
             get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
         },
@@ -20,7 +19,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -129,6 +128,8 @@ enum ArgPlaceholder {
     NativesDirectory,
     LauncherName,
     LauncherVersion,
+    ClasspathSeparator,
+    LibraryDirectory,
 }
 
 impl TryFrom<&str> for ArgPlaceholder {
@@ -152,6 +153,8 @@ impl TryFrom<&str> for ArgPlaceholder {
             "natives_directory" => ArgPlaceholder::NativesDirectory,
             "launcher_name" => ArgPlaceholder::LauncherName,
             "launcher_version" => ArgPlaceholder::LauncherVersion,
+            "classpath_separator" => ArgPlaceholder::ClasspathSeparator,
+            "library_directory" => ArgPlaceholder::LibraryDirectory,
             _ => anyhow::bail!("Unknown argument placeholder: {arg}"),
         };
 
@@ -178,6 +181,8 @@ impl From<ArgPlaceholder> for &str {
             ArgPlaceholder::NativesDirectory => "natives_directory",
             ArgPlaceholder::LauncherName => "launcher_name",
             ArgPlaceholder::LauncherVersion => "launcher_version",
+            ArgPlaceholder::ClasspathSeparator => "classpath_separator",
+            ArgPlaceholder::LibraryDirectory => "library_directory",
         }
     }
 }
@@ -188,7 +193,7 @@ struct ReplacerArgs {
     version_name: String,
     game_directory: InstancePath,
     game_assets: PathBuf,
-    target_directory: PathBuf,
+    library_directory: PathBuf,
     natives_path: PathBuf,
     assets_root: PathBuf,
     assets_index_name: String,
@@ -223,6 +228,11 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::NativesDirectory => replacer_args.natives_path.display().to_string(),
         ArgPlaceholder::LauncherName => "GDLauncher".to_string(),
         ArgPlaceholder::LauncherVersion => APP_VERSION.to_string(),
+        ArgPlaceholder::ClasspathSeparator => CLASSPATH_SEPARATOR.to_string(),
+        ArgPlaceholder::LibraryDirectory => replacer_args
+            .library_directory
+            .to_string_lossy()
+            .to_string(),
     }
 }
 
@@ -315,7 +325,7 @@ pub async fn generate_startup_command(
         version_name: version.id.clone(),
         game_directory: instance_path,
         game_assets: runtime_path.get_assets().to_path(),
-        target_directory: PathBuf::new(),
+        library_directory: runtime_path.get_libraries().to_path(),
         natives_path: runtime_path.get_natives().get_versioned(&version.id),
         assets_root: runtime_path.get_assets().to_path(),
         assets_index_name: version.assets.clone(),
@@ -340,13 +350,19 @@ pub async fn generate_startup_command(
                 if let Some(value) = caps.name("value") {
                     let value = match value.as_str().try_into() {
                         Ok(value) => replace_placeholder(&replacer_args, value),
-                        Err(_) => return String::new(),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
                     };
                     return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
                 } else if let Some(standalone) = caps.name("standalone") {
                     return match standalone.as_str().try_into() {
                         Ok(standalone) => replace_placeholder(&replacer_args, standalone),
-                        Err(_) => return String::new(),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
                     };
                 }
                 if let Some(arg) = caps.name("arg") {

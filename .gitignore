@@ -83,7 +83,7 @@ target
 packages/ui/src/style.dist.css
 apps/desktop/data
 packages/core_module/data
-packages/core_module/bindings.d.ts
+# packages/core_module/bindings.d.ts
 MC_TEST
 tests_decompressed
 java_runtimes

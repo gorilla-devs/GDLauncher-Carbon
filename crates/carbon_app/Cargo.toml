@@ -4,11 +4,6 @@ version = "0.0.0"
 edition = "2021"
 author = "GorillaDevs Inc."
 
-[lib]
-crate-type = ["lib"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = { workspace = true }
 derive_more = { workspace = true }
@@ -17,7 +12,6 @@ sentry = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
 serde_urlencoded = "0.7.1"
-tracing-test = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }
@@ -26,7 +20,7 @@ rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
-tracing-forest = { workspace = true }
+# tracing-forest = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json"] }
 reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
@@ -50,7 +44,6 @@ image = { workspace = true, features = ["png"], default-features = false }
 task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 zip = { workspace = true }
-http = { workspace = true }
 httpdate = { workspace = true }
 daedalus = { workspace = true }
 url = { workspace = true }
@@ -64,7 +57,6 @@ opener = { workspace = true }
 md-5 = { workspace = true }
 hex = { workspace = true }
 murmurhash32 = { workspace = true }
-pin-project = { workspace = true }
 fs_extra = { workspace = true }
 # libc = { workspace = true }
 
@@ -72,13 +64,11 @@ fs_extra = { workspace = true }
 winreg = { workspace = true }
 # winapi = { version = "0.3.9" }
 
-
-[dev-dependencies]
-ntest = { workspace = true }
-
 [build-dependencies]
 serde_json = { workspace = true }
 dotenvy = { workspace = true }
+
+[test-dependencies]
 
 [features]
 production = ["iridium"]
