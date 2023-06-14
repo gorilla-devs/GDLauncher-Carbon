@@ -62,7 +62,7 @@ const ThirdStep = (props: Props) => {
         </div> */}
         </div>
       </div>
-      <div class="flex align-between w-full">
+      <div class="flex w-full align-between">
         <Button
           type="secondary"
           size="large"
