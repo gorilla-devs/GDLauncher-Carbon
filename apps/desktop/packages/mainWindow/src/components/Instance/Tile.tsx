@@ -373,7 +373,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 transition-transform right-5 h-7 w-7 will-change-transform"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform transition-transform right-5 h-7 w-7"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
