@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createResource, Show } from "solid-js";
+import { createResource, createSignal, Match, Switch } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -13,6 +13,8 @@ import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
 import { DEFAULT_LANG, LANGUAGES } from "./constants";
 import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
+import RiveAppWapper from "./utils/RiveAppWapper";
+import GDAnimation from "./gd_logo_animation.riv";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -62,17 +64,31 @@ render(() => {
     return instance;
   });
 
+  const [isReady, setIsReady] = createSignal(false);
+
   return (
-    <Show
-      when={
-        i18nInstance.state === "ready" && coreModuleLoaded.state === "ready"
+    <Switch
+      fallback={
+        <div class="w-full h-screen flex justify-center items-center">
+          <RiveAppWapper
+            src={GDAnimation}
+            onStop={() => {
+              setIsReady(
+                i18nInstance.state === "ready" &&
+                  coreModuleLoaded.state === "ready"
+              );
+            }}
+          />
+        </div>
       }
     >
-      <InnerApp
-        port={coreModuleLoaded() as unknown as number}
-        i18nInstance={i18nInstance() as unknown as typeof i18n}
-      />
-    </Show>
+      <Match when={isReady()}>
+        <InnerApp
+          port={coreModuleLoaded() as unknown as number}
+          i18nInstance={i18nInstance() as unknown as typeof i18n}
+        />
+      </Match>
+    </Switch>
   );
 }, document.getElementById("root") as HTMLElement);
 
