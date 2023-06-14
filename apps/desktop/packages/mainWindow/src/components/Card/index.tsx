@@ -1,6 +1,6 @@
 import { mergeProps } from "solid-js";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
-import bookIcon from "/assets/images/icons/book.png";
+import magicBallIcon from "/assets/images/icons/magicBall.png";
 import clockIcon from "/assets/images/icons/clock.png";
 import pickAxeIcon from "/assets/images/icons/pickaxe.png";
 import mapIcon from "/assets/images/icons/map.png";
@@ -23,7 +23,7 @@ const Card = (props: Props) => {
       case "vanilla":
         return vanillaIcon;
       case "book":
-        return bookIcon;
+        return magicBallIcon;
       case "cart":
         return questIcon;
       case "clock":

@@ -5,7 +5,6 @@ import {
   For,
   JSX,
   lazy,
-  Show,
   useContext,
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
@@ -101,17 +100,35 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const closeModal = (name?: ModalName) => {
     setModalStack((currentStack) => {
+      const newStack = currentStack.slice();
+
+      // Remove the specific modal or the top modal
+      let indexToRemove: number;
       if (name) {
-        // Remove the specified modal
-        return currentStack.filter((modal) => modal.name !== name);
+        indexToRemove = currentStack.findIndex((modal) => modal.name === name);
       } else {
-        // Remove the top modal
-        return currentStack.slice(0, currentStack.length - 1);
+        indexToRemove = currentStack.length - 1;
       }
+
+      if (indexToRemove >= 0) {
+        newStack.splice(indexToRemove, 1);
+        const newParams: { [k: string]: string | null } = Object.fromEntries(
+          urlSearchParams()
+        );
+
+        for (let key in Object.fromEntries(urlSearchParams())) {
+          if (key !== `m[${indexToRemove + 1}]`) {
+            newParams[`m[${indexToRemove + 1}]`] = null;
+          }
+        }
+
+        setSearchParams(newParams);
+      }
+
+      return newStack;
     });
 
     if (modalStack().length === 0) {
-      urlSearchParams()?.delete("m");
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "none";
     }
@@ -121,19 +138,25 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
+      overlay.style.opacity = "0"; // Set initial opacity to 0
+      setTimeout(() => (overlay.style.opacity = "1"), 10); // Transition to opacity 1
       setModalStack((currentStack) => [
         ...currentStack,
         { name: modal.name, data },
       ]);
 
+      // Update URL params
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
-        url.append("m", modal.name);
+
+        url.append(`m[${modalStack().length}]`, modal.name);
 
         const decodedParamString = decodeURIComponent(url.toString());
         navigate(decodedParamString.replace("=&", "?"));
       } else {
-        setSearchParams({ m: modal.name });
+        setSearchParams({
+          [`m[${modalStack().length}]`]: modal.name,
+        });
       }
     },
     closeModal,
@@ -143,7 +166,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <div class="h-screen w-screen">
+        <div class="w-screen h-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component;
@@ -151,30 +174,32 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const title = defaultModals[modal.name].title || "";
 
               return (
-                <Show when={modal.name}>
+                <div
+                  class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 origin-center"
+                  classList={{
+                    "opacity-100": !!modal.name,
+                    "opacity-0": !modal.name,
+                  }}
+                  onClick={() => {
+                    closeModal();
+                  }}
+                >
                   <div
-                    class="h-screen w-screen absolute text-white ease-in-out duration-100 transition-opacity backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-999 transition-opacity origin-center will-change-opacity"
+                    style={{ "z-index": `${index() + 1}` }}
+                    class="absolute top-1/2 left-1/2 duration-100 ease-in-out -translate-1/2"
                     classList={{
-                      "opacity-100": modalStack().length > 0,
-                      "opacity-0": modalStack().length > 0,
-                    }}
-                    onClick={() => {
-                      closeModal();
+                      "scale-100": !!modal.name,
+                      "scale-0": !modal.name,
                     }}
                   >
-                    <div
-                      style={{ "z-index": `${index() + 1}` }}
-                      class="absolute top-1/2 left-1/2 -translate-1/2"
-                    >
-                      <Dynamic
-                        component={ModalComponent}
-                        data={modal.data}
-                        noHeader={noHeader}
-                        title={title}
-                      />
-                    </div>
+                    <Dynamic
+                      component={ModalComponent}
+                      data={modal.data}
+                      noHeader={noHeader}
+                      title={title}
+                    />
                   </div>
-                </Show>
+                </div>
               );
             }}
           </For>
