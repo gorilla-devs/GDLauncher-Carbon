@@ -1,6 +1,13 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createResource, createSignal, Match, Switch } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  Match,
+  onMount,
+  Switch,
+} from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -66,10 +73,18 @@ render(() => {
 
   const [isReady, setIsReady] = createSignal(false);
 
+  createEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      setIsReady(
+        i18nInstance.state === "ready" && coreModuleLoaded.state === "ready"
+      );
+    }
+  });
+
   return (
     <Switch
       fallback={
-        <div class="w-full h-screen flex justify-center items-center">
+        <div class="w-full flex justify-center items-center h-screen">
           <RiveAppWapper
             src={GDAnimation}
             onStop={() => {
@@ -87,6 +102,19 @@ render(() => {
           port={coreModuleLoaded() as unknown as number}
           i18nInstance={i18nInstance() as unknown as typeof i18n}
         />
+      </Match>
+      <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
+        <div class="w-full flex justify-center items-center h-screen">
+          <RiveAppWapper
+            src={GDAnimation}
+            onStop={() => {
+              setIsReady(
+                i18nInstance.state === "ready" &&
+                  coreModuleLoaded.state === "ready"
+              );
+            }}
+          />
+        </div>
       </Match>
     </Switch>
   );
