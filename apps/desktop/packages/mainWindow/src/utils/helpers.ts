@@ -173,3 +173,52 @@ export const generateSequence = (
 
   return sequence;
 };
+
+export const generateMinecraftName = () => {
+  const adjectives = [
+    "Pixelated",
+    "Creeper",
+    "Ender",
+    "Nether",
+    "Crafting",
+    "Mining",
+    "Redstone",
+    "Diamond",
+    "Zombie",
+    "Obsidian",
+    "End",
+    "TNT",
+    "Lava",
+    "Notch",
+    "Herobrine",
+    "Piston",
+    "Villager",
+    "Portal",
+  ];
+
+  const nouns = [
+    "Sword",
+    "Pickaxe",
+    "Torch",
+    "Creeper",
+    "Zombie",
+    "Spider",
+    "Enderman",
+    "Villager",
+    "Golem",
+    "Dragon",
+    "Steve",
+    "Alex",
+    "Pig",
+    "Sheep",
+    "Cow",
+    "Chicken",
+    "Portal",
+    "Minecart",
+  ];
+
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+
+  return `${adjective} ${noun}`;
+};

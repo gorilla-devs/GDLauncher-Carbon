@@ -2,7 +2,15 @@ import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onMount,
+} from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
   FEModdedManifestLoaderVersion,
@@ -10,8 +18,9 @@ import {
   McType,
   ModLoaderType,
 } from "@gd/core_module/bindings";
-import { blobToBase64 } from "@/utils/helpers";
+import { blobToBase64, generateMinecraftName } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
@@ -29,13 +38,14 @@ const InstanceCreation = (props: ModalProps) => {
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal("");
   const [mcVersion, setMcVersion] = createSignal("");
-  const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
-  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
-  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(true);
+  const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(false);
+  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
+  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
   const addNotification = createNotification();
   const modalsContext = useModal();
+  const navigate = useGDNavigate();
 
   const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
     enabled: false,
@@ -80,6 +90,7 @@ const InstanceCreation = (props: ModalProps) => {
     {
       onSuccess() {
         modalsContext?.closeModal();
+        navigate(`/library`);
         addNotification("Instance successfully created.");
       },
 
@@ -166,6 +177,10 @@ const InstanceCreation = (props: ModalProps) => {
     }
   };
 
+  onMount(() => {
+    setTitle(generateMinecraftName());
+  });
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -238,20 +253,28 @@ const InstanceCreation = (props: ModalProps) => {
                     }}
                   />
                 </h5>
-                <Input
-                  required
-                  placeholder="New instance"
-                  inputColor="bg-darkSlate-800"
-                  onInput={(e) => {
-                    setTitle(e.currentTarget.value);
-                  }}
-                  value={title()}
-                  error={
-                    error() &&
-                    !title() &&
-                    (t("error.missing_field_title") as string)
-                  }
-                />
+                <div class="flex gap-4 items-center">
+                  <Input
+                    required
+                    placeholder="New instance"
+                    inputColor="bg-darkSlate-800"
+                    onInput={(e) => {
+                      setTitle(e.currentTarget.value);
+                    }}
+                    value={title()}
+                    error={
+                      error() &&
+                      !title() &&
+                      (t("error.missing_field_title") as string)
+                    }
+                  />
+                  <div
+                    onClick={() => setTitle(generateMinecraftName())}
+                    class="group border-1 border-solid border-darkSlate-200 bg-darkSlate-700 cursor-pointer rounded w-8 h-8 flex justify-center items-center duration-100 transition-color hover:bg-darkSlate-600 hover:border-lightGray-100"
+                  >
+                    <div class="i-ri:refresh-line text-darkSlate-100 group-hover:text-lightGray-100" />
+                  </div>
+                </div>
               </div>
             </div>
             <div class="flex gap-2">
