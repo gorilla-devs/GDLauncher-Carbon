@@ -138,8 +138,9 @@ const InstanceCreation = (props: ModalProps) => {
 
       const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
       const versions =
-        forgeVersionsQuery?.data?.gameVersions.find((v) => v.id === mcVers?.id)
-          ?.loaders || [];
+        forgeVersionsQuery?.data?.gameVersions.find(
+          (v) => v.id === (mcVersion() || mcVers?.id)
+        )?.loaders || [];
 
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
@@ -425,7 +426,7 @@ const InstanceCreation = (props: ModalProps) => {
                       bgColorClass="bg-darkSlate-800"
                       containerClass="w-full"
                       class="w-full"
-                      value={"noneZ"}
+                      value={"none"}
                       placement="bottom"
                       onChange={(l) => {
                         if (loader() === "Forge") {
