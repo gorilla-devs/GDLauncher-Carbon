@@ -152,7 +152,7 @@ const ResourcePacks = () => {
   const [t] = useTransContext();
   return (
     <div>
-      <div class="flex flex-col bg-darkSlate-800 z-10 pt-10 transition-all duration-100 ease-in-out sticky top-30">
+      <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky pt-10 top-30">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
             placeholder="Type Here"

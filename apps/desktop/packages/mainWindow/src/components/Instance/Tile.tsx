@@ -25,13 +25,12 @@ type Props = {
   version: string | undefined | null;
   img: string | undefined;
   variant?: Variant;
-  invalid?: boolean;
+  isInvalid?: boolean;
   instanceId: number;
   downloaded?: number;
   totalDownload?: number;
   isRunning?: boolean;
   isPreparing?: boolean;
-  isInQueue?: boolean;
   subTasks?: Subtask[] | undefined;
   failError?: string;
   onClick?: (_e: MouseEvent) => void;
@@ -130,7 +129,7 @@ const Tile = (props: Props) => {
   };
 
   const handleDuplicate = () => {
-    if (!props.invalid) {
+    if (!props.isInvalid) {
       duplicateInstanceMutation.mutate({
         instance: props.instanceId,
         new_name: props.title,
@@ -149,7 +148,7 @@ const Tile = (props: Props) => {
       label: t("instance.action_settings"),
       action: handleSettings,
     },
-    ...(!props.invalid
+    ...(!props.isInvalid
       ? [
           {
             icon: "i-ri:file-copy-fill",
@@ -185,18 +184,20 @@ const Tile = (props: Props) => {
     } else launchInstanceMutation.mutate(props.instanceId);
   };
 
+  const isInQueue = () => props.isPreparing && !props.isLoading;
+
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="select-none group flex justify-center flex-col z-50 items-start"
+            class="flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
                 !props.isLoading &&
-                !props.isInQueue &&
-                !props.invalid &&
+                !isInQueue() &&
+                !props.isInvalid &&
                 !props.failError
               ) {
                 props?.onClick?.(e);
@@ -204,13 +205,13 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative rounded-2xl items-center overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
+              class="flex justify-center relative items-center rounded-2xl overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
               classList={{
-                grayscale: props.isLoading || props.isInQueue,
+                grayscale: props.isLoading || isInQueue(),
                 "cursor-pointer":
                   !props.isLoading &&
-                  !props.isInQueue &&
-                  !props.invalid &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
                   !props.failError &&
                   !props.isRunning,
               }}
@@ -218,15 +219,16 @@ const Tile = (props: Props) => {
                 "background-image": props.img
                   ? `url("${props.img as string}")`
                   : `url("${DefaultImg}")`,
+                "background-size": props.img ? "100%" : "120%",
               }}
             >
-              <Show when={props.invalid}>
-                <h2 class="text-sm text-center z-20">
+              <Show when={props.isInvalid}>
+                <h2 class="text-sm z-20 text-center">
                   <Trans key="instance.error_invalid" />
                 </h2>
-                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                <div class="i-ri:alert-fill absolute z-10 text-2xl text-yellow-500 top-1 right-1" />
+                <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
               </Show>
               <Show when={props.failError}>
                 <h2 class="text-center z-20 text-sm">{props.failError}</h2>
@@ -236,7 +238,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-all duration-100 will-change-transform"
+                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out transition-all duration-100 h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
                 classList={{
                   "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                     !props.isRunning,
@@ -244,8 +246,8 @@ const Tile = (props: Props) => {
                   "bg-red-500 scale-100": props.isRunning,
                   "group-hover:scale-100 group-hover:drop-shadow-xl":
                     !props.isLoading &&
-                    !props.isInQueue &&
-                    !props.invalid &&
+                    !isInQueue() &&
+                    !props.isInvalid &&
                     !props.failError &&
                     !props.isRunning,
                 }}
@@ -286,7 +288,7 @@ const Tile = (props: Props) => {
                   </For>
                 </div>
               </Show>
-              <Show when={props.isInQueue}>
+              <Show when={isInQueue()}>
                 <div class="z-12">
                   <Spinner />
                 </div>
@@ -299,17 +301,17 @@ const Tile = (props: Props) => {
                   }}
                 />
               </Show>
-              <Show when={props.isLoading || props.isInQueue}>
+              <Show when={props.isLoading || isInQueue()}>
                 <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
               </Show>
             </div>
             <h4
-              class="text-ellipsis overflow-hidden max-w-38 whitespace-nowrap mt-2 mb-1"
+              class="overflow-hidden max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
-                "text-white": !props.isLoading && !props.isInQueue,
-                "text-lightGray-900": props.isLoading || props.isInQueue,
+                "text-white": !props.isLoading && !isInQueue(),
+                "text-lightGray-900": props.isLoading || isInQueue(),
               }}
             >
               {props.title}
@@ -318,7 +320,7 @@ const Tile = (props: Props) => {
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-2">
-                    <Show when={!props.invalid && !props.failError}>
+                    <Show when={!props.isInvalid && !props.failError}>
                       <img
                         class="w-4 h-4"
                         src={getModloaderIcon(props.modloader as ModLoaderType)}
@@ -342,27 +344,29 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
+            class="group relative group select-none flex items-center w-full gap-4 box-border cursor-pointer px-3 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
-                !props.isInQueue &&
-                !props.invalid &&
+                !isInQueue() &&
+                !props.isInvalid &&
                 !props.failError
               ) {
                 props?.onClick?.(e);
               }
             }}
             classList={{
-              grayscale: props.isLoading || props.isInQueue,
+              grayscale: props.isLoading || isInQueue(),
             }}
           >
-            <Show when={props.invalid}>
+            <Show when={props.isInvalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 z-10 text-2xl right-2" />
             </Show>
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition hover:bg-primary-500" />
+
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
               <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
@@ -380,8 +384,8 @@ const Tile = (props: Props) => {
                 "bg-red-500 scale-100": props.isRunning,
                 "group-hover:scale-100":
                   !props.isLoading &&
-                  !props.isInQueue &&
-                  !props.invalid &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
                   !props.failError &&
                   !props.isRunning,
               }}
@@ -430,7 +434,7 @@ const Tile = (props: Props) => {
               </h4>
               <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">
-                  <Show when={!props.invalid && !props.failError}>
+                  <Show when={!props.isInvalid && !props.failError}>
                     <img
                       class="w-4 h-4"
                       src={getModloaderIcon(props.modloader as ModLoaderType)}
@@ -451,8 +455,8 @@ const Tile = (props: Props) => {
           onClick={(e) => {
             if (
               !props.isLoading &&
-              !props.isInQueue &&
-              !props.invalid &&
+              !isInQueue() &&
+              !props.isInvalid &&
               !props.failError
             ) {
               props?.onClick?.(e);
@@ -460,6 +464,8 @@ const Tile = (props: Props) => {
           }}
           class="group h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
         >
+          <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition hover:bg-primary-500" />
+
           <Show when={props.selected && !props.isLoading}>
             <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
             <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
@@ -476,10 +482,10 @@ const Tile = (props: Props) => {
                 : `url("${DefaultImg}")`,
             }}
             classList={{
-              grayscale: props.isLoading || props.isInQueue,
+              grayscale: props.isLoading || isInQueue(),
             }}
           >
-            <Show when={props.invalid}>
+            <Show when={props.isInvalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
             <Show when={props.failError}>
@@ -494,8 +500,8 @@ const Tile = (props: Props) => {
                 "bg-red-500 scale-100": props.isRunning,
                 "group-hover:scale-100":
                   !props.isLoading &&
-                  !props.isInQueue &&
-                  !props.invalid &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
                   !props.failError &&
                   !props.isRunning,
               }}
@@ -507,7 +513,7 @@ const Tile = (props: Props) => {
                   "i-ri:stop-fill": props.isRunning,
                 }}
                 onClick={(e) => {
-                  e.preventDefault();
+                  e.stopPropagation();
                   handlePlayClick();
                 }}
               />

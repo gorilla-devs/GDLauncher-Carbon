@@ -328,20 +328,6 @@ const InstanceCreation = (props: ModalProps) => {
                   }}
                 />
                 <div class="flex gap-4 mt-2">
-                  <div class="flex gap-2 items-center">
-                    <Checkbox
-                      checked={snapshotVersionFilter()}
-                      onChange={(e) => setSnapshotVersionFilter(e)}
-                    />
-                    <h6 class="m-0 flex items-center">
-                      <Trans
-                        key="instance.instance_version_snapshot"
-                        options={{
-                          defaultValue: "Snapshot",
-                        }}
-                      />
-                    </h6>
-                  </div>
                   <div class="flex gap-2">
                     <Checkbox
                       checked={releaseVersionFilter()}
@@ -352,6 +338,20 @@ const InstanceCreation = (props: ModalProps) => {
                         key="instance.instance_version_release"
                         options={{
                           defaultValue: "Release",
+                        }}
+                      />
+                    </h6>
+                  </div>
+                  <div class="flex gap-2 items-center">
+                    <Checkbox
+                      checked={snapshotVersionFilter()}
+                      onChange={(e) => setSnapshotVersionFilter(e)}
+                    />
+                    <h6 class="m-0 flex items-center">
+                      <Trans
+                        key="instance.instance_version_snapshot"
+                        options={{
+                          defaultValue: "Snapshot",
                         }}
                       />
                     </h6>
@@ -411,13 +411,9 @@ const InstanceCreation = (props: ModalProps) => {
                       value={loaderVersions()[0].id}
                       placement="bottom"
                       onChange={(l) => {
-                        if (loader() === "Forge") {
-                          const key = l.key as string;
-                          const versions =
-                            forgeVersionsQuery?.data?.gameVersions.find(
-                              (v) => v.id === key
-                            )?.loaders;
-                          if (versions) setLoaderVersions(versions);
+                        const key = l.key as string;
+                        if (key) {
+                          setChosenLoaderVersion(key);
                         }
                       }}
                     />

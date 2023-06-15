@@ -28,11 +28,6 @@ const ModalLayout = (props: Props) => {
         class={`flex flex-col h-fit w-fit bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 ${
           props.class ?? ""
         }`}
-        // classList={{
-        //   "overflow-hidden": !props.overflowHiddenDisabled,
-        //   "scale-100": modalsContext?.isVisible(),
-        //   "scale-0": !modalsContext?.isVisible(),
-        // }}
       >
         <Show when={!props.noHeader}>
           <div class="bg-darkSlate-800 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">

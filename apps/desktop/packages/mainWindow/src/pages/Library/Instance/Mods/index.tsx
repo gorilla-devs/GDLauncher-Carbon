@@ -64,7 +64,7 @@ const Mods = () => {
 
   return (
     <div>
-      <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky pt-10 top-30">
+      <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
