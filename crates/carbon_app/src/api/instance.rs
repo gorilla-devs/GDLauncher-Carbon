@@ -640,6 +640,7 @@ struct ModLoader {
 enum ModLoaderType {
     Forge,
     Fabric,
+    Quilt,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -716,6 +717,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
         match value {
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
+            domain::Quilt => Self::Quilt,
         }
     }
 }
@@ -794,6 +796,7 @@ impl From<ModLoaderType> for domain::info::ModLoaderType {
         match value {
             ModLoaderType::Forge => Self::Forge,
             ModLoaderType::Fabric => Self::Fabric,
+            ModLoaderType::Quilt => Self::Quilt,
         }
     }
 }

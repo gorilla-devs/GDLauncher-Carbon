@@ -67,6 +67,7 @@ pub struct ModLoader {
 pub enum ModLoaderType {
     Forge,
     Fabric,
+    Quilt,
 }
 
 impl Modpack {

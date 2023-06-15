@@ -20,6 +20,8 @@ use super::ManagerRef;
 mod assets;
 pub mod curseforge;
 pub mod forge;
+pub mod fabric;
+pub mod quilt;
 pub mod minecraft;
 
 pub(crate) struct MinecraftManager {
@@ -48,6 +50,14 @@ impl ManagerRef<'_, MinecraftManager> {
 
     pub async fn get_forge_manifest(&self) -> anyhow::Result<Manifest> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+    }
+
+    pub async fn get_fabric_manifest(&self) -> anyhow::Result<Manifest> {
+        fabric::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+    }
+
+    pub async fn get_quilt_manifest(&self) -> anyhow::Result<Manifest> {
+        quilt::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
     pub async fn get_all_version_info_files(

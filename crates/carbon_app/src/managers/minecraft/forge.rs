@@ -37,7 +37,7 @@ pub async fn get_manifest(
         .send()
         .await?
         .json::<Manifest>()
-        .await?;
+        .await.map_err(|err| ForgeManifestError::from(err))?;
 
     Ok(new_manifest)
 }

@@ -378,6 +378,80 @@ impl ManagerRef<'_, InstanceManager> {
                         version_info =
                             daedalus::modded::merge_partial_version(forge_version, version_info);
                     }
+                    Some(ModLoader {
+                        type_: ModLoaderType::Fabric,
+                        version: fabric_version,
+                    }) => {
+                        let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
+
+                        let dummy_string = daedalus::BRANDING
+                            .get_or_init(daedalus::Branding::default)
+                            .dummy_replace_string.clone();
+
+                        let fabric_manifest_version = fabric_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == dummy_string)
+                            .ok_or_else(|| {
+                                anyhow!("Could not find fabric metadata template using {}", dummy_string)
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|v| &v.id == fabric_version)
+                            .ok_or_else(|| {
+                                anyhow!("Could not find fabric version {}", fabric_version)
+                            })?;
+
+                        let fabric_version = crate::managers::minecraft::fabric::replace_template(
+                            &crate::managers::minecraft::fabric::get_version(
+                                &app.reqwest_client,
+                                fabric_manifest_version,
+                            )
+                            .await?,
+                            &version.release,
+                            &dummy_string
+                        );
+
+                        version_info =
+                            daedalus::modded::merge_partial_version(fabric_version, version_info);
+                    }
+                    Some(ModLoader {
+                        type_: ModLoaderType::Quilt,
+                        version: quilt_version,
+                    }) => {
+                        let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
+
+                        let dummy_string = daedalus::BRANDING
+                            .get_or_init(daedalus::Branding::default)
+                            .dummy_replace_string.clone();
+
+                        let quilt_manifest_version = quilt_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == dummy_string)
+                            .ok_or_else(|| {
+                                anyhow!("Could not find quilt metadata template using {}", dummy_string)
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|v| &v.id == quilt_version)
+                            .ok_or_else(|| {
+                                anyhow!("Could not find quilt version {}", quilt_version)
+                            })?;
+
+                        let quilt_version = crate::managers::minecraft::quilt::replace_template(
+                            &crate::managers::minecraft::quilt::get_version(
+                                &app.reqwest_client,
+                                quilt_manifest_version,
+                            )
+                            .await?,
+                            &version.release,
+                            &dummy_string,
+                        );
+
+                        version_info =
+                            daedalus::modded::merge_partial_version(quilt_version, version_info);
+                    }
                     _ => {}
                 }
 
@@ -714,7 +788,7 @@ mod test {
     use crate::{
         api::keys,
         domain::instance::info::{self, StandardVersion},
-        managers::{account::FullAccount, instance::InstanceVersionSouce},
+        managers::{account::FullAccount, instance::InstanceVersionSource},
     };
 
     //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
@@ -727,7 +801,7 @@ mod test {
                 app.instance_manager().get_default_group().await?,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(StandardVersion {
+                InstanceVersionSource::Version(info::GameVersion::Standard(StandardVersion {
                     release: String::from("1.16.5"),
                     modloaders: HashSet::new(),
                 })),

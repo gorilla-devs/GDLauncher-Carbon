@@ -66,6 +66,8 @@ impl TryFrom<ModLoaders> for ModLoader {
         Ok(ModLoader {
             type_: match loader {
                 "forge" => ModLoaderType::Forge,
+                "fabric" => ModLoaderType::Fabric,
+                "quilt" => ModLoaderType::Quilt,
                 _ => bail!("unsupported modloader '{loader}'"),
             },
             version: version.to_string(),
