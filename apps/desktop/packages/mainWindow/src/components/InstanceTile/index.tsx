@@ -15,11 +15,14 @@ import {
   ListInstance,
   UngroupedInstance,
   Subtask,
+  Task,
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { bytesToMB } from "@/utils/helpers";
+import { RSPCError } from "@rspc/client";
+import { CreateQueryResult } from "@tanstack/solid-query";
 
 type InstanceDownloadProgress = {
   totalDownload: number;
@@ -57,26 +60,31 @@ const InstanceTile = (props: {
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
-  const task = rspc.createQuery(() => ["vtask.getTask", taskId() as number], {
-    enabled: false,
-  });
+  // const task = useConditionalQuery("vtask.getTask", taskId());
+
+  const [task, setTask] = createSignal<CreateQueryResult<
+    Task | null,
+    RSPCError
+  > | null>(null);
 
   createEffect(() => {
     if (taskId() !== undefined) {
-      task.refetch();
+      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
     }
   });
 
   createEffect(() => {
     setFailError("");
-    if (task.data) {
-      setProgress("totalDownload", task.data.download_total);
-      setProgress("downloaded", task.data.downloaded);
-      if (isProgressKnown(task.data.progress)) {
-        setProgress("subTasks", task.data.active_subtasks);
-        setProgress("percentage", task.data.progress.Known);
+    if (task() !== null && task()?.data) {
+      const data = (task() as CreateQueryResult<Task | null, RSPCError>)
+        .data as Task;
+      setProgress("totalDownload", data.download_total);
+      setProgress("downloaded", data.downloaded);
+      if (isProgressKnown(data.progress)) {
+        setProgress("subTasks", data.active_subtasks);
+        setProgress("percentage", data.progress.Known);
         setIsLoading(true);
-      } else if (isProgressFailed(task.data.progress)) {
+      } else if (isProgressFailed(data.progress)) {
         setIsLoading(false);
       } else {
         setIsLoading(false);

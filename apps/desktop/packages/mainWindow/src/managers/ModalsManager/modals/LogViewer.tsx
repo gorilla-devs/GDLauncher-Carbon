@@ -17,7 +17,7 @@ const LogViewer = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190 overflow-hidden">
+      <div class="overflow-hidden h-130 w-190">
         <Show when={(logs.data?.length || 0) > 0}>
           <div class="bg-darkSlate-800 max-h-full">
             <Tabs variant="traditional">
@@ -29,14 +29,10 @@ const LogViewer = (props: ModalProps) => {
                         (instance) => instance.id === log.instance_id
                       );
                       return (
-                        <Tab
-                          onClick={() => {
-                            console.log("log.instance_id", log.instance_id);
-                          }}
-                        >
+                        <Tab>
                           <div class="w-full flex gap-2 items-center h-10 justify-start">
                             <div class="w-6 rounded-md bg-green h-6" />
-                            <p class="my-2 whitespace-nowrap">
+                            <p class="whitespace-nowrap my-2">
                               {instance?.name}
                             </p>
                           </div>
@@ -45,7 +41,7 @@ const LogViewer = (props: ModalProps) => {
                     }}
                   </For>
                 </TabList>
-                <div class="flex gap-4 px-5 pb-2">
+                <div class="flex gap-4 pb-2 px-5">
                   <div class="cursor-pointer text-darkSlate-50 i-ri:upload-2-line" />
                   <div class="text-darkSlate-50 cursor-pointer i-ri:file-copy-fill" />
                 </div>
@@ -86,7 +82,7 @@ const LogViewer = (props: ModalProps) => {
                               {(log) => {
                                 return (
                                   <div class="flex flex-col justify-center items-center w-full">
-                                    <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
+                                    <pre class="m-0 w-full box-border py-2 leading-8 whitespace-pre-wrap pl-4">
                                       <code>{log?.line}</code>
                                     </pre>
                                   </div>

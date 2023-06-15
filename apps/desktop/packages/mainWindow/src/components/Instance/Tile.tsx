@@ -191,7 +191,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="select-none group flex justify-center flex-col z-50 items-start"
+            class="flex justify-center flex-col items-start select-none group z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -205,7 +205,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative rounded-2xl items-center overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
+              class="flex justify-center relative items-center bg-cover bg-center rounded-2xl overflow-hidden h-38 w-38 max-w-38"
               classList={{
                 grayscale: props.isLoading || isInQueue(),
                 "cursor-pointer":
@@ -219,15 +219,16 @@ const Tile = (props: Props) => {
                 "background-image": props.img
                   ? `url("${props.img as string}")`
                   : `url("${DefaultImg}")`,
+                "background-size": props.img ? "100%" : "120%",
               }}
             >
               <Show when={props.isInvalid}>
-                <h2 class="text-sm text-center z-20">
+                <h2 class="z-20 text-sm text-center">
                   <Trans key="instance.error_invalid" />
                 </h2>
-                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                 <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                <div class="i-ri:alert-fill absolute z-10 text-2xl text-yellow-500 top-1 right-1" />
+                <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
               </Show>
               <Show when={props.failError}>
                 <h2 class="text-center z-20 text-sm">{props.failError}</h2>
@@ -237,7 +238,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden transition-all duration-100 will-change-transform"
+                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out transition-all duration-100 h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
                 classList={{
                   "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                     !props.isRunning,
@@ -307,7 +308,7 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="text-ellipsis overflow-hidden max-w-38 whitespace-nowrap mt-2 mb-1"
+              class="overflow-hidden max-w-38 mt-2 text-ellipsis whitespace-nowrap mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
                 "text-lightGray-900": props.isLoading || isInQueue(),
@@ -343,7 +344,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full gap-4 box-border px-3 cursor-pointer h-14 erelative"
+            class="group relative group select-none flex items-center w-full gap-4 box-border cursor-pointer px-3 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
@@ -374,7 +375,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 transition-transform right-5 h-7 w-7 will-change-transform"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform transition-transform right-5 h-7 w-7"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
