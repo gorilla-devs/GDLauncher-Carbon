@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     path::{Path, PathBuf},
@@ -23,7 +24,7 @@ use error::DownloadError;
 
 mod error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Checksum {
     Sha1(String),
     Sha256(String),
@@ -37,12 +38,18 @@ pub trait IntoDownloadable {
     fn into_downloadable(self, base_path: &Path) -> Downloadable;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Downloadable {
     pub url: String,
     pub path: PathBuf,
     pub checksum: Option<Checksum>,
     pub size: Option<u64>,
+}
+
+impl Display for Downloadable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> {}", self.url, self.path.display())
+    }
 }
 
 impl Downloadable {
@@ -95,7 +102,10 @@ pub async fn download_file(
     let mut response = client.get(&downloadable_file.url).send().await?;
 
     if !response.status().is_success() {
-        return Err(DownloadError::Non200StatusCode(response.status().as_u16()));
+        return Err(DownloadError::Non200StatusCode(
+            downloadable_file.clone(),
+            response.status().as_u16(),
+        ));
     }
 
     // Ensure the parent directory exists
@@ -199,7 +209,7 @@ pub async fn download_multiple(
 
     let progress_counter = Arc::new(AtomicU64::new(0));
     let file_counter = Arc::new(AtomicU64::new(0));
-    let total_size = Arc::new(AtomicU64::new(files.iter().map(|f| f.size).flatten().sum()));
+    let total_size = Arc::new(AtomicU64::new(files.iter().filter_map(|f| f.size).sum()));
 
     let total_count = files.len() as u64;
 
@@ -304,8 +314,16 @@ pub async fn download_multiple(
             let mut file_downloaded = 0u64;
             let mut file_size_reported = file.size.unwrap_or(0);
 
-            let mut resp_stream = client.get(&url).send().await?.bytes_stream();
+            let resp = client.get(&url).send().await?;
 
+            if !resp.status().is_success() {
+                return Err(DownloadError::Non200StatusCode(
+                    file.clone(),
+                    resp.status().as_u16(),
+                ));
+            }
+
+            let mut resp_stream = resp.bytes_stream();
             tokio::fs::create_dir_all(path.parent().ok_or(DownloadError::GenericDownload(
                 "Can't create folder".to_owned(),
             ))?)

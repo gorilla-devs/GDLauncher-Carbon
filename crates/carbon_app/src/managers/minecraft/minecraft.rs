@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     app_version::APP_VERSION,
@@ -10,8 +13,8 @@ use crate::{
     },
 };
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, DownloadType, Library, LibraryGroup, Os, Version,
-    VersionInfo, VersionManifest,
+    Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
+    VersionManifest,
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -314,15 +317,18 @@ pub async fn generate_startup_command(
         FullAccountType::Microsoft { access_token, .. } => access_token,
     };
 
-    let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
-        "{}.jar",
-        version.downloads.get(&DownloadType::Client).unwrap().sha1
-    ));
+    let client_jar_path = runtime_path
+        .get_libraries()
+        .get_mc_client(&version.inherits_from.as_ref().unwrap_or(&version.id));
 
     let replacer_args = ReplacerArgs {
         player_name: full_account.username,
         player_token: player_token.clone(),
-        version_name: version.id.clone(),
+        version_name: version
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version.id)
+            .clone(),
         game_directory: instance_path,
         game_assets: runtime_path.get_assets().to_path(),
         library_directory: runtime_path.get_libraries().to_path(),
@@ -345,8 +351,16 @@ pub async fn generate_startup_command(
     };
 
     let substitute_argument = |argument: &str| {
+        let mut argument = argument.to_string();
+        if argument.starts_with("-DignoreList=") {
+            argument.push_str(&format!(
+                ",{}.jar",
+                version.inherits_from.as_ref().unwrap_or(&version.id)
+            ));
+        }
+
         regex
-            .replace_all(argument, |caps: &Captures| {
+            .replace_all(&argument, |caps: &Captures| {
                 if let Some(value) = caps.name("value") {
                     let value = match value.as_str().try_into() {
                         Ok(value) => replace_placeholder(&replacer_args, value),
@@ -503,7 +517,7 @@ pub async fn extract_natives(
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
-        version_id: &str,
+        dest: &Path,
         native_name: &str,
     ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
@@ -520,15 +534,18 @@ pub async fn extract_natives(
                 .path
                 .clone()
         });
-        let dest = runtime_path.get_natives().get_versioned(version_id);
-        tokio::fs::create_dir_all(&dest).await?;
 
         info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, &dest).await?;
+        carbon_compression::decompress(path, dest).await?;
 
         Ok(())
     }
+
+    info!("Start natives extraction for id {}", version.id);
+
+    let dest = runtime_path.get_natives().get_versioned(&version.id);
+    tokio::fs::create_dir_all(&dest).await?;
 
     for library in version
         .libraries
@@ -539,7 +556,7 @@ pub async fn extract_natives(
         match &library.natives {
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
-                    extract_single_library_natives(runtime_path, library, &version.id, native_name)
+                    extract_single_library_natives(runtime_path, library, &dest, native_name)
                         .await?;
                 }
             }

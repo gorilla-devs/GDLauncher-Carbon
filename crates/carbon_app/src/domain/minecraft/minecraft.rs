@@ -4,7 +4,11 @@ use daedalus::minecraft::{
 use std::path::PathBuf;
 use sysinfo::SystemExt;
 
-use crate::domain::{java::JavaArch, maven::MavenCoordinates, runtime_path::AssetsPath};
+use crate::domain::{
+    java::JavaArch,
+    maven::MavenCoordinates,
+    runtime_path::{AssetsPath, RuntimePath},
+};
 
 pub fn libraries_into_vec_downloadable(
     libraries: Vec<Library>,
@@ -33,14 +37,17 @@ pub fn libraries_into_vec_downloadable(
             let checksum = None;
 
             // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
-            let Ok(maven_path) = MavenCoordinates::try_from(library.name.to_string(), None) else {
+            let Ok(maven) = MavenCoordinates::try_from(library.name.to_string(), None) else {
                 continue
             };
 
-            let maven_path = maven_path.into_path();
+            let maven_path = maven.clone().into_path();
+            let Ok(maven_url) = maven.into_url(base_url) else {
+                continue
+            };
 
             files.push(carbon_net::Downloadable {
-                url: format!("{}/{}", base_url, maven_path.to_string_lossy()),
+                url: maven_url.to_string(),
                 path: PathBuf::from(base_path).join(maven_path),
                 checksum,
                 size: None,
@@ -58,9 +65,8 @@ pub fn is_rule_allowed(rule: Rule, java_arch: &JavaArch) -> bool {
             os: Some(ref os), ..
         } => os_rule(os, java_arch),
         Rule {
-            features: Some(ref features),
-            ..
-        } => features.has_demo_resolution.unwrap_or(false),
+            features: Some(_), ..
+        } => false,
         _ => true,
     };
 
@@ -148,9 +154,10 @@ pub fn library_into_natives_downloadable(
 
 pub fn version_download_into_downloadable(
     version_download: Download,
-    base_path: &std::path::Path,
+    version_id: &str,
+    runtime_path: &RuntimePath,
 ) -> carbon_net::Downloadable {
-    let jar_path = base_path.join(format!("{}.jar", &version_download.sha1));
+    let jar_path = runtime_path.get_libraries().get_mc_client(version_id);
 
     carbon_net::Downloadable::new(version_download.url, jar_path)
         .with_checksum(Some(carbon_net::Checksum::Sha1(version_download.sha1)))
