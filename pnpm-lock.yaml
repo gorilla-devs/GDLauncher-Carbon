@@ -46,6 +46,9 @@ importers:
       '@playwright/test':
         specifier: ^1.29.1
         version: 1.29.1
+      '@rive-app/canvas':
+        specifier: ^1.2.0
+        version: 1.2.0
       '@rspc/client':
         specifier: ^0.0.0-main-60a4fa93187c20bc5cb565cc6ee30b2f0903840e
         version: 0.0.0-main-7c0a67c1
@@ -4407,6 +4410,10 @@ packages:
 
   /@reach/observe-rect@1.2.0:
     resolution: {integrity: sha512-Ba7HmkFgfQxZqqaeIWWkNK0rEhpxVQHIoVyW1YDSkGsGIXzcaW4deC8B0pZrNSSyLTdIk7y+5olKt5+g0GmFIQ==}
+    dev: true
+
+  /@rive-app/canvas@1.2.0:
+    resolution: {integrity: sha512-Wm6bQiE9F5+vE9R/zTnGOH3yNM8Dim+81dI2MWeuOFJ2mmdKWgsFir1tdHFjmndESNKySO7cFs8xZ4TVLERWlQ==}
     dev: true
 
   /@rollup/pluginutils@5.0.2:

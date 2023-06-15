@@ -505,7 +505,6 @@ mod test {
     use crate::managers::download::{DownloadError, DownloadStartError};
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
@@ -528,7 +527,6 @@ mod test {
 
     #[tokio::test]
     #[should_panic]
-    #[timeout(120_000)]
     async fn attempt_download_twice() {
         let app = crate::setup_managers_for_test().await;
 
@@ -550,7 +548,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_download_after_cancel() -> Result<(), DownloadStartError> {
         let app = crate::setup_managers_for_test().await;
 
@@ -569,7 +566,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_cancel_download() {
         let app = crate::setup_managers_for_test().await;
 

@@ -14,7 +14,7 @@ pub async fn setup_logger(runtime_path: &Path) {
     }
 
     let filter = EnvFilter::try_new(
-        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn",
+        "debug,carbon_app=trace,hyper::client::pool=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn,hyper::proto::h1::conn=warn,quaint::connector::metrics=warn,hyper::client::connect::http=warn,hyper::client::connect::dns=warn",
     )
     .unwrap();
 

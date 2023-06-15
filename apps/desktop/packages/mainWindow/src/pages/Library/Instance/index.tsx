@@ -276,7 +276,7 @@ const Instance = () => {
           <div class="flex justify-center sticky h-24 top-52 z-20 px-6 w-full bg-gradient-to-t from-darkSlate-800 from-30% pb-2">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
-                <div class="flex flex-col gap-4 w-full lg:flex-row justify-end">
+                <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
@@ -318,7 +318,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="i-ri:pencil-fill hover:text-darkSlate-50 transition-color ease-in-out duration-100"
+                            class="transition-color ease-in-out duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>

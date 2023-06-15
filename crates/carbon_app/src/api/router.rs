@@ -30,7 +30,7 @@ macro_rules! router {
                     let span = ::tracing::info_span!($endpoint.span_key);
                     let block: ::core::result::Result::<_, $crate::api::router::router_rt_helper!($($rtmarker)?)>
                         = ::tracing::Instrument::instrument(async move {
-                            ::tracing::trace!("Running endpoint");
+                            ::tracing::trace!("Running endpoint {:?} with args: {:?}", $endpoint.full, $args);
                             $block
                         }, span).await;
 

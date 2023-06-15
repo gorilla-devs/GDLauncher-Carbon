@@ -93,6 +93,19 @@ const Dropdown = (props: Props) => {
 
   onCleanup(() => setMenuOpened(false));
 
+  createEffect(() => {
+    if (menuOpened() && menuRef() && selectedValue()) {
+      const selectedOptionIndex = props.options.findIndex(
+        (option) => option.key === selectedValue().key
+      );
+      if (selectedOptionIndex !== -1) {
+        (menuRef() as HTMLUListElement).children[
+          selectedOptionIndex
+        ].scrollIntoView();
+      }
+    }
+  });
+
   return (
     <>
       <div
