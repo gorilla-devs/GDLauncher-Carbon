@@ -378,7 +378,10 @@ const Instance = () => {
                           </span>
                         </div>
                         <Show
-                          when={modpackDetails()?.data?.data.authors.length > 0}
+                          when={
+                            (modpackDetails()?.data?.data.authors || [])
+                              .length > 0
+                          }
                         >
                           <div class="flex gap-2 items-start">
                             <div class="i-ri:user-fill" />

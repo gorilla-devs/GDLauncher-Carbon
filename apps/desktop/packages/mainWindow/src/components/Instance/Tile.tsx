@@ -509,7 +509,7 @@ const Tile = (props: Props) => {
                   "i-ri:stop-fill": props.isRunning,
                 }}
                 onClick={(e) => {
-                  e.preventDefault();
+                  e.stopPropagation();
                   handlePlayClick();
                 }}
               />

@@ -76,8 +76,6 @@ const LogViewer = (props: ModalProps) => {
                       <TabPanel>
                         <div>
                           <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500">
-                            {instance.id}
-                            {instanceLogs().length}
                             <For each={instanceLogs()}>
                               {(log) => {
                                 return (
