@@ -429,14 +429,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let libraries_path = runtime_path.get_libraries();
                 let game_version = version_info.id.to_string();
-                let client_path = runtime_path.get_versions().get_clients_path().join(format!(
-                    "{}.jar",
+                let client_path = runtime_path.get_libraries().get_mc_client(
                     version_info
-                        .downloads
-                        .get(&DownloadType::Client)
-                        .unwrap()
-                        .sha1
-                ));
+                        .inherits_from
+                        .as_ref()
+                        .unwrap_or(&version_info.id),
+                );
 
                 if let Some(t_forge_processors) = &t_forge_processors {
                     t_forge_processors.start_opaque();

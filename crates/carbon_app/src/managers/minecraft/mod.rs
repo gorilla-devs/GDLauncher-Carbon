@@ -57,6 +57,12 @@ impl ManagerRef<'_, MinecraftManager> {
     ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
+        let version_id = version_info
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version_info.id)
+            .clone();
+
         let mut all_files = vec![];
 
         let lwjgl =
@@ -78,7 +84,8 @@ impl ManagerRef<'_, MinecraftManager> {
                 .get(&DownloadType::Client)
                 .unwrap()
                 .clone(),
-            &runtime_path.get_versions().get_clients_path(),
+            &version_id,
+            runtime_path,
         );
 
         let assets = assets_index_into_vec_downloadable(
@@ -106,7 +113,6 @@ mod tests {
 
     use carbon_net::Progress;
     use chrono::Utc;
-    use daedalus::minecraft::DownloadType;
 
     use crate::managers::{
         account::{FullAccount, FullAccountType},
@@ -222,14 +228,12 @@ mod tests {
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();
-        let client_path = runtime_path.get_versions().get_clients_path().join(format!(
-            "{}.jar",
+        let client_path = runtime_path.get_libraries().get_mc_client(
             version_info
-                .downloads
-                .get(&DownloadType::Client)
-                .unwrap()
-                .sha1
-        ));
+                .inherits_from
+                .as_ref()
+                .unwrap_or(&version_info.id),
+        );
 
         if let Some(processors) = &version_info.processors {
             execute_processors(

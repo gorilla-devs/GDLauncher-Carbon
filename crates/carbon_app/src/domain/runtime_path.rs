@@ -21,6 +21,12 @@ pub struct LibrariesPath(PathBuf);
 
 // TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
+    pub fn get_mc_client(&self, id: &str) -> PathBuf {
+        self.0
+            .join("net/minecraft/client")
+            .join(id)
+            .join(format!("{}.jar", id))
+    }
     pub fn get_library_path(&self, library_path: String) -> PathBuf {
         self.0.join(library_path)
     }
@@ -47,18 +53,6 @@ impl AssetsPath {
 
     pub fn get_objects_path(&self) -> PathBuf {
         self.0.join("objects")
-    }
-}
-
-pub struct VersionsPath(PathBuf);
-
-impl VersionsPath {
-    pub fn get_clients_path(&self) -> PathBuf {
-        self.0.join("clients")
-    }
-
-    pub fn get_servers_path(&self) -> PathBuf {
-        self.0.join("servers")
     }
 }
 
@@ -241,10 +235,6 @@ impl RuntimePath {
 
     pub fn get_assets(&self) -> AssetsPath {
         AssetsPath(self.0.join("assets"))
-    }
-
-    pub fn get_versions(&self) -> VersionsPath {
-        VersionsPath(self.0.join("versions"))
     }
 
     pub fn get_natives(&self) -> NativesPath {
