@@ -73,6 +73,14 @@ impl ManagedJavasPath {
     }
 }
 
+pub struct LoggingConfigsPath(PathBuf);
+
+impl LoggingConfigsPath {
+    pub fn get_client_path(&self, id: &str) -> PathBuf {
+        self.0.clone().join(&id)
+    }
+}
+
 // TODO: WIP
 pub struct InstancesPath(PathBuf);
 
@@ -247,6 +255,10 @@ impl RuntimePath {
 
     pub fn get_instances(&self) -> InstancesPath {
         InstancesPath(self.0.join("instances"))
+    }
+
+    pub fn get_logging_configs(&self) -> LoggingConfigsPath {
+        LoggingConfigsPath(self.0.join("logging_configs"))
     }
 
     pub fn get_temp(&self) -> TempPath {
