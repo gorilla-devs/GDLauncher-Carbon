@@ -9,14 +9,29 @@ import {
   useParams,
   useRouteData,
 } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import { formatDistance } from "date-fns";
-import { InstanceDetails, UngroupedInstance } from "@gd/core_module/bindings";
+import {
+  FEModResponse,
+  InstanceDetails,
+  UngroupedInstance,
+} from "@gd/core_module/bindings";
 import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { CreateQueryResult } from "@tanstack/solid-query";
+import { RSPCError } from "@rspc/client";
 
 type InstancePage = {
   label: string;
@@ -152,23 +167,35 @@ const Instance = () => {
 
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
 
-  const getInstanceDetailsQuery = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    parseInt(params.id, 10),
-  ]);
-
   const isRunning = () =>
-    getInstanceDetailsQuery.data?.state &&
-    getRunningState(getInstanceDetailsQuery.data?.state);
+    routeData.instanceDetails.data?.state &&
+    getRunningState(routeData.instanceDetails.data?.state);
 
   const isPreparing = () =>
-    getInstanceDetailsQuery.data?.state &&
-    getPreparingState(getInstanceDetailsQuery.data?.state);
+    routeData.instanceDetails.data?.state &&
+    getPreparingState(routeData.instanceDetails.data?.state);
 
-  // let containerRef: HTMLDivElement;
-  // let bgRef: HTMLDivElement;
-  // let innerContainerRef: HTMLDivElement;
-  // let refStickyContainer: HTMLDivElement;
+  const [modpackDetails, setModpackDetails] = createSignal<CreateQueryResult<
+    FEModResponse,
+    RSPCError
+  > | null>(null);
+
+  createEffect(() => {
+    if (
+      routeData.instanceDetails.data?.modpack?.Curseforge.project_id !==
+      undefined
+    ) {
+      setModpackDetails(
+        rspc.createQuery(() => [
+          "modplatforms.curseforgeGetMod",
+          {
+            modId: routeData.instanceDetails.data?.modpack?.Curseforge
+              .project_id as number,
+          },
+        ])
+      );
+    }
+  });
 
   const handleNameChange = () => {
     if (newName()) {
@@ -184,59 +211,53 @@ const Instance = () => {
   };
 
   let nameRef: HTMLHeadingElement | undefined;
+  let headerRef: HTMLElement | undefined;
+  let innerContainerRef: HTMLDivElement | undefined;
+
+  const checkContainerSize = () => {
+    if (!headerRef || !innerContainerRef) return;
+    // get computed style for the container
+    let containerStyle = window.getComputedStyle(headerRef);
+
+    // get width as integer
+    let containerWidth = parseInt(containerStyle.getPropertyValue("width"));
+
+    if (containerWidth <= 800) {
+      // add flex-col class
+      innerContainerRef.classList.remove("flex-row");
+      innerContainerRef.classList.add("flex-col");
+      innerContainerRef.classList.add("gap-4");
+    } else {
+      // add flex-row class
+      innerContainerRef.classList.remove("flex-col");
+      innerContainerRef.classList.add("flex-row");
+      innerContainerRef.classList.remove("gap-4");
+    }
+  };
+
+  onMount(() => {
+    checkContainerSize();
+
+    // Then run it every time the window resizes
+    window?.addEventListener("resize", checkContainerSize);
+  });
+
+  onCleanup(() => window?.removeEventListener("resize", checkContainerSize));
 
   return (
-    <div
-      class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
-      style={{
-        "scrollbar-gutter": "stable",
-      }}
-      // onScroll={(e) => {
-      //   if (e.currentTarget.scrollTop > 50) {
-      //     innerContainerRef.style.opacity = "0";
-      //     containerRef.classList.remove("h-52");
-      //     containerRef.classList.add("h-0");
-
-      //     bgRef.classList.add("bg-darkSlate-900");
-
-      //     refStickyContainer.classList.remove("h-0", "opacity-0");
-      //     refStickyContainer.classList.add("h-20", "sticky", "top-0");
-      //   } else {
-      //     innerContainerRef.style.opacity = "1";
-      //     containerRef.classList.add("h-52");
-      //     containerRef.classList.remove("h-0");
-
-      //     bgRef.classList.remove("bg-darkSlate-900");
-
-      //     refStickyContainer.classList.add("h-0", "opacity-0");
-      //     refStickyContainer.classList.remove("h-20", "sticky", "top-0");
-      //   }
-      // }}
-    >
-      <div
-        class="relative flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
-        // ref={(el) => {
-        //   containerRef = el;
-        // }}
+    <main class="relative h-full bg-darkSlate-800 overflow-x-hidden scrollbar-hide flex flex-col">
+      <header
+        ref={headerRef}
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out min-h-52 transition-100"
+        style={{
+          transition: "height 0.2s",
+          "background-image": routeData.image()
+            ? `url("${routeData.image()}")`
+            : `url("${DefaultImg}")`,
+          "background-position": routeData.image() ? "right-5rem" : "bottom",
+        }}
       >
-        <div
-          class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
-          style={{
-            "background-image": routeData.image()
-              ? `url("${routeData.image()}")`
-              : `url("${DefaultImg}")`,
-            "background-position": routeData.image() ? "right-5rem" : "bottom",
-          }}
-          // ref={(el) => {
-          //   bgRef = el;
-          // }}
-        />
-        <div
-          class="h-full"
-          // ref={(el) => {
-          //   innerContainerRef = el;
-          // }}
-        >
+        <div class="h-full">
           <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
@@ -252,16 +273,10 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div
-            class="flex justify-center sticky h-24 top-52 z-20 px-6"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, #1D2028 100%)",
-            }}
-          >
+          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
-                <div class="flex flex-col gap-4 w-full lg:flex-row justify-end">
+                <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
@@ -303,7 +318,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="i-ri:pencil-fill hover:text-darkSlate-50 transition-color ease-in-out duration-100"
+                            class="transition-color ease-in-out duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -338,16 +353,19 @@ const Instance = () => {
                         />
                       </div>
                     </div>
-                    <div class="flex flex-col lg:flex-row justify-between cursor-default">
-                      <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                        <div class="m-0 flex gap-2 p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                    <div
+                      ref={innerContainerRef}
+                      class="flex justify-between cursor-default flex-row"
+                    >
+                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
+                        <div class="m-0 flex gap-2 items-start">
                           <span>
                             {routeData.instanceDetails.data?.modloaders[0]
                               ?.type_ || "Vanilla"}
                           </span>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
-                        <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
+                        <div class="flex gap-2 items-start">
                           <div class="i-ri:time-fill" />
                           <span>
                             {formatDistance(
@@ -359,20 +377,21 @@ const Instance = () => {
                             )}
                           </span>
                         </div>
-                        <div class="p-0 lg:px-4 flex gap-2 items-center">
-                          <div class="i-ri:user-fill" />
-                          ATMTeam
-                        </div>
+                        <Show
+                          when={
+                            (modpackDetails()?.data?.data.authors || [])
+                              .length > 0
+                          }
+                        >
+                          <div class="flex gap-2 items-start">
+                            <div class="i-ri:user-fill" />
+                            <For each={modpackDetails()?.data?.data.authors}>
+                              {(author) => <p class="m-0">{author.name}</p>}
+                            </For>
+                          </div>
+                        </Show>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                        {/* <div
-                          class="flex justify-center items-center rounded-full h-8 w-8"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.1)",
-                          }}
-                        >
-                          <div class="i-ri:more-2-fill text-xl" />
-                        </div> */}
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
@@ -439,128 +458,11 @@ const Instance = () => {
             </div>
           </div>
         </div>
-      </div>
-      <div
-        class="flex gap-4 justify-center items-center w-full z-20 ease-in-out px-4 box-border bg-darkSlate-900 h-0 opacity-0 transition-height duration-200"
-        // ref={(el) => {
-        //   refStickyContainer = el;
-        // }}
-      >
-        <div class="flex items-start w-full ease-in-out transition-opacity duration-300">
-          <div class="w-fit justify-center items-center transition ease-in-out duration-100 h-fit mr-4">
-            <Button
-              onClick={() => navigate("/library")}
-              icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
-              size="small"
-              type="transparent"
-            >
-              <Trans
-                key="instance.step_back"
-                options={{
-                  defaultValue: "Back",
-                }}
-              />
-            </Button>
-          </div>
-          <div class="flex flex-1 flex-col max-w-185">
-            <h4 class="m-0"> {routeData.instanceDetails.data?.name}</h4>
-            <div class="flex flex-col lg:flex-row justify-between">
-              <div class="flex items-start lg:items-center flex-col gap-1 lg:gap-0 lg:flex-row text-darkSlate-50">
-                <div class="flex gap-2 p-0 border-0 lg:border-r-2 border-darkSlate-500 text-xs lg:pr-2">
-                  <span>
-                    {routeData.instanceDetails.data?.modloaders[0]?.type_ ||
-                      "Vanilla"}
-                  </span>
-                  <span>{routeData.instanceDetails.data?.version}</span>
-                </div>
-                <div class="text-xs p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
-                  <div class="i-ri:time-fill" />
-                  <span>
-                    {formatDistance(
-                      new Date(
-                        routeData.instanceDetails.data?.last_played ||
-                          Date.now()
-                      ).getTime(),
-                      Date.now()
-                    )}
-                  </span>
-                </div>
-                <div class="text-xs p-0 lg:px-2 flex gap-2 items-center">
-                  <div class="i-ri:user-fill" />
-                  ATMTeam
-                </div>
-              </div>
-              <div class="flex items-center gap-2 mt-2 lg:mt-0 z-10">
-                {/* <div
-                  class="rounded-full w-8 h-8 flex justify-center items-center"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.1)",
-                  }}
-                >
-                  <div class="i-ri:more-2-fill text-xl" />
-                </div> */}
-                <div
-                  class="rounded-full w-8 h-8 flex justify-center items-center cursor-pointer"
-                  style={{
-                    background: "rgba(255, 255, 255, 0.1)",
-                  }}
-                >
-                  <div
-                    class="text-xl"
-                    classList={{
-                      "text-yellow-500 i-ri:star-s-fill": isFavorite(),
-                      "i-ri:star-line": !isFavorite(),
-                    }}
-                    onClick={() =>
-                      setFavoriteMutation.mutate({
-                        instance: parseInt(params.id, 10),
-                        favorite: !routeData.instanceDetails.data?.favorite,
-                      })
-                    }
-                  />
-                </div>
-                <Button
-                  uppercase
-                  type="glow"
-                  size="small"
-                  variant={isRunning() && "red"}
-                  loading={isPreparing() !== undefined}
-                  onClick={() => {
-                    if (isRunning()) {
-                      killInstanceMutation.mutate(parseInt(params.id, 10));
-                    } else {
-                      launchInstanceMutation.mutate(parseInt(params.id, 10));
-                    }
-                  }}
-                >
-                  <Switch>
-                    <Match when={!isRunning()}>
-                      <Trans
-                        key="instance.play"
-                        options={{
-                          defaultValue: "play",
-                        }}
-                      />
-                    </Match>
-                    <Match when={isRunning()}>
-                      <Trans
-                        key="instance.stop"
-                        options={{
-                          defaultValue: "stop",
-                        }}
-                      />
-                    </Match>
-                  </Switch>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="bg-darkSlate-800">
+      </header>
+      <div class="bg-darkSlate-800 sticky">
         <div class="flex justify-center p-6">
-          <div class="bg-darkSlate-800 max-w-full w-185">
-            <div class="sticky z-20 flex flex-col bg-darkSlate-800 mb-4 top-20">
+          <div class="bg-darkSlate-800 w-full">
+            <div class="sticky z-20 flex flex-col bg-darkSlate-800 mb-4 top-0">
               <Tabs index={selectedIndex()}>
                 <TabList>
                   <For each={instancePages()}>
@@ -577,7 +479,7 @@ const Instance = () => {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

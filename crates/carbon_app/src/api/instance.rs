@@ -29,13 +29,13 @@ use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query DEFAULT_GROUP[app, _: ()] {
+        query DEFAULT_GROUP[app, args: ()] {
             Ok(*app.instance_manager()
                 .get_default_group()
                 .await?)
         }
 
-        query GET_GROUPS[app, _: ()] {
+        query GET_GROUPS[app, args: ()] {
             Ok(app.instance_manager()
                 .list_groups()
                 .await?
@@ -44,7 +44,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .collect::<Vec<_>>())
         }
 
-        query GET_INSTANCES_UNGROUPED[app, _: ()] {
+        query GET_INSTANCES_UNGROUPED[app, args: ()] {
             Ok(app.instance_manager()
                 .list_groups()
                 .await?
@@ -182,7 +182,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query GET_LOGS[app, _: ()] {
+        query GET_LOGS[app, args: ()] {
             Ok(app.instance_manager()
                 .get_logs()
                .await
@@ -367,10 +367,10 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
 }
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 struct GroupId(i32);
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 struct InstanceId(i32);
 
 impl From<domain::GroupId> for GroupId {
@@ -397,14 +397,14 @@ impl From<InstanceId> for domain::InstanceId {
     }
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct ListGroup {
     id: GroupId,
     name: String,
     instances: Vec<ListInstance>,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct ListInstance {
     id: InstanceId,
     name: String,
@@ -412,20 +412,20 @@ struct ListInstance {
     status: ListInstanceStatus,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct UngroupedInstance {
     favorite: bool,
     #[serde(flatten)]
     instance: ListInstance,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 enum ListInstanceStatus {
     Valid(ValidListInstance),
     Invalid(InvalidListInstance),
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
     modloader: Option<ModLoaderType>,
@@ -433,19 +433,19 @@ struct ValidListInstance {
     state: LaunchState,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 enum ModpackPlatform {
     Curseforge,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 enum InvalidListInstance {
     JsonMissing,
     JsonError(ConfigurationParseError),
     Other(String),
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct ConfigurationParseError {
     type_: ConfigurationParseErrorType,
     message: String,
@@ -453,14 +453,14 @@ struct ConfigurationParseError {
     config_text: String,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct CreateInstance {
     group: GroupId,
     name: String,
@@ -469,7 +469,7 @@ struct CreateInstance {
     notes: String,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct UpdateInstance {
     instance: InstanceId,
     #[specta(optional)]
@@ -490,19 +490,19 @@ struct UpdateInstance {
     memory: Option<Set<Option<MemoryRange>>>,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct DuplicateInstance {
     instance: InstanceId,
     new_name: String,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct SetFavorite {
     instance: InstanceId,
     favorite: bool,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 enum Set<T> {
     Set(T),
 }
@@ -515,78 +515,78 @@ impl<T> Set<T> {
     }
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct InstanceMod {
     instance_id: InstanceId,
     mod_id: String,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct InstallMod {
     instance_id: InstanceId,
     project_id: u32,
     file_id: u32,
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 struct GameLogId(i32);
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct GameLogEntry {
     id: GameLogId,
     instance_id: InstanceId,
     active: bool,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 enum CreateInstanceVersion {
     Version(GameVersion),
     Modpack(Modpack),
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 enum GameVersion {
     Standard(StandardVersion),
     // Custom(json)
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 struct CurseforgeModpack {
     project_id: u32,
     file_id: u32,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct StandardVersion {
     release: String,
     modloaders: HashSet<ModLoader>,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct MoveGroup {
     group: GroupId,
     before: Option<GroupId>,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct MoveInstance {
     instance: InstanceId,
     target: MoveInstanceTarget,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 enum MoveInstanceTarget {
     BeforeInstance(InstanceId),
     BeginningOfGroup(GroupId),
     EndOfGroup(GroupId),
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct InstanceDetails {
     name: String,
     favorite: bool,
@@ -603,19 +603,19 @@ struct InstanceDetails {
     mods: Vec<Mod>,
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 pub struct MemoryRange {
     pub min_mb: u16,
     pub max_mb: u16,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 struct OpenInstanceFolder {
     instance_id: InstanceId,
     folder: InstanceFolder,
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 enum InstanceFolder {
     Root,
     Data,
@@ -630,19 +630,19 @@ enum InstanceFolder {
     ShaderPacks,
 }
 
-#[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
     type_: ModLoaderType,
     version: String,
 }
 
-#[derive(Type, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 enum ModLoaderType {
     Forge,
     Fabric,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 enum LaunchState {
     Inactive {
         failed_task: Option<TaskId>,
@@ -654,7 +654,7 @@ enum LaunchState {
     },
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct Mod {
     id: String,
     filename: String,
@@ -663,7 +663,7 @@ struct Mod {
     metadata: ModFileMetadata,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
     modid: String,
     name: Option<String>,

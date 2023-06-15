@@ -429,14 +429,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let libraries_path = runtime_path.get_libraries();
                 let game_version = version_info.id.to_string();
-                let client_path = runtime_path.get_versions().get_clients_path().join(format!(
-                    "{}.jar",
+                let client_path = runtime_path.get_libraries().get_mc_client(
                     version_info
-                        .downloads
-                        .get(&DownloadType::Client)
-                        .unwrap()
-                        .sha1
-                ));
+                        .inherits_from
+                        .as_ref()
+                        .unwrap_or(&version_info.id),
+                );
 
                 if let Some(t_forge_processors) = &t_forge_processors {
                     t_forge_processors.start_opaque();
@@ -538,6 +536,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stdout.read(&mut outbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stdout: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdOut, &*utf8);
                                             false
@@ -566,6 +568,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stderr.read(&mut errbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stderr: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdErr, &*utf8);
                                             false

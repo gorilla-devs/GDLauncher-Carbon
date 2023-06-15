@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use crate::{
     app_version::APP_VERSION,
@@ -10,8 +13,8 @@ use crate::{
     },
 };
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, DownloadType, Library, LibraryGroup, Os, Version,
-    VersionInfo, VersionManifest,
+    Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
+    VersionManifest,
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -19,7 +22,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -128,6 +131,8 @@ enum ArgPlaceholder {
     NativesDirectory,
     LauncherName,
     LauncherVersion,
+    ClasspathSeparator,
+    LibraryDirectory,
 }
 
 impl TryFrom<&str> for ArgPlaceholder {
@@ -151,6 +156,8 @@ impl TryFrom<&str> for ArgPlaceholder {
             "natives_directory" => ArgPlaceholder::NativesDirectory,
             "launcher_name" => ArgPlaceholder::LauncherName,
             "launcher_version" => ArgPlaceholder::LauncherVersion,
+            "classpath_separator" => ArgPlaceholder::ClasspathSeparator,
+            "library_directory" => ArgPlaceholder::LibraryDirectory,
             _ => anyhow::bail!("Unknown argument placeholder: {arg}"),
         };
 
@@ -177,6 +184,8 @@ impl From<ArgPlaceholder> for &str {
             ArgPlaceholder::NativesDirectory => "natives_directory",
             ArgPlaceholder::LauncherName => "launcher_name",
             ArgPlaceholder::LauncherVersion => "launcher_version",
+            ArgPlaceholder::ClasspathSeparator => "classpath_separator",
+            ArgPlaceholder::LibraryDirectory => "library_directory",
         }
     }
 }
@@ -187,7 +196,7 @@ struct ReplacerArgs {
     version_name: String,
     game_directory: InstancePath,
     game_assets: PathBuf,
-    target_directory: PathBuf,
+    library_directory: PathBuf,
     natives_path: PathBuf,
     assets_root: PathBuf,
     assets_index_name: String,
@@ -222,6 +231,11 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::NativesDirectory => replacer_args.natives_path.display().to_string(),
         ArgPlaceholder::LauncherName => "GDLauncher".to_string(),
         ArgPlaceholder::LauncherVersion => APP_VERSION.to_string(),
+        ArgPlaceholder::ClasspathSeparator => CLASSPATH_SEPARATOR.to_string(),
+        ArgPlaceholder::LibraryDirectory => replacer_args
+            .library_directory
+            .to_string_lossy()
+            .to_string(),
     }
 }
 
@@ -303,18 +317,21 @@ pub async fn generate_startup_command(
         FullAccountType::Microsoft { access_token, .. } => access_token,
     };
 
-    let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
-        "{}.jar",
-        version.downloads.get(&DownloadType::Client).unwrap().sha1
-    ));
+    let client_jar_path = runtime_path
+        .get_libraries()
+        .get_mc_client(&version.inherits_from.as_ref().unwrap_or(&version.id));
 
     let replacer_args = ReplacerArgs {
         player_name: full_account.username,
         player_token: player_token.clone(),
-        version_name: version.id.clone(),
+        version_name: version
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version.id)
+            .clone(),
         game_directory: instance_path,
         game_assets: runtime_path.get_assets().to_path(),
-        target_directory: PathBuf::new(),
+        library_directory: runtime_path.get_libraries().to_path(),
         natives_path: runtime_path.get_natives().get_versioned(&version.id),
         assets_root: runtime_path.get_assets().to_path(),
         assets_index_name: version.assets.clone(),
@@ -334,18 +351,32 @@ pub async fn generate_startup_command(
     };
 
     let substitute_argument = |argument: &str| {
+        let mut argument = argument.to_string();
+        if argument.starts_with("-DignoreList=") {
+            argument.push_str(&format!(
+                ",{}.jar",
+                version.inherits_from.as_ref().unwrap_or(&version.id)
+            ));
+        }
+
         regex
-            .replace_all(argument, |caps: &Captures| {
+            .replace_all(&argument, |caps: &Captures| {
                 if let Some(value) = caps.name("value") {
                     let value = match value.as_str().try_into() {
                         Ok(value) => replace_placeholder(&replacer_args, value),
-                        Err(_) => return String::new(),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
                     };
                     return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
                 } else if let Some(standalone) = caps.name("standalone") {
                     return match standalone.as_str().try_into() {
                         Ok(standalone) => replace_placeholder(&replacer_args, standalone),
-                        Err(_) => return String::new(),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
                     };
                 }
                 if let Some(arg) = caps.name("arg") {
@@ -486,7 +517,7 @@ pub async fn extract_natives(
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
-        version_id: &str,
+        dest: &Path,
         native_name: &str,
     ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
@@ -503,15 +534,18 @@ pub async fn extract_natives(
                 .path
                 .clone()
         });
-        let dest = runtime_path.get_natives().get_versioned(version_id);
-        tokio::fs::create_dir_all(&dest).await?;
 
         info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, &dest).await?;
+        carbon_compression::decompress(path, dest).await?;
 
         Ok(())
     }
+
+    info!("Start natives extraction for id {}", version.id);
+
+    let dest = runtime_path.get_natives().get_versioned(&version.id);
+    tokio::fs::create_dir_all(&dest).await?;
 
     for library in version
         .libraries
@@ -522,7 +556,7 @@ pub async fn extract_natives(
         match &library.natives {
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
-                    extract_single_library_natives(runtime_path, library, &version.id, native_name)
+                    extract_single_library_natives(runtime_path, library, &dest, native_name)
                         .await?;
                 }
             }

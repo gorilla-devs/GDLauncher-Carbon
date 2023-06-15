@@ -12,16 +12,17 @@ const fetchLogs = async (logId: number) =>
 
 const LogViewer = (props: ModalProps) => {
   const instances = rspc.createQuery(() => ["instance.getInstancesUngrouped"]);
+  const deleteLogsMutation = rspc.createMutation(["instance.deleteLog"]);
 
   const logs = rspc.createQuery(() => ["instance.getLogs"]);
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190 overflow-hidden">
+      <div class="overflow-hidden h-130 w-190">
         <Show when={(logs.data?.length || 0) > 0}>
           <div class="bg-darkSlate-800 max-h-full">
             <Tabs variant="traditional">
-              <div class="flex items-center max-h-full">
+              <div class="flex items-center max-h-full scrollbar-hide">
                 <TabList>
                   <For each={logs.data}>
                     {(log) => {
@@ -29,26 +30,29 @@ const LogViewer = (props: ModalProps) => {
                         (instance) => instance.id === log.instance_id
                       );
                       return (
-                        <Tab
-                          onClick={() => {
-                            console.log("log.instance_id", log.instance_id);
-                          }}
-                        >
+                        <Tab>
                           <div class="w-full flex gap-2 items-center h-10 justify-start">
                             <div class="w-6 rounded-md bg-green h-6" />
-                            <p class="my-2 whitespace-nowrap">
-                              {instance?.name}
-                            </p>
+                            <div class="whitespace-nowrap my-2 flex gap-2">
+                              <span>{instance?.name}</span>
+                              <div
+                                class="i-ri:close-fill hover:text-lightGray-50 transition-color ease-in-out duration-100"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteLogsMutation.mutate(log.id);
+                                }}
+                              />
+                            </div>
                           </div>
                         </Tab>
                       );
                     }}
                   </For>
                 </TabList>
-                <div class="flex gap-4 px-5 pb-2">
+                {/* <div class="flex gap-4 pb-2 px-5">
                   <div class="cursor-pointer text-darkSlate-50 i-ri:upload-2-line" />
                   <div class="text-darkSlate-50 cursor-pointer i-ri:file-copy-fill" />
-                </div>
+                </div> */}
               </div>
               <div class="bg-darkSlate-700 overflow-y-auto max-h-130">
                 <For each={logs.data}>
@@ -70,6 +74,7 @@ const LogViewer = (props: ModalProps) => {
 
                     createEffect(() => {
                       if (logs()?.body) {
+                        setLogsObj(instance.id, []);
                         processStream((logs() as any).body);
                       }
                     });
@@ -80,13 +85,11 @@ const LogViewer = (props: ModalProps) => {
                       <TabPanel>
                         <div>
                           <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500">
-                            {instance.id}
-                            {instanceLogs().length}
                             <For each={instanceLogs()}>
                               {(log) => {
                                 return (
                                   <div class="flex flex-col justify-center items-center w-full">
-                                    <pre class="m-0 py-2 w-full box-border leading-8 whitespace-pre-wrap pl-4">
+                                    <pre class="m-0 w-full box-border py-2 leading-8 whitespace-pre-wrap pl-4">
                                       <code>{log?.line}</code>
                                     </pre>
                                   </div>

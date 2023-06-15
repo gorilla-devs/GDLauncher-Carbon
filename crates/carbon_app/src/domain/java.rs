@@ -338,7 +338,7 @@ impl SystemJavaProfileName {
 impl From<MinecraftJavaProfile> for SystemJavaProfileName {
     fn from(value: MinecraftJavaProfile) -> Self {
         match value {
-            MinecraftJavaProfile::JRELegacy => Self::Legacy,
+            MinecraftJavaProfile::JreLegacy => Self::Legacy,
             MinecraftJavaProfile::JavaRuntimeAlpha => Self::Alpha,
             MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
             MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,

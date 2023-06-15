@@ -35,7 +35,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(FEModSearchResponse::from(response))
         }
 
-        query CURSEFORGE_GET_CATEGORIES[app, _: ()] {
+        query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_categories().await?;
 
