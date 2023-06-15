@@ -140,6 +140,10 @@ const Instance = () => {
       label: "Settings",
       path: `/library/${params.id}/settings`,
     },
+    {
+      label: "Logs",
+      path: `/library/${params.id}/logs`,
+    },
     // {
     //   label: "Resource Packs",
     //   path: `/library/${params.id}/resourcepacks`,
@@ -245,7 +249,7 @@ const Instance = () => {
   onCleanup(() => window?.removeEventListener("resize", checkContainerSize));
 
   return (
-    <main class="relative h-full bg-darkSlate-800 overflow-x-hidden scrollbar-hide flex flex-col">
+    <main class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col">
       <header
         ref={headerRef}
         class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out min-h-52 transition-100"

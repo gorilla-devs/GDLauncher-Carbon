@@ -60,10 +60,6 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance",
   },
-  logViewer: {
-    component: lazy(() => import("./modals/LogViewer")),
-    title: "Logs",
-  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification",
