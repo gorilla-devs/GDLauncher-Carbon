@@ -18,7 +18,7 @@ import {
   McType,
   ModLoaderType,
 } from "@gd/core_module/bindings";
-import { blobToBase64, generateMinecraftName } from "@/utils/helpers";
+import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
@@ -177,10 +177,6 @@ const InstanceCreation = (props: ModalProps) => {
     }
   };
 
-  onMount(() => {
-    setTitle(generateMinecraftName());
-  });
-
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -261,19 +257,18 @@ const InstanceCreation = (props: ModalProps) => {
                     onInput={(e) => {
                       setTitle(e.currentTarget.value);
                     }}
-                    value={title()}
+                    value={
+                      title() ||
+                      `${loader() || "Vanilla"} ${
+                        mcVersion() || (mappedMcVersions()?.[0]?.id as string)
+                      }`
+                    }
                     error={
                       error() &&
                       !title() &&
                       (t("error.missing_field_title") as string)
                     }
                   />
-                  <div
-                    onClick={() => setTitle(generateMinecraftName())}
-                    class="group border-1 border-solid border-darkSlate-200 bg-darkSlate-700 cursor-pointer rounded w-8 h-8 flex justify-center items-center duration-100 transition-color hover:bg-darkSlate-600 hover:border-lightGray-100"
-                  >
-                    <div class="i-ri:refresh-line text-darkSlate-100 group-hover:text-lightGray-100" />
-                  </div>
                 </div>
               </div>
             </div>
