@@ -5,7 +5,6 @@ import {
   createResource,
   createSignal,
   Match,
-  onMount,
   Switch,
 } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";

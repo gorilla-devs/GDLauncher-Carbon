@@ -3,7 +3,6 @@ import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
-import { useGDNavigate } from "./managers/NavigationManager";
 import { useModal } from "./managers/ModalsManager";
 
 type Props = {
@@ -12,7 +11,6 @@ type Props = {
 
 const App = (props: Props) => {
   const Route = useRoutes(routes);
-  const navigate = useGDNavigate();
   const modalsContext = useModal();
   const currentRoute = useLocation();
 
@@ -35,7 +33,7 @@ const App = (props: Props) => {
 
   return (
     <div class="relative w-screen">
-      <div class="flex w-screen z-10 h-auto">
+      <div class="w-screen flex z-10 h-auto">
         <main class="relative overflow-hidden flex-1">
           {/* <Suspense fallback={<></>}> */}
           <Route />

@@ -248,7 +248,7 @@ const Instance = () => {
     <main class="relative h-full bg-darkSlate-800 overflow-x-hidden scrollbar-hide flex flex-col">
       <header
         ref={headerRef}
-        class="relative flex flex-col justify-between ease-in-out transition-all min-h-52 items-stretch transition-100 ease-in-out"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out min-h-52 transition-100"
         style={{
           transition: "height 0.2s",
           "background-image": routeData.image()
@@ -273,7 +273,7 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 px-6 w-full bg-gradient-to-t from-darkSlate-800 pb-2">
+          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
@@ -355,7 +355,7 @@ const Instance = () => {
                     </div>
                     <div
                       ref={innerContainerRef}
-                      class="flex flex-row justify-between cursor-default"
+                      class="flex justify-between cursor-default flex-row"
                     >
                       <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
                         <div class="m-0 flex gap-2 items-start">

@@ -191,7 +191,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="flex justify-center flex-col items-start select-none group z-50"
+            class="flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -205,7 +205,7 @@ const Tile = (props: Props) => {
             }}
           >
             <div
-              class="flex justify-center relative items-center bg-cover bg-center rounded-2xl overflow-hidden h-38 w-38 max-w-38"
+              class="flex justify-center relative items-center rounded-2xl overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
               classList={{
                 grayscale: props.isLoading || isInQueue(),
                 "cursor-pointer":
@@ -223,7 +223,7 @@ const Tile = (props: Props) => {
               }}
             >
               <Show when={props.isInvalid}>
-                <h2 class="z-20 text-sm text-center">
+                <h2 class="text-sm z-20 text-center">
                   <Trans key="instance.error_invalid" />
                 </h2>
                 <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
@@ -308,7 +308,7 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="overflow-hidden max-w-38 mt-2 text-ellipsis whitespace-nowrap mb-1"
+              class="overflow-hidden max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
                 "text-lightGray-900": props.isLoading || isInQueue(),
