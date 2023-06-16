@@ -9,8 +9,8 @@ split-debuginfo = "unpacked"
 [profile.production]
 inherits = "release"
 debug = 2
-codegen-units = 1
-lto = true
+# codegen-units = 6
+lto = false
 opt-level = "s"
 split-debuginfo = "unpacked"
 
