@@ -22,7 +22,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -279,19 +279,25 @@ pub async fn generate_startup_command(
             }
 
             let path = runtime_path.get_libraries().get_library_path({
-                if let Some(artifact) = &library.downloads.as_ref().unwrap().artifact {
-                    artifact.path.clone()
-                } else if let Some(classifiers) = &library.downloads.as_ref().unwrap().classifiers {
-                    let Some(native_name) = library
-                        .natives
-                        .as_ref()
-                        .and_then(|natives| natives.get(&Os::native())) else {
-                            return None;
-                        };
+                if let Some(downloads) = library.downloads.as_ref() {
+                    if let Some(artifact) = downloads.artifact.as_ref() {
+                        artifact.path.clone()
+                    } else if let Some(classifiers) = downloads.classifiers.as_ref() {
+                        let Some(native_name) = library
+                            .natives
+                            .as_ref()
+                            .and_then(|natives| natives.get(&Os::native())) else {
+                                return None;
+                            };
 
-                    classifiers.get(native_name).unwrap().path.clone()
+                        classifiers.get(native_name).unwrap().path.clone()
+                    } else {
+                        panic!("Library has no artifact or classifier");
+                    }
+                } else if let Some(_) = &library.url {
+                    library.name.path()
                 } else {
-                    panic!("Library has no artifact or classifier");
+                    panic!("Library has no method of retrieval");
                 }
             });
 

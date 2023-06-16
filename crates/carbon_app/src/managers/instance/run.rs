@@ -386,14 +386,18 @@ impl ManagerRef<'_, InstanceManager> {
 
                         let dummy_string = daedalus::BRANDING
                             .get_or_init(daedalus::Branding::default)
-                            .dummy_replace_string.clone();
+                            .dummy_replace_string
+                            .clone();
 
                         let fabric_manifest_version = fabric_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == dummy_string)
                             .ok_or_else(|| {
-                                anyhow!("Could not find fabric metadata template using {}", dummy_string)
+                                anyhow!(
+                                    "Could not find fabric metadata template using {}",
+                                    dummy_string
+                                )
                             })?
                             .loaders
                             .into_iter()
@@ -409,7 +413,7 @@ impl ManagerRef<'_, InstanceManager> {
                             )
                             .await?,
                             &version.release,
-                            &dummy_string
+                            &dummy_string,
                         );
 
                         version_info =
@@ -423,14 +427,18 @@ impl ManagerRef<'_, InstanceManager> {
 
                         let dummy_string = daedalus::BRANDING
                             .get_or_init(daedalus::Branding::default)
-                            .dummy_replace_string.clone();
+                            .dummy_replace_string
+                            .clone();
 
                         let quilt_manifest_version = quilt_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == dummy_string)
                             .ok_or_else(|| {
-                                anyhow!("Could not find quilt metadata template using {}", dummy_string)
+                                anyhow!(
+                                    "Could not find quilt metadata template using {}",
+                                    dummy_string
+                                )
                             })?
                             .loaders
                             .into_iter()
