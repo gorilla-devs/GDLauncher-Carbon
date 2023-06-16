@@ -124,7 +124,7 @@ const Auth = (props: Props) => {
           <Trans
             key="login.sign_in_with_microsoft"
             options={{
-              defaultValue: "Sign in with microsoft",
+              defaultValue: "Sign in with Microsoft",
             }}
           />
         </Button>

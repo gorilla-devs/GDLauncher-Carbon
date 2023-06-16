@@ -1,10 +1,10 @@
-import { streamToJson } from "@/utils/helpers";
-import { Log, logsObj, setLogsObj } from "@/utils/logs";
+import { logsObj, setLogsObj } from "@/utils/logs";
 import { port } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useParams, useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createResource } from "solid-js";
 import fetchData from "../instance.logs.data";
+import { getRunningState } from "@/utils/instances";
 
 const fetchLogs = async (logId: number) => {
   return fetch(`http://localhost:${port}/instance/log?id=${logId}`);
@@ -15,51 +15,74 @@ const Logs = () => {
 
   const routeData = useRouteData<typeof fetchData>();
 
-  async function processStream(stream: ReadableStream<Uint8Array>) {
-    if (stream.locked) {
-      console.error("Stream is already locked, skipping processing");
-      return;
-    }
-
-    for await (const jsonObject of streamToJson(stream)) {
-      // Do something with jsonObject
-      if (jsonObject) {
-        console.log("jsonObject", jsonObject);
-        setLogsObj(parseInt(params.id, 10), (prev) => {
-          return [...(prev || []), jsonObject as Log];
-        });
-      }
-    }
-  }
+  const instanceId = () => parseInt(params.id, 10);
 
   const instanceLogs = () =>
     routeData.logs.data
       ?.reverse()
-      .find((item) => item.instance_id === parseInt(params.id, 10));
+      .find((item) => item.instance_id === instanceId());
 
   const logId = () => instanceLogs()?.id;
 
-  const [allLogs] = createResource(logId, fetchLogs);
+  const [allLogs, { refetch }] = createResource(logId, fetchLogs);
 
-  const instanceLogss = () => logsObj?.[parseInt(params.id, 10)] || [];
+  async function streamToJson(readableStream: ReadableStream) {
+    // Get the reader from the stream
+    // eslint-disable-next-line no-undef
+    let reader: ReadableStreamDefaultReader;
+    // Check if the stream is locked
+    if (readableStream.locked) {
+      // Stream is locked, use the existing reader
+      if (readableStream.locked) {
+        throw new Error("ReadableStream is locked but no reader found");
+      }
+      reader = readableStream.getReader();
+    } else {
+      // Stream is not locked, get a new reader
+      reader = readableStream.getReader();
+    }
 
-  createEffect(() => {
-    console.log(
-      "logsList",
-      allLogs(),
-      logsObj,
-      parseInt(params.id, 10),
-      instanceLogss()
-    );
-  });
+    // Read the stream
+    let result = "";
+    while (true) {
+      const { value, done } = await reader.read();
+
+      if (done) {
+        // Stream has ended
+        break;
+      }
+
+      // Add value to the result
+      result += new TextDecoder("utf-8").decode(value);
+    }
+
+    // Fix and parse broken JSON
+    const fixedJson = "[" + result.replace(/}{/g, "},{") + "]";
+    const json = JSON.parse(fixedJson);
+    if (!readableStream.locked) readableStream.cancel();
+    return json;
+  }
 
   createEffect(() => {
     if (routeData.instanceDetails.data) {
-      if (allLogs()?.body) {
-        processStream((allLogs() as any).body);
+      const isRunning = getRunningState(routeData.instanceDetails.data.state);
+      if (isRunning) {
+        refetch();
       }
     }
   });
+
+  createEffect(() => {
+    if (allLogs()?.body) {
+      streamToJson((allLogs() as any).body).then((logs) => {
+        setLogsObj(instanceId(), () => {
+          return logs;
+        });
+      });
+    }
+  });
+
+  const instanceLogss = () => logsObj[instanceId()] || [];
 
   return (
     <div class="overflow-y-auto pb-4 max-h-full divide-y divide-darkSlate-500">
