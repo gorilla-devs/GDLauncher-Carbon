@@ -108,6 +108,21 @@ impl ManagerRef<'_, MinecraftManager> {
             &runtime_path.get_assets(),
         );
 
+        if let Some(logging_xml) = version_info.logging {
+            if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+                all_files.push(
+                    Downloadable::new(
+                        client.file.url.clone(),
+                        runtime_path
+                            .get_logging_configs()
+                            .get_client_path(&client.file.id),
+                    )
+                    .with_size(client.file.size as u64)
+                    .with_checksum(Some(carbon_net::Checksum::Sha1(client.file.sha1.clone()))),
+                );
+            }
+        }
+
         all_files.push(client_main_jar);
         all_files.extend(libraries);
         all_files.extend(assets);

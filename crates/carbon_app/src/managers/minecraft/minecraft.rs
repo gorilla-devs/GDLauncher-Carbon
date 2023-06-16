@@ -423,6 +423,20 @@ pub async fn generate_startup_command(
     command.push(format!("-Xmx{xmx_memory}m"));
     command.push(format!("-Xms{xms_memory}m"));
 
+    if let Some(logging_xml) = version.logging {
+        if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+            let logging_path = runtime_path
+                .get_logging_configs()
+                .get_client_path(&client.file.id);
+
+            let argument_replaced = client
+                .argument
+                .replace("${path}", &logging_path.to_string_lossy());
+
+            command.push(argument_replaced);
+        }
+    }
+
     let arguments = version.arguments.clone().unwrap_or_else(|| {
         let mut arguments = HashMap::new();
         arguments.insert(
