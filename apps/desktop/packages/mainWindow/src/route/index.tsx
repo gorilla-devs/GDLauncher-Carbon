@@ -57,7 +57,7 @@ export const routes: RouteDefinition[] = [
               },
               {
                 path: "/logs",
-                component: lazy(() => import("@/pages/Library/Instance/Logs")),
+                component: lazy(() => import("@/pages/Library/Instance/Log")),
                 data: InstanceLogsData,
               },
               {
