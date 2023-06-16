@@ -62,7 +62,7 @@ const Logs = () => {
   });
 
   return (
-    <div class="overflow-y-auto pb-4 divide-y divide-darkSlate-500 max-h-full">
+    <div class="overflow-y-auto pb-4 max-h-full divide-y divide-darkSlate-500">
       <Switch>
         <Match when={(instanceLogss().length || 0) > 0}>
           <For each={instanceLogss()}>
@@ -70,7 +70,7 @@ const Logs = () => {
               return (
                 <div class="flex flex-col justify-center items-center w-full">
                   <pre class="m-0 w-full box-border py-2 leading-8 whitespace-pre-wrap pl-4">
-                    <code class="text-md text-darkSlate-50">{log?.line}</code>
+                    <code class="text-darkSlate-50 text-md">{log?.line}</code>
                   </pre>
                 </div>
               );

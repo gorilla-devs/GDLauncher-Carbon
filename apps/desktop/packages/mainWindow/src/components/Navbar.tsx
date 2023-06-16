@@ -153,7 +153,7 @@ const AppNavbar = () => {
                     </Tab>
                   </Link>
                   <div
-                    class="text-dark-slate-50 text-2xl cursor-pointer i-ri:notification-2-fill"
+                    class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
                     onClick={() =>
                       modalsContext?.openModal({ name: "notification" })
                     }

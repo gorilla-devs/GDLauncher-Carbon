@@ -41,7 +41,7 @@ const Appearance = () => {
               shade2="fill-[#272B35]"
               shade3="fill-[#333947]"
             />
-            <div class="flex gap-2 items-center w-full box-border justify-start px-2 py-1">
+            <div class="flex gap-2 items-center w-full box-border px-2 py-1 justify-start">
               <Show when={themeName() === "default"}>
                 <div class="i-ri:check-fill text-darkSlate-50" />
               </Show>
