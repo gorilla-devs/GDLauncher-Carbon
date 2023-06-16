@@ -2,9 +2,10 @@ import ThemePreview from "@/components/ThemePreview";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { Show } from "solid-js";
+import { For, Show, onMount } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
+import { getAvailableThemes, getThemeColors } from "@/utils/theme";
 
 const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -15,6 +16,9 @@ const Appearance = () => {
       queryClient.setQueryData(["settings.setSettings"], newTheme);
     },
   });
+
+  // const anotherTheme = getThemeColors(anotherThemeName);
+  const themes = getAvailableThemes();
 
   return (
     <LoadingError routeData={routeData}>
@@ -27,88 +31,47 @@ const Appearance = () => {
             }}
           />
         </h2>
-        <div class="flex justify-between w-full border-box max-w-[35rem]">
-          <div
-            class="flex flex-col flex justify-center items-center cursor-pointer w-42 p-1 bg-[#15181E]"
-            onClick={() => {
-              settingsMutation.mutate({
-                theme: "default",
-              });
-            }}
-          >
-            <ThemePreview
-              shade1="fill-[#15181E]"
-              shade2="fill-[#272B35]"
-              shade3="fill-[#333947]"
-            />
-            <div class="flex gap-2 items-center w-full box-border justify-start px-2 py-1">
-              <Show when={themeName() === "default"}>
-                <div class="i-ri:check-fill text-darkSlate-50" />
-              </Show>
-              <p class="m-0 text-darkSlate-50">
-                <Trans
-                  key="settings.theme_default"
-                  options={{
-                    defaultValue: "default",
+        <div class="flex flex-wrap gap-4 w-full border-box max-w-full">
+          <For each={themes}>
+            {(theme) => {
+              const themeColors = getThemeColors(theme);
+
+              const shade1 = themeColors && themeColors["darkSlate-900"];
+              const shade2 = themeColors && themeColors["darkSlate-700"];
+              const shade3 = themeColors && themeColors["darkSlate-600"];
+
+              return (
+                <div
+                  class="flex inline-flex flex-col justify-center items-center cursor-pointer p-1 w-42"
+                  style={{ "background-color": shade1 }}
+                  onClick={() => {
+                    settingsMutation.mutate({
+                      theme: theme,
+                    });
                   }}
-                />
-              </p>
-            </div>
-          </div>
-          <div
-            class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
-            onClick={() => {
-              settingsMutation.mutate({
-                theme: "light",
-              });
+                >
+                  <ThemePreview
+                    shade1={shade1}
+                    shade2={shade2}
+                    shade3={shade3}
+                  />
+                  <div class="flex gap-2 items-center w-full box-border px-2 py-1 justify-start">
+                    <Show when={themeName() === theme}>
+                      <div class="i-ri:check-fill text-darkSlate-50" />
+                    </Show>
+                    <p class="m-0 text-darkSlate-50">
+                      <Trans
+                        key={`settings.theme_${theme}`}
+                        options={{
+                          defaultValue: "default",
+                        }}
+                      />
+                    </p>
+                  </div>
+                </div>
+              );
             }}
-          >
-            <ThemePreview
-              shade1="fill-[#380505]"
-              shade2="fill-[#A90F0F]"
-              shade3="fill-[#E11313]"
-            />
-            <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
-              <Show when={themeName() === "light"}>
-                <div class="i-ri:check-fill text-darkSlate-50" />
-              </Show>
-              <p class="m-0 text-darkSlate-50">
-                <Trans
-                  key="settings.theme_light"
-                  options={{
-                    defaultValue: "light",
-                  }}
-                />
-              </p>
-            </div>
-          </div>
-          <div
-            class="flex flex-col w-42 p-1 bg-[#15181E] flex justify-center items-center cursor-pointer"
-            onClick={() => {
-              settingsMutation.mutate({
-                theme: "poison-green",
-              });
-            }}
-          >
-            <ThemePreview
-              shade1="fill-[#162009]"
-              shade2="fill-[#43651B]"
-              shade3="fill-[#598523]"
-            />
-            <div class="flex justify-start items-center gap-2 w-full py-1 px-2 box-border">
-              <Show when={themeName() === "poison-green"}>
-                <div class="i-ri:check-fill text-darkSlate-50" />
-              </Show>
-              <p class="m-0 text-darkSlate-50">
-                <Trans
-                  key="poison-green"
-                  options={{
-                    defaultValue: "poison-green",
-                  }}
-                />
-              </p>
-            </div>
-          </div>
+          </For>
         </div>
       </div>
     </LoadingError>

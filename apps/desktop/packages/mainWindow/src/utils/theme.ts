@@ -1,4 +1,10 @@
-import { mainTheme, lightTheme, Theme as UITheme, poisonGreen } from "@gd/ui";
+import {
+  mainTheme,
+  lightTheme,
+  Theme as UITheme,
+  poisonGreen,
+  Dracula,
+} from "@gd/ui";
 import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
 
@@ -6,6 +12,7 @@ enum _Theme {
   _Default = "default",
   _Light = "light",
   _PoisonGreen = "poison-green",
+  _Dracula = "dracula",
 }
 
 const initThemes = () => {
@@ -29,6 +36,10 @@ const initThemes = () => {
         applyTheme(poisonGreen);
         break;
       }
+      case _Theme._Dracula: {
+        applyTheme(Dracula);
+        break;
+      }
     }
   });
 
@@ -42,5 +53,30 @@ const initThemes = () => {
     }
   }
 };
+
+export function getAvailableThemes(): string[] {
+  return Object.values(_Theme);
+}
+
+export function getThemeColors(themeName: string): UITheme | undefined {
+  switch (themeName) {
+    case _Theme._Default: {
+      return mainTheme;
+    }
+    case _Theme._Light: {
+      return lightTheme;
+    }
+    case _Theme._PoisonGreen: {
+      return poisonGreen;
+    }
+    case _Theme._Dracula: {
+      return Dracula;
+    }
+    default: {
+      console.error(`Unknown theme: ${themeName}`);
+      return undefined;
+    }
+  }
+}
 
 export default initThemes;
