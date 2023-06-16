@@ -22,7 +22,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -294,7 +294,7 @@ pub async fn generate_startup_command(
                     } else {
                         panic!("Library has no artifact or classifier");
                     }
-                } else if let Some(_) = &library.url {
+                } else if library.url.is_some() {
                     library.name.path()
                 } else {
                     panic!("Library has no method of retrieval");

@@ -67,7 +67,8 @@ pub async fn main() {
     daedalus::Branding::set_branding(daedalus::Branding::new(
         "gdlauncher".to_string(),
         "".to_string(),
-    )).expect("Branding not to fail");
+    ))
+    .expect("Branding not to fail");
 
     #[cfg(feature = "production")]
     iridium::startup_check();

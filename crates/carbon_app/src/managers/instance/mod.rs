@@ -1972,10 +1972,12 @@ mod test {
                 default_group_id,
                 String::from("test"),
                 false,
-                InstanceVersionSource::Version(info::GameVersion::Standard(info::StandardVersion {
-                    release: String::from("1.7.10"),
-                    modloaders: HashSet::new(),
-                })),
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
                 String::new(),
             )
             .await?;

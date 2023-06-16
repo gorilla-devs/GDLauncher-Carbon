@@ -1,29 +1,10 @@
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-    path::{Path, PathBuf},
-};
-
-use crate::{
-    domain::{
-        maven::MavenCoordinates,
-        runtime_path::{InstancePath, LibrariesPath},
-    },
-    managers::java::utils::PATH_SEPARATOR,
-};
-use anyhow::bail;
-use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry};
-use prisma_client_rust::QueryError;
+use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
-use tokio::process::Command;
-use tracing::info;
 
 #[derive(Error, Debug)]
 pub enum FabricManifestError {
     #[error("Could not fetch fabric manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
-    #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
 }
 
 pub async fn get_manifest(
@@ -37,7 +18,7 @@ pub async fn get_manifest(
         .await?
         .json::<Manifest>()
         .await
-        .map_err(|err| FabricManifestError::from(err))?;
+        .map_err(FabricManifestError::from)?;
 
     Ok(new_manifest)
 }

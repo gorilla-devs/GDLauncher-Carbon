@@ -19,10 +19,10 @@ use super::ManagerRef;
 
 mod assets;
 pub mod curseforge;
-pub mod forge;
 pub mod fabric;
-pub mod quilt;
+pub mod forge;
 pub mod minecraft;
+pub mod quilt;
 
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,

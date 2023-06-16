@@ -1,30 +1,10 @@
-use std::{
-    collections::HashMap,
-    io::{BufRead, BufReader},
-    path::{Path, PathBuf},
-};
-
-use anyhow::bail;
-use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry};
-use prisma_client_rust::QueryError;
+use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
-use tokio::process::Command;
-use tracing::info;
-use crate::{
-    domain::{
-        maven::MavenCoordinates,
-        runtime_path::{InstancePath, LibrariesPath},
-    },
-    managers::java::utils::PATH_SEPARATOR,
-};
-
 
 #[derive(Error, Debug)]
 pub enum QuiltManifestError {
     #[error("Could not fetch quilt manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
-    #[error("Manifest database query error: {0}")]
-    DBQueryError(#[from] QueryError),
 }
 
 pub async fn get_manifest(
@@ -37,7 +17,8 @@ pub async fn get_manifest(
         .send()
         .await?
         .json::<Manifest>()
-        .await.map_err(|err| QuiltManifestError::from(err))?;
+        .await
+        .map_err(QuiltManifestError::from)?;
 
     Ok(new_manifest)
 }

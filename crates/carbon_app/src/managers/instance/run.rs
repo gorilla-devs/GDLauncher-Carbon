@@ -4,7 +4,7 @@ use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
-use daedalus::minecraft::DownloadType;
+
 use std::path::PathBuf;
 
 use std::time::Duration;
