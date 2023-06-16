@@ -2,15 +2,7 @@ import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { Trans, useTransContext } from "@gd/i18n";
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
-  onMount,
-} from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
   FEModdedManifestLoaderVersion,
