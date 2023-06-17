@@ -3,7 +3,6 @@ import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
-  Show,
   Suspense,
   Switch,
   createEffect,
