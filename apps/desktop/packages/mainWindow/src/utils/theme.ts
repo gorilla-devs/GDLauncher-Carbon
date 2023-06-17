@@ -37,7 +37,7 @@ const initThemes = () => {
         break;
       }
       case _Theme._Dracula: {
-        applyTheme(Dracula);
+        applyTheme(dracula);
         break;
       }
     }

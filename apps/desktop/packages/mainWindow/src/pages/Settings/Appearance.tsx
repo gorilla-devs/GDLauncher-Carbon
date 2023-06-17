@@ -2,7 +2,7 @@ import ThemePreview from "@/components/ThemePreview";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, onMount } from "solid-js";
+import { For, Show } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
 import { getAvailableThemes, getThemeColors } from "@/utils/theme";
