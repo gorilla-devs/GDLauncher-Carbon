@@ -3,7 +3,7 @@ import {
   lightTheme,
   Theme as UITheme,
   poisonGreen,
-  Dracula,
+  dracula,
 } from "@gd/ui";
 import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
@@ -70,7 +70,7 @@ export function getThemeColors(themeName: string): UITheme | undefined {
       return poisonGreen;
     }
     case _Theme._Dracula: {
-      return Dracula;
+      return dracula;
     }
     default: {
       console.error(`Unknown theme: ${themeName}`);
