@@ -32,6 +32,7 @@ import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
+import { convertSecondsToHumanTime } from "@/utils/helpers";
 
 type InstancePage = {
   label: string;
@@ -365,18 +366,24 @@ const Instance = () => {
                           </span>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
-                        <div class="flex gap-2 items-start">
-                          <div class="i-ri:time-fill" />
-                          <span>
-                            {formatDistance(
-                              new Date(
-                                routeData.instanceDetails.data?.last_played ||
-                                  Date.now()
-                              ).getTime(),
-                              Date.now()
-                            )}
-                          </span>
-                        </div>
+                        <Show
+                          when={
+                            routeData.instanceDetails.data?.seconds_played !==
+                            undefined
+                          }
+                        >
+                          <div class="flex gap-2 items-start">
+                            <div class="i-ri:time-fill" />
+                            <span>
+                              {convertSecondsToHumanTime(
+                                (
+                                  routeData.instanceDetails
+                                    .data as InstanceDetails
+                                ).seconds_played
+                              )}
+                            </span>
+                          </div>
+                        </Show>
                         <Show
                           when={
                             (modpackDetails()?.data?.data.authors || [])
