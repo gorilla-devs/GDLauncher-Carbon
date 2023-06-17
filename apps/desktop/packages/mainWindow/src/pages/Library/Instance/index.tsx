@@ -22,7 +22,6 @@ import {
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
-import { formatDistance } from "date-fns";
 import {
   FEModResponse,
   InstanceDetails,
