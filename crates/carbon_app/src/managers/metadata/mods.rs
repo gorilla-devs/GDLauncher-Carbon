@@ -368,7 +368,7 @@ enum QuiltIcon {
 struct QuiltLoaderMetadata {
     name: Option<String>,
     description: Option<String>,
-    contributors: Option<HashMap<String, QuiltContributorRole>>,
+    contributors: Option<indexmap::IndexMap<String, QuiltContributorRole>>,
     contact: Option<QuiltContactInfo>,
     license: Option<QuiltLicense>,
     icon: Option<QuiltIcon>,
@@ -393,7 +393,7 @@ struct QuiltLoader {
 }
 
 fn quilt_intermediate_mappings_default() -> String {
-    "org.quiltmc:hashed".to_string()
+    String::from("org.quiltmc:hashed")
 }
 
 #[derive(Deserialize, Clone)]
