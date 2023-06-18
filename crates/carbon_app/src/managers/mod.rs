@@ -195,7 +195,7 @@ impl Drop for AppInner {
 
             tokio::runtime::Handle::current().block_on(async move {
                 debug!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(client, close_event).await;
+                let res = self.metrics_manager.track_event(close_event).await;
                 match res {
                     Ok(_) => debug!("Successfully collected metric for app close"),
                     Err(e) => error!("Error collecting metric for app close: {e}"),
