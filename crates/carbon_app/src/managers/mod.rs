@@ -21,7 +21,6 @@ use self::minecraft::MinecraftManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
-mod cache_manager;
 pub mod download;
 pub mod instance;
 pub mod java;
@@ -46,6 +45,8 @@ pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
     use tracing::error;
+
+    use crate::cache_middleware;
 
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
@@ -93,7 +94,12 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let reqwest = cache_manager::new_client(unsaferef);
+            let client = reqwest::Client::builder().build().unwrap();
+
+            let reqwest = cache_middleware::new_client(
+                unsaferef.clone(),
+                reqwest_middleware::ClientBuilder::new(client),
+            );
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
@@ -103,7 +109,7 @@ mod app {
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
-                    modplatforms_manager: ModplatformsManager::new(),
+                    modplatforms_manager: ModplatformsManager::new(unsaferef),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
@@ -189,7 +195,7 @@ impl Drop for AppInner {
 
             tokio::runtime::Handle::current().block_on(async move {
                 debug!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(client, close_event).await;
+                let res = self.metrics_manager.track_event(close_event).await;
                 match res {
                     Ok(_) => debug!("Successfully collected metric for app close"),
                     Err(e) => error!("Error collecting metric for app close: {e}"),
@@ -234,6 +240,7 @@ impl AppRef {
 //
 // SAFETY:
 // This type (both MaybeUninits) must be initialized before it is used or dropped.
+#[derive(Clone)]
 pub struct UnsafeAppRef(Weak<UnsafeCell<MaybeUninit<AppInner>>>);
 
 unsafe impl Send for UnsafeAppRef {}

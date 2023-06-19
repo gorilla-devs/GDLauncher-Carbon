@@ -200,9 +200,7 @@ impl ManagerRef<'_, InstanceManager> {
                     t_modpack
                 {
                     if let Some(modpack) = &config.modpack {
-                        let modpack = match modpack {
-                            Modpack::Curseforge(modpack) => modpack,
-                        };
+                        let Modpack::Curseforge(modpack) = modpack;
 
                         t_request.start_opaque();
                         let file = app
@@ -255,6 +253,9 @@ impl ManagerRef<'_, InstanceManager> {
 
                         downloads.extend(modpack_info.downloadables);
                         let v: StandardVersion = modpack_info.manifest.minecraft.try_into()?;
+
+                        tracing::info!("Modpack version: {:?}", v);
+
                         version = Some(v.clone());
 
                         app.instance_manager()
@@ -337,43 +338,43 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 };
 
-                match version.modloaders.iter().next() {
-                    Some(ModLoader {
-                        type_: ModLoaderType::Forge,
-                        version: forge_version,
-                    }) => {
-                        let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+                if let Some(ModLoader {
+                    type_: ModLoaderType::Forge,
+                    version: forge_version,
+                }) = version.modloaders.iter().next()
+                {
+                    let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-                        let forge_version =
-                            match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                                None => forge_version.clone(),
-                                Some(sub) => sub.to_string(),
-                            };
+                    let forge_version =
+                        match forge_version.strip_prefix(&format!("{}-", version.release)) {
+                            None => forge_version.clone(),
+                            Some(sub) => sub.to_string(),
+                        };
 
-                        let forge_manifest_version = forge_manifest
-                            .game_versions
-                            .into_iter()
-                            .find(|v| v.id == version.release)
-                            .ok_or_else(|| {
-                                anyhow!("Could not find forge versions for {}", version.release)
-                            })?
-                            .loaders
-                            .into_iter()
-                            .find(|v| v.id == format!("{}-{}", version.release, forge_version))
-                            .ok_or_else(|| {
-                                anyhow!(
-                                    "Could not find forge version {}-{} for minecraft version {}",
-                                    version.release,
-                                    forge_version,
-                                    version.release,
-                                )
-                            })?;
+                    let forge_manifest_version = forge_manifest
+                        .game_versions
+                        .into_iter()
+                        .find(|v| v.id == version.release)
+                        .ok_or_else(|| {
+                            anyhow!("Could not find forge versions for {}", version.release)
+                        })?
+                        .loaders
+                        .into_iter()
+                        .find(|v| v.id == format!("{}-{}", version.release, forge_version))
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "Could not find forge version {}-{} for minecraft version {}",
+                                version.release,
+                                forge_version,
+                                version.release,
+                            )
+                        })?;
 
-                        let forge_version = crate::managers::minecraft::forge::get_version(
-                            &app.reqwest_client,
-                            forge_manifest_version,
-                        )
-                        .await?;
+                    let forge_version = crate::managers::minecraft::forge::get_version(
+                        &app.reqwest_client,
+                        forge_manifest_version,
+                    )
+                    .await?;
 
                         version_info =
                             daedalus::modded::merge_partial_version(forge_version, version_info);

@@ -14,12 +14,13 @@ use tracing::info;
 
 pub mod api;
 mod app_version;
+pub mod cache_middleware;
 pub(crate) mod db;
 pub mod domain;
 mod error;
+pub mod iridium_client;
 pub mod managers;
 // mod pprocess_keepalive;
-mod iridium_client;
 mod logger;
 mod once_send;
 mod runtime_path_override;
