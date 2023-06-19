@@ -35,7 +35,6 @@ function Slider(props: Props) {
     undefined
   );
 
-  // let handleRef: HTMLDivElement;
   let sliderRef: HTMLDivElement;
 
   const getSliderStart = () => {
@@ -116,6 +115,7 @@ function Slider(props: Props) {
 
   const mousemove = (e: MouseEvent) => {
     if (!dragging()) return;
+    setShowTooltip(true);
     let diffPosition = e.pageX - startPosition();
     const diffValue =
       (diffPosition / getSliderLength()) * (props.max - props.min);
@@ -128,17 +128,32 @@ function Slider(props: Props) {
   };
 
   const mouseup = () => {
+    setShowTooltip(false);
     setDragging(false);
+  };
+
+  const trackClick = (e: MouseEvent) => {
+    e.preventDefault();
+
+    // Don't react if the click came from the handle itself.
+    if (e.target === handleRef()) {
+      return;
+    }
+
+    const value = calcValueByPos(e.clientX);
+    onChange(value);
   };
 
   onMount(() => {
     handleRef()?.addEventListener("mousedown", mousedown);
+    sliderRef.addEventListener("click", trackClick);
     document.addEventListener("mousemove", mousemove);
     document.addEventListener("mouseup", mouseup);
   });
 
   onCleanup(() => {
     handleRef()?.removeEventListener("mousedown", mousedown);
+    sliderRef.removeEventListener("click", trackClick);
     document.removeEventListener("mousemove", mousemove);
     document.removeEventListener("mouseup", mouseup);
   });
@@ -181,7 +196,10 @@ function Slider(props: Props) {
                       calcOffset(currentValue()),
                     "bg-primary-500 border-primary-500":
                       calcOffset(parseInt(value, 10)) <=
-                      calcOffset(currentValue()),
+                        calcOffset(currentValue()) && !showTooptip(),
+                    "bg-accent border-accent":
+                      calcOffset(parseInt(value, 10)) <=
+                        calcOffset(currentValue()) && showTooptip(),
                   }}
                 />
                 <p
@@ -208,11 +226,15 @@ function Slider(props: Props) {
           </For>
           <div
             ref={setHandleRef}
-            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-move z-10"
+            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-pointer z-20 after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100"
             style={{
               position: "absolute",
               left: `${calcOffset(currentValue())}%`,
               transform: "translateX(-50%)",
+            }}
+            classList={{
+              "after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100":
+                showTooptip(),
             }}
             onMouseOver={() => {
               setShowTooltip(true);
@@ -222,16 +244,26 @@ function Slider(props: Props) {
             }}
           />
           <div
-            class=" h-2 bg-primary-500 rounded-full"
+            ref={(el) => {
+              sliderRef = el;
+            }}
+            class="absolute top-1/2 left-0 right-0 -translate-y-1/2 w-full h-2 z-10 cursor-pointer"
+          />
+          <div
+            class="h-2 rounded-full"
+            classList={{
+              "bg-accent": showTooptip(),
+              "bg-primary-500": !showTooptip(),
+            }}
             style={{
               position: "absolute",
               width: `${calcOffset(currentValue())}%`,
             }}
           />
           <div
-            ref={(el) => {
-              sliderRef = el;
-            }}
+            // ref={(el) => {
+            //   sliderRef = el;
+            // }}
             class="w-full h-2 bg-darkSlate-900 rounded-full"
           />
         </div>
