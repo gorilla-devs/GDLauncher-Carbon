@@ -9,16 +9,18 @@ import useModpacksQuery from "./useModpacksQuery";
 import {
   Setter,
   createContext,
-  createEffect,
   createSignal,
+  onMount,
   useContext,
 } from "solid-js";
 import {
+  FEMod,
   FEModSearchParameters,
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
+import { scrollTop } from "@/utils/browser";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -27,12 +29,13 @@ type InfiniteQueryType = {
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
   resetList: () => void;
+  allRows: () => FEMod[];
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
 
 export const useInfiniteModpacksQuery = () => {
-  return useContext(InfiniteQueryContext);
+  return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
 function ModpacksLayout() {
@@ -87,10 +90,8 @@ function ModpacksLayout() {
     overscan: 15,
   });
 
-  createEffect(() => {
-    rowVirtualizer.setOptions({
-      getScrollElement: () => parentRef(),
-    });
+  onMount(() => {
+    parentRef()?.scrollTo(0, scrollTop());
   });
 
   const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
@@ -113,6 +114,7 @@ function ModpacksLayout() {
     rowVirtualizer,
     setParentRef,
     resetList,
+    allRows,
   };
 
   return (

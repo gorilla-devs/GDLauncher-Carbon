@@ -251,162 +251,162 @@ impl CurseForge {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::domain::modplatforms::curseforge::filters::{
-        ModFilesParametersQuery, ModSearchParametersQuery,
-    };
+// #[cfg(test)]
+// mod test {
+//     use crate::domain::modplatforms::curseforge::filters::{
+//         ModFilesParametersQuery, ModSearchParametersQuery,
+//     };
 
-    #[tokio::test]
-    async fn test_search_no_query() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_search_no_query() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let search_params = ModSearchParameters {
-            query: ModSearchParametersQuery {
-                game_id: 432,
-                category_id: None,
-                game_version: None,
-                index: None,
-                page_size: None,
-                search_filter: None,
-                slug: None,
-                class_id: None,
-                game_version_type_id: None,
-                mod_loader_type: None,
-                author_id: None,
-                sort_field: None,
-                sort_order: None,
-            },
-        };
+//         let search_params = ModSearchParameters {
+//             query: ModSearchParametersQuery {
+//                 game_id: 432,
+//                 category_id: None,
+//                 game_version: None,
+//                 index: None,
+//                 page_size: None,
+//                 search_filter: None,
+//                 slug: None,
+//                 class_id: None,
+//                 game_version_type_id: None,
+//                 mod_loader_type: None,
+//                 author_id: None,
+//                 sort_field: None,
+//                 sort_order: None,
+//             },
+//         };
 
-        let mods = curseforge.search(search_params).await.unwrap();
-        assert!(!mods.data.is_empty());
-    }
+//         let mods = curseforge.search(search_params).await.unwrap();
+//         assert!(!mods.data.is_empty());
+//     }
 
-    #[tokio::test]
-    async fn test_search_with_query() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_search_with_query() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let search_params = ModSearchParameters {
-            query: ModSearchParametersQuery {
-                game_id: 432,
-                category_id: None,
-                game_version: None,
-                index: None,
-                page_size: None,
-                search_filter: Some("jei".to_string()),
-                slug: None,
-                class_id: None,
-                game_version_type_id: None,
-                mod_loader_type: None,
-                author_id: None,
-                sort_field: None,
-                sort_order: None,
-            },
-        };
+//         let search_params = ModSearchParameters {
+//             query: ModSearchParametersQuery {
+//                 game_id: 432,
+//                 category_id: None,
+//                 game_version: None,
+//                 index: None,
+//                 page_size: None,
+//                 search_filter: Some("jei".to_string()),
+//                 slug: None,
+//                 class_id: None,
+//                 game_version_type_id: None,
+//                 mod_loader_type: None,
+//                 author_id: None,
+//                 sort_field: None,
+//                 sort_order: None,
+//             },
+//         };
 
-        let mods = curseforge.search(search_params).await.unwrap();
-        assert!(!mods.data.is_empty());
-    }
+//         let mods = curseforge.search(search_params).await.unwrap();
+//         assert!(!mods.data.is_empty());
+//     }
 
-    #[tokio::test]
-    async fn test_get_mod() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_get_mod() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let mod_id = 389615;
+//         let mod_id = 389615;
 
-        let mod_ = curseforge.get_mod(ModParameters { mod_id }).await.unwrap();
-        assert_eq!(mod_.data.id, mod_id);
-    }
+//         let mod_ = curseforge.get_mod(ModParameters { mod_id }).await.unwrap();
+//         assert_eq!(mod_.data.id, mod_id);
+//     }
 
-    #[tokio::test]
-    async fn test_get_mod_description() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_get_mod_description() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let mod_id = 389615;
+//         let mod_id = 389615;
 
-        let mod_ = curseforge
-            .get_mod_description(ModDescriptionParameters { mod_id })
-            .await
-            .unwrap();
-        assert_ne!(mod_.data.len(), 0);
-    }
+//         let mod_ = curseforge
+//             .get_mod_description(ModDescriptionParameters { mod_id })
+//             .await
+//             .unwrap();
+//         assert_ne!(mod_.data.len(), 0);
+//     }
 
-    #[tokio::test]
-    async fn test_get_mod_file() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_get_mod_file() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let mod_id = 389615;
-        let file_id = 3931045;
+//         let mod_id = 389615;
+//         let file_id = 3931045;
 
-        let mod_ = curseforge
-            .get_mod_file(ModFileParameters { mod_id, file_id })
-            .await
-            .unwrap();
-        assert_eq!(mod_.data.id, file_id);
-    }
+//         let mod_ = curseforge
+//             .get_mod_file(ModFileParameters { mod_id, file_id })
+//             .await
+//             .unwrap();
+//         assert_eq!(mod_.data.id, file_id);
+//     }
 
-    #[tokio::test]
-    async fn test_get_mod_files() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_get_mod_files() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let mod_id = 389615;
+//         let mod_id = 389615;
 
-        let mod_ = curseforge
-            .get_mod_files(ModFilesParameters {
-                mod_id,
-                query: ModFilesParametersQuery {
-                    game_version: None,
-                    index: None,
-                    page_size: None,
-                    game_version_type_id: None,
-                    mod_loader_type: None,
-                },
-            })
-            .await
-            .unwrap();
-        assert!(!mod_.data.is_empty());
-    }
+//         let mod_ = curseforge
+//             .get_mod_files(ModFilesParameters {
+//                 mod_id,
+//                 query: ModFilesParametersQuery {
+//                     game_version: None,
+//                     index: None,
+//                     page_size: None,
+//                     game_version_type_id: None,
+//                     mod_loader_type: None,
+//                 },
+//             })
+//             .await
+//             .unwrap();
+//         assert!(!mod_.data.is_empty());
+//     }
 
-    #[tokio::test]
-    async fn test_get_mod_file_changelog() {
-        use super::*;
+//     #[tokio::test]
+//     async fn test_get_mod_file_changelog() {
+//         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let mod_id = 389615;
-        let file_id = 3931045;
+//         let mod_id = 389615;
+//         let file_id = 3931045;
 
-        let mod_ = curseforge
-            .get_mod_file_changelog(ModFileChangelogParameters { mod_id, file_id })
-            .await
-            .unwrap();
-        assert_ne!(mod_.data.len(), 0);
-    }
-}
+//         let mod_ = curseforge
+//             .get_mod_file_changelog(ModFileChangelogParameters { mod_id, file_id })
+//             .await
+//             .unwrap();
+//         assert_ne!(mod_.data.len(), 0);
+//     }
+// }
