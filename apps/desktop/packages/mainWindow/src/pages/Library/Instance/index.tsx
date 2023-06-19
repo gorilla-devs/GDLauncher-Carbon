@@ -254,10 +254,10 @@ const Instance = () => {
           "background-image": routeData.image()
             ? `url("${routeData.image()}")`
             : `url("${DefaultImg}")`,
-          "background-position": routeData.image() ? "right-5rem" : "bottom",
+          "background-position": "center",
         }}
       >
-        <div class="h-full">
+        <div class="h-full bg-gradient-to-t from-darkSlate-800">
           <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
