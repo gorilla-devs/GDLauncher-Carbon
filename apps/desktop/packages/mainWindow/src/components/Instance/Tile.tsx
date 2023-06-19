@@ -15,6 +15,7 @@ import { Spinner, createNotification } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
+import { getValideInstance } from "@/utils/instances";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -130,12 +131,20 @@ const Tile = (props: Props) => {
     navigate(`/library/${props.instance.id}/settings`);
   };
 
+  const validInstance = () => getValideInstance(props.instance.status);
+
   const handleEdit = () => {
     modalsContext?.openModal(
       {
         name: "instanceCreation",
       },
-      props.instance
+      {
+        id: props.instance.id,
+        modloader: validInstance()?.modloader,
+        title: props.instance.name,
+        mcVersion: validInstance()?.mc_version,
+        // modloaderVersion: validInstance()?.modloader,
+      }
     );
   };
 

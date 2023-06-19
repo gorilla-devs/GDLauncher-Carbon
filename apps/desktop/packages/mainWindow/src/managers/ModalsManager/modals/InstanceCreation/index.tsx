@@ -14,9 +14,14 @@ import {
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
-import { getValideInstance } from "@/utils/instances";
 
-type Instancetype = UngroupedInstance | ListInstance;
+type Instancetype = {
+  id: string;
+  modloader: ModLoaderType | undefined;
+  title: string | undefined;
+  mcVersion: string | undefined;
+  modloaderVersion: string | undefined;
+};
 
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
@@ -25,25 +30,21 @@ const InstanceCreation = (props: ModalProps) => {
   >([]);
 
   const instanceData = () => props.data as Instancetype | undefined;
-  const validInstance = () =>
-    instanceData() &&
-    getValideInstance((instanceData() as Instancetype).status);
-  const modloader = () => validInstance()?.modloader;
 
-  const [title, setTitle] = createSignal(instanceData()?.name || "");
+  const [title, setTitle] = createSignal(instanceData()?.title || "");
   const [error, setError] = createSignal("");
   const [bgPreview, setBgPreview] = createSignal<string | null>(null);
   const [loader, setLoader] = createSignal<ModLoaderType | undefined>(
-    validInstance()?.modloader || undefined
+    instanceData()?.modloader || undefined
   );
   const [loaderVersions, setLoaderVersions] = createSignal<
     FEModdedManifestLoaderVersion[]
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal(
-    modloader() || ""
+    instanceData()?.modloaderVersion || ""
   );
   const [mcVersion, setMcVersion] = createSignal(
-    validInstance()?.modloader || ""
+    instanceData()?.mcVersion || ""
   );
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
@@ -55,10 +56,6 @@ const InstanceCreation = (props: ModalProps) => {
 
   const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
     enabled: false,
-  });
-
-  createEffect(() => {
-    console.log("validInstance", validInstance());
   });
 
   createEffect(() => {
@@ -217,7 +214,7 @@ const InstanceCreation = (props: ModalProps) => {
       )?.loaders || [];
 
     updateInstanceMutation.mutate({
-      instance: instanceData()?.id as number,
+      instance: instanceData().id as number,
       use_loaded_icon: { Set: true },
       name: { Set: title() },
       version: { Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string) },

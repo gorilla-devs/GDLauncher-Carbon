@@ -60,8 +60,6 @@ const InstanceTile = (props: {
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
-  // const task = useConditionalQuery("vtask.getTask", taskId());
-
   const [task, setTask] = createSignal<CreateQueryResult<
     Task | null,
     RSPCError

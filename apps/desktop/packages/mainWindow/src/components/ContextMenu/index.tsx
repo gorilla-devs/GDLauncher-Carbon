@@ -9,8 +9,6 @@ import {
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useContextMenu } from "./ContextMenuContext";
-import { useFloating } from "solid-floating-ui";
-import { offset, flip, shift, autoUpdate, hide, size } from "@floating-ui/dom";
 
 interface MenuItem {
   icon?: string;
@@ -43,19 +41,51 @@ const ContextMenu = (props: ContextMenuProps) => {
   );
 
   const openContextMenu = (e: MouseEvent) => {
-    if (containerRef())
-      ContextMenu?.setOpenMenu(containerRef() as HTMLDivElement);
     e.preventDefault();
+    if (containerRef()) {
+      ContextMenu?.setOpenMenu(containerRef() as HTMLDivElement);
+    }
+
+    // Initially set the position to cursor location
     setX(e.clientX);
     setY(e.clientY);
+
+    // Wait for the next frame when the menu has been painted
+    requestAnimationFrame(() => {
+      if (menuRef()) {
+        const menuElement = menuRef() as HTMLDivElement;
+        const boundingClientRect = menuElement.getBoundingClientRect();
+
+        let newX = e.clientX; // No change to X coordinate
+        let newY = e.clientY - boundingClientRect.height;
+
+        // If the new y position is less than 0, set it to 0 to prevent the menu from going out of view to the top
+        if (newY < 0) {
+          newY = 0;
+        }
+
+        setX(newX);
+        setY(newY);
+      }
+    });
   };
 
   const closeContextMenu = () => {
     ContextMenu?.closeMenu();
   };
 
+  // const handleClickOutside = (e: MouseEvent) => {
+  //   if (containerRef() && !containerRef()?.contains(e.target as Node)) {
+  //     closeContextMenu();
+  //   }
+  // };
+
   const handleClickOutside = (e: MouseEvent) => {
-    if (containerRef() && !containerRef()?.contains(e.target as Node)) {
+    if (
+      containerRef() &&
+      !containerRef()?.contains(e.target as Node) &&
+      containerRef() == ContextMenu?.openMenu()
+    ) {
       closeContextMenu();
     }
   };
@@ -69,15 +99,6 @@ const ContextMenu = (props: ContextMenuProps) => {
     } else {
       containerRef()?.addEventListener("click", openContextMenu);
     }
-  });
-
-  const position = useFloating(menuRef, containerRef, {
-    placement: "bottom-end",
-    middleware: [offset(5), flip(), shift(), hide(), size()],
-    whileElementsMounted: (reference, floating, update) =>
-      autoUpdate(reference, floating, update, {
-        animationFrame: true,
-      }),
   });
 
   onCleanup(() => {
@@ -94,23 +115,11 @@ const ContextMenu = (props: ContextMenuProps) => {
           <div
             ref={setMenuRef}
             class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40"
-            // style={{
-            //   position: "absolute",
-            //   top: y() - 200 + "px",
-            //   left: x() + 10 + "px",
-            //   "z-index": "1000",
-            // }}
             style={{
               position: "absolute",
-              // top: isContextTrigger()
-              //   ? `${position.y ?? 0}px`
-              //   : y() - 200 + "px",
-              // left: isContextTrigger()
-              //   ? `${position.x ?? 0}px`
-              //   : x() + 10 + "px",
-              top: y() - 200 + "px",
-              left: x() + 10 + "px",
-              "z-index": "1000",
+              top: y() + "px",
+              left: x() + "px",
+              "z-index": "1000000",
             }}
             onClick={closeContextMenu}
           >

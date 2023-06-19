@@ -33,6 +33,7 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
 import { ContextMenu } from "@/components/ContextMenu";
+import { useModal } from "@/managers/ModalsManager";
 
 type InstancePage = {
   label: string;
@@ -50,6 +51,7 @@ const Instance = () => {
     routeData.instanceDetails.data?.name || ""
   );
   const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -246,37 +248,43 @@ const Instance = () => {
 
   onCleanup(() => window?.removeEventListener("resize", checkContainerSize));
 
+  const openFolderMutation = rspc.createMutation([
+    "instance.openInstanceFolder",
+  ]);
+
+  const handleEdit = () => {
+    modalsContext?.openModal(
+      {
+        name: "instanceCreation",
+      },
+      {
+        id: params.id,
+        modloader: routeData.instanceDetails.data?.modloaders[0].type_,
+        title: routeData.instanceDetails.data?.name,
+        mcVersion: routeData.instanceDetails.data?.version,
+        modloaderVersion: routeData.instanceDetails.data?.modloaders[0].version,
+      }
+    );
+  };
+
+  const handleOpenFolder = () => {
+    openFolderMutation.mutate({
+      instance_id: parseInt(params.id, 10),
+      folder: "Root",
+    });
+  };
+
   const menuItems = () => [
-    // {
-    //   icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
-    //   label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-    //   action: handlePlay,
-    // },
-    // {
-    //   icon: "i-ri:settings-3-fill",
-    //   label: t("instance.action_settings"),
-    //   action: handleSettings,
-    // },
-    // ...(!props.isInvalid
-    //   ? [
-    //       {
-    //         icon: "i-ri:file-copy-fill",
-    //         label: t("instance.action_duplicate"),
-    //         action: handleDuplicate,
-    //       },
-    //     ]
-    //   : []),
+    {
+      icon: "i-ri:pencil-fill",
+      label: t("instance.action_edit"),
+      action: handleEdit,
+    },
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
-      action: () => {},
+      action: handleOpenFolder,
     },
-    // {
-    //   id: "delete",
-    //   icon: "i-ri:delete-bin-2-fill",
-    //   label: t("instance.action_delete"),
-    //   action: handleDelete,
-    // },
   ];
 
   return (
@@ -433,9 +441,6 @@ const Instance = () => {
                             style={{
                               background: "rgba(255, 255, 255, 0.1)",
                             }}
-                            // onClick={() =>{
-
-                            // }}
                           >
                             <div class="text-xl i-ri:more-2-fill" />
                           </div>
