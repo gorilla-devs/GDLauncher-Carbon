@@ -99,7 +99,7 @@ const Java = () => {
             <Slider
               min={0}
               max={mbTotalRAM()}
-              steps={1}
+              steps={1000}
               value={routeData.settings.data?.xmx}
               marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) =>

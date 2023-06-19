@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect, onMount } from "solid-js";
+import { For, Match, Show, Switch, createEffect } from "solid-js";
 import Modpack from "./Modpack";
 import LogoDark from "/assets/images/logo-dark.svg";
 import { useModal } from "@/managers/ModalsManager";
@@ -9,6 +9,8 @@ import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
 import { SortFields } from "@/utils/constants";
+import { rspc } from "@/utils/rspcClient";
+import { setScrollTop } from "@/utils/browser";
 
 const NoMoreModpacks = () => {
   return (
@@ -68,15 +70,13 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
 export default function Browser() {
   const modalsContext = useModal();
   const [t] = useTransContext();
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
   const infiniteQuery = useInfiniteModpacksQuery();
 
-  const modpacks = () =>
-    infiniteQuery?.infiniteQuery.data
-      ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
-      : [];
+  const modpacks = () => infiniteQuery.allRows();
 
-  const allVirtualRows = () => infiniteQuery?.rowVirtualizer.getVirtualItems();
+  const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
@@ -95,11 +95,6 @@ export default function Browser() {
     ) {
       infiniteQuery.infiniteQuery.fetchNextPage();
     }
-  });
-
-  onMount(() => {
-    if (modpacks().length > 0 && !infiniteQuery?.infiniteQuery.isInitialLoading)
-      infiniteQuery?.resetList();
   });
 
   return (
@@ -239,7 +234,10 @@ export default function Browser() {
             <div
               class="w-full h-full overflow-y-auto overflow-x-hidden"
               ref={(el) => {
-                infiniteQuery?.setParentRef(el);
+                infiniteQuery.setParentRef(el);
+              }}
+              onScroll={(e) => {
+                setScrollTop(e.target.scrollTop);
               }}
             >
               <div
@@ -279,7 +277,10 @@ export default function Browser() {
                             }
                           >
                             <Match when={!isLoaderRow() && modpack()}>
-                              <Modpack modpack={modpack()} />
+                              <Modpack
+                                modpack={modpack()}
+                                defaultGroup={defaultGroup.data}
+                              />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
                               <NoMoreModpacks />

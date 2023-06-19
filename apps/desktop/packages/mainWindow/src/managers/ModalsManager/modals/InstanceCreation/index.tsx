@@ -14,6 +14,7 @@ import {
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 type Instancetype = {
   id: string;
@@ -48,11 +49,13 @@ const InstanceCreation = (props: ModalProps) => {
   );
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
-  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
-  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(true);
+  const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(false);
+  const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
+  const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
   const addNotification = createNotification();
   const modalsContext = useModal();
+  const navigate = useGDNavigate();
 
   const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
     enabled: false,
@@ -97,6 +100,7 @@ const InstanceCreation = (props: ModalProps) => {
     {
       onSuccess() {
         modalsContext?.closeModal();
+        navigate(`/library`);
         addNotification("Instance successfully created.");
       },
 
@@ -301,20 +305,27 @@ const InstanceCreation = (props: ModalProps) => {
                     }}
                   />
                 </h5>
-                <Input
-                  required
-                  placeholder="New instance"
-                  inputColor="bg-darkSlate-800"
-                  onInput={(e) => {
-                    setTitle(e.currentTarget.value);
-                  }}
-                  value={title()}
-                  error={
-                    error() &&
-                    !title() &&
-                    (t("error.missing_field_title") as string)
-                  }
-                />
+                <div class="flex gap-4 items-center">
+                  <Input
+                    required
+                    placeholder="New instance"
+                    inputColor="bg-darkSlate-800"
+                    onInput={(e) => {
+                      setTitle(e.currentTarget.value);
+                    }}
+                    value={
+                      title() ||
+                      `${loader() || "Vanilla"} ${
+                        mcVersion() || (mappedMcVersions()?.[0]?.id as string)
+                      }`
+                    }
+                    error={
+                      error() &&
+                      !title() &&
+                      (t("error.missing_field_title") as string)
+                    }
+                  />
+                </div>
               </div>
             </div>
             <div class="flex gap-2">

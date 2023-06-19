@@ -9,7 +9,13 @@ import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
 
 export const rspc = createSolidQueryHooks<Procedures>();
-export const queryClient = new QueryClient();
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // default: true
+    },
+  },
+});
 
 export let port: number | null = null;
 

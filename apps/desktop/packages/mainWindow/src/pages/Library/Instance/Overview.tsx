@@ -4,7 +4,7 @@ import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
-import { format } from "date-fns";
+import { format, formatDistance } from "date-fns";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -57,10 +57,12 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.seconds_played}>
           <Card
             title={t("instance.overview_card_played_time_title")}
-            text={
-              (routeData.instanceDetails.data as InstanceDetails)
-                ?.seconds_played
-            }
+            text={formatDistance(
+              new Date(
+                routeData.instanceDetails.data?.last_played || Date.now()
+              ).getTime(),
+              Date.now()
+            )}
             icon="clock"
           />
         </Show>

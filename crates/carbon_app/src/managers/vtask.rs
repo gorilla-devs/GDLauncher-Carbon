@@ -11,6 +11,7 @@ use anyhow::anyhow;
 
 use thiserror::Error;
 use tokio::sync::{watch, RwLock};
+use tracing::error;
 
 use super::ManagerRef;
 
@@ -231,6 +232,8 @@ impl VisualTask {
     }
 
     pub async fn fail(mut self, error: anyhow::Error) {
+        error!({ error = ?error }, "task failed: {name:?}", name = self.data.read().await.name);
+
         self.edit(|data| data.state = TaskState::Failed(Arc::new(error)))
             .await;
 

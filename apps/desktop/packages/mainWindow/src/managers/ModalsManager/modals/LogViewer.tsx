@@ -36,7 +36,7 @@ const LogViewer = (props: ModalProps) => {
                             <div class="whitespace-nowrap my-2 flex gap-2">
                               <span>{instance?.name}</span>
                               <div
-                                class="i-ri:close-fill hover:text-lightGray-50 transition-color ease-in-out duration-100"
+                                class="i-ri:close-fill ease-in-out duration-100 hover:text-lightGray-50 transition-color"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   deleteLogsMutation.mutate(log.id);
