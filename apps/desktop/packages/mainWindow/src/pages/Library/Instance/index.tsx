@@ -22,7 +22,6 @@ import {
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
-import { formatDistance } from "date-fns";
 import {
   FEModResponse,
   InstanceDetails,
@@ -32,6 +31,7 @@ import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
+import { convertSecondsToHumanTime } from "@/utils/helpers";
 
 type InstancePage = {
   label: string;
@@ -254,10 +254,10 @@ const Instance = () => {
           "background-image": routeData.image()
             ? `url("${routeData.image()}")`
             : `url("${DefaultImg}")`,
-          "background-position": routeData.image() ? "right-5rem" : "bottom",
+          "background-position": "center",
         }}
       >
-        <div class="h-full">
+        <div class="h-full bg-gradient-to-t from-darkSlate-800">
           <div class="z-10 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
@@ -365,18 +365,24 @@ const Instance = () => {
                           </span>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
-                        <div class="flex gap-2 items-start">
-                          <div class="i-ri:time-fill" />
-                          <span>
-                            {formatDistance(
-                              new Date(
-                                routeData.instanceDetails.data?.last_played ||
-                                  Date.now()
-                              ).getTime(),
-                              Date.now()
-                            )}
-                          </span>
-                        </div>
+                        <Show
+                          when={
+                            routeData.instanceDetails.data?.seconds_played !==
+                            undefined
+                          }
+                        >
+                          <div class="flex gap-2 items-start">
+                            <div class="i-ri:time-fill" />
+                            <span>
+                              {convertSecondsToHumanTime(
+                                (
+                                  routeData.instanceDetails
+                                    .data as InstanceDetails
+                                ).seconds_played
+                              )}
+                            </span>
+                          </div>
+                        </Show>
                         <Show
                           when={
                             (modpackDetails()?.data?.data.authors || [])

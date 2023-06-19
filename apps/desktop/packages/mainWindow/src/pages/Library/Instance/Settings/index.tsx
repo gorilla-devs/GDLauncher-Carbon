@@ -62,7 +62,7 @@ const Settings = () => {
             <Slider
               min={0}
               max={mbTotalRAM()}
-              steps={1}
+              steps={1000}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
               marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) =>
