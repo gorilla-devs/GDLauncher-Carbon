@@ -77,7 +77,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700"
+                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700 cursor-pointer"
                 onClick={() => {
                   toggleSidebar();
                   inputRef?.focus();

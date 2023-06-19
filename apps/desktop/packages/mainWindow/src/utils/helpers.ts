@@ -14,37 +14,32 @@ export const strToMs = (string: string) => {
   return new Date(string)?.getTime();
 };
 
-export const convertMinutesToHumanTime = (minutes: number) => {
-  const days = Math.floor(minutes / 1440); // 60*24
-  const hours = Math.floor((minutes - days * 1440) / 60);
-  const min = Math.round(minutes % 60);
-  const weeks = Math.floor(days / 7);
-  const months = Math.floor(weeks / 4);
+export const convertSecondsToHumanTime = (seconds: number) => {
+  const timeUnits = [
+    { name: "year", length: 60 * 60 * 24 * 365 },
+    { name: "month", length: 60 * 60 * 24 * 30 },
+    { name: "week", length: 60 * 60 * 24 * 7 },
+    { name: "day", length: 60 * 60 * 24 },
+    { name: "hour", length: 60 * 60 },
+    { name: "minute", length: 60 },
+    { name: "second", length: 1 },
+  ];
 
-  switch (true) {
-    case months >= 2:
-      return `${months} months`;
-    case months === 1:
-      return `1 month`;
-    case weeks >= 2:
-      return `${weeks} weeks`;
-    case weeks === 1:
-      return `1 week`;
-    case days >= 1:
-      return `${days} d, ${hours} h, ${min} m`;
-    case hours >= 2:
-      return `${hours} h, ${min} m`;
-    case hours === 1:
-      return `1 hour`;
-    case minutes >= 2:
-      return `${min} minutes`;
-    case minutes === 1:
-      return `1 minute`;
-    case minutes === 0:
-      return "0 minutes";
-    default:
-      return "";
+  let remainingSeconds = seconds;
+
+  // Loop over time units
+  for (let i = 0; i < timeUnits.length; i++) {
+    const timeUnit = timeUnits[i];
+    const timeValue = Math.floor(remainingSeconds / timeUnit.length);
+
+    if (timeValue >= 1) {
+      remainingSeconds = remainingSeconds % timeUnit.length;
+      const unit = timeValue > 1 ? timeUnit.name + "s" : timeUnit.name;
+      return `${timeValue} ${unit}`; // Return the largest unit with a value >= 1
+    }
   }
+
+  return "0 seconds";
 };
 
 export const blobToBase64 = (

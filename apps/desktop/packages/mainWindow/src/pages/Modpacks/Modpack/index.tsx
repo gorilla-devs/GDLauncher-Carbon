@@ -7,12 +7,11 @@ import { Button, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
 import { For, Show, createSignal } from "solid-js";
 
-type Props = { modpack: FEMod };
+type Props = { modpack: FEMod; defaultGroup: number | undefined };
 
 const Modpack = (props: Props) => {
   const navigate = useGDNavigate();
   const [loading, setLoading] = createSignal(false);
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
   const addNotification = createNotification();
 
   const prepareInstanceMutation = rspc.createMutation(
@@ -122,7 +121,7 @@ const Modpack = (props: Props) => {
               onClick={() => {
                 loadIconMutation.mutate(props.modpack.logo.url);
                 createInstanceMutation.mutate({
-                  group: defaultGroup.data || 1,
+                  group: props.defaultGroup || 1,
                   use_loaded_icon: true,
                   notes: "",
                   name: props.modpack.name,
