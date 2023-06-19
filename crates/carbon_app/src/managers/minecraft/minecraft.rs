@@ -98,6 +98,8 @@ pub async fn get_lwjgl_meta(
         version_info_lwjgl_requirement.uid, lwjgl_suggest
     ))?;
 
+    tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
+
     let lwjgl = reqwest_client
         .get(lwjgl_json_url)
         .send()
@@ -319,7 +321,7 @@ pub async fn generate_startup_command(
 
     let client_jar_path = runtime_path
         .get_libraries()
-        .get_mc_client(&version.inherits_from.as_ref().unwrap_or(&version.id));
+        .get_mc_client(version.inherits_from.as_ref().unwrap_or(&version.id));
 
     let replacer_args = ReplacerArgs {
         player_name: full_account.username,
@@ -511,7 +513,7 @@ pub async fn launch_minecraft(
     );
 
     let mut command_exec = tokio::process::Command::new(java_component.path);
-    command_exec.current_dir(instance_path.get_root());
+    command_exec.current_dir(instance_path.get_data_path());
 
     command_exec
         .stdout(std::process::Stdio::piped())
