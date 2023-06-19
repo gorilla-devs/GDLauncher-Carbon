@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import {
+  ListInstance,
   ModLoaderType,
   Subtask,
   Translation,
@@ -13,12 +14,13 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { Spinner, createNotification } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { useModal } from "@/managers/ModalsManager";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
-  title: string;
   modloader: ModLoaderType | null | undefined;
+  instance: UngroupedInstance | ListInstance;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
@@ -26,7 +28,6 @@ type Props = {
   img: string | undefined;
   variant?: Variant;
   isInvalid?: boolean;
-  instanceId: number;
   downloaded?: number;
   totalDownload?: number;
   isRunning?: boolean;
@@ -44,6 +45,7 @@ const Tile = (props: Props) => {
   const [t] = useTransContext();
   const addNotification = createNotification();
   const navigate = useGDNavigate();
+  const modalsContext = useModal();
 
   const deleteInstanceMutation = rspc.createMutation(
     ["instance.deleteInstance"],
@@ -111,28 +113,37 @@ const Tile = (props: Props) => {
 
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
-      instance_id: props.instanceId,
+      instance_id: props.instance.id,
       folder: "Root",
     });
   };
 
   const handlePlay = () => {
-    launchInstanceMutation.mutate(props.instanceId);
+    launchInstanceMutation.mutate(props.instance.id);
   };
 
   const handleDelete = () => {
-    deleteInstanceMutation.mutate(props.instanceId);
+    deleteInstanceMutation.mutate(props.instance.id);
   };
 
   const handleSettings = () => {
-    navigate(`/library/${props.instanceId}/settings`);
+    navigate(`/library/${props.instance.id}/settings`);
+  };
+
+  const handleEdit = () => {
+    modalsContext?.openModal(
+      {
+        name: "instanceCreation",
+      },
+      props.instance
+    );
   };
 
   const handleDuplicate = () => {
     if (!props.isInvalid) {
       duplicateInstanceMutation.mutate({
-        instance: props.instanceId,
-        new_name: props.title,
+        instance: props.instance.id,
+        new_name: props.instance.name,
       });
     }
   };
@@ -142,6 +153,11 @@ const Tile = (props: Props) => {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
+    },
+    {
+      icon: "i-ri:pencil-fill",
+      label: t("instance.action_edit"),
+      action: handleEdit,
     },
     {
       icon: "i-ri:settings-3-fill",
@@ -180,8 +196,8 @@ const Tile = (props: Props) => {
   const handlePlayClick = () => {
     if (props.isPreparing) return;
     if (props.isRunning) {
-      killInstanceMutation.mutate(props.instanceId);
-    } else launchInstanceMutation.mutate(props.instanceId);
+      killInstanceMutation.mutate(props.instance.id);
+    } else launchInstanceMutation.mutate(props.instance.id);
   };
 
   const isInQueue = () => props.isPreparing && !props.isLoading;
@@ -314,7 +330,7 @@ const Tile = (props: Props) => {
                 "text-lightGray-900": props.isLoading || isInQueue(),
               }}
             >
-              {props.title}
+              {props.instance.name}
             </h4>
             <Switch>
               <Match when={!props.isLoading}>
@@ -430,7 +446,7 @@ const Tile = (props: Props) => {
                   "text-white": !mergedProps.isLoading,
                 }}
               >
-                {props.title}
+                {props.instance.name}
               </h4>
               <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">

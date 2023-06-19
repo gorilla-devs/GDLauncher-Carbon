@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import {
   Link,
@@ -32,6 +32,7 @@ import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
+import { ContextMenu } from "@/components/ContextMenu";
 
 type InstancePage = {
   label: string;
@@ -48,6 +49,7 @@ const Instance = () => {
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   );
+  const [t] = useTransContext();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -244,6 +246,39 @@ const Instance = () => {
 
   onCleanup(() => window?.removeEventListener("resize", checkContainerSize));
 
+  const menuItems = () => [
+    // {
+    //   icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
+    //   label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
+    //   action: handlePlay,
+    // },
+    // {
+    //   icon: "i-ri:settings-3-fill",
+    //   label: t("instance.action_settings"),
+    //   action: handleSettings,
+    // },
+    // ...(!props.isInvalid
+    //   ? [
+    //       {
+    //         icon: "i-ri:file-copy-fill",
+    //         label: t("instance.action_duplicate"),
+    //         action: handleDuplicate,
+    //       },
+    //     ]
+    //   : []),
+    {
+      icon: "i-ri:folder-open-fill",
+      label: t("instance.action_open_folder"),
+      action: () => {},
+    },
+    // {
+    //   id: "delete",
+    //   icon: "i-ri:delete-bin-2-fill",
+    //   label: t("instance.action_delete"),
+    //   action: handleDelete,
+    // },
+  ];
+
   return (
     <main class="relative h-full bg-darkSlate-800 overflow-x-hidden scrollbar-hide flex flex-col">
       <header
@@ -392,6 +427,19 @@ const Instance = () => {
                         </Show>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                        <ContextMenu menuItems={menuItems()} trigger="click">
+                          <div
+                            class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.1)",
+                            }}
+                            // onClick={() =>{
+
+                            // }}
+                          >
+                            <div class="text-xl i-ri:more-2-fill" />
+                          </div>
+                        </ContextMenu>
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{

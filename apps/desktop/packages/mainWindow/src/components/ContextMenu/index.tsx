@@ -1,6 +1,16 @@
-import { For, createSignal, JSX, onMount, Show } from "solid-js";
+import {
+  For,
+  createSignal,
+  JSX,
+  onMount,
+  Show,
+  mergeProps,
+  onCleanup,
+} from "solid-js";
 import { Portal } from "solid-js/web";
 import { useContextMenu } from "./ContextMenuContext";
+import { useFloating } from "solid-floating-ui";
+import { offset, flip, shift, autoUpdate, hide, size } from "@floating-ui/dom";
 
 interface MenuItem {
   icon?: string;
@@ -12,17 +22,29 @@ interface MenuItem {
 interface ContextMenuProps {
   menuItems: MenuItem[];
   children: JSX.Element;
+  trigger?: "context" | "click";
 }
 
 const ContextMenu = (props: ContextMenuProps) => {
   const [x, setX] = createSignal(0);
   const [y, setY] = createSignal(0);
-  let menuRef: HTMLDivElement | undefined;
+  const [menuRef, setMenuRef] = createSignal<HTMLDivElement | undefined>();
+  const [containerRef, setContainerRef] = createSignal<
+    HTMLDivElement | undefined
+  >();
 
   const ContextMenu = useContextMenu();
 
+  const mergedProps = mergeProps(
+    {
+      trigger: "context",
+    },
+    props
+  );
+
   const openContextMenu = (e: MouseEvent) => {
-    if (menuRef) ContextMenu?.setOpenMenu(menuRef);
+    if (containerRef())
+      ContextMenu?.setOpenMenu(containerRef() as HTMLDivElement);
     e.preventDefault();
     setX(e.clientX);
     setY(e.clientY);
@@ -33,32 +55,59 @@ const ContextMenu = (props: ContextMenuProps) => {
   };
 
   const handleClickOutside = (e: MouseEvent) => {
-    if (menuRef && !menuRef.contains(e.target as Node)) {
+    if (containerRef() && !containerRef()?.contains(e.target as Node)) {
       closeContextMenu();
     }
   };
 
+  const isContextTrigger = () => mergedProps.trigger === "context";
+
   onMount(() => {
     document.addEventListener("click", handleClickOutside);
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
+    if (isContextTrigger()) {
+      containerRef()?.addEventListener("contextmenu", openContextMenu);
+    } else {
+      containerRef()?.addEventListener("click", openContextMenu);
+    }
+  });
+
+  const position = useFloating(menuRef, containerRef, {
+    placement: "bottom-end",
+    middleware: [offset(5), flip(), shift(), hide(), size()],
+    whileElementsMounted: (reference, floating, update) =>
+      autoUpdate(reference, floating, update, {
+        animationFrame: true,
+      }),
+  });
+
+  onCleanup(() => {
+    document.removeEventListener("click", handleClickOutside);
+    containerRef()?.removeEventListener("contextmenu", openContextMenu);
+    containerRef()?.removeEventListener("click", openContextMenu);
   });
 
   return (
-    <div
-      onContextMenu={openContextMenu}
-      ref={(el) => {
-        menuRef = el;
-      }}
-    >
+    <div ref={setContainerRef}>
       {props.children}
-      <Show when={menuRef == ContextMenu?.openMenu()}>
+      <Show when={containerRef() == ContextMenu?.openMenu()}>
         <Portal mount={document.body}>
           <div
+            ref={setMenuRef}
             class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40"
+            // style={{
+            //   position: "absolute",
+            //   top: y() - 200 + "px",
+            //   left: x() + 10 + "px",
+            //   "z-index": "1000",
+            // }}
             style={{
               position: "absolute",
+              // top: isContextTrigger()
+              //   ? `${position.y ?? 0}px`
+              //   : y() - 200 + "px",
+              // left: isContextTrigger()
+              //   ? `${position.x ?? 0}px`
+              //   : x() + 10 + "px",
               top: y() - 200 + "px",
               left: x() + 10 + "px",
               "z-index": "1000",

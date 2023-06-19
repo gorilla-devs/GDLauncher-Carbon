@@ -6,29 +6,45 @@ import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
   FEModdedManifestLoaderVersion,
+  ListInstance,
   ManifestVersion,
   McType,
   ModLoaderType,
+  UngroupedInstance,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
+import { getValideInstance } from "@/utils/instances";
+
+type Instancetype = UngroupedInstance | ListInstance;
 
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     ManifestVersion[]
   >([]);
-  const [title, setTitle] = createSignal("");
+
+  const instanceData = () => props.data as Instancetype | undefined;
+  const validInstance = () =>
+    instanceData() &&
+    getValideInstance((instanceData() as Instancetype).status);
+  const modloader = () => validInstance()?.modloader;
+
+  const [title, setTitle] = createSignal(instanceData()?.name || "");
   const [error, setError] = createSignal("");
   const [bgPreview, setBgPreview] = createSignal<string | null>(null);
   const [loader, setLoader] = createSignal<ModLoaderType | undefined>(
-    undefined
+    validInstance()?.modloader || undefined
   );
   const [loaderVersions, setLoaderVersions] = createSignal<
     FEModdedManifestLoaderVersion[]
   >([]);
-  const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal("");
-  const [mcVersion, setMcVersion] = createSignal("");
+  const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal(
+    modloader() || ""
+  );
+  const [mcVersion, setMcVersion] = createSignal(
+    validInstance()?.modloader || ""
+  );
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(true);
   const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(true);
@@ -39,6 +55,10 @@ const InstanceCreation = (props: ModalProps) => {
 
   const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
     enabled: false,
+  });
+
+  createEffect(() => {
+    console.log("validInstance", validInstance());
   });
 
   createEffect(() => {
@@ -110,6 +130,27 @@ const InstanceCreation = (props: ModalProps) => {
       },
     }
   );
+  const updateInstanceMutation = rspc.createMutation(
+    ["instance.updateInstance"],
+    {
+      onSuccess() {
+        modalsContext?.closeModal();
+        addNotification("Instance successfully updated.");
+      },
+      onError() {
+        modalsContext?.closeModal();
+        addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        setError("");
+        setTitle("");
+        setError("");
+        setBgPreview(null);
+        setMcVersion("");
+        setChosenLoaderVersion("");
+      },
+    }
+  );
 
   const mapTypeToColor = (type: McType) => {
     return (
@@ -164,6 +205,31 @@ const InstanceCreation = (props: ModalProps) => {
         },
       });
     }
+  };
+
+  const handleUpdate = () => {
+    setError("");
+
+    const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
+    const versions =
+      forgeVersionsQuery?.data?.gameVersions.find(
+        (v) => v.id === (mcVersion() || mcVers?.id)
+      )?.loaders || [];
+
+    updateInstanceMutation.mutate({
+      instance: instanceData()?.id as number,
+      use_loaded_icon: { Set: true },
+      name: { Set: title() },
+      version: { Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string) },
+      modloader: {
+        Set: loader()
+          ? {
+              type_: loader() as ModLoaderType,
+              version: chosenLoaderVersion() || versions[0].id,
+            }
+          : null,
+      },
+    });
   };
 
   return (
@@ -462,7 +528,8 @@ const InstanceCreation = (props: ModalProps) => {
               type="primary"
               style={{ width: "100%", "max-width": "200px" }}
               onClick={() => {
-                handleCreate();
+                if (instanceData()) handleCreate();
+                else handleUpdate();
               }}
             >
               <Trans
