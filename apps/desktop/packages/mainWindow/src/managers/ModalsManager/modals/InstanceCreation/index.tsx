@@ -209,28 +209,33 @@ const InstanceCreation = (props: ModalProps) => {
   };
 
   const handleUpdate = () => {
-    setError("");
+    if (instanceData()?.id) {
+      setError("");
 
-    const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
-    const versions =
-      forgeVersionsQuery?.data?.gameVersions.find(
-        (v) => v.id === (mcVersion() || mcVers?.id)
-      )?.loaders || [];
+      const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
+      const versions =
+        forgeVersionsQuery?.data?.gameVersions.find(
+          (v) => v.id === (mcVersion() || mcVers?.id)
+        )?.loaders || [];
 
-    updateInstanceMutation.mutate({
-      instance: instanceData().id as number,
-      use_loaded_icon: { Set: true },
-      name: { Set: title() },
-      version: { Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string) },
-      modloader: {
-        Set: loader()
-          ? {
-              type_: loader() as ModLoaderType,
-              version: chosenLoaderVersion() || versions[0].id,
-            }
-          : null,
-      },
-    });
+      console.log("ID", instanceData());
+      updateInstanceMutation.mutate({
+        instance: parseInt((instanceData() as Instancetype).id, 10),
+        use_loaded_icon: { Set: true },
+        name: { Set: title() },
+        version: {
+          Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
+        },
+        modloader: {
+          Set: loader()
+            ? {
+                type_: loader() as ModLoaderType,
+                version: chosenLoaderVersion() || versions[0].id,
+              }
+            : null,
+        },
+      });
+    }
   };
 
   return (

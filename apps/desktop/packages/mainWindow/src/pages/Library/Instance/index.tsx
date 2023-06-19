@@ -298,6 +298,7 @@ const Instance = () => {
             ? `url("${routeData.image()}")`
             : `url("${DefaultImg}")`,
           "background-position": "center",
+          "background-repeat": "repeat",
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">

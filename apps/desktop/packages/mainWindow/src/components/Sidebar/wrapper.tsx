@@ -14,12 +14,11 @@ const SiderbarWrapper = (props: Props) => {
     <div
       style={{
         width: isSidebarOpened() || !mergedProps.collapsable ? "15rem" : "5rem",
-        transition: "width .1s ease-in-out",
       }}
       classList={{
         "p-5": !props.noPadding,
       }}
-      class="h-full bg-darkSlate-800 relative text-white box-border overflow-hidden flex-none"
+      class="h-full bg-darkSlate-800 relative text-white box-border overflow-hidden flex-none transition-all ease-in-out duration-100"
     >
       <Show when={mergedProps.collapsable}>
         <div
