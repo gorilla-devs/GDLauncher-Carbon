@@ -31,6 +31,7 @@
     "------divider-utils------": "------divider------",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
     "test": "turbo run test && cargo test",
+    "test-prod": "turbo run test --filter @gd/desktop",
     "lint-desktop": "turbo run lint --filter @gd/desktop",
     "rspc-bindings:generate": "cargo run -p carbon_app -- --generate-ts-bindings",
     "------divider-prisma-generate-normal------": "------divider------",
