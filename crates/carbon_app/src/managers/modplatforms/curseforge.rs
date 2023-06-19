@@ -22,11 +22,7 @@ pub struct CurseForge {
 
 impl CurseForge {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
-        let base_url = if cfg!(feature = "production") {
-            format!("{GDL_API_BASE}/v1/curseforge/")
-        } else {
-            format!("{GDL_API_BASE}/cf/")
-        };
+        let base_url = format!("{GDL_API_BASE}/v1/curseforge/");
         Self {
             client,
             base_url: base_url.parse().unwrap(),
