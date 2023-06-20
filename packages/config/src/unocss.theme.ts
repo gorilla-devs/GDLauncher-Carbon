@@ -138,7 +138,7 @@ const theme = {
         "{ 0% { transform: scale(.9); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }",
     },
 
-    duration: { loadingbar: "1s", enterScaleIn: 200 },
+    durations: { loadingbar: "1s", enterScaleIn: "200ms" },
     timingFns: { loadingbar: "linear", enterScaleIn: "ease-in-out" },
     counts: { loadingbar: "infinite" },
   },

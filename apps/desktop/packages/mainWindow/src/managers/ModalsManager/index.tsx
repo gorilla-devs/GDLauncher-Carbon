@@ -183,7 +183,6 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   <div
                     style={{
                       "z-index": `${index() + 1}`,
-                      "animation-duration": "200ms",
                     }}
                     class="animate-enterScaleIn"
                   >

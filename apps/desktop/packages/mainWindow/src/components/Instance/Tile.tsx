@@ -1,13 +1,22 @@
 /* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import {
+  InstanceDetails,
   ListInstance,
   ModLoaderType,
   Subtask,
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, mergeProps } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  mergeProps,
+} from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -16,6 +25,8 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
 import { getValideInstance } from "@/utils/instances";
+import { CreateQueryResult } from "@tanstack/solid-query";
+import { RSPCError } from "@rspc/client";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -112,6 +123,22 @@ const Tile = (props: Props) => {
     "instance.duplicateInstance",
   ]);
 
+  const [instanceDetails, setInstanceDetails] = createSignal<CreateQueryResult<
+    InstanceDetails,
+    RSPCError
+  > | null>(null);
+
+  createEffect(() => {
+    if (props.instance.id !== undefined) {
+      setInstanceDetails(
+        rspc.createQuery(() => [
+          "instance.getInstanceDetails",
+          props.instance.id,
+        ])
+      );
+    }
+  });
+
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: props.instance.id,
@@ -143,7 +170,8 @@ const Tile = (props: Props) => {
         modloader: validInstance()?.modloader,
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
-        // modloaderVersion: validInstance()?.modloader,
+        modloaderVersion: instanceDetails()?.data?.modloaders[0]?.version,
+        img: props.img,
       }
     );
   };

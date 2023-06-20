@@ -65,6 +65,7 @@
   "instance.instance_version": "Version",
   "instance.instance_modal_instance_creation_cancel": "Cancel",
   "instance.instance_modal_instance_creation_create": "Create",
+  "instance.instance_modal_instance_update": "Update",
   "instance.vanilla": "Vanilla",
   "instance.forge": "Forge",
   "instance.fabric": "Fabric",
