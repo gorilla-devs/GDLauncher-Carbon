@@ -71,6 +71,7 @@
   "instance.fabric": "Fabric",
   "instance.step_back": "Back",
   "instance.play": "Play",
+  "instance.stop": "Stop",
   "instance.notes": "notes",
   "instance.no_mods_text": "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
   "instance.no_instances_text": "At the moment there are not instances. Add one to start playing!",

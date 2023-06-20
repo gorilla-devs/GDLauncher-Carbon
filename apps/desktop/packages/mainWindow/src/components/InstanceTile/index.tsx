@@ -72,10 +72,6 @@ const InstanceTile = (props: {
   });
 
   createEffect(() => {
-    console.log("imageResource", imageResource(), props.instance);
-  });
-
-  createEffect(() => {
     setFailError("");
     if (task() !== null && task()?.data) {
       const data = (task() as CreateQueryResult<Task | null, RSPCError>)

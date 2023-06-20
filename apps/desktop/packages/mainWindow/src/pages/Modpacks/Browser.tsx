@@ -11,6 +11,7 @@ import { mappedMcVersions } from "@/utils/mcVersion";
 import { SortFields } from "@/utils/constants";
 import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
+import skull from "/assets/images/icons/skull.png";
 
 const NoMoreModpacks = () => {
   return (
@@ -21,6 +22,25 @@ const NoMoreModpacks = () => {
             key="instance.fetching_no_more_modpacks"
             options={{
               defaultValue: "No more modpacks to load",
+            }}
+          />
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const NoModpacksAvailable = () => {
+  return (
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+      <div class="flex justify-center items-center flex-col text-center">
+        <img src={skull} class="w-16 h-16" />
+
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_no_modpacks_available"
+            options={{
+              defaultValue: "No modpacks available",
             }}
           />
         </p>
@@ -302,6 +322,15 @@ export default function Browser() {
             }
           >
             <Skeleton.modpacksList />
+          </Match>
+          <Match
+            when={
+              modpacks().length === 0 &&
+              !infiniteQuery?.infiniteQuery.isLoading &&
+              !infiniteQuery?.infiniteQuery.isInitialLoading
+            }
+          >
+            <NoModpacksAvailable />
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
             <ErrorFetchingModpacks
