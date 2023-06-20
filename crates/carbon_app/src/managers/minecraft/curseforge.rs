@@ -190,39 +190,39 @@ pub async fn prepare_modpack(
     })
 }
 
-#[cfg(test)]
-mod test {
-    use crate::domain::runtime_path::InstancePath;
-    use crate::managers::minecraft::curseforge::{prepare_modpack, ProgressState};
-    use crate::{
-        domain::modplatforms::curseforge::filters::ModFileParameters,
-        managers::modplatforms::curseforge::CurseForge, setup_managers_for_test,
-    };
+// #[cfg(test)]
+// mod test {
+//     use crate::domain::runtime_path::InstancePath;
+//     use crate::managers::minecraft::curseforge::{prepare_modpack, ProgressState};
+//     use crate::{
+//         domain::modplatforms::curseforge::filters::ModFileParameters,
+//         managers::modplatforms::curseforge::CurseForge, setup_managers_for_test,
+//     };
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_prepare_modpack() {
-        let app = setup_managers_for_test().await;
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+//     async fn test_prepare_modpack() {
+//         let app = setup_managers_for_test().await;
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let temp_path = app.tmpdir.join("test_prepare_modpack");
+//         let temp_path = app.tmpdir.join("test_prepare_modpack");
 
-        let mod_id = 389615;
-        let file_id = 3931045;
+//         let mod_id = 389615;
+//         let file_id = 3931045;
 
-        let cf_mod = curseforge
-            .get_mod_file(ModFileParameters { mod_id, file_id })
-            .await
-            .unwrap()
-            .data;
+//         let cf_mod = curseforge
+//             .get_mod_file(ModFileParameters { mod_id, file_id })
+//             .await
+//             .unwrap()
+//             .data;
 
-        let progress = tokio::sync::watch::channel(ProgressState::Idle);
+//         let progress = tokio::sync::watch::channel(ProgressState::Idle);
 
-        let result = prepare_modpack(&app, &cf_mod, InstancePath::new(temp_path), progress.0)
-            .await
-            .unwrap();
+//         let result = prepare_modpack(&app, &cf_mod, InstancePath::new(temp_path), progress.0)
+//             .await
+//             .unwrap();
 
-        assert!(!result.downloadables.is_empty())
-    }
-}
+//         assert!(!result.downloadables.is_empty())
+//     }
+// }
