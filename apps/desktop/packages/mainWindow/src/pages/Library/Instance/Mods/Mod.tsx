@@ -37,7 +37,7 @@ const Mod = (props: Props) => {
             <div class="flex flex-col">
               {props.mod.metadata.name}
               <div class="flex gap-2">
-                <img class="w-4 h-4" src={getModloaderIcon("Forge")} />
+                <img class="w-4 h-4" src={getModloaderIcon(props.mod.modloader)} />
                 <p class="m-0 text-darkSlate-500 text-sm">
                   {`${props.mod.modloader} ${props.mod.metadata.version}`}
                 </p>

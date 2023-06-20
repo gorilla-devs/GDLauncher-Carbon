@@ -1,5 +1,7 @@
 import { createSignal } from "solid-js";
 import forgeIcon from "/assets/images/icons/forge.png";
+import fabricIcon from "/assets/images/icons/fabric.png";
+import quiltIcon from "/assets/images/icons.quilt.svg";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
 import { ModLoaderType } from "@gd/core_module/bindings";
 
@@ -14,7 +16,9 @@ const getModloaderIcon = (modloader?: ModLoaderType) => {
     case "Forge":
       return forgeIcon;
     case "Fabric":
-      return forgeIcon;
+      return fabricIcon;
+    case "Quilt":
+      return quiltIcon;
     default:
       return vanillaIcon;
   }

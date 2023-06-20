@@ -5,7 +5,11 @@ import { Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createSignal } from "solid-js";
-import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
+import {
+  FECategory,
+  FEModLoaderType,
+  ModLoaderType,
+} from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 
@@ -68,7 +72,12 @@ const Sidebar = () => {
               </Radio>
               <Radio name="modloader" value="forge">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("Forge")} />
+                  <img
+                    class="h-4 w-4"
+                    src={getModloaderIcon(
+                      infiniteQuery?.query.query.modLoaderType as ModLoaderType
+                    )}
+                  />
                   <p class="m-0">Forge</p>
                 </div>
               </Radio>
