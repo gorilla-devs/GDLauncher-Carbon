@@ -182,7 +182,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 >
                   <div
                     style={{ "z-index": `${index() + 1}` }}
-                    class="absolute top-1/2 left-1/2 duration-100 ease-in-out -translate-1/2"
+                    class="absolute top-1/2 duration-100 ease-in-out -translate-1/2 left-[37%]"
                     classList={{
                       "scale-100": !!modal.name,
                       "scale-0": !modal.name,
