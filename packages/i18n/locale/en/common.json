@@ -68,6 +68,7 @@
   "instance.vanilla": "Vanilla",
   "instance.forge": "Forge",
   "instance.fabric": "Fabric",
+  "instance.quilt":  "Quilt",
   "instance.step_back": "Back",
   "instance.play": "Play",
   "instance.notes": "notes",

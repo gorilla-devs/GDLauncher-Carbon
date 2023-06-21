@@ -72,6 +72,18 @@ const Sidebar = () => {
                   <p class="m-0">Forge</p>
                 </div>
               </Radio>
+              <Radio name="modloader" value="fabric">
+                <div class="flex items-center gap-2">
+                  <img class="h-4 w-4" src={getModloaderIcon("Fabric")} />
+                  <p class="m-0">Fabric</p>
+                </div>
+              </Radio>
+              <Radio name="modloader" value="quilt">
+                <div class="flex items-center gap-2">
+                  <img class="h-4 w-4" src={getModloaderIcon("Quilt")} />
+                  <p class="m-0">Quilt</p>
+                </div>
+              </Radio>
             </Radio.group>
           </div>
         </Collapsable>

@@ -192,7 +192,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                             id,
                                             filename: filename.to_owned(),
                                             enabled: !is_jar_disabled,
-                                            modloader: info::ModLoaderType::Forge,
+                                            modloaders: metadata.modloaders.clone().unwrap_or_else(|| vec![info::ModLoaderType::Unknown]),
                                             metadata,
                                         }
                                     });
@@ -845,7 +845,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
         name: String,
         use_loaded_icon: bool,
-        version: InstanceVersionSouce,
+        version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
         let tmpdir = self
@@ -871,8 +871,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let (version, modpack) = match version {
-            InstanceVersionSouce::Version(version) => (Some(version), None),
-            InstanceVersionSouce::Modpack(modpack) => (None, Some(modpack)),
+            InstanceVersionSource::Version(version) => (Some(version), None),
+            InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
         };
 
         let info = info::Instance {
@@ -1328,7 +1328,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     id: m.id.clone(),
                     filename: m.filename.to_string_lossy().to_string(),
                     enabled: m.enabled,
-                    modloader: m.modloader,
+                    modloaders: m.modloaders.clone(),
                     metadata: m.metadata.clone(),
                 })
                 .collect(),
@@ -1553,11 +1553,11 @@ pub struct Mod {
     id: String,
     filename: OsString,
     enabled: bool,
-    modloader: info::ModLoaderType,
+    modloaders: Vec<domain::info::ModLoaderType>,
     metadata: domain::ModFileMetadata,
 }
 
-pub enum InstanceVersionSouce {
+pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
 }
@@ -1590,7 +1590,7 @@ mod test {
         },
     };
 
-    use super::InstanceVersionSouce;
+    use super::InstanceVersionSource;
 
     #[tokio::test]
     async fn move_groups() -> anyhow::Result<()> {
@@ -1972,10 +1972,12 @@ mod test {
                 default_group_id,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
-                    release: String::from("1.7.10"),
-                    modloaders: HashSet::new(),
-                })),
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
                 String::new(),
             )
             .await?;

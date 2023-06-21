@@ -4,7 +4,7 @@ use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
-use daedalus::minecraft::DownloadType;
+
 use std::path::PathBuf;
 
 use std::time::Duration;
@@ -338,46 +338,164 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 };
 
-                if let Some(ModLoader {
-                    type_: ModLoaderType::Forge,
-                    version: forge_version,
-                }) = version.modloaders.iter().next()
-                {
-                    let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+                for modloader in version.modloaders.iter() {
+                    match modloader {
+                        ModLoader {
+                            type_: ModLoaderType::Forge,
+                            version: forge_version,
+                        } => {
+                            let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-                    let forge_version =
-                        match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                            None => forge_version.clone(),
-                            Some(sub) => sub.to_string(),
-                        };
+                            let forge_version =
+                                match forge_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => forge_version.clone(),
+                                    Some(sub) => sub.to_string(),
+                                };
 
-                    let forge_manifest_version = forge_manifest
-                        .game_versions
-                        .into_iter()
-                        .find(|v| v.id == version.release)
-                        .ok_or_else(|| {
-                            anyhow!("Could not find forge versions for {}", version.release)
-                        })?
-                        .loaders
-                        .into_iter()
-                        .find(|v| v.id == format!("{}-{}", version.release, forge_version))
-                        .ok_or_else(|| {
-                            anyhow!(
-                                "Could not find forge version {}-{} for minecraft version {}",
-                                version.release,
-                                forge_version,
-                                version.release,
+                            let forge_manifest_version = forge_manifest
+                                .game_versions
+                                .into_iter()
+                                .find(|v| v.id == version.release)
+                                .ok_or_else(|| {
+                                    anyhow!("Could not find forge versions for {}", version.release)
+                                })?
+                                .loaders
+                                .into_iter()
+                                .find(|v| v.id == format!("{}-{}", version.release, forge_version))
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Could not find forge version {}-{} for minecraft version {}",
+                                        version.release,
+                                        forge_version,
+                                        version.release,
+                                    )
+                                })?;
+
+                            let forge_version = crate::managers::minecraft::forge::get_version(
+                                &app.reqwest_client,
+                                forge_manifest_version,
                             )
-                        })?;
+                            .await?;
 
-                    let forge_version = crate::managers::minecraft::forge::get_version(
-                        &app.reqwest_client,
-                        forge_manifest_version,
-                    )
-                    .await?;
+                            version_info =
+                                daedalus::modded::merge_partial_version(forge_version, version_info);
+                        }
+                        ModLoader {
+                            type_: ModLoaderType::Fabric,
+                            version: fabric_version,
+                        } => {
+                            let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
 
-                    version_info =
-                        daedalus::modded::merge_partial_version(forge_version, version_info);
+                            let fabric_version =
+                                match fabric_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => fabric_version.clone(),
+                                    Some(sub) => sub.to_string(),
+                                };
+
+                            let dummy_string = daedalus::BRANDING
+                                .get_or_init(daedalus::Branding::default)
+                                .dummy_replace_string
+                                .clone();
+
+                            let supported = fabric_manifest
+                                    .game_versions
+                                    .iter()
+                                    .find(|v| v.id == version.release)
+                                    .is_some();
+
+                            if !supported {
+                                return Err(anyhow!("Fabric does not support version {}", version.release));
+                            }
+
+                            let fabric_manifest_version = fabric_manifest
+                                .game_versions
+                                .into_iter()
+                                .find(|v| v.id == dummy_string)
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Could not find fabric metadata template using {}",
+                                        dummy_string
+                                    )
+                                })?
+                                .loaders
+                                .into_iter()
+                                .find(|v| v.id == fabric_version)
+                                .ok_or_else(|| {
+                                    anyhow!("Could not find fabric version {}", fabric_version)
+                                })?;
+
+                            let fabric_version = crate::managers::minecraft::fabric::replace_template(
+                                &crate::managers::minecraft::fabric::get_version(
+                                    &app.reqwest_client,
+                                    fabric_manifest_version,
+                                )
+                                .await?,
+                                &version.release,
+                                &dummy_string,
+                            );
+
+                            version_info =
+                                daedalus::modded::merge_partial_version(fabric_version, version_info);
+                        }
+                        ModLoader {
+                            type_: ModLoaderType::Quilt,
+                            version: quilt_version,
+                        } => {
+                            let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
+
+                            let quilt_version =
+                                match quilt_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => quilt_version.clone(),
+                                    Some(sub) => sub.to_string(),
+                                };
+
+                            let dummy_string = daedalus::BRANDING
+                                .get_or_init(daedalus::Branding::default)
+                                .dummy_replace_string
+                                .clone();
+
+                            let supported = quilt_manifest
+                                    .game_versions
+                                    .iter()
+                                    .find(|v| v.id == version.release)
+                                    .is_some();
+
+                            if !supported {
+                                return Err(anyhow!("Quilt does not support version {}", version.release));
+                            }
+
+                            let quilt_manifest_version = quilt_manifest
+                                .game_versions
+                                .into_iter()
+                                .find(|v| v.id == dummy_string)
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Could not find quilt metadata template using {}",
+                                        dummy_string
+                                    )
+                                })?
+                                .loaders
+                                .into_iter()
+                                .find(|v| v.id == quilt_version)
+                                .ok_or_else(|| {
+                                    anyhow!("Could not find quilt version {}", quilt_version)
+                                })?;
+
+                            let quilt_version = crate::managers::minecraft::quilt::replace_template(
+                                &crate::managers::minecraft::quilt::get_version(
+                                    &app.reqwest_client,
+                                    quilt_manifest_version,
+                                )
+                                .await?,
+                                &version.release,
+                                &dummy_string,
+                            );
+
+                            version_info =
+                                daedalus::modded::merge_partial_version(quilt_version, version_info);
+                        }
+                        _ => {}
+                    }
                 }
 
                 t_request_version_info.update_items(3, 3);
@@ -713,7 +831,7 @@ mod test {
     use crate::{
         api::keys,
         domain::instance::info::{self, StandardVersion},
-        managers::{account::FullAccount, instance::InstanceVersionSouce},
+        managers::{account::FullAccount, instance::InstanceVersionSource},
     };
 
     //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
@@ -726,7 +844,7 @@ mod test {
                 app.instance_manager().get_default_group().await?,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(StandardVersion {
+                InstanceVersionSource::Version(info::GameVersion::Standard(StandardVersion {
                     release: String::from("1.16.5"),
                     modloaders: HashSet::new(),
                 })),
