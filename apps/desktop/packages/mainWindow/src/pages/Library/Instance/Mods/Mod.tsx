@@ -38,16 +38,18 @@ const Mod = (props: Props) => {
             <div class="flex flex-col">
               {props.mod.metadata.name}
               <div class="flex gap-2">
-                <For each={props.mod.modloaders}>{(modloader, _) =>
-                  <span class="flex gap-2 justify-center items-center" >
-                    <img class="w-4 h-4" src={getModloaderIcon(modloader)} />
-                    <p class="m-0 text-darkSlate-500 text-sm">
-                          {`${modloader}`}
-                    </p>
-                  </span>
-                }</For>
+                <For each={props.mod.modloaders}>
+                  {(modloader, _) => (
+                    <span class="flex gap-2 justify-center items-center">
+                      <img class="w-4 h-4" src={getModloaderIcon(modloader)} />
+                      <p class="m-0 text-darkSlate-500 text-sm">
+                        {`${modloader}`}
+                      </p>
+                    </span>
+                  )}
+                </For>
                 <p class="m-0 text-darkSlate-500 text-sm">
-                    {`${props.mod.metadata.version}`}
+                  {`${props.mod.metadata.version}`}
                 </p>
               </div>
             </div>

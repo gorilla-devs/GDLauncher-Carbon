@@ -3,7 +3,7 @@ use std::{
     io::{self, Seek},
 };
 
-use crate::domain::instance::{ModFileMetadata, info::ModLoaderType};
+use crate::domain::instance::{info::ModLoaderType, ModFileMetadata};
 use anyhow::anyhow;
 use serde::Deserialize;
 use std::io::{BufRead, Read};
@@ -527,9 +527,12 @@ impl From<QuiltModJson> for ModFileMetadata {
     }
 }
 
-fn merge_mod_metadata(metadata: Option<ModFileMetadata>, other: ModFileMetadata) -> Option<ModFileMetadata> {
+fn merge_mod_metadata(
+    metadata: Option<ModFileMetadata>,
+    other: ModFileMetadata,
+) -> Option<ModFileMetadata> {
     match metadata {
-        Some(metadata) => Some(ModFileMetadata{
+        Some(metadata) => Some(ModFileMetadata {
             modid: metadata.modid,
             name: metadata.name.or(other.name),
             version: metadata.version.or(other.version),
@@ -539,12 +542,11 @@ fn merge_mod_metadata(metadata: Option<ModFileMetadata>, other: ModFileMetadata)
                 (Some(mut a), Some(mut b)) => {
                     a.append(&mut b);
                     Some(a)
-                },
+                }
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
             },
-
         }),
         None => Some(other),
     }
@@ -594,7 +596,6 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
         mod_metadata = merge_mod_metadata(mod_metadata, metadata);
     }
 
-
     'fabric_mod_json: {
         let Ok(mut file) = zip.by_name("fabric.mod.json") else { break 'fabric_mod_json };
         let mut content = String::with_capacity(file.size() as usize);
@@ -630,7 +631,7 @@ mod test {
 
     use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 
-    use crate::domain::instance::{ModFileMetadata, info::ModLoaderType};
+    use crate::domain::instance::{info::ModLoaderType, ModFileMetadata};
 
     use super::parse_metadata;
 
@@ -861,7 +862,6 @@ displayName = "TestMod"
 
         Ok(())
     }
-
 
     #[test]
     pub fn quilt_mod_json() -> anyhow::Result<()> {

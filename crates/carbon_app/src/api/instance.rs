@@ -720,7 +720,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
             domain::Quilt => Self::Quilt,
-            domain::Unknown => Self::Unknown
+            domain::Unknown => Self::Unknown,
         }
     }
 }
@@ -918,7 +918,9 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors,
-            modloaders: value.modloaders.and_then(|v| Some(v.into_iter().map(Into::into).collect())),
+            modloaders: value
+                .modloaders
+                .and_then(|v| Some(v.into_iter().map(Into::into).collect())),
         }
     }
 }

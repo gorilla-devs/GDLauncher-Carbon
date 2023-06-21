@@ -239,7 +239,10 @@ impl ManagerRef<'_, InstanceManager> {
                     id,
                     filename: OsString::from(file.file_name),
                     enabled: true,
-                    modloaders: metadata.modloaders.clone().unwrap_or_else(|| vec![domain::info::ModLoaderType::Forge]),
+                    modloaders: metadata
+                        .modloaders
+                        .clone()
+                        .unwrap_or_else(|| vec![domain::info::ModLoaderType::Forge]),
                     metadata,
                 });
 
