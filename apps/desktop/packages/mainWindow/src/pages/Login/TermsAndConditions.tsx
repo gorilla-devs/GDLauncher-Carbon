@@ -37,17 +37,18 @@ const TermsAndConditions = (props: Props) => {
       </div>
       <div class="w-full flex flex-col items-center">
         <div class="flex justify-between items-center w-full">
-          <div
-            class="flex gap-2 cursor-pointer"
-            // onClick={() => setAccepted((prev) => !prev)}
-          >
+          <div class="flex gap-2 cursor-pointer">
             <Checkbox
               checked={accepted()}
               onChange={() => {
+                console.log("onChange");
                 setAccepted((prev) => !prev);
               }}
             />
-            <p class="m-0 text-xs text-darkSlate-100 select-none leading-5">
+            <p
+              class="m-0 text-xs text-darkSlate-100 select-none leading-5"
+              onClick={() => setAccepted((prev) => !prev)}
+            >
               <Trans key="login.read_and_accept" />
             </p>
           </div>
