@@ -17,7 +17,7 @@ fn main() {
     let git_hash = String::from_utf8(git_hash.stdout).unwrap();
 
     let git_commit_author_date = Command::new("git")
-        .args(["log", "-1", "--format=%at"])
+        .args(["log", "-1", "--format=%ct"])
         .output()
         .unwrap();
     let git_commit_author_date = String::from_utf8(git_commit_author_date.stdout).unwrap();

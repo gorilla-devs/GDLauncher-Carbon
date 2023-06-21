@@ -9,6 +9,7 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
+use tracing::info;
 
 use crate::error::request::{censor_error, RequestContext, RequestError, RequestErrorDetails};
 
@@ -427,7 +428,7 @@ impl McAuth {
             }
         };
 
-        println!("Entitlements: {entitlements:#?}");
+        info!("Entitlements: {entitlements:#?}");
 
         // likely will not work for gamepass
         let owns_game = entitlements

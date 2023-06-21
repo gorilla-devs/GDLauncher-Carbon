@@ -18,7 +18,12 @@ const Versions = () => {
           }
         >
           <For each={routeData.curseforgeGetModFiles.data?.data}>
-            {(modFile) => <VersionRow modVersion={modFile} />}
+            {(modFile) => (
+              <VersionRow
+                project={routeData.curseforgeGetMod.data!.data}
+                modVersion={modFile}
+              />
+            )}
           </For>
         </Match>
         <Match

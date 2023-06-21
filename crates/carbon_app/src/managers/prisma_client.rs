@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use crate::db::{self, PrismaClient};
 use thiserror::Error;
+use tracing::{debug, instrument, trace};
 
 use super::java::JavaManager;
 
@@ -19,19 +20,26 @@ pub enum DatabaseError {
     EnsureProfiles(anyhow::Error),
 }
 
+#[instrument]
 pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
-    let db_client = db::new_client_with_url(&format!(
+    let db_uri = format!(
         "file:{}",
         runtime_path.join("gdl_conf.db").to_str().unwrap()
-    ))
-    .await
-    .map_err(DatabaseError::Client)?;
+    );
 
+    debug!("db uri: {}", db_uri);
+
+    let db_client = db::new_client_with_url(&db_uri)
+        .await
+        .map_err(DatabaseError::Client)?;
+
+    debug!("Trying to migrate database");
     let try_migrate = db_client._migrate_deploy().await;
 
     #[cfg(debug_assertions)]
     {
         if try_migrate.is_err() {
+            debug!("Forcing reset of database");
             db_client
                 ._db_push()
                 .accept_data_loss()
@@ -52,6 +60,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
 async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
+        trace!("No app configuration found. Creating default one");
         db_client.app_configuration().create(vec![]).exec().await?;
     }
 

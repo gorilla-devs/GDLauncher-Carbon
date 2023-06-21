@@ -1,8 +1,7 @@
 import { createSignal } from "solid-js";
 import forgeIcon from "/assets/images/icons/forge.png";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
-
-export type ModloaderType = "forge" | "vanilla" | "fabric";
+import { ModLoaderType } from "@gd/core_module/bindings";
 
 const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);
 
@@ -10,11 +9,11 @@ export const toggleSidebar = () => {
   return setIsSidebarOpened(!isSidebarOpened());
 };
 
-const getModloaderIcon = (modloader: ModloaderType) => {
+const getModloaderIcon = (modloader?: ModLoaderType) => {
   switch (modloader) {
-    case "vanilla":
-      return vanillaIcon;
-    case "forge":
+    case "Forge":
+      return forgeIcon;
+    case "Fabric":
       return forgeIcon;
     default:
       return vanillaIcon;

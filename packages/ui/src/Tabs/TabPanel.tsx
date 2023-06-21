@@ -14,11 +14,9 @@ const TabPanel = (props: Props) => {
 
   onMount(() => {
     // eslint-disable-next-line solid/reactivity
-    queueMicrotask(() => {
-      if (tabsContext) {
-        setIndex(tabsContext.registerTabPanel(ref()!));
-      }
-    });
+    if (tabsContext) {
+      setIndex(tabsContext.registerTabPanel(ref()!));
+    }
   });
 
   return (

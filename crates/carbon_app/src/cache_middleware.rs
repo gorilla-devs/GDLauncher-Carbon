@@ -2,8 +2,7 @@ use std::mem;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, Utc};
-use http::{Method, StatusCode};
-use reqwest::{Client, Request, Response};
+use reqwest::{Client, Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
 use task_local_extensions::Extensions;
 
@@ -15,12 +14,8 @@ use crate::{
     managers::UnsafeAppRef,
 };
 
-pub fn new_client(app: UnsafeAppRef) -> ClientWithMiddleware {
-    let client = Client::builder().build().unwrap();
-
-    ClientBuilder::new(client)
-        .with(CacheMiddleware { app })
-        .build()
+pub fn new_client(app: UnsafeAppRef, client_builder: ClientBuilder) -> ClientWithMiddleware {
+    client_builder.with(CacheMiddleware { app }).build()
 }
 
 struct CacheMiddleware {
@@ -48,7 +43,7 @@ impl Middleware for CacheMiddleware {
             body: Vec<u8>,
             cached: bool,
         ) -> std::result::Result<Response, ()> {
-            let mut response = http::Response::builder()
+            let mut response = hyper::Response::builder()
                 .status(StatusCode::from_u16(status.try_into().map_err(|_| ())?).map_err(|_| ())?);
 
             if cached {
@@ -76,8 +71,7 @@ impl Middleware for CacheMiddleware {
         // return the cached value if fresh
         if let Some(expires) = cached.as_ref().and_then(|c| c.expires_at) {
             if expires > Utc::now() {
-                let cached =
-                    mem::replace(&mut cached, None).expect("cached was just asserted to be Some");
+                let cached = cached.take().expect("cached was just asserted to be Some");
                 if let Ok(response) = build_cached(cached.status_code, cached.data, true) {
                     return Ok(response);
                 }

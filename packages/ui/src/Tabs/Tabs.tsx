@@ -11,7 +11,7 @@ export type SpacingTab = { ref: HTMLDivElement; type: string; space: number };
 export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
 
 type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
-export interface ITabsContext {
+interface ITabsContext {
   gap?: number;
   paddingX?: string;
   paddingY?: string;
@@ -27,7 +27,7 @@ export interface ITabsContext {
   isSelectedIndex: (_: number) => boolean;
 }
 
-export interface Props {
+interface Props {
   children: Element[] | JSXElement;
   defaultIndex?: number;
   index?: number;

@@ -12,8 +12,7 @@ const Changelog = () => {
       <Switch fallback={<Skeleton.modpackChangelogPage />}>
         <Match
           when={
-            routeData.modpackChangelog &&
-            !routeData.modpackChangelog?.isFetching
+            routeData.modpackChangelog && !routeData.modpackChangelog?.isLoading
           }
         >
           <div innerHTML={routeData.modpackChangelog?.data?.data} />

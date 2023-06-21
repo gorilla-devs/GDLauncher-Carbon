@@ -68,20 +68,6 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in library 'carbon_domain'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=carbon_domain"],
-        "filter": {
-          "name": "carbon_domain",
-          "kind": "lib"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
       "name": "Debug unit tests in library 'carbon_net'",
       "cargo": {
         "args": ["test", "--no-run", "--lib", "--package=carbon_net"],

@@ -1,23 +1,56 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { formatDownloadCount } from "@/utils/helpers";
+import { formatDownloadCount, truncateText } from "@/utils/helpers";
+import { rspc } from "@/utils/rspcClient";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Tag } from "@gd/ui";
+import { Button, Spinner, Tag, createNotification } from "@gd/ui";
 import { format } from "date-fns";
-import { For } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 
-type Props = { modpack: FEMod };
-
-const truncateText = (text: string, maxLength: number): string => {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return text.slice(0, maxLength) + "...";
-};
+type Props = { modpack: FEMod; defaultGroup: number | undefined };
 
 const Modpack = (props: Props) => {
   const navigate = useGDNavigate();
+  const [loading, setLoading] = createSignal(false);
+  const addNotification = createNotification();
+
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        setLoading(false);
+        addNotification("Instance successfully created.");
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        setLoading(false);
+        navigate(`/library`);
+      },
+    }
+  );
+
+  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+
+  const createInstanceMutation = rspc.createMutation(
+    ["instance.createInstance"],
+    {
+      onMutate() {
+        setLoading(true);
+      },
+      onSuccess(instanceId) {
+        setLoading(true);
+        prepareInstanceMutation.mutate(instanceId);
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while downloading the modpack.", "error");
+      },
+    }
+  );
+
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
@@ -66,7 +99,7 @@ const Modpack = (props: Props) => {
         </div>
         <div class="flex gap-3">
           <Button
-            variant="outline"
+            type="outline"
             onClick={() => navigate(`/modpacks/${props.modpack.id}`)}
           >
             <Trans
@@ -76,23 +109,46 @@ const Modpack = (props: Props) => {
               }}
             />
           </Button>
-          <Dropdown.button
-            options={[
-              { label: "1.16.5", key: "1.16.5" },
-              { label: "1.16.4", key: "1.16.4" },
-              { label: "1.16.3", key: "1.16.3" },
-              { label: "1.16.2", key: "1.16.2" },
-            ]}
-            rounded
-            value="1.16.2"
-          >
-            <Trans
-              key="instance.download_modpacks"
-              options={{
-                defaultValue: "Download",
+          <Show when={loading()}>
+            <Button>
+              <Spinner />
+            </Button>
+          </Show>
+          <Show when={!loading()}>
+            <Button
+              disabled={loading()}
+              rounded
+              onClick={() => {
+                loadIconMutation.mutate(props.modpack.logo.url);
+                createInstanceMutation.mutate({
+                  group: props.defaultGroup || 1,
+                  use_loaded_icon: true,
+                  notes: "",
+                  name: props.modpack.name,
+                  version: {
+                    Modpack: {
+                      Curseforge: {
+                        file_id: props.modpack.mainFileId,
+                        project_id: props.modpack.id,
+                      },
+                    },
+                  },
+                });
               }}
-            />
-          </Dropdown.button>
+            >
+              <Show when={loading()}>
+                <Spinner />
+              </Show>
+              <Show when={!loading()}>
+                <Trans
+                  key="instance.download_latest"
+                  options={{
+                    defaultValue: "Download Latest",
+                  }}
+                />
+              </Show>
+            </Button>
+          </Show>
         </div>
       </div>
     </div>

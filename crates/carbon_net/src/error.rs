@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::Downloadable;
+
 #[derive(Error, Debug)]
 pub enum DownloadError {
     #[error("Failed to download {0}")]
@@ -18,6 +20,6 @@ pub enum DownloadError {
     SizeMismatch { expected: u64, actual: u64 },
     #[error("Checksum mismatch")]
     ChecksumMismatch { expected: String, actual: String },
-    #[error("Non 200 status code {0}")]
-    Non200StatusCode(u16),
+    #[error("Non 200 status code {0}: {1}")]
+    Non200StatusCode(Downloadable, u16),
 }

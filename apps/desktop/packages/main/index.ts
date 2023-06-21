@@ -85,6 +85,13 @@ async function createWindow() {
     return getAdSize().adSize;
   });
 
+  ipcMain.handle("openFileDialog", async (_, filters) => {
+    return dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters,
+    });
+  });
+
   ipcMain.handle("getCurrentOS", async () => {
     return { platform: os.platform(), arch: os.arch() };
   });

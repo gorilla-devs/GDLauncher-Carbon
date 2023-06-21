@@ -1,6 +1,12 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import { createResource, Show } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  createSignal,
+  Match,
+  Switch,
+} from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
@@ -12,6 +18,9 @@ import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
 import { DEFAULT_LANG, LANGUAGES } from "./constants";
+import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
+import RiveAppWapper from "./utils/RiveAppWapper";
+import GDAnimation from "./gd_logo_animation.riv";
 
 queueMicrotask(() => {
   initAnalytics();
@@ -61,17 +70,52 @@ render(() => {
     return instance;
   });
 
-  return (
-    <Show
-      when={
+  const [isReady, setIsReady] = createSignal(false);
+
+  createEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      setIsReady(
         i18nInstance.state === "ready" && coreModuleLoaded.state === "ready"
+      );
+    }
+  });
+
+  return (
+    <Switch
+      fallback={
+        <div class="w-full flex justify-center items-center h-screen">
+          <RiveAppWapper
+            src={GDAnimation}
+            onStop={() => {
+              setIsReady(
+                i18nInstance.state === "ready" &&
+                  coreModuleLoaded.state === "ready"
+              );
+            }}
+          />
+        </div>
       }
     >
-      <InnerApp
-        port={coreModuleLoaded() as unknown as number}
-        i18nInstance={i18nInstance() as unknown as typeof i18n}
-      />
-    </Show>
+      <Match when={isReady()}>
+        <InnerApp
+          port={coreModuleLoaded() as unknown as number}
+          i18nInstance={i18nInstance() as unknown as typeof i18n}
+        />
+      </Match>
+      <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
+        <div class="w-full flex justify-center items-center h-screen">
+          <RiveAppWapper
+            src={GDAnimation}
+            onStop={() => {
+              setIsReady(
+                i18nInstance.state === "ready" &&
+                  coreModuleLoaded.state === "ready"
+              );
+            }}
+          />
+        </div>
+      </Match>
+    </Switch>
   );
 }, document.getElementById("root") as HTMLElement);
 
@@ -90,9 +134,11 @@ const InnerApp = (props: InnerAppProps) => {
         <NavigationManager>
           <TransProvider instance={props.i18nInstance} options={{ lng: "en" }}>
             <NotificationsProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={createInvalidateQuery} />
-              </ModalProvider>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
             </NotificationsProvider>
           </TransProvider>
         </NavigationManager>

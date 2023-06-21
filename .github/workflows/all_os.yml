@@ -26,7 +26,7 @@ jobs:
   #         node-version: "18.16.0"
   #     - uses: dtolnay/rust-toolchain@master
   #       with:
-  #         toolchain: 1.68.2
+  #         toolchain: 1.70.0
   #         targets: aarch64-apple-darwin
   #         components: clippy, rustfmt
   #     - name: Prepare
@@ -36,20 +36,20 @@ jobs:
   #     - run: |
   #         npm run sudo-init
   #         chmod -R a+x node_modules
-  #     - name: Codegen
+  #     - name: Iridium patchfix
+  #       run: node iridium_patchfix.js
+  #     - name: Prisma codegen
   #       env:
   #         CARGO_INCREMENTAL: 0
-  #         BASE_API: ${{ vars.BASE_API }}
-  #       run: pnpm codegen
+  #       run: pnpm prisma:generate
   #     - name: Build
   #       run: pnpm build:mac-arm64
   #       env:
   #         CARGO_INCREMENTAL: 0
   #         BASE_API: ${{ vars.BASE_API }}
-  #     # - name: Lint
-  #     #   run: pnpm lint
+  #     - name: Lint
+  #       run: pnpm lint
   #     - name: Clear target before tests to avoid folder getting too big
-  #       shell: bash
   #       run: rm -rf target
   #     - name: Test
   #       env:
@@ -72,7 +72,7 @@ jobs:
   #         node-version: "18.16.0"
   #     - uses: dtolnay/rust-toolchain@master
   #       with:
-  #         toolchain: 1.68.2
+  #         toolchain: 1.70.0
   #         targets: x86_64-apple-darwin
   #         components: clippy, rustfmt
   #     - name: Prepare
@@ -82,20 +82,20 @@ jobs:
   #     - run: |
   #         npm run sudo-init
   #         chmod -R a+x node_modules
-  #     - name: Codegen
+  #     - name: Iridium patchfix
+  #       run: node iridium_patchfix.js
+  #     - name: Prisma codegen
   #       env:
   #         CARGO_INCREMENTAL: 0
-  #         BASE_API: ${{ vars.BASE_API }}
-  #       run: pnpm codegen
+  #       run: pnpm prisma:generate:mac-x64
   #     - name: Build
   #       run: pnpm build:mac-x64
   #       env:
   #         CARGO_INCREMENTAL: 0
   #         BASE_API: ${{ vars.BASE_API }}
-  #     # - name: Lint
-  #     #   run: pnpm lint
+  #     - name: Lint
+  #       run: pnpm lint
   #     - name: Clear target before tests to avoid folder getting too big
-  #       shell: bash
   #       run: rm -rf target
   #     - name: Test
   #       env:
@@ -106,7 +106,7 @@ jobs:
     defaults:
       run:
         working-directory: ./GDLauncher
-    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/upstream') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
+    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -118,7 +118,7 @@ jobs:
           node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.68.2
+          toolchain: 1.70.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -128,77 +128,79 @@ jobs:
       - run: |
           npm run sudo-init
           chmod -R a+x node_modules
-      - name: Codegen
+      - name: Iridium patchfix
+        run: node iridium_patchfix.js
+      - name: Prisma codegen
         env:
           CARGO_INCREMENTAL: 0
-          BASE_API: ${{ vars.BASE_API }}
-        run: pnpm codegen
+        run: pnpm prisma:generate:linux-x64
       - name: Build
         run: pnpm build:linux-x64
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
-      # - name: Lint
-      #   run: pnpm lint
+      - name: Lint
+        run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
-        shell: bash
         run: rm -rf target
       - name: Test
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
-  # windows_x64:
-  #   defaults:
-  #     run:
-  #       working-directory: ./GDLauncher
-  #   if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/upstream') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
-  #   runs-on: windows-2022
-  #   timeout-minutes: 60
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #       with:
-  #         path: GDLauncher
-  #     - uses: actions/setup-node@v3
-  #       with:
-  #         node-version: "18.16.0"
-  #     - uses: dtolnay/rust-toolchain@master
-  #       with:
-  #         toolchain: 1.68.2
-  #         targets: x86_64-pc-windows-msvc
-  #         components: clippy, rustfmt
-  #     - name: Prepare
-  #       shell: bash
-  #       run: |
-  #         echo "" > crates/carbon_app/src/db.rs
-  #         cargo fmt --check
-  #     - name: init
-  #       shell: bash
-  #       run: npm run init
-  #     - name: Codegen
-  #       shell: bash
-  #       env:
-  #         CARGO_INCREMENTAL: 0
-  #         BASE_API: ${{ vars.BASE_API }}
-  #         CARGO_NET_GIT_FETCH_WITH_CLI: true
-  #       run: pnpm codegen
-  #     - name: Build
-  #       shell: bash
-  #       run: pnpm build:win-x64
-  #       env:
-  #         CARGO_INCREMENTAL: 0
-  #         BASE_API: ${{ vars.BASE_API }}
-  #         CARGO_NET_GIT_FETCH_WITH_CLI: true
-  #     # - name: Lint
-  #     #   shell: bash
-  #     #   run: pnpm lint
-  #     - name: Clear target before tests to avoid folder getting too big
-  #       shell: bash
-  #       run: rm -rf target
-  #     - name: Test
-  #       shell: bash
-  #       env:
-  #         CARGO_INCREMENTAL: 0
-#           BASE_API: ${{ vars.BASE_API }}
-#         CARGO_NET_GIT_FETCH_WITH_CLI: true
-#       run: pnpm test
+  windows_x64:
+    defaults:
+      run:
+        working-directory: ./GDLauncher
+    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          path: GDLauncher
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "18.16.0"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.70.0
+          targets: x86_64-pc-windows-msvc
+          components: clippy, rustfmt
+      - name: Prepare
+        shell: bash
+        run: |
+          echo "" > crates/carbon_app/src/db.rs
+          cargo fmt --check
+      - name: init
+        shell: bash
+        run: npm run init
+      - name: Iridium patchfix
+        shell: bash
+        run: node iridium_patchfix.js
+      - name: Prisma codegen
+        shell: bash
+        env:
+          CARGO_INCREMENTAL: 0
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: pnpm prisma:generate:win-x64
+      - name: Build
+        shell: bash
+        run: pnpm build:win-x64
+        env:
+          CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+      - name: Lint
+        shell: bash
+        run: pnpm lint
+      - name: Clear target before tests to avoid folder getting too big
+        shell: bash
+        run: rm -rf target
+      - name: Test
+        shell: bash
+        env:
+          CARGO_INCREMENTAL: 0
+          BASE_API: ${{ vars.BASE_API }}
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
+        run: pnpm test
