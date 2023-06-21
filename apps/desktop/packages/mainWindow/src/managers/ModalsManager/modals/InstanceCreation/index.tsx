@@ -61,7 +61,6 @@ const InstanceCreation = (props: ModalProps) => {
 
       setLoaderVersions(versions || []);
     } else if (!loader()) {
-      setMappedMcVersions(mcVersions());
       setLoaderVersions([]);
     }
   });
@@ -73,9 +72,7 @@ const InstanceCreation = (props: ModalProps) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-      setMappedMcVersions(mcVersions());
     } else if (!loader()) {
-      setMappedMcVersions(mcVersions());
       setLoaderVersions([]);
     }
   });
@@ -87,24 +84,21 @@ const InstanceCreation = (props: ModalProps) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-      setMappedMcVersions(mcVersions());
     } else if (!loader()) {
-      setMappedMcVersions(mcVersions());
       setLoaderVersions([]);
     }
   });
 
   createEffect(() => {
-    const filteredData = () =>
-      mcVersions().filter(
-        (item) =>
-          (item.type === "release" && releaseVersionFilter()) ||
-          (item.type === "snapshot" && snapshotVersionFilter()) ||
-          (item.type === "old_beta" && oldBetaVersionFilter()) ||
-          (item.type === "old_alpha" && oldAlphaVersionFilter())
-      );
+    const filteredData = mcVersions().filter(
+      (item) =>
+        (item.type === "release" && releaseVersionFilter()) ||
+        (item.type === "snapshot" && snapshotVersionFilter()) ||
+        (item.type === "old_beta" && oldBetaVersionFilter()) ||
+        (item.type === "old_alpha" && oldAlphaVersionFilter())
+    );
 
-    setMappedMcVersions(filteredData());
+    setMappedMcVersions(filteredData);
   });
 
   const modloaders = [
@@ -362,7 +356,10 @@ const InstanceCreation = (props: ModalProps) => {
               <div>
                 <Dropdown
                   disabled={Boolean(
-                    (forgeVersionsQuery.isLoading && loader()) ||
+                    ((forgeVersionsQuery.isFetching ||
+                      fabricVersionsQuery.isFetching ||
+                      quiltVersionsQuery.isFetching) &&
+                      loader()) ||
                       mappedMcVersions().length === 0
                   )}
                   options={mappedMcVersions().map((v) => ({
@@ -481,7 +478,12 @@ const InstanceCreation = (props: ModalProps) => {
                 <Switch>
                   <Match when={loaderVersions().length > 0}>
                     <Dropdown
-                      disabled={!loaderVersions()}
+                      disabled={
+                        forgeVersionsQuery.isFetching ||
+                        fabricVersionsQuery.isFetching ||
+                        quiltVersionsQuery.isFetching ||
+                        !loaderVersions()
+                      }
                       options={loaderVersions()?.map((v) => ({
                         label: v.id,
                         key: v.id,
