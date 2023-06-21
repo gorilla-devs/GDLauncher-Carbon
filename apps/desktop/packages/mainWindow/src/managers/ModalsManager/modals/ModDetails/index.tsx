@@ -4,7 +4,15 @@ import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onMount,
+} from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
@@ -15,7 +23,7 @@ const ModDetails = (props: ModalProps) => {
   const modId = () => modDetails()?.id;
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
-
+  let contentRef: HTMLDivElement | undefined;
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onMutate() {
       setLoading(true);
@@ -33,6 +41,22 @@ const ModDetails = (props: ModalProps) => {
       ]);
       if (modpackDescription.data?.data)
         setModpackDescription(modpackDescription.data?.data);
+    }
+  });
+
+  onMount(() => {
+    if (contentRef) {
+      contentRef.addEventListener("click", (event: MouseEvent) => {
+        let target = event.target as HTMLAnchorElement;
+        if (
+          target &&
+          target.tagName === "A" &&
+          target.href.startsWith("http")
+        ) {
+          event.preventDefault();
+          window.openExternalLink((event.target as any).href);
+        }
+      });
     }
   });
 
@@ -150,7 +174,11 @@ const ModDetails = (props: ModalProps) => {
                   </div>
                 </div>
               </div>
-              <div class="p-4" innerHTML={modpackDescription()} />
+              <div
+                class="p-4"
+                innerHTML={modpackDescription()}
+                ref={contentRef}
+              />
             </div>
           </Match>
         </Switch>
