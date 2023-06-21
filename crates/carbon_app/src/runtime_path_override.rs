@@ -11,12 +11,15 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
     let override_path = base_path.join("runtime_path_override.txt");
 
     if override_path.exists() {
+        println!("Runtime path override file exists, reading");
         let mut file = tokio::fs::File::open(&override_path).await.unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).await.unwrap();
         let path = PathBuf::from(contents.trim());
+        println!("Runtime path override is {}", path.display());
 
         if !path.exists() {
+            println!("Runtime path override does not exist. Creating");
             tokio::fs::create_dir_all(&path).await.unwrap();
         }
         base_path = path;
@@ -30,6 +33,10 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
                 .expect("failed to open finder");
         }
 
+        println!(
+            "Runtime path override file does not exist. Using base {}",
+            base_path.display()
+        );
         tokio::fs::create_dir_all(&base_path).await.unwrap();
     }
 

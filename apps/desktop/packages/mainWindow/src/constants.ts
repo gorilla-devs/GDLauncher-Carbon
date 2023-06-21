@@ -4,7 +4,7 @@ export const NAVBAR_ROUTES = [
     path: "/library",
   },
   {
-    label: "modpacks",
+    label: "explore",
     path: "/modpacks",
   },
 ];

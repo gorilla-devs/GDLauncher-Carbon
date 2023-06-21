@@ -10,10 +10,10 @@ const Overview = () => {
   return (
     <div>
       <Switch>
-        <Match when={!routeData.modpackDescription.isFetching}>
+        <Match when={!routeData.modpackDescription.isLoading}>
           <div innerHTML={routeData.modpackDescription.data?.data} />
         </Match>
-        <Match when={routeData.modpackDescription.isFetching}>
+        <Match when={routeData.modpackDescription.isLoading}>
           <Skeleton.modpackOverviewPage />
         </Match>
       </Switch>

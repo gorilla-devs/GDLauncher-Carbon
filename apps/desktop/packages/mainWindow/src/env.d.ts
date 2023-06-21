@@ -9,4 +9,9 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+declare module "*.riv" {
+  const content: any;
+  export default content;
+}
+
 declare const __APP_VERSION__: string;

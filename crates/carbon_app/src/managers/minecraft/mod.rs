@@ -13,6 +13,8 @@ use crate::domain::{
     },
 };
 
+use self::minecraft::get_lwjgl_meta;
+
 use super::ManagerRef;
 
 mod assets;
@@ -55,10 +57,23 @@ impl ManagerRef<'_, MinecraftManager> {
     ) -> anyhow::Result<Vec<Downloadable>> {
         let runtime_path = &self.app.settings_manager().runtime_path;
 
+        let version_id = version_info
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version_info.id)
+            .clone();
+
         let mut all_files = vec![];
 
+        let lwjgl =
+            get_lwjgl_meta(&self.app.reqwest_client, &version_info, &self.meta_base_url).await?;
+
         let libraries = libraries_into_vec_downloadable(
-            version_info.libraries,
+            version_info
+                .libraries
+                .into_iter()
+                .chain(lwjgl.libraries.into_iter())
+                .collect(),
             &runtime_path.get_libraries().to_path(),
             java_arch,
         );
@@ -69,7 +84,8 @@ impl ManagerRef<'_, MinecraftManager> {
                 .get(&DownloadType::Client)
                 .unwrap()
                 .clone(),
-            &runtime_path.get_versions().get_clients_path(),
+            &version_id,
+            runtime_path,
         );
 
         let assets = assets_index_into_vec_downloadable(
@@ -81,6 +97,21 @@ impl ManagerRef<'_, MinecraftManager> {
             .await?,
             &runtime_path.get_assets(),
         );
+
+        if let Some(logging_xml) = version_info.logging {
+            if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+                all_files.push(
+                    Downloadable::new(
+                        client.file.url.clone(),
+                        runtime_path
+                            .get_logging_configs()
+                            .get_client_path(&client.file.id),
+                    )
+                    .with_size(client.file.size as u64)
+                    .with_checksum(Some(carbon_net::Checksum::Sha1(client.file.sha1.clone()))),
+                );
+            }
+        }
 
         all_files.push(client_main_jar);
         all_files.extend(libraries);
@@ -97,27 +128,26 @@ mod tests {
 
     use carbon_net::Progress;
     use chrono::Utc;
-    use daedalus::minecraft::DownloadType;
 
     use crate::managers::{
         account::{FullAccount, FullAccountType},
         java::java_checker::{JavaChecker, RealJavaChecker},
         minecraft::{
             forge::execute_processors,
-            minecraft::{extract_natives, launch_minecraft},
+            minecraft::{extract_natives, get_lwjgl_meta, launch_minecraft},
         },
     };
 
     #[ignore]
     #[tokio::test(flavor = "multi_thread", worker_threads = 12)]
     async fn test_download_minecraft() {
-        let version = "1.16.5";
+        let version = "1.20.1";
 
         let app = crate::setup_managers_for_test().await;
 
         let java_component = RealJavaChecker
             .get_bin_info(
-                &PathBuf::from("/Users/davideceschia/.sdkman/candidates/java/current/bin/java"),
+                &PathBuf::from("java"),
                 crate::domain::java::JavaComponentType::Local,
             )
             .await
@@ -149,28 +179,37 @@ mod tests {
         .await
         .unwrap();
 
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version_info,
+            &app.minecraft_manager().meta_base_url,
+        )
+        .await
+        .unwrap();
+
         // Uncomment for FORGE
         // -----FORGE
 
-        // let forge_manifest = crate::managers::minecraft::forge::get_manifest(
-        //     &app.reqwest_client.clone(),
-        //     &app.minecraft_manager.meta_base_url,
-        // )
-        // .await
-        // .unwrap()
-        // .game_versions
-        // .into_iter()
-        // .find(|v| v.id == version)
-        // .unwrap()
-        // .loaders[0]
-        //     .clone();
+        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+            &app.reqwest_client.clone(),
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap()
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == version)
+        .unwrap()
+        .loaders[0]
+            .clone();
 
-        // let forge_version_info =
-        //     crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-        //         .await
-        //         .unwrap();
+        let forge_version_info =
+            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
+                .await
+                .unwrap();
 
-        // let version_info = merge_partial_version(forge_version_info, version_info);
+        let version_info =
+            daedalus::modded::merge_partial_version(forge_version_info, version_info);
 
         // -----FORGE
 
@@ -193,18 +232,23 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version_info, &java_component.arch).await;
+        extract_natives(
+            runtime_path,
+            &version_info,
+            &lwjgl_group,
+            &java_component.arch,
+        )
+        .await
+        .unwrap();
 
         let libraries_path = runtime_path.get_libraries();
         let game_version = version_info.id.to_string();
-        let client_path = runtime_path.get_versions().get_clients_path().join(format!(
-            "{}.jar",
+        let client_path = runtime_path.get_libraries().get_mc_client(
             version_info
-                .downloads
-                .get(&DownloadType::Client)
-                .unwrap()
-                .sha1
-        ));
+                .inherits_from
+                .as_ref()
+                .unwrap_or(&version_info.id),
+        );
 
         if let Some(processors) = &version_info.processors {
             execute_processors(
@@ -239,6 +283,7 @@ mod tests {
             "",
             runtime_path,
             version_info,
+            &lwjgl_group,
             instance_path,
         )
         .await
@@ -248,8 +293,15 @@ mod tests {
         let stdout = child.stdout.take().unwrap();
         let mut reader = tokio::io::BufReader::new(stdout);
 
+        let stderr = child.stderr.take().unwrap();
+        let mut reader_err = tokio::io::BufReader::new(stderr);
+
         tokio::spawn(async move {
             tokio::io::copy(&mut reader, &mut tokio::io::stdout())
+                .await
+                .unwrap();
+
+            tokio::io::copy(&mut reader_err, &mut tokio::io::stderr())
                 .await
                 .unwrap();
         });

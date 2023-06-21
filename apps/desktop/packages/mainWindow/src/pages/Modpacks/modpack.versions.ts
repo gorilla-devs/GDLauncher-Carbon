@@ -6,7 +6,12 @@ const fetchData = ({ params }: { params: any }) => {
     { modId: parseInt(params.id, 10), query: {} },
   ]);
 
-  return { curseforgeGetModFiles };
+  const curseforgeGetMod = rspc.createQuery(() => [
+    "modplatforms.curseforgeGetMod",
+    { modId: parseInt(params.id, 10) },
+  ]);
+
+  return { curseforgeGetModFiles, curseforgeGetMod };
 };
 
 export default fetchData;

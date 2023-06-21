@@ -6,7 +6,7 @@ import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import { FECategory, FEModLoaderType } from "@gd/core_module/bindings";
-import { useInfiniteQuery } from "@/pages/Modpacks";
+import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 
 const Sidebar = () => {
@@ -15,7 +15,7 @@ const Sidebar = () => {
     FECategory[]
   >([]);
 
-  const infiniteQuery = useInfiniteQuery();
+  const infiniteQuery = useInfiniteModpacksQuery();
 
   createEffect(() => {
     if (routeData.forgeCategories.data?.data) {
@@ -31,6 +31,7 @@ const Sidebar = () => {
     if (routeData.minecraftVersions.data) {
       setMcVersions(routeData.minecraftVersions.data);
 
+      setMappedMcVersions([]);
       routeData.minecraftVersions.data.forEach((version) => {
         if (version.type === "release") {
           setMappedMcVersions((prev) => [
@@ -53,21 +54,21 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
+                const mappedValue = val === "any" ? null : val;
                 infiniteQuery?.setQuery({
-                  modLoaderType: val as FEModLoaderType,
+                  modLoaderType: mappedValue as FEModLoaderType,
                 });
               }}
               value={infiniteQuery?.query.query.modLoaderType || "any"}
             >
               <Radio name="modloader" value="any">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("vanilla")} />
-                  <p class="m-0">Vanilla</p>
+                  <p class="m-0">Any</p>
                 </div>
               </Radio>
               <Radio name="modloader" value="forge">
                 <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("forge")} />
+                  <img class="h-4 w-4" src={getModloaderIcon("Forge")} />
                   <p class="m-0">Forge</p>
                 </div>
               </Radio>

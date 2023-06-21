@@ -1,6 +1,6 @@
-use crate::iridium_client::get_client;
+use crate::{cache_middleware, iridium_client::get_client};
 
-use super::ManagerRef;
+use super::{ManagerRef, UnsafeAppRef};
 
 pub mod curseforge;
 
@@ -9,32 +9,14 @@ pub struct ModplatformsManager {
 }
 
 impl ModplatformsManager {
-    pub fn new() -> Self {
+    pub fn new(unsafeappref: UnsafeAppRef) -> Self {
         Self {
-            curseforge: curseforge::CurseForge::new(get_client()),
+            curseforge: curseforge::CurseForge::new(cache_middleware::new_client(
+                unsafeappref,
+                get_client(),
+            )),
         }
     }
 }
 
 impl ManagerRef<'_, ModplatformsManager> {}
-
-// #[cfg(test)]
-// mod test {
-//     use crate::setup_managers_for_test;
-
-//     use super::*;
-
-//     #[tokio::test]
-//     async fn test_get_client() {
-//         let client = get_client();
-
-//         let response = client
-//             // .get("https://api.gdlauncher.com/v1/curseforge/mods/520914")
-//             .get("https://api.gdlauncher.com/cf/mods/520914")
-//             .send()
-//             .await
-//             .unwrap();
-
-//         assert_eq!(response.status(), 200);
-//     }
-// }

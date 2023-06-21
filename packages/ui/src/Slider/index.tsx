@@ -6,12 +6,13 @@ import {
   onCleanup,
   onMount,
   JSX,
+  Show,
 } from "solid-js";
 
 interface Marks {
   [mark: number]: string | { label: JSX.Element };
 }
-export interface Props {
+interface Props {
   max: number;
   min: number;
   steps?: number | null;
@@ -29,8 +30,11 @@ function Slider(props: Props) {
   const [startPosition, setStartPosition] = createSignal<number>(0);
   const [startValue, setStartValue] = createSignal<number>(0);
   const [dragging, setDragging] = createSignal(false);
+  const [showTooptip, setShowTooltip] = createSignal(false);
+  const [handleRef, setHandleRef] = createSignal<HTMLDivElement | undefined>(
+    undefined
+  );
 
-  let handleRef: HTMLDivElement;
   let sliderRef: HTMLDivElement;
 
   const getSliderStart = () => {
@@ -111,6 +115,7 @@ function Slider(props: Props) {
 
   const mousemove = (e: MouseEvent) => {
     if (!dragging()) return;
+    setShowTooltip(true);
     let diffPosition = e.pageX - startPosition();
     const diffValue =
       (diffPosition / getSliderLength()) * (props.max - props.min);
@@ -123,17 +128,32 @@ function Slider(props: Props) {
   };
 
   const mouseup = () => {
+    setShowTooltip(false);
     setDragging(false);
   };
 
+  const trackClick = (e: MouseEvent) => {
+    e.preventDefault();
+
+    // Don't react if the click came from the handle itself.
+    if (e.target === handleRef()) {
+      return;
+    }
+
+    const value = calcValueByPos(e.clientX);
+    onChange(value);
+  };
+
   onMount(() => {
-    handleRef.addEventListener("mousedown", mousedown);
+    handleRef()?.addEventListener("mousedown", mousedown);
+    sliderRef.addEventListener("click", trackClick);
     document.addEventListener("mousemove", mousemove);
     document.addEventListener("mouseup", mouseup);
   });
 
   onCleanup(() => {
-    handleRef.removeEventListener("mousedown", mousedown);
+    handleRef()?.removeEventListener("mousedown", mousedown);
+    sliderRef.removeEventListener("click", trackClick);
     document.removeEventListener("mousemove", mousemove);
     document.removeEventListener("mouseup", mouseup);
   });
@@ -144,73 +164,111 @@ function Slider(props: Props) {
   };
 
   return (
-    <div class="h-10 flex items-center w-full max-w-full box-border mb-10">
-      <div class="relative w-full">
-        <For each={Object.entries(props.marks)}>
-          {([value, label], i) => (
-            <>
-              <div
-                class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
-                style={{
-                  position: "absolute",
-                  left: `${calcOffset(parseInt(value, 10))}%`,
-                  "margin-left": -(16 / 2) + "px",
-                }}
-                classList={{
-                  "bg-darkSlate-900 border-darkSlate-900":
-                    calcOffset(parseInt(value, 10)) >=
-                    calcOffset(currentValue()),
-                  "bg-primary-500 border-primary-500":
-                    calcOffset(parseInt(value, 10)) <=
-                    calcOffset(currentValue()),
-                }}
-              />
-              <p
-                class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-darkSlate-500 w-10"
-                style={{
-                  position: "absolute",
-                  left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
-                    i() === Object.entries(props.marks).length - 1
-                      ? "10px"
-                      : "0px"
-                  })`,
-                  top: "10px",
-                }}
-              >
-                <Switch>
-                  <Match when={typeof label === "string"}>{label}</Match>
-                  <Match when={typeof label === "object"}>{label.label}</Match>
-                </Switch>
-              </p>
-            </>
-          )}
-        </For>
-        <div
-          ref={(el) => {
-            handleRef = el;
-          }}
-          class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-move z-10"
-          style={{
-            position: "absolute",
-            left: `${calcOffset(currentValue())}%`,
-            transform: "translateX(-50%)",
-          }}
-        />
-        <div
-          class=" h-2 bg-primary-500 rounded-full"
-          style={{
-            position: "absolute",
-            width: `${calcOffset(currentValue())}%`,
-          }}
-        />
-        <div
-          ref={(el) => {
-            sliderRef = el;
-          }}
-          class="w-full h-2 bg-darkSlate-900 rounded-full"
-        />
+    <>
+      <div class="relative h-10 flex items-center w-full max-w-full box-border mb-10">
+        <Show when={showTooptip()}>
+          <div
+            class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"
+            style={{
+              position: "absolute",
+              left: `${calcOffset(currentValue())}%`,
+              transform: "translate(-50%, -40px)",
+            }}
+          >
+            <div class="z-10 relative">{currentValue()}</div>
+            <div class="z-1 absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 rotate-45 bg-darkSlate-900" />
+          </div>
+        </Show>
+        <div class="relative w-full">
+          <For each={Object.entries(props.marks)}>
+            {([value, label], i) => (
+              <>
+                <div
+                  class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
+                  style={{
+                    position: "absolute",
+                    left: `${calcOffset(parseInt(value, 10))}%`,
+                    "margin-left": -(16 / 2) + "px",
+                  }}
+                  classList={{
+                    "bg-darkSlate-900 border-darkSlate-900":
+                      calcOffset(parseInt(value, 10)) >=
+                      calcOffset(currentValue()),
+                    "bg-primary-500 border-primary-500":
+                      calcOffset(parseInt(value, 10)) <=
+                        calcOffset(currentValue()) && !showTooptip(),
+                    "bg-accent border-accent":
+                      calcOffset(parseInt(value, 10)) <=
+                        calcOffset(currentValue()) && showTooptip(),
+                  }}
+                />
+                <p
+                  class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-darkSlate-500 w-10"
+                  style={{
+                    position: "absolute",
+                    left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                      i() === Object.entries(props.marks).length - 1
+                        ? "10px"
+                        : "0px"
+                    })`,
+                    top: "10px",
+                  }}
+                >
+                  <Switch>
+                    <Match when={typeof label === "string"}>{label}</Match>
+                    <Match when={typeof label === "object"}>
+                      {label.label}
+                    </Match>
+                  </Switch>
+                </p>
+              </>
+            )}
+          </For>
+          <div
+            ref={setHandleRef}
+            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-pointer z-20 after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100"
+            style={{
+              position: "absolute",
+              left: `${calcOffset(currentValue())}%`,
+              transform: "translateX(-50%)",
+            }}
+            classList={{
+              "after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100":
+                showTooptip(),
+            }}
+            onMouseOver={() => {
+              setShowTooltip(true);
+            }}
+            onMouseOut={() => {
+              setShowTooltip(false);
+            }}
+          />
+          <div
+            ref={(el) => {
+              sliderRef = el;
+            }}
+            class="absolute top-1/2 left-0 right-0 -translate-y-1/2 w-full h-2 z-10 cursor-pointer"
+          />
+          <div
+            class="h-2 rounded-full"
+            classList={{
+              "bg-accent": showTooptip(),
+              "bg-primary-500": !showTooptip(),
+            }}
+            style={{
+              position: "absolute",
+              width: `${calcOffset(currentValue())}%`,
+            }}
+          />
+          <div
+            // ref={(el) => {
+            //   sliderRef = el;
+            // }}
+            class="w-full h-2 bg-darkSlate-900 rounded-full"
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

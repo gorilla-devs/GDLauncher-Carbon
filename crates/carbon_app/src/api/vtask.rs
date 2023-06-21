@@ -12,7 +12,7 @@ use super::translation::Translation;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query GET_TASKS[app, _: ()] {
+        query GET_TASKS[app, args: ()] {
             Ok(app.task_manager().get_tasks().await
                .into_iter()
                .map(Task::from)
@@ -32,7 +32,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     }
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 pub struct TaskId(pub i32);
 
 impl From<domain::VisualTaskId> for TaskId {

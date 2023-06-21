@@ -18,8 +18,5 @@ sha1 = { workspace = true }
 futures = { workspace = true }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-tokio ={ workspace = true, features = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 hex = { workspace = true }
-
-[dev-dependencies]
-tracing-test = { workspace = true }

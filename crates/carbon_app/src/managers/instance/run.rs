@@ -3,6 +3,7 @@ use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
+use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 
@@ -199,9 +200,7 @@ impl ManagerRef<'_, InstanceManager> {
                     t_modpack
                 {
                     if let Some(modpack) = &config.modpack {
-                        let modpack = match modpack {
-                            Modpack::Curseforge(modpack) => modpack,
-                        };
+                        let Modpack::Curseforge(modpack) = modpack;
 
                         t_request.start_opaque();
                         let file = app
@@ -254,6 +253,9 @@ impl ManagerRef<'_, InstanceManager> {
 
                         downloads.extend(modpack_info.downloadables);
                         let v: StandardVersion = modpack_info.manifest.minecraft.try_into()?;
+
+                        tracing::info!("Modpack version: {:?}", v);
+
                         version = Some(v.clone());
 
                         app.instance_manager()
@@ -292,6 +294,13 @@ impl ManagerRef<'_, InstanceManager> {
                     .get_minecraft_version(manifest_version.clone())
                     .await?;
 
+                let lwjgl_group = get_lwjgl_meta(
+                    &app.reqwest_client,
+                    &version_info,
+                    &app.minecraft_manager().meta_base_url,
+                )
+                .await?;
+
                 t_request_version_info.update_items(2, 3);
 
                 let java = {
@@ -329,48 +338,46 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 };
 
-                match version.modloaders.iter().next() {
-                    Some(ModLoader {
-                        type_: ModLoaderType::Forge,
-                        version: forge_version,
-                    }) => {
-                        let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+                if let Some(ModLoader {
+                    type_: ModLoaderType::Forge,
+                    version: forge_version,
+                }) = version.modloaders.iter().next()
+                {
+                    let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-                        let forge_version =
-                            match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                                None => forge_version.clone(),
-                                Some(sub) => sub.to_string(),
-                            };
+                    let forge_version =
+                        match forge_version.strip_prefix(&format!("{}-", version.release)) {
+                            None => forge_version.clone(),
+                            Some(sub) => sub.to_string(),
+                        };
 
-                        let forge_manifest_version = forge_manifest
-                            .game_versions
-                            .into_iter()
-                            .find(|v| v.id == version.release)
-                            .ok_or_else(|| {
-                                anyhow!("Could not find forge versions for {}", version.release)
-                            })?
-                            .loaders
-                            .into_iter()
-                            .find(|v| v.id == format!("{}-{}", version.release, forge_version))
-                            .ok_or_else(|| {
-                                anyhow!(
-                                    "Could not find forge version {}-{} for minecraft version {}",
-                                    version.release,
-                                    forge_version,
-                                    version.release,
-                                )
-                            })?;
+                    let forge_manifest_version = forge_manifest
+                        .game_versions
+                        .into_iter()
+                        .find(|v| v.id == version.release)
+                        .ok_or_else(|| {
+                            anyhow!("Could not find forge versions for {}", version.release)
+                        })?
+                        .loaders
+                        .into_iter()
+                        .find(|v| v.id == format!("{}-{}", version.release, forge_version))
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "Could not find forge version {}-{} for minecraft version {}",
+                                version.release,
+                                forge_version,
+                                version.release,
+                            )
+                        })?;
 
-                        let forge_version = crate::managers::minecraft::forge::get_version(
-                            &app.reqwest_client,
-                            forge_manifest_version,
-                        )
-                        .await?;
+                    let forge_version = crate::managers::minecraft::forge::get_version(
+                        &app.reqwest_client,
+                        forge_manifest_version,
+                    )
+                    .await?;
 
-                        version_info =
-                            daedalus::modded::merge_partial_version(forge_version, version_info);
-                    }
-                    _ => {}
+                    version_info =
+                        daedalus::modded::merge_partial_version(forge_version, version_info);
                 }
 
                 t_request_version_info.update_items(3, 3);
@@ -413,21 +420,20 @@ impl ManagerRef<'_, InstanceManager> {
                 managers::minecraft::minecraft::extract_natives(
                     &runtime_path,
                     &version_info,
+                    &lwjgl_group,
                     &java.arch,
                 )
-                .await;
+                .await?;
                 t_extract_natives.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
                 let game_version = version_info.id.to_string();
-                let client_path = runtime_path.get_versions().get_clients_path().join(format!(
-                    "{}.jar",
+                let client_path = runtime_path.get_libraries().get_mc_client(
                     version_info
-                        .downloads
-                        .get(&DownloadType::Client)
-                        .unwrap()
-                        .sha1
-                ));
+                        .inherits_from
+                        .as_ref()
+                        .unwrap_or(&version_info.id),
+                );
 
                 if let Some(t_forge_processors) = &t_forge_processors {
                     t_forge_processors.start_opaque();
@@ -458,11 +464,12 @@ impl ManagerRef<'_, InstanceManager> {
                         managers::minecraft::minecraft::launch_minecraft(
                             java,
                             account,
-                            xms_memory,
                             xmx_memory,
+                            xms_memory,
                             &extra_java_args,
                             &runtime_path,
                             version_info,
+                            &lwjgl_group,
                             instance_path,
                         )
                         .await?,
@@ -528,6 +535,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stdout.read(&mut outbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stdout: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdOut, &*utf8);
                                             false
@@ -556,6 +567,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 r = stderr.read(&mut errbuf) => match r {
                                     Ok(count) if count > 0 => {
                                         let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
+                                        #[cfg(debug_assertions)]
+                                        {
+                                            tracing::trace!("stderr: {}", utf8);
+                                        }
                                         log.send_if_modified(|log| {
                                             log.push(EntryType::StdErr, &*utf8);
                                             false
@@ -738,10 +753,10 @@ mod test {
         app.task_manager().wait_with_log(task).await?;
         app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
             .await?;
-        println!("Task exited");
+        tracing::info!("Task exited");
         let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
             domain::LaunchState::Inactive { .. } => {
-                println!("Game not running");
+                tracing::info!("Game not running");
                 return Ok(());
             }
             domain::LaunchState::Running { log_id, .. } => log_id,
@@ -756,7 +771,7 @@ mod test {
             let new_lines = log.get_region(idx..);
             idx = log.len();
             for line in new_lines {
-                println!("[{:?}]: {}", line.type_, line.text);
+                tracing::info!("[{:?}]: {}", line.type_, line.text);
             }
         }
 

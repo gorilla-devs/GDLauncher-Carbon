@@ -39,6 +39,7 @@ export default defineConfig({
       ],
     }),
   ],
+  assetsInclude: "**/*.riv",
   envDir: resolve(__dirname, "../../../../"),
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
