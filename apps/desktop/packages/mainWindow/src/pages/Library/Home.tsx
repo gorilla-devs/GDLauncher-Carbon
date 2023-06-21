@@ -3,7 +3,6 @@ import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
-  Show,
   Suspense,
   Switch,
   createEffect,
@@ -34,17 +33,24 @@ const Home = () => {
   return (
     <div class="pb-0 p-6">
       <div>
-        <Show
-          when={news.length > 0 && isNewsVisible()}
-          fallback={<Skeleton.news />}
-        >
-          <News
-            slides={news}
-            onClick={(news) => {
-              window.openExternalLink(news.url || "");
-            }}
-          />
-        </Show>
+        <Switch>
+          <Match when={news.length > 0 && isNewsVisible()}>
+            <News
+              slides={news}
+              onClick={(news) => {
+                window.openExternalLink(news.url || "");
+              }}
+            />
+          </Match>
+          <Match
+            when={
+              (news.length === 0 && isNewsVisible()) ||
+              routeData.settings.isLoading
+            }
+          >
+            <Skeleton.news />
+          </Match>
+        </Switch>
         <Switch>
           <Match
             when={
