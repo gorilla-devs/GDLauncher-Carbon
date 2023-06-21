@@ -140,6 +140,10 @@ export const routes: RouteDefinition[] = [
             component: lazy(() => import("@/pages/Settings/Java")),
             data: SettingsJavaData,
           },
+          {
+            path: "/privacy",
+            component: lazy(() => import("@/pages/Settings/Privacy")),
+          },
         ],
       },
       {

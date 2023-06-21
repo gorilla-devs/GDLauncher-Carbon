@@ -142,7 +142,7 @@ const CodeStep = (props: Props) => {
         setEnrollmentInProgress(false);
         setError("Something went wrong while logging in");
         accountEnrollCancelMutation.mutate(undefined);
-        props.setStep(0);
+        props.setStep(1);
       },
       onComplete(account) {
         finalizeMutation.mutate(undefined);
@@ -153,7 +153,7 @@ const CodeStep = (props: Props) => {
       onError() {
         setError("Something went wrong while logging in");
         accountEnrollCancelMutation.mutate(undefined);
-        props.setStep(0);
+        props.setStep(1);
       },
     });
   });

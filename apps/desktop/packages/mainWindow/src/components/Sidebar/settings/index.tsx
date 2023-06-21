@@ -22,8 +22,13 @@ const settings: Array<settingsItem> = [
   },
   {
     name: "Java",
-    icon: "palette",
+    icon: "",
     path: "/settings/java",
+  },
+  {
+    name: "Privacy",
+    icon: "",
+    path: "/settings/privacy",
   },
 ];
 

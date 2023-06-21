@@ -96,6 +96,11 @@ async function createWindow() {
     return { platform: os.platform(), arch: os.arch() };
   });
 
+  ipcMain.handle("openCMPWindow", async () => {
+    // @ts-ignore
+    app.overwolf.openCMPWindow();
+  });
+
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {

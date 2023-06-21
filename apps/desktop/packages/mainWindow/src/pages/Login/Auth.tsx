@@ -85,7 +85,7 @@ const Auth = (props: Props) => {
           link: info.verificationUri,
           expiresAt: info.expiresAt,
         });
-        props.setStep(1);
+        props.setStep(2);
       },
       onFail() {
         retryLogin();

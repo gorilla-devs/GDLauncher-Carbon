@@ -1,11 +1,12 @@
 import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match } from "solid-js";
+import { createSignal, Switch, Match, createEffect } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
 import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
+import TermsAndConditions from "./TermsAndConditions";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -29,6 +30,10 @@ export default function Login() {
       if (newSettings.language) changeLanguage(newSettings.language as string);
       queryClient.setQueryData(["settings.getSettings"], newSettings);
     },
+  });
+
+  createEffect(() => {
+    // if already accepted go to the next step
   });
 
   return (
@@ -61,20 +66,23 @@ export default function Login() {
             class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 0 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
-              "overflow-hidden": step() === 1,
+              "overflow-hidden": step() === 2,
             }}
           >
             <Switch>
               <Match when={step() === 0}>
+                <TermsAndConditions setStep={setStep} />
+              </Match>
+              <Match when={step() === 1}>
                 <Auth
                   setStep={setStep}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />
               </Match>
-              <Match when={step() === 1}>
+              <Match when={step() === 2}>
                 <CodeStep
                   setStep={setStep}
                   deviceCodeObject={deviceCodeObject()}
