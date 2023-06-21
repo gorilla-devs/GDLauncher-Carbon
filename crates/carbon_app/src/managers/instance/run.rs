@@ -397,6 +397,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 .dummy_replace_string
                                 .clone();
 
+                            let supported = fabric_manifest
+                                    .game_versions
+                                    .iter()
+                                    .find(|v| v.id == version.release)
+                                    .is_some();
+
+                            if !supported {
+                                return Err(anyhow!("Fabric does not support version {}", version.release));
+                            }
+
                             let fabric_manifest_version = fabric_manifest
                                 .game_versions
                                 .into_iter()
@@ -443,6 +453,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 .get_or_init(daedalus::Branding::default)
                                 .dummy_replace_string
                                 .clone();
+
+                            let supported = quilt_manifest
+                                    .game_versions
+                                    .iter()
+                                    .find(|v| v.id == version.release)
+                                    .is_some();
+
+                            if !supported {
+                                return Err(anyhow!("Quilt does not support version {}", version.release));
+                            }
 
                             let quilt_manifest_version = quilt_manifest
                                 .game_versions
