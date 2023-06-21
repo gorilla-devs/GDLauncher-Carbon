@@ -8,7 +8,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use super::metadata::mods as mod_meta;
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
-use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::instance::info::{GameVersion, InstanceIcon, ModLoaderType};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
@@ -192,7 +192,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                             id,
                                             filename: filename.to_owned(),
                                             enabled: !is_jar_disabled,
-                                            modloader: info::ModLoaderType::Forge,
+                                            modloaders: metadata.modloaders.clone().unwrap_or_else(|| vec![info::ModLoaderType::Unknown]),
                                             metadata,
                                         }
                                     });
@@ -1328,7 +1328,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     id: m.id.clone(),
                     filename: m.filename.to_string_lossy().to_string(),
                     enabled: m.enabled,
-                    modloader: m.modloader,
+                    modloaders: m.modloaders.clone(),
                     metadata: m.metadata.clone(),
                 })
                 .collect(),
@@ -1553,7 +1553,7 @@ pub struct Mod {
     id: String,
     filename: OsString,
     enabled: bool,
-    modloader: info::ModLoaderType,
+    modloaders: Vec<domain::info::ModLoaderType>,
     metadata: domain::ModFileMetadata,
 }
 

@@ -68,6 +68,7 @@ pub enum ModLoaderType {
     Forge,
     Fabric,
     Quilt,
+    Unknown,
 }
 
 impl Modpack {

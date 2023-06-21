@@ -5,6 +5,7 @@ import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
 import { useParams } from "@solidjs/router";
 import { SetStoreFunction } from "solid-js/store";
+import { For } from "solid-js";
 
 type Props = {
   mod: ModType;
@@ -37,9 +38,16 @@ const Mod = (props: Props) => {
             <div class="flex flex-col">
               {props.mod.metadata.name}
               <div class="flex gap-2">
-                <img class="w-4 h-4" src={getModloaderIcon(props.mod.modloader)} />
+                <For each={props.mod.modloaders}>{(modloader, _) =>
+                  <span class="flex gap-2 justify-center items-center" >
+                    <img class="w-4 h-4" src={getModloaderIcon(modloader)} />
+                    <p class="m-0 text-darkSlate-500 text-sm">
+                          {`${modloader}`}
+                    </p>
+                  </span>
+                }</For>
                 <p class="m-0 text-darkSlate-500 text-sm">
-                  {`${props.mod.modloader} ${props.mod.metadata.version}`}
+                    {`${props.mod.metadata.version}`}
                 </p>
               </div>
             </div>

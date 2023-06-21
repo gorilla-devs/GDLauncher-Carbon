@@ -474,6 +474,7 @@ impl ManagerRef<'_, InstanceManager> {
                             version_info =
                                 daedalus::modded::merge_partial_version(quilt_version, version_info);
                         }
+                        _ => {}
                     }
                 }
 

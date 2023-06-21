@@ -3,7 +3,7 @@ use std::{
     io::{self, Seek},
 };
 
-use crate::domain::instance::ModFileMetadata;
+use crate::domain::instance::{ModFileMetadata, info::ModLoaderType};
 use anyhow::anyhow;
 use serde::Deserialize;
 use std::io::{BufRead, Read};
@@ -439,6 +439,7 @@ impl From<McModInfo> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors.map(|list| list.join(", ")),
+            modloaders: Some(vec![ModLoaderType::Forge]),
         }
     }
 }
@@ -451,6 +452,7 @@ impl From<ModsTomlEntry> for ModFileMetadata {
             version: Some(value.version),
             description: value.description,
             authors: value.authors,
+            modloaders: Some(vec![ModLoaderType::Forge]),
         }
     }
 }
@@ -484,6 +486,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                 version: Some(info.version),
                 description: info.description,
                 authors: info.authors.and_then(flatten_authors),
+                modloaders: Some(vec![ModLoaderType::Fabric]),
             }),
             FabricModJson::List(list) => {
                 let info = list
@@ -495,6 +498,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                     version: Some(info.version.clone()),
                     description: info.description.clone(),
                     authors: info.authors.clone().and_then(flatten_authors),
+                    modloaders: Some(vec![ModLoaderType::Fabric]),
                 })
             }
         }
@@ -518,12 +522,38 @@ impl From<QuiltModJson> for ModFileMetadata {
             version: Some(value.quilt_loader.version),
             description,
             authors,
+            modloaders: Some(vec![ModLoaderType::Quilt]),
         }
+    }
+}
+
+fn merge_mod_metadata(metadata: Option<ModFileMetadata>, other: ModFileMetadata) -> Option<ModFileMetadata> {
+    match metadata {
+        Some(metadata) => Some(ModFileMetadata{
+            modid: metadata.modid,
+            name: metadata.name.or(other.name),
+            version: metadata.version.or(other.version),
+            description: metadata.description.or(other.description),
+            authors: metadata.authors.or(other.authors),
+            modloaders: match (metadata.modloaders, other.modloaders) {
+                (Some(mut a), Some(mut b)) => {
+                    a.append(&mut b);
+                    Some(a)
+                },
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
+
+        }),
+        None => Some(other),
     }
 }
 
 pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFileMetadata>> {
     let mut zip = zip::ZipArchive::new(reader)?;
+
+    let mut mod_metadata: Option<ModFileMetadata> = None;
 
     // Used a block and let else instead of an if let to avoid what appears to be a
     // borrow checker life extension bug.
@@ -553,8 +583,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
             }
         }
 
-        return Ok(Some(modstoml.into()));
+        mod_metadata = merge_mod_metadata(mod_metadata, modstoml.into());
     }
+
 
     'fabric_mod_json: {
         let Ok(mut file) = zip.by_name("fabric.mod.json") else { break 'fabric_mod_json };
@@ -563,7 +594,7 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
 
         let fabric_mod_json = serde_json::from_str::<FabricModJson>(&content)?;
 
-        return Ok(Some(fabric_mod_json.try_into()?));
+        mod_metadata = merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
     }
 
     'quilt_mod_json: {
@@ -573,16 +604,16 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
 
         let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&content)?;
 
-        return Ok(Some(quilt_mod_json.into()));
+        mod_metadata = merge_mod_metadata(mod_metadata, quilt_mod_json.into());
     }
 
     if let Ok(file) = zip.by_name("mcmod.info") {
         let mcmod: McModInfo =
             serde_json::from_reader::<_, McModInfoContainer>(file)?.try_into()?;
-        return Ok(Some(mcmod.into()));
+        mod_metadata = merge_mod_metadata(mod_metadata, mcmod.into());
     }
 
-    Ok(None)
+    Ok(mod_metadata)
 }
 
 #[cfg(test)]
@@ -591,7 +622,7 @@ mod test {
 
     use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 
-    use crate::domain::instance::ModFileMetadata;
+    use crate::domain::instance::{ModFileMetadata, info::ModLoaderType};
 
     use super::parse_metadata;
 
@@ -629,6 +660,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -651,6 +683,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -679,6 +712,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -703,6 +737,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -727,6 +762,7 @@ authors = "TestAuthor1, TestAuthor2"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -749,6 +785,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: None,
             authors: None,
+            modloaders: Some(vec![ModLoaderType::Forge]),
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -807,6 +844,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("This is an example description!")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            modloaders: Some(vec![ModLoaderType::Fabric]),
         });
 
         let returned = parsemeta("fabric.mod.json", modjson)?;
@@ -815,6 +853,7 @@ displayName = "TestMod"
 
         Ok(())
     }
+
 
     #[test]
     pub fn quilt_mod_json() -> anyhow::Result<()> {
@@ -867,6 +906,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("A short description of your mod.")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            modloaders: Some(vec![ModLoaderType::Quilt]),
         });
 
         let returned = parsemeta("quilt.mod.json", modjson)?;

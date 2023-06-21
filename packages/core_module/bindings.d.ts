@@ -92,8 +92,6 @@ export type FEFilesParameters = { body: FEFilesParametersBody }
 
 export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
 
-export type LaunchState = { Inactive: { failed_task: TaskId | null } } | { Preparing: TaskId } | { Running: { start_time: string; log_id: number } }
-
 export type CurseforgeModpack = { project_id: number; file_id: number }
 
 export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean }
@@ -108,15 +106,13 @@ export type InstanceDetails = { name: string; favorite: boolean; version: string
 
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
 
-export type Mod = { id: string; filename: string; enabled: boolean; modloader: ModLoaderType; metadata: ModFileMetadata }
-
 export type GameLogId = number
+
+export type LaunchState = { Inactive: { failed_task: TaskId | null } } | { Preparing: TaskId } | { Running: { start_time: string; log_id: number } }
 
 export type CauseSegment = { display: string; debug: string }
 
 export type ConfigurationParseError = { type_: ConfigurationParseErrorType; message: string; line: number; config_text: string }
-
-export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null }
 
 export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
 
@@ -143,6 +139,8 @@ export type FEModSearchParameters = { query: FEModSearchParametersQuery }
 export type MemoryRange = { min_mb: number; max_mb: number }
 
 export type FEFile = { id: number; gameId: number; modId: number; isAvailable: boolean; displayName: string; fileName: string; releaseType: FEFileReleaseType; fileStatus: FEFileStatus; hashes: FEFileHash[]; fileDate: string; fileLength: number; downloadCount: number; downloadUrl: string | null; gameVersions: string[]; sortableGameVersions: FESortableGameVersion[]; dependencies: FEFileDependency[]; exposeAsAlternative: boolean | null; parentProjectFileId: number | null; alternateFileId: number | null; isServerPack: boolean | null; serverPackFileId: number | null; isEarlyAccessContent: boolean | null; earlyAccessEndDate: string | null; fileFingerprint: string; modules: FEFileModule[] }
+
+export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: ModLoaderType[] | null }
 
 export type FEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
@@ -206,7 +204,7 @@ export type FeError = { cause: CauseSegment[]; backtrace: string }
 
 export type ManifestVersion = { id: string; type: McType }
 
-export type ModLoaderType = "Forge" | "Fabric" | "Quilt"
+export type ModLoaderType = "Forge" | "Fabric" | "Quilt" | "Unknown"
 
 export type InstanceId = number
 
@@ -269,6 +267,8 @@ export type FEVendor = "azul"
 export type FEModsParameters = { body: FEModsParametersBody }
 
 export type FEModAsset = { id: number; modId: number; title: string; description: string; thumbnailUrl: string; url: string }
+
+export type Mod = { id: string; filename: string; enabled: boolean; modloaders: ModLoaderType[]; metadata: ModFileMetadata }
 
 export type Set<T> = { Set: T }
 

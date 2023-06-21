@@ -641,6 +641,7 @@ enum ModLoaderType {
     Forge,
     Fabric,
     Quilt,
+    Unknown,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -660,7 +661,7 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
-    modloader: ModLoaderType,
+    modloaders: Vec<ModLoaderType>,
     metadata: ModFileMetadata,
 }
 
@@ -671,6 +672,7 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
+    modloaders: Option<Vec<ModLoaderType>>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -718,6 +720,7 @@ impl From<domain::info::ModLoaderType> for ModLoaderType {
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
             domain::Quilt => Self::Quilt,
+            domain::Unknown => Self::Unknown
         }
     }
 }
@@ -797,6 +800,7 @@ impl From<ModLoaderType> for domain::info::ModLoaderType {
             ModLoaderType::Forge => Self::Forge,
             ModLoaderType::Fabric => Self::Fabric,
             ModLoaderType::Quilt => Self::Quilt,
+            ModLoaderType::Unknown => Self::Unknown,
         }
     }
 }
@@ -900,7 +904,7 @@ impl From<domain::Mod> for Mod {
             id: value.id,
             filename: value.filename,
             enabled: value.enabled,
-            modloader: value.modloader.into(),
+            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             metadata: value.metadata.into(),
         }
     }
@@ -914,6 +918,7 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors,
+            modloaders: value.modloaders.and_then(|v| Some(v.into_iter().map(Into::into).collect())),
         }
     }
 }
