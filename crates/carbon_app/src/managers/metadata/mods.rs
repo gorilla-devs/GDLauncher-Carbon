@@ -583,7 +583,15 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
             }
         }
 
-        mod_metadata = merge_mod_metadata(mod_metadata, modstoml.into());
+        let mut metadata: ModFileMetadata = modstoml.into();
+        match metadata.version {
+            Some(version) if version == "${file.jarVersion}" => {
+                metadata.version = None;
+            }
+            _ => (),
+        }
+
+        mod_metadata = merge_mod_metadata(mod_metadata, metadata);
     }
 
 
