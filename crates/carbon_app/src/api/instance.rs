@@ -145,6 +145,15 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(InstanceDetails::from)
         }
 
+        query INSTANCE_MODS[app, id: InstanceId] {
+            Ok(app.instance_manager()
+                .list_mods(id.into())
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<Mod>>())
+        }
+
         mutation PREPARE_INSTANCE[app, id: InstanceId] {
             app.instance_manager()
                 .prepare_game(id.into(), None)
@@ -583,7 +592,6 @@ struct InstanceDetails {
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
-    mods: Vec<Mod>,
 }
 
 #[derive(Type, Serialize, Deserialize)]
@@ -643,7 +651,8 @@ struct Mod {
     filename: String,
     enabled: bool,
     modloader: ModLoaderType,
-    metadata: ModFileMetadata,
+    metadata: Option<ModFileMetadata>,
+    curseforge: Option<CurseForgeModMetadata>,
 }
 
 #[derive(Type, Serialize)]
@@ -653,6 +662,16 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
+}
+
+#[derive(Type, Serialize)]
+struct CurseForgeModMetadata {
+    pub project_id: u32,
+    pub file_id: u32,
+    pub name: String,
+    pub urlslug: String,
+    pub summary: String,
+    pub authors: String,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -670,7 +689,6 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
             state: value.state.into(),
-            mods: value.mods.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -881,7 +899,8 @@ impl From<domain::Mod> for Mod {
             filename: value.filename,
             enabled: value.enabled,
             modloader: value.modloader.into(),
-            metadata: value.metadata.into(),
+            metadata: value.metadata.map(Into::into),
+            curseforge: value.curseforge.map(Into::into),
         }
     }
 }
@@ -893,6 +912,19 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             name: value.name,
             version: value.version,
             description: value.description,
+            authors: value.authors,
+        }
+    }
+}
+
+impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
+    fn from(value: domain::CurseForgeModMetadata) -> Self {
+        Self {
+            project_id: value.project_id,
+            file_id: value.file_id,
+            name: value.name,
+            urlslug: value.urlslug,
+            summary: value.summary,
             authors: value.authors,
         }
     }

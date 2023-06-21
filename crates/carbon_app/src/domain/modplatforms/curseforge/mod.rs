@@ -138,11 +138,11 @@ pub struct FingerprintMatch {
 pub struct FingerprintsMatchesResult {
     pub is_cache_built: bool,
     pub exact_matches: Vec<FingerprintMatch>,
-    pub exact_fingerprints: Vec<u64>,
+    pub exact_fingerprints: Vec<u32>,
     pub partial_matches: Vec<FingerprintMatch>,
     pub partial_match_fingerprints: HashMap<String, Vec<u64>>,
-    pub installed_fingerprints: Vec<u64>,
-    pub unmatched_fingerprints: Vec<u64>,
+    pub installed_fingerprints: Vec<u32>,
+    pub unmatched_fingerprints: Vec<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

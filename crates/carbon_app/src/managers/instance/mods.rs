@@ -1,45 +1,98 @@
-use std::{
-    ffi::{OsStr, OsString},
-    io::Cursor,
-    time::Duration,
-};
+use std::time::Duration;
 
 use anyhow::bail;
 use carbon_net::Downloadable;
-use md5::{Digest, Md5};
 use thiserror::Error;
 
-use crate::domain::instance as domain;
 use crate::{
-    api::keys::instance::*,
     api::translation::Translation,
     domain::{modplatforms::curseforge::filters::ModFileParameters, vtask::VisualTaskId},
-    managers::{metadata, vtask::VisualTask, ManagerRef},
+    managers::{vtask::VisualTask, ManagerRef},
 };
 
-use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError, Mod};
+use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use crate::{db::read_filters::IntFilter, domain::instance as domain};
+
+use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 impl ManagerRef<'_, InstanceManager> {
+    pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
+        {
+            let instances = self.instances.read().await;
+            if instances.get(&instance_id).is_none() {
+                bail!(InvalidInstanceIdError(instance_id));
+            }
+        }
+
+        let mods = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
+                *instance_id,
+            ))])
+            .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
+            .exec()
+            .await?
+            .into_iter()
+            .map(|m| domain::Mod {
+                id: m.id,
+                filename: m.filename,
+                enabled: m.enabled,
+                modloader: domain::info::ModLoaderType::Forge,
+                metadata: m
+                    .metadata
+                    .as_ref()
+                    .map(|m| match m.modid.clone() {
+                        Some(modid) => Some(domain::ModFileMetadata {
+                            modid,
+                            name: m.name.clone(),
+                            version: m.version.clone(),
+                            description: m.description.clone(),
+                            authors: m.authors.clone(),
+                        }),
+                        _ => None,
+                    })
+                    .flatten(),
+                curseforge: m
+                    .metadata
+                    .map(|m| m.curseforge)
+                    .flatten()
+                    .flatten()
+                    .map(|m| domain::CurseForgeModMetadata {
+                        project_id: m.project_id as u32,
+                        file_id: m.file_id as u32,
+                        name: m.name,
+                        urlslug: m.urlslug,
+                        summary: m.summary,
+                        authors: m.authors,
+                    }),
+            });
+
+        Ok(mods.collect::<Vec<_>>())
+    }
+
     pub async fn enable_mod(
         self,
         instance_id: InstanceId,
         id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
-        let mut instance = instances
-            .get_mut(&instance_id)
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &mut instance else {
-            bail!("enable_mod called on invalid instance");
-        };
+        let shortpath = &instance.shortpath;
 
-        let m = data
-            .mods
-            .iter_mut()
-            .find(|m| m.id == id)
-            .ok_or_else(|| InvalidModIdError(instance_id, id.clone()))?;
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .exec()
+            .await?
+            .ok_or_else(|| InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
@@ -52,7 +105,7 @@ impl ManagerRef<'_, InstanceManager> {
         let enabled_path = disabled_path.join(&m.filename);
 
         let mut disabled = m.filename.clone();
-        disabled.push(OsStr::new(".disabled"));
+        disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
         if enabled {
@@ -77,28 +130,30 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::rename(enabled_path, disabled_path).await?;
         }
 
-        m.enabled = !m.enabled;
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            .meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
+
         Ok(())
     }
 
     pub async fn delete_mod(self, instance_id: InstanceId, id: String) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
-        let mut instance = instances
-            .get_mut(&instance_id)
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &mut instance else {
-            bail!("enable_mod called on invalid instance");
-        };
+        let shortpath = &instance.shortpath;
 
-        let (i, m) = data
-            .mods
-            .iter_mut()
-            .enumerate()
-            .find(|(_, m)| m.id == id)
-            .ok_or_else(|| InvalidModIdError(instance_id, id.clone()))?;
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .exec()
+            .await?
+            .ok_or_else(|| InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
@@ -111,7 +166,7 @@ impl ManagerRef<'_, InstanceManager> {
         let enabled_path = disabled_path.join(&m.filename);
 
         let mut disabled = m.filename.clone();
-        disabled.push(OsStr::new(".disabled"));
+        disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
         if enabled_path.is_file() {
@@ -120,9 +175,11 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::remove_file(disabled_path).await?;
         }
 
-        data.mods.remove(i);
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            .meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
+
         Ok(())
     }
 
@@ -152,12 +209,20 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("install_mod called on invalid instance");
         };
 
-        // TODO: check with fingerprint once local meta cache is done
-        if data
-            .mods
-            .iter()
-            .any(|m| m.filename.to_string_lossy() == file.file_name)
-        {
+        // TODO: check with fingerprint?
+        let is_installed = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
+                *instance_id,
+                file.file_name.clone(),
+            ))
+            .exec()
+            .await?
+            .is_some();
+
+        if is_installed {
             bail!("mod is already installed");
         }
 
@@ -212,38 +277,11 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_file(&downloadable, Some(progress_watch_tx)).await?;
 
-                let instance_manager = app.instance_manager();
-                let mut instances = instance_manager.instances.write().await;
-                let mut instance = instances
-                    .get_mut(&instance_id)
-                    .ok_or(InvalidInstanceIdError(instance_id))?;
+                // invalidates INSTANCE_MODS
+                app.meta_cache_manager()
+                    .queue_local_caching(instance_id, true)
+                    .await;
 
-                let Instance { type_: InstanceType::Valid(data), .. } = &mut instance else {
-                    bail!("install_mod called on invalid instance");
-                };
-
-                let file_data = tokio::fs::read(downloadable.path).await?;
-                let md5hash = Md5::new_with_prefix(&file_data).finalize();
-
-                let metadata = tokio::task::spawn_blocking(|| {
-                    metadata::mods::parse_metadata(Cursor::new(file_data))
-                })
-                .await??
-                .ok_or_else(|| {
-                    anyhow::anyhow!("downloaded curseforge mod did not have any metadata")
-                })?;
-
-                let id = hex::encode(md5hash);
-
-                data.mods.push(Mod {
-                    id,
-                    filename: OsString::from(file.file_name),
-                    enabled: true,
-                    modloader: domain::info::ModLoaderType::Forge,
-                    metadata,
-                });
-
-                app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                 Ok::<_, anyhow::Error>(())
             })()
             .await;

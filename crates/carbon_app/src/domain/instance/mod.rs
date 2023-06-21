@@ -1,5 +1,6 @@
 use crate::domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 pub mod info;
 
@@ -11,6 +12,9 @@ pub struct InstanceId(pub i32);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct GameLogId(pub i32);
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct InstanceModId(pub Uuid);
 
 #[derive(Clone, Debug)]
 pub struct GameLogEntry {
@@ -32,7 +36,6 @@ pub struct InstanceDetails {
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
-    pub mods: Vec<Mod>,
 }
 
 pub struct InstanceSettingsUpdate {
@@ -64,7 +67,8 @@ pub struct Mod {
     pub filename: String,
     pub enabled: bool,
     pub modloader: info::ModLoaderType,
-    pub metadata: ModFileMetadata,
+    pub metadata: Option<ModFileMetadata>,
+    pub curseforge: Option<CurseForgeModMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,6 +78,16 @@ pub struct ModFileMetadata {
     pub version: Option<String>,
     pub description: Option<String>,
     pub authors: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurseForgeModMetadata {
+    pub project_id: u32,
+    pub file_id: u32,
+    pub name: String,
+    pub urlslug: String,
+    pub summary: String,
+    pub authors: String,
 }
 
 #[derive(Debug, Copy, Clone)]

@@ -4,81 +4,128 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::path::PathBuf;
-use std::str::FromStr;
+use std::usize;
 
 use md5::Digest;
-use md5::Md5;
 
+use sha2::Sha512;
+use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use uuid::Uuid;
 
+use crate::api::keys::instance::INSTANCE_MODS;
+use crate::db::read_filters::BytesFilter;
+use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
 
 use crate::domain::instance::InstanceId;
+use crate::domain::modplatforms::curseforge::filters::ModsParameters;
+use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
+use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
+use crate::domain::modplatforms::curseforge::Mod;
 use crate::domain::runtime_path::InstancesPath;
 
 use crate::managers::ManagerRef;
 use crate::once_send::OnceSend;
 
+use crate::db::{curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb};
+use itertools::Itertools;
+
 pub struct MetaCacheManager {
     waiting_instances: RwLock<HashSet<InstanceId>>,
+    scanned_instances: Mutex<HashSet<InstanceId>>,
     priority_instance: Mutex<Option<InstanceId>>,
-    remote_request_queue: RwLock<VecDeque<([u8; 16], InstanceId)>>,
+    remote_instance: watch::Sender<Option<InstanceId>>,
     waiting_notify: watch::Sender<()>,
-    remote_nofity: watch::Sender<()>,
     // local cache notify, remote cache notify
-    background_watches: OnceSend<(watch::Receiver<()>, watch::Receiver<()>)>,
-}
-
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-struct ModId(pub [u8; 16]);
-
-impl ToString for ModId {
-    fn to_string(&self) -> String {
-        hex::encode(self.0)
-    }
-}
-
-impl FromStr for ModId {
-    type Err = hex::FromHexError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut slice = [0u8; 16];
-        hex::decode_to_slice(s, &mut slice)?;
-        Ok(Self(slice))
-    }
+    background_watches: OnceSend<(watch::Receiver<()>, watch::Receiver<Option<InstanceId>>)>,
 }
 
 impl MetaCacheManager {
     pub fn new() -> Self {
         let (local_tx, local_rx) = watch::channel(());
-        let (remote_tx, remote_rx) = watch::channel(());
+        let (remote_tx, remote_rx) = watch::channel(None);
 
         Self {
             waiting_instances: RwLock::new(HashSet::new()),
+            scanned_instances: Mutex::new(HashSet::new()),
             priority_instance: Mutex::new(None),
-            remote_request_queue: RwLock::new(VecDeque::new()),
+            remote_instance: remote_tx,
             waiting_notify: local_tx,
-            remote_nofity: remote_tx,
             background_watches: OnceSend::new((local_rx, remote_rx)),
         }
     }
 }
 
 impl ManagerRef<'_, MetaCacheManager> {
+    pub async fn instance_removed(self, instance_id: InstanceId) {
+        let mut priority = self.priority_instance.lock().await;
+        if let Some(priority_v) = &*priority {
+            if *priority_v == instance_id {
+                *priority = None;
+            }
+        }
+        drop(priority);
+
+        let _ = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .delete_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
+                *instance_id,
+            ))])
+            .exec()
+            .await;
+
+        self.gc_mod_metadata().await;
+    }
+
+    pub async fn gc_mod_metadata(self) {
+        let _ = self
+            .app
+            .prisma_client
+            .mod_metadata()
+            .delete_many(vec![metadb::WhereParam::CachedFilesNone(Vec::new())])
+            .exec()
+            .await;
+    }
+
+    pub async fn queue_local_caching(self, instance_id: InstanceId, force_recache: bool) {
+        let lock = match force_recache {
+            false => None,
+            true => Some(self.scanned_instances.lock().await),
+        };
+
+        if lock
+            .as_ref()
+            .map(|m| !m.contains(&instance_id))
+            .unwrap_or(true)
+        {
+            self.waiting_instances.write().await.insert(instance_id);
+            let _ = self.waiting_notify.send(());
+            // prevent future calls
+            lock.unwrap_or(self.scanned_instances.lock().await)
+                .insert(instance_id);
+        }
+    }
+
+    pub async fn prioritize_instance(self, instance_id: InstanceId) {
+        *self.priority_instance.lock().await = Some(instance_id);
+    }
+
     /// Panics if called more than once
     pub async fn launch_background_tasks(self) {
-        let (mut local_notify, _cf_notify) = self
+        let (mut local_notify, mut remote_watch) = self
             .background_watches
             .take()
             .expect("launch_background_tasks may only be called once");
 
         let app_local = self.app.clone();
-        let _app_cf = self.app.clone();
+        let app_cf = self.app.clone();
 
         tokio::spawn(async move {
-            use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
             let app = app_local;
             let instance_manager = app.instance_manager();
             let basepath = app.settings_manager().runtime_path.get_root().to_path();
@@ -129,12 +176,12 @@ impl ManagerRef<'_, MetaCacheManager> {
                     pathbuf.push(&basepath);
                     pathbuf.push(&subpath);
 
-                    let mut modpaths = HashMap::<String, u64>::new();
+                    let mut modpaths = HashMap::<String, (bool, u64)>::new();
                     let Ok(mut entries) = tokio::fs::read_dir(&pathbuf).await else { continue };
 
                     while let Ok(Some(entry)) = entries.next_entry().await {
                         let file_name = entry.file_name();
-                        let Some(utf8_name) = file_name.to_str() else { continue };
+                        let Some(mut utf8_name) = file_name.to_str() else { continue };
 
                         let is_jar = utf8_name.ends_with(".jar");
                         let is_jar_disabled = utf8_name.ends_with(".jar.disabled");
@@ -142,85 +189,138 @@ impl ManagerRef<'_, MetaCacheManager> {
                         if !is_jar && !is_jar_disabled {
                             continue;
                         }
+
+                        if is_jar_disabled {
+                            utf8_name = utf8_name.strip_suffix(".disabled").unwrap();
+                        }
+
                         let Ok(metadata) = entry.metadata().await else { continue };
                         // file || symlink
                         if !metadata.is_dir() {
                             continue;
                         }
 
-                        modpaths.insert(utf8_name.to_string(), metadata.len());
+                        modpaths.insert(utf8_name.to_string(), (!is_jar_disabled, metadata.len()));
                     }
 
                     let mut dirty_cache = Vec::<fcdb::UniqueWhereParam>::new();
 
                     if let Ok(Ok(cached_entries)) = cached_entries.await {
                         for entry in cached_entries {
-                            if let Some(real_size) = modpaths.get(&entry.path) {
-                                if *real_size == entry.filesize as u64 {
-                                    modpaths.remove(&entry.path);
+                            if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
+                                // enabled probably shouldn't be here
+                                if *real_size == entry.filesize as u64 && *enabled == entry.enabled
+                                {
+                                    modpaths.remove(&entry.filename);
                                     continue;
                                 }
                             }
 
-                            dirty_cache.push(fcdb::UniqueWhereParam::InstanceIdPathEquals(
+                            dirty_cache.push(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
                                 *instance_id,
-                                entry.path,
+                                entry.filename,
                             ));
                         }
                     }
 
-                    let entry_futures = modpaths.into_iter().map(|(subpath, filesize)| {
-                        let pathbuf = &pathbuf;
-                        async move {
-                            let content = tokio::fs::read(pathbuf.join(&subpath)).await?;
-                            let (md5, murmur2, meta) = tokio::task::spawn_blocking(|| {
-                                (
-                                    <[u8; 16] as From<_>>::from(
-                                        Md5::new_with_prefix(&content).finalize(),
-                                    ),
-                                    murmurhash32::murmurhash2(&content),
-                                    super::mods::parse_metadata(Cursor::new(content)),
-                                )
-                            })
-                            .await?;
+                    let entry_futures =
+                        modpaths.into_iter().map(|(subpath, (enabled, filesize))| {
+                            let pathbuf = &pathbuf;
+                            let db = &app.prisma_client;
+                            async move {
+                                let mut path = pathbuf.join(&subpath);
+                                if !enabled {
+                                    path.push(".disabled")
+                                }
 
-                            let meta = meta?;
+                                let mut content = tokio::fs::read(path).await?;
+                                let (sha512, meta, murmur2) =
+                                    tokio::task::spawn_blocking(move || {
+                                        (
+                                            <[u8; 64] as From<_>>::from(
+                                                Sha512::new_with_prefix(&content).finalize(),
+                                            ),
+                                            super::mods::parse_metadata(Cursor::new(&content)),
+                                            murmurhash32::murmurhash2({
+                                                // curseforge's weird api
+                                                content.retain(|&x| {
+                                                    x != 9 && x != 10 && x != 13 && x != 32
+                                                });
+                                                &content
+                                            }),
+                                        )
+                                    })
+                                    .await?;
 
-                            Ok::<_, anyhow::Error>(Some((subpath, filesize, md5, murmur2, meta)))
-                        }
-                    });
+                                let meta = meta?;
 
-                    let (new_fc_entries, meta_entries) = futures::future::join_all(entry_futures)
-                        .await
-                        .into_iter()
-                        .map(|m| m.unwrap_or(None))
-                        .filter_map(|m| m)
-                        .map(|(subpath, filesize, md5, murmur2, meta)| {
-                            (
-                                (
-                                    *instance_id as i32,
-                                    subpath,
-                                    filesize as i32,
-                                    Vec::from(md5),
-                                    Vec::new(),
-                                ),
-                                (
-                                    Vec::from(md5),
-                                    murmur2 as i32,
-                                    match meta {
-                                        Some(meta) => vec![
-                                            metadb::SetParam::SetName(meta.name),
-                                            metadb::SetParam::SetModid(Some(meta.modid)),
-                                            metadb::SetParam::SetVersion(meta.version),
-                                            metadb::SetParam::SetDescription(meta.description),
-                                            metadb::SetParam::SetAuthors(meta.authors),
-                                        ],
-                                        None => Vec::new(),
-                                    },
-                                ),
+                                let dbmeta = db
+                                    .mod_metadata()
+                                    // just check both hashes for now
+                                    .find_first(vec![
+                                        metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(
+                                            sha512,
+                                        ))),
+                                        metadb::WhereParam::Murmur2(IntFilter::Equals(
+                                            murmur2 as i32,
+                                        )),
+                                    ])
+                                    .exec()
+                                    .await?;
+
+                                let (meta_id, meta) = match dbmeta {
+                                    Some(dbmeta) => (dbmeta.id, None),
+                                    None => (Uuid::new_v4().to_string(), Some(meta)),
+                                };
+
+                                Ok::<_, anyhow::Error>(Some((
+                                    subpath, filesize, enabled, sha512, murmur2, meta_id, meta,
+                                )))
+                            }
+                        });
+
+                    let (new_fc_entries, new_meta_entries): (_, Vec<_>) =
+                        futures::future::join_all(entry_futures)
+                            .await
+                            .into_iter()
+                            .map(|m| m.unwrap_or(None))
+                            .filter_map(|m| m)
+                            .map(
+                                |(subpath, filesize, enabled, sha512, murmur2, meta_id, meta)| {
+                                    (
+                                        (
+                                            *instance_id as i32,
+                                            subpath,
+                                            filesize as i32,
+                                            enabled,
+                                            meta_id.clone(),
+                                            Vec::new(),
+                                        ),
+                                        meta.map(|meta| {
+                                            (
+                                                meta_id,
+                                                murmur2 as i32,
+                                                Vec::from(sha512),
+                                                match meta {
+                                                    Some(meta) => vec![
+                                                        metadb::SetParam::SetName(meta.name),
+                                                        metadb::SetParam::SetModid(Some(
+                                                            meta.modid,
+                                                        )),
+                                                        metadb::SetParam::SetVersion(meta.version),
+                                                        metadb::SetParam::SetDescription(
+                                                            meta.description,
+                                                        ),
+                                                        metadb::SetParam::SetAuthors(meta.authors),
+                                                    ],
+                                                    None => Vec::new(),
+                                                },
+                                            )
+                                        }),
+                                    )
+                                },
                             )
-                        })
-                        .unzip();
+                            .unzip();
 
                     // TODO: FE background error endpoint
                     let _ = app
@@ -230,28 +330,188 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 .into_iter()
                                 .map(|id| app.prisma_client.mod_file_cache().delete(id))
                                 .collect::<Vec<_>>(),
+                            app.prisma_client.mod_metadata().create_many(
+                                new_meta_entries.into_iter().filter_map(|e| e).collect(),
+                            ),
                             app.prisma_client
                                 .mod_file_cache()
                                 .create_many(new_fc_entries),
-                            {
-                                let mut q =
-                                    app.prisma_client.mod_metadata().create_many(meta_entries);
-
-                                q.skip_duplicates = true;
-                                q
-                            },
                         ))
                         .await;
+
+                    let priority = app
+                        .meta_cache_manager()
+                        .priority_instance
+                        .lock()
+                        .await
+                        .is_some();
+
+                    app.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+
+                    if priority {
+                        let _ = app
+                            .meta_cache_manager()
+                            .remote_instance
+                            .send(Some(instance_id));
+                    }
                 }
             }
         });
 
-        /*
         tokio::spawn(async move {
             let app = app_cf;
 
-            while cf_notify.changed().await.is_ok() {}
+            while remote_watch.changed().await.is_ok() {
+                loop {
+                    let Some(instance_id) = *remote_watch.borrow() else { break };
+
+                    let fut = async {
+                        let mut modlist = app
+                            .prisma_client
+                            .mod_file_cache()
+                            .find_many(vec![
+                                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                                fcdb::WhereParam::MetadataIs(vec![
+                                    metadb::WhereParam::CurseforgeIsNot(vec![
+                                        cfdb::WhereParam::CachedAt(DateTimeFilter::Lt(
+                                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
+                                        )),
+                                    ]),
+                                ]),
+                            ])
+                            .with(fcdb::metadata::fetch())
+                            .exec()
+                            .await?
+                            .into_iter()
+                            .map(|m| {
+                                let metadata = m.metadata.expect(
+                                    "metadata was queried with mod cache yet is not present",
+                                );
+
+                                (
+                                    metadata.murmur_2 as u32,
+                                    (metadata.id, metadata.murmur_2 as u32),
+                                )
+                            })
+                            .collect::<VecDeque<_>>();
+
+                        let (batch_tx, mut batch_rx) = mpsc::unbounded_channel::<(
+                            Vec<(String, u32)>,
+                            FingerprintsMatchesResult,
+                            Vec<Mod>,
+                        )>();
+
+                        let app_db = app.clone();
+                        tokio::spawn(async move {
+                            while let Some((batch, fp_response, mods_response)) =
+                                batch_rx.recv().await
+                            {
+                                let mut matches = fp_response
+                                    .exact_fingerprints
+                                    .into_iter()
+                                    .zip(fp_response.exact_matches.into_iter())
+                                    .zip(mods_response.into_iter())
+                                    .map(|((fingerprint, fileinfo), modinfo)| {
+                                        (fingerprint, (fileinfo, modinfo))
+                                    })
+                                    .collect::<HashMap<_, _>>();
+
+                                // todo local db changes
+                                let (creates, deletes) = batch
+                                    .into_iter()
+                                    .filter_map(|(metadata_id, murmur2)| {
+                                        let fpmatch = matches.remove(&murmur2);
+                                        fpmatch.map(|(fileinfo, modinfo)| {
+                                            (
+                                                (
+                                                    murmur2 as i32,
+                                                    modinfo.id,
+                                                    fileinfo.file.id,
+                                                    modinfo.name,
+                                                    modinfo.slug,
+                                                    modinfo.summary,
+                                                    modinfo
+                                                        .authors
+                                                        .into_iter()
+                                                        .map(|a| a.name)
+                                                        .join(", "),
+                                                    metadata_id.clone(),
+                                                    Vec::new(),
+                                                ),
+                                                app_db
+                                                    .prisma_client
+                                                    .curse_forge_mod_cache()
+                                                    .delete(
+                                                        cfdb::UniqueWhereParam::MetadataIdEquals(
+                                                            metadata_id,
+                                                        ),
+                                                    ),
+                                            )
+                                        })
+                                    })
+                                    .unzip::<_, _, Vec<_>, Vec<_>>();
+
+                                // may fail if the user removed a mod
+                                let r = app_db
+                                    .prisma_client
+                                    ._batch((
+                                        deletes,
+                                        app_db
+                                            .prisma_client
+                                            .curse_forge_mod_cache()
+                                            .create_many(creates),
+                                    ))
+                                    .await;
+
+                                if let Err(e) = r {
+                                    tracing::error!({ error = ?e }, "Could not store mod metadata");
+                                }
+
+                                app_db.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+                            }
+                        });
+
+                        while !modlist.is_empty() {
+                            let (fingerprints, metadata) = modlist
+                                .drain(0..usize::min(1000, modlist.len()))
+                                .unzip::<_, _, Vec<_>, Vec<_>>();
+
+                            let fp_response = app
+                                .modplatforms_manager()
+                                .curseforge
+                                .get_fingerprints(&fingerprints[..])
+                                .await?
+                                .data;
+
+                            let mods_response = app
+                                .modplatforms_manager()
+                                .curseforge
+                                .get_mods(ModsParameters {
+                                    body: ModsParametersBody {
+                                        mod_ids: fp_response
+                                            .exact_matches
+                                            .iter()
+                                            .map(|m| m.id)
+                                            .collect::<Vec<_>>(),
+                                    },
+                                })
+                                .await?
+                                .data;
+
+                            let _ = batch_tx.send((metadata, fp_response, mods_response));
+                        }
+
+                        Ok::<_, anyhow::Error>(())
+                    };
+
+                    // TODO: if we changed to the same instance, just add new mods instead of
+                    // forcing the whole thing to rerun
+                    tokio::select! {
+                        _ = remote_watch.changed() => continue,
+                        _ = fut => break,
+                    };
+                }
+            }
         });
-        */
     }
 }
