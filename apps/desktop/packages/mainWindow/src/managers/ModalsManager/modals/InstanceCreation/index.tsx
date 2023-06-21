@@ -76,8 +76,8 @@ const InstanceCreation = (props: ModalProps) => {
       const versions =
         supported !== false
           ? fabricVersionsQuery?.data?.gameVersions.find(
-            (v) => v.id === DUMMY_META_VERSION
-          )?.loaders
+              (v) => v.id === DUMMY_META_VERSION
+            )?.loaders
           : [];
 
       setLoaderVersions(versions || []);
@@ -97,8 +97,8 @@ const InstanceCreation = (props: ModalProps) => {
       const versions =
         supported !== false
           ? quiltVersionsQuery?.data?.gameVersions.find(
-            (v) => v.id === DUMMY_META_VERSION
-          )?.loaders
+              (v) => v.id === DUMMY_META_VERSION
+            )?.loaders
           : [];
 
       setLoaderVersions(versions || []);
@@ -222,11 +222,11 @@ const InstanceCreation = (props: ModalProps) => {
               release: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
               modloaders: loader()
                 ? [
-                  {
-                    type_: loader() as ModLoaderType,
-                    version: chosenLoaderVersion() || versions[0].id,
-                  },
-                ]
+                    {
+                      type_: loader() as ModLoaderType,
+                      version: chosenLoaderVersion() || versions[0].id,
+                    },
+                  ]
                 : [],
             },
           },
@@ -317,7 +317,8 @@ const InstanceCreation = (props: ModalProps) => {
                     }}
                     value={
                       title() ||
-                      `${loader() || "Vanilla"} ${mcVersion() || (mappedMcVersions()?.[0]?.id as string)
+                      `${loader() || "Vanilla"} ${
+                        mcVersion() || (mappedMcVersions()?.[0]?.id as string)
                       }`
                     }
                     error={
@@ -377,7 +378,7 @@ const InstanceCreation = (props: ModalProps) => {
                       fabricVersionsQuery.isFetching ||
                       quiltVersionsQuery.isFetching) &&
                       loader()) ||
-                    mappedMcVersions().length === 0
+                      mappedMcVersions().length === 0
                   )}
                   options={mappedMcVersions().map((v) => ({
                     label: (
@@ -414,8 +415,8 @@ const InstanceCreation = (props: ModalProps) => {
                       const versions =
                         supported !== false
                           ? fabricVersionsQuery?.data?.gameVersions.find(
-                            (v) => v.id === DUMMY_META_VERSION
-                          )?.loaders
+                              (v) => v.id === DUMMY_META_VERSION
+                            )?.loaders
                           : [];
 
                       setLoaderVersions(versions || []);
@@ -428,8 +429,8 @@ const InstanceCreation = (props: ModalProps) => {
                       const versions =
                         supported !== false
                           ? quiltVersionsQuery?.data?.gameVersions.find(
-                            (v) => v.id === DUMMY_META_VERSION
-                          )?.loaders
+                              (v) => v.id === DUMMY_META_VERSION
+                            )?.loaders
                           : [];
 
                       setLoaderVersions(versions || []);
@@ -558,8 +559,8 @@ const InstanceCreation = (props: ModalProps) => {
                           const versions =
                             supported !== false
                               ? fabricVersionsQuery?.data?.gameVersions.find(
-                                (v) => v.id === DUMMY_META_VERSION
-                              )?.loaders
+                                  (v) => v.id === DUMMY_META_VERSION
+                                )?.loaders
                               : [];
                           if (versions) setLoaderVersions(versions);
                         } else if (loader() === "Quilt") {
@@ -571,8 +572,8 @@ const InstanceCreation = (props: ModalProps) => {
                           const versions =
                             supported !== false
                               ? quiltVersionsQuery?.data?.gameVersions.find(
-                                (v) => v.id === DUMMY_META_VERSION
-                              )?.loaders
+                                  (v) => v.id === DUMMY_META_VERSION
+                                )?.loaders
                               : [];
                           if (versions) setLoaderVersions(versions);
                         }

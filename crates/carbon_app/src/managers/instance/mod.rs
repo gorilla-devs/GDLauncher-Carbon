@@ -8,7 +8,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use super::metadata::mods as mod_meta;
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
-use crate::domain::instance::info::{GameVersion, InstanceIcon, ModLoaderType};
+use crate::domain::instance::info::{GameVersion, InstanceIcon};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
