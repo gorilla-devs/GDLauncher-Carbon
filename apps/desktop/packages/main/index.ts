@@ -96,6 +96,13 @@ async function createWindow() {
     return { platform: os.platform(), arch: os.arch() };
   });
 
+  win.webContents.on("will-navigate", (e, url) => {
+    if (win && url !== win.webContents.getURL()) {
+      e.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {

@@ -60,10 +60,6 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance",
   },
-  logViewer: {
-    component: lazy(() => import("./modals/LogViewer")),
-    title: "Logs",
-  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification",
@@ -174,26 +170,41 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const title = defaultModals[modal.name].title || "";
 
               return (
-                <div
-                  class="h-screen w-screen text-white backdrop-blur-sm backdrop-brightness-50 z-999 origin-center fixed flex justify-center items-center"
-                  onClick={() => {
-                    closeModal();
-                  }}
-                >
+                <>
                   <div
-                    style={{
-                      "z-index": `${index() + 1}`,
+                    class="absolute right-[440px] bottom-0 top-0 left-0 flex justify-center items-center z-999"
+                    onClick={() => {
+                      closeModal();
                     }}
                     class="animate-enterScaleIn"
                   >
-                    <Dynamic
-                      component={ModalComponent}
-                      data={modal.data}
-                      noHeader={noHeader}
-                      title={title}
-                    />
+                    <div
+                      style={{ "z-index": `${index() + 1}` }}
+                      class="duration-100 ease-in-out"
+                      classList={{
+                        "scale-100": !!modal.name,
+                        "scale-0": !modal.name,
+                      }}
+                    >
+                      <Dynamic
+                        component={ModalComponent}
+                        data={modal.data}
+                        noHeader={noHeader}
+                        title={title}
+                      />
+                    </div>
                   </div>
-                </div>
+                  <div
+                    class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-99 origin-center"
+                    classList={{
+                      "opacity-100": !!modal.name,
+                      "opacity-0": !modal.name,
+                    }}
+                    onClick={() => {
+                      closeModal();
+                    }}
+                  />
+                </>
               );
             }}
           </For>

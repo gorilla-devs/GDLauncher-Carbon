@@ -5,6 +5,7 @@ import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
 import { useTransContext } from "@gd/i18n";
+import { queryClient, rspc } from "@/utils/rspcClient";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -17,11 +18,18 @@ export default function Login() {
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
 
-  const [, { changeLanguage }] = useTransContext();
+  const [t, { changeLanguage }] = useTransContext();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data && routeData?.accounts?.data?.length! > 0;
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      if (newSettings.language) changeLanguage(newSettings.language as string);
+      queryClient.setQueryData(["settings.getSettings"], newSettings);
+    },
+  });
 
   return (
     <Switch>
@@ -38,13 +46,13 @@ export default function Login() {
           />
           <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
             <Dropdown
+              value={routeData.settings.data?.language || "en"}
               options={[
-                { label: "english", key: "en" },
-                { label: "italian", key: "it" },
+                { label: t("languages.english"), key: "eng" },
+                { label: t("languages.italian"), key: "it" },
               ]}
-              value={"asc"}
               onChange={(lang) => {
-                changeLanguage(lang.key as string);
+                settingsMutation.mutate({ language: lang.key as string });
               }}
               rounded
             />
