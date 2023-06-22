@@ -62,6 +62,7 @@ pub enum LaunchState {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mod {
     pub id: String,
     pub filename: String,

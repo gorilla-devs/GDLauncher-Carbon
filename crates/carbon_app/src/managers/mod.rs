@@ -130,6 +130,7 @@ mod app {
 
             let app2 = app.clone();
             tokio::spawn(async move {
+                app2.meta_cache_manager().launch_background_tasks().await;
                 // ignore scanning errors instead of taking down the launcher
                 let _ = app2.clone().instance_manager().scan_instances().await;
             });

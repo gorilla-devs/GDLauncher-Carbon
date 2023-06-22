@@ -157,6 +157,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query INSTANCE_MODS[app, id: InstanceId] {
+            app.meta_cache_manager()
+                .prioritize_instance(id.into())
+                .await;
+
             Ok(app.instance_manager()
                 .list_mods(id.into())
                 .await?
@@ -376,10 +380,10 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
 }
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize, Copy, Clone)]
 struct GroupId(i32);
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize, Copy, Clone)]
 struct InstanceId(i32);
 
 impl From<domain::GroupId> for GroupId {

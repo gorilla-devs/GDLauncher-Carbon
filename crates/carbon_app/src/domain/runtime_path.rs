@@ -86,7 +86,7 @@ pub struct InstancesPath(PathBuf);
 
 impl InstancesPath {
     pub fn subpath() -> InstancesPath {
-        Self(PathBuf::new())
+        Self(PathBuf::from("instances"))
     }
 
     pub fn to_path(&self) -> PathBuf {
