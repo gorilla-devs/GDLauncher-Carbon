@@ -968,6 +968,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .await
                         .context("saving instance icon")?;
 
+                    if let InstanceIcon::RelativePath(oldpath) = &info.icon {
+                        if *oldpath != ipath {
+                            tokio::fs::remove_file(path.join(oldpath))
+                                .await
+                                .context("removing old instance icon")?;
+                        }
+                    }
+
                     InstanceIcon::RelativePath(ipath)
                 }
                 _ => InstanceIcon::Default,
@@ -1032,23 +1040,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         data.config = info;
 
         if let Some(name) = update.name {
-            let _lock = self.path_lock.lock().await;
-            let (new_shortpath, new_path) = self.next_folder(&name).await?;
-            tokio::fs::rename(path, new_path).await?;
-            *shortpath = new_shortpath.clone();
+            if name != data.config.name {
+                let _lock = self.path_lock.lock().await;
+                let (new_shortpath, new_path) = self.next_folder(&name).await?;
+                tokio::fs::rename(path, new_path).await?;
+                *shortpath = new_shortpath.clone();
 
-            self.app
-                .prisma_client
-                .instance()
-                .update(
-                    UniqueWhereParam::IdEquals(*update.instance_id),
-                    vec![
-                        SetParam::SetName(name),
-                        SetParam::SetShortpath(new_shortpath),
-                    ],
-                )
-                .exec()
-                .await?;
+                self.app
+                    .prisma_client
+                    .instance()
+                    .update(
+                        UniqueWhereParam::IdEquals(*update.instance_id),
+                        vec![
+                            SetParam::SetName(name),
+                            SetParam::SetShortpath(new_shortpath),
+                        ],
+                    )
+                    .exec()
+                    .await?;
+            }
         }
 
         self.app.invalidate(GET_GROUPS, None);
