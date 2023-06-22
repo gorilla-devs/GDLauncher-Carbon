@@ -43,6 +43,16 @@ const InstanceCreation = (props: ModalProps) => {
     enabled: false,
   });
 
+  const fabricVersionsQuery = rspc.createQuery(() => ["mc.getFabricVersions"], {
+    enabled: false,
+  });
+
+  const quiltVersionsQuery = rspc.createQuery(() => ["mc.getQuiltVersions"], {
+    enabled: false,
+  });
+
+  const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
+
   createEffect(() => {
     if (forgeVersionsQuery.data && loader() === "Forge") {
       const versions = forgeVersionsQuery?.data?.gameVersions.find(
@@ -51,28 +61,69 @@ const InstanceCreation = (props: ModalProps) => {
 
       setLoaderVersions(versions || []);
     } else if (!loader()) {
-      setMappedMcVersions(mcVersions());
       setLoaderVersions([]);
     }
   });
 
   createEffect(() => {
-    const filteredData = () =>
-      mcVersions().filter(
-        (item) =>
-          (item.type === "release" && releaseVersionFilter()) ||
-          (item.type === "snapshot" && snapshotVersionFilter()) ||
-          (item.type === "old_beta" && oldBetaVersionFilter()) ||
-          (item.type === "old_alpha" && oldAlphaVersionFilter())
-      );
+    if (fabricVersionsQuery.data && loader() === "Fabric") {
+      const supported =
+        fabricVersionsQuery?.data?.gameVersions.find(
+          (v) =>
+            v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
+        ) ?? false;
 
-    setMappedMcVersions(filteredData());
+      const versions =
+        supported !== false
+          ? fabricVersionsQuery?.data?.gameVersions.find(
+              (v) => v.id === DUMMY_META_VERSION
+            )?.loaders
+          : [];
+
+      setLoaderVersions(versions || []);
+    } else if (!loader()) {
+      setLoaderVersions([]);
+    }
+  });
+
+  createEffect(() => {
+    if (quiltVersionsQuery.data && loader() === "Quilt") {
+      const supported =
+        quiltVersionsQuery?.data?.gameVersions.find(
+          (v) =>
+            v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
+        ) ?? false;
+
+      const versions =
+        supported !== false
+          ? quiltVersionsQuery?.data?.gameVersions.find(
+              (v) => v.id === DUMMY_META_VERSION
+            )?.loaders
+          : [];
+
+      setLoaderVersions(versions || []);
+    } else if (!loader()) {
+      setLoaderVersions([]);
+    }
+  });
+
+  createEffect(() => {
+    const filteredData = mcVersions().filter(
+      (item) =>
+        (item.type === "release" && releaseVersionFilter()) ||
+        (item.type === "snapshot" && snapshotVersionFilter()) ||
+        (item.type === "old_beta" && oldBetaVersionFilter()) ||
+        (item.type === "old_alpha" && oldAlphaVersionFilter())
+    );
+
+    setMappedMcVersions(filteredData);
   });
 
   const modloaders = [
     { label: t("instance.vanilla"), key: undefined },
     { label: t("instance.forge"), key: "Forge" },
-    // { label: t("instance.fabric"), key: "Fabric" },
+    { label: t("instance.fabric"), key: "Fabric" },
+    { label: t("instance.quilt"), key: "Quilt" },
   ];
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
@@ -139,11 +190,26 @@ const InstanceCreation = (props: ModalProps) => {
     } else {
       setError("");
 
-      const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
-      const versions =
-        forgeVersionsQuery?.data?.gameVersions.find(
-          (v) => v.id === (mcVersion() || mcVers?.id)
-        )?.loaders || [];
+      let versions: FEModdedManifestLoaderVersion[];
+      if (loader() == "Forge") {
+        const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
+        versions =
+          forgeVersionsQuery?.data?.gameVersions.find(
+            (v) => v.id === (mcVersion() || mcVers?.id)
+          )?.loaders || [];
+      } else if (loader() == "Fabric") {
+        versions =
+          fabricVersionsQuery?.data?.gameVersions.find(
+            (v) => v.id === DUMMY_META_VERSION
+          )?.loaders || [];
+      } else if (loader() == "Quilt") {
+        versions =
+          quiltVersionsQuery?.data?.gameVersions.find(
+            (v) => v.id === DUMMY_META_VERSION
+          )?.loaders || [];
+      } else {
+        versions = [];
+      }
 
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
@@ -279,7 +345,9 @@ const InstanceCreation = (props: ModalProps) => {
                       if (modloader.key === "Forge") {
                         forgeVersionsQuery.refetch();
                       } else if (modloader.key === "Fabric") {
-                        // fabric
+                        fabricVersionsQuery.refetch();
+                      } else if (modloader.key === "Quilt") {
+                        quiltVersionsQuery.refetch();
                       }
 
                       setLoader(
@@ -306,7 +374,10 @@ const InstanceCreation = (props: ModalProps) => {
               <div>
                 <Dropdown
                   disabled={Boolean(
-                    (forgeVersionsQuery.isLoading && loader()) ||
+                    ((forgeVersionsQuery.isFetching ||
+                      fabricVersionsQuery.isFetching ||
+                      quiltVersionsQuery.isFetching) &&
+                      loader()) ||
                       mappedMcVersions().length === 0
                   )}
                   options={mappedMcVersions().map((v) => ({
@@ -333,6 +404,34 @@ const InstanceCreation = (props: ModalProps) => {
                         forgeVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
                         )?.loaders;
+
+                      setLoaderVersions(versions || []);
+                    } else if (loader() === "Fabric") {
+                      const supported =
+                        fabricVersionsQuery?.data?.gameVersions.find(
+                          (v) => v.id === l.key
+                        ) ?? false;
+
+                      const versions =
+                        supported !== false
+                          ? fabricVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === DUMMY_META_VERSION
+                            )?.loaders
+                          : [];
+
+                      setLoaderVersions(versions || []);
+                    } else if (loader() === "Quilt") {
+                      const supported =
+                        quiltVersionsQuery?.data?.gameVersions.find(
+                          (v) => v.id === l.key
+                        ) ?? false;
+
+                      const versions =
+                        supported !== false
+                          ? quiltVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === DUMMY_META_VERSION
+                            )?.loaders
+                          : [];
 
                       setLoaderVersions(versions || []);
                     }
@@ -411,7 +510,12 @@ const InstanceCreation = (props: ModalProps) => {
                 <Switch>
                   <Match when={loaderVersions().length > 0}>
                     <Dropdown
-                      disabled={!loaderVersions()}
+                      disabled={
+                        forgeVersionsQuery.isFetching ||
+                        fabricVersionsQuery.isFetching ||
+                        quiltVersionsQuery.isFetching ||
+                        !loaderVersions()
+                      }
                       options={loaderVersions()?.map((v) => ({
                         label: v.id,
                         key: v.id,
@@ -445,6 +549,32 @@ const InstanceCreation = (props: ModalProps) => {
                             forgeVersionsQuery?.data?.gameVersions.find(
                               (v) => v.id === key
                             )?.loaders;
+                          if (versions) setLoaderVersions(versions);
+                        } else if (loader() === "Fabric") {
+                          const key = l.key as string;
+                          const supported =
+                            fabricVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === key
+                            ) ?? false;
+                          const versions =
+                            supported !== false
+                              ? fabricVersionsQuery?.data?.gameVersions.find(
+                                  (v) => v.id === DUMMY_META_VERSION
+                                )?.loaders
+                              : [];
+                          if (versions) setLoaderVersions(versions);
+                        } else if (loader() === "Quilt") {
+                          const key = l.key as string;
+                          const supported =
+                            quiltVersionsQuery?.data?.gameVersions.find(
+                              (v) => v.id === key
+                            ) ?? false;
+                          const versions =
+                            supported !== false
+                              ? quiltVersionsQuery?.data?.gameVersions.find(
+                                  (v) => v.id === DUMMY_META_VERSION
+                                )?.loaders
+                              : [];
                           if (versions) setLoaderVersions(versions);
                         }
                       }}

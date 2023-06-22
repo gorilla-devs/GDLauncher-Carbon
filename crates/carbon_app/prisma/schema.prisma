@@ -9,22 +9,23 @@ generator client {
 }
 
 model AppConfiguration {
-  id                  Int     @id @unique @default(0)
-  theme               String  @default("main")
-  reducedMotion       Boolean @default(false)
-  language            String  @default("en")
-  discordIntegration  Boolean @default(true)
-  releaseChannel      String  @default("stable")
-  activeAccountUuid   String?
-  concurrentDownloads Int     @default(8)
-  showNews            Boolean @default(true)
-  startupResolution   String  @default("854x480")
-  javaCustomArgs      String  @default("")
-  xmx                 Int     @default(1024)
-  xms                 Int     @default(1024)
+  id                   Int     @id @unique @default(0)
+  theme                String  @default("main")
+  reducedMotion        Boolean @default(false)
+  language             String  @default("en")
+  discordIntegration   Boolean @default(true)
+  releaseChannel       String  @default("stable")
+  activeAccountUuid    String?
+  concurrentDownloads  Int     @default(8)
+  showNews             Boolean @default(true)
+  startupResolution    String  @default("854x480")
+  javaCustomArgs       String  @default("")
+  xmx                  Int     @default(1024)
+  xms                  Int     @default(1024)
   defaultInstanceGroup Int?
-  isFirstLaunch       Boolean @default(true)
-  autoManageJava      Boolean @default(true)
+  isFirstLaunch        Boolean @default(true)
+  autoManageJava       Boolean @default(true)
+  isLegalAccepted      Boolean @default(false)
 }
 
 model Java {
@@ -78,12 +79,12 @@ model ActiveDownloads {
 }
 
 model Instance {
-  id        Int            @id @default(autoincrement())
+  id        Int           @id @default(autoincrement())
   name      String
-  shortpath String         @unique
-  favorite  Boolean        @default(false)
+  shortpath String        @unique
+  favorite  Boolean       @default(false)
   index     Int
-  group     InstanceGroup  @relation(fields: [groupId], references: [id])
+  group     InstanceGroup @relation(fields: [groupId], references: [id])
   groupId   Int
 }
 
@@ -105,7 +106,7 @@ model ModFileCache {
 }
 
 model ModMetadata {
-  md5         Bytes @id
+  md5         Bytes               @id
   murmur2     Int
   name        String?
   modid       String?
@@ -117,11 +118,11 @@ model ModMetadata {
 }
 
 model CurseForgeModCache {
-  murmur2     Int @id
-  project_id  Int
-  file_id     Int
-  name        String
-  urlslug     String
-  summary     String
-  metadata    ModMetadata[]
+  murmur2    Int           @id
+  project_id Int
+  file_id    Int
+  name       String
+  urlslug    String
+  summary    String
+  metadata   ModMetadata[]
 }

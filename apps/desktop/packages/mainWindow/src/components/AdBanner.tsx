@@ -24,7 +24,7 @@ export const AdsBanner = () => {
           </div>
         </div>
       </Show>
-      <owadview />
+      <owadview class="z-[9999999] relative" />
     </div>
   );
 };

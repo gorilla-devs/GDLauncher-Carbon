@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
@@ -28,14 +28,12 @@ pub struct ModpackInfo {
     pub downloadables: Vec<Downloadable>,
 }
 
-pub async fn prepare_modpack(
+pub async fn prepare_modpack_from_addon(
     app: &App,
     cf_addon: &File,
     instance_path: InstancePath,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
-    let progress_percentage_sender = Arc::new(progress_percentage_sender);
-
     let temp_dir = &app.settings_manager().runtime_path.get_temp();
     let modpack_download_url = cf_addon
         .download_url
@@ -58,22 +56,33 @@ pub async fn prepare_modpack(
     let (download_progress_sender, mut download_progress_recv) =
         tokio::sync::watch::channel(Progress::new());
 
-    let progress_percentage_sender_clone = progress_percentage_sender.clone();
-
-    tokio::spawn(async move {
+    let progress_percentage_sender = tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
-            progress_percentage_sender_clone.send(ProgressState::DownloadingAddonZip(
+            progress_percentage_sender.send(ProgressState::DownloadingAddonZip(
                 download_progress_recv.borrow().current_size,
                 download_progress_recv.borrow().total_size,
             ))?;
         }
 
-        Ok::<(), anyhow::Error>(())
+        Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    let file_path_clone = file_path.clone();
+    let progress_percentage_sender = progress_percentage_sender.await??;
+
+    prepare_modpack_from_zip(app, file_path, instance_path, progress_percentage_sender).await
+}
+
+pub async fn prepare_modpack_from_zip(
+    app: &App,
+    zip_path: PathBuf,
+    instance_path: InstancePath,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+) -> anyhow::Result<ModpackInfo> {
+    let progress_percentage_sender = Arc::new(progress_percentage_sender);
+
+    let file_path_clone = zip_path.clone();
     let (mut archive, manifest) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
         let mut archive = zip::ZipArchive::new(file)?;
@@ -132,13 +141,11 @@ pub async fn prepare_modpack(
             handles.push(handle);
         }
 
-        let downloadables = futures::future::join_all(handles)
+        futures::future::join_all(handles)
             .await
             .into_iter()
             .flatten()
-            .collect::<Result<Vec<_>, _>>()?;
-
-        downloadables
+            .collect::<Result<Vec<_>, _>>()?
     };
 
     let override_folder_name = manifest.overrides.clone();
@@ -182,7 +189,7 @@ pub async fn prepare_modpack(
     })
     .await??;
 
-    tokio::fs::remove_file(&file_path).await?;
+    tokio::fs::remove_file(&zip_path).await?;
 
     Ok(ModpackInfo {
         manifest,

@@ -1,8 +1,6 @@
-use std::mem;
-
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, Utc};
-use reqwest::{Client, Method, Request, Response, StatusCode};
+use reqwest::{Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
 use task_local_extensions::Extensions;
 
