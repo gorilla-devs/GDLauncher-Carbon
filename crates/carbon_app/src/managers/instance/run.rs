@@ -326,7 +326,7 @@ impl ManagerRef<'_, InstanceManager> {
                             t_install_java.start_opaque();
                             let path = app
                                 .java_manager()
-                                .require_java_install(required_java)
+                                .require_java_install(required_java, true)
                                 .await?;
                             t_install_java.complete_opaque();
 
