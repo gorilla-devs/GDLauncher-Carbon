@@ -3,7 +3,8 @@ import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
-import { useModal } from "./managers/ModalsManager";
+import { useModal } from "@/managers/ModalsManager";
+import initAnalytics from "@/utils/analytics";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -19,7 +20,14 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"], {
+    onSuccess(data) {
+      if (data.metricsLevel !== 0 && data.metricsLevel !== null) {
+        initAnalytics(data.metricsLevel);
+      }
+    },
+  });
+
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
 
   createEffect(() => {

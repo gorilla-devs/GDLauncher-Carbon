@@ -1,11 +1,15 @@
 import posthog from "posthog-js";
 
-function initAnalytics() {
+let init = false;
+function initAnalytics(metricsLevel: Number) {
+  if (init) {
+    return;
+  }
+
   if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
     posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
       api_host: import.meta.env.VITE_METRICS_URL,
-      disable_session_recording: false,
-      debug: true,
+      disable_session_recording: metricsLevel === 1,
       loaded: async () => {
         let os = await window.getCurrentOS();
 
@@ -19,6 +23,8 @@ function initAnalytics() {
       },
     });
   }
+
+  init = true;
 }
 
 export function trackEvent(event: string, properties?: Record<string, any>) {

@@ -12,7 +12,6 @@ import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
 import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
 import App from "@/app";
 import { ModalProvider } from "@/managers/ModalsManager";
-import initAnalytics from "@/utils/analytics";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
@@ -21,10 +20,6 @@ import { DEFAULT_LANG, LANGUAGES } from "./constants";
 import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWapper";
 import GDAnimation from "./gd_logo_animation.riv";
-
-queueMicrotask(() => {
-  initAnalytics();
-});
 
 interface Translations {
   [translationKey: string]: string;

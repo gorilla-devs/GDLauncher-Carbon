@@ -16,7 +16,8 @@ CREATE TABLE "AppConfiguration" (
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
-    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false
+    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
+    "metricsLevel" INTEGER
 );
 
 -- CreateTable
