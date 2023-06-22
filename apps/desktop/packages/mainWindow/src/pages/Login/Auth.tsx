@@ -8,6 +8,7 @@ import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useModal } from "@/managers/ModalsManager";
 import { DeviceCodeObjectType } from ".";
+import { trackEvent } from "@/utils/analytics";
 
 type Props = {
   setStep: Setter<number>;
@@ -60,6 +61,7 @@ const Auth = (props: Props) => {
   };
 
   const handleClick = async () => {
+    trackEvent("microsoft_auth");
     setClicked(true);
     if (!routeData.status.data || !enrollmentInProgress()) {
       accountEnrollBeginMutation.mutate(undefined);

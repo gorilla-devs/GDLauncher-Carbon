@@ -94,7 +94,7 @@ export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileNa
 
 export type CurseforgeModpack = { project_id: number; file_id: number }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; isLegalAccepted: boolean }
 
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
 
@@ -166,8 +166,6 @@ export type FEEvent = { name: FEEventName; properties: { [key: string]: string }
 
 export type FEMod = { id: number; gameId: number; name: string; slug: string; links: FEModLinks; summary: string; status: FEModStatus; downloadCount: number; isFeatured: boolean; primaryCategoryId: number; categories: FECategory[]; classId: number | null; authors: FEModAuthor[]; logo: FEModAsset; screenshots: FEModAsset[]; mainFileId: number; latestFiles: FEFile[]; latestFilesIndexes: FEFileIndex[]; dateCreated: string; dateModified: string; dateReleased: string; allowModDistribution: boolean | null; gamePopularityRank: number; isAvailable: boolean; thumbsUpCount: number }
 
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null }
-
 export type FEFileStatus = "processing" | "changesRequired" | "underReview" | "approved" | "rejected" | "malwareDetected" | "deleted" | "archived" | "testing" | "released" | "readyForReview" | "deprecated" | "baking" | "awaitingPublishing" | "failedPublishing"
 
 export type FEFileHash = { value: string; algo: FEHashAlgo }
@@ -183,6 +181,8 @@ export type ModpackPlatform = "Curseforge"
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
 
 export type FEModParameters = { modId: number }
+
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; isLegalAccepted?: boolean | null }
 
 export type FEEventName = "AppClosed"
 

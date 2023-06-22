@@ -1,68 +1,32 @@
-// import { version } from "../../../../package.json";
-
-// function initAnalytics(this: any) {
-//   const httpsDesktopUrl = "https://" + import.meta.env.VITE_DESKTOP_APP_URL;
-//   var i: any = {};
-//   var a = window.location,
-//     r = window.document,
-//     o = r.currentScript,
-//     s = import.meta.env.VITE_ANALYTICS_ENDPOINT;
-
-//   function t(t: string, e: { props: any; meta?: any; callback?: any }) {
-//     // if (
-//     //   /^localhost$|^127(\.[0-9]+){0,2}\.[0-9]+$|^\[::1?\]$/.test(a.hostname)
-//     // ) {
-//     //   return;
-//     // }
-//     (i.n = t),
-//       (i.d = import.meta.env.VITE_DESKTOP_APP_URL),
-//       (i.r = httpsDesktopUrl), // referrer
-//       (i.w = window.innerWidth),
-//       e && e.meta && (i.m = JSON.stringify(e.meta)),
-//       e && e.props && (i.p = e.props);
-//     var n = new XMLHttpRequest();
-//     n.open("POST", s, !0),
-//       n.setRequestHeader("Content-Type", "text/plain"),
-//       n.send(JSON.stringify(i)),
-//       (n.onreadystatechange = function () {
-//         4 === n.readyState && e && e.callback && e.callback();
-//       });
-//   }
-//   var e = (window.plausible && window.plausible.q) || [];
-//   window.plausible = t;
-//   for (var i, n = 0; n < e.length; n++) t.apply(this, e[n]);
-
-//   function p() {
-//     const sliced = a.hash.slice(1);
-//     const url = new URL(httpsDesktopUrl + sliced);
-//     const params = new URLSearchParams(url.search);
-//     if (params.has("m")) {
-//       i.u = httpsDesktopUrl + `/modal/${params.get("m")}`;
-//     } else {
-//       i.u = httpsDesktopUrl + sliced;
-//     }
-//     t("pageview", { props: JSON.stringify({ version: pgk.version }) });
-//   }
-//   window.addEventListener("hashchange", p);
-//   p();
-// }
+import posthog from "posthog-js";
 
 function initAnalytics() {
-  const httpsDesktopUrl = "https://" + import.meta.env.VITE_DESKTOP_APP_URL;
-  function p() {
-    const i: any = {};
-    const sliced = window.location.hash.slice(1);
-    const url = new URL(httpsDesktopUrl + sliced);
-    const params = new URLSearchParams(url.search);
-    if (params.has("m")) {
-      i.u = httpsDesktopUrl + `/modal/${params.get("m")}`;
-    } else {
-      i.u = httpsDesktopUrl + sliced;
-    }
-    // t("pageview", { props: JSON.stringify({ version: pgk.version }) });
+  if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
+    posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
+      api_host: import.meta.env.VITE_METRICS_URL,
+      disable_session_recording: false,
+      debug: true,
+      loaded: async () => {
+        let os = await window.getCurrentOS();
+
+        posthog.register({
+          $set: {
+            app_version: __APP_VERSION__,
+            os: os.platform,
+            arch: os.arch,
+          },
+        });
+      },
+    });
   }
-  window.addEventListener("hashchange", p);
-  p();
+}
+
+export function trackEvent(event: string, properties?: Record<string, any>) {
+  if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
+    posthog.capture(event, {
+      ...(properties || {}),
+    });
+  }
 }
 
 export default initAnalytics;
