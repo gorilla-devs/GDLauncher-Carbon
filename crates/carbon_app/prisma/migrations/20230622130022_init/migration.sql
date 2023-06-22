@@ -15,7 +15,8 @@ CREATE TABLE "AppConfiguration" (
     "xms" INTEGER NOT NULL DEFAULT 1024,
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
-    "autoManageJava" BOOLEAN NOT NULL DEFAULT true
+    "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
+    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false
 );
 
 -- CreateTable

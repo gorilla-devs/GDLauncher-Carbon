@@ -243,7 +243,7 @@ impl ManagerRef<'_, InstanceManager> {
                             t_download_files.complete_download();
                         });
 
-                        let modpack_info = curseforge::prepare_modpack(
+                        let modpack_info = curseforge::prepare_modpack_from_addon(
                             &app,
                             &file,
                             instance_path.clone(),

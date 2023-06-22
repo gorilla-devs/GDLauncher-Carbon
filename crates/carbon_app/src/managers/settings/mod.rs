@@ -149,6 +149,15 @@ impl ManagerRef<'_, SettingsManager> {
             ));
             something_changed = true;
         }
+        if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::UniqueWhereParam::IdEquals(0),
+                vec![app_configuration::SetParam::SetAutoManageJava(
+                    is_legal_accepted,
+                )],
+            ));
+            something_changed = true;
+        }
 
         if something_changed {
             db._batch(queries).await?;
