@@ -32,34 +32,32 @@ impl ManagerRef<'_, SettingsManager> {
         let mut something_changed = false;
         if let Some(theme) = incoming_settings.theme {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetTheme(theme)],
+                app_configuration::id::equals(0),
+                vec![app_configuration::theme::set(theme)],
             ));
             something_changed = true;
         }
 
         if let Some(language) = incoming_settings.language {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetLanguage(language)],
+                app_configuration::id::equals(0),
+                vec![app_configuration::language::set(language)],
             ));
             something_changed = true;
         }
 
         if let Some(reduced_motion) = incoming_settings.reduced_motion {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetReducedMotion(
-                    reduced_motion,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::reduced_motion::set(reduced_motion)],
             ));
             something_changed = true;
         }
 
         if let Some(discord_integration) = incoming_settings.discord_integration {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetDiscordIntegration(
+                app_configuration::id::equals(0),
+                vec![app_configuration::discord_integration::set(
                     discord_integration,
                 )],
             ));
@@ -68,18 +66,16 @@ impl ManagerRef<'_, SettingsManager> {
 
         if let Some(release_channel) = incoming_settings.release_channel {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetReleaseChannel(
-                    release_channel,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::release_channel::set(release_channel)],
             ));
             something_changed = true;
         }
 
         if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetConcurrentDownloads(
+                app_configuration::id::equals(0),
+                vec![app_configuration::concurrent_downloads::set(
                     concurrent_downloads,
                 )],
             ));
@@ -88,42 +84,40 @@ impl ManagerRef<'_, SettingsManager> {
 
         if let Some(show_news) = incoming_settings.show_news {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetShowNews(show_news)],
+                app_configuration::id::equals(0),
+                vec![app_configuration::show_news::set(show_news)],
             ));
             something_changed = true;
         }
 
         if let Some(xmx) = incoming_settings.xmx {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetXmx(xmx)],
+                app_configuration::id::equals(0),
+                vec![app_configuration::xmx::set(xmx)],
             ));
             something_changed = true;
         }
 
         if let Some(xms) = incoming_settings.xms {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetXms(xms)],
+                app_configuration::id::equals(0),
+                vec![app_configuration::xms::set(xms)],
             ));
             something_changed = true;
         }
 
         if let Some(is_first_launch) = incoming_settings.is_first_launch {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetIsFirstLaunch(
-                    is_first_launch,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::is_first_launch::set(is_first_launch)],
             ));
             something_changed = true;
         }
 
         if let Some(startup_resolution) = incoming_settings.startup_resolution {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetStartupResolution(
+                app_configuration::id::equals(0),
+                vec![app_configuration::startup_resolution::set(
                     startup_resolution,
                 )],
             ));
@@ -132,29 +126,23 @@ impl ManagerRef<'_, SettingsManager> {
 
         if let Some(java_custom_args) = incoming_settings.java_custom_args {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetJavaCustomArgs(
-                    java_custom_args,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::java_custom_args::set(java_custom_args)],
             ));
             something_changed = true;
         }
 
         if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetAutoManageJava(
-                    auto_manage_java,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::auto_manage_java::set(auto_manage_java)],
             ));
             something_changed = true;
         }
         if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
             queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![app_configuration::SetParam::SetAutoManageJava(
-                    is_legal_accepted,
-                )],
+                app_configuration::id::equals(0),
+                vec![app_configuration::is_legal_accepted::set(is_legal_accepted)],
             ));
             something_changed = true;
         }
@@ -171,10 +159,7 @@ impl ManagerRef<'_, SettingsManager> {
         self.app
             .prisma_client
             .app_configuration()
-            .update(
-                app_configuration::UniqueWhereParam::IdEquals(0),
-                vec![value],
-            )
+            .update(app_configuration::id::equals(0), vec![value])
             .exec()
             .await?;
 
