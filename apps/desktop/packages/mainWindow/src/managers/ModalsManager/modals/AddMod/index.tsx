@@ -273,7 +273,7 @@ const AddMod = (props: ModalProps) => {
                   {(virtualItem) => {
                     const isLoaderRow = () =>
                       virtualItem.index > mods().length - 1;
-                    const modpack = () => mods()[virtualItem.index];
+                    const mod = () => mods()[virtualItem.index];
 
                     const hasNextPage = () => infiniteQuery?.hasNextPage;
 
@@ -297,9 +297,9 @@ const AddMod = (props: ModalProps) => {
                               </div>
                             }
                           >
-                            <Match when={!isLoaderRow() && modpack()}>
+                            <Match when={!isLoaderRow() && mod()}>
                               <Mod
-                                mod={modpack()}
+                                mod={mod()}
                                 mcVersion={props.data as string}
                               />
                             </Match>

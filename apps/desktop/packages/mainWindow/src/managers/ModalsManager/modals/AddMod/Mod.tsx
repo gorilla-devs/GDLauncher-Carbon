@@ -3,7 +3,7 @@ import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Spinner, Tag } from "@gd/ui";
 import { format } from "date-fns";
-import { For, Match, Show, Switch, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { useModal } from "../..";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
@@ -19,8 +19,8 @@ const Mod = (props: Props) => {
       (file) => file.gameVersion === props.mcVersion
     );
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
+  const instanceMods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
     parseInt(lastInstanceOpened(), 10),
   ]);
 
@@ -40,9 +40,12 @@ const Mod = (props: Props) => {
   });
 
   const isModInstalled = () =>
-    instanceDetails.data?.mods.find(
-      (mod) => parseInt(mod.id, 10) === props.mod.id
-    ) !== undefined;
+    instanceMods.data?.find((mod) => parseInt(mod.id, 10) === props.mod.id) !==
+    undefined;
+
+  createEffect(() => {
+    console.log("TEST", instanceMods.data, props.mod);
+  });
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">

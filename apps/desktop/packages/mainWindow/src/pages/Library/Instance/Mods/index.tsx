@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
@@ -62,6 +62,17 @@ const Mods = () => {
     );
   };
 
+  const mods = () => routeData.instanceMods.data || [];
+
+  createEffect(() => {
+    console.log(
+      "mods()",
+      mods(),
+      routeData.instanceMods,
+      routeData.instanceDetails
+    );
+  });
+
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
@@ -113,7 +124,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 onChange={(checked) => {
-                  routeData.instanceDetails.data?.mods.forEach((mod) => {
+                  routeData.instanceMods.data?.forEach((mod) => {
                     if (checked) {
                       setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
                     } else
@@ -169,12 +180,11 @@ const Mods = () => {
               <div
                 class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
                 onClick={() => {
-                  const areSelectedEnabled =
-                    routeData.instanceDetails.data?.mods
-                      .filter((mod) => selectedMods[mod.id])
-                      .every((mod) => mod.enabled);
+                  const areSelectedEnabled = mods()
+                    .filter((mod) => selectedMods[mod.id])
+                    .every((mod) => mod.enabled);
 
-                  routeData.instanceDetails.data?.mods
+                  mods()
                     .filter((mod) => selectedMods[mod.id])
                     .forEach((mod) => {
                       if (areSelectedEnabled) {
@@ -192,7 +202,7 @@ const Mods = () => {
                 }}
               >
                 <Show
-                  when={routeData.instanceDetails.data?.mods
+                  when={mods()
                     .filter((mod) => selectedMods[mod.id])
                     .every((mod) => mod.enabled)}
                   fallback={
@@ -215,7 +225,7 @@ const Mods = () => {
             </Show>
           </div>
           <div class="flex gap-1">
-            <span>{routeData.instanceDetails.data?.mods.length}</span>
+            <span>{mods().length}</span>
 
             <Trans
               key="instance.mods"
@@ -229,13 +239,11 @@ const Mods = () => {
       <div class="h-full overflow-y-hidden">
         <Show
           when={
-            routeData.instanceDetails.data?.mods &&
-            routeData.instanceDetails.data?.mods.length > 0 &&
-            !routeData.instanceDetails.isLoading
+            mods() && mods().length > 0 && !routeData.instanceDetails.isLoading
           }
           fallback={<NoMods />}
         >
-          <For each={routeData.instanceDetails.data?.mods}>
+          <For each={mods()}>
             {(props) => (
               <Mod
                 mod={props}

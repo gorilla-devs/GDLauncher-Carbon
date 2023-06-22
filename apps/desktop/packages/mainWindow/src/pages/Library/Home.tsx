@@ -29,6 +29,9 @@ const Home = () => {
   createEffect(() => {
     setIsNewVisible(!!routeData.settings.data?.showNews);
   });
+  createEffect(() => {
+    console.log("instancesUngrouped", routeData.instancesUngrouped.data);
+  });
 
   return (
     <div class="pb-0 p-6">
