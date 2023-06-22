@@ -411,6 +411,7 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintsMatchesResult>
             unmatched_fingerprints: matches_result
                 .unmatched_fingerprints
                 .into_iter()
+                .flat_map(|uf| uf.into_iter())
                 .map(|f| f.to_string())
                 .collect(),
         }

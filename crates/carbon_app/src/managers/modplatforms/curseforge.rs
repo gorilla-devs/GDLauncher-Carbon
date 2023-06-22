@@ -102,7 +102,7 @@ impl CurseForge {
         let resp = self
             .client
             .post(url.as_str())
-            .json(&body)
+            .body(body.to_string())
             .send()
             .await?
             .json::<CurseForgeResponse<Vec<Mod>>>()
@@ -116,7 +116,7 @@ impl CurseForge {
         &self,
         hashes: &[u32],
     ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
-        let url = self.base_url.join("v1/fingerprints/432")?;
+        let url = self.base_url.join("fingerprints")?;
 
         let body = json!({ "fingerprints": hashes });
 

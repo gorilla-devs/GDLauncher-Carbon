@@ -13,6 +13,9 @@ use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use tracing::error;
+use tracing::info;
+use tracing::trace;
 use uuid::Uuid;
 
 use crate::api::keys::instance::INSTANCE_MODS;
@@ -93,9 +96,10 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn queue_local_caching(self, instance_id: InstanceId, force_recache: bool) {
+        trace!("possibly queueing instance {instance_id} for recaching");
         let lock = match force_recache {
-            false => None,
-            true => Some(self.scanned_instances.lock().await),
+            true => None,
+            false => Some(self.scanned_instances.lock().await),
         };
 
         if lock
@@ -108,6 +112,8 @@ impl ManagerRef<'_, MetaCacheManager> {
             // prevent future calls
             lock.unwrap_or(self.scanned_instances.lock().await)
                 .insert(instance_id);
+
+            info!("queued instance {instance_id} for recaching");
         }
     }
 
@@ -132,26 +138,35 @@ impl ManagerRef<'_, MetaCacheManager> {
             let mut pathbuf = PathBuf::new();
 
             while local_notify.changed().await.is_ok() {
+                trace!("mod caching task woken");
                 loop {
-                    let instance_id = match app
-                        .meta_cache_manager()
-                        .priority_instance
-                        .lock()
-                        .await
-                        .take()
-                    {
-                        Some(priority) => Some(priority),
-                        None => app
+                    let (priority, instance_id) = 'pi: {
+                        let priority_instance = app
                             .meta_cache_manager()
-                            .waiting_instances
-                            .read()
+                            .priority_instance
+                            .lock()
                             .await
-                            .iter()
-                            .next()
-                            .copied(),
+                            .clone();
+
+                        let mcm = app.meta_cache_manager();
+                        let mut waiting = mcm.waiting_instances.write().await;
+
+                        if let Some(pi) = priority_instance
+                            .map(|instance| waiting.take(&instance))
+                            .flatten()
+                        {
+                            break 'pi (true, Some(pi));
+                        }
+
+                        let next = waiting.iter().next().cloned();
+                        (false, next.map(|n| waiting.take(&n)).flatten())
                     };
 
                     let Some(instance_id) = instance_id else { break };
+                    info!(
+                        { priority },
+                        "recaching instance mod metadata for {instance_id}"
+                    );
 
                     let instances = instance_manager.instances.read().await;
                     let Some(instance) = instances.get(&instance_id) else { continue };
@@ -176,10 +191,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                     pathbuf.push(&basepath);
                     pathbuf.push(&subpath);
 
+                    trace!({ dir = ?pathbuf }, "scanning mods dir for instance {instance_id}");
                     let mut modpaths = HashMap::<String, (bool, u64)>::new();
-                    let Ok(mut entries) = tokio::fs::read_dir(&pathbuf).await else { continue };
+                    let mut entries = match tokio::fs::read_dir(&pathbuf).await {
+                        Ok(entries) => entries,
+                        Err(e) => {
+                            error!({ dir = ?pathbuf, error = ?e }, "could not read instance {instance_id}  for mod scanning");
+                            continue;
+                        }
+                    };
 
                     while let Ok(Some(entry)) = entries.next_entry().await {
+                        trace!("scanning mods folder entry `{:?}`", entry.file_name());
                         let file_name = entry.file_name();
                         let Some(mut utf8_name) = file_name.to_str() else { continue };
 
@@ -196,10 +219,11 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                         let Ok(metadata) = entry.metadata().await else { continue };
                         // file || symlink
-                        if !metadata.is_dir() {
+                        if metadata.is_dir() {
                             continue;
                         }
 
+                        trace!("tracking mod `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(utf8_name.to_string(), (!is_jar_disabled, metadata.len()));
                     }
 
@@ -212,9 +236,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 if *real_size == entry.filesize as u64 && *enabled == entry.enabled
                                 {
                                     modpaths.remove(&entry.filename);
+                                    trace!(
+                                        "up to data metadata entry for mod `{}`, skipping",
+                                        &entry.filename
+                                    );
                                     continue;
                                 }
                             }
+
+                            trace!(
+                                "outdated metadata entry for mod `{}`, adding to update list",
+                                &entry.filename
+                            );
 
                             dirty_cache.push(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
                                 *instance_id,
@@ -322,8 +355,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                             )
                             .unzip();
 
-                    // TODO: FE background error endpoint
-                    let _ = app
+                    let r = app
                         .prisma_client
                         ._batch((
                             dirty_cache
@@ -339,12 +371,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                         ))
                         .await;
 
-                    let priority = app
-                        .meta_cache_manager()
-                        .priority_instance
-                        .lock()
-                        .await
-                        .is_some();
+                    if let Err(e) = r {
+                        error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
+                    }
 
                     app.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
 
@@ -364,6 +393,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             while remote_watch.changed().await.is_ok() {
                 loop {
                     let Some(instance_id) = *remote_watch.borrow() else { break };
+                    info!("updating curseforge metadata cache for instance {instance_id}");
 
                     let fut = async {
                         let mut modlist = app
@@ -406,6 +436,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                             while let Some((batch, fp_response, mods_response)) =
                                 batch_rx.recv().await
                             {
+                                trace!("processing mod batch for instance {instance_id}");
+
                                 let mut matches = fp_response
                                     .exact_fingerprints
                                     .into_iter()
@@ -416,13 +448,15 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     })
                                     .collect::<HashMap<_, _>>();
 
-                                // todo local db changes
-                                let (creates, deletes) = batch
+                                let upserts = batch
                                     .into_iter()
                                     .filter_map(|(metadata_id, murmur2)| {
                                         let fpmatch = matches.remove(&murmur2);
                                         fpmatch.map(|(fileinfo, modinfo)| {
-                                            (
+                                            app_db.prisma_client.curse_forge_mod_cache().upsert(
+                                                cfdb::UniqueWhereParam::MetadataIdEquals(
+                                                    metadata_id.clone(),
+                                                ),
                                                 (
                                                     murmur2 as i32,
                                                     modinfo.id,
@@ -435,33 +469,20 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                         .into_iter()
                                                         .map(|a| a.name)
                                                         .join(", "),
-                                                    metadata_id.clone(),
+                                                    metadb::UniqueWhereParam::IdEquals(
+                                                        metadata_id.clone(),
+                                                    ),
                                                     Vec::new(),
                                                 ),
-                                                app_db
-                                                    .prisma_client
-                                                    .curse_forge_mod_cache()
-                                                    .delete(
-                                                        cfdb::UniqueWhereParam::MetadataIdEquals(
-                                                            metadata_id,
-                                                        ),
-                                                    ),
+                                                Vec::new(),
                                             )
                                         })
                                     })
-                                    .unzip::<_, _, Vec<_>, Vec<_>>();
+                                    .collect::<Vec<_>>();
 
+                                trace!("saving mod metadata batch");
                                 // may fail if the user removed a mod
-                                let r = app_db
-                                    .prisma_client
-                                    ._batch((
-                                        deletes,
-                                        app_db
-                                            .prisma_client
-                                            .curse_forge_mod_cache()
-                                            .create_many(creates),
-                                    ))
-                                    .await;
+                                let r = app_db.prisma_client._batch(upserts).await;
 
                                 if let Err(e) = r {
                                     tracing::error!({ error = ?e }, "Could not store mod metadata");
@@ -475,6 +496,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                             let (fingerprints, metadata) = modlist
                                 .drain(0..usize::min(1000, modlist.len()))
                                 .unzip::<_, _, Vec<_>, Vec<_>>();
+
+                            trace!("querying curseforge mod batch for instance {instance_id}");
 
                             let fp_response = app
                                 .modplatforms_manager()
@@ -491,14 +514,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                                         mod_ids: fp_response
                                             .exact_matches
                                             .iter()
-                                            .map(|m| m.id)
+                                            .map(|m| m.file.mod_id)
                                             .collect::<Vec<_>>(),
                                     },
                                 })
                                 .await?
                                 .data;
 
-                            let _ = batch_tx.send((metadata, fp_response, mods_response));
+                            batch_tx
+                                .send((metadata, fp_response, mods_response))
+                                .expect(
+                                "batch processor should not drop until the transmitter is dropped",
+                            );
                         }
 
                         Ok::<_, anyhow::Error>(())
@@ -508,7 +535,12 @@ impl ManagerRef<'_, MetaCacheManager> {
                     // forcing the whole thing to rerun
                     tokio::select! {
                         _ = remote_watch.changed() => continue,
-                        _ = fut => break,
+                        r = fut => {
+                            if let Err(e) = r {
+                                error!({ error = ?e }, "failed to query curseforge for instance {instance_id} mods");
+                            }
+                            break
+                        },
                     };
                 }
             }
