@@ -2,6 +2,7 @@ import { createSignal, Setter } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
+import { rspc } from "@/utils/rspcClient";
 
 type Props = {
   setStep: Setter<number>;
@@ -10,6 +11,8 @@ type Props = {
 const TermsAndConditions = (props: Props) => {
   const [accepted, setAccepted] = createSignal(false);
   const modalsContext = useModal();
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   return (
     <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 h-full">
@@ -41,7 +44,6 @@ const TermsAndConditions = (props: Props) => {
             <Checkbox
               checked={accepted()}
               onChange={() => {
-                console.log("onChange");
                 setAccepted((prev) => !prev);
               }}
             />
@@ -57,6 +59,7 @@ const TermsAndConditions = (props: Props) => {
             size="small"
             disabled={!accepted()}
             onClick={() => {
+              settingsMutation.mutate({ isLegalAccepted: true });
               props.setStep((prev) => prev + 1);
             }}
           >
