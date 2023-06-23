@@ -22,7 +22,7 @@ const unocssConfig = {
       ri: () => import("@iconify-json/ri/icons.json").then((i) => i.default),
     }),
   ],
-  rules: [],
+  rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
   theme,
 } as unknown;
 
