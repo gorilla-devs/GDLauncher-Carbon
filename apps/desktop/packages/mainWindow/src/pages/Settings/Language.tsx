@@ -8,16 +8,17 @@ import { For, createEffect } from "solid-js";
 import { rspc, queryClient } from "@/utils/rspcClient";
 import { FESettings } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
+import Title from "./components/Title";
 
 const Language = () => {
-  let data = rspc.createQuery(() => ["settings.getSettings"]);
+  let settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  const [settings, setSettings] = createStore<FESettings | {}>({});
+  // @ts-ignore
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {});
-
-  createEffect(() => {
-    if (data.data) setSettings(data.data);
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      queryClient.setQueryData(["settings.getSettings"], newSettings);
+    },
   });
 
   return (
@@ -31,7 +32,10 @@ const Language = () => {
         />
       </PageTitle>
       <RowsContainer>
-        <Row>
+        <Row class="flex-col justify-start">
+          <Title class="w-full">
+            <Trans key="settings.select_a_language" />
+          </Title>
           <div class="w-full flex flex-col mt-6 divide-y divide-darkSlate-600">
             <Radio.group
               onChange={(value) => {
@@ -39,6 +43,7 @@ const Language = () => {
                   language: value as string,
                 });
               }}
+              value={settings.data?.language}
             >
               <For each={supportedLanguages}>
                 {(item) => (

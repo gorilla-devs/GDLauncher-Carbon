@@ -33,6 +33,7 @@
   "expert_user_mod": "Expert user mod",
   "settings.general": "General",
   "settings.choose_a_language_title": "Language",
+  "settings.select_a_language": "Please select a language",
   "settings.settings_more_control": "Adds more control over the settings of your instances and java.",
   "settings.reset": "Reset all to default",
   "settings.release_channel_title": "Release Channel",
