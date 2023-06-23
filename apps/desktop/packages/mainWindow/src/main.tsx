@@ -5,6 +5,7 @@ import {
   createResource,
   createSignal,
   Match,
+  Show,
   Switch,
 } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
@@ -109,7 +110,7 @@ const loadLanguageResources = async (lang: string) => {
 const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
-  rspc.createQuery(() => ["settings.getSettings"], {
+  const settings = rspc.createQuery(() => ["settings.getSettings"], {
     async onSuccess({ language }) {
       if (!_i18nInstance.isInitialized) {
         await _i18nInstance.init({
@@ -120,8 +121,6 @@ const TransWrapper = (props: TransWrapperProps) => {
           partialBundledLanguages: true,
           // debug: true,
         });
-
-        return;
       } else {
         if (language === _i18nInstance.language) {
           return;
@@ -164,18 +163,20 @@ const TransWrapper = (props: TransWrapperProps) => {
   });
 
   return (
-    <TransProvider instance={_i18nInstance}>
-      <Router source={hashIntegration()}>
-        <NavigationManager>
-          <NotificationsProvider>
-            <ContextMenuProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={props.createInvalidateQuery} />
-              </ModalProvider>
-            </ContextMenuProvider>
-          </NotificationsProvider>
-        </NavigationManager>
-      </Router>
-    </TransProvider>
+    <Show when={!settings.isInitialLoading}>
+      <TransProvider instance={_i18nInstance}>
+        <Router source={hashIntegration()}>
+          <NavigationManager>
+            <NotificationsProvider>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={props.createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
+            </NotificationsProvider>
+          </NavigationManager>
+        </Router>
+      </TransProvider>
+    </Show>
   );
 };

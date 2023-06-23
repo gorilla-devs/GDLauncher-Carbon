@@ -10,10 +10,6 @@ import { FESettings } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 
 const Language = () => {
-  const [t, { getI18next }] = useTransContext();
-
-  console.log(getI18next().getResourceBundle("english", "languages"));
-
   let data = rspc.createQuery(() => ["settings.getSettings"]);
 
   const [settings, setSettings] = createStore<FESettings | {}>({});
