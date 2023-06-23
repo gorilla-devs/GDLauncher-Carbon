@@ -1,4 +1,4 @@
-export const supportedLanguages = [
+[
   "english",
   "italian",
   "german",
@@ -43,5 +43,5 @@ export const supportedLanguages = [
   "armenian",
   "azerbaijani",
   "basque",
-  "belarusian",
-];
+  "belarusian"
+]

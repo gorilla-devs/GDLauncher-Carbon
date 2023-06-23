@@ -5,7 +5,7 @@ import { theme } from "./unocss.theme.js";
 import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { supportedLanguages } from "@gd/i18n";
+import supportedLanguages from "@gd/i18n/supportedLanguages.json";
 // import gdlIcons from "./unocss.icons.js";
 
 const unocssConfig = {
