@@ -2,10 +2,12 @@ export const NAVBAR_ROUTES = [
   {
     label: "library",
     path: "/library",
+    icon: "i-ri:ancient-pavilion-fill",
   },
   {
     label: "explore",
     path: "/modpacks",
+    icon: "i-ri:compass-line",
   },
 ];
 

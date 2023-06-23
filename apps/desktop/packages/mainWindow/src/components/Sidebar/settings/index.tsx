@@ -12,27 +12,27 @@ export type settingsItem = {
 const settings: Array<settingsItem> = [
   {
     name: "General",
-    icon: "settings",
+    icon: "i-ri:home-gear-fill",
     path: "/settings",
   },
   {
     name: "Language",
-    icon: "language",
+    icon: "i-ri:global-line",
     path: "/settings/language",
   },
   {
     name: "Appearance",
-    icon: "palette",
+    icon: "i-ri:brush-line",
     path: "/settings/appearance",
   },
   {
     name: "Java",
-    icon: "",
+    icon: "i-nonicons:java-16",
     path: "/settings/java",
   },
   {
     name: "Privacy",
-    icon: "",
+    icon: "i-ri:shield-keyhole-line",
     path: "/settings/privacy",
   },
 ];
@@ -56,7 +56,10 @@ const Sidebar = () => {
                   navigate(item.path);
                 }}
               >
-                {item.name}
+                <div class="flex gap-2 items-center">
+                  <i class={"w-5 h-5 " + item.icon} />
+                  <div>{item.name}</div>
+                </div>
               </Tab>
             )}
           </For>
