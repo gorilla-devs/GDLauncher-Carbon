@@ -9,21 +9,23 @@ import {
 } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
-import { i18n, TransProvider, icu, loadLanguageFile } from "@gd/i18n";
+import {
+  i18n,
+  TransProvider,
+  icu,
+  loadLanguageFile,
+  supportedLanguages,
+  loadLanguagesFile,
+} from "@gd/i18n";
 import App from "@/app";
 import { ModalProvider } from "@/managers/ModalsManager";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
-import { DEFAULT_LANG, LANGUAGES } from "./constants";
 import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWapper";
 import GDAnimation from "./gd_logo_animation.riv";
-
-interface Translations {
-  [translationKey: string]: string;
-}
 
 render(() => {
   const [coreModuleLoaded] = createResource(async () => {
@@ -37,41 +39,11 @@ render(() => {
     return port;
   });
 
-  const [i18nInstance] = createResource(async () => {
-    const buildResources = async (langs: string[]) => {
-      const langFilesPromises = langs.map(loadLanguageFile);
-      const langFiles: Translations = (await Promise.all(
-        langFilesPromises
-      )) as any;
-
-      const resources: { [translationKey: string]: Translations } = {};
-      for (let i = 0; i < langs.length; i++) {
-        resources[langs[i]] = {
-          common: langFiles[i],
-        };
-      }
-
-      return resources;
-    };
-
-    const resources = await buildResources(LANGUAGES);
-
-    const instance = await i18n.use(icu).createInstance({
-      defaultNS: "common",
-      fallbackLng: DEFAULT_LANG,
-      resources: resources,
-    });
-
-    return instance;
-  });
-
   const [isReady, setIsReady] = createSignal(false);
 
   createEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      setIsReady(
-        i18nInstance.state === "ready" && coreModuleLoaded.state === "ready"
-      );
+      setIsReady(coreModuleLoaded.state === "ready");
     }
   });
 
@@ -82,30 +54,21 @@ render(() => {
           <RiveAppWapper
             src={GDAnimation}
             onStop={() => {
-              setIsReady(
-                i18nInstance.state === "ready" &&
-                  coreModuleLoaded.state === "ready"
-              );
+              setIsReady(coreModuleLoaded.state === "ready");
             }}
           />
         </div>
       }
     >
       <Match when={isReady()}>
-        <InnerApp
-          port={coreModuleLoaded() as unknown as number}
-          i18nInstance={i18nInstance() as unknown as typeof i18n}
-        />
+        <InnerApp port={coreModuleLoaded() as unknown as number} />
       </Match>
       <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
         <div class="w-full flex justify-center items-center h-screen">
           <RiveAppWapper
             src={GDAnimation}
             onStop={() => {
-              setIsReady(
-                i18nInstance.state === "ready" &&
-                  coreModuleLoaded.state === "ready"
-              );
+              setIsReady(coreModuleLoaded.state === "ready");
             }}
           />
         </div>
@@ -116,7 +79,6 @@ render(() => {
 
 type InnerAppProps = {
   port: number;
-  i18nInstance: typeof i18n;
 };
 
 const InnerApp = (props: InnerAppProps) => {
@@ -125,19 +87,95 @@ const InnerApp = (props: InnerAppProps) => {
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
+      <TransWrapper createInvalidateQuery={createInvalidateQuery} />
+    </rspc.Provider>
+  );
+};
+
+type TransWrapperProps = {
+  createInvalidateQuery: () => void;
+};
+
+const loadLanguageResources = async (lang: string) => {
+  let langFile = await loadLanguageFile(lang);
+  let languagesFile = await loadLanguagesFile();
+
+  return {
+    common: langFile,
+    languages: languagesFile,
+  };
+};
+
+const _i18nInstance = i18n.use(icu).createInstance();
+
+const TransWrapper = (props: TransWrapperProps) => {
+  rspc.createQuery(() => ["settings.getSettings"], {
+    async onSuccess({ language }) {
+      if (!_i18nInstance.isInitialized) {
+        await _i18nInstance.init({
+          ns: ["common", "languages"],
+          defaultNS: "common",
+          lng: language,
+          resources: {},
+          partialBundledLanguages: true,
+          // debug: true,
+        });
+
+        return;
+      } else {
+        if (language === _i18nInstance.language) {
+          return;
+        }
+      }
+
+      if (!supportedLanguages.includes(language)) {
+        console.warn(`Language ${language} is not supported`);
+        return;
+      }
+
+      const previousLanguage = _i18nInstance.language;
+
+      const resources = await loadLanguageResources(language);
+
+      if (!_i18nInstance.hasResourceBundle(language, "common")) {
+        _i18nInstance.addResourceBundle(language, "common", resources.common);
+      }
+      if (!_i18nInstance.hasResourceBundle(language, "languages")) {
+        _i18nInstance.addResourceBundle(
+          language,
+          "languages",
+          resources.languages
+        );
+      }
+
+      _i18nInstance.changeLanguage(language);
+
+      if (previousLanguage && language !== previousLanguage) {
+        if (_i18nInstance.hasResourceBundle(previousLanguage, "common")) {
+          _i18nInstance.removeResourceBundle(previousLanguage, "common");
+        }
+        if (_i18nInstance.hasResourceBundle(previousLanguage, "languages")) {
+          _i18nInstance.removeResourceBundle(previousLanguage, "languages");
+        }
+      }
+
+      _i18nInstance.setDefaultNamespace("common");
+    },
+  });
+
+  return (
+    <TransProvider instance={_i18nInstance}>
       <Router source={hashIntegration()}>
         <NavigationManager>
-          <TransProvider instance={props.i18nInstance} options={{ lng: "en" }}>
-            <NotificationsProvider>
-              <ContextMenuProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={createInvalidateQuery} />
-                </ModalProvider>
-              </ContextMenuProvider>
-            </NotificationsProvider>
-          </TransProvider>
+          <NotificationsProvider>
+            <ContextMenuProvider>
+              <ModalProvider>
+                <App createInvalidateQuery={props.createInvalidateQuery} />
+              </ModalProvider>
+            </ContextMenuProvider>
+          </NotificationsProvider>
         </NavigationManager>
       </Router>
-    </rspc.Provider>
+    </TransProvider>
   );
 };

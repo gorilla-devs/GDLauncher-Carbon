@@ -33,6 +33,26 @@ const Privacy = () => {
           </Button>
         </div>
       </div>
+      <div class="mb-6">
+        <h5 class="mt-0 mb-2">
+          <Trans key="settings.metrics_level_title" />
+        </h5>
+        <div class="flex w-full justify-between">
+          <p class="m-0 text-darkSlate-300 max-w-100">
+            <Trans key="settings.metrics_level_text" />
+          </p>
+          <Button
+            type="secondary"
+            size="small"
+            rounded={false}
+            onClick={() => {
+              window?.openCMPWindow();
+            }}
+          >
+            <Trans key="login.manage" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

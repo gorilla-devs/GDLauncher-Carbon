@@ -16,6 +16,11 @@ const settings: Array<settingsItem> = [
     path: "/settings",
   },
   {
+    name: "Language",
+    icon: "language",
+    path: "/settings/language",
+  },
+  {
     name: "Appearance",
     icon: "palette",
     path: "/settings/appearance",
