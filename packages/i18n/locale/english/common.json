@@ -19,7 +19,7 @@
   "login.waiting_login_code_msg": "Waiting authorization...",
   "login.open_in_browser": "Copy and open in browser",
   "login.refresh": "refresh",
-  "login.read_and_accept": "I have read and accept Terms and Privacy Policy",
+  "login.read_and_accept": "I have read and accept <0>terms</0> and <1>privacy_policy<1/>",
   "login.next": "Next",
   "login.we_value_privacy_title": "We value your privacy",
   "login.we_value_privacy_text": "The Overwolf platform supports the display of in-app ads. This helps app developers make a living, and provide you with free high-quality apps.\nIn order to deliver ads that are relevant for you, Overwolf and trusted ad vendors store and/or access information on your computer, and process personal data such as IP address and cookies.\nClick the 'Manage' button to control your consents, or to object to the processing of your data when done on the basis of legitmate interest.\nYou can change your prefrences at any time via Overwolf settings.",

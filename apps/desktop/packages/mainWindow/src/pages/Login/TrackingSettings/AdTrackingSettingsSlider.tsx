@@ -1,6 +1,6 @@
 import { useTransContext } from "@gd/i18n";
 import { Slider } from "@gd/ui";
-import { createSignal } from "solid-js";
+import { Match, Switch, createSignal } from "solid-js";
 
 type Props = {
   onChange: (_metricsLevel: number) => void;
@@ -10,18 +10,26 @@ const AdTrackingSettingsSlider = (props: Props) => {
   const [t] = useTransContext();
 
   const mapValueToTile = (value: number) => {
-    switch (value) {
-      case 0:
-        return t("tracking.setting_disabled");
-      case 200:
-        return t("tracking.setting_anonymous");
-      case 600:
-        return t("tracking.setting_anonymous+session");
-      case 1000:
-        return t("tracking.authenticated+session");
-      default:
-        return t("tracking.setting_disabled");
-    }
+    return (
+      <Switch>
+        <Match when={value === 0}>
+          <div class="text-red-500">{t("tracking.setting_disabled")}</div>
+        </Match>
+        <Match when={value === 250}>
+          <div class="text-yellow-900">{t("tracking.setting_anonymous")}</div>
+        </Match>
+        <Match when={value === 500}>
+          <div class="text-yellow-500">
+            {t("tracking.setting_anonymous+session")}
+          </div>
+        </Match>
+        <Match when={value === 1000}>
+          <div class="text-green-500">
+            {t("tracking.authenticated+session")}
+          </div>
+        </Match>
+      </Switch>
+    );
   };
 
   const [title, setTitle] = createSignal(mapValueToTile(1000));
@@ -30,9 +38,9 @@ const AdTrackingSettingsSlider = (props: Props) => {
     switch (value) {
       case 0:
         return 0;
-      case 200:
+      case 250:
         return 1;
-      case 600:
+      case 500:
         return 2;
       case 1000:
         return 3;
@@ -43,9 +51,10 @@ const AdTrackingSettingsSlider = (props: Props) => {
 
   return (
     <div class="w-full flex flex-col items-center max-w-2/3">
-      <h3 class="mb-10">{title()}</h3>
+      <h3 class="mb-10" classList={{}}>
+        {title()}
+      </h3>
       <Slider
-        noLabels
         noTooltip
         min={0}
         max={1000}
@@ -53,8 +62,8 @@ const AdTrackingSettingsSlider = (props: Props) => {
         value={1000}
         marks={{
           0: "disabled",
-          200: "anonymous",
-          600: "anonymous+session",
+          250: "anonymous",
+          500: "anonymous+session",
           1000: "authenticated",
         }}
         onChange={(val) => {

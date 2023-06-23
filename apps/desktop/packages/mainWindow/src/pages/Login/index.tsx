@@ -58,10 +58,10 @@ export default function Login() {
           />
           <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
             <Dropdown
-              value={routeData.settings.data?.language || "en"}
+              value={routeData.settings.data?.language}
               options={[
-                { label: t("languages.english"), key: "eng" },
-                { label: t("languages.italian"), key: "it" },
+                { label: t("languages.english"), key: "english" },
+                { label: t("languages.italian"), key: "italian" },
               ]}
               onChange={(lang) => {
                 settingsMutation.mutate({ language: lang.key as string });
@@ -70,7 +70,7 @@ export default function Login() {
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
               "justify-content": step() === 2 ? "flex-end" : "center",

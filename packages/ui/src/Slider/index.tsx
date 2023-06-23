@@ -208,7 +208,7 @@ function Slider(props: Props) {
                   }}
                 />
                 <p
-                  class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-darkSlate-500 w-10"
+                  class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-lightSlate-500 w-10"
                   style={{
                     position: "absolute",
                     left: `calc(${calcOffset(parseInt(value, 10))}% -  ${

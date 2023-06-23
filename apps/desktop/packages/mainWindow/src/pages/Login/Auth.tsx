@@ -142,49 +142,6 @@ const Auth = (props: Props) => {
         <Show when={error()}>
           <p class="m-0 text-red-500">{error()}</p>
         </Show>
-        <ul class="flex text-sm list-none gap-3 p-0 mb-8 underline">
-          <li
-            class="cursor-pointer"
-            onClick={() => {
-              modalsContext?.openModal({ name: "privacyPolicy" });
-            }}
-          >
-            <Trans
-              key="login.privacy_policy"
-              options={{
-                defaultValue: "Privacy Policy",
-              }}
-            />
-          </li>
-          <li
-            class="cursor-pointer"
-            onClick={() => {
-              modalsContext?.openModal({
-                name: "termsAndConditions",
-              });
-            }}
-          >
-            <Trans
-              key="login.terms_and_conditions"
-              options={{
-                defaultValue: "Terms and Conditions",
-              }}
-            />
-          </li>
-          <li
-            class="cursor-pointer"
-            onClick={() =>
-              modalsContext?.openModal({ name: "acceptableUsePolicy" })
-            }
-          >
-            <Trans
-              key="login.acceptable_use_policy"
-              options={{
-                defaultValue: "Acceptable Use Policy",
-              }}
-            />
-          </li>
-        </ul>
       </div>
     </div>
   );

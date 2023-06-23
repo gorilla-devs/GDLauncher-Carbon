@@ -123,7 +123,6 @@ const General = () => {
           </Title>
           <RightHandSide>
             <Dropdown
-              value="en"
               placeholder={t("settings.resolution_presets") || ""}
               options={[
                 { label: "800x600", key: "800x600" },
@@ -154,7 +153,6 @@ const General = () => {
           </Title>
           <RightHandSide>
             <Dropdown
-              value="en"
               options={[
                 { label: "Alphabetical", key: "alphabetical" },
                 { label: "Creation Date", key: "creation" },

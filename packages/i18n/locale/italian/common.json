@@ -19,6 +19,7 @@
   "login.waiting_login_code_msg": "Waiting authorization...",
   "login.open_in_browser": "Copy and open in browser",
   "login.refresh": "refresh",
+  "login.read_and_accept": "Ho letto e accettato i <0>{termini}</0> e <1>{policy}<1/>",
   "recent_played": "Recent Played",
   "your_instances": "Your Instances",
   "popular_modpacks": "Popular Modpacks",
