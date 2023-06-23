@@ -11,7 +11,7 @@ import { DeviceCodeObjectType } from ".";
 import { trackEvent } from "@/utils/analytics";
 
 type Props = {
-  setStep: Setter<number>;
+  nextStep: () => void;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
 };
 
@@ -87,7 +87,7 @@ const Auth = (props: Props) => {
           link: info.verificationUri,
           expiresAt: info.expiresAt,
         });
-        props.setStep(2);
+        props.nextStep();
       },
       onFail() {
         retryLogin();

@@ -1,11 +1,11 @@
-import { createSignal, Setter } from "solid-js";
+import { createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
 
 type Props = {
-  setStep: Setter<number>;
+  nextStep: () => void;
 };
 
 const TermsAndConditions = (props: Props) => {
@@ -60,7 +60,7 @@ const TermsAndConditions = (props: Props) => {
             disabled={!accepted()}
             onClick={() => {
               settingsMutation.mutate({ isLegalAccepted: true });
-              props.setStep((prev) => prev + 1);
+              props.nextStep();
             }}
           >
             <Trans key="login.next" />

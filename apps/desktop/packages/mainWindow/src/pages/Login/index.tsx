@@ -7,6 +7,7 @@ import { Navigate, useRouteData } from "@solidjs/router";
 import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
+import TrackingSettings from "./TrackingSettings";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -34,9 +35,13 @@ export default function Login() {
 
   createEffect(() => {
     if (routeData.settings.data?.isLegalAccepted) {
-      setStep(1);
+      // setStep(2);
     }
   });
+
+  const nextStep = () => {
+    setStep((prev) => prev + 1);
+  };
 
   return (
     <Switch>
@@ -68,25 +73,28 @@ export default function Login() {
             class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 1 ? "flex-end" : "center",
+              "justify-content": step() === 2 ? "flex-end" : "center",
             }}
             classList={{
-              "overflow-hidden": step() === 2,
+              "overflow-hidden": step() === 3,
             }}
           >
             <Switch>
               <Match when={step() === 0}>
-                <TermsAndConditions setStep={setStep} />
+                <TermsAndConditions nextStep={nextStep} />
               </Match>
               <Match when={step() === 1}>
+                <TrackingSettings nextStep={nextStep} />
+              </Match>
+              <Match when={step() === 2}>
                 <Auth
-                  setStep={setStep}
+                  nextStep={nextStep}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />
               </Match>
-              <Match when={step() === 2}>
+              <Match when={step() === 3}>
                 <CodeStep
-                  setStep={setStep}
+                  nextStep={nextStep}
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />

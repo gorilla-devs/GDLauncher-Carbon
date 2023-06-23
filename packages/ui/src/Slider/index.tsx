@@ -7,6 +7,7 @@ import {
   onMount,
   JSX,
   Show,
+  mergeProps,
 } from "solid-js";
 
 interface Marks {
@@ -18,6 +19,8 @@ interface Props {
   steps?: number | null;
   marks: Marks;
   value?: number;
+  noLabels?: boolean;
+  noTooltip?: boolean;
   onChange?: (_val: number) => void;
 }
 
@@ -34,6 +37,8 @@ function Slider(props: Props) {
   const [handleRef, setHandleRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
+
+  const mergedProps = mergeProps({ noLabels: false, noTooltip: false }, props);
 
   let sliderRef: HTMLDivElement;
 
@@ -166,7 +171,7 @@ function Slider(props: Props) {
   return (
     <>
       <div class="relative h-10 flex items-center w-full max-w-full box-border mb-10">
-        <Show when={showTooptip()}>
+        <Show when={showTooptip() && !mergedProps.noTooltip}>
           <div
             class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"
             style={{
@@ -215,8 +220,14 @@ function Slider(props: Props) {
                   }}
                 >
                   <Switch>
-                    <Match when={typeof label === "string"}>{label}</Match>
-                    <Match when={typeof label === "object"}>
+                    <Match
+                      when={typeof label === "string" && !mergedProps.noLabels}
+                    >
+                      {label}
+                    </Match>
+                    <Match
+                      when={typeof label === "object" && !mergedProps.noLabels}
+                    >
                       {label.label}
                     </Match>
                   </Switch>
@@ -226,14 +237,14 @@ function Slider(props: Props) {
           </For>
           <div
             ref={setHandleRef}
-            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-pointer z-20 after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100"
+            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-pointer z-20"
             style={{
               position: "absolute",
               left: `${calcOffset(currentValue())}%`,
               transform: "translateX(-50%)",
             }}
             classList={{
-              "after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100":
+              "after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:z-0 z-10":
                 showTooptip(),
             }}
             onMouseOver={() => {
@@ -260,12 +271,7 @@ function Slider(props: Props) {
               width: `${calcOffset(currentValue())}%`,
             }}
           />
-          <div
-            // ref={(el) => {
-            //   sliderRef = el;
-            // }}
-            class="w-full h-2 bg-darkSlate-900 rounded-full"
-          />
+          <div class="w-full h-2 bg-darkSlate-900 rounded-full" />
         </div>
       </div>
     </>
