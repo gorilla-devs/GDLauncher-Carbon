@@ -1,13 +1,11 @@
 /* eslint-disable i18next/no-literal-string */
-import { Trans, supportedLanguages, useTransContext } from "@gd/i18n";
+import { Trans, supportedLanguages } from "@gd/i18n";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import RowsContainer from "./components/RowsContainer";
 import { Radio } from "@gd/ui";
-import { For, createEffect } from "solid-js";
+import { For } from "solid-js";
 import { rspc, queryClient } from "@/utils/rspcClient";
-import { FESettings } from "@gd/core_module/bindings";
-import { createStore } from "solid-js/store";
 import Title from "./components/Title";
 
 const Language = () => {
