@@ -117,7 +117,10 @@ const TransWrapper = (props: TransWrapperProps) => {
           ns: ["common", "languages"],
           defaultNS: "common",
           lng: language,
-          resources: {},
+          fallbackLng: "english",
+          resources: {
+            [language]: (await loadLanguageResources(language)) as any,
+          },
           partialBundledLanguages: true,
           // debug: true,
         });
@@ -149,7 +152,11 @@ const TransWrapper = (props: TransWrapperProps) => {
 
       _i18nInstance.changeLanguage(language);
 
-      if (previousLanguage && language !== previousLanguage) {
+      if (
+        previousLanguage &&
+        language !== previousLanguage &&
+        previousLanguage !== "english"
+      ) {
         if (_i18nInstance.hasResourceBundle(previousLanguage, "common")) {
           _i18nInstance.removeResourceBundle(previousLanguage, "common");
         }
