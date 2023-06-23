@@ -3,6 +3,7 @@ use crate::{cache_middleware, iridium_client::get_client};
 use super::{ManagerRef, UnsafeAppRef};
 
 pub mod curseforge;
+pub mod modrinth;
 
 pub struct ModplatformsManager {
     pub curseforge: curseforge::CurseForge,

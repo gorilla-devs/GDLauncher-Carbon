@@ -59,6 +59,7 @@ hex = { workspace = true }
 murmurhash32 = { workspace = true }
 fs_extra = { workspace = true }
 indexmap = { version = "1.9.3", features = ["serde"] }
+tracing-test = "0.2.4"
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
