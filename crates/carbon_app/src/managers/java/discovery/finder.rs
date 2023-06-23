@@ -2,16 +2,19 @@ use std::path::PathBuf;
 
 use crate::managers::java::utils::PATH_SEPARATOR;
 
-async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
-    let env_path = std::env::var("PATH")?;
-    let env_path = env_path.split(PATH_SEPARATOR);
-    let gdl_env_path = std::env::var("GDL_JAVA_PATH")?;
-    let gdl_env_path = gdl_env_path.split(PATH_SEPARATOR);
+const SEARCH_ENV_VARS: [&str; 2] = ["PATH", "GDL_JAVA_PATH"];
 
-    let paths: Vec<_> = env_path.chain(gdl_env_path).map(PathBuf::from).collect();
+async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     let mut java_paths = Vec::new();
-    for path in paths {
-        java_paths.extend(search_java_binary_in_path(path));
+
+    for env_var in SEARCH_ENV_VARS.iter() {
+        let env_path = std::env::var(env_var);
+        if let Ok(env_path) = env_path {
+            let paths: Vec<_> = env_path.split(PATH_SEPARATOR).map(PathBuf::from).collect();
+            for path in paths {
+                java_paths.extend(search_java_binary_in_path(path));
+            }
+        }
     }
 
     Ok(java_paths)
@@ -200,12 +203,10 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
         if parent_dir.exists() {
             let children = std::fs::read_dir(parent_dir);
             if let Ok(mut children) = children {
-                while let Some(child) = children.next() {
-                    if let Ok(child) = child {
-                        let child = child.path();
-                        if child.is_dir() {
-                            javas.extend(search_java_binary_in_path(child));
-                        }
+                for child in children.by_ref().flatten() {
+                    let child = child.path();
+                    if child.is_dir() {
+                        javas.extend(search_java_binary_in_path(child));
                     }
                 }
             }
@@ -227,7 +228,7 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
 #[cfg(target_os = "linux")]
 pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     let folders = [
-        "/usr/java",
+        "/usr/bin",
         "/usr/lib/jvm",
         "/usr/lib64/jvm",
         "/usr/lib32/jvm",
