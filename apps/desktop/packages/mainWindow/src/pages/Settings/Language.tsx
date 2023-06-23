@@ -34,7 +34,7 @@ const Language = () => {
           <Title class="w-full">
             <Trans key="settings.select_a_language" />
           </Title>
-          <div class="w-full flex flex-col mt-6 divide-y divide-darkSlate-600">
+          <div class="w-full flex flex-col divide-y divide-darkSlate-600">
             <Radio.group
               onChange={(value) => {
                 settingsMutation.mutate({

@@ -16,6 +16,7 @@ import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
 import { generateSequence } from "@/utils/helpers";
+import PageTitle from "./components/PageTitle";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -75,15 +76,15 @@ const Java = () => {
   };
 
   return (
-    <div class="flex bg-darkSlate-800 w-full h-auto flex-col pt-5 px-5 box-border pb-10">
-      <h2 class="m-0 mb-7 text-4">
+    <>
+      <PageTitle>
         <Trans
           key="java.java"
           options={{
             defaultValue: "Java",
           }}
         />
-      </h2>
+      </PageTitle>
 
       <Show when={routeData.settings.data}>
         <div class="mb-4">
@@ -278,7 +279,7 @@ const Java = () => {
           </div>
         </Show>
       </div>
-    </div>
+    </>
   );
 };
 
