@@ -1,5 +1,5 @@
 import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match, createEffect } from "solid-js";
+import { createSignal, Switch, Match, createEffect, Show } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
@@ -8,6 +8,7 @@ import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import TrackingSettings from "./TrackingSettings";
+import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -41,6 +42,10 @@ export default function Login() {
 
   const nextStep = () => {
     setStep((prev) => prev + 1);
+  };
+
+  const prevStep = () => {
+    setStep((prev) => prev - 1);
   };
 
   return (
@@ -79,12 +84,30 @@ export default function Login() {
               "overflow-hidden": step() === 3,
             }}
           >
+            <Show when={step() < 2}>
+              <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
+                <img class="w-40" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
+            <Show when={step() === 2}>
+              <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
+                <img class="w-40" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
             <Switch>
               <Match when={step() === 0}>
                 <TermsAndConditions nextStep={nextStep} />
               </Match>
               <Match when={step() === 1}>
-                <TrackingSettings nextStep={nextStep} />
+                <TrackingSettings prevStep={prevStep} nextStep={nextStep} />
               </Match>
               <Match when={step() === 2}>
                 <Auth

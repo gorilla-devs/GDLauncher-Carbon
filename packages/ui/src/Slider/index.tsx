@@ -170,7 +170,7 @@ function Slider(props: Props) {
 
   return (
     <>
-      <div class="relative h-10 flex items-center w-full max-w-full box-border mb-10">
+      <div class="relative h-10 flex items-center w-full max-w-full box-border mb-4">
         <Show when={showTooptip() && !mergedProps.noTooltip}>
           <div
             class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"

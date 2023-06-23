@@ -5,15 +5,17 @@ import AdTrackingSettingsSlider from "./AdTrackingSettingsSlider";
 
 type Props = {
   nextStep: () => void;
+  prevStep: () => void;
 };
 
 const TrackingSettings = (props: Props) => {
+  const settings = rspc.createQuery(() => ["settings.getSettings"]);
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   return (
-    <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 h-full w-full box-border">
-      <div class="flex flex-col justify-between items-center w-full">
-        <div class="flex flex-col gap-4">
+    <div class="flex flex-col justify-between items-center text-center pt-0 pb-4 px-6 h-full w-full box-border">
+      <div class="flex flex-col gap-2 items-center w-full">
+        <div class="flex flex-col">
           <div class="flex justify-between">
             <h2 class="m-0">
               <Trans key="login.ad_tracking_settings_title" />
@@ -24,9 +26,22 @@ const TrackingSettings = (props: Props) => {
           </p>
         </div>
       </div>
-
-      <AdTrackingSettingsSlider onChange={() => {}} />
-      <div class="w-full flex justify-end">
+      <AdTrackingSettingsSlider
+        metricLevel={settings.data?.metricsLevel}
+        onChange={(metricsLevel) => {
+          settingsMutation.mutate({ metricsLevel });
+        }}
+      />
+      <div class="w-full flex justify-between">
+        <Button
+          variant="primary"
+          size="small"
+          onClick={() => {
+            props.prevStep();
+          }}
+        >
+          <Trans key="login.prev" />
+        </Button>
         <Button
           variant="primary"
           size="small"

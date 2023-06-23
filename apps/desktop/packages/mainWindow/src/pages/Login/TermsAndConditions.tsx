@@ -46,7 +46,7 @@ const TermsAndConditions = (props: Props) => {
               <Trans key="login.read_and_accept">
                 I have read and accept
                 <span
-                  class="underline text-lightSlate-400"
+                  class="underline text-lightSlate-400 cursor-pointer"
                   onClick={() => {
                     modalsContext?.openModal({
                       name: "termsAndConditions",
@@ -57,7 +57,7 @@ const TermsAndConditions = (props: Props) => {
                 </span>
                 and
                 <span
-                  class="underline text-lightSlate-400"
+                  class="underline text-lightSlate-400 cursor-pointer"
                   onClick={() => {
                     modalsContext?.openModal({
                       name: "acceptableUsePolicy",

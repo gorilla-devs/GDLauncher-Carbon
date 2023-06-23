@@ -3,6 +3,7 @@ import { Slider } from "@gd/ui";
 import { Match, Switch, createSignal } from "solid-js";
 
 type Props = {
+  metricLevel: number | null | undefined;
   onChange: (_metricsLevel: number) => void;
 };
 
@@ -49,9 +50,24 @@ const AdTrackingSettingsSlider = (props: Props) => {
     }
   };
 
+  const mapMetricLevelToValue = (value: number | undefined | null) => {
+    switch (value) {
+      case 0:
+        return 0;
+      case 1:
+        return 250;
+      case 2:
+        return 500;
+      case 3:
+        return 1000;
+      default:
+        return 1000;
+    }
+  };
+
   return (
     <div class="w-full flex flex-col items-center max-w-2/3">
-      <h3 class="mb-10" classList={{}}>
+      <h3 class="m-0" classList={{}}>
         {title()}
       </h3>
       <Slider
@@ -59,7 +75,7 @@ const AdTrackingSettingsSlider = (props: Props) => {
         min={0}
         max={1000}
         steps={1000}
-        value={1000}
+        value={mapMetricLevelToValue(props.metricLevel)}
         marks={{
           0: "disabled",
           250: "anonymous",
