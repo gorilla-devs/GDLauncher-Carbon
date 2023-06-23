@@ -48,7 +48,10 @@ const Language = () => {
                   <div class="h-12 flex items-center">
                     <Radio value={item}>
                       <div class="w-full flex justify-between">
-                        <div>
+                        <div class="flex items-center gap-2">
+                          <div
+                            class={`h-5 w-5 i-emojione-v1:flag-for-${item}`}
+                          />
                           <Trans key={`languages:${item}_native`} />
                         </div>
                       </div>

@@ -4,7 +4,7 @@ import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { useTransContext } from "@gd/i18n";
+import { supportedLanguages, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import TrackingSettings from "./TrackingSettings";
@@ -64,10 +64,14 @@ export default function Login() {
           <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
             <Dropdown
               value={routeData.settings.data?.language}
-              options={[
-                { label: t("languages.english"), key: "english" },
-                { label: t("languages.italian"), key: "italian" },
-              ]}
+              options={supportedLanguages.map((lang) => ({
+                label: (
+                  <div class="whitespace-nowrap">
+                    {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
+                  </div>
+                ),
+                key: lang,
+              }))}
               onChange={(lang) => {
                 settingsMutation.mutate({ language: lang.key as string });
               }}

@@ -9,7 +9,6 @@ import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
 
 enum _Theme {
-  _Default = "default",
   _Light = "light",
   _PoisonGreen = "poison-green",
   _Dracula = "dracula",
@@ -24,10 +23,6 @@ const initThemes = () => {
       return;
     }
     switch (themeName()) {
-      case _Theme._Default: {
-        applyTheme(mainTheme);
-        break;
-      }
       case _Theme._Light: {
         applyTheme(lightTheme);
         break;
@@ -38,6 +33,10 @@ const initThemes = () => {
       }
       case _Theme._Dracula: {
         applyTheme(dracula);
+        break;
+      }
+      default: {
+        applyTheme(mainTheme);
         break;
       }
     }

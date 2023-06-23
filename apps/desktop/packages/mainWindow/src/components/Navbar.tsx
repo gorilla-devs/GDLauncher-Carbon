@@ -107,7 +107,10 @@ const AppNavbar = () => {
                           }}
                         >
                           <Tab>
-                            <li class="no-underline">{route.label}</li>
+                            <div class="flex items-center gap-2">
+                              <i class={"w-5 h-5 " + route.icon} />
+                              <li class="no-underline">{route.label}</li>
+                            </div>
                           </Tab>
                         </div>
                       );

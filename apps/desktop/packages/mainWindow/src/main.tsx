@@ -170,18 +170,20 @@ const TransWrapper = (props: TransWrapperProps) => {
   });
 
   return (
-    <TransProvider instance={_i18nInstance}>
-      <Router source={hashIntegration()}>
-        <NavigationManager>
-          <NotificationsProvider>
-            <ContextMenuProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={props.createInvalidateQuery} />
-              </ModalProvider>
-            </ContextMenuProvider>
-          </NotificationsProvider>
-        </NavigationManager>
-      </Router>
-    </TransProvider>
+    <Show when={!settings.isInitialLoading}>
+      <TransProvider instance={_i18nInstance}>
+        <Router source={hashIntegration()}>
+          <NavigationManager>
+            <NotificationsProvider>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={props.createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
+            </NotificationsProvider>
+          </NavigationManager>
+        </Router>
+      </TransProvider>
+    </Show>
   );
 };

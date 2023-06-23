@@ -277,8 +277,18 @@ const General = () => {
           <RightHandSide>
             <div>
               <div class="flex justify-end gap-4">
-                <Button type="secondary">Restart App</Button>
-                <Button type="secondary">Reset All Data</Button>
+                <Button type="secondary">
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:restart-line" />
+                    <div>Restart App</div>
+                  </div>
+                </Button>
+                <Button type="secondary">
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:delete-bin-7-line" />
+                    <div>Restart App</div>
+                  </div>
+                </Button>
               </div>
               <div class="text-darkSlate-300 text-4 mt-4">
                 {"v"} {__APP_VERSION__}
