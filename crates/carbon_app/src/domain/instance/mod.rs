@@ -35,6 +35,7 @@ pub struct InstanceDetails {
     pub mods: Vec<Mod>,
 }
 
+#[derive(Debug)]
 pub struct InstanceSettingsUpdate {
     pub instance_id: InstanceId,
     pub name: Option<String>,

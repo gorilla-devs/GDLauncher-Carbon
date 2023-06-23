@@ -1037,10 +1037,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let json = schema::make_instance_config(info.clone())?;
         tokio::fs::write(path.join("instance.json"), json).await?;
+
+        let name_matches = Some(&data.config.name) == update.name.as_ref();
         data.config = info;
 
         if let Some(name) = update.name {
-            if name != data.config.name {
+            if !name_matches {
                 let _lock = self.path_lock.lock().await;
                 let (new_shortpath, new_path) = self.next_folder(&name).await?;
                 tokio::fs::rename(path, new_path).await?;
