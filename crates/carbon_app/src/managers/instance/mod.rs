@@ -95,7 +95,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .iter()
                 .find(|instance| instance.shortpath == shortpath);
 
-            let Some(instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
+            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
             let InstanceType::Valid(data) = &instance.type_ else { continue };
 
             let instance_id = match cached {
@@ -110,7 +110,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
             };
 
-            self.instances.write().await.insert(instance_id, instance);
+            let mut instances = self.instances.write().await;
+
+            if let (
+                Instance {
+                    type_: InstanceType::Valid(data),
+                    ..
+                },
+                Some(Instance {
+                    type_: InstanceType::Valid(old_data),
+                    ..
+                }),
+            ) = (&mut instance, instances.remove(&instance_id))
+            {
+                data.state = old_data.state;
+            }
+
+            instances.insert(instance_id, instance);
         }
 
         self.app.invalidate(GET_GROUPS, None);
