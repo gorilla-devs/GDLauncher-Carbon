@@ -8,6 +8,12 @@ import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 import supportedLanguages from "@gd/i18n/supportedLanguages.json";
 // import gdlIcons from "./unocss.icons.js";
 
+const safelist = Object.values(supportedLanguages).map(
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  (lang) => `i-emojione-v1:flag-for-${lang}`
+);
+
 const unocssConfig = {
   include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
   presets: [
@@ -28,11 +34,7 @@ const unocssConfig = {
     }),
   ],
   rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
-  safelist: supportedLanguages.map(
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    (lang) => `i-emojione-v1:flag-for-${lang}`
-  ),
+  safelist,
   theme,
 } as unknown;
 

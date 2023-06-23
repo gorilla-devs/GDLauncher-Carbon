@@ -64,7 +64,7 @@ export default function Login() {
           <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
             <Dropdown
               value={routeData.settings.data?.language}
-              options={supportedLanguages.map((lang) => ({
+              options={Object.keys(supportedLanguages).map((lang) => ({
                 label: (
                   <div class="whitespace-nowrap">
                     {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}

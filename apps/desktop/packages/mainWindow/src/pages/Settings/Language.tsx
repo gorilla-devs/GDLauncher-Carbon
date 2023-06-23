@@ -43,16 +43,16 @@ const Language = () => {
               }}
               value={settings.data?.language}
             >
-              <For each={supportedLanguages}>
-                {(item) => (
+              <For each={Object.entries(supportedLanguages)}>
+                {([key, value]) => (
                   <div class="h-12 flex items-center">
-                    <Radio value={item}>
+                    <Radio value={key}>
                       <div class="w-full flex justify-between">
                         <div class="flex items-center gap-2">
                           <div
-                            class={`h-5 w-5 i-emojione-v1:flag-for-${item}`}
+                            class={`h-5 w-5 i-emojione-v1:flag-for-${value}`}
                           />
-                          <Trans key={`languages:${item}_native`} />
+                          <Trans key={`languages:${key}_native`} />
                         </div>
                       </div>
                     </Radio>

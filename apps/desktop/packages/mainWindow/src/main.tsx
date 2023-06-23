@@ -130,7 +130,7 @@ const TransWrapper = (props: TransWrapperProps) => {
         }
       }
 
-      if (!supportedLanguages.includes(language)) {
+      if (!Object.keys(supportedLanguages).includes(language)) {
         console.warn(`Language ${language} is not supported`);
         return;
       }
