@@ -11,7 +11,7 @@ import {
 } from "solid-js";
 
 interface Marks {
-  [mark: number]: string | { label: JSX.Element };
+  [mark: number]: string | JSX.Element | { label: JSX.Element };
 }
 interface Props {
   max: number;

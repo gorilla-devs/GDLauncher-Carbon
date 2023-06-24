@@ -14,39 +14,39 @@ const AdTrackingSettingsSlider = (props: Props) => {
     return (
       <Switch>
         <Match when={value === 0}>
-          <div class="text-red-500">{t("tracking.setting_disabled")}</div>
+          <div class="text-yellow-400">{t("tracking.setting_disabled")}</div>
         </Match>
-        <Match when={value === 250}>
-          <div class="text-yellow-900">{t("tracking.setting_anonymous")}</div>
+        <Match when={value === 150}>
+          <div class="text-green-300">{t("tracking.setting_anonymous")}</div>
         </Match>
         <Match when={value === 500}>
-          <div class="text-yellow-500">
-            {t("tracking.setting_anonymous+session")}
+          <div class="text-purple-500">
+            {t("tracking.setting_anonymous_with_session_recordings")}
           </div>
         </Match>
         <Match when={value === 1000}>
-          <div class="text-green-500">
-            {t("tracking.authenticated+session")}
+          <div class="text-fuchsia-400">
+            {t("tracking.settings_authenticated_with_session_recordings")}
           </div>
         </Match>
       </Switch>
     );
   };
 
-  const [title, setTitle] = createSignal(mapValueToTile(1000));
+  const [title, setTitle] = createSignal(mapValueToTile(props.metricLevel));
 
   const mapValueToMetricLevel = (value: number) => {
     switch (value) {
       case 0:
         return 0;
-      case 250:
+      case 150:
         return 1;
       case 500:
         return 2;
       case 1000:
         return 3;
       default:
-        return 0;
+        return 1;
     }
   };
 
@@ -55,18 +55,18 @@ const AdTrackingSettingsSlider = (props: Props) => {
       case 0:
         return 0;
       case 1:
-        return 250;
+        return 150;
       case 2:
         return 500;
       case 3:
         return 1000;
       default:
-        return 1000;
+        return 1;
     }
   };
 
   return (
-    <div class="w-full flex flex-col items-center max-w-2/3">
+    <div class="w-full flex flex-col items-center box-border px-12">
       <h3 class="m-0" classList={{}}>
         {title()}
       </h3>
@@ -77,10 +77,10 @@ const AdTrackingSettingsSlider = (props: Props) => {
         steps={1000}
         value={mapMetricLevelToValue(props.metricLevel)}
         marks={{
-          0: "disabled",
-          250: "anonymous",
-          500: "anonymous+session",
-          1000: "authenticated",
+          0: t("tracking.setting_disabled"),
+          150: t("tracking.setting_anonymous"),
+          500: t("tracking.setting_anonymous_with_session_recordings"),
+          1000: t("tracking.settings_authenticated_with_session_recordings"),
         }}
         onChange={(val) => {
           setTitle(mapValueToTile(val));

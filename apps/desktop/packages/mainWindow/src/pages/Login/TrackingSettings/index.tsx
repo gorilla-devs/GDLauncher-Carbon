@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
-import AdTrackingSettingsSlider from "./AdTrackingSettingsSlider";
+import AdTrackingSettingsSlider from "../../../components/AdTrackingSettingsSlider";
 
 type Props = {
   nextStep: () => void;

@@ -2,12 +2,13 @@ import { JSX, children } from "solid-js";
 
 type Props = {
   children: JSX.Element;
+  class?: string;
 };
 
 function RightHandSide(props: Props) {
   const c = children(() => props.children);
 
-  return <h4>{c()}</h4>;
+  return <div class={props.class}>{c()}</div>;
 }
 
 export default RightHandSide;
