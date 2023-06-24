@@ -1,7 +1,6 @@
 import { useLocation, useSearchParams } from "@solidjs/router";
 import {
   createContext,
-  createEffect,
   createSignal,
   For,
   JSX,

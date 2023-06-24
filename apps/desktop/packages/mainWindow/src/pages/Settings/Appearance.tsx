@@ -22,7 +22,7 @@ const Appearance = () => {
 
   return (
     <LoadingError routeData={routeData}>
-      <div class="bg-darkSlate-800 w-full h-auto flex flex-col py-5 px-6 box-border">
+      <div class="bg-darkSlate-800 w-full flex flex-col px-6 box-border h-auto py-5">
         <h2 class="m-0 mb-7 text-4">
           <Trans
             key="settings.appearance"
@@ -31,7 +31,7 @@ const Appearance = () => {
             }}
           />
         </h2>
-        <div class="flex flex-wrap gap-4 w-full border-box max-w-full">
+        <div class="flex gap-4 w-full border-box flex-wrap max-w-full">
           <For each={themes}>
             {(theme) => {
               const themeColors = getThemeColors(theme);
@@ -42,7 +42,7 @@ const Appearance = () => {
 
               return (
                 <div
-                  class="flex inline-flex flex-col justify-center items-center cursor-pointer p-1 w-42"
+                  class="flex flex-col justify-center items-center cursor-pointer inline-flex p-1 w-42"
                   style={{ "background-color": shade1 }}
                   onClick={() => {
                     settingsMutation.mutate({
@@ -57,7 +57,7 @@ const Appearance = () => {
                   />
                   <div class="flex gap-2 items-center w-full box-border px-2 py-1 justify-start">
                     <Show when={themeName() === theme}>
-                      <div class="i-ri:check-fill text-darkSlate-50" />
+                      <div class="text-darkSlate-50 i-ri:check-fill" />
                     </Show>
                     <p class="m-0 text-darkSlate-50">
                       <Trans

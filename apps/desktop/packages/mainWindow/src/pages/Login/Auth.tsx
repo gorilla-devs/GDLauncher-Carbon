@@ -1,12 +1,10 @@
 import { useNavigate, useRouteData } from "@solidjs/router";
 import { createEffect, createSignal, Setter, Show } from "solid-js";
-import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
-import { useModal } from "@/managers/ModalsManager";
 import { DeviceCodeObjectType } from ".";
 import { trackEvent } from "@/utils/analytics";
 
@@ -22,8 +20,6 @@ const Auth = (props: Props) => {
   const [retry, setRetry] = createSignal(0);
   const navigate = useNavigate();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-
-  const modalsContext = useModal();
 
   const accountEnrollFinalizeMutation = rspc.createMutation([
     "account.enroll.finalize",

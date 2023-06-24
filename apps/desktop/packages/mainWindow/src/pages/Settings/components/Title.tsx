@@ -11,7 +11,7 @@ function Title(props: Props) {
 
   return (
     <div class={props.class || undefined}>
-      <h4 class="text-lightSlate-100 text-lg">{c()}</h4>
+      <h4 class="text-lg text-lightSlate-100">{c()}</h4>
       <Show when={props.description}>
         <p class="text-lightSlate-800 max-w-200 pr-4">{props.description}</p>
       </Show>

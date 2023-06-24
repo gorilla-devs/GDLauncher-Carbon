@@ -13,7 +13,7 @@ const TrackingSettings = (props: Props) => {
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   return (
-    <div class="flex flex-col justify-between items-center text-center pt-0 pb-4 px-6 h-full w-full box-border">
+    <div class="flex flex-col justify-between items-center text-center h-full w-full box-border pb-4 px-6 pt-0">
       <div class="flex flex-col gap-2 items-center w-full">
         <div class="flex flex-col">
           <div class="flex justify-between">
@@ -25,13 +25,13 @@ const TrackingSettings = (props: Props) => {
             <Trans key="login.ad_tracking_settings_text" />
           </p>
         </div>
+        <AdTrackingSettingsSlider
+          metricLevel={settings.data?.metricsLevel}
+          onChange={(metricsLevel) => {
+            settingsMutation.mutate({ metricsLevel });
+          }}
+        />
       </div>
-      <AdTrackingSettingsSlider
-        metricLevel={settings.data?.metricsLevel}
-        onChange={(metricsLevel) => {
-          settingsMutation.mutate({ metricsLevel });
-        }}
-      />
       <div class="w-full flex justify-between">
         <Button
           variant="primary"

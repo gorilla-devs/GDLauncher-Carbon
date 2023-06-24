@@ -36,7 +36,7 @@ export default function Login() {
 
   createEffect(() => {
     if (routeData.settings.data?.isLegalAccepted) {
-      // setStep(2);
+      setStep(2);
     }
   });
 
@@ -61,7 +61,7 @@ export default function Login() {
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
           />
-          <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
+          <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
             <Dropdown
               value={routeData.settings.data?.language}
               options={Object.keys(supportedLanguages).map((lang) => ({

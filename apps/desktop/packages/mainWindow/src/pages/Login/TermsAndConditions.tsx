@@ -1,6 +1,5 @@
 import { createSignal } from "solid-js";
-import { Trans, useTransContext } from "@gd/i18n";
-import CustomTrans from "../../components/i18n/Trans";
+import { Trans } from "@gd/i18n";
 import { Button, Checkbox } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
@@ -12,7 +11,6 @@ type Props = {
 const TermsAndConditions = (props: Props) => {
   const [accepted, setAccepted] = createSignal(false);
   const modalsContext = useModal();
-  const [t] = useTransContext();
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
@@ -25,7 +23,7 @@ const TermsAndConditions = (props: Props) => {
               <Trans key="login.we_value_privacy_title" />
             </h2>
           </div>
-          <p class="m-0 text-darkSlate-100 leading-5 text-left">
+          <p class="m-0 text-darkSlate-100 text-left leading-5">
             <Trans key="login.we_value_privacy_text" />
           </p>
         </div>
@@ -46,7 +44,7 @@ const TermsAndConditions = (props: Props) => {
               <Trans key="login.read_and_accept">
                 I have read and accept
                 <span
-                  class="underline text-lightSlate-400 cursor-pointer"
+                  class="cursor-pointer underline text-lightSlate-400"
                   onClick={() => {
                     modalsContext?.openModal({
                       name: "termsAndConditions",

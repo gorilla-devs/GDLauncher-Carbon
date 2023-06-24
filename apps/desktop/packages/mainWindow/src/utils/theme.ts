@@ -59,9 +59,6 @@ export function getAvailableThemes(): string[] {
 
 export function getThemeColors(themeName: string): UITheme | undefined {
   switch (themeName) {
-    case _Theme._Default: {
-      return mainTheme;
-    }
     case _Theme._Light: {
       return lightTheme;
     }
@@ -72,8 +69,7 @@ export function getThemeColors(themeName: string): UITheme | undefined {
       return dracula;
     }
     default: {
-      console.error(`Unknown theme: ${themeName}`);
-      return undefined;
+      return mainTheme;
     }
   }
 }

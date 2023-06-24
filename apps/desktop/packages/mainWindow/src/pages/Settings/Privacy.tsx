@@ -47,7 +47,7 @@ const Privacy = () => {
             description={
               <div class="flex flex-col gap-4">
                 <div>
-                  <div class="text-yellow-400 font-extrabold mb-2">
+                  <div class="text-yellow-400 mb-2 font-extrabold">
                     <Trans key="tracking.setting_disabled" />
                   </div>
                   <Trans key="tracking.setting_disabled_text" />

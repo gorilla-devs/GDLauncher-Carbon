@@ -275,7 +275,7 @@ const General = () => {
           <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
           <RightHandSide>
             <div>
-              <div class="flex justify-end gap-4 flex-col 2xl:flex-row items-center">
+              <div class="flex justify-end gap-4 flex-col items-center 2xl:flex-row">
                 <Button type="secondary">
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:restart-line" />

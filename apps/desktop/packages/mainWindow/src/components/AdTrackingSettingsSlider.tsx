@@ -10,7 +10,7 @@ type Props = {
 const AdTrackingSettingsSlider = (props: Props) => {
   const [t] = useTransContext();
 
-  const mapValueToTile = (value: number) => {
+  const mapValueToTile = (value: number | null | undefined) => {
     return (
       <Switch>
         <Match when={value === 0}>
