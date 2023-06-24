@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string */
 import { Button, Dropdown, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -276,17 +275,21 @@ const General = () => {
           <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
           <RightHandSide>
             <div>
-              <div class="flex justify-end gap-4">
+              <div class="flex justify-end gap-4 flex-col 2xl:flex-row items-center">
                 <Button type="secondary">
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:restart-line" />
-                    <div>Restart App</div>
+                    <div>
+                      <Trans key="settings.restart_app" />
+                    </div>
                   </div>
                 </Button>
                 <Button type="secondary">
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:delete-bin-7-line" />
-                    <div>Restart App</div>
+                    <div>
+                      <Trans key="settings.reset_all_data" />
+                    </div>
                   </div>
                 </Button>
               </div>

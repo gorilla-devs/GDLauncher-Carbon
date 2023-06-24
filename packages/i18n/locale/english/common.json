@@ -69,6 +69,8 @@
   "settings.ads_personalization_text": "View and manage how GDLauncher may use your data for ad personalization",
   "settings.metrics_level_title": "Metrics Level",
   "settings.metrics_level_text": "Select the level of metrics you want to send to us. This helps us improve the launcher.",
+  "settings.restart_app": "Restart App",
+  "settings.reset_all_data": "Reset All Data",
   "sidebar.plus_add_instance": "+ Add Instance",
   "instance.instance_name": "Instance name",
   "instance.instance_description": "Description",
