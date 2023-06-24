@@ -6,13 +6,13 @@ use super::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct User {
-    pub username: String,
+    pub username: ArcStr,
     /// The user's display name
-    pub name: Option<String>,
+    pub name: Option<ArcStr>,
     /// The user's email, only visible to the user itself when authenticated
-    pub email: Option<String>,
+    pub email: Option<ArcStr>,
     /// A description of the user
-    pub bio: Option<String>,
+    pub bio: Option<ArcStr>,
     /// Various data relating to the user's payouts status,
     /// only visible to the user itself when authenticated
     pub payout_data: Option<PayoutData>,
@@ -31,10 +31,10 @@ pub struct User {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PayoutData {
-    balance: String,
+    balance: ArcStr,
     payout_wallet: Option<PayoutWallet>,
     payout_wallet_type: Option<PayoutWalletType>,
-    payout_address: Option<String>,
+    payout_address: Option<ArcStr>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -42,7 +42,7 @@ pub struct TeamMember {
     /// The ID of the member's team
     pub team_id: ArcStr,
     pub user: User,
-    pub role: String,
+    pub role: ArcStr,
     /// The user's permissions in bitflag format
     /// (requires authorisation to view)
     ///
@@ -74,10 +74,10 @@ pub struct Notification {
     pub user_id: ArcStr,
     #[serde(rename = "type")]
     pub notification_type: Option<NotificationType>,
-    pub title: String,
+    pub title: ArcStr,
     pub text: String,
     /// A _relative_ link to the related project/version
-    pub link: String,
+    pub link: ArcStr,
     pub read: bool,
     pub created: UtcDateTime,
     /// A list of actions that can be performed
@@ -87,17 +87,17 @@ pub struct Notification {
 // Undocumented struct pulled from the labrinth source code
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NotificationAction {
-    pub title: String,
+    pub title: ArcStr,
     /// The route to call when this notification action is called.
     /// Contains the HTTP method and route respectively.
-    pub action_route: (String, String),
+    pub action_route: (ArcStr, ArcStr),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct PayoutHistory {
-    pub all_time: String,
+    pub all_time: ArcStr,
     /// The amount made by the user in the previous 30 days
-    pub last_month: String,
+    pub last_month: ArcStr,
     pub payouts: Vec<Payout>,
 }
 
@@ -105,7 +105,7 @@ pub struct PayoutHistory {
 pub struct Payout {
     pub created: UtcDateTime,
     pub amount: Number,
-    pub status: String,
+    pub status: ArcStr,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

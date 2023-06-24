@@ -4,7 +4,7 @@ use super::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Report {
-    pub report_type: String,
+    pub report_type: ArcStr,
     /// The ID of the item being reported
     pub item_id: ArcStr,
     /// The type of item being reported
@@ -18,7 +18,7 @@ pub struct Report {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ReportSubmission {
-    pub report_type: String,
+    pub report_type: ArcStr,
     /// The ID of the item being reported
     pub item_id: ArcStr,
     /// The type of item being reported

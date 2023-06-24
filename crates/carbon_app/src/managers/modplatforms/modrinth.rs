@@ -2,7 +2,11 @@ use reqwest_middleware::ClientWithMiddleware;
 use tracing::trace;
 use url::Url;
 
-use crate::domain::modplatforms::modrinth::search::{SearchParameters, SearchResponse};
+use crate::domain::modplatforms::modrinth::{
+    project::Project,
+    search::{SearchParameters, SearchResponse},
+    tag::Category,
+};
 
 pub struct Modrinth {
     client: ClientWithMiddleware,
@@ -21,6 +25,22 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
+    pub async fn get_categories(&self) -> anyhow::Result<Vec<Category>> {
+        let url = self.base_url.join("/tag/category")?;
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json::<Vec<Category>>()
+            .await?;
+        Ok(resp)
+    }
+
+    #[tracing::instrument(skip(self))]
     pub async fn search(&self, search_params: SearchParameters) -> anyhow::Result<SearchResponse> {
         let mut url = self.base_url.join("search")?;
         let query = search_params.into_query_parameters()?;
@@ -34,6 +54,22 @@ impl Modrinth {
             .send()
             .await?
             .json::<SearchResponse>()
+            .await?;
+        Ok(resp)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_project(&self, project_id: &str) -> anyhow::Result<Project> {
+        let mut url = self.base_url.join("project/")?.join(project_id)?;
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json::<Project>()
             .await?;
         Ok(resp)
     }

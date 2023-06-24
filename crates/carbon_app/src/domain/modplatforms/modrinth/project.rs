@@ -8,17 +8,17 @@ use super::*;
 pub struct Project {
     /// The project's slug, used for vanity URLs.
     /// This can change at any time, so use the [`Project::id`] for long term storage.
-    pub slug: String,
-    pub title: String,
+    pub slug: ArcStr,
+    pub title: ArcStr,
     /// A short description of the project
     pub description: String,
-    pub categories: Vec<String>,
+    pub categories: Vec<ArcStr>,
     pub client_side: ProjectSupportRange,
     pub server_side: ProjectSupportRange,
     /// A long form description of the project
     pub body: String,
     /// A list of categories which are searchable but non-primary
-    pub additional_categories: Vec<String>,
+    pub additional_categories: Vec<ArcStr>,
     /// A link to submit bugs or issues with the project
     #[serde(deserialize_with = "deserialise_optional_url")]
     pub issues_url: Option<Url>,
@@ -57,9 +57,9 @@ pub struct Project {
     /// This will only ever be empty if the project is a draft.
     pub versions: Vec<ArcStr>,
     /// A list of all of the game versions supported by the project
-    pub game_versions: Vec<String>,
+    pub game_versions: Vec<ArcStr>,
     /// A list of all of the loaders supported by the project
-    pub loaders: Vec<String>,
+    pub loaders: Vec<ArcStr>,
     /// A list of images that have been uploaded to the project's gallery
     pub gallery: Vec<GalleryItem>,
 }
@@ -74,9 +74,9 @@ pub struct ModeratorMessage {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct License {
     /// The SPDX license ID of a project
-    pub id: String,
+    pub id: ArcStr,
     /// The license's long name
-    pub name: String,
+    pub name: ArcStr,
     /// The URL to this license
     #[serde(deserialize_with = "deserialise_optional_url")]
     pub url: Option<Url>,
@@ -85,8 +85,8 @@ pub struct License {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct DonationLink {
     /// The donation platform's ID
-    pub id: String,
-    pub platform: String,
+    pub id: ArcStr,
+    pub platform: ArcStr,
     /// A link to the donation platform and user
     pub url: Url,
 }
@@ -96,7 +96,7 @@ pub struct DonationLink {
 pub struct GalleryItem {
     pub url: Url,
     pub featured: bool,
-    pub title: Option<String>,
+    pub title: Option<ArcStr>,
     pub description: Option<String>,
     pub created: UtcDateTime,
     /// The order of the gallery image.

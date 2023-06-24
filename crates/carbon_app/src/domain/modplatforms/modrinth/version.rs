@@ -7,16 +7,16 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Version {
-    pub name: String,
+    pub name: ArcStr,
     /// The version number.
     /// Ideally, this will follow semantic versioning.
-    pub version_number: String,
+    pub version_number: ArcStr,
     pub changelog: Option<String>,
     pub dependencies: Vec<Dependency>,
-    pub game_versions: Vec<String>,
+    pub game_versions: Vec<ArcStr>,
     /// The release channel for this version
     pub version_type: VersionType,
-    pub loaders: Vec<String>,
+    pub loaders: Vec<ArcStr>,
     pub featured: bool,
     pub status: Option<Status>,
     pub requested_status: Option<RequestedStatus>,
@@ -39,7 +39,7 @@ pub struct Version {
 pub struct VersionFile {
     pub hashes: Hashes,
     pub url: Url,
-    pub filename: String,
+    pub filename: ArcStr,
     /// Whether the file is the primary file of its version.
     ///
     /// There can only be a maximum of one primary file per version.
@@ -53,32 +53,32 @@ pub struct VersionFile {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Hashes {
-    pub sha512: String,
-    pub sha1: String,
+    pub sha512: ArcStr,
+    pub sha1: ArcStr,
     /// A map of other hashes that may have been provided
     #[serde(flatten)]
-    pub others: HashMap<String, String>,
+    pub others: HashMap<ArcStr, ArcStr>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LatestVersionBody {
-    pub loaders: Vec<String>,
-    pub game_versions: Vec<String>,
+    pub loaders: Vec<ArcStr>,
+    pub game_versions: Vec<ArcStr>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LatestVersionsBody {
-    pub hashes: Vec<String>,
+    pub hashes: Vec<ArcStr>,
     pub algorithm: HashAlgorithm,
-    pub loaders: Vec<String>,
-    pub game_versions: Vec<String>,
+    pub loaders: Vec<ArcStr>,
+    pub game_versions: Vec<ArcStr>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Dependency {
     pub version_id: Option<ArcStr>,
     pub project_id: Option<ArcStr>,
-    pub file_name: Option<String>,
+    pub file_name: Option<ArcStr>,
     pub dependency_type: DependencyType,
 }
 
