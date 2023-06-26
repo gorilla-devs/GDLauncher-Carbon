@@ -233,6 +233,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
                     mods,
+                    icon_revision: 0,
                 };
 
                 Ok(Some(Instance {
@@ -297,6 +298,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         id: InstanceId(instance.id),
                         name: instance.name,
                         favorite: instance.favorite,
+                        icon_revision: match &status {
+                            InstanceType::Valid(data) => data.icon_revision,
+                            InstanceType::Invalid(_) => 0,
+                        },
                         status: match status {
                             InstanceType::Valid(status) => {
                                 ListInstanceStatus::Valid(ValidListInstance {
@@ -943,6 +948,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
                     mods: Vec::new(),
+                    icon_revision: 0,
                 }),
             },
         );
@@ -998,6 +1004,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             };
 
             info.icon = icon;
+            data.icon_revision += 1;
         }
 
         if let Some(name) = update.name.clone() {
@@ -1195,6 +1202,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
                     mods,
+                    icon_revision: 0,
                 }),
             },
         );
@@ -1360,6 +1368,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     metadata: m.metadata.clone(),
                 })
                 .collect(),
+            icon_revision: 0,
         })
     }
 
@@ -1443,6 +1452,7 @@ pub struct ListInstance {
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
+    pub icon_revision: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1574,6 +1584,7 @@ pub struct InstanceData {
     config: info::Instance,
     state: run::LaunchState,
     mods: Vec<Mod>,
+    icon_revision: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -2018,6 +2029,7 @@ mod test {
                 id: instance_id,
                 name: String::from("test"),
                 favorite: false,
+                icon_revision: 0,
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,

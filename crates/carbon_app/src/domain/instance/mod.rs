@@ -33,6 +33,7 @@ pub struct InstanceDetails {
     pub state: LaunchState,
     pub notes: String,
     pub mods: Vec<Mod>,
+    pub icon_revision: u32,
 }
 
 #[derive(Debug)]
