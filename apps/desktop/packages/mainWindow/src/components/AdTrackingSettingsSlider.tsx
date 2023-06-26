@@ -67,26 +67,29 @@ const AdTrackingSettingsSlider = (props: Props) => {
 
   return (
     <div class="w-full flex flex-col items-center box-border px-12">
-      <h3 class="m-0" classList={{}}>
+      <h3 class="mt-0 h-10 mb-4" classList={{}}>
         {title()}
       </h3>
-      <Slider
-        noTooltip
-        min={0}
-        max={1000}
-        steps={1000}
-        value={mapMetricLevelToValue(props.metricLevel)}
-        marks={{
-          0: t("tracking.setting_disabled"),
-          150: t("tracking.setting_anonymous"),
-          500: t("tracking.setting_anonymous_with_session_recordings"),
-          1000: t("tracking.settings_authenticated_with_session_recordings"),
-        }}
-        onChange={(val) => {
-          setTitle(mapValueToTile(val));
-          props.onChange(mapValueToMetricLevel(val));
-        }}
-      />
+      <div class="h-80">
+        <Slider
+          vertical
+          noTooltip
+          min={0}
+          max={1000}
+          steps={1000}
+          value={mapMetricLevelToValue(props.metricLevel)}
+          marks={{
+            0: t("tracking.setting_disabled"),
+            150: t("tracking.setting_anonymous"),
+            500: t("tracking.setting_anonymous_with_session_recordings"),
+            1000: t("tracking.settings_authenticated_with_session_recordings"),
+          }}
+          onChange={(val) => {
+            setTitle(mapValueToTile(val));
+            props.onChange(mapValueToMetricLevel(val));
+          }}
+        />
+      </div>
     </div>
   );
 };

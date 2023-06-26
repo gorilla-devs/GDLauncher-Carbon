@@ -22,6 +22,7 @@ interface Props {
   noLabels?: boolean;
   noTooltip?: boolean;
   onChange?: (_val: number) => void;
+  vertical?: boolean;
 }
 
 function Slider(props: Props) {
@@ -44,7 +45,7 @@ function Slider(props: Props) {
 
   const getSliderStart = () => {
     const rect = sliderRef.getBoundingClientRect();
-    return rect.left;
+    return props.vertical ? rect.top : rect.left;
   };
 
   const getSliderLength = () => {
@@ -52,7 +53,7 @@ function Slider(props: Props) {
       return 0;
     }
 
-    return sliderRef.clientWidth;
+    return props.vertical ? sliderRef.clientHeight : sliderRef.clientWidth;
   };
 
   const calcValue = (offset: number) => {
@@ -89,12 +90,15 @@ function Slider(props: Props) {
     const diffs = points.map((point) => Math.abs(val - point));
     const closestPoint = points[diffs.indexOf(Math.min.apply(Math, diffs))];
 
-    return props.steps !== null && props.steps !== undefined
+    return props.steps !== null && props.steps !== undefined && closestPoint
       ? parseFloat(closestPoint.toFixed(getPrecision(props.steps)))
       : closestPoint;
   };
 
   const calcValueByPos = (position: number) => {
+    // const pixelOffset = props.vertical
+    //   ? getSliderStart() - position // Invert the offset calculation for vertical sliders
+    //   : position - getSliderStart();
     const pixelOffset = position - getSliderStart();
     const nextValue = trimAlignValue(calcValue(pixelOffset));
     return nextValue;
@@ -103,10 +107,13 @@ function Slider(props: Props) {
   const mousedown = (e: MouseEvent) => {
     e.preventDefault();
 
-    const value = calcValueByPos(e.pageX);
+    const position = props.vertical ? e.pageY : e.pageX; // Use pageY for vertical slider, pageX for horizontal
+    const value = calcValueByPos(position);
     setDragging(true);
-    setStartPosition(e.pageX);
+    setStartPosition(position);
     setStartValue(value);
+
+    console.log("DOWN", value);
 
     if (currentValue() !== value) {
       onChange(value);
@@ -121,13 +128,24 @@ function Slider(props: Props) {
   const mousemove = (e: MouseEvent) => {
     if (!dragging()) return;
     setShowTooltip(true);
-    let diffPosition = e.pageX - startPosition();
+
+    let position = props.vertical ? e.pageY : e.pageX; // Use pageY for vertical slider, pageX for horizontal
+    let diffPosition = position - startPosition();
+
+    // For vertical sliders, we need to consider the slider's length minus the current mouse position.
+    // if (props.vertical) {
+    //   diffPosition = getSliderLength() - position - startPosition();
+    // }
+
     const diffValue =
       (diffPosition / getSliderLength()) * (props.max - props.min);
 
     const value = trimAlignValue(startValue() + diffValue);
+    console.log("DIFFF", diffValue, value, diffPosition, getSliderLength());
     const oldValue = currentValue();
     if (value === oldValue) return;
+
+    console.log("VAL", value);
 
     onChange(value);
   };
@@ -145,7 +163,8 @@ function Slider(props: Props) {
       return;
     }
 
-    const value = calcValueByPos(e.clientX);
+    const position = props.vertical ? e.clientY : e.clientX; // Use clientY for vertical slider, clientX for horizontal
+    const value = calcValueByPos(position);
     onChange(value);
   };
 
@@ -170,7 +189,13 @@ function Slider(props: Props) {
 
   return (
     <>
-      <div class="relative h-10 flex items-center w-full max-w-full box-border mb-4">
+      <div
+        class="relative flex items-center box-border mb-4"
+        classList={{
+          "h-10 w-full max-w-full": !props.vertical,
+          "h-full w-10": props.vertical,
+        }}
+      >
         <Show when={showTooptip() && !mergedProps.noTooltip}>
           <div
             class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"
@@ -184,16 +209,30 @@ function Slider(props: Props) {
             <div class="z-1 absolute left-1/2 -translate-x-1/2 -bottom-1 w-3 h-3 rotate-45 bg-darkSlate-900" />
           </div>
         </Show>
-        <div class="relative w-full">
+        <div
+          class="relative"
+          classList={{
+            "w-full": !props.vertical,
+            "h-full": props.vertical,
+          }}
+        >
           <For each={Object.entries(props.marks)}>
             {([value, label], i) => (
               <>
                 <div
-                  class="-top-1 w-2 h-2 rounded-full border-4 border-solid"
+                  class="w-2 h-2 rounded-full border-4 border-solid"
                   style={{
                     position: "absolute",
-                    left: `${calcOffset(parseInt(value, 10))}%`,
-                    "margin-left": -(16 / 2) + "px",
+
+                    ...(props.vertical
+                      ? {
+                          top: `${calcOffset(parseInt(value, 10))}%`,
+                          "margin-top": -(16 / 2) + "px",
+                        }
+                      : {
+                          left: `${calcOffset(parseInt(value, 10))}%`,
+                          "margin-left": -(16 / 2) + "px",
+                        }),
                   }}
                   classList={{
                     "bg-darkSlate-900 border-darkSlate-900":
@@ -205,18 +244,35 @@ function Slider(props: Props) {
                     "bg-accent border-accent":
                       calcOffset(parseInt(value, 10)) <=
                         calcOffset(currentValue()) && showTooptip(),
+                    "-top-1": !props.vertical,
+                    "-right-1": props.vertical,
                   }}
                 />
                 <p
-                  class="flex flex-col -ml-2 mt-2 mb-0 text-xs text-lightSlate-500 w-10"
+                  class="flex flex-col mb-0 text-xs text-lightSlate-500 w-fit"
+                  classList={{
+                    "-ml-2 mt-2": !props.vertical,
+                    "-mt-2 mr-2": props.vertical,
+                  }}
                   style={{
                     position: "absolute",
-                    left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
-                      i() === Object.entries(props.marks).length - 1
-                        ? "10px"
-                        : "0px"
-                    })`,
-                    top: "10px",
+                    ...(props.vertical
+                      ? {
+                          right: "10px",
+                          top: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                            i() === Object.entries(props.marks).length - 1
+                              ? "10px"
+                              : "0px"
+                          })`,
+                        }
+                      : {
+                          top: "10px",
+                          left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                            i() === Object.entries(props.marks).length - 1
+                              ? "10px"
+                              : "0px"
+                          })`,
+                        }),
                   }}
                 >
                   <Switch>
@@ -237,15 +293,24 @@ function Slider(props: Props) {
           </For>
           <div
             ref={setHandleRef}
-            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 -top-2 cursor-pointer z-20"
+            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 cursor-pointer z-20"
             style={{
               position: "absolute",
-              left: `${calcOffset(currentValue())}%`,
-              transform: "translateX(-50%)",
+              ...(props.vertical
+                ? {
+                    top: `${calcOffset(currentValue())}%`,
+                    transform: "translateY(-50%)",
+                  }
+                : {
+                    left: `${calcOffset(currentValue())}%`,
+                    transform: "translateX(-50%)",
+                  }),
             }}
             classList={{
               "after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:z-0 z-10":
                 showTooptip(),
+              "-top-2": !props.vertical,
+              "-left-2": props.vertical,
             }}
             onMouseOver={() => {
               setShowTooltip(true);
@@ -258,20 +323,40 @@ function Slider(props: Props) {
             ref={(el) => {
               sliderRef = el;
             }}
-            class="absolute top-1/2 left-0 right-0 -translate-y-1/2 w-full h-2 z-10 cursor-pointer"
+            class="absolute z-10 cursor-pointer"
+            classList={{
+              "top-1/2 left-0 right-0 -translate-y-1/2 w-full h-2":
+                !props.vertical,
+              "top-0 bottom-0 left-1/2 -translate-x-1/2 h-full w-2":
+                props.vertical,
+            }}
           />
           <div
-            class="h-2 rounded-full"
+            class="rounded-full"
             classList={{
               "bg-accent": showTooptip(),
               "bg-primary-500": !showTooptip(),
+              "h-2": !props.vertical,
+              "w-2": props.vertical,
             }}
             style={{
               position: "absolute",
-              width: `${calcOffset(currentValue())}%`,
+              ...(props.vertical
+                ? {
+                    height: `${calcOffset(currentValue())}%`,
+                  }
+                : {
+                    width: `${calcOffset(currentValue())}%`,
+                  }),
             }}
           />
-          <div class="w-full h-2 bg-darkSlate-900 rounded-full" />
+          <div
+            class="bg-darkSlate-900 rounded-full"
+            classList={{
+              "w-full h-2": !props.vertical,
+              "h-full w-2": props.vertical,
+            }}
+          />
         </div>
       </div>
     </>
