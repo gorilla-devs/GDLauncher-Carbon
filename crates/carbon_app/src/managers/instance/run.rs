@@ -4,7 +4,6 @@ use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
-use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 
 use std::time::Duration;
@@ -271,6 +270,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 memory: None,
                             })
                             .await?;
+
+                        app.meta_cache_manager()
+                            .queue_local_caching(instance_id, true)
+                            .await;
                     }
                 }
 
@@ -409,12 +412,6 @@ impl ManagerRef<'_, InstanceManager> {
                 });
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
-
-                // scan instances again offtask to pick up modpack mods
-                let app2 = app.clone();
-                tokio::spawn(async move {
-                    let _ = app2.instance_manager().scan_instances().await;
-                });
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(
