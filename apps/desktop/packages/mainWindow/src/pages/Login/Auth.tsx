@@ -104,34 +104,27 @@ const Auth = (props: Props) => {
   });
 
   return (
-    <div>
-      <div class="flex flex-col justify-center items-center text-center">
-        <Button
-          id="auth-button"
-          loading={clicked()}
-          size="large"
-          onClick={() => handleClick()}
-        >
-          <Trans
-            key="login.sign_in_with_microsoft"
-            options={{
-              defaultValue: "Sign in with Microsoft",
-            }}
-          />
-        </Button>
-        <p class="text-darkSlate-50 text-sm max-w-90">
-          <Trans
-            key="login.sign_in_with_microsoft_text"
-            options={{
-              defaultValue:
-                "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
-            }}
-          />
-        </p>
-        <Show when={error()}>
-          <p class="m-0 text-red-500">{error()}</p>
-        </Show>
-      </div>
+    <div class="flex flex-col justify-center items-center text-center mb-6">
+      <Button loading={clicked()} size="large" onClick={() => handleClick()}>
+        <Trans
+          key="login.sign_in_with_microsoft"
+          options={{
+            defaultValue: "Sign in with Microsoft",
+          }}
+        />
+      </Button>
+      <p class="text-darkSlate-50 text-sm max-w-90">
+        <Trans
+          key="login.sign_in_with_microsoft_text"
+          options={{
+            defaultValue:
+              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
+          }}
+        />
+      </p>
+      <Show when={error()}>
+        <p class="m-0 text-red-500">{error()}</p>
+      </Show>
     </div>
   );
 };

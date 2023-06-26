@@ -249,9 +249,9 @@ function Slider(props: Props) {
                   }}
                 />
                 <p
-                  class="flex flex-col mb-0 text-xs text-lightSlate-500 w-fit"
+                  class="flex flex-col mb-0 text-xs text-lightSlate-500"
                   classList={{
-                    "-ml-2 mt-2": !props.vertical,
+                    "-ml-2 mt-2 max-w-25": !props.vertical,
                     "-mt-2 mr-2": props.vertical,
                   }}
                   style={{

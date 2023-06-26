@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
-import AdTrackingSettingsSlider from "../../../components/AdTrackingSettingsSlider";
+import Slider from "./Slider";
 
 type Props = {
   nextStep: () => void;
@@ -25,7 +25,7 @@ const TrackingSettings = (props: Props) => {
             <Trans key="login.ad_tracking_settings_text" />
           </p>
         </div>
-        <AdTrackingSettingsSlider
+        <Slider
           metricLevel={settings.data?.metricsLevel}
           onChange={(metricsLevel) => {
             settingsMutation.mutate({ metricsLevel });
