@@ -33,6 +33,7 @@ const AdTrackingSettingsSlider = (props: Props) => {
     );
   };
 
+  // eslint-disable-next-line solid/reactivity
   const [title, setTitle] = createSignal(mapValueToTile(props.metricLevel));
 
   const mapValueToMetricLevel = (value: number) => {

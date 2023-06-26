@@ -96,9 +96,6 @@ function Slider(props: Props) {
   };
 
   const calcValueByPos = (position: number) => {
-    // const pixelOffset = props.vertical
-    //   ? getSliderStart() - position // Invert the offset calculation for vertical sliders
-    //   : position - getSliderStart();
     const pixelOffset = position - getSliderStart();
     const nextValue = trimAlignValue(calcValue(pixelOffset));
     return nextValue;
@@ -112,8 +109,6 @@ function Slider(props: Props) {
     setDragging(true);
     setStartPosition(position);
     setStartValue(value);
-
-    console.log("DOWN", value);
 
     if (currentValue() !== value) {
       onChange(value);
@@ -129,24 +124,15 @@ function Slider(props: Props) {
     if (!dragging()) return;
     setShowTooltip(true);
 
-    let position = props.vertical ? e.pageY : e.pageX; // Use pageY for vertical slider, pageX for horizontal
+    let position = props.vertical ? e.pageY : e.pageX;
     let diffPosition = position - startPosition();
-
-    // For vertical sliders, we need to consider the slider's length minus the current mouse position.
-    // if (props.vertical) {
-    //   diffPosition = getSliderLength() - position - startPosition();
-    // }
 
     const diffValue =
       (diffPosition / getSliderLength()) * (props.max - props.min);
 
     const value = trimAlignValue(startValue() + diffValue);
-    console.log("DIFFF", diffValue, value, diffPosition, getSliderLength());
     const oldValue = currentValue();
     if (value === oldValue) return;
-
-    console.log("VAL", value);
-
     onChange(value);
   };
 
