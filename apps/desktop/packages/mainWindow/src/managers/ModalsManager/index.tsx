@@ -172,11 +172,10 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               return (
                 <>
                   <div
-                    class="absolute right-[440px] bottom-0 top-0 left-0 flex justify-center items-center z-999"
+                    class="absolute bottom-0 top-0 left-0 flex justify-center items-center z-999 right-[440px] animate-enterScaleIn"
                     onClick={() => {
                       closeModal();
                     }}
-                    class="animate-enterScaleIn"
                   >
                     <div
                       style={{ "z-index": `${index() + 1}` }}

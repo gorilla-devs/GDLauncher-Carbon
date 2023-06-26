@@ -348,7 +348,6 @@ const InstanceCreation = (props: ModalProps) => {
                   "background-image": `url("${bgPreview()}")`,
                 }}
                 onClick={() => {
-                  if (bgPreview()) return;
                   window
                     .openFileDialog([
                       { name: "Image", extensions: ["png", "jpg", "jpeg"] },
@@ -477,13 +476,13 @@ const InstanceCreation = (props: ModalProps) => {
                   onChange={(l) => {
                     setMcVersion(l.key as string);
 
-                        if (!loader) {
-                          setLoaderVersions([]);
-                        } else if (loader() === "Forge") {
-                          const versions =
-                            forgeVersionsQuery?.data?.gameVersions.find(
-                              (v) => v.id === l.key
-                            )?.loaders;
+                    if (!loader) {
+                      setLoaderVersions([]);
+                    } else if (loader() === "Forge") {
+                      const versions =
+                        forgeVersionsQuery?.data?.gameVersions.find(
+                          (v) => v.id === l.key
+                        )?.loaders;
 
                       setLoaderVersions(versions || []);
                     } else if (loader() === "Fabric") {
@@ -622,42 +621,6 @@ const InstanceCreation = (props: ModalProps) => {
                       class="w-full"
                       value={"none"}
                       placement="bottom"
-                      onChange={(l) => {
-                        if (loader() === "Forge") {
-                          const key = l.key as string;
-                          const versions =
-                            forgeVersionsQuery?.data?.gameVersions.find(
-                              (v) => v.id === key
-                            )?.loaders;
-                          if (versions) setLoaderVersions(versions);
-                        } else if (loader() === "Fabric") {
-                          const key = l.key as string;
-                          const supported =
-                            fabricVersionsQuery?.data?.gameVersions.find(
-                              (v) => v.id === key
-                            ) ?? false;
-                          const versions =
-                            supported !== false
-                              ? fabricVersionsQuery?.data?.gameVersions.find(
-                                  (v) => v.id === DUMMY_META_VERSION
-                                )?.loaders
-                              : [];
-                          if (versions) setLoaderVersions(versions);
-                        } else if (loader() === "Quilt") {
-                          const key = l.key as string;
-                          const supported =
-                            quiltVersionsQuery?.data?.gameVersions.find(
-                              (v) => v.id === key
-                            ) ?? false;
-                          const versions =
-                            supported !== false
-                              ? quiltVersionsQuery?.data?.gameVersions.find(
-                                  (v) => v.id === DUMMY_META_VERSION
-                                )?.loaders
-                              : [];
-                          if (versions) setLoaderVersions(versions);
-                        }
-                      }}
                     />
                   </Match>
                 </Switch>
