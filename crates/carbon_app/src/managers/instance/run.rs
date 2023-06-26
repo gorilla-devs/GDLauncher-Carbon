@@ -5,10 +5,12 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 
+use std::fmt::Debug;
 use std::path::PathBuf;
 
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
+use tracing::{debug, error, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -755,6 +757,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        debug!("changing state of instance {instance_id} to {state:?}");
         instance.data_mut()?.state = state;
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
@@ -785,6 +788,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("kill_instance called on instance that was not running")
         };
 
+        info!("killing instance {instance_id}");
         running.kill_tx.send(()).await?;
 
         Ok(())
@@ -795,6 +799,20 @@ pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
     Preparing(VisualTaskId),
     Running(RunningInstance),
+}
+
+impl Debug for LaunchState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Inactive { .. } => "Inactive",
+                Self::Preparing(_) => "Preparing",
+                Self::Running(_) => "Running",
+            }
+        )
+    }
 }
 
 pub struct RunningInstance {
