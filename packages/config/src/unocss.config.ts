@@ -6,7 +6,11 @@ import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 // import gdlIcons from "./unocss.icons.js";
 
 const unocssConfig = {
-  include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  content: {
+    pipeline: {
+      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+    },
+  },
   presets: [
     presetAttributify(),
     presetWind(),
