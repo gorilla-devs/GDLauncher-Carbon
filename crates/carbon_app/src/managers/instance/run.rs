@@ -419,6 +419,8 @@ impl ManagerRef<'_, InstanceManager> {
                     app.meta_cache_manager()
                         .queue_local_caching(instance_id, true)
                         .await;
+
+                    tracing::trace!("queued metadata caching");
                 }
 
                 t_extract_natives.start_opaque();
