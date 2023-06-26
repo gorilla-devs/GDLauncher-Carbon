@@ -346,7 +346,16 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                         ),
                                                         metadb::SetParam::SetAuthors(meta.authors),
                                                     ],
-                                                    None => Vec::new(),
+
+                                                    // Prisma sucks and is generating invalid sql.
+                                                    // As a workaround, all the defaults are explicitly set manually.
+                                                    None => vec![
+                                                        metadb::SetParam::SetName(None),
+                                                        metadb::SetParam::SetModid(None),
+                                                        metadb::SetParam::SetVersion(None),
+                                                        metadb::SetParam::SetDescription(None),
+                                                        metadb::SetParam::SetAuthors(None),
+                                                    ],
                                                 },
                                             )
                                         }),
