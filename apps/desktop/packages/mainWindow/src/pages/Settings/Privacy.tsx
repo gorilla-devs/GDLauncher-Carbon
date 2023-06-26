@@ -7,6 +7,7 @@ import Title from "./components/Title";
 import RightHandSide from "./components/RightHandSide";
 import AdTrackingSettingsSlider from "@/components/AdTrackingSettingsSlider";
 import { rspc } from "@/utils/rspcClient";
+import { trackEvent } from "@/utils/analytics";
 
 const Privacy = () => {
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
@@ -53,19 +54,19 @@ const Privacy = () => {
                   <Trans key="tracking.setting_disabled_text" />
                 </div>
                 <div>
-                  <div class="text-green-300 font-extrabold mb-2">
+                  <div class="font-extrabold mb-2 text-green-300">
                     <Trans key="tracking.setting_anonymous" />
                   </div>
                   <Trans key="tracking.setting_anonymous_text" />
                 </div>
                 <div>
-                  <div class="text-purple-500 font-extrabold mb-2">
+                  <div class="font-extrabold mb-2 text-purple-500">
                     <Trans key="tracking.setting_anonymous_with_session_recordings" />
                   </div>
                   <Trans key="tracking.setting_anonymous_with_session_recordings_text" />
                 </div>
                 <div>
-                  <div class="text-fuchsia-400 font-extrabold mb-2">
+                  <div class="font-extrabold mb-2 text-fuchsia-400">
                     <Trans key="tracking.settings_authenticated_with_session_recordings" />
                   </div>
                   <Trans key="tracking.settings_authenticated_with_session_recordings_text" />
@@ -80,6 +81,7 @@ const Privacy = () => {
               metricLevel={settings.data?.metricsLevel}
               onChange={(metricsLevel) => {
                 settingsMutation.mutate({ metricsLevel });
+                trackEvent("metrics_disabled");
               }}
             />
           </RightHandSide>

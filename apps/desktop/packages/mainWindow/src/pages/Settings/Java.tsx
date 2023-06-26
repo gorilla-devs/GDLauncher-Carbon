@@ -20,6 +20,7 @@ import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
+import RightHandSide from "./components/RightHandSide";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -53,7 +54,7 @@ const Java = () => {
 
   const DeleteIcon = (props: { id: string }) => (
     <div
-      class="i-ri:delete-bin-7-fill text-darkSlate-50 hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
+      class="text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
       onClick={() => deleteJavaMutation.mutate(props.id)}
     />
   );
@@ -98,7 +99,7 @@ const Java = () => {
               }}
             />
           </Title>
-          <div class="flex justify-center px-3 w-120">
+          <RightHandSide class="w-64">
             <Slider
               min={256}
               max={mbTotalRAM()}
@@ -111,18 +112,18 @@ const Java = () => {
                 })
               }
             />
-          </div>
+          </RightHandSide>
         </Row>
-        <div>
-          <h5 class="m-0 mb-4">
+        <Row class="flex-col items-stretch">
+          <Title>
             <Trans
               key="java.java_arguments_title"
               options={{
                 defaultValue: "Java Arguments",
               }}
             />
-          </h5>
-          <div class="flex w-full gap-4 items-center">
+          </Title>
+          <div class="flex gap-4 justify-center items-center">
             <Input
               class="w-full"
               value={routeData.settings.data?.javaCustomArgs}
@@ -151,26 +152,30 @@ const Java = () => {
               />
             </Button>
           </div>
-        </div>
-        <div class="flex mb-4 h-full justify-between mt-10">
-          <h2 class="mt-0 text-sm">
+        </Row>
+        <Row>
+          <Title>
             <Trans
               key="java.auto_handle_java"
               options={{
                 defaultValue: "Auto handle java",
               }}
             />
-          </h2>
-          <GDSwitch
-            checked={routeData.settings.data?.autoManageJava}
-            onChange={(e) => {
-              setSettingsMutation.mutate({ autoManageJava: e.target.checked });
-            }}
-          />
-        </div>
+          </Title>
+          <RightHandSide>
+            <GDSwitch
+              checked={routeData.settings.data?.autoManageJava}
+              onChange={(e) => {
+                setSettingsMutation.mutate({
+                  autoManageJava: e.target.checked,
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
         <div class="flex flex-col">
           <Show when={!routeData.settings.data?.autoManageJava}>
-            <div class="overflow-hidden rounded-2xl">
+            <div class="rounded-2xl overflow-hidden">
               <Tabs variant="block">
                 <TabList>
                   <Tab>
@@ -222,7 +227,7 @@ const Java = () => {
                               <div class="flex flex-col gap-4">
                                 <For each={obj}>
                                   {(java) => (
-                                    <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
+                                    <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center bg-darkSlate-700 rounded-lg px-4 py-2">
                                       <span class="text-xs text-darkSlate-100">
                                         {java.path}
                                       </span>
