@@ -42,6 +42,7 @@ struct FESettings {
     startup_resolution: String,
     java_custom_args: String,
     auto_manage_java: bool,
+    is_legal_accepted: bool,
 }
 
 impl From<crate::db::app_configuration::Data> for FESettings {
@@ -60,6 +61,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             startup_resolution: data.startup_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
+            is_legal_accepted: data.is_legal_accepted,
         }
     }
 }
@@ -94,4 +96,6 @@ pub struct FESettingsUpdate {
     pub java_custom_args: Option<String>,
     #[specta(optional)]
     pub auto_manage_java: Option<bool>,
+    #[specta(optional)]
+    pub is_legal_accepted: Option<bool>,
 }
