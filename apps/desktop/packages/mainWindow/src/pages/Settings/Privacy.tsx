@@ -7,7 +7,7 @@ import Title from "./components/Title";
 import RightHandSide from "./components/RightHandSide";
 import AdTrackingSettingsSlider from "@/components/AdTrackingSettingsSlider";
 import { rspc } from "@/utils/rspcClient";
-import { trackEvent } from "@/utils/analytics";
+import { Show } from "solid-js";
 
 const Privacy = () => {
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
@@ -48,40 +48,87 @@ const Privacy = () => {
             description={
               <div class="flex flex-col gap-4">
                 <div>
-                  <div class="text-yellow-400 mb-2 font-extrabold">
-                    <Trans key="tracking.setting_disabled" />
+                  <div class="flex gap-4">
+                    <div
+                      class="text-yellow-400 mb-2"
+                      classList={{
+                        "font-extrabold": settings.data?.metricsLevel === 0,
+                      }}
+                    >
+                      <Trans key="tracking.setting_disabled" />
+                    </div>
+                    <Show when={settings.data?.metricsLevel === 0}>
+                      <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
+                    </Show>
                   </div>
-                  <Trans key="tracking.setting_disabled_text" />
+                  <p class="text-xs p-0">
+                    <Trans key="tracking.setting_disabled_text" />
+                  </p>
                 </div>
                 <div>
-                  <div class="font-extrabold mb-2 text-green-300">
-                    <Trans key="tracking.setting_anonymous" />
+                  <div class="flex gap-4">
+                    <div
+                      class="text-green-300 mb-2"
+                      classList={{
+                        "font-extrabold": settings.data?.metricsLevel === 1,
+                      }}
+                    >
+                      <Trans key="tracking.setting_anonymous" />
+                    </div>
+                    <Show when={settings.data?.metricsLevel === 1}>
+                      <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
+                    </Show>
                   </div>
-                  <Trans key="tracking.setting_anonymous_text" />
+                  <p class="text-xs p-0">
+                    <Trans key="tracking.setting_anonymous_text" />
+                  </p>
                 </div>
                 <div>
-                  <div class="font-extrabold mb-2 text-purple-500">
-                    <Trans key="tracking.setting_anonymous_with_session_recordings" />
+                  <div class="flex gap-4">
+                    <div
+                      class="text-purple-500 mb-2"
+                      classList={{
+                        "font-extrabold": settings.data?.metricsLevel === 2,
+                      }}
+                    >
+                      <Trans key="tracking.setting_anonymous_with_session_recordings" />
+                    </div>
+                    <Show when={settings.data?.metricsLevel === 2}>
+                      <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
+                    </Show>
                   </div>
-                  <Trans key="tracking.setting_anonymous_with_session_recordings_text" />
+                  <p class="text-xs p-0">
+                    <Trans key="tracking.setting_anonymous_with_session_recordings_text" />
+                  </p>
                 </div>
                 <div>
-                  <div class="font-extrabold mb-2 text-fuchsia-400">
-                    <Trans key="tracking.settings_authenticated_with_session_recordings" />
+                  <div class="flex gap-4">
+                    <div
+                      class="text-fuchsia-400 mb-2"
+                      classList={{
+                        "font-extrabold": settings.data?.metricsLevel === 3,
+                      }}
+                    >
+                      <Trans key="tracking.settings_authenticated_with_session_recordings" />
+                    </div>
+                    <Show when={settings.data?.metricsLevel === 3}>
+                      <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
+                    </Show>
                   </div>
-                  <Trans key="tracking.settings_authenticated_with_session_recordings_text" />
+                  <p class="text-xs p-0">
+                    <Trans key="tracking.settings_authenticated_with_session_recordings_text" />
+                  </p>
                 </div>
               </div>
             }
           >
             <Trans key="settings.metrics_level_title" />
           </Title>
-          <RightHandSide class="w-280">
+          <RightHandSide class="w-250">
             <AdTrackingSettingsSlider
               metricLevel={settings.data?.metricsLevel}
               onChange={(metricsLevel) => {
                 settingsMutation.mutate({ metricsLevel });
-                trackEvent("metrics_disabled");
               }}
             />
           </RightHandSide>
