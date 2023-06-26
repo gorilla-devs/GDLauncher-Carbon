@@ -195,6 +195,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut downloads = Vec::new();
 
+                let mut is_initial_modpack_launch = false;
                 if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
                 {
@@ -271,9 +272,7 @@ impl ManagerRef<'_, InstanceManager> {
                             })
                             .await?;
 
-                        app.meta_cache_manager()
-                            .queue_local_caching(instance_id, true)
-                            .await;
+                        is_initial_modpack_launch = true;
                     }
                 }
 
@@ -412,6 +411,15 @@ impl ManagerRef<'_, InstanceManager> {
                 });
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
+
+                // update mod metadata after mods are downloaded
+                if is_initial_modpack_launch {
+                    tracing::info!("queueing metadata caching for running instance");
+
+                    app.meta_cache_manager()
+                        .queue_local_caching(instance_id, true)
+                        .await;
+                }
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(

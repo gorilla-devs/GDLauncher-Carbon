@@ -616,9 +616,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
-        self.app.meta_cache_manager()
-            .gc_mod_metadata()
-            .await;
+        self.app.meta_cache_manager().gc_mod_metadata().await;
 
         Ok(())
     }
