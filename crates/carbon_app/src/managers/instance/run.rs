@@ -4,7 +4,6 @@ use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge::{self, ProgressState};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
-use daedalus::minecraft::DownloadType;
 use std::path::PathBuf;
 
 use std::time::Duration;
@@ -196,6 +195,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut downloads = Vec::new();
 
+                let mut is_initial_modpack_launch = false;
                 if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
                 {
@@ -271,6 +271,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 memory: None,
                             })
                             .await?;
+
+                        is_initial_modpack_launch = true;
                     }
                 }
 
@@ -410,11 +412,16 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_multiple(downloads, progress_watch_tx).await?;
 
-                // scan instances again offtask to pick up modpack mods
-                let app2 = app.clone();
-                tokio::spawn(async move {
-                    let _ = app2.instance_manager().scan_instances().await;
-                });
+                // update mod metadata after mods are downloaded
+                if is_initial_modpack_launch {
+                    tracing::info!("queueing metadata caching for running instance");
+
+                    app.meta_cache_manager()
+                        .queue_local_caching(instance_id, true)
+                        .await;
+
+                    tracing::trace!("queued metadata caching");
+                }
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(

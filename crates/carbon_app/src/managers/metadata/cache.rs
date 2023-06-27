@@ -13,6 +13,7 @@ use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use tracing::debug;
 use tracing::error;
 use tracing::info;
 use tracing::trace;
@@ -97,21 +98,15 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     pub async fn queue_local_caching(self, instance_id: InstanceId, force_recache: bool) {
         trace!("possibly queueing instance {instance_id} for recaching");
-        let lock = match force_recache {
-            true => None,
-            false => Some(self.scanned_instances.lock().await),
-        };
 
-        if lock
-            .as_ref()
-            .map(|m| !m.contains(&instance_id))
-            .unwrap_or(true)
-        {
+        let mut lock = self.scanned_instances.lock().await;
+
+        if force_recache || lock.contains(&instance_id) {
             self.waiting_instances.write().await.insert(instance_id);
             let _ = self.waiting_notify.send(());
+
             // prevent future calls
-            lock.unwrap_or(self.scanned_instances.lock().await)
-                .insert(instance_id);
+            lock.insert(instance_id);
 
             info!("queued instance {instance_id} for recaching");
         }
@@ -346,7 +341,16 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                         ),
                                                         metadb::SetParam::SetAuthors(meta.authors),
                                                     ],
-                                                    None => Vec::new(),
+
+                                                    // Prisma sucks and is generating invalid sql.
+                                                    // As a workaround, all the defaults are explicitly set manually.
+                                                    None => vec![
+                                                        metadb::SetParam::SetName(None),
+                                                        metadb::SetParam::SetModid(None),
+                                                        metadb::SetParam::SetVersion(None),
+                                                        metadb::SetParam::SetDescription(None),
+                                                        metadb::SetParam::SetAuthors(None),
+                                                    ],
                                                 },
                                             )
                                         }),
@@ -378,10 +382,16 @@ impl ManagerRef<'_, MetaCacheManager> {
                     app.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
 
                     if priority {
+                        info!("queueing remote metadata download for instance {instance_id}");
+
                         let _ = app
                             .meta_cache_manager()
                             .remote_instance
                             .send(Some(instance_id));
+                    } else {
+                        debug!(
+                            "not queueing remote metadata for non priority instance {instance_id}"
+                        );
                     }
                 }
             }
@@ -392,6 +402,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
             while remote_watch.changed().await.is_ok() {
                 loop {
+                    debug!("remote watch target updated");
                     let Some(instance_id) = *remote_watch.borrow() else { break };
                     info!("updating curseforge metadata cache for instance {instance_id}");
 

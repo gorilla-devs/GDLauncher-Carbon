@@ -616,6 +616,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
+        self.app.meta_cache_manager().gc_mod_metadata().await;
+
         Ok(())
     }
 
@@ -1053,7 +1055,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             })?
             .group_id;
 
-        let data = instance.data()?;
         let mut new_info = instance.data()?.config.clone();
         let (new_shortpath, new_path) = self.next_folder(&instance.shortpath).await?;
         new_info.name = name;
