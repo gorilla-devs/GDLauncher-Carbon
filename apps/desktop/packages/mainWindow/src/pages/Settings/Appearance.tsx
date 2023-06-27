@@ -22,7 +22,7 @@ const Appearance = () => {
 
   return (
     <LoadingError routeData={routeData}>
-      <div class="bg-darkSlate-800 w-full flex flex-col px-6 box-border h-auto py-5">
+      <div class="w-full flex flex-col box-border bg-darkSlate-800 px-6 h-auto py-5">
         <h2 class="m-0 mb-7 text-4">
           <Trans
             key="settings.appearance"
