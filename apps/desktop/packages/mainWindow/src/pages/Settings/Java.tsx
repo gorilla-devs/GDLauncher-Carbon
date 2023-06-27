@@ -126,7 +126,7 @@ const Java = () => {
             <Input
               class="w-26"
               value={settings.data?.xmx}
-              onBlur={(e) => {
+              onChange={(e) => {
                 settingsMutation.mutate({
                   xmx: parseInt(e.currentTarget.value, 10),
                 });

@@ -185,6 +185,20 @@ const TransWrapper = (props: TransWrapperProps) => {
     },
   });
 
+  createEffect(() => {
+    const root = document.getElementById("root");
+    const overlay = document.getElementById("overlay");
+    if (root && overlay) {
+      if (settings.data?.reducedMotion) {
+        root.classList.add("potato-pc");
+        overlay.classList.add("potato-pc");
+      } else {
+        root.classList.remove("potato-pc");
+        overlay.classList.remove("potato-pc");
+      }
+    }
+  });
+
   return (
     <Show when={!settings.isInitialLoading}>
       <TransProvider instance={_i18nInstance}>
