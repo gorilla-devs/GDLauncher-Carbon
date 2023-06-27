@@ -1,6 +1,6 @@
 import { fetchImage } from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
-import { createEffect, createResource } from "solid-js";
+import { createResource } from "solid-js";
 
 //@ts-ignore
 const fetchData = ({ params }) => {

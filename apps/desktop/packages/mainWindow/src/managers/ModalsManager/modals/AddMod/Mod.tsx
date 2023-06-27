@@ -1,5 +1,5 @@
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
-import { FEMod } from "@gd/core_module/bindings";
+import { FEMod, Task } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Spinner, Tag } from "@gd/ui";
 import { format } from "date-fns";
@@ -7,12 +7,13 @@ import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { useModal } from "../..";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
+import { CreateQueryResult } from "@tanstack/solid-query";
+import { RSPCError } from "@rspc/client";
 
 type Props = { mod: FEMod; mcVersion: string };
 
 const Mod = (props: Props) => {
   const modalsContext = useModal();
-  const [loading, setLoading] = createSignal(false);
 
   const latestFIlesIndexes = () =>
     props.mod.latestFilesIndexes.filter(
@@ -30,22 +31,29 @@ const Mod = (props: Props) => {
       label: version.filename,
     }));
 
+  const [task, setTask] = createSignal<CreateQueryResult<
+    Task | null,
+    RSPCError
+  > | null>(null);
+
+  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+
+  createEffect(() => {
+    if (taskId() !== undefined) {
+      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
+    }
+  });
+
   const installModMutation = rspc.createMutation(["instance.installMod"], {
-    onMutate() {
-      setLoading(true);
-    },
-    onSettled() {
-      setLoading(false);
+    onSuccess(taskId) {
+      setTaskId(taskId);
     },
   });
 
   const isModInstalled = () =>
-    instanceMods.data?.find((mod) => parseInt(mod.id, 10) === props.mod.id) !==
-    undefined;
-
-  createEffect(() => {
-    console.log("TEST", instanceMods.data, props.mod);
-  });
+    instanceMods.data?.find(
+      (mod) => mod.curseforge?.project_id === props.mod.id
+    ) !== undefined;
 
   return (
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
@@ -56,7 +64,17 @@ const Mod = (props: Props) => {
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
-            <h2 class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92">
+            <h2
+              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 hover:underline cursor-pointer"
+              onClick={() =>
+                modalsContext?.openModal(
+                  {
+                    name: "modDetails",
+                  },
+                  { mod: props.mod }
+                )
+              }
+            >
               {props.mod.name}
             </h2>
             <div class="flex gap-4 items-center">
@@ -74,7 +92,7 @@ const Mod = (props: Props) => {
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:user-fill" />
-                <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
+                <div class="text-sm whitespace-nowrap flex gap-2">
                   <For each={props.mod.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
                   </For>
@@ -115,7 +133,7 @@ const Mod = (props: Props) => {
           <Switch>
             <Match when={!isModInstalled()}>
               <Dropdown.button
-                disabled={loading()}
+                disabled={!!task()}
                 options={mappedVersions()}
                 rounded
                 value={mappedVersions()[0]?.key}
@@ -139,10 +157,10 @@ const Mod = (props: Props) => {
                   }
                 }}
               >
-                <Show when={loading()}>
+                <Show when={task()}>
                   <Spinner />
                 </Show>
-                <Show when={!loading()}>
+                <Show when={!task()}>
                   <Trans
                     key="instance.download_latest"
                     options={{
@@ -153,7 +171,10 @@ const Mod = (props: Props) => {
               </Dropdown.button>
             </Match>
             <Match when={isModInstalled()}>
-              <Button>
+              <Button
+                variant="green"
+                icon={<div class="i-ri:check-fill text-xl" />}
+              >
                 <Trans
                   key="mod.downloaded"
                   options={{
