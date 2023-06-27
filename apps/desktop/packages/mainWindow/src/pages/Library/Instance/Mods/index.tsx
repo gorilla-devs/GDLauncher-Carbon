@@ -64,10 +64,6 @@ const Mods = () => {
 
   const mods = () => routeData.instanceMods.data || [];
 
-  createEffect(() => {
-    console.log("mods()", mods(), routeData.instanceMods);
-  });
-
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
