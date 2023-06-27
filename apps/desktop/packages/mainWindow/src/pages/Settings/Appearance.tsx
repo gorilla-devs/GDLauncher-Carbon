@@ -6,6 +6,8 @@ import { For, Show } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
 import { getAvailableThemes, getThemeColors } from "@/utils/theme";
+import PageTitle from "./components/PageTitle";
+import Row from "./components/Row";
 
 const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -22,16 +24,16 @@ const Appearance = () => {
 
   return (
     <LoadingError routeData={routeData}>
-      <div class="w-full flex flex-col box-border bg-darkSlate-800 px-6 h-auto py-5">
-        <h2 class="m-0 mb-7 text-4">
+      <>
+        <PageTitle>
           <Trans
             key="settings.appearance"
             options={{
               defaultValue: "Appearance",
             }}
           />
-        </h2>
-        <div class="flex gap-4 w-full border-box flex-wrap max-w-full">
+        </PageTitle>
+        <Row class="gap-4 w-full border-box flex-wrap max-w-full">
           <For each={themes}>
             {(theme) => {
               const themeColors = getThemeColors(theme);
@@ -72,8 +74,8 @@ const Appearance = () => {
               );
             }}
           </For>
-        </div>
-      </div>
+        </Row>
+      </>
     </LoadingError>
   );
 };

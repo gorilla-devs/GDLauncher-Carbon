@@ -27,9 +27,14 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
-  let setSettingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newTheme) => {
-      queryClient.setQueryData(["settings.setSettings"], newTheme);
+  const settings = rspc.createQuery(() => ["settings.getSettings"]);
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      queryClient.setQueryData(["settings.getSettings"], {
+        ...settings?.data,
+        ...newSettings,
+      });
     },
   });
 
@@ -38,7 +43,7 @@ const Java = () => {
   const mbTotalRAM = () =>
     Math.round(Number(routeData.totalRam.data) / 1024 / 1024);
 
-  const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
+  const initailJavaArgs = settings.data?.javaCustomArgs;
 
   const flattenedAvailableJavas = () =>
     Object.values(routeData.availableJavas.data || {}).reduce(
@@ -111,18 +116,18 @@ const Java = () => {
                 )}MB`,
                 [mbTotalRAM()]: `${mbTotalRAM()}MB`,
               }}
-              value={routeData.settings.data?.xmx}
+              value={settings.data?.xmx}
               onChange={(val) =>
-                setSettingsMutation.mutate({
+                settingsMutation.mutate({
                   xmx: val,
                 })
               }
             />
             <Input
               class="w-26"
-              value={routeData.settings.data?.xmx}
-              onChange={(e) => {
-                setSettingsMutation.mutate({
+              value={settings.data?.xmx}
+              onBlur={(e) => {
+                settingsMutation.mutate({
                   xmx: parseInt(e.currentTarget.value, 10),
                 });
               }}
@@ -141,9 +146,9 @@ const Java = () => {
           <div class="flex gap-4 justify-center items-center">
             <Input
               class="w-full"
-              value={routeData.settings.data?.javaCustomArgs}
+              value={settings.data?.javaCustomArgs}
               onChange={(e) => {
-                setSettingsMutation.mutate({
+                settingsMutation.mutate({
                   javaCustomArgs: e.target.value,
                 });
               }}
@@ -154,7 +159,7 @@ const Java = () => {
               class="h-10"
               textColor="text-red-500"
               onClick={() => {
-                setSettingsMutation.mutate({
+                settingsMutation.mutate({
                   javaCustomArgs: initailJavaArgs,
                 });
               }}
@@ -179,9 +184,9 @@ const Java = () => {
           </Title>
           <RightHandSide>
             <GDSwitch
-              checked={routeData.settings.data?.autoManageJava}
+              checked={settings.data?.autoManageJava}
               onChange={(e) => {
-                setSettingsMutation.mutate({
+                settingsMutation.mutate({
                   autoManageJava: e.target.checked,
                 });
               }}
@@ -189,7 +194,7 @@ const Java = () => {
           </RightHandSide>
         </Row>
         <div class="flex flex-col">
-          <Show when={!routeData.settings.data?.autoManageJava}>
+          <Show when={!settings.data?.autoManageJava}>
             <div class="rounded-2xl overflow-hidden">
               <Tabs variant="block">
                 <TabList>
