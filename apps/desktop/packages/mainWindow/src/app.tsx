@@ -32,7 +32,7 @@ const App = (props: Props) => {
   });
 
   return (
-    <div class="relative w-screen">
+    <div class="relative w-screen select-none">
       <div class="w-screen flex z-10 h-auto">
         <main class="relative overflow-hidden flex-1">
           {/* <Suspense fallback={<></>}> */}

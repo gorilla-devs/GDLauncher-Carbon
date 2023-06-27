@@ -60,7 +60,10 @@ const Modpack = (props: Props) => {
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
-            <h2 class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92">
+            <h2
+              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 cursor-pointer hover:underline"
+              onClick={() => navigate(`/modpacks/${props.modpack.id}`)}
+            >
               {props.modpack.name}
             </h2>
             <div class="flex gap-4 items-center">
@@ -78,7 +81,7 @@ const Modpack = (props: Props) => {
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:user-fill" />
-                <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
+                <div class="text-sm whitespace-nowrap flex gap-2">
                   <For each={props.modpack.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
                   </For>

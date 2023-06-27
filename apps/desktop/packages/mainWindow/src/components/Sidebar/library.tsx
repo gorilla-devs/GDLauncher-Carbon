@@ -2,13 +2,19 @@ import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import {
   For,
+  Match,
   Show,
   Suspense,
+  Switch,
   createEffect,
   createMemo,
   createSignal,
 } from "solid-js";
-import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
+import {
+  getModloaderIcon,
+  isSidebarOpened,
+  toggleSidebar,
+} from "@/utils/sidebar";
 import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -18,6 +24,7 @@ import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
+import { ModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -69,6 +76,25 @@ const Sidebar = () => {
   const favoriteInstances = () =>
     routeData.instancesUngrouped.data?.filter((inst) => inst.favorite) || [];
 
+  const mapIconToKey = (key: string) => {
+    return (
+      <Switch>
+        <Match when={isSidebarOpened() && key === "vanilla"}>
+          {t("vanilla")}
+        </Match>
+        <Match when={isSidebarOpened() && key === "Forge"}>
+          {t("vanilla")}
+        </Match>
+        <Match when={!isSidebarOpened() && key === "vanilla"}>
+          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
+        </Match>
+        <Match when={!isSidebarOpened() && key === "Forge"}>
+          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
+        </Match>
+      </Switch>
+    );
+  };
+
   return (
     <SiderbarWrapper noPadding>
       <div class="h-full w-full box-border transition-all pt-5 pb-5">
@@ -89,7 +115,7 @@ const Sidebar = () => {
           >
             <Input
               ref={inputRef}
-              placeholder={t("general.type_here") || ""}
+              placeholder={t("general.search") || ""}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}
@@ -108,7 +134,13 @@ const Sidebar = () => {
         >
           <Show when={favoriteInstances().length > 0}>
             <Collapsable
-              title={"Favorites"}
+              title={
+                isSidebarOpened() ? (
+                  t("favorite")
+                ) : (
+                  <div class="text-yellow-500 i-ri:star-s-fill w-6 h-6" />
+                )
+              }
               size={isSidebarOpened() ? "standard" : "small"}
             >
               <For each={favoriteInstances()}>
@@ -139,7 +171,7 @@ const Sidebar = () => {
           >
             {([key, values]) => (
               <Collapsable
-                title={key}
+                title={mapIconToKey(key)}
                 size={isSidebarOpened() ? "standard" : "small"}
               >
                 <For each={values}>

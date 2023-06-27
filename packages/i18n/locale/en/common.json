@@ -1,5 +1,6 @@
 {
   "general.type_here": "Type Here",
+  "general.search": "Search",
   "languages.italian": "Italiano",
   "languages.english": "English",
   "languages.german": "german",
@@ -68,7 +69,7 @@
   "instance.vanilla": "Vanilla",
   "instance.forge": "Forge",
   "instance.fabric": "Fabric",
-  "instance.quilt":  "Quilt",
+  "instance.quilt": "Quilt",
   "instance.step_back": "Back",
   "instance.play": "Play",
   "instance.notes": "notes",
