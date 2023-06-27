@@ -11,8 +11,6 @@ import Title from "./components/Title";
 const Language = () => {
   let settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  // @ts-ignore
-
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
@@ -45,7 +43,7 @@ const Language = () => {
             >
               <For each={Object.entries(supportedLanguages)}>
                 {([key, value]) => (
-                  <div class="h-12 flex items-center">
+                  <div class="flex items-center h-12">
                     <Radio value={key}>
                       <div class="w-full flex justify-between">
                         <div class="flex items-center gap-2">

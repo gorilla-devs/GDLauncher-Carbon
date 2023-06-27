@@ -110,8 +110,15 @@ const loadLanguageResources = async (lang: string) => {
 const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      queryClient.setQueryData(["settings.getSettings"], newSettings);
+    },
+  });
+
   const settings = rspc.createQuery(() => ["settings.getSettings"], {
-    async onSuccess({ language }) {
+    async onSuccess(settings) {
+      let { language } = settings;
       if (!_i18nInstance.isInitialized) {
         await _i18nInstance.init({
           ns: ["common", "languages"],
@@ -138,6 +145,15 @@ const TransWrapper = (props: TransWrapperProps) => {
       const previousLanguage = _i18nInstance.language;
 
       const resources = await loadLanguageResources(language);
+
+      if (!resources.common || !resources.languages) {
+        if (previousLanguage) {
+          settingsMutation.mutate({
+            language: previousLanguage,
+          });
+        }
+        return;
+      }
 
       if (!_i18nInstance.hasResourceBundle(language, "common")) {
         _i18nInstance.addResourceBundle(language, "common", resources.common);
