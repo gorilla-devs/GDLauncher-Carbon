@@ -65,12 +65,7 @@ const Mods = () => {
   const mods = () => routeData.instanceMods.data || [];
 
   createEffect(() => {
-    console.log(
-      "mods()",
-      mods(),
-      routeData.instanceMods,
-      routeData.instanceDetails
-    );
+    console.log("mods()", mods(), routeData.instanceMods);
   });
 
   return (
