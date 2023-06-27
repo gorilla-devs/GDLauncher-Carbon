@@ -52,7 +52,7 @@ const Modpack = (props: Props) => {
   );
 
   return (
-    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
+    <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60 overflow-hidden">
       <div class="flex gap-4">
         <img
           class="rounded-xl select-none h-30 w-30"
