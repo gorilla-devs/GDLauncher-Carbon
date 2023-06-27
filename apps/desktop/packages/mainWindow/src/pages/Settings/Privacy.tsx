@@ -61,7 +61,12 @@ const Privacy = () => {
                       <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
                     </Show>
                   </div>
-                  <p class="text-xs p-0">
+                  <p
+                    class="text-xs p-0"
+                    classList={{
+                      "text-white": settings.data?.metricsLevel === 0,
+                    }}
+                  >
                     <Trans key="tracking.setting_disabled_text" />
                   </p>
                 </div>
@@ -79,7 +84,12 @@ const Privacy = () => {
                       <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
                     </Show>
                   </div>
-                  <p class="text-xs p-0">
+                  <p
+                    class="text-xs p-0"
+                    classList={{
+                      "text-white": settings.data?.metricsLevel === 1,
+                    }}
+                  >
                     <Trans key="tracking.setting_anonymous_text" />
                   </p>
                 </div>
@@ -97,7 +107,12 @@ const Privacy = () => {
                       <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
                     </Show>
                   </div>
-                  <p class="text-xs p-0">
+                  <p
+                    class="text-xs p-0"
+                    classList={{
+                      "text-white": settings.data?.metricsLevel === 2,
+                    }}
+                  >
                     <Trans key="tracking.setting_anonymous_with_session_recordings_text" />
                   </p>
                 </div>
@@ -115,7 +130,12 @@ const Privacy = () => {
                       <div class="w-6 h-4 text-white i-ri:arrow-left-fill" />
                     </Show>
                   </div>
-                  <p class="text-xs p-0">
+                  <p
+                    class="text-xs p-0"
+                    classList={{
+                      "text-white": settings.data?.metricsLevel === 3,
+                    }}
+                  >
                     <Trans key="tracking.settings_authenticated_with_session_recordings_text" />
                   </p>
                 </div>

@@ -15,7 +15,6 @@ import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
-import { generateSequence } from "@/utils/helpers";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import Title from "./components/Title";
@@ -36,7 +35,8 @@ const Java = () => {
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
-  const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
+  const mbTotalRAM = () =>
+    Math.round(Number(routeData.totalRam.data) / 1024 / 1024);
 
   const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
 
@@ -99,18 +99,33 @@ const Java = () => {
               }}
             />
           </Title>
-          <RightHandSide class="w-64">
+          <RightHandSide class="w-86 flex gap box-content gap-12">
             <Slider
               min={256}
               max={mbTotalRAM()}
-              steps={1000}
+              steps={1}
+              marks={{
+                256: "256MB",
+                [Math.round(mbTotalRAM() / 2)]: `${Math.round(
+                  mbTotalRAM() / 2
+                )}MB`,
+                [mbTotalRAM()]: `${mbTotalRAM()}MB`,
+              }}
               value={routeData.settings.data?.xmx}
-              marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) =>
                 setSettingsMutation.mutate({
                   xmx: val,
                 })
               }
+            />
+            <Input
+              class="w-26"
+              value={routeData.settings.data?.xmx}
+              onChange={(e) => {
+                setSettingsMutation.mutate({
+                  xmx: parseInt(e.currentTarget.value, 10),
+                });
+              }}
             />
           </RightHandSide>
         </Row>
