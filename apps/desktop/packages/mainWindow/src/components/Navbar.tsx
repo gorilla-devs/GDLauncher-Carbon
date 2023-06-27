@@ -7,16 +7,10 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
-import { AccountType, Procedures } from "@gd/core_module/bindings";
+import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
 import updateAvailable, { checkForUpdates } from "@/utils/updaterhelper";
-
-type EnrollStatusResult = Extract<
-  Procedures["queries"],
-  { key: "account.getAccountStatus" }
->["result"];
 
 interface AccountsStatus {
   label: {
@@ -24,7 +18,7 @@ interface AccountsStatus {
     icon: string | undefined;
     uuid: string;
     type: AccountType;
-    status: EnrollStatusResult | undefined;
+    status: AccountStatus | undefined;
   };
   key: string;
 }
@@ -32,7 +26,6 @@ interface AccountsStatus {
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
-  const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
 
   const isLogin = useMatch(() => "/");
@@ -41,7 +34,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 4
+      ? 3
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -67,9 +60,6 @@ const AppNavbar = () => {
     }
   });
 
-  // const runningInstances = () =>
-  //   Object.values(activeInstances).filter((running) => running).length;
-
   onMount(() => {
     checkForUpdates();
   });
@@ -81,7 +71,7 @@ const AppNavbar = () => {
           <div class="flex items-center w-36">
             <img
               src={GDLauncherWideLogo}
-              class="cursor-pointer h-9"
+              class="cursor-pointer h-9 -mt-3"
               onClick={() => navigate("/library")}
             />
           </div>
@@ -152,12 +142,12 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </Link>
-                  <div
+                  {/* <div
                     class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
                     onClick={() =>
                       modalsContext?.openModal({ name: "notification" })
                     }
-                  />
+                  /> */}
                 </div>
               </TabList>
             </Tabs>
