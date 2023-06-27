@@ -301,7 +301,9 @@ export default function Browser() {
               infiniteQuery?.infiniteQuery.isInitialLoading
             }
           >
-            <Skeleton.modpacksList />
+            <div class="m-x-5">
+              <Skeleton.modpacksList />
+            </div>
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
             <ErrorFetchingModpacks
