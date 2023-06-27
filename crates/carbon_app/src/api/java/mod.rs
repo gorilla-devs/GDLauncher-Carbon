@@ -152,7 +152,7 @@ async fn update_system_java_profile_path(
     args: FEUpdateSystemJavaProfileArgs,
 ) -> anyhow::Result<()> {
     app.java_manager()
-        .update_system_java_profile_path(args.profile_name.into(), args.java_id)
+        .update_system_java_profile(args.profile_name.into(), args.java_id)
         .await
 }
 

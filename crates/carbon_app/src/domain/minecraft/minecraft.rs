@@ -116,8 +116,14 @@ pub fn library_into_lib_downloadable(
             checksum,
             size: Some(artifact.size as u64),
         });
+    } else if let Some(base_url) = &library.url {
+        return Some(carbon_net::Downloadable {
+            url: format!("{}{}", base_url, library.name.path()),
+            path: PathBuf::from(base_path.join(library.name.path())),
+            checksum: None,
+            size: None,
+        });
     }
-
     None
 }
 

@@ -114,7 +114,7 @@ impl ManagerRef<'_, JavaManager> {
         Ok(all_profiles)
     }
 
-    pub async fn update_system_java_profile_path(
+    pub async fn update_system_java_profile(
         &self,
         profile_name: SystemJavaProfileName,
         java_id: String,
@@ -217,8 +217,7 @@ impl ManagerRef<'_, JavaManager> {
             .get_system_java_profiles()
             .await?
             .into_iter()
-            .filter(|profile| profile.name == target_profile)
-            .next()
+            .find(|profile| profile.name == target_profile)
             .ok_or_else(|| {
                 anyhow::anyhow!("system java profile not found for {target_profile:?}")
             })?;
@@ -254,6 +253,7 @@ impl ManagerRef<'_, JavaManager> {
     pub async fn require_java_install(
         self,
         target_profile: SystemJavaProfileName,
+        update_target_profile: bool,
     ) -> anyhow::Result<Option<JavaComponent>> {
         use crate::db::java::UniqueWhereParam;
 
@@ -275,14 +275,12 @@ impl ManagerRef<'_, JavaManager> {
                 JavaVendor::Azul,
                 versions
                     .get(&current_os)
-                    .map(|for_arch| for_arch.get(&current_arch))
-                    .flatten()
-                    .map(|versions| {
+                    .and_then(|for_arch| for_arch.get(&current_arch))
+                    .and_then(|versions| {
                         versions
                             .iter()
                             .find(|v| target_profile.is_java_version_compatible(&v.java_version))
                     })
-                    .flatten()
                     .ok_or_else(|| {
                         anyhow::anyhow!("unable to find automatically installable java version")
                     })?
@@ -291,6 +289,24 @@ impl ManagerRef<'_, JavaManager> {
                 self.app.clone(),
             )
             .await?;
+
+        if update_target_profile {
+            self.app
+                .prisma_client
+                .java_system_profile()
+                .update(
+                    crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                        target_profile.to_string(),
+                    ),
+                    vec![crate::db::java_system_profile::SetParam::ConnectJava(
+                        crate::db::java::UniqueWhereParam::IdEquals(id.clone()),
+                    )],
+                )
+                .exec()
+                .await?;
+
+            self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+        }
 
         let java = self
             .app

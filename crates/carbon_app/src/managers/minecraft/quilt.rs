@@ -2,8 +2,8 @@ use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum FabricManifestError {
-    #[error("Could not fetch fabric manifest from launchermeta: {0}")]
+pub enum QuiltManifestError {
+    #[error("Could not fetch quilt manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
 }
 
@@ -11,14 +11,14 @@ pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &reqwest::Url,
 ) -> anyhow::Result<Manifest> {
-    let server_url = meta_base_url.join("fabric/v0/manifest.json")?;
+    let server_url = meta_base_url.join("quilt/v0/manifest.json")?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
         .await?
         .json::<Manifest>()
         .await
-        .map_err(FabricManifestError::from)?;
+        .map_err(QuiltManifestError::from)?;
 
     Ok(new_manifest)
 }
