@@ -427,6 +427,7 @@ dependencies = [
  "daedalus",
  "derive_more",
  "directories",
+ "discord-presence",
  "dotenvy",
  "fs_extra",
  "futures",
@@ -853,6 +854,28 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "discord-presence"
+version = "0.5.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ea3a22248813947f5b5fb64fc667bff308b5fa840bfdbbf70fc9f53447805fd"
+dependencies = [
+ "byteorder",
+ "bytes",
+ "cfg-if",
+ "crossbeam-channel",
+ "named_pipe",
+ "num-derive",
+ "num-traits",
+ "parking_lot 0.12.1",
+ "serde",
+ "serde_json",
+ "strum",
+ "thiserror",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2037,6 +2060,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "named_pipe"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad9c443cce91fc3e12f017290db75dde490d685cdaaf508d7159d7cf41f0eb2b"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2133,6 +2165,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
 dependencies = [
  "num-traits",
+]
+
+[[package]]
+name = "num-derive"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "876a53fff98e03a936a674b29568b0e605f06b29372c2489ff4de23f1949743d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -3891,6 +3934,9 @@ name = "strum"
 version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
