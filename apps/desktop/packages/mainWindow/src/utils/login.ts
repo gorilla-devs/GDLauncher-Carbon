@@ -7,7 +7,7 @@ import {
 import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 
-type RouteData = CreateQueryResult<EnrollmentStatus, RSPCError>;
+type RouteData = CreateQueryResult<EnrollmentStatus | null, RSPCError>;
 
 type EventsCallbacks = {
   onPolling?: (_info: DeviceCode) => void;

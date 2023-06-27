@@ -232,7 +232,7 @@ export default function Browser() {
             }
           >
             <div
-              class="h-full overflow-y-auto overflow-x-hidden ml-5 pr-2 rounded-xl"
+              class="h-full overflow-y-auto overflow-x-hidden pr-2 rounded-xl ml-5"
               ref={(el) => {
                 infiniteQuery.setParentRef(el);
               }}

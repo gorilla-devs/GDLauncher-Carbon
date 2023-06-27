@@ -138,7 +138,7 @@ const Sidebar = () => {
                 isSidebarOpened() ? (
                   t("favorite")
                 ) : (
-                  <div class="text-yellow-500 i-ri:star-s-fill w-6 h-6" />
+                  <div class="text-yellow-500 w-6 h-6 i-ri:star-s-fill" />
                 )
               }
               size={isSidebarOpened() ? "standard" : "small"}
