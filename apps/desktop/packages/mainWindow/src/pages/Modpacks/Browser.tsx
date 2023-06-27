@@ -177,8 +177,8 @@ export default function Browser() {
           </Button> */}
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700">
+      <div class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
+        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700 mx-5">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
               <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
@@ -232,7 +232,7 @@ export default function Browser() {
             }
           >
             <div
-              class="w-full h-full overflow-y-auto overflow-x-hidden"
+              class="h-full overflow-y-auto overflow-x-hidden ml-5 pr-2 rounded-xl"
               ref={(el) => {
                 infiniteQuery.setParentRef(el);
               }}

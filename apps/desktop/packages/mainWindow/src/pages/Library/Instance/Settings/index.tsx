@@ -25,7 +25,7 @@ const Settings = () => {
   const mbTotalRAM = () => Number(totalRam.data) / 1024 / 1024;
 
   return (
-    <div class="pt-10">
+    <div class="pt-10 divide-y divide-darkSlate-600">
       <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
@@ -111,7 +111,7 @@ const Settings = () => {
           />
         </div>
       </div> */}
-      <div class="mb-6">
+      <div class="mb-6 pt-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
             <Trans

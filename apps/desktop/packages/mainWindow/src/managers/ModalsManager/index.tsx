@@ -21,7 +21,7 @@ type Hash = {
     component: ((_props: ModalProps) => JSX.Element) & {
       preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
     };
-
+    preventClose?: boolean;
     title?: string;
     noHeader?: boolean;
   };
@@ -59,6 +59,7 @@ const defaultModals: Hash = {
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance",
+    preventClose: true,
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
@@ -168,13 +169,14 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const ModalComponent = defaultModals[modal.name].component;
               const noHeader = defaultModals[modal.name].noHeader || false;
               const title = defaultModals[modal.name].title || "";
+              const preventClose = defaultModals[modal.name].preventClose;
 
               return (
                 <>
                   <div
                     class="absolute right-[440px] bottom-0 top-0 left-0 flex justify-center items-center z-999"
                     onClick={() => {
-                      closeModal();
+                      if (!preventClose) closeModal();
                     }}
                   >
                     <div
