@@ -2,6 +2,12 @@ import path from "path";
 import os from "os";
 import { spawn } from "child_process";
 import { ipcMain } from "electron";
+import {
+  initDRPC,
+  shutdownDRPC,
+  stopActivityDRPC,
+  updateActivityDRPC,
+} from "./discordRPC";
 
 const isDev = import.meta.env.MODE === "development";
 
@@ -49,10 +55,26 @@ const loadCoreModule: CoreModule = () =>
       let rows = dataString.split(/\r?\n|\r|\n/g);
 
       for (let row of rows) {
-        if (row.startsWith("_STATUS_: ")) {
-          let port = row.split("|")[1];
+        if (row.startsWith("_STATUS_:")) {
+          const port = row.split("|")[1];
           console.log(`[CORE] Port: ${port}`);
           resolve(port);
+        } else if (row.startsWith("_DRPC_:")) {
+          const [eventName, value] = row.split(":")[1].split("|");
+          switch (eventName) {
+            case "INIT":
+              initDRPC();
+              break;
+            case "SHUTDOWN":
+              shutdownDRPC();
+              break;
+            case "STOP_ACTIVITY":
+              stopActivityDRPC();
+              break;
+            case "UPDATE_ACTIVITY":
+              updateActivityDRPC(value);
+              break;
+          }
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
