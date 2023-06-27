@@ -35,11 +35,16 @@ const Mod = (props: Props) => {
           <div class="flex items-center gap-2">
             <div class="h-10 w-10 rounded-xl bg-green-500" />
             <div class="flex flex-col">
-              {props.mod.curseforge?.name}
+              {props.mod.curseforge?.name ||
+                props.mod.metadata?.name ||
+                props.mod.filename}
               <div class="flex gap-2">
                 <img class="w-4 h-4" src={getModloaderIcon("Forge")} />
                 <p class="m-0 text-darkSlate-500 text-sm">
-                  {`${props.mod.modloader} ${props.mod.curseforge?.project_id}`}
+                  {`${props.mod.modloader} ${
+                    props.mod.curseforge?.project_id ||
+                    props.mod.metadata?.version
+                  }`}
                 </p>
               </div>
             </div>
