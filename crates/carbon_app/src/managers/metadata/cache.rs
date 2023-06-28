@@ -329,6 +329,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                 meta_id,
                                                 murmur2 as i32,
                                                 Vec::from(sha512),
+                                                meta.as_ref()
+                                                    .map(|meta| &meta.modloaders)
+                                                    .map(|vec| {
+                                                        vec.into_iter()
+                                                            .map(|m| m.to_string())
+                                                            .join(",")
+                                                    })
+                                                    .unwrap_or(String::new()),
                                                 match meta {
                                                     Some(meta) => vec![
                                                         metadb::SetParam::SetName(meta.name),

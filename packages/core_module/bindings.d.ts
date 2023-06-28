@@ -22,8 +22,10 @@ export type Procedures = {
         { key: "java.getManagedVersionsByVendor", input: FEVendor, result: FEManagedJavaOsMap } | 
         { key: "java.getSetupManagedJavaProgress", input: never, result: FEManagedJavaSetupProgress } | 
         { key: "java.getSystemJavaProfiles", input: never, result: FESystemJavaProfile[] } | 
+        { key: "mc.getFabricVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getForgeVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getMinecraftVersions", input: never, result: ManifestVersion[] } | 
+        { key: "mc.getQuiltVersions", input: never, result: FEModdedManifest } | 
         { key: "modplatforms.curseforgeGetCategories", input: never, result: FECategoriesResponse } | 
         { key: "modplatforms.curseforgeGetFiles", input: FEFilesParameters, result: FEFilesResponse } | 
         { key: "modplatforms.curseforgeGetMod", input: FEModParameters, result: FEModResponse } | 
@@ -173,7 +175,7 @@ export type FEModStatus = "new" | "changesRequired" | "underSoftReview" | "appro
 
 export type FEModParameters = { modId: number }
 
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null }
+export type MoveGroup = { group: GroupId; before: GroupId | null }
 
 export type MoveGroup = { group: GroupId; before: GroupId | null }
 
@@ -231,7 +233,7 @@ export type FEFilesParameters = { body: FEFilesParametersBody }
 
 export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationParseError } | { Other: string }
 
-export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
+export type FEModFileParameters = { modId: number; fileId: number }
 
 export type FEModFileParameters = { modId: number; fileId: number }
 
@@ -247,8 +249,6 @@ export type FEEvent = { name: FEEventName; properties: { [key: string]: string }
 
 export type FEModdedManifestLoaderVersion = { id: string }
 
-export type FEModsResponse = { data: FEMod[]; pagination: FEPagination | null }
-
 export type FEFileHash = { value: string; algo: FEHashAlgo }
 
 export type UpdateInstance = { instance: InstanceId; name?: Set<string> | null; use_loaded_icon?: Set<boolean> | null; notes?: Set<string> | null; version?: Set<string> | null; modloader?: Set<ModLoader | null> | null; global_java_args?: Set<boolean> | null; extra_java_args?: Set<string | null> | null; memory?: Set<MemoryRange | null> | null }
@@ -261,7 +261,7 @@ export type GroupId = number
 
 export type Progress = "Indeterminate" | { Known: number } | { Failed: FeError }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; isLegalAccepted: boolean }
 
 export type FEModsParametersBody = { modIds: number[] }
 
@@ -281,7 +281,7 @@ export type FEModAsset = { id: number; modId: number; title: string; description
 
 export type LaunchState = { Inactive: { failed_task: TaskId | null } } | { Preparing: TaskId } | { Running: { start_time: string; log_id: number } }
 
-export type CauseSegment = { display: string; debug: string }
+export type FEClassId = "mods" | "modpacks"
 
 export type ModLoader = { type_: ModLoaderType; version: string }
 

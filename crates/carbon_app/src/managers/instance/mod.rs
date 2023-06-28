@@ -92,7 +92,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .iter()
                 .find(|instance| instance.shortpath == shortpath);
 
-            let Some(instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
+            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
             let InstanceType::Valid(data) = &instance.type_ else { continue };
 
             let instance_id = match cached {
@@ -107,7 +107,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
             };
 
-            self.instances.write().await.insert(instance_id, instance);
+            let mut instances = self.instances.write().await;
+
+            if let (
+                Instance {
+                    type_: InstanceType::Valid(data),
+                    ..
+                },
+                Some(Instance {
+                    type_: InstanceType::Valid(old_data),
+                    ..
+                }),
+            ) = (&mut instance, instances.remove(&instance_id))
+            {
+                data.state = old_data.state;
+            }
+
+            instances.insert(instance_id, instance);
 
             self.app
                 .meta_cache_manager()
@@ -789,7 +805,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
         name: String,
         use_loaded_icon: bool,
-        version: InstanceVersionSouce,
+        version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
         let tmpdir = self
@@ -815,8 +831,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let (version, modpack) = match version {
-            InstanceVersionSouce::Version(version) => (Some(version), None),
-            InstanceVersionSouce::Modpack(modpack) => (None, Some(modpack)),
+            InstanceVersionSource::Version(version) => (Some(version), None),
+            InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
         };
 
         let info = info::Instance {
@@ -1484,11 +1500,11 @@ pub struct Mod {
     id: String,
     filename: OsString,
     enabled: bool,
-    modloader: info::ModLoaderType,
+    modloaders: Vec<domain::info::ModLoaderType>,
     metadata: domain::ModFileMetadata,
 }
 
-pub enum InstanceVersionSouce {
+pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
 }
@@ -1521,7 +1537,7 @@ mod test {
         },
     };
 
-    use super::InstanceVersionSouce;
+    use super::InstanceVersionSource;
 
     #[tokio::test]
     async fn move_groups() -> anyhow::Result<()> {
@@ -1903,10 +1919,12 @@ mod test {
                 default_group_id,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
-                    release: String::from("1.7.10"),
-                    modloaders: HashSet::new(),
-                })),
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
                 String::new(),
             )
             .await?;

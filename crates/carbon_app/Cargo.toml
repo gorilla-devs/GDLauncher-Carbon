@@ -60,6 +60,7 @@ murmurhash32 = { workspace = true }
 sha2 = { workspace = true }
 itertools = { workspace = true }
 fs_extra = { workspace = true }
+indexmap = { version = "1.9.3", features = ["serde"] }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

@@ -15,7 +15,8 @@ CREATE TABLE "AppConfiguration" (
     "xms" INTEGER NOT NULL DEFAULT 1024,
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
-    "autoManageJava" BOOLEAN NOT NULL DEFAULT true
+    "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
+    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false
 );
 
 -- CreateTable
@@ -111,7 +112,8 @@ CREATE TABLE "ModMetadata" (
     "modid" TEXT,
     "version" TEXT,
     "description" TEXT,
-    "authors" TEXT
+    "authors" TEXT,
+    "modloaders" TEXT NOT NULL
 );
 
 -- CreateTable

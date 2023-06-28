@@ -64,6 +64,8 @@ keys! {
     mc {
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
         GET_FORGE_VERSIONS                          = "getForgeVersions";
+        GET_FABRIC_VERSIONS                         = "getFabricVersions";
+        GET_QUILT_VERSIONS                          = "getQuiltVersions";
     }
 
     instance {

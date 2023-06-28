@@ -67,7 +67,6 @@ pub struct Mod {
     pub id: String,
     pub filename: String,
     pub enabled: bool,
-    pub modloader: info::ModLoaderType,
     pub metadata: Option<ModFileMetadata>,
     pub curseforge: Option<CurseForgeModMetadata>,
 }
@@ -79,6 +78,7 @@ pub struct ModFileMetadata {
     pub version: Option<String>,
     pub description: Option<String>,
     pub authors: Option<String>,
+    pub modloaders: Vec<info::ModLoaderType>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

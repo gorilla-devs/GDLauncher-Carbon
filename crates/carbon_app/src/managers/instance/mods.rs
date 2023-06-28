@@ -7,7 +7,10 @@ use tracing::log::info;
 
 use crate::{
     api::translation::Translation,
-    domain::{modplatforms::curseforge::filters::ModFileParameters, vtask::VisualTaskId},
+    domain::{
+        instance::info::ModLoaderType, modplatforms::curseforge::filters::ModFileParameters,
+        vtask::VisualTaskId,
+    },
     managers::{vtask::VisualTask, ManagerRef},
 };
 
@@ -40,7 +43,6 @@ impl ManagerRef<'_, InstanceManager> {
                 id: m.id,
                 filename: m.filename,
                 enabled: m.enabled,
-                modloader: domain::info::ModLoaderType::Forge,
                 metadata: m
                     .metadata
                     .as_ref()
@@ -51,6 +53,12 @@ impl ManagerRef<'_, InstanceManager> {
                             version: m.version.clone(),
                             description: m.description.clone(),
                             authors: m.authors.clone(),
+                            modloaders: m
+                                .modloaders
+                                .split(",")
+                                // ignore unknown modloaders
+                                .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                                .collect::<Vec<_>>(),
                         }),
                         _ => None,
                     })
