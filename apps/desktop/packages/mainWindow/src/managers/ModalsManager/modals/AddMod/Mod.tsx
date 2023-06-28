@@ -20,6 +20,8 @@ const Mod = (props: Props) => {
       (file) => file.gameVersion === props.mcVersion
     );
 
+  const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
+
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
     parseInt(lastInstanceOpened(), 10),
@@ -47,6 +49,9 @@ const Mod = (props: Props) => {
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onSuccess(taskId) {
       setTaskId(taskId);
+    },
+    onSettled() {
+      if (taskId()) dismissTaskMutation.mutate(taskId() as number);
     },
   });
 
