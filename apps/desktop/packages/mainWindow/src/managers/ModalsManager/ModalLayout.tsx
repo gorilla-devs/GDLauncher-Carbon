@@ -10,6 +10,7 @@ interface Props extends ModalProps {
   preventClose?: boolean;
   noPadding?: boolean;
   overflowHiddenDisabled?: boolean;
+  background?: JSX.Element;
 }
 
 const ModalLayout = (props: Props) => {
@@ -25,10 +26,14 @@ const ModalLayout = (props: Props) => {
       }}
     >
       <div
-        class={`flex flex-col h-fit w-fit bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 ${
+        class={`relative flex flex-col h-fit w-fit bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 ${
           props.class ?? ""
         }`}
+        classList={{
+          "overflow-hidden": !props.overflowHiddenDisabled,
+        }}
       >
+        <Show when={props.background}>{props.background}</Show>
         <Show when={!props.noHeader}>
           <div class="bg-darkSlate-800 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">
             <h3>{props.title}</h3>
@@ -42,7 +47,7 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
-          class="box-border h-full overflow-hidden"
+          class="box-border h-full overflow-hidden z-10"
           classList={{
             "p-5": !props.noPadding,
           }}
