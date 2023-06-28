@@ -40,7 +40,7 @@ const Mod = (props: Props) => {
                 props.mod.metadata?.name ||
                 props.mod.filename}
               <div class="flex gap-2">
-                <For each={props.mod.modloaders}>
+                <For each={props.mod.metadata?.modloaders}>
                   {(modloader, _) => (
                     <span class="flex gap-2 justify-center items-center">
                       <img class="w-4 h-4" src={getModloaderIcon(modloader)} />
@@ -51,7 +51,7 @@ const Mod = (props: Props) => {
                   )}
                 </For>
                 <p class="m-0 text-darkSlate-500 text-sm">
-                  {`${props.mod.modloader} ${
+                  {`${props.mod.metadata?.modloaders[0]} ${
                     props.mod.curseforge?.project_id ||
                     props.mod.metadata?.version
                   }`}

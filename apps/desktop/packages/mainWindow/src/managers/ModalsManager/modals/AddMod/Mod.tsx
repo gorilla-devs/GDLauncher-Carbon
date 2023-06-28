@@ -65,7 +65,7 @@ const Mod = (props: Props) => {
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
             <h2
-              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 hover:underline cursor-pointer"
+              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer max-w-92 hover:underline"
               onClick={() =>
                 modalsContext?.openModal(
                   {
@@ -106,7 +106,7 @@ const Mod = (props: Props) => {
         </div>
       </div>
       <div class="flex justify-between items-center gap-3">
-        <div class="flex gap-2 overflow-x-auto max-w-100 scrollbar-hide">
+        <div class="flex gap-2 max-w-100 overflow-x-auto scrollbar-hide">
           <For each={props.mod.categories}>
             {(tag) => <Tag name={tag.name} img={tag.iconUrl} type="fixed" />}
           </For>
@@ -145,12 +145,13 @@ const Mod = (props: Props) => {
                   });
                 }}
                 onChange={(val) => {
-                  const file = props.mod.latestFiles.find(
-                    (file) => file.id === parseInt(val.key as string, 10)
+                  const file = props.mod.latestFilesIndexes.find(
+                    (file) => file.fileId === parseInt(val.key as string, 10)
                   );
+
                   if (file) {
                     installModMutation.mutate({
-                      file_id: file.id,
+                      file_id: file.fileId,
                       instance_id: parseInt(lastInstanceOpened(), 10),
                       project_id: props.mod.id,
                     });
@@ -173,7 +174,7 @@ const Mod = (props: Props) => {
             <Match when={isModInstalled()}>
               <Button
                 variant="green"
-                icon={<div class="i-ri:check-fill text-xl" />}
+                icon={<div class="text-xl i-ri:check-fill" />}
               >
                 <Trans
                   key="mod.downloaded"
