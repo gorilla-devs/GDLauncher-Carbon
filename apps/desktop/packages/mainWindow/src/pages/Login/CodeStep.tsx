@@ -1,6 +1,5 @@
 import { Button, LoadingBar } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import DoorImage from "/assets/images/icons/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
@@ -12,6 +11,9 @@ import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { DeviceCodeObjectType } from ".";
+import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper";
+import GateAnimation from "../../gate_animation.riv";
+
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
@@ -178,12 +180,13 @@ const CodeStep = (props: Props) => {
 
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
-      <img src={DoorImage} class="w-20 h-20" />
+      <GateAnimationRiveWrapper width={80} height={80} src={GateAnimation} />
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode
             disabled={expired()}
             value={userCode() || ""}
+            id="login-link-btn"
             onClick={() => {
               window.copyToClipboard(userCode() || "");
               addNotification("The link has been copied");
@@ -239,6 +242,7 @@ const CodeStep = (props: Props) => {
       </Show>
       <Show when={!expired()}>
         <Button
+          id="login-btn"
           class="normal-case"
           onClick={() => {
             setLoading(true);
