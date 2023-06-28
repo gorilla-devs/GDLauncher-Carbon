@@ -1,4 +1,5 @@
-const discordRPC = require("discord-rpc");
+// @ts-ignore
+import * as discordRPC from "discord-rpc";
 
 let client: any | undefined;
 let activity: typeof defaultValue | undefined;
