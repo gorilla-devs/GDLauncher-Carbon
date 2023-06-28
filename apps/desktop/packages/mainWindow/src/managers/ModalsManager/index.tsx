@@ -198,7 +198,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     </div>
                   </div>
                   <div
-                    class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm backdrop-brightness-50 grid place-items-center z-99 origin-center"
+                    class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm grid place-items-center z-99 origin-center"
                     classList={{
                       "opacity-100": !!modal.name,
                       "opacity-0": !modal.name,
@@ -206,7 +206,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     onClick={() => {
                       closeModal();
                     }}
-                  />
+                  >
+                    <div class="h-screen w-screen bg-darkSlate-900 opacity-80" />
+                  </div>
                 </>
               );
             }}
