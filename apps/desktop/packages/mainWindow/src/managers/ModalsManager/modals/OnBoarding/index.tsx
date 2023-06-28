@@ -43,12 +43,10 @@ const OnBoarding = (props: ModalProps) => {
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      // overflowHiddenDisabled={true}
       background={
         <img class="absolute w-190 -top-15 z-0 -left-10" src={mcCubes} />
       }
     >
-      {/* <img class="absolute w-180 -top-11 z-0 -left-5" src={mcCubes} /> */}
       <div class="select-none w-160 box-border h-145">
         <div class="max-w-70 mx-auto">
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
