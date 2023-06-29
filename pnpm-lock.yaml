@@ -61,6 +61,9 @@ importers:
       '@solid-primitives/deep':
         specifier: ^0.0.102
         version: 0.0.102(solid-js@1.7.3)
+      '@solid-primitives/keyboard':
+        specifier: ^1.2.3
+        version: 1.2.3(solid-js@1.7.3)
       '@solid-primitives/map':
         specifier: ^0.4.6
         version: 0.4.6(solid-js@1.7.3)
@@ -4622,12 +4625,41 @@ packages:
       solid-js: 1.7.3
     dev: true
 
+  /@solid-primitives/event-listener@2.2.13(solid-js@1.7.3):
+    resolution: {integrity: sha512-8GtVEq0ECZoa5Klo1jjfGPfwg0zVJ8TNnNkWu8FqRkh0CkhbhCVJAKwjleem9K/qL6zUDfJihLjhqGBTBbb+8w==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/keyboard@1.2.3(solid-js@1.7.3):
+    resolution: {integrity: sha512-8EBUk1lARIXVhSs9H2t0rclCuyX1y56Kf9J8VVmlPDSh1L+nSIU0wcDGVeVy3HWG6W8pRoRD7kwlQvXhdW2LAQ==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/event-listener': 2.2.13(solid-js@1.7.3)
+      '@solid-primitives/rootless': 1.4.1(solid-js@1.7.3)
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
   /@solid-primitives/map@0.4.6(solid-js@1.7.3):
     resolution: {integrity: sha512-zfuIShcHPmD814vvwuEqq0kQeLOL8g4kFXpNveSkkgNvnhsH/+b8kssen38F86oH9st2i/G4LV0PPREOcCXguw==}
     peerDependencies:
       solid-js: ^1.6.12
     dependencies:
       '@solid-primitives/trigger': 1.0.7(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/rootless@1.4.1(solid-js@1.7.3):
+    resolution: {integrity: sha512-h7VBUk8usD76Eh1a4wT17PcGtIRxGPlLuJ4Mf7roCNu46W5cc9DAoz8M6XebuZWVKeUkML/JuPMZQSV0mLo2Fw==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
       solid-js: 1.7.3
     dev: true
 
