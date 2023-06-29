@@ -189,7 +189,7 @@ const Dropdown = (props: Props) => {
                 "min-w-20": props.btnDropdown,
               }}
               style={{
-                width: "auto",
+                width: buttonRef()?.offsetWidth + "px" || "auto",
                 top: `${position.y ?? 0}px`,
                 left: `${position.x ?? 0}px`,
               }}
