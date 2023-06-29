@@ -362,7 +362,7 @@ const Instance = () => {
                       class="flex justify-between cursor-default flex-row"
                     >
                       <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-start">
+                        <div class="m-0 flex gap-2 items-center h-full">
                           <span>
                             {routeData.instanceDetails.data?.modloaders[0]
                               ?.type_ || "Vanilla"}
@@ -375,7 +375,7 @@ const Instance = () => {
                             undefined
                           }
                         >
-                          <div class="flex gap-2 items-start">
+                          <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:time-fill" />
                             <span>
                               {convertSecondsToHumanTime(
@@ -393,7 +393,7 @@ const Instance = () => {
                               .length > 0
                           }
                         >
-                          <div class="flex gap-2 items-start">
+                          <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:user-fill" />
                             <For each={modpackDetails()?.data?.data.authors}>
                               {(author) => <p class="m-0">{author.name}</p>}
@@ -401,7 +401,7 @@ const Instance = () => {
                           </div>
                         </Show>
                       </div>
-                      <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                      <div class="flex items-center gap-2 h-full">
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
