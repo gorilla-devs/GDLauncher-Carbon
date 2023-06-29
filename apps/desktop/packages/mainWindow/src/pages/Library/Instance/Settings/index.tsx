@@ -42,7 +42,10 @@ const Settings = () => {
               updateInstanceMutation.mutate({
                 memory: {
                   Set: e.target.checked
-                    ? { max_mb: mbTotalRAM() / 2, min_mb: mbTotalRAM() / 2 }
+                    ? {
+                        max_mb: Math.round(mbTotalRAM() / 2),
+                        min_mb: Math.round(mbTotalRAM() / 2),
+                      }
                     : null,
                 },
                 extra_java_args: null,
