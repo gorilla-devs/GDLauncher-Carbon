@@ -71,7 +71,7 @@ const AppNavbar = () => {
           <div class="flex items-center w-36">
             <img
               src={GDLauncherWideLogo}
-              class="cursor-pointer h-9 -mt-3"
+              class="cursor-pointer h-9"
               onClick={() => navigate("/library")}
             />
           </div>
