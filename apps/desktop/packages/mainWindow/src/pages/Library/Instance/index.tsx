@@ -252,7 +252,7 @@ const Instance = () => {
     <main class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col">
       <header
         ref={headerRef}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out min-h-52 transition-100"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
           "background-image": routeData.image()
@@ -262,7 +262,7 @@ const Instance = () => {
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
-          <div class="z-10 sticky top-5 left-5 w-fit">
+          <div class="z-10 absolute top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}

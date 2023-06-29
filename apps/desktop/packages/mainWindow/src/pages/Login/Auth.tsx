@@ -107,7 +107,7 @@ const Auth = (props: Props) => {
 
   return (
     <div>
-      <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
+      <div class="absolute right-0 flex justify-center items-center flex-col left-0 -top-15 m-auto">
         <img class="w-40" src={Logo} />
         <p class="text-darkSlate-50">
           {"v"}

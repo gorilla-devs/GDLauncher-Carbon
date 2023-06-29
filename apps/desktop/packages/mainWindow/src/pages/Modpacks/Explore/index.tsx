@@ -95,7 +95,7 @@ const Modpack = () => {
         }}
       >
         <div
-          class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
+          class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58"
           // ref={(el) => {
           //   containerRef = el;
           // }}
@@ -119,7 +119,7 @@ const Modpack = () => {
               //   bgRef = el;
               // }}
             />
-            <div class="z-10 top-5 sticky left-5 w-fit">
+            <div class="top-5 absolute left-5 w-fit">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}

@@ -489,7 +489,7 @@ export const AccountsDropdown = (props: Props) => {
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
               <div
-                class="text-darkSlate-50 cursor-pointer transition ease-in-out i-ri:file-copy-fill text-sm hover:text-white"
+                class="text-darkSlate-50 ease-in-out cursor-pointer transition i-ri:file-copy-fill text-sm hover:text-white"
                 onClick={() => {
                   navigator.clipboard.writeText(
                     (activeAccount() as Label)?.uuid

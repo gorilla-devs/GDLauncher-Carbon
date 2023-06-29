@@ -65,9 +65,9 @@ const VersionRow = (props: Props) => {
   );
 
   return (
-    <div class="group flex justify-between items-center py-2 px-2 hover:bg-darkSlate-900 rounded-md">
+    <div class="group flex justify-between items-center py-2 rounded-md px-2 hover:bg-darkSlate-900">
       <div class="flex flex-col">
-        <h4 class="font-medium m-0 group-hover:text-lightSlate-200">
+        <h4 class="m-0 font-medium group-hover:text-lightSlate-200">
           {props.modVersion.displayName}
         </h4>
         <div class="flex justify-between items-center">

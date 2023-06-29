@@ -163,6 +163,7 @@
   "onboarding.continue": "Continue",
   "onboarding.next": "Next",
   "onboarding.prev": "Back",
+  "onboarding.start_playing": "Start playing!",
   "InstanceTaskLaunch": "Launching {{name}}",
   "InstanceTaskLaunchRequestVersions": "Requesting versions",
   "InstanceTaskLaunchDownloadFiles": "Downloading files",
