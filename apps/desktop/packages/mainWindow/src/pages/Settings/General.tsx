@@ -293,7 +293,7 @@ const General = () => {
                   </div>
                 </Button>
               </div>
-              <div class="text-darkSlate-300 text-4 mt-4">
+              <div class="text-darkSlate-300 mt-4 text-4">
                 {"v"} {__APP_VERSION__}
               </div>
             </div>

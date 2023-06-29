@@ -104,7 +104,7 @@ const Java = () => {
               }}
             />
           </Title>
-          <RightHandSide class="w-86 flex gap box-content gap-12">
+          <RightHandSide class="flex w-86 gap box-content gap-12">
             <Slider
               min={256}
               max={mbTotalRAM()}
