@@ -38,6 +38,7 @@ pub mod log;
 mod mods;
 mod run;
 mod schema;
+mod importer;
 
 pub struct InstanceManager {
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
