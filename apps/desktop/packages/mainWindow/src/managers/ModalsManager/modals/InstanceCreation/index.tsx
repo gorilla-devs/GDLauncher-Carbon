@@ -283,10 +283,9 @@ const InstanceCreation = (props: ModalProps) => {
       title={props?.title}
       overflowHiddenDisabled={true}
       noPadding={true}
-      preventClose
     >
-      <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-136">
-        <div class="flex flex-col justify-between gap-4 p-5 h-full">
+      <div class="flex flex-col justify-between w-120 scrollbar-hide overflow-y-scroll h-136">
+        <div class="flex flex-col justify-between gap-4 h-full p-5">
           <span class="flex flex-col justify-between gap-4">
             <div class="flex gap-4 w-full">
               <div
@@ -329,7 +328,7 @@ const InstanceCreation = (props: ModalProps) => {
                     </h3>
                   </Match>
                   <Match when={bgPreview()}>
-                    <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
+                    <div class="absolute top-0 right-0 pb-2 pl-2 bg-darkSlate-700 rounded-bl-2xl">
                       <div
                         class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
                         onClick={(e) => {

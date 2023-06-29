@@ -176,7 +176,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   <div
                     class="absolute bottom-0 top-0 left-0 flex justify-center items-center right-[440px] z-999"
                     onClick={() => {
-                      if (!preventClose) closeModal();
+                      if (!preventClose) {
+                        closeModal();
+                      }
                     }}
                   >
                     <div
@@ -202,7 +204,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                       "opacity-0": !modal.name,
                     }}
                     onClick={() => {
-                      closeModal();
+                      if (!preventClose) {
+                        closeModal();
+                      }
                     }}
                   />
                 </>

@@ -44,7 +44,10 @@ const OnBoarding = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       background={
-        <img class="absolute w-190 -top-15 z-0 -left-10" src={mcCubes} />
+        <img
+          class="absolute w-190 -top-15 z-0 -left-10 opacity-70"
+          src={mcCubes}
+        />
       }
     >
       <div class="select-none w-160 box-border h-145">

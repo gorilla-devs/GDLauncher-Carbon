@@ -40,8 +40,10 @@ const ModalLayout = (props: Props) => {
             <div
               class="cursor-pointer text-darkSlate-500 h-5 w-5 i-ri:close-fill"
               onClick={() => {
-                navigate(location.pathname);
-                modalsContext?.closeModal();
+                if (!props.preventClose) {
+                  navigate(location.pathname);
+                  modalsContext?.closeModal();
+                }
               }}
             />
           </div>

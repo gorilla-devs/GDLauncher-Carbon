@@ -61,7 +61,7 @@ const Tile = (props: Props) => {
           queryClient.getQueryData(["instance.getInstancesUngrouped"]);
 
         queryClient.setQueryData(
-          ["account.setActiveUuid", null],
+          ["account.getActiveUuid", null],
           (old: UngroupedInstance[] | undefined) => {
             const filteredAccounts = old?.filter(
               (account) => account.id !== instanceId

@@ -288,7 +288,7 @@ export const AccountsDropdown = (props: Props) => {
         "account.getActiveUuid",
       ]);
 
-      queryClient.setQueryData(["account.getActiveUuid", null], null);
+      queryClient.setQueryData(["account.getActiveUuid"], null);
 
       queryClient.setQueryData(
         ["account.getAccounts", null],
@@ -434,9 +434,7 @@ export const AccountsDropdown = (props: Props) => {
         </div>
 
         <span
-          class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
-            menuOpened() ? "rotate-180" : "rotate-0"
-          }`}
+          class="text-3xl ease-in-out duration-100 i-ri:arrow-drop-down-line"
           classList={{
             "text-darkSlate-50 group-hover:text-white": !props.disabled,
             "text-darkSlate-500": props.disabled,
