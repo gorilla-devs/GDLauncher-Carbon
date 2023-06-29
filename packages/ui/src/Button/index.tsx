@@ -116,8 +116,7 @@ const getVariant = (
     },
     transparent: {
       ...commonStyle,
-      "backdrop-blur-md": true,
-      "will-change-transform": true, // backdrop filters can sometimes behave unexpectedly, this is a workaround/fix
+      // "backdrop-blur-md": true,
       "bg-darkSlate-800": true,
       "text-darkSlate-500": isDisabled,
       "border-0": true,
