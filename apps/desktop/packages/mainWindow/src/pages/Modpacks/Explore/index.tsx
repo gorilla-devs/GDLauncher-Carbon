@@ -119,7 +119,7 @@ const Modpack = () => {
               //   bgRef = el;
               // }}
             />
-            <div class="top-5 absolute left-5 w-fit">
+            <div class="top-5 sticky left-5 w-fit">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -271,7 +271,7 @@ const Modpack = () => {
         <div class="bg-darkSlate-800">
           <div class="flex justify-center px-4 pb-4">
             <div class="bg-darkSlate-800 w-full">
-              <div class="sticky top-0 flex flex-col mb-4 z-0">
+              <div class="sticky top-0 flex flex-col mb-4 z-10">
                 <Tabs>
                   <TabList>
                     <For each={instancePages()}>
@@ -284,7 +284,7 @@ const Modpack = () => {
                   </TabList>
                 </Tabs>
               </div>
-              <div>
+              <div class="z-0">
                 <Outlet />
               </div>
             </div>

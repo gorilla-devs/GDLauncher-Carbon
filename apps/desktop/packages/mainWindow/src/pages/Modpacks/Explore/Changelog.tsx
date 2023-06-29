@@ -4,7 +4,29 @@ import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { Dropdown, Skeleton } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "../modpack.overview";
-import { FEModResponse } from "@gd/core_module/bindings";
+import { FEFileIndex, FEModResponse } from "@gd/core_module/bindings";
+
+const sortArrayByGameVersion = (arr: FEFileIndex[]) => {
+  let sortedArr = [...arr];
+
+  sortedArr.sort((a, b) => {
+    let aVersion = a.gameVersion.split(".").map(Number);
+    let bVersion = b.gameVersion.split(".").map(Number);
+
+    for (let i = 0; i < aVersion.length; i++) {
+      if (aVersion[i] > bVersion[i]) {
+        return -1;
+      }
+      if (aVersion[i] < bVersion[i]) {
+        return 1;
+      }
+    }
+
+    return 0;
+  });
+
+  return sortedArr;
+};
 
 const Changelog = () => {
   const params = useParams();
@@ -31,18 +53,19 @@ const Changelog = () => {
     }
   });
 
+  const sortedFilesByMcVersion = () =>
+    sortArrayByGameVersion(
+      (routeData.modpackDetails.data as FEModResponse).data.latestFilesIndexes
+    );
+
   return (
     <div>
       <Show when={routeData.modpackDetails.data}>
         <Dropdown
-          options={(
-            routeData.modpackDetails.data as FEModResponse
-          ).data.latestFiles
-            .reverse()
-            .map((file) => ({
-              key: file.id,
-              label: file.displayName,
-            }))}
+          options={sortedFilesByMcVersion().map((file) => ({
+            key: file.fileId,
+            label: file.filename,
+          }))}
           value={fileId() || lastFile()?.id}
           onChange={(fileId) => {
             setFileId(fileId.key as number);
