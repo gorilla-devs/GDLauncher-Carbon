@@ -23,7 +23,7 @@ const TermsAndConditions = (props: Props) => {
               <Trans key="login.we_value_privacy_title" />
             </h2>
           </div>
-          <div class="flex flex-col m-0 text-darkSlate-100 text-left leading-5 gap-4">
+          <div class="flex flex-col m-0 text-darkSlate-100 text-left leading-5 gap-1">
             <div>
               <Trans key="login.we_value_privacy_text1" />
             </div>
@@ -48,10 +48,7 @@ const TermsAndConditions = (props: Props) => {
                 setAccepted((prev) => !prev);
               }}
             />
-            <p
-              class="m-0 text-xs text-darkSlate-100 select-none leading-5"
-              onClick={() => setAccepted((prev) => !prev)}
-            >
+            <p class="m-0 text-xs text-darkSlate-100 select-none leading-5">
               <Trans key="login.read_and_accept">
                 I have read and accept
                 <span

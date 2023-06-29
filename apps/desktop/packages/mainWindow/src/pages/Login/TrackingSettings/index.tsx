@@ -21,7 +21,7 @@ const TrackingSettings = (props: Props) => {
               <Trans key="login.ad_tracking_settings_title" />
             </h2>
           </div>
-          <p class="m-0 text-darkSlate-100 leading-5 text-left">
+          <p class="m-0 text-darkSlate-100 text-left leading-5">
             <Trans key="login.ad_tracking_settings_text" />
           </p>
         </div>

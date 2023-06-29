@@ -90,7 +90,7 @@ export default function Login() {
           >
             <Show when={step() < 2}>
               <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
-                <img class="w-40" src={Logo} />
+                <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">
                   {"v"}
                   {__APP_VERSION__}
@@ -99,7 +99,7 @@ export default function Login() {
             </Show>
             <Show when={step() === 2}>
               <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
-                <img class="w-40" src={Logo} />
+                <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">
                   {"v"}
                   {__APP_VERSION__}
