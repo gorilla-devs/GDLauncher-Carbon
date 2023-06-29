@@ -35,7 +35,7 @@ export default function Login() {
   });
 
   createEffect(() => {
-    if (routeData.settings.data?.isLegalAccepted) {
+    if (routeData.settings.data?.isLegalAccepted && step() === 0) {
       setStep(2);
     }
   });
