@@ -4,7 +4,15 @@ import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { FEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onMount,
+} from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
@@ -36,6 +44,13 @@ const ModDetails = (props: ModalProps) => {
     }
   });
 
+  let refStickyTabs: HTMLDivElement;
+  const [isSticky, setIsSticky] = createSignal(false);
+
+  createEffect(() => {
+    console.log("isSticky", isSticky());
+  });
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="h-130 w-190">
@@ -45,6 +60,10 @@ const ModDetails = (props: ModalProps) => {
               class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
               style={{
                 "scrollbar-gutter": "stable",
+              }}
+              onScroll={() => {
+                const rect = refStickyTabs.getBoundingClientRect();
+                setIsSticky(rect.top <= 80);
               }}
             >
               <div class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch">
@@ -150,7 +169,61 @@ const ModDetails = (props: ModalProps) => {
                   </div>
                 </div>
               </div>
-              <div class="p-4" innerHTML={modpackDescription()} />
+              <Show when={isSticky()}>
+                <div class="bg-darkSlate-900 w-full sticky top-0 flex justify-between items-center px-4 py-2 box-border">
+                  <Show when={isSticky()}>
+                    <Button
+                      onClick={() => {
+                        modalsContext?.closeModal();
+                      }}
+                      icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
+                      size="small"
+                      type="secondary"
+                    >
+                      <Trans
+                        key="instance.step_back"
+                        options={{
+                          defaultValue: "Back",
+                        }}
+                      />
+                    </Button>
+                  </Show>
+                  <Show when={isSticky()}>
+                    <Button
+                      disabled={loading()}
+                      uppercase
+                      type="glow"
+                      size="small"
+                      onClick={() => {
+                        installModMutation.mutate({
+                          file_id: modDetails().mainFileId,
+                          instance_id: parseInt(lastInstanceOpened(), 10),
+                          project_id: modDetails().id,
+                        });
+                      }}
+                    >
+                      <Show when={loading()}>
+                        <Spinner />
+                      </Show>
+                      <Show when={!loading()}>
+                        <Trans
+                          key="mod.download"
+                          options={{
+                            defaultValue: "Download",
+                          }}
+                        />
+                      </Show>
+                    </Button>
+                  </Show>
+                </div>
+              </Show>
+              <div
+                class="p-4"
+                ref={(el) => {
+                  refStickyTabs = el;
+                }}
+                innerHTML={modpackDescription()}
+              />
             </div>
           </Match>
         </Switch>
