@@ -15,7 +15,11 @@ import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
-import { generateSequence } from "@/utils/helpers";
+import PageTitle from "./components/PageTitle";
+import Row from "./components/Row";
+import Title from "./components/Title";
+import RowsContainer from "./components/RowsContainer";
+import RightHandSide from "./components/RightHandSide";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -23,17 +27,23 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
-  let setSettingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newTheme) => {
-      queryClient.setQueryData(["settings.setSettings"], newTheme);
+  const settings = rspc.createQuery(() => ["settings.getSettings"]);
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      queryClient.setQueryData(["settings.getSettings"], {
+        ...settings?.data,
+        ...newSettings,
+      });
     },
   });
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
-  const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
+  const mbTotalRAM = () =>
+    Math.round(Number(routeData.totalRam.data) / 1024 / 1024);
 
-  const initailJavaArgs = routeData.settings.data?.javaCustomArgs;
+  const initailJavaArgs = settings.data?.javaCustomArgs;
 
   const flattenedAvailableJavas = () =>
     Object.values(routeData.availableJavas.data || {}).reduce(
@@ -49,7 +59,7 @@ const Java = () => {
 
   const DeleteIcon = (props: { id: string }) => (
     <div
-      class="i-ri:delete-bin-7-fill text-darkSlate-50 hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
+      class="text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
       onClick={() => deleteJavaMutation.mutate(props.id)}
     />
   );
@@ -75,210 +85,231 @@ const Java = () => {
   };
 
   return (
-    <div class="flex bg-darkSlate-800 w-full h-auto flex-col pt-5 px-5 box-border pb-10">
-      <h2 class="m-0 mb-7 text-4">
+    <>
+      <PageTitle>
         <Trans
           key="java.java"
           options={{
             defaultValue: "Java",
           }}
         />
-      </h2>
-
-      <Show when={routeData.settings.data}>
-        <div class="mb-4">
-          <h5 class="m-0 mb-4">
+      </PageTitle>
+      <RowsContainer>
+        <Row>
+          <Title>
             <Trans
               key="java.java_memory_title"
               options={{
                 defaultValue: "Java Memory",
               }}
             />
-          </h5>
-          <div class="flex justify-center px-3">
+          </Title>
+          <RightHandSide class="flex w-86 gap box-content gap-12">
             <Slider
-              min={0}
+              min={256}
               max={mbTotalRAM()}
-              steps={1000}
-              value={routeData.settings.data?.xmx}
-              marks={generateSequence(1024, mbTotalRAM())}
+              steps={1}
+              marks={{
+                256: "256MB",
+                [Math.round(mbTotalRAM() / 2)]: `${Math.round(
+                  mbTotalRAM() / 2
+                )}MB`,
+                [mbTotalRAM()]: `${mbTotalRAM()}MB`,
+              }}
+              value={settings.data?.xmx}
               onChange={(val) =>
-                setSettingsMutation.mutate({
+                settingsMutation.mutate({
                   xmx: val,
                 })
               }
             />
-          </div>
-        </div>
-      </Show>
-      <div>
-        <h5 class="m-0 mb-4">
-          <Trans
-            key="java.java_arguments_title"
-            options={{
-              defaultValue: "Java Arguments",
-            }}
-          />
-        </h5>
-        <div class="flex w-full gap-4 items-center">
-          <Input
-            class="w-full"
-            value={routeData.settings.data?.javaCustomArgs}
-            onChange={(e) => {
-              setSettingsMutation.mutate({
-                javaCustomArgs: e.target.value,
-              });
-            }}
-          />
-          <Button
-            rounded={false}
-            type="secondary"
-            class="h-10"
-            textColor="text-red-500"
-            onClick={() => {
-              setSettingsMutation.mutate({
-                javaCustomArgs: initailJavaArgs,
-              });
-            }}
-          >
-            <Trans
-              key="java.reset_java_args"
-              options={{
-                defaultValue: "Reset",
+            <Input
+              class="w-26"
+              value={settings.data?.xmx}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  xmx: parseInt(e.currentTarget.value, 10),
+                });
               }}
             />
-          </Button>
-        </div>
-      </div>
-      <div class="flex mb-4 h-full justify-between mt-10">
-        <h2 class="mt-0 text-sm">
-          <Trans
-            key="java.auto_handle_java"
-            options={{
-              defaultValue: "Auto handle java",
-            }}
-          />
-        </h2>
-        <GDSwitch
-          checked={routeData.settings.data?.autoManageJava}
-          onChange={(e) => {
-            setSettingsMutation.mutate({ autoManageJava: e.target.checked });
-          }}
-        />
-      </div>
-      <div class="flex flex-col">
-        <Show when={!routeData.settings.data?.autoManageJava}>
-          <div class="overflow-hidden rounded-2xl">
-            <Tabs variant="block">
-              <TabList>
-                <Tab>
-                  <Trans
-                    key="java.manage"
-                    options={{
-                      defaultValue: "Manage",
-                    }}
-                  />
-                </Tab>
-                <Tab>
-                  <Trans
-                    key="java.profiles"
-                    options={{
-                      defaultValue: "Profiles",
-                    }}
-                  />
-                </Tab>
-              </TabList>
-              <TabPanel>
-                <div class="h-full bg-darkSlate-900 p-4 min-h-96">
-                  <div class="flex justify-between items-center mb-4">
-                    <h2 class="m-0 text-sm font-normal">
-                      <Trans
-                        key="java.found_java_text"
-                        options={{
-                          defaultValue:
-                            "We found the following java versions on your pc",
-                        }}
-                      />
-                    </h2>
-                    <Button
-                      rounded={false}
-                      type="secondary"
-                      size="small"
-                      onClick={() => {
-                        modalsContext?.openModal({ name: "addJava" });
+          </RightHandSide>
+        </Row>
+        <Row class="flex-col items-stretch">
+          <Title>
+            <Trans
+              key="java.java_arguments_title"
+              options={{
+                defaultValue: "Java Arguments",
+              }}
+            />
+          </Title>
+          <div class="flex gap-4 justify-center items-center">
+            <Input
+              class="w-full"
+              value={settings.data?.javaCustomArgs}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  javaCustomArgs: e.target.value,
+                });
+              }}
+            />
+            <Button
+              rounded={false}
+              type="secondary"
+              class="h-10"
+              textColor="text-red-500"
+              onClick={() => {
+                settingsMutation.mutate({
+                  javaCustomArgs: initailJavaArgs,
+                });
+              }}
+            >
+              <Trans
+                key="java.reset_java_args"
+                options={{
+                  defaultValue: "Reset",
+                }}
+              />
+            </Button>
+          </div>
+        </Row>
+        <Row>
+          <Title>
+            <Trans
+              key="java.auto_handle_java"
+              options={{
+                defaultValue: "Auto handle java",
+              }}
+            />
+          </Title>
+          <RightHandSide>
+            <GDSwitch
+              checked={settings.data?.autoManageJava}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  autoManageJava: e.target.checked,
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <div class="flex flex-col">
+          <Show when={!settings.data?.autoManageJava}>
+            <div class="rounded-2xl overflow-hidden">
+              <Tabs variant="block">
+                <TabList>
+                  <Tab>
+                    <Trans
+                      key="java.manage"
+                      options={{
+                        defaultValue: "Manage",
                       }}
-                    >
-                      <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
-                    </Button>
-                  </div>
-                  <div class="flex flex-col gap-4">
-                    <For each={Object.entries(javas())}>
-                      {([javaVersion, obj]) => (
-                        <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
-                          <h3 class="m-0 mb-4">{javaVersion}</h3>
-                          <Show when={obj.length > 0}>
-                            <div class="flex flex-col gap-4">
-                              <For each={obj}>
-                                {(java) => (
-                                  <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center rounded-lg px-4 py-2 bg-darkSlate-700">
-                                    <span class="text-xs text-darkSlate-100">
-                                      {java.path}
-                                    </span>
-                                    <div class="flex gap-2 justify-center items-center">
-                                      <span>{java.type}</span>
-                                      {mapJavaTypeToAction(java.type, java.id)}
-                                      <Show when={javaInProfile(java.id)}>
-                                        <div class="text-green-500 i-ri:checkbox-circle-fill" />
-                                      </Show>
+                    />
+                  </Tab>
+                  <Tab>
+                    <Trans
+                      key="java.profiles"
+                      options={{
+                        defaultValue: "Profiles",
+                      }}
+                    />
+                  </Tab>
+                </TabList>
+                <TabPanel>
+                  <div class="h-full bg-darkSlate-900 p-4 min-h-96">
+                    <div class="flex justify-between items-center mb-4">
+                      <h2 class="m-0 text-sm font-normal">
+                        <Trans
+                          key="java.found_java_text"
+                          options={{
+                            defaultValue:
+                              "We found the following java versions on your pc",
+                          }}
+                        />
+                      </h2>
+                      <Button
+                        rounded={false}
+                        type="secondary"
+                        size="small"
+                        onClick={() => {
+                          modalsContext?.openModal({ name: "addJava" });
+                        }}
+                      >
+                        <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
+                      </Button>
+                    </div>
+                    <div class="flex flex-col gap-4">
+                      <For each={Object.entries(javas())}>
+                        {([javaVersion, obj]) => (
+                          <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
+                            <h3 class="m-0 mb-4">{javaVersion}</h3>
+                            <Show when={obj.length > 0}>
+                              <div class="flex flex-col gap-4">
+                                <For each={obj}>
+                                  {(java) => (
+                                    <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center bg-darkSlate-700 rounded-lg px-4 py-2">
+                                      <span class="text-xs text-darkSlate-100">
+                                        {java.path}
+                                      </span>
+                                      <div class="flex gap-2 justify-center items-center">
+                                        <span>{java.type}</span>
+                                        {mapJavaTypeToAction(
+                                          java.type,
+                                          java.id
+                                        )}
+                                        <Show when={javaInProfile(java.id)}>
+                                          <div class="text-green-500 i-ri:checkbox-circle-fill" />
+                                        </Show>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </For>
-                            </div>
-                          </Show>
-                          <Show when={obj.length === 0}>
-                            <p>
-                              <Trans
-                                key="java.no_found_java_text"
-                                options={{
-                                  defaultValue: "No java available",
-                                }}
-                              />
-                            </p>
-                          </Show>
-                        </div>
-                      )}
+                                  )}
+                                </For>
+                              </div>
+                            </Show>
+                            <Show when={obj.length === 0}>
+                              <p>
+                                <Trans
+                                  key="java.no_found_java_text"
+                                  options={{
+                                    defaultValue: "No java available",
+                                  }}
+                                />
+                              </p>
+                            </Show>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </TabPanel>
+                <TabPanel>
+                  <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
+                    <For each={routeData.javaProfiles.data}>
+                      {(profile) => {
+                        const path = flattenedAvailableJavas()?.find(
+                          (java) => java.id === profile.javaId
+                        )?.path;
+                        return (
+                          <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
+                            <h3 class="m-0">{profile.name}</h3>
+                            <span class="m-0">
+                              <Switch>
+                                <Match when={path}>{path}</Match>
+                                <Match when={!path}>-</Match>
+                              </Switch>
+                            </span>
+                          </div>
+                        );
+                      }}
                     </For>
                   </div>
-                </div>
-              </TabPanel>
-              <TabPanel>
-                <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
-                  <For each={routeData.javaProfiles.data}>
-                    {(profile) => {
-                      const path = flattenedAvailableJavas()?.find(
-                        (java) => java.id === profile.javaId
-                      )?.path;
-                      return (
-                        <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
-                          <h3 class="m-0">{profile.name}</h3>
-                          <span class="m-0">
-                            <Switch>
-                              <Match when={path}>{path}</Match>
-                              <Match when={!path}>-</Match>
-                            </Switch>
-                          </span>
-                        </div>
-                      );
-                    }}
-                  </For>
-                </div>
-              </TabPanel>
-            </Tabs>
-          </div>
-        </Show>
-      </div>
-    </div>
+                </TabPanel>
+              </Tabs>
+            </div>
+          </Show>
+        </div>
+      </RowsContainer>
+    </>
   );
 };
 
