@@ -53,8 +53,8 @@ interface DropDownButtonProps {
 
 const Dropdown = (props: Props) => {
   const defaultValue = () =>
-    props.options.find((option) => option.key === props.value) ||
-    props.options[0];
+    props.options?.find((option) => option.key === props.value) ||
+    props.options?.[0];
 
   const [selectedValue, setSelectedValue] = createSignal<Option>(
     defaultValue()

@@ -222,7 +222,6 @@ const Sidebar = () => {
             onClick={() => {
               modalsContext?.openModal({
                 name: "instanceCreation",
-                url: "/modpacks",
               });
             }}
             style={{

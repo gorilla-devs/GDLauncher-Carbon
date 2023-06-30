@@ -15,7 +15,11 @@ const safelist = Object.values(supportedLanguages).map(
 );
 
 const unocssConfig = {
-  include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  content: {
+    pipeline: {
+      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+    },
+  },
   presets: [
     presetAttributify(),
     presetWind(),

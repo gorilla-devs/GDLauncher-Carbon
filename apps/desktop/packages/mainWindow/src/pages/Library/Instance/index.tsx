@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import {
   Link,
@@ -31,6 +31,8 @@ import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
+import { ContextMenu } from "@/components/ContextMenu";
+import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 
 type InstancePage = {
@@ -48,6 +50,8 @@ const Instance = () => {
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   );
+  const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -251,6 +255,45 @@ const Instance = () => {
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
 
+  const openFolderMutation = rspc.createMutation([
+    "instance.openInstanceFolder",
+  ]);
+
+  const handleEdit = () => {
+    modalsContext?.openModal(
+      {
+        name: "instanceCreation",
+      },
+      {
+        id: params.id,
+        modloader: routeData.instanceDetails.data?.modloaders[0].type_,
+        title: routeData.instanceDetails.data?.name,
+        mcVersion: routeData.instanceDetails.data?.version,
+        modloaderVersion: routeData.instanceDetails.data?.modloaders[0].version,
+      }
+    );
+  };
+
+  const handleOpenFolder = () => {
+    openFolderMutation.mutate({
+      instance_id: parseInt(params.id, 10),
+      folder: "Root",
+    });
+  };
+
+  const menuItems = () => [
+    {
+      icon: "i-ri:pencil-fill",
+      label: t("instance.action_edit"),
+      action: handleEdit,
+    },
+    {
+      icon: "i-ri:folder-open-fill",
+      label: t("instance.action_open_folder"),
+      action: handleOpenFolder,
+    },
+  ];
+
   return (
     <main
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
@@ -270,6 +313,7 @@ const Instance = () => {
             ? `url("${routeData.image()}")`
             : `url("${DefaultImg}")`,
           "background-position": "center",
+          "background-repeat": "repeat",
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
@@ -412,7 +456,17 @@ const Instance = () => {
                           </div>
                         </Show>
                       </div>
-                      <div class="flex items-center gap-2 h-full">
+                      <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                        <ContextMenu menuItems={menuItems()} trigger="click">
+                          <div
+                            class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            <div class="text-xl i-ri:more-2-fill" />
+                          </div>
+                        </ContextMenu>
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{

@@ -22,6 +22,7 @@ import {
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { SortFields } from "@/utils/constants";
+import skull from "/assets/images/icons/skull.png";
 
 const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
@@ -142,6 +143,25 @@ const AddMod = (props: ModalProps) => {
               key="mods.fetching_no_more_mods"
               options={{
                 defaultValue: "No more mods to load",
+              }}
+            />
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const NoModsAvailable = () => {
+    return (
+      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+        <div class="flex justify-center items-center flex-col text-center">
+          <img src={skull} class="w-16 h-16" />
+
+          <p class="text-darkSlate-50 max-w-100">
+            <Trans
+              key="mods.fetching_no_mods_available"
+              options={{
+                defaultValue: "there is no mod available",
               }}
             />
           </p>
@@ -314,6 +334,15 @@ const AddMod = (props: ModalProps) => {
                 </For>
               </div>
             </div>
+          </Match>
+          <Match
+            when={
+              mods().length === 0 &&
+              !infiniteQuery?.isLoading &&
+              !infiniteQuery?.isInitialLoading
+            }
+          >
+            <NoModsAvailable />
           </Match>
           <Match
             when={
