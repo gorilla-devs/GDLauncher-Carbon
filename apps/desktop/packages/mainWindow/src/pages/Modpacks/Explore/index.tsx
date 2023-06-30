@@ -88,12 +88,7 @@ const Modpack = () => {
 
   return (
     <ContentWrapper>
-      <div
-        class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
-        style={{
-          "scrollbar-gutter": "stable",
-        }}
-      >
+      <div class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden scrollbar-gutter">
         <div
           class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
           // ref={(el) => {
