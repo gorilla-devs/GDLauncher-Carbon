@@ -1,5 +1,5 @@
 import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match, createEffect, Show } from "solid-js";
+import { createSignal, Switch, Match, Show } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
@@ -7,7 +7,6 @@ import { Navigate, useRouteData } from "@solidjs/router";
 import { supportedLanguages, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
-import TrackingSettings from "./TrackingSettings";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 export type DeviceCodeObjectType = {
@@ -34,19 +33,13 @@ export default function Login() {
     },
   });
 
-  createEffect(() => {
-    if (routeData.settings.data?.isLegalAccepted && step() === 0) {
-      setStep(2);
-    }
-  });
-
   const nextStep = () => {
     setStep((prev) => prev + 1);
   };
 
-  const prevStep = () => {
-    setStep((prev) => prev - 1);
-  };
+  // const prevStep = () => {
+  //   setStep((prev) => prev - 1);
+  // };
 
   return (
     <Switch>
@@ -82,13 +75,13 @@ export default function Login() {
             class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 2 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
-              "overflow-hidden": step() === 3,
+              "overflow-hidden": step() === 2,
             }}
           >
-            <Show when={step() < 2}>
+            <Show when={step() < 1}>
               <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
                 <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">
@@ -97,7 +90,7 @@ export default function Login() {
                 </p>
               </div>
             </Show>
-            <Show when={step() === 2}>
+            <Show when={step() === 1}>
               <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
                 <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">
@@ -110,16 +103,16 @@ export default function Login() {
               <Match when={step() === 0}>
                 <TermsAndConditions nextStep={nextStep} />
               </Match>
-              <Match when={step() === 1}>
+              {/* <Match when={step() === 1}>
                 <TrackingSettings prevStep={prevStep} nextStep={nextStep} />
-              </Match>
-              <Match when={step() === 2}>
+              </Match> */}
+              <Match when={step() === 1}>
                 <Auth
                   nextStep={nextStep}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />
               </Match>
-              <Match when={step() === 3}>
+              <Match when={step() === 2}>
                 <CodeStep
                   nextStep={nextStep}
                   deviceCodeObject={deviceCodeObject()}
