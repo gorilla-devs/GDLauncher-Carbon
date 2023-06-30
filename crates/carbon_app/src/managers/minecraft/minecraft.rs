@@ -537,6 +537,7 @@ pub async fn launch_minecraft(
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
+    command_exec.stderr(std::process::Stdio::piped());
 
     let child = command_exec.args(startup_command);
 
