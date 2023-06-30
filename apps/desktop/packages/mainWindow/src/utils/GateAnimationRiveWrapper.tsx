@@ -3,7 +3,6 @@ import { createSignal, onCleanup, onMount } from "solid-js";
 
 type Props = {
   src: string;
-  onStop?: () => void;
   width?: number;
   height?: number;
 };
@@ -13,22 +12,29 @@ const RiveAppWapper = (props: Props) => {
 
   const [riveRef, setRiveRef] = createSignal<Rive | undefined>();
   onMount(() => {
+    const buttonOpen = document.getElementById("login-btn");
+    const buttonLinkBtn = document.getElementById("login-link-btn");
+
     if (canvas && props.src) {
       const r = new Rive({
         src: props.src,
         autoplay: true,
         canvas: canvas,
-        stateMachines: ["State Machine 1"],
+        stateMachines: ["gate"],
         onLoad: () => {
           r.resizeDrawingSurfaceToCanvas();
           setRiveRef(r);
-        },
-        onStateChange: (state) => {
-          // there is no way to dected the end of an animation in rive.app
-          // to achive it, I added another state at the end of the animatio so I can detect it
-          // sorry idk how to change the name of the state, so it's ""
-          if ((state.data as string[])[0] === "") {
-            props?.onStop?.();
+          const inputs = r.stateMachineInputs("gate");
+          const openGate = inputs.find((i) => i.name === "openGate");
+
+          if (buttonOpen && buttonLinkBtn) {
+            buttonOpen.onclick = () => {
+              openGate?.fire();
+            };
+
+            buttonLinkBtn.onclick = () => {
+              openGate?.fire();
+            };
           }
         },
       });
@@ -41,6 +47,7 @@ const RiveAppWapper = (props: Props) => {
       riveRef()?.cleanup();
     }
   });
+
   return (
     <canvas
       ref={canvas}

@@ -60,8 +60,6 @@ const InstanceTile = (props: {
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
-  // const task = useConditionalQuery("vtask.getTask", taskId());
-
   const [task, setTask] = createSignal<CreateQueryResult<
     Task | null,
     RSPCError
@@ -111,6 +109,7 @@ const InstanceTile = (props: {
 
   createEffect(() => {
     if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+      if (taskId()) dismissTaskMutation.mutate(taskId() as number);
       setFailError(failedTask.data.progress.Failed.cause[0].display);
     }
   });

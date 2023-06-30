@@ -23,7 +23,7 @@ const TermsAndConditions = (props: Props) => {
               <Trans key="login.we_value_privacy_title" />
             </h2>
           </div>
-          <div class="max-h-48 overflow-y-scroll">
+          <div class="overflow-y-scroll max-h-48">
             <div class="flex flex-col m-0 text-darkSlate-100 text-left gap-4 leading-5">
               <div>
                 <Trans key="login.we_value_privacy_text1" />

@@ -37,10 +37,6 @@ export default function Login() {
     setStep((prev) => prev + 1);
   };
 
-  // const prevStep = () => {
-  //   setStep((prev) => prev - 1);
-  // };
-
   return (
     <Switch>
       <Match when={isAlreadyAuthenticated()}>
@@ -91,7 +87,7 @@ export default function Login() {
               </div>
             </Show>
             <Show when={step() === 1}>
-              <div class="absolute right-0 flex justify-center items-center flex-col left-0 m-auto -top-15">
+              <div class="absolute right-0 flex justify-center items-center flex-col left-0 -top-15 m-auto">
                 <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">
                   {"v"}

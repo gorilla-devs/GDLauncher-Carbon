@@ -14,11 +14,14 @@ import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { trackEvent } from "@/utils/analytics";
+import { ReactiveMap } from "@solid-primitives/map";
+
+type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
 
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
-    ManifestVersion[]
+    MappedMcVersions[]
   >([]);
   const [title, setTitle] = createSignal("");
   const [error, setError] = createSignal("");
@@ -36,20 +39,39 @@ const InstanceCreation = (props: ModalProps) => {
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
+  const forgeHasmap = new ReactiveMap();
+  const fabricHashmap = new ReactiveMap();
+  const quiltHashmap = new ReactiveMap();
+
   const addNotification = createNotification();
   const modalsContext = useModal();
   const navigate = useGDNavigate();
 
   const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
     enabled: false,
+    onSuccess(data) {
+      data.gameVersions.forEach((version) => {
+        forgeHasmap.set(version.id, version.loaders);
+      });
+    },
   });
 
   const fabricVersionsQuery = rspc.createQuery(() => ["mc.getFabricVersions"], {
     enabled: false,
+    onSuccess(data) {
+      data.gameVersions.forEach((version) => {
+        fabricHashmap.set(version.id, version.loaders);
+      });
+    },
   });
 
   const quiltVersionsQuery = rspc.createQuery(() => ["mc.getQuiltVersions"], {
     enabled: false,
+    onSuccess(data) {
+      data.gameVersions.forEach((version) => {
+        quiltHashmap.set(version.id, version.loaders);
+      });
+    },
   });
 
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
@@ -117,7 +139,12 @@ const InstanceCreation = (props: ModalProps) => {
         (item.type === "old_alpha" && oldAlphaVersionFilter())
     );
 
-    setMappedMcVersions(filteredData);
+    const mappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: forgeHasmap.has(item.id) };
+    });
+
+    if (loader()) setMappedMcVersions(mappedVersions);
+    else setMappedMcVersions(filteredData);
   });
 
   const modloaders = [
@@ -166,20 +193,35 @@ const InstanceCreation = (props: ModalProps) => {
     }
   );
 
-  const mapTypeToColor = (type: McType) => {
+  const mapTypeToColor = (
+    type: McType,
+    hasNoModloader: boolean | undefined
+  ) => {
     return (
       <Switch>
         <Match when={type === "release"}>
-          <span class="text-green-500">{`[${type}]`}</span>
+          <span
+            class="text-green-500"
+            classList={{ "opacity-50": hasNoModloader }}
+          >{`[${type}]`}</span>
         </Match>
         <Match when={type === "snapshot"}>
-          <span class="text-yellow-500">{`[${type}]`}</span>
+          <span
+            class="text-yellow-500"
+            classList={{ "opacity-50": hasNoModloader }}
+          >{`[${type}]`}</span>
         </Match>
         <Match when={type === "old_alpha"}>
-          <span class="text-purple-500">{`[${type}]`}</span>
+          <span
+            class="text-purple-500"
+            classList={{ "opacity-50": hasNoModloader }}
+          >{`[${type}]`}</span>
         </Match>
         <Match when={type === "old_beta"}>
-          <span class="text-red-500">{`[${type}]`}</span>
+          <span
+            class="text-red-500"
+            classList={{ "opacity-50": hasNoModloader }}
+          >{`[${type}]`}</span>
         </Match>
       </Switch>
     );
@@ -248,8 +290,8 @@ const InstanceCreation = (props: ModalProps) => {
       overflowHiddenDisabled={true}
       noPadding={true}
     >
-      <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-136">
-        <div class="flex flex-col justify-between gap-4 p-5 h-full">
+      <div class="flex flex-col justify-between scrollbar-hide w-120 overflow-y-scroll h-136">
+        <div class="flex flex-col justify-between gap-4 h-full p-5">
           <span class="flex flex-col justify-between gap-4">
             <div class="flex gap-4 w-full">
               <div
@@ -292,7 +334,7 @@ const InstanceCreation = (props: ModalProps) => {
                     </h3>
                   </Match>
                   <Match when={bgPreview()}>
-                    <div class="absolute top-0 right-0 pl-2 pb-2 bg-darkSlate-700 rounded-bl-2xl">
+                    <div class="absolute top-0 right-0 pb-2 pl-2 bg-darkSlate-700 rounded-bl-2xl">
                       <div
                         class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
                         onClick={(e) => {
@@ -388,9 +430,19 @@ const InstanceCreation = (props: ModalProps) => {
                   )}
                   options={mappedMcVersions().map((v) => ({
                     label: (
-                      <div class="flex justify-between w-full">
+                      <div
+                        class="flex justify-between w-full"
+                        classList={{
+                          "text-darkSlate-500": Boolean(
+                            !v.hasModloader && loader()
+                          ),
+                        }}
+                      >
                         <span>{v.id}</span>
-                        {mapTypeToColor(v.type)}
+                        {mapTypeToColor(
+                          v.type,
+                          Boolean(!v.hasModloader && loader())
+                        )}
                       </div>
                     ),
                     key: v.id,

@@ -32,6 +32,7 @@
     "@rspc/solid": "^0.0.0-main-60a4fa93187c20bc5cb565cc6ee30b2f0903840e",
     "@sentry/electron": "^4.4.0",
     "@solid-primitives/deep": "^0.0.102",
+    "@solid-primitives/map": "^0.4.6",
     "@solid-primitives/keyboard": "^1.2.3",
     "@solidjs/router": "^0.8.2",
     "@tanstack/solid-query": "^4.22.0",

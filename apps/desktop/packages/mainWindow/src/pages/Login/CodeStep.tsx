@@ -1,6 +1,5 @@
 import { Button, LoadingBar } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import DoorImage from "/assets/images/icons/door.png";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
@@ -12,17 +11,14 @@ import fetchData from "./auth.login.data";
 import { handleStatus } from "@/utils/login";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { DeviceCodeObjectType } from ".";
-import { Procedures } from "@gd/core_module";
+import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper";
+import GateAnimation from "../../gate_animation.riv";
+
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
   nextStep: () => void;
 }
-
-type ActiveUUID = Extract<
-  Procedures["queries"],
-  { key: "account.setActiveUuid" }
->["result"];
 
 const CodeStep = (props: Props) => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -53,11 +49,12 @@ const CodeStep = (props: Props) => {
   const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
     onMutate: async (
       uuid
-    ): Promise<{ previousActiveUUID: ActiveUUID } | undefined> => {
+    ): Promise<{ previousActiveUUID: string } | undefined> => {
       await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
 
-      const previousActiveUUID: ActiveUUID | undefined =
-        queryClient.getQueryData(["account.setActiveUuid"]);
+      const previousActiveUUID: string | undefined = queryClient.getQueryData([
+        "account.setActiveUuid",
+      ]);
 
       queryClient.setQueryData(["account.setActiveUuid", null], uuid);
 
@@ -66,7 +63,7 @@ const CodeStep = (props: Props) => {
     onError: (
       error,
       _variables,
-      context: { previousActiveUUID: ActiveUUID } | undefined
+      context: { previousActiveUUID: string } | undefined
     ) => {
       addNotification(error.message, "error");
 
@@ -183,12 +180,13 @@ const CodeStep = (props: Props) => {
 
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
-      <img src={DoorImage} class="w-20 h-20" />
+      <GateAnimationRiveWrapper width={80} height={80} src={GateAnimation} />
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode
             disabled={expired()}
             value={userCode() || ""}
+            id="login-link-btn"
             onClick={() => {
               window.copyToClipboard(userCode() || "");
               addNotification("The link has been copied");
@@ -244,6 +242,7 @@ const CodeStep = (props: Props) => {
       </Show>
       <Show when={!expired()}>
         <Button
+          id="login-btn"
           class="normal-case"
           onClick={() => {
             setLoading(true);
