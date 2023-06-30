@@ -41,12 +41,7 @@ const ModDetails = (props: ModalProps) => {
       <div class="h-130 w-190">
         <Switch>
           <Match when={props.data}>
-            <div
-              class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
-              style={{
-                "scrollbar-gutter": "stable",
-              }}
-            >
+            <div class="relative h-full bg-darkSlate-800 overflow-auto max-h-full scrollbar-gutter overflow-x-hidden">
               <div class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch">
                 <div class="relative h-full">
                   <div

@@ -13,6 +13,7 @@ import {
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { trackEvent } from "@/utils/analytics";
 
 type Instancetype = {
   id: string;
@@ -271,6 +272,11 @@ const InstanceCreation = (props: ModalProps) => {
       } else {
         versions = [];
       }
+
+      trackEvent("instanceCreate", {
+        loader: loader(),
+        mcVersion: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
+      });
 
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,

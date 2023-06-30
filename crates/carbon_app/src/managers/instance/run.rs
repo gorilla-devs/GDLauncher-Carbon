@@ -627,6 +627,11 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(Some(mut child)) => {
                     drop(task);
 
+                    let _ = app
+                        .rich_presence_manager()
+                        .update_activity("Playing Minecraft".to_string())
+                        .await;
+
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
                     let (log_id, log) = app.instance_manager().create_log(instance_id).await;
@@ -732,6 +737,8 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Ok(exitcode) = child.wait().await {
                         log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
                     }
+
+                    let _ = app.rich_presence_manager().stop_activity().await;
 
                     let _ = app
                         .instance_manager()

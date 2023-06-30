@@ -49,8 +49,8 @@ const loadCoreModule: CoreModule = () =>
       let rows = dataString.split(/\r?\n|\r|\n/g);
 
       for (let row of rows) {
-        if (row.startsWith("_STATUS_: ")) {
-          let port = row.split("|")[1];
+        if (row.startsWith("_STATUS_:")) {
+          const port = row.split("|")[1];
           console.log(`[CORE] Port: ${port}`);
           resolve(port);
         }
