@@ -119,12 +119,12 @@ function ModpacksLayout() {
 
   return (
     <InfiniteQueryContext.Provider value={context}>
-      <div class="flex w-full">
+      <>
         <Sidebar />
         <ContentWrapper>
           <Outlet />
         </ContentWrapper>
-      </div>
+      </>
     </InfiniteQueryContext.Provider>
   );
 }

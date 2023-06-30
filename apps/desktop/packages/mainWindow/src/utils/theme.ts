@@ -24,10 +24,6 @@ const initThemes = () => {
       return;
     }
     switch (themeName()) {
-      case _Theme._Default: {
-        applyTheme(mainTheme);
-        break;
-      }
       case _Theme._Light: {
         applyTheme(lightTheme);
         break;
@@ -38,6 +34,10 @@ const initThemes = () => {
       }
       case _Theme._Dracula: {
         applyTheme(dracula);
+        break;
+      }
+      default: {
+        applyTheme(mainTheme);
         break;
       }
     }
@@ -60,9 +60,6 @@ export function getAvailableThemes(): string[] {
 
 export function getThemeColors(themeName: string): UITheme | undefined {
   switch (themeName) {
-    case _Theme._Default: {
-      return mainTheme;
-    }
     case _Theme._Light: {
       return lightTheme;
     }
@@ -73,8 +70,7 @@ export function getThemeColors(themeName: string): UITheme | undefined {
       return dracula;
     }
     default: {
-      console.error(`Unknown theme: ${themeName}`);
-      return undefined;
+      return mainTheme;
     }
   }
 }

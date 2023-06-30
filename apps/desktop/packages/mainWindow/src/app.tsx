@@ -5,6 +5,7 @@ import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
+import initAnalytics from "@/utils/analytics";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -20,7 +21,14 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"], {
+    onSuccess(data) {
+      if (data.metricsLevel !== 0 && data.metricsLevel !== null) {
+        initAnalytics(data.metricsLevel);
+      }
+    },
+  });
+
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
 
   createEffect(() => {
@@ -49,7 +57,7 @@ const App = (props: Props) => {
   return (
     <div class="relative w-screen">
       <div class="w-screen flex z-10 h-auto">
-        <main class="relative overflow-hidden flex-1">
+        <main class="relative flex-1">
           {/* <Suspense fallback={<></>}> */}
           <Route />
           {/* </Suspense> */}

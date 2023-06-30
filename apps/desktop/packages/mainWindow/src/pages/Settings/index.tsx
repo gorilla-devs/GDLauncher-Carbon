@@ -4,12 +4,12 @@ import ContentWrapper from "@/components/ContentWrapper";
 
 function Settings() {
   return (
-    <div class="flex flex-1">
+    <>
       <Sidebar />
       <ContentWrapper>
         <Outlet />
       </ContentWrapper>
-    </div>
+    </>
   );
 }
 
