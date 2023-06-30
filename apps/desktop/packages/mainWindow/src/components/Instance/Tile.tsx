@@ -64,7 +64,7 @@ const Tile = (props: Props) => {
           queryClient.getQueryData(["instance.getInstancesUngrouped"]);
 
         queryClient.setQueryData(
-          ["account.setActiveUuid", null],
+          ["account.getActiveUuid", null],
           (old: UngroupedInstance[] | undefined) => {
             const filteredAccounts = old?.filter(
               (account) => account.id !== instanceId
@@ -269,7 +269,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out transition-all duration-100 h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
+                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
                 classList={{
                   "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                     !props.isRunning,

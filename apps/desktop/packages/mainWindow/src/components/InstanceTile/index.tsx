@@ -118,6 +118,7 @@ const InstanceTile = (props: {
 
   createEffect(() => {
     if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+      if (taskId()) dismissTaskMutation.mutate(taskId() as number);
       setFailError(failedTask.data.progress.Failed.cause[0].display);
     }
   });

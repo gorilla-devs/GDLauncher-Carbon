@@ -62,7 +62,7 @@ const ThirdStep = (props: Props) => {
         </div> */}
         </div>
       </div>
-      <div class="flex w-full align-between">
+      <div class="flex justify-between w-full">
         <Button
           type="secondary"
           size="large"
@@ -71,6 +71,14 @@ const ThirdStep = (props: Props) => {
           }}
         >
           <Trans key="onboarding.prev" />
+        </Button>
+        <Button
+          onClick={() => {
+            modalsContext?.closeModal();
+          }}
+          size="large"
+        >
+          <Trans key="onboarding.start_playing" />
         </Button>
       </div>
     </div>

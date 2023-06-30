@@ -34,7 +34,7 @@ const SiderbarWrapper = (props: Props) => {
           <Show
             when={!isSidebarOpened()}
             fallback={
-              <span class="text-darkSlate-500 i-ri:arrow-left-s-line text-3xl" />
+              <span class="text-darkSlate-500 text-3xl i-ri:arrow-left-s-line" />
             }
           >
             <span class="text-darkSlate-500 text-3xl i-ri:arrow-right-s-line" />

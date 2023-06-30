@@ -158,7 +158,7 @@ const Dropdown = (props: Props) => {
             </span>
           </Show>
           <span
-            class="i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100"
+            class="i-ri:arrow-drop-down-line text-3xl ease-in-out duration-100"
             classList={{
               "text-darkSlate-50 group-hover:text-white":
                 !props.disabled &&
@@ -169,8 +169,6 @@ const Dropdown = (props: Props) => {
                 !!props.error || (props.btnDropdown && !props.textColorClass),
               "text-darkSlate-500": props.disabled && !props.btnDropdown,
               "text-primary-200": props.disabled && props.btnDropdown,
-              "rotate-0": menuOpened(),
-              "rotate-180": !menuOpened(),
             }}
           />
         </button>

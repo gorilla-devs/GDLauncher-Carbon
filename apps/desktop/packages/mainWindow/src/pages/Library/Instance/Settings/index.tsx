@@ -25,7 +25,7 @@ const Settings = () => {
   const mbTotalRAM = () => Number(totalRam.data) / 1024 / 1024;
 
   return (
-    <div class="pt-10">
+    <div class="pt-10 divide-y divide-darkSlate-600">
       <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
@@ -42,7 +42,10 @@ const Settings = () => {
               updateInstanceMutation.mutate({
                 memory: {
                   Set: e.target.checked
-                    ? { max_mb: mbTotalRAM() / 2, min_mb: mbTotalRAM() / 2 }
+                    ? {
+                        max_mb: Math.round(mbTotalRAM() / 2),
+                        min_mb: Math.round(mbTotalRAM() / 2),
+                      }
                     : null,
                 },
                 extra_java_args: null,

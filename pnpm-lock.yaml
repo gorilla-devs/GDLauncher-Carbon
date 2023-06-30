@@ -64,6 +64,9 @@ importers:
       '@solid-primitives/keyboard':
         specifier: ^1.2.3
         version: 1.2.3(solid-js@1.7.3)
+      '@solid-primitives/map':
+        specifier: ^0.4.6
+        version: 0.4.6(solid-js@1.7.3)
       '@solidjs/router':
         specifier: ^0.8.2
         version: 0.8.2(solid-js@1.7.3)
@@ -5138,8 +5141,26 @@ packages:
       solid-js: 1.7.3
     dev: true
 
+  /@solid-primitives/map@0.4.6(solid-js@1.7.3):
+    resolution: {integrity: sha512-zfuIShcHPmD814vvwuEqq0kQeLOL8g4kFXpNveSkkgNvnhsH/+b8kssen38F86oH9st2i/G4LV0PPREOcCXguw==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/trigger': 1.0.7(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
   /@solid-primitives/rootless@1.4.1(solid-js@1.7.3):
     resolution: {integrity: sha512-h7VBUk8usD76Eh1a4wT17PcGtIRxGPlLuJ4Mf7roCNu46W5cc9DAoz8M6XebuZWVKeUkML/JuPMZQSV0mLo2Fw==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/trigger@1.0.7(solid-js@1.7.3):
+    resolution: {integrity: sha512-vICmbDtncFs29NwstIzat8QzPUMWR9Wlq1kElIOjQ/jKqBzZ7o1S5bfuBXG2ckp1W0CEvS1gcMAF3kuVSQAFqQ==}
     peerDependencies:
       solid-js: ^1.6.12
     dependencies:

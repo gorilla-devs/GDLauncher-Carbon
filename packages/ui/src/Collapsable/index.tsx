@@ -2,7 +2,7 @@ import { JSX, createSignal } from "solid-js";
 
 type Props = {
   children: JSX.Element;
-  title?: string;
+  title?: string | JSX.Element;
   size?: "standard" | "small";
 };
 
