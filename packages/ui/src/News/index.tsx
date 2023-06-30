@@ -42,6 +42,7 @@ const News = (props: CarouselProps) => {
     { showIndicators: true, showArrows: true, rtl: true },
     props
   );
+
   let slidesRef: HTMLDivElement;
 
   const moveSlide = () => {
@@ -51,6 +52,15 @@ const News = (props: CarouselProps) => {
   const firstSlide = () => props.slides[0];
   const lastSlide = () => props.slides[props.slides.length - 1];
   const copiedSlides = () => [lastSlide(), ...props.slides, firstSlide()];
+
+  const resetInterval = () => {
+    clearInterval(interval);
+    interval = setInterval(() => {
+      if (!props.disableAutoRotation) {
+        changeSlide(mergedProps.rtl ? "right" : "left");
+      }
+    }, props.speed || 5000);
+  };
 
   const handleTransitionEnd = () => {
     setIsMoving(false);
@@ -86,11 +96,7 @@ const News = (props: CarouselProps) => {
   };
 
   createEffect(() => {
-    interval = setInterval(() => {
-      if (!props.disableAutoRotation) {
-        changeSlide(mergedProps.rtl ? "right" : "left");
-      }
-    }, props.speed || 5000);
+    resetInterval();
   });
 
   onCleanup(() => clearInterval(interval));
@@ -165,9 +171,10 @@ const News = (props: CarouselProps) => {
                   currentImageIndex() === i() + 1 ? "opacity-100" : "opacity-30"
                 }`}
                 onClick={() => {
+                  resetInterval();
                   slidesRef.style.transition = `transform 450ms ease-in-out`;
-                  slidesRef.style.transform = `translateX(-${i() * 100}%)`;
                   setCurrentImageIndex(i() + 1);
+                  moveSlide();
                 }}
               />
             )}
