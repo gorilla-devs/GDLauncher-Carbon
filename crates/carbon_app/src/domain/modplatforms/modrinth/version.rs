@@ -7,26 +7,26 @@ use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Version {
-    pub name: ArcStr,
+    pub name: String,
     /// The version number.
     /// Ideally, this will follow semantic versioning.
-    pub version_number: ArcStr,
+    pub version_number: String,
     pub changelog: Option<String>,
     pub dependencies: Vec<Dependency>,
-    pub game_versions: Vec<ArcStr>,
+    pub game_versions: Vec<String>,
     /// The release channel for this version
     pub version_type: VersionType,
-    pub loaders: Vec<ArcStr>,
+    pub loaders: Vec<String>,
     pub featured: bool,
     pub status: Option<Status>,
     pub requested_status: Option<RequestedStatus>,
-    pub id: ArcStr,
+    pub id: String,
     /// The ID of the project this version is for
-    pub project_id: ArcStr,
+    pub project_id: String,
     /// The ID of the author who published this version
-    pub author_id: ArcStr,
+    pub author_id: String,
     pub date_published: UtcDateTime,
-    pub downloads: Number,
+    pub downloads: u32,
     /// A link to the version's changelog (only present for old versions)
     #[deprecated = "Read from `changelog` instead"]
     #[serde(deserialize_with = "deserialise_optional_url")]
@@ -39,46 +39,46 @@ pub struct Version {
 pub struct VersionFile {
     pub hashes: Hashes,
     pub url: Url,
-    pub filename: ArcStr,
+    pub filename: String,
     /// Whether the file is the primary file of its version.
     ///
     /// There can only be a maximum of one primary file per version.
     /// If there are no primary files specified, the first file can be taken as the primary file.
     pub primary: bool,
     /// The size of the file in bytes
-    pub size: Number,
+    pub size: u32,
     /// The type of the additional file, used mainly for adding resource packs to datapacks
     pub file_type: Option<AdditionalFileType>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Hashes {
-    pub sha512: ArcStr,
-    pub sha1: ArcStr,
+    pub sha512: String,
+    pub sha1: String,
     /// A map of other hashes that may have been provided
     #[serde(flatten)]
-    pub others: HashMap<ArcStr, ArcStr>,
+    pub others: HashMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LatestVersionBody {
-    pub loaders: Vec<ArcStr>,
-    pub game_versions: Vec<ArcStr>,
+    pub loaders: Vec<String>,
+    pub game_versions: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LatestVersionsBody {
-    pub hashes: Vec<ArcStr>,
+    pub hashes: Vec<String>,
     pub algorithm: HashAlgorithm,
-    pub loaders: Vec<ArcStr>,
-    pub game_versions: Vec<ArcStr>,
+    pub loaders: Vec<String>,
+    pub game_versions: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Dependency {
-    pub version_id: Option<ArcStr>,
-    pub project_id: Option<ArcStr>,
-    pub file_name: Option<ArcStr>,
+    pub version_id: Option<String>,
+    pub project_id: Option<String>,
+    pub file_name: Option<String>,
     pub dependency_type: DependencyType,
 }
 

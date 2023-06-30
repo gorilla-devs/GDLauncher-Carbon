@@ -6,18 +6,7 @@ use crate::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
             CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
             CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
-        },
-        modplatforms::{
-            curseforge::filters::{
-                FEFilesParameters, FEModDescriptionParameters, FEModFileChangelogParameters,
-                FEModFileParameters, FEModFilesParameters, FEModParameters, FEModSearchParameters,
-                FEModsParameters,
-            },
-            curseforge::responses::{
-                FECategoriesResponse, FEFilesResponse, FEModDescriptionResponse,
-                FEModFileChangelogResponse, FEModFileResponse, FEModFilesResponse, FEModResponse,
-                FEModSearchResponse, FEModsResponse,
-            },
+            MODRINTH_SEARCH,
         },
         router::router,
     },
@@ -25,70 +14,82 @@ use crate::{
 };
 
 mod curseforge;
+mod modrinth;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
-        query CURSEFORGE_SEARCH[app, filters: FEModSearchParameters] {
+        // Curseforge
+        query CURSEFORGE_SEARCH[app, filters: curseforge::filters::FEModSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
                 let response = modplatforms.curseforge.search(filters.into()).await?;
 
-            Ok(FEModSearchResponse::from(response))
+            Ok(curseforge::responses::FEModSearchResponse::from(response))
         }
 
         query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_categories().await?;
 
-            Ok(FECategoriesResponse::from(response))
+            Ok(curseforge::responses::FECategoriesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD[app, mod_parameters: FEModParameters] {
+        query CURSEFORGE_GET_MOD[app, mod_parameters: curseforge::filters::FEModParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod(mod_parameters.into()).await?;
 
-            Ok(FEModResponse::from(response))
+            Ok(curseforge::responses::FEModResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MODS[app, mod_parameters: FEModsParameters] {
+        query CURSEFORGE_GET_MODS[app, mod_parameters: curseforge::filters::FEModsParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mods(mod_parameters.into()).await?;
 
-            Ok(FEModsResponse::from(response))
+            Ok(curseforge::responses::FEModsResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_DESCRIPTION[app, mod_parameters: FEModDescriptionParameters] {
+        query CURSEFORGE_GET_MOD_DESCRIPTION[app, mod_parameters: curseforge::filters::FEModDescriptionParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_description(mod_parameters.into()).await?;
 
-            Ok(FEModDescriptionResponse::from(response))
+            Ok(curseforge::responses::FEModDescriptionResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: FEModFileParameters] {
+        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: curseforge::filters::FEModFileParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_file(mod_parameters.into()).await?;
 
-            Ok(FEModFileResponse::from(response))
+            Ok(curseforge::responses::FEModFileResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILES[app, mod_parameters: FEModFilesParameters] {
+        query CURSEFORGE_GET_MOD_FILES[app, mod_parameters: curseforge::filters::FEModFilesParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_files(mod_parameters.into()).await?;
 
-            Ok(FEModFilesResponse::from(response))
+            Ok(curseforge::responses::FEModFilesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_FILES[app, mod_parameters: FEFilesParameters] {
+        query CURSEFORGE_GET_FILES[app, mod_parameters: curseforge::filters::FEFilesParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_files(mod_parameters.into()).await?;
 
-            Ok(FEFilesResponse::from(response))
+            Ok(curseforge::responses::FEFilesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILE_CHANGELOG[app, mod_parameters: FEModFileChangelogParameters] {
+        query CURSEFORGE_GET_MOD_FILE_CHANGELOG[app, mod_parameters: curseforge::filters::FEModFileChangelogParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_file_changelog(mod_parameters.into()).await?;
 
-            Ok(FEModFileChangelogResponse::from(response))
+            Ok(curseforge::responses::FEModFileChangelogResponse::from(response))
         }
+
+        // Modrinth
+        query MODRINTH_SEARCH[app, search_params: modrinth::filters::FEProjectSearchParameters] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.search(search_params.into()).await?;
+
+            Ok(modrinth::responses::FEProjectSearchResponse::from(response))
+
+        }
+        // query MODRINTH_GET_CATEGORIES[app ]
     }
 }

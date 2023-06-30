@@ -4,23 +4,23 @@ use super::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Report {
-    pub report_type: ArcStr,
+    pub report_type: String,
     /// The ID of the item being reported
-    pub item_id: ArcStr,
+    pub item_id: String,
     /// The type of item being reported
     pub item_type: ReportItemType,
     /// An extended explanation of the report
     pub body: String,
     /// The ID of the user who submitted the report
-    pub reporter: ArcStr,
+    pub reporter: String,
     pub created: UtcDateTime,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ReportSubmission {
-    pub report_type: ArcStr,
+    pub report_type: String,
     /// The ID of the item being reported
-    pub item_id: ArcStr,
+    pub item_id: String,
     /// The type of item being reported
     pub item_type: ReportItemType,
     /// An extended explanation of the report
@@ -37,13 +37,13 @@ pub enum ReportItemType {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Statistics {
     /// The number of project on Modrinth
-    pub projects: Number,
+    pub projects: u32,
     /// The number of versions on Modrinth
-    pub versions: Number,
+    pub versions: u32,
     /// The number of version files on Modrinth
-    pub files: Number,
+    pub files: u32,
     /// The number of authors (users with projects) on Modrinth
-    pub authors: Number,
+    pub authors: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

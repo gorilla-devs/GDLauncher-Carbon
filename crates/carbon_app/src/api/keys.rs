@@ -128,5 +128,8 @@ keys! {
         CURSEFORGE_GET_MOD_FILES                    = "curseforgeGetModFiles";
         CURSEFORGE_GET_FILES                        = "curseforgeGetFiles";
         CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforgeGetModFileChangelog";
+
+        MODRINTH_GET_CATEGORIES                     = "modrinthGetCategories";
+        MODRINTH_SEARCH                             = "modrinthSearch";
     }
 }

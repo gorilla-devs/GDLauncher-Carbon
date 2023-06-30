@@ -2,16 +2,13 @@
 
 pub mod misc;
 pub mod project;
+pub mod search;
 pub mod tag;
 pub mod user;
 pub mod version;
-pub mod search;
 
 /// ISO 8601 UTC datetime
 pub type UtcDateTime = chrono::DateTime<chrono::Utc>;
-pub type Number = usize;
-/// If we don't need mutability so an `Arc<str>` is efficient over a String.
-pub type ArcStr = std::sync::Arc<str>;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
