@@ -3,7 +3,8 @@ import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
+import { useModal } from "./managers/ModalsManager";
+import { useKeyDownEvent } from "@solid-primitives/keyboard";
 import initAnalytics from "@/utils/analytics";
 
 type Props = {
@@ -36,6 +37,20 @@ const App = (props: Props) => {
         modalsContext?.openModal({ name: "onBoarding" });
         setIsFirstRun.mutate({ isFirstLaunch: false });
       });
+    }
+  });
+
+  const event = useKeyDownEvent();
+
+  createEffect(() => {
+    // close modal clicking Escape
+    const e = event();
+    if (e) {
+      if (e.key === "Escape") {
+        untrack(() => {
+          modalsContext?.closeModal();
+        });
+      }
     }
   });
 

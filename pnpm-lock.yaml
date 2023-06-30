@@ -61,6 +61,9 @@ importers:
       '@solid-primitives/deep':
         specifier: ^0.0.102
         version: 0.0.102(solid-js@1.7.3)
+      '@solid-primitives/keyboard':
+        specifier: ^1.2.3
+        version: 1.2.3(solid-js@1.7.3)
       '@solidjs/router':
         specifier: ^0.8.2
         version: 0.8.2(solid-js@1.7.3)
@@ -4598,6 +4601,43 @@ packages:
 
   /@solid-primitives/deep@0.0.102(solid-js@1.7.3):
     resolution: {integrity: sha512-qD4J69VUDnnjwe4zlU3yEyZoa04wF8atytU88i80+CZ4pi7qNKEjTiU1DQg6lMTtx9znZrhChz349sRfHViVPQ==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/event-listener@2.2.13(solid-js@1.7.3):
+    resolution: {integrity: sha512-8GtVEq0ECZoa5Klo1jjfGPfwg0zVJ8TNnNkWu8FqRkh0CkhbhCVJAKwjleem9K/qL6zUDfJihLjhqGBTBbb+8w==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/keyboard@1.2.3(solid-js@1.7.3):
+    resolution: {integrity: sha512-8EBUk1lARIXVhSs9H2t0rclCuyX1y56Kf9J8VVmlPDSh1L+nSIU0wcDGVeVy3HWG6W8pRoRD7kwlQvXhdW2LAQ==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/event-listener': 2.2.13(solid-js@1.7.3)
+      '@solid-primitives/rootless': 1.4.1(solid-js@1.7.3)
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/rootless@1.4.1(solid-js@1.7.3):
+    resolution: {integrity: sha512-h7VBUk8usD76Eh1a4wT17PcGtIRxGPlLuJ4Mf7roCNu46W5cc9DAoz8M6XebuZWVKeUkML/JuPMZQSV0mLo2Fw==}
+    peerDependencies:
+      solid-js: ^1.6.12
+    dependencies:
+      '@solid-primitives/utils': 6.2.0(solid-js@1.7.3)
+      solid-js: 1.7.3
+    dev: true
+
+  /@solid-primitives/utils@6.2.0(solid-js@1.7.3):
+    resolution: {integrity: sha512-T62WlLwKkbmicsw/xpwMQyv9MmZRSaVyutXfS5icc9v0cb8qGMUxRxr5LVvZHYQCZ9DEFboZB0r711xsbVBbeA==}
     peerDependencies:
       solid-js: ^1.6.12
     dependencies:
