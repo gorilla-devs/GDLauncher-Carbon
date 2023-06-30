@@ -104,8 +104,13 @@ const Auth = (props: Props) => {
   });
 
   return (
-    <div class="flex flex-col justify-center items-center text-center mb-6">
-      <Button loading={clicked()} size="large" onClick={() => handleClick()}>
+    <div class="flex flex-col justify-center items-center text-center">
+      <Button
+        class="mb-12"
+        loading={clicked()}
+        size="large"
+        onClick={() => handleClick()}
+      >
         <Trans
           key="login.sign_in_with_microsoft"
           options={{
