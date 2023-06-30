@@ -85,36 +85,8 @@ const Settings = () => {
           </div>
         </Show>
       </div>
-      {/* <div class="mb-6">
-        <div class="w-full flex justify-between items-center mb-4">
-          <h5 class="m-0">
-            <Trans
-              key="java.game_resolution"
-              options={{
-                defaultValue: "Game Resolution",
-              }}
-            />
-          </h5>
-          <Switch checked={true} />
-        </div>
-        <div class="flex w-full justify-between">
-          <div class="flex gap-4 items-center">
-            <Input class="w-20" placeholder="width" value={"1024"} />
-            x
-            <Input class="w-20" placeholder="height" value={"768"} />
-          </div>
-          <Dropdown
-            value="en"
-            placeholder={t("settings.resolution_presets") || ""}
-            options={[
-              { label: "800x600", key: "800x600" },
-              { label: "1024x768", key: "1024x768" },
-              { label: "1920x1080", key: "1920x1080" },
-            ]}
-          />
-        </div>
-      </div> */}
-      <div class="mb-6 pt-6">
+
+      <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
             <Trans

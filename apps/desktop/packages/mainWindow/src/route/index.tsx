@@ -130,6 +130,10 @@ export const routes: RouteDefinition[] = [
             component: lazy(() => import("@/pages/Settings/General")),
           },
           {
+            path: "/language",
+            component: lazy(() => import("@/pages/Settings/Language")),
+          },
+          {
             path: "/appearance",
             component: lazy(() => import("@/pages/Settings/Appearance")),
           },
@@ -137,6 +141,10 @@ export const routes: RouteDefinition[] = [
             path: "/java",
             component: lazy(() => import("@/pages/Settings/Java")),
             data: SettingsJavaData,
+          },
+          {
+            path: "/privacy",
+            component: lazy(() => import("@/pages/Settings/Privacy")),
           },
         ],
       },

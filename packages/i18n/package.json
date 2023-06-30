@@ -4,6 +4,10 @@
   "exports": {
     ".": {
       "import": "./index.ts"
+    },
+    "./supportedLanguages.json": {
+      "import": "./supportedLanguages.json",
+      "default": "./supportedLanguages.json"
     }
   },
   "devDependencies": {

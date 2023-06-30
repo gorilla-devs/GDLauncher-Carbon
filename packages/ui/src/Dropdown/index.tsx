@@ -79,7 +79,7 @@ const Dropdown = (props: Props) => {
   };
 
   const position = useFloating(buttonRef, menuRef, {
-    placement: "bottom-end",
+    placement: "bottom-start",
     middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
@@ -176,7 +176,7 @@ const Dropdown = (props: Props) => {
           <Portal>
             <ul
               ref={setMenuRef}
-              class="absolute max-h-60 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+              class="absolute max-h-60 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
               onMouseOut={() => {
                 setFocusIn(false);
               }}
@@ -195,7 +195,7 @@ const Dropdown = (props: Props) => {
               <For each={props.options}>
                 {(option) => (
                   <li
-                    class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
+                    class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-600 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full"
                     classList={{
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-500": selectedValue().key === option.key,

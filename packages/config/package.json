@@ -14,8 +14,8 @@
     "lint": "tsc -p . -m commonjs --noEmit"
   },
   "devDependencies": {
-    "@iconify-json/heroicons": "^1.1.8",
-    "@iconify-json/ri": "^1.1.4",
+    "@gd/i18n": "workspace:*",
+    "@iconify/json": "^2.2.82",
     "@typescript-eslint/eslint-plugin": "^5.48.1",
     "@unocss/preset-icons": "^0.48.0",
     "@unocss/preset-wind": "^0.48.0",

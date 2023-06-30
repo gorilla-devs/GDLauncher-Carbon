@@ -17,7 +17,7 @@ import GateAnimation from "../../gate_animation.riv";
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
-  setStep: Setter<number>;
+  nextStep: () => void;
 }
 
 const CodeStep = (props: Props) => {
@@ -139,7 +139,7 @@ const CodeStep = (props: Props) => {
         setEnrollmentInProgress(false);
         setError("Something went wrong while logging in");
         accountEnrollCancelMutation.mutate(undefined);
-        props.setStep(0);
+        props.nextStep();
       },
       onComplete(account) {
         finalizeMutation.mutate(undefined);
@@ -150,7 +150,7 @@ const CodeStep = (props: Props) => {
       onError() {
         setError("Something went wrong while logging in");
         accountEnrollCancelMutation.mutate(undefined);
-        props.setStep(0);
+        props.nextStep();
       },
     });
   });

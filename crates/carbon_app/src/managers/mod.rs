@@ -29,6 +29,7 @@ mod metrics;
 mod minecraft;
 mod modplatforms;
 mod prisma_client;
+pub mod rich_presence;
 mod settings;
 pub mod system_info;
 pub mod vtask;
@@ -68,6 +69,7 @@ mod app {
         pub(crate) prisma_client: Arc<PrismaClient>,
         pub(crate) task_manager: VisualTaskManager,
         pub(crate) system_info_manager: SystemInfoManager,
+        pub(crate) rich_presence_manager: rich_presence::RichPresenceManager,
     }
 
     macro_rules! manager_getter {
@@ -119,6 +121,7 @@ mod app {
                     prisma_client: Arc::new(db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
+                    rich_presence_manager: rich_presence::RichPresenceManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -128,10 +131,15 @@ mod app {
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
-            let app2 = app.clone();
+            let _app = app.clone();
             tokio::spawn(async move {
                 // ignore scanning errors instead of taking down the launcher
-                let _ = app2.clone().instance_manager().scan_instances().await;
+                let _ = _app.clone().instance_manager().scan_instances().await;
+            });
+
+            let _app = app.clone();
+            tokio::spawn(async move {
+                let _ = _app.clone().rich_presence_manager().start_presence().await;
             });
 
             app
@@ -148,6 +156,7 @@ mod app {
         manager_getter!(instance_manager: InstanceManager);
         manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
+        manager_getter!(rich_presence_manager: rich_presence::RichPresenceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
