@@ -10,7 +10,6 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
 import { checkForUpdates } from "@/utils/updaterhelper";
 
 interface AccountsStatus {
@@ -28,7 +27,6 @@ const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
-  const modalsContext = useModal();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -128,12 +126,12 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </div>
-                  <div
+                  {/* <div
                     class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
                     onClick={() =>
                       modalsContext?.openModal({ name: "notification" })
                     }
-                  />
+                  /> */}
                 </div>
               </TabList>
             </Tabs>

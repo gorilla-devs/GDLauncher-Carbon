@@ -42,6 +42,7 @@ const Changelog = () => {
   createEffect(() => {
     const modpackId = parseInt(params.id, 10);
     if (fileId() !== undefined || lastFile()?.id !== undefined) {
+      // eslint-disable-next-line solid/reactivity
       const changelogQuery = rspc.createQuery(() => [
         "modplatforms.curseforgeGetModFileChangelog",
         {

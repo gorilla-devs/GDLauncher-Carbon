@@ -30,6 +30,7 @@ const VersionRow = (props: Props) => {
 
   createEffect(() => {
     if (taskId() !== undefined) {
+      // eslint-disable-next-line solid/reactivity
       setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
     }
   });
