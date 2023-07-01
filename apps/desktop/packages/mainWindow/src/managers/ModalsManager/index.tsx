@@ -187,11 +187,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   >
                     <div
                       style={{ "z-index": `${index() + 1}` }}
-                      class="duration-100 ease-in-out"
-                      classList={{
-                        "scale-100": !!modal.name,
-                        "scale-0": !modal.name,
-                      }}
+                      class="duration-100 ease-in-out animate-enterScaleIn"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -203,10 +199,6 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   </div>
                   <div
                     class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm grid place-items-center z-99 origin-center"
-                    classList={{
-                      "opacity-100": !!modal.name,
-                      "opacity-0": !modal.name,
-                    }}
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();

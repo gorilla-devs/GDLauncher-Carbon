@@ -332,7 +332,7 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6">
+          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6 box-border">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">

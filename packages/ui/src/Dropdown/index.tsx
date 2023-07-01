@@ -9,7 +9,15 @@ import {
 import { Button } from "../Button";
 import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
-import { offset, flip, shift, autoUpdate, hide, size } from "@floating-ui/dom";
+import {
+  offset,
+  flip,
+  shift,
+  autoUpdate,
+  hide,
+  size,
+  Placement,
+} from "@floating-ui/dom";
 
 type Option = {
   label: string | JSX.Element;
@@ -33,6 +41,7 @@ type Props = {
   icon?: JSX.Element;
   placeholder?: string;
   placement?: "bottom" | "top";
+  menuPlacement?: Placement;
 };
 interface DropDownButtonProps {
   children: JSX.Element;
@@ -49,6 +58,7 @@ interface DropDownButtonProps {
   bgColorClass?: string;
   btnDropdown?: boolean;
   icon?: JSX.Element;
+  menuPlacement?: Placement;
 }
 
 const Dropdown = (props: Props) => {
@@ -79,7 +89,7 @@ const Dropdown = (props: Props) => {
   };
 
   const position = useFloating(buttonRef, menuRef, {
-    placement: "bottom-start",
+    placement: props.menuPlacement || "bottom-start",
     middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
@@ -187,7 +197,7 @@ const Dropdown = (props: Props) => {
                 "min-w-20": props.btnDropdown,
               }}
               style={{
-                width: buttonRef()?.offsetWidth + "px" || "auto",
+                "min-width": buttonRef()?.offsetWidth + "px" || "auto",
                 top: `${position.y ?? 0}px`,
                 left: `${position.x ?? 0}px`,
               }}
@@ -243,6 +253,7 @@ const DropDownButton = (props: DropDownButtonProps) => {
         rounded
         value={props.value}
         onChange={(option) => handleChange(option)}
+        menuPlacement={props.menuPlacement}
       />
     </div>
   );

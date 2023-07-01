@@ -81,7 +81,7 @@ const Mod = (props: Props) => {
               </div>
               <div class="flex gap-2 items-center text-darkSlate-100">
                 <i class="text-darkSlate-100 i-ri:user-fill" />
-                <div class="text-sm whitespace-nowrap flex gap-2 max-w-52 overflow-x-auto">
+                <div class="text-sm whitespace-nowrap flex gap-2">
                   <For each={props.mod.authors}>
                     {(author) => <p class="m-0">{author.name}</p>}
                   </For>
@@ -122,6 +122,7 @@ const Mod = (props: Props) => {
           <Switch>
             <Match when={!isModInstalled()}>
               <Dropdown.button
+                menuPlacement="bottom-end"
                 disabled={loading()}
                 options={mappedVersions()}
                 rounded
