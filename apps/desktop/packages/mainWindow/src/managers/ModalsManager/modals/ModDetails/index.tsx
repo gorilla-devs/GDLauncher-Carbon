@@ -39,10 +39,6 @@ const ModDetails = (props: ModalProps) => {
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
 
-  createEffect(() => {
-    console.log("isSticky", isSticky());
-  });
-
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="h-130 w-190">

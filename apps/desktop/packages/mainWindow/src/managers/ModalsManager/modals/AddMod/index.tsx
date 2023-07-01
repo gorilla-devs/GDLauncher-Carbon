@@ -14,7 +14,6 @@ import { createVirtualizer } from "@tanstack/solid-virtual";
 import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
-import Mod from "./Mod";
 import {
   FEModLoaderType,
   FEModSearchParametersQuery,
@@ -23,6 +22,7 @@ import {
 import { RSPCError } from "@rspc/client";
 import { SortFields } from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
+import ModRow from "@/components/ModRow";
 
 const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
@@ -74,7 +74,7 @@ const AddMod = (props: ModalProps) => {
         : allRows().length;
     },
     getScrollElement: () => parentRef(),
-    estimateSize: () => 230,
+    estimateSize: () => 170,
     overscan: 15,
   });
 
@@ -318,8 +318,9 @@ const AddMod = (props: ModalProps) => {
                             }
                           >
                             <Match when={!isLoaderRow() && modpack()}>
-                              <Mod
-                                mod={modpack()}
+                              <ModRow
+                                type="Mod"
+                                data={modpack()}
                                 mcVersion={props.data as string}
                               />
                             </Match>

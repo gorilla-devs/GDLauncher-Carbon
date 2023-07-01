@@ -1,9 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
+import { Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
 import { For, Match, Show, Switch, createEffect } from "solid-js";
-import Modpack from "./Modpack";
-import LogoDark from "/assets/images/logo-dark.svg";
-import { useModal } from "@/managers/ModalsManager";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
@@ -12,6 +9,7 @@ import { SortFields } from "@/utils/constants";
 import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
+import ModRow from "@/components/ModRow";
 
 const NoMoreModpacks = () => {
   return (
@@ -88,7 +86,6 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
 };
 
 export default function Browser() {
-  const modalsContext = useModal();
   const [t] = useTransContext();
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
@@ -198,7 +195,7 @@ export default function Browser() {
         </div>
       </div>
       <div class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700 mx-5">
+        {/* <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700 mx-5">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
               <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
@@ -243,7 +240,7 @@ export default function Browser() {
               </Button>
             </div>
           </div>
-        </div>
+        </div> */}
         <Switch>
           <Match
             when={
@@ -297,8 +294,9 @@ export default function Browser() {
                             }
                           >
                             <Match when={!isLoaderRow() && modpack()}>
-                              <Modpack
-                                modpack={modpack()}
+                              <ModRow
+                                type="Modpack"
+                                data={modpack()}
                                 defaultGroup={defaultGroup.data}
                               />
                             </Match>
