@@ -53,7 +53,17 @@ const Mod = (props: Props) => {
         />
         <div class="flex flex-col gap-2">
           <div class="flex flex-col justify-between">
-            <h2 class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92">
+            <h2
+              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 cursor-pointer hover:underline"
+              onClick={() =>
+                modalsContext?.openModal(
+                  {
+                    name: "modDetails",
+                  },
+                  { mod: props.mod }
+                )
+              }
+            >
               {props.mod.name}
             </h2>
             <div class="flex gap-4 items-center">

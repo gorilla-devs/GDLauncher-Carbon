@@ -299,7 +299,7 @@ const Instance = () => {
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();
-        setIsSticky(rect.top <= 80);
+        setIsSticky(rect.top <= 104);
       }}
     >
       <header
@@ -535,7 +535,7 @@ const Instance = () => {
         </div>
       </header>
       <div class="bg-darkSlate-800 sticky">
-        <div class="flex justify-center p-6">
+        <div class="flex justify-center p-6 min-h-150">
           <div class="bg-darkSlate-800 w-full">
             <div
               class="sticky top-0 flex items-center justify-between mb-4 z-10 bg-darkSlate-800"
