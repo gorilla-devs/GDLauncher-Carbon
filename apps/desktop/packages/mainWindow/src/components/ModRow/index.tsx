@@ -9,7 +9,7 @@ import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
 import { useLocation } from "@solidjs/router";
 import { CreateQueryResult } from "@tanstack/solid-query";
-import { format } from "date-fns";
+import { format, formatDistanceToNowStrict } from "date-fns";
 import {
   For,
   Match,
@@ -187,7 +187,7 @@ const ModRow = (props: Props) => {
                   class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 cursor-pointer hover:underline"
                   onClick={() => handleExplore()}
                 >
-                  {props.data.name}
+                  {props.data?.name}
                 </h2>
                 <div class="flex gap-2 scrollbar-hide">
                   <Switch>
@@ -215,7 +215,9 @@ const ModRow = (props: Props) => {
                 <div class="flex gap-2 items-center text-darkSlate-100">
                   <i class="text-darkSlate-100 i-ri:time-fill" />
                   <div class="whitespace-nowrap text-sm">
-                    {format(new Date(props.data.dateCreated).getTime(), "P")}
+                    {formatDistanceToNowStrict(
+                      new Date(props.data.dateCreated).getTime()
+                    )}
                   </div>
                 </div>
                 <div class="flex gap-2 items-center text-darkSlate-100">
@@ -230,11 +232,11 @@ const ModRow = (props: Props) => {
                     <Switch>
                       <Match when={!isRowSmall()}>
                         <For each={props.data.authors}>
-                          {(author) => <p class="m-0">{author.name}</p>}
+                          {(author) => <p class="m-0">{author?.name}</p>}
                         </For>
                       </Match>
                       <Match when={isRowSmall()}>
-                        <p class="m-0">{props.data.authors[0].name}</p>
+                        <p class="m-0">{props.data.authors[0]?.name}</p>
                         <Show when={props.data.authors.length - 1 > 0}>
                           <p class="m-0">{`+${
                             props.data.authors.length - 1
@@ -250,7 +252,7 @@ const ModRow = (props: Props) => {
               <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15 max-w-full">
                 {truncateText(props.data?.summary, 137)}
               </p>
-              <div class="flex justify-end items-center w-full">
+              <div class="flex justify-end items-end w-full">
                 <Switch>
                   <Match when={mergedProps.type === "Modpack"}>
                     <div class="flex gap-3">
@@ -283,7 +285,7 @@ const ModRow = (props: Props) => {
                               group: props.defaultGroup || 1,
                               use_loaded_icon: true,
                               notes: "",
-                              name: props.data.name,
+                              name: props.data?.name,
                               version: {
                                 Modpack: {
                                   Curseforge: {

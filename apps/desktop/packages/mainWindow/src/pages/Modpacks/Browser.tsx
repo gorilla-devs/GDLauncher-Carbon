@@ -1,6 +1,15 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect } from "solid-js";
+import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
@@ -10,6 +19,7 @@ import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
+import { useModal } from "@/managers/ModalsManager";
 
 const NoMoreModpacks = () => {
   return (
@@ -87,6 +97,8 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
 
 export default function Browser() {
   const [t] = useTransContext();
+  const modalsContext = useModal();
+
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
   const infiniteQuery = useInfiniteModpacksQuery();
@@ -114,9 +126,33 @@ export default function Browser() {
     }
   });
 
+  const [headerHeight, setHeaderHeight] = createSignal(90);
+
+  let containrRef: HTMLDivElement;
+  let resizeObserver: ResizeObserver;
+
+  onMount(() => {
+    resizeObserver = new ResizeObserver((entries) => {
+      window.requestAnimationFrame(() => {
+        setHeaderHeight(entries[0].target.getBoundingClientRect().height);
+      });
+    });
+
+    resizeObserver.observe(containrRef);
+  });
+
+  onCleanup(() => {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    }
+  });
+
   return (
     <div class="box-border h-full w-full relative">
-      <div class="flex flex-col bg-darkSlate-800 pt-5 sticky top-0 left-0 right-0 z-10 px-5">
+      <div
+        ref={(el) => (containrRef = el)}
+        class="flex flex-col bg-darkSlate-800 pt-5 z-10 px-5"
+      >
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -164,6 +200,21 @@ export default function Browser() {
               <Skeleton.select />
             </Show>
           </div>
+          <Button
+            type="outline"
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "instanceCreation",
+              });
+            }}
+          >
+            <Trans
+              key="sidebar.plus_add_instance"
+              options={{
+                defaultValue: "+ Add Instance",
+              }}
+            />
+          </Button>
           <div
             class="cursor-pointer text-2xl"
             classList={{
@@ -194,53 +245,12 @@ export default function Browser() {
           </Button> */}
         </div>
       </div>
-      <div class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        {/* <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700 mx-5">
-          <div class="flex justify-between items-center">
-            <span class="flex gap-4">
-              <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
-                <img class="h-12" src={LogoDark} />
-              </div>
-              <div class="flex flex-col justify-center">
-                <div class="flex flex-col gap-2">
-                  <h2 class="m-0">
-                    <Trans
-                      key="instance.create_new_instance_title"
-                      options={{
-                        defaultValue: "New instance",
-                      }}
-                    />
-                  </h2>
-                  <p class="m-0 text-darkSlate-50">
-                    <Trans
-                      key="instance.create_new_instance_text"
-                      options={{
-                        defaultValue: "Create your own empty instance",
-                      }}
-                    />
-                  </p>
-                </div>
-              </div>
-            </span>
-            <div class="flex gap-3">
-              <Button
-                type="glow"
-                onClick={() =>
-                  modalsContext?.openModal({ name: "instanceCreation" })
-                }
-              >
-                <span class="uppercase">
-                  <Trans
-                    key="instance.create_instance_btn"
-                    options={{
-                      defaultValue: "Create",
-                    }}
-                  />
-                </span>
-              </Button>
-            </div>
-          </div>
-        </div> */}
+      <div
+        class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0"
+        style={{
+          top: `${headerHeight()}px`,
+        }}
+      >
         <Switch>
           <Match
             when={

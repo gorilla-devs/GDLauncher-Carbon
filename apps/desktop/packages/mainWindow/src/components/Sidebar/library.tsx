@@ -21,7 +21,6 @@ import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
-import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { ModLoaderType } from "@gd/core_module/bindings";
@@ -30,7 +29,6 @@ const Sidebar = () => {
   const location = useLocation();
 
   const [t] = useTransContext();
-  const modalsContext = useModal();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -216,7 +214,7 @@ const Sidebar = () => {
             </div>
           </Show>
         </div>
-        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
+        {/* <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
             type="outline"
             onClick={() => {
@@ -239,7 +237,7 @@ const Sidebar = () => {
               />
             </Show>
           </Button>
-        </div>
+        </div> */}
       </div>
     </SiderbarWrapper>
   );

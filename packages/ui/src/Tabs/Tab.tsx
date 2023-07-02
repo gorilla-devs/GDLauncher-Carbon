@@ -16,6 +16,7 @@ interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   onClick?: () => void;
   ignored?: boolean;
   noPointer?: boolean;
+  noPadding?: boolean;
 }
 
 const Tab = (_props: Props) => {
@@ -65,6 +66,7 @@ const Tab = (_props: Props) => {
         "w-full": tabsContext?.variant === "block",
         "w-auto": tabsContext?.variant === "traditional",
         "cursor-pointer": !props.noPointer,
+        "flex flex-col justify-center": props.noPadding,
       }}
       ref={(el) => {
         ref = el;
@@ -84,11 +86,13 @@ const Tab = (_props: Props) => {
             classList={{
               "py-5":
                 tabsContext?.orientation === "horizontal" &&
-                !tabsContext?.paddingY,
+                !tabsContext?.paddingY &&
+                !props.noPadding,
               "border-box": tabsContext?.orientation === "horizontal",
               "py-2":
                 tabsContext?.orientation === "vertical" &&
-                !tabsContext?.paddingY,
+                !tabsContext?.paddingY &&
+                !props.noPadding,
               "px-5":
                 tabsContext?.orientation === "vertical" &&
                 !tabsContext?.paddingX,

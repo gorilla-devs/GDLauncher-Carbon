@@ -2,7 +2,7 @@ import { useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, onMount } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Button } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
@@ -11,6 +11,8 @@ import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
 import { checkForUpdates } from "@/utils/updaterhelper";
+import { Trans } from "@gd/i18n";
+import { useModal } from "@/managers/ModalsManager";
 
 interface AccountsStatus {
   label: {
@@ -27,6 +29,7 @@ const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
+  const modalsContext = useModal();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -34,7 +37,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 3
+      ? 4
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -108,6 +111,25 @@ const AppNavbar = () => {
                   </For>
                 </div>
                 <Spacing class="w-full" />
+                <Tab ignored noPadding>
+                  <Button
+                    size="small"
+                    class="w-max"
+                    type="primary"
+                    onClick={() => {
+                      modalsContext?.openModal({
+                        name: "instanceCreation",
+                      });
+                    }}
+                  >
+                    <Trans
+                      key="sidebar.add_instance"
+                      options={{
+                        defaultValue: "Add Instance",
+                      }}
+                    />
+                  </Button>
+                </Tab>
                 <div class="flex gap-6 items-center">
                   <div
                     onClick={() =>
