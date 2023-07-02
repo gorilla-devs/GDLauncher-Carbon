@@ -266,10 +266,11 @@ const Instance = () => {
       },
       {
         id: params.id,
-        modloader: routeData.instanceDetails.data?.modloaders[0].type_,
+        modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
         title: routeData.instanceDetails.data?.name,
         mcVersion: routeData.instanceDetails.data?.version,
-        modloaderVersion: routeData.instanceDetails.data?.modloaders[0].version,
+        modloaderVersion:
+          routeData.instanceDetails.data?.modloaders[0]?.version,
       }
     );
   };

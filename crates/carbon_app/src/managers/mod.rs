@@ -18,6 +18,7 @@ use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
+use self::rich_presence::RichPresenceManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
@@ -156,7 +157,7 @@ mod app {
         manager_getter!(instance_manager: InstanceManager);
         manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
-        manager_getter!(rich_presence_manager: rich_presence::RichPresenceManager);
+        manager_getter!(rich_presence_manager: RichPresenceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self

@@ -877,7 +877,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .maketmp()
             .await?;
 
-        //let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
         let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
@@ -1015,6 +1014,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.notes = notes;
         }
 
+        let mut need_reinstall = false;
+
         if let Some(version) = update.version {
             info.game_configuration.version =
                 Some(info::GameVersion::Standard(info::StandardVersion {
@@ -1027,6 +1028,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         _ => HashSet::new(),
                     },
                 }));
+            need_reinstall = true;
         }
 
         if let Some(modloader) = update.modloader {
@@ -1044,6 +1046,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         None => HashSet::new(),
                     },
                 }));
+            need_reinstall = true;
         }
 
         if let Some(global_java_args) = update.global_java_args {
@@ -1068,7 +1071,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             if !name_matches {
                 let _lock = self.path_lock.lock().await;
                 let (new_shortpath, new_path) = self.next_folder(&name).await?;
-                tokio::fs::rename(path, new_path).await?;
+                tokio::fs::rename(path.clone(), new_path).await?;
                 *shortpath = new_shortpath.clone();
 
                 self.app
@@ -1090,6 +1093,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
+
+        if need_reinstall {
+            tokio::fs::write(path.join(".first_run_incomplete"), "")
+                .await
+                .context("writing incomplete instance marker")?;
+
+            let app = self.app.clone();
+            tokio::spawn(async move {
+                app.instance_manager()
+                    .prepare_game(InstanceId(*update.instance_id), None)
+                    .await?;
+
+                Ok(()) as anyhow::Result<()>
+            });
+        }
 
         Ok(())
     }
@@ -1516,11 +1534,13 @@ pub enum InstanceMoveTarget {
     EndOfGroup(GroupId),
 }
 
+#[derive(Debug)]
 pub struct Instance {
     pub shortpath: String,
     pub type_: InstanceType,
 }
 
+#[derive(Debug)]
 pub enum InstanceType {
     Valid(InstanceData),
     Invalid(InvalidConfiguration),
@@ -1552,6 +1572,7 @@ impl Instance {
     }
 }
 
+#[derive(Debug)]
 pub enum InvalidConfiguration {
     NoFile,
     Invalid(ConfigurationParseError),
@@ -1579,6 +1600,7 @@ pub enum Late<T> {
     Ready(T),
 }
 
+#[derive(Debug)]
 pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
