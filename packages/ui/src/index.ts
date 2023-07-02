@@ -21,4 +21,5 @@ export {
   createNotification,
 } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
+export { Tooltip } from "./Tooltip";
 export * from "./themes";

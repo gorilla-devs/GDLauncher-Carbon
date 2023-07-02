@@ -80,9 +80,7 @@ const Sidebar = () => {
         <Match when={isSidebarOpened() && key === "vanilla"}>
           {t("vanilla")}
         </Match>
-        <Match when={isSidebarOpened() && key === "Forge"}>
-          {t("vanilla")}
-        </Match>
+        <Match when={isSidebarOpened() && key === "Forge"}>{t("forge")}</Match>
         <Match when={!isSidebarOpened() && key === "vanilla"}>
           <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
         </Match>

@@ -5,7 +5,14 @@ import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
 import { FEMod, InstanceDetails } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Spinner, Tag, createNotification } from "@gd/ui";
+import {
+  Button,
+  Dropdown,
+  Spinner,
+  Tag,
+  Tooltip,
+  createNotification,
+} from "@gd/ui";
 import { RSPCError } from "@rspc/client";
 import { useLocation } from "@solidjs/router";
 import { CreateQueryResult } from "@tanstack/solid-query";
@@ -202,10 +209,22 @@ const ModRow = (props: Props) => {
                         type="fixed"
                       />
                       <Show when={props.data.categories.length - 1 > 0}>
-                        <Tag
-                          name={`+${props.data.categories.length - 1}`}
-                          type="fixed"
-                        />
+                        <Tooltip
+                          content={
+                            <div class="flex">
+                              <For each={props.data.categories.slice(1)}>
+                                {(tag) => (
+                                  <Tag img={tag.iconUrl} type="fixed" />
+                                )}
+                              </For>
+                            </div>
+                          }
+                        >
+                          <Tag
+                            name={`+${props.data.categories.length - 1}`}
+                            type="fixed"
+                          />
+                        </Tooltip>
                       </Show>
                     </Match>
                   </Switch>
@@ -238,9 +257,21 @@ const ModRow = (props: Props) => {
                       <Match when={isRowSmall()}>
                         <p class="m-0">{props.data.authors[0]?.name}</p>
                         <Show when={props.data.authors.length - 1 > 0}>
-                          <p class="m-0">{`+${
-                            props.data.authors.length - 1
-                          }`}</p>
+                          <Tooltip
+                            content={
+                              <div class="flex gap-2">
+                                <For each={props.data.authors.slice(1)}>
+                                  {(author) => (
+                                    <p class="m-0">{author?.name}</p>
+                                  )}
+                                </For>
+                              </div>
+                            }
+                          >
+                            <p class="m-0">{`+${
+                              props.data.authors.length - 1
+                            }`}</p>
+                          </Tooltip>
                         </Show>
                       </Match>
                     </Switch>
