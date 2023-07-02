@@ -333,7 +333,7 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6">
+          <div class="flex sticky bg-gradient-to-t from-darkSlate-800 justify-center h-24 top-52 z-20 w-full pb-2 px-6">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
@@ -348,7 +348,7 @@ const Instance = () => {
 
                   <div class="flex flex-col max-w-185 flex-1">
                     <div
-                      class="flex gap-4 items-center w-fit pl-1"
+                      class="flex gap-4 w-fit items-center pl-1"
                       classList={{
                         "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
@@ -362,7 +362,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="m-0 border-box cursor-pointer z-10 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
+                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
@@ -378,7 +378,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="transition-color ease-in-out duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
+                            class="ease-in-out transition-color duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -388,14 +388,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl z-10 duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName(),
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition i-ri:close-fill text-3xl duration-50 hover:text-red-500 z-10"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -460,7 +460,7 @@ const Instance = () => {
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <ContextMenu menuItems={menuItems()} trigger="click">
                           <div
-                            class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
+                            class="flex justify-center items-center cursor-pointer rounded-full h-8 w-8"
                             style={{
                               background: "rgba(255, 255, 255, 0.1)",
                             }}
@@ -539,7 +539,7 @@ const Instance = () => {
         <div class="flex justify-center p-6">
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="sticky top-0 flex items-center justify-between mb-4 z-10 bg-darkSlate-800"
+              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
               ref={(el) => {
                 refStickyTabs = el;
               }}

@@ -136,7 +136,7 @@ const AddMod = (props: ModalProps) => {
 
   const NoMoreMods = () => {
     return (
-      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
+      <div class="flex flex-col justify-center items-center gap-4 rounded-xl p-5 bg-darkSlate-700 h-56">
         <div class="flex justify-center items-center flex-col text-center">
           <p class="text-darkSlate-50 max-w-100">
             <Trans
@@ -210,8 +210,8 @@ const AddMod = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190 bg-darkSlate-800 p-5">
-        <div class="flex flex-col bg-darkSlate-800 top-0 left-0 right-0 z-10 sticky">
+      <div class="bg-darkSlate-800 p-5 h-130 w-190">
+        <div class="flex flex-col bg-darkSlate-800 top-0 z-10 sticky left-0 right-0">
           <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
             <Input
               placeholder="Type Here"

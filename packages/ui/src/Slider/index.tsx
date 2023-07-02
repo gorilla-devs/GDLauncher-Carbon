@@ -30,6 +30,7 @@ function Slider(props: Props) {
   const defaultValue = () => props.value;
   const min = () => props.min;
   const [currentValue, setCurrentValue] = createSignal<number>(
+    // eslint-disable-next-line solid/reactivity
     defaultValue() || min()
   );
   const [startPosition, setStartPosition] = createSignal<number>(0);

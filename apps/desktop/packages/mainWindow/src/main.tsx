@@ -110,6 +110,7 @@ const loadLanguageResources = async (lang: string) => {
 const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
+  const [isI18nReady, setIsI18nReady] = createSignal(false);
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
@@ -129,12 +130,14 @@ const TransWrapper = (props: TransWrapperProps) => {
             [language]: (await loadLanguageResources(language)) as any,
           },
           partialBundledLanguages: true,
-          // debug: true,
+          debug: true,
         });
-      } else {
-        if (language === _i18nInstance.language) {
-          return;
-        }
+
+        setIsI18nReady(true);
+
+        return;
+      } else if (language === _i18nInstance.language) {
+        return;
       }
 
       if (!Object.keys(supportedLanguages).includes(language)) {
@@ -200,7 +203,7 @@ const TransWrapper = (props: TransWrapperProps) => {
   });
 
   return (
-    <Show when={!settings.isInitialLoading}>
+    <Show when={!settings.isInitialLoading && isI18nReady()}>
       <TransProvider instance={_i18nInstance}>
         <Router source={hashIntegration()}>
           <NavigationManager>
