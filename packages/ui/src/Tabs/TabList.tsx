@@ -85,7 +85,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}
@@ -131,7 +131,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}
@@ -146,7 +146,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}
