@@ -78,7 +78,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex text-white w-full m-0 list-none items-between gap-6 pl-10">
+          <ul class="flex text-white w-full m-0 list-none items-center gap-6 pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">

@@ -1,4 +1,4 @@
-import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
+import { Collapsable, Input, Skeleton } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import {
   For,
@@ -99,7 +99,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700 cursor-pointer"
+                class="flex justify-center items-center cursor-pointer group w-10 h-10 rounded-full bg-darkSlate-700"
                 onClick={() => {
                   toggleSidebar();
                   inputRef?.focus();
@@ -134,7 +134,7 @@ const Sidebar = () => {
                 isSidebarOpened() ? (
                   t("favorite")
                 ) : (
-                  <div class="text-yellow-500 w-6 h-6 i-ri:star-s-fill" />
+                  <div class="w-6 h-6 text-yellow-500 i-ri:star-s-fill" />
                 )
               }
               size={isSidebarOpened() ? "standard" : "small"}
@@ -199,16 +199,24 @@ const Sidebar = () => {
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center">
-              <img src={skull} class="w-16 h-16" />
-              <p class="text-darkSlate-50 text-center text-xs max-w-100">
-                <Trans
-                  key="instance.no_instances_text"
-                  options={{
-                    defaultValue:
-                      "At the moment there are not instances. Add one to start playing!",
-                  }}
-                />
-              </p>
+              <img
+                src={skull}
+                classList={{
+                  "w-16 h-16": isSidebarOpened(),
+                  "w-10 h-10": !isSidebarOpened(),
+                }}
+              />
+              <Show when={isSidebarOpened()}>
+                <p class="text-darkSlate-50 text-center text-xs max-w-50">
+                  <Trans
+                    key="instance.no_instances_text"
+                    options={{
+                      defaultValue:
+                        "At the moment there are not instances. Add one to start playing!",
+                    }}
+                  />
+                </p>
+              </Show>
             </div>
           </Show>
         </div>

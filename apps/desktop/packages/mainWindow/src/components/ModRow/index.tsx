@@ -16,7 +16,7 @@ import {
 import { RSPCError } from "@rspc/client";
 import { useLocation } from "@solidjs/router";
 import { CreateQueryResult } from "@tanstack/solid-query";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { formatDistanceToNowStrict } from "date-fns";
 import {
   For,
   Match,
@@ -153,6 +153,7 @@ const ModRow = (props: Props) => {
 
   onMount(() => {
     resizeObserver = new ResizeObserver((entries) => {
+      // eslint-disable-next-line solid/reactivity
       window.requestAnimationFrame(() => {
         for (let entry of entries) {
           const cr = entry.contentRect;
@@ -176,13 +177,13 @@ const ModRow = (props: Props) => {
   return (
     <div
       ref={(el) => (containrRef = el)}
-      class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl h-40 box-border overflow-hidden"
+      class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-40"
     >
       <div class="flex w-full">
         <div class="flex gap-4 w-full">
           <Show when={!isRowSmall()}>
             <img
-              class="rounded-xl select-none h-20 w-20"
+              class="select-none rounded-xl h-20 w-20"
               src={props.data.logo.thumbnailUrl}
             />
           </Show>
@@ -191,7 +192,7 @@ const ModRow = (props: Props) => {
             <div class="flex flex-col justify-between">
               <div class="flex justify-between w-full">
                 <h2
-                  class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 max-w-92 cursor-pointer hover:underline"
+                  class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer max-w-92 hover:underline"
                   onClick={() => handleExplore()}
                 >
                   {props.data?.name}
@@ -283,7 +284,7 @@ const ModRow = (props: Props) => {
               <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15 max-w-full">
                 {truncateText(props.data?.summary, 137)}
               </p>
-              <div class="flex justify-end items-end w-full">
+              <div class="flex w-full justify-end items-end">
                 <Switch>
                   <Match when={mergedProps.type === "Modpack"}>
                     <div class="flex gap-3">

@@ -67,6 +67,7 @@ const Dropdown = (props: Props) => {
     props.options?.[0];
 
   const [selectedValue, setSelectedValue] = createSignal<Option>(
+    // eslint-disable-next-line solid/reactivity
     defaultValue()
   );
   const [menuOpened, setMenuOpened] = createSignal(false);

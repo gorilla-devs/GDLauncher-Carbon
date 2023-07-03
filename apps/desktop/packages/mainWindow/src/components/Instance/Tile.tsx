@@ -221,6 +221,11 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
+          {/* <Tooltip
+            content="TEST"
+            placement="right-start"
+            color="bg-darkSlate-400"
+          > */}
           <div
             class="flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
@@ -370,6 +375,7 @@ const Tile = (props: Props) => {
               </Match>
             </Switch>
           </div>
+          {/* </Tooltip> */}
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>

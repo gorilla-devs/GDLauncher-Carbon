@@ -15,6 +15,7 @@ type Props = {
   children: JSX.Element;
   content: JSX.Element | string | number;
   placement?: Placement;
+  color?: string;
 };
 
 const Tooltip = (props: Props) => {
@@ -45,15 +46,27 @@ const Tooltip = (props: Props) => {
         <Portal>
           <div
             ref={(el) => setToolTipRef(el)}
-            class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"
+            class={`absolute rounded-lg px-2 py-1 ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
               left: `${position.x ?? 0}px`,
             }}
+            classList={{
+              "bg-darkSlate-900": !props.color,
+            }}
           >
             <div class="relative z-20">{props.content}</div>
-            <div class="absolute left-1/2 -translate-x-1/2 -bottom-1 w-4 h-4 rotate-45 bg-darkSlate-900 z-10" />
+            <div
+              class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
+              classList={{
+                "bg-darkSlate-900": !props.color,
+                "left-1/2 -translate-x-1/2 -bottom-1":
+                  props.placement?.includes("top") || !props.placement,
+                "top-1/2 -translate-y-1/2 -left-1":
+                  props.placement?.includes("right"),
+              }}
+            />
           </div>
         </Portal>
       </Show>
