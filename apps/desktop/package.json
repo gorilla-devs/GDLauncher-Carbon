@@ -55,7 +55,7 @@
     "playwright": "^1.29.1",
     "posthog-js": "^1.68.2",
     "prettier": "^2.8.1",
-    "solid-js": "^1.7.7",
+    "solid-js": "^1.7.3",
     "solid-transition-group": "^0.0.12",
     "typescript": "^5.1.6",
     "vite": "^4.2.1",
