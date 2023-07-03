@@ -36,8 +36,10 @@ pub struct InstanceDetails {
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
+    pub icon_revision: u32,
 }
 
+#[derive(Debug)]
 pub struct InstanceSettingsUpdate {
     pub instance_id: InstanceId,
     pub name: Option<String>,

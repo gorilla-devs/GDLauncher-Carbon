@@ -53,8 +53,8 @@ interface DropDownButtonProps {
 
 const Dropdown = (props: Props) => {
   const defaultValue = () =>
-    props.options.find((option) => option.key === props.value) ||
-    props.options[0];
+    props.options?.find((option) => option.key === props.value) ||
+    props.options?.[0];
 
   const [selectedValue, setSelectedValue] = createSignal<Option>(
     defaultValue()
@@ -79,7 +79,7 @@ const Dropdown = (props: Props) => {
   };
 
   const position = useFloating(buttonRef, menuRef, {
-    placement: "bottom-end",
+    placement: "bottom-start",
     middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
@@ -158,7 +158,7 @@ const Dropdown = (props: Props) => {
             </span>
           </Show>
           <span
-            class="i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100"
+            class="i-ri:arrow-drop-down-line text-3xl ease-in-out duration-100"
             classList={{
               "text-darkSlate-50 group-hover:text-white":
                 !props.disabled &&
@@ -169,8 +169,6 @@ const Dropdown = (props: Props) => {
                 !!props.error || (props.btnDropdown && !props.textColorClass),
               "text-darkSlate-500": props.disabled && !props.btnDropdown,
               "text-primary-200": props.disabled && props.btnDropdown,
-              "rotate-0": menuOpened(),
-              "rotate-180": !menuOpened(),
             }}
           />
         </button>
@@ -178,7 +176,7 @@ const Dropdown = (props: Props) => {
           <Portal>
             <ul
               ref={setMenuRef}
-              class="absolute max-h-60 overflow-y-auto text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+              class="absolute max-h-60 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
               onMouseOut={() => {
                 setFocusIn(false);
               }}
@@ -197,7 +195,7 @@ const Dropdown = (props: Props) => {
               <For each={props.options}>
                 {(option) => (
                   <li
-                    class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-[#343946] py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer"
+                    class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-600 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full"
                     classList={{
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-500": selectedValue().key === option.key,

@@ -1,5 +1,6 @@
 import {
   createContext,
+  createEffect,
   createSignal,
   For,
   JSX,
@@ -8,62 +9,84 @@ import {
 } from "solid-js";
 
 type NotificationType = "success" | "warning" | "error";
+type NotificationPosition = "bottom" | "top";
 
 type Notification = {
   name: string;
   type?: NotificationType;
   position?: string;
+  createdAt: number;
+  duration: number;
 };
 
 type Props = {
   children: Element | HTMLElement | JSX.Element | any;
 };
 
-const NotificationContext = createContext();
+type NotificationContextType = (
+  _name: string,
+  _type?: NotificationType,
+  _position?: NotificationPosition,
+  _duration?: number
+) => void;
+
+const NotificationContext = createContext<NotificationContextType>();
 
 const NotificationsProvider = (props: Props) => {
   const [notifications, setNotifications] = createSignal<Notification[]>([]);
-  const [notificationTimeOut, setNotificationTimeOut] = createSignal<
-    ReturnType<typeof setTimeout>[]
-  >([]);
 
   const addNotification = (
     name: string,
     type?: NotificationType,
-    position?: string
+    position?: NotificationPosition,
+    duration: number = 2000
   ) => {
-    setNotifications((prev) => [
-      ...prev,
-      {
-        name,
-        // type can be success, error or warning and it change the style/color of the notification
-        type: type || "success",
-        // position can be bottom or top, if not present, by default is bottom
-        position: position || "bottom",
-      },
-    ]);
+    const createdAt = Date.now();
+    const newNotification = {
+      name,
+      // type can be success, error or warning and it change the style/color of the notification
+      type: type || "success",
+      // position can be bottom or top, if not present, by default is bottom
+      position: position || "bottom",
+      createdAt,
+      duration,
+    };
 
-    setNotificationTimeOut((prev) => [
-      ...prev,
-      setTimeout(() => {
-        setNotifications((notification) =>
-          notification.slice(1, notification.length)
-        );
-      }, 2000),
-    ]);
+    setNotifications((prev) => [...prev, newNotification]);
   };
 
-  onCleanup(() => {
-    for (const notificationTimeOutt of notificationTimeOut()) {
-      clearTimeout(notificationTimeOutt);
-    }
-  });
+  const setTimers = () => {
+    const now = Date.now();
+    const timers = notifications().map((notification) => {
+      const durationLeft =
+        notification.duration - (now - notification.createdAt);
+      if (durationLeft <= 0) {
+        setNotifications((prev) => {
+          return prev.filter((n) => n.createdAt !== notification.createdAt);
+        });
+        return;
+      }
 
-  const value = addNotification;
+      return setTimeout(() => {
+        setNotifications((prev) => {
+          return prev.filter((n) => n.createdAt !== notification.createdAt);
+        });
+      }, durationLeft);
+    });
+    return timers;
+  };
+
+  createEffect(() => {
+    const timers = setTimers();
+    onCleanup(() => {
+      if (!timers) return;
+      timers.forEach((timer) => timer && clearTimeout(timer));
+    });
+  });
 
   return (
     <>
-      <NotificationContext.Provider value={value}>
+      <NotificationContext.Provider value={addNotification}>
         <For each={notifications()}>
           {(notification, i) => (
             <div
@@ -81,12 +104,22 @@ const NotificationsProvider = (props: Props) => {
                 "bottom-auto": notification.position !== "bottom",
                 "top-12": notification.position === "top",
                 "top-auto": notification.position !== "top",
-                "bg-red-500": notification.type === "error",
-                "bg-yellow-500": notification.type === "warning",
-                "bg-green-500": notification.type === "success",
+                "bg-red-200": notification.type === "error",
+                "bg-yellow-200": notification.type === "warning",
+                "bg-green-200": notification.type === "success",
               }}
             >
-              {notification.name}
+              <div
+                class="i-ri:close-fill absolute top-1 right-1 text-white w-4 h-4 cursor-pointer"
+                onClick={() => {
+                  setNotifications((prev) => {
+                    return prev.filter(
+                      (n) => n.createdAt !== notification.createdAt
+                    );
+                  });
+                }}
+              />
+              <span>{notification.name}</span>
             </div>
           )}
         </For>
@@ -97,11 +130,14 @@ const NotificationsProvider = (props: Props) => {
 };
 
 const createNotification = () => {
-  return useContext(NotificationContext) as (
-    _name: string,
-    _type?: string,
-    _position?: string
-  ) => void;
+  const context = useContext(NotificationContext);
+
+  if (context === undefined) {
+    throw new Error(
+      "`createNotification` must be used within a `NotificationContext`"
+    );
+  }
+  return context;
 };
 
 export { NotificationsProvider, createNotification };

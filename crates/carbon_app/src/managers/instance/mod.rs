@@ -175,6 +175,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    icon_revision: 0,
                 };
 
                 Ok(Some(Instance {
@@ -239,6 +240,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         id: InstanceId(instance.id),
                         name: instance.name,
                         favorite: instance.favorite,
+                        icon_revision: match &status {
+                            InstanceType::Valid(data) => data.icon_revision,
+                            InstanceType::Invalid(_) => 0,
+                        },
                         status: match status {
                             InstanceType::Valid(status) => {
                                 ListInstanceStatus::Valid(ValidListInstance {
@@ -816,7 +821,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .maketmp()
             .await?;
 
-        //let tmpdir = tempdir::TempDir::new("gdl_carbon_create_instance")?;
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
         let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
@@ -886,6 +890,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    icon_revision: 0,
                 }),
             },
         );
@@ -927,12 +932,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .await
                         .context("saving instance icon")?;
 
+                    if let InstanceIcon::RelativePath(oldpath) = &info.icon {
+                        if *oldpath != ipath {
+                            tokio::fs::remove_file(path.join(oldpath))
+                                .await
+                                .context("removing old instance icon")?;
+                        }
+                    }
+
                     InstanceIcon::RelativePath(ipath)
                 }
                 _ => InstanceIcon::Default,
             };
 
             info.icon = icon;
+            data.icon_revision += 1;
         }
 
         if let Some(name) = update.name.clone() {
@@ -942,6 +956,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if let Some(notes) = update.notes {
             info.notes = notes;
         }
+
+        let mut need_reinstall = false;
 
         if let Some(version) = update.version {
             info.game_configuration.version =
@@ -955,6 +971,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         _ => HashSet::new(),
                     },
                 }));
+            need_reinstall = true;
         }
 
         if let Some(modloader) = update.modloader {
@@ -972,6 +989,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         None => HashSet::new(),
                     },
                 }));
+            need_reinstall = true;
         }
 
         if let Some(global_java_args) = update.global_java_args {
@@ -988,32 +1006,51 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let json = schema::make_instance_config(info.clone())?;
         tokio::fs::write(path.join("instance.json"), json).await?;
+
+        let name_matches = Some(&data.config.name) == update.name.as_ref();
         data.config = info;
 
         if let Some(name) = update.name {
-            let _lock = self.path_lock.lock().await;
-            let (new_shortpath, new_path) = self.next_folder(&name).await?;
-            tokio::fs::rename(path, new_path).await?;
-            *shortpath = new_shortpath.clone();
+            if !name_matches {
+                let _lock = self.path_lock.lock().await;
+                let (new_shortpath, new_path) = self.next_folder(&name).await?;
+                tokio::fs::rename(path.clone(), new_path).await?;
+                *shortpath = new_shortpath.clone();
 
-            self.app
-                .prisma_client
-                .instance()
-                .update(
-                    UniqueWhereParam::IdEquals(*update.instance_id),
-                    vec![
-                        SetParam::SetName(name),
-                        SetParam::SetShortpath(new_shortpath),
-                    ],
-                )
-                .exec()
-                .await?;
+                self.app
+                    .prisma_client
+                    .instance()
+                    .update(
+                        UniqueWhereParam::IdEquals(*update.instance_id),
+                        vec![
+                            SetParam::SetName(name),
+                            SetParam::SetShortpath(new_shortpath),
+                        ],
+                    )
+                    .exec()
+                    .await?;
+            }
         }
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
+
+        if need_reinstall {
+            tokio::fs::write(path.join(".first_run_incomplete"), "")
+                .await
+                .context("writing incomplete instance marker")?;
+
+            let app = self.app.clone();
+            tokio::spawn(async move {
+                app.instance_manager()
+                    .prepare_game(InstanceId(*update.instance_id), None)
+                    .await?;
+
+                Ok(()) as anyhow::Result<()>
+            });
+        }
 
         Ok(())
     }
@@ -1122,6 +1159,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    icon_revision: 0,
                 }),
             },
         );
@@ -1280,6 +1318,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
+            icon_revision: 0,
         })
     }
 
@@ -1363,6 +1402,7 @@ pub struct ListInstance {
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
+    pub icon_revision: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1426,11 +1466,13 @@ pub enum InstanceMoveTarget {
     EndOfGroup(GroupId),
 }
 
+#[derive(Debug)]
 pub struct Instance {
     pub shortpath: String,
     pub type_: InstanceType,
 }
 
+#[derive(Debug)]
 pub enum InstanceType {
     Valid(InstanceData),
     Invalid(InvalidConfiguration),
@@ -1462,6 +1504,7 @@ impl Instance {
     }
 }
 
+#[derive(Debug)]
 pub enum InvalidConfiguration {
     NoFile,
     Invalid(ConfigurationParseError),
@@ -1489,10 +1532,12 @@ pub enum Late<T> {
     Ready(T),
 }
 
+#[derive(Debug)]
 pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
+    icon_revision: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -1937,6 +1982,7 @@ mod test {
                 id: instance_id,
                 name: String::from("test"),
                 favorite: false,
+                icon_revision: 0,
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,

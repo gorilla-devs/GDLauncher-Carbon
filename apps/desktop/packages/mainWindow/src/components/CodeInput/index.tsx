@@ -3,6 +3,7 @@ interface Props {
   icon?: string;
   onClick?: () => void;
   disabled?: boolean;
+  id?: string;
 }
 
 export const DeviceCode = (props: Props) => {
@@ -17,6 +18,7 @@ export const DeviceCode = (props: Props) => {
         {props.value}
       </span>
       <span
+        id={props.id}
         class="cursor-pointer text-darkSlate-50 i-ri:file-copy-fill"
         style={{
           color: props.disabled ? "#404759" : "#8A8B8F",

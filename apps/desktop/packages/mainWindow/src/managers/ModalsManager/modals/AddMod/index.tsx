@@ -22,6 +22,7 @@ import {
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { SortFields } from "@/utils/constants";
+import skull from "/assets/images/icons/skull.png";
 
 const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
@@ -135,13 +136,32 @@ const AddMod = (props: ModalProps) => {
 
   const NoMoreMods = () => {
     return (
-      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
+      <div class="flex flex-col justify-center items-center gap-4 rounded-xl p-5 bg-darkSlate-700 h-56">
         <div class="flex justify-center items-center flex-col text-center">
           <p class="text-darkSlate-50 max-w-100">
             <Trans
               key="mods.fetching_no_more_mods"
               options={{
                 defaultValue: "No more mods to load",
+              }}
+            />
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const NoModsAvailable = () => {
+    return (
+      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+        <div class="flex justify-center items-center flex-col text-center">
+          <img src={skull} class="w-16 h-16" />
+
+          <p class="text-darkSlate-50 max-w-100">
+            <Trans
+              key="mods.fetching_no_mods_available"
+              options={{
+                defaultValue: "there is no mod available",
               }}
             />
           </p>
@@ -190,8 +210,8 @@ const AddMod = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190 bg-darkSlate-800 p-5">
-        <div class="flex flex-col bg-darkSlate-800 top-0 left-0 right-0 z-10 sticky">
+      <div class="bg-darkSlate-800 p-5 h-130 w-190">
+        <div class="flex flex-col bg-darkSlate-800 top-0 z-10 sticky left-0 right-0">
           <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
             <Input
               placeholder="Type Here"
@@ -314,6 +334,15 @@ const AddMod = (props: ModalProps) => {
                 </For>
               </div>
             </div>
+          </Match>
+          <Match
+            when={
+              mods().length === 0 &&
+              !infiniteQuery?.isLoading &&
+              !infiniteQuery?.isInitialLoading
+            }
+          >
+            <NoModsAvailable />
           </Match>
           <Match
             when={

@@ -3,7 +3,7 @@ CREATE TABLE "AppConfiguration" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT DEFAULT 0,
     "theme" TEXT NOT NULL DEFAULT 'main',
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
-    "language" TEXT NOT NULL DEFAULT 'en',
+    "language" TEXT NOT NULL DEFAULT 'english',
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
     "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
     "activeAccountUuid" TEXT,
@@ -16,7 +16,8 @@ CREATE TABLE "AppConfiguration" (
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
-    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false
+    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
+    "metricsLevel" INTEGER
 );
 
 -- CreateTable
@@ -93,42 +94,33 @@ CREATE TABLE "InstanceGroup" (
 
 -- CreateTable
 CREATE TABLE "ModFileCache" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "instanceId" INTEGER NOT NULL,
-    "filename" TEXT NOT NULL,
+    "instance_id" INTEGER NOT NULL,
+    "path" TEXT NOT NULL,
     "filesize" INTEGER NOT NULL,
-    "enabled" BOOLEAN NOT NULL,
-    "metadataId" TEXT NOT NULL,
-    CONSTRAINT "ModFileCache_instanceId_fkey" FOREIGN KEY ("instanceId") REFERENCES "Instance" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "ModFileCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "md5" BLOB NOT NULL,
+    CONSTRAINT "ModFileCache_md5_fkey" FOREIGN KEY ("md5") REFERENCES "ModMetadata" ("md5") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "ModMetadata" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "md5" BLOB NOT NULL PRIMARY KEY,
     "murmur2" INTEGER NOT NULL,
-    "sha512" BLOB NOT NULL,
     "name" TEXT,
     "modid" TEXT,
     "version" TEXT,
     "description" TEXT,
     "authors" TEXT,
-    "modloaders" TEXT NOT NULL
+    CONSTRAINT "ModMetadata_murmur2_fkey" FOREIGN KEY ("murmur2") REFERENCES "CurseForgeModCache" ("murmur2") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "CurseForgeModCache" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "murmur2" INTEGER NOT NULL,
-    "projectId" INTEGER NOT NULL,
-    "fileId" INTEGER NOT NULL,
+    "murmur2" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "project_id" INTEGER NOT NULL,
+    "file_id" INTEGER NOT NULL,
     "name" TEXT NOT NULL,
     "urlslug" TEXT NOT NULL,
-    "summary" TEXT NOT NULL,
-    "authors" TEXT NOT NULL,
-    "cachedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "metadataId" TEXT NOT NULL,
-    CONSTRAINT "CurseForgeModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    "summary" TEXT NOT NULL
 );
 
 -- CreateIndex
@@ -153,10 +145,4 @@ CREATE UNIQUE INDEX "ActiveDownloads_file_id_key" ON "ActiveDownloads"("file_id"
 CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ModFileCache_instanceId_filename_key" ON "ModFileCache"("instanceId", "filename");
-
--- CreateIndex
-CREATE UNIQUE INDEX "CurseForgeModCache_metadataId_key" ON "CurseForgeModCache"("metadataId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "CurseForgeModCache_projectId_fileId_key" ON "CurseForgeModCache"("projectId", "fileId");
+CREATE UNIQUE INDEX "ModFileCache_instance_id_path_key" ON "ModFileCache"("instance_id", "path");

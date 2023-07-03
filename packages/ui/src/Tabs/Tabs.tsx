@@ -129,10 +129,15 @@ function Tabs(props: Props) {
     getRegisteredTabs,
     registerTabSpacing,
     registerTabPanel,
+    // eslint-disable-next-line solid/reactivity
     gap: gap(),
+    // eslint-disable-next-line solid/reactivity
     variant: variant(),
+    // eslint-disable-next-line solid/reactivity
     orientation: orientation(),
+    // eslint-disable-next-line solid/reactivity
     paddingX: paddingX(),
+    // eslint-disable-next-line solid/reactivity
     paddingY: paddingY(),
   };
 

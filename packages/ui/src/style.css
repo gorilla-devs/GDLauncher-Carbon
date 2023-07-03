@@ -19,3 +19,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--lightGray-800);
 }
+
+.potato-pc *,
+.potato-pc *::before,
+.potato-pc *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+}

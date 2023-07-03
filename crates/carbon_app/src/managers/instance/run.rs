@@ -13,8 +13,9 @@ use tracing::{debug, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
-use crate::domain::instance::{self as domain, GameLogId, InstanceSettingsUpdate};
+use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
+use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
 use tokio::sync::Semaphore;
 
@@ -76,7 +77,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         }
 
-        let config = data.config.clone();
+        let mut config = data.config.clone();
 
         let (xms_memory, xmx_memory) = match config.game_configuration.memory {
             Some(memory) => memory,
@@ -114,9 +115,9 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instance_path(&instance.shortpath);
 
         let mut version = match config.game_configuration.version {
-            Some(GameVersion::Standard(v)) => Some(v),
+            Some(GameVersion::Standard(ref v)) => Some(v.clone()),
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
-            None if config.modpack.is_some() => None,
+            None if config.modpack.as_ref().is_some() => None,
             None => bail!("Instance has no associated game version and cannot be launched"),
         };
 
@@ -142,6 +143,7 @@ impl ManagerRef<'_, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
         let app = self.app.clone();
+        let instance_shortpath = instance.shortpath.clone();
         tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
@@ -260,20 +262,42 @@ impl ManagerRef<'_, InstanceManager> {
 
                         version = Some(v.clone());
 
-                        app.instance_manager()
-                            .update_instance(InstanceSettingsUpdate {
-                                instance_id,
-                                version: Some(v.release.clone()),
-                                modloader: Some(v.modloaders.iter().next().cloned()),
-                                name: None,
-                                use_loaded_icon: None,
-                                notes: None,
-                                global_java_args: None,
-                                extra_java_args: None,
-                                memory: None,
-                            })
-                            .await?;
+                        let path = app
+                        .settings_manager()
+                        .runtime_path
+                        .get_instances()
+                        .to_path()
+                        .join(instance_shortpath);
 
+                        config.game_configuration.version =
+                            Some(GameVersion::Standard(StandardVersion {
+                                release: v.release.clone(),
+                                modloaders: match &config.game_configuration.version {
+                                    Some(GameVersion::Standard(StandardVersion {
+                                        modloaders,
+                                        ..
+                                    })) => modloaders.clone(),
+                                    _ => std::collections::HashSet::new(),
+                                },
+                            }));
+
+                            config.game_configuration.version =
+                            Some(GameVersion::Standard(StandardVersion {
+                                release: match &config.game_configuration.version {
+                                    Some(GameVersion::Standard(StandardVersion {
+                                        release,
+                                        ..
+                                    })) => release.clone(),
+                                    _ => bail!("custom versions are not yet supported"),
+                                },
+                                modloaders: match v.modloaders.iter().next().cloned() {
+                                    Some(modloader) => std::collections::HashSet::from([modloader]),
+                                    None => std::collections::HashSet::new(),
+                                },
+                            }));
+
+                        let json = make_instance_config(config.clone())?;
+                        tokio::fs::write(path.join("instance.json"), json).await?;
                         is_initial_modpack_launch = true;
                     }
                 }
@@ -404,8 +428,7 @@ impl ManagerRef<'_, InstanceManager> {
                             let supported = fabric_manifest
                                     .game_versions
                                     .iter()
-                                    .find(|v| v.id == version.release)
-                                    .is_some();
+                                    .any(|v| v.id == version.release);
 
                             if !supported {
                                 return Err(anyhow!("Fabric does not support version {}", version.release));
@@ -461,8 +484,7 @@ impl ManagerRef<'_, InstanceManager> {
                             let supported = quilt_manifest
                                     .game_versions
                                     .iter()
-                                    .find(|v| v.id == version.release)
-                                    .is_some();
+                                    .any(|v| v.id == version.release);
 
                             if !supported {
                                 return Err(anyhow!("Quilt does not support version {}", version.release));
@@ -633,6 +655,11 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(Some(mut child)) => {
                     drop(task);
 
+                    let _ = app
+                        .rich_presence_manager()
+                        .update_activity("Playing Minecraft".to_string())
+                        .await;
+
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
                     let (log_id, log) = app.instance_manager().create_log(instance_id).await;
@@ -738,6 +765,8 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Ok(exitcode) = child.wait().await {
                         log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
                     }
+
+                    let _ = app.rich_presence_manager().stop_activity().await;
 
                     let _ = app
                         .instance_manager()

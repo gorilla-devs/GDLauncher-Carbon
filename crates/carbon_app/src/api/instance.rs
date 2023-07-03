@@ -423,6 +423,7 @@ struct ListInstance {
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
+    icon_revision: u32,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -613,6 +614,7 @@ struct InstanceDetails {
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
+    icon_revision: u32,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -711,6 +713,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
             state: value.state.into(),
+            icon_revision: value.icon_revision,
         }
     }
 }
@@ -840,6 +843,7 @@ impl From<manager::ListInstance> for ListInstance {
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),
+            icon_revision: value.icon_revision,
         }
     }
 }
