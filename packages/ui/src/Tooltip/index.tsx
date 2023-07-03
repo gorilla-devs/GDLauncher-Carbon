@@ -51,7 +51,7 @@ const Tooltip = (props: Props) => {
         <Portal>
           <div
             ref={(el) => setToolTipRef(el)}
-            class={`absolute rounded-lg ${props.color || ""}`}
+            class={`absolute rounded-lg z-[100] ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
