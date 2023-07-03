@@ -246,7 +246,7 @@ export default function Browser() {
         </div>
       </div>
       <div
-        class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0"
+        class="flex flex-col pb-5 gap-2 left-0 right-0 absolute bottom-0 overflow-y-hidden"
         style={{
           top: `${headerHeight()}px`,
         }}
@@ -259,7 +259,7 @@ export default function Browser() {
             }
           >
             <div
-              class="h-full overflow-y-auto overflow-x-hidden pr-2 rounded-xl ml-5"
+              class="h-full overflow-y-auto rounded-xl overflow-x-hidden pr-2 ml-5"
               ref={(el) => {
                 infiniteQuery.setParentRef(el);
               }}
