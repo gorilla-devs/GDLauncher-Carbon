@@ -131,5 +131,9 @@ keys! {
 
         MODRINTH_GET_CATEGORIES                     = "modrinthGetCategories";
         MODRINTH_SEARCH                             = "modrinthSearch";
+        MODRINTH_GET_PROJECT                        = "modrinthGetProject";
+        MODRINTH_GET_PROJECTS                       = "modrinthGetProjects";
+        MODRINTH_GET_VERSION                        = "modrinthGetVersion";
+        MODRINTH_GET_VERSIONS                       = "modrinthGetVersions";
     }
 }

@@ -1,11 +1,11 @@
 use std::{fmt::Display, ops::Deref, str::FromStr};
 
-use carbon_macro::into_query_parameters;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::search::{
-    ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr, SearchIndex,
+    ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
+    SearchIndex, VersionID, VersionIDs,
 };
 use anyhow::anyhow;
 
@@ -130,7 +130,7 @@ impl From<FESearchFacet> for SearchFacet {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FESearchFacetOr(Vec<FESearchFacet>);
+pub struct FESearchFacetOr(pub Vec<FESearchFacet>);
 
 impl From<FESearchFacet> for FESearchFacetOr {
     fn from(facet: FESearchFacet) -> Self {
@@ -156,7 +156,9 @@ impl IntoIterator for FESearchFacetOr {
 
 impl FromIterator<FESearchFacet> for FESearchFacetOr {
     fn from_iter<I: IntoIterator<Item = FESearchFacet>>(iter: I) -> Self {
-        let mut c = Vec::new();
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
@@ -166,18 +168,18 @@ impl FromIterator<FESearchFacet> for FESearchFacetOr {
 
 impl From<SearchFacetOr> for FESearchFacetOr {
     fn from(facets: SearchFacetOr) -> Self {
-        FESearchFacetOr::from_iter(facets.into_iter().map(|facet| facet.into()))
+        facets.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<FESearchFacetOr> for SearchFacetOr {
     fn from(facets: FESearchFacetOr) -> Self {
-        SearchFacetOr::from_iter(facets.into_iter().map(|facet| facet.into()))
+        facets.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FESearchFacetAnd(Vec<FESearchFacetOr>);
+pub struct FESearchFacetAnd(pub Vec<FESearchFacetOr>);
 
 impl From<FESearchFacetOr> for FESearchFacetAnd {
     fn from(facets: FESearchFacetOr) -> Self {
@@ -209,7 +211,9 @@ impl IntoIterator for FESearchFacetAnd {
 
 impl FromIterator<FESearchFacetOr> for FESearchFacetAnd {
     fn from_iter<I: IntoIterator<Item = FESearchFacetOr>>(iter: I) -> Self {
-        let mut c = Vec::new();
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
@@ -219,17 +223,16 @@ impl FromIterator<FESearchFacetOr> for FESearchFacetAnd {
 
 impl From<SearchFacetAnd> for FESearchFacetAnd {
     fn from(facets: SearchFacetAnd) -> Self {
-        FESearchFacetAnd::from_iter(facets.into_iter().map(|facet| facet.into()))
+        facets.into_iter().map(Into::into).collect()
     }
 }
 
 impl From<FESearchFacetAnd> for SearchFacetAnd {
     fn from(facets: FESearchFacetAnd) -> Self {
-        SearchFacetAnd::from_iter(facets.into_iter().map(|facet| facet.into()))
+        facets.into_iter().map(Into::into).collect()
     }
 }
 
-#[into_query_parameters]
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct FEProjectSearchParameters {
     pub query: Option<String>,
@@ -244,8 +247,8 @@ impl From<ProjectSearchParameters> for FEProjectSearchParameters {
     fn from(value: ProjectSearchParameters) -> Self {
         FEProjectSearchParameters {
             query: value.query,
-            facets: value.facets.map(|facets| facets.into()),
-            index: value.index.map(|index| index.into()),
+            facets: value.facets.map(Into::into),
+            index: value.index.map(Into::into),
             offset: value.offset,
             limit: value.limit,
             filters: value.filters,
@@ -257,11 +260,139 @@ impl From<FEProjectSearchParameters> for ProjectSearchParameters {
     fn from(value: FEProjectSearchParameters) -> Self {
         ProjectSearchParameters {
             query: value.query,
-            facets: value.facets.map(|facets| facets.into()),
-            index: value.index.map(|index| index.into()),
+            facets: value.facets.map(Into::into),
+            index: value.index.map(Into::into),
             offset: value.offset,
             limit: value.limit,
             filters: value.filters,
         }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEProjectID(pub String);
+
+impl Deref for FEProjectID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<ProjectID> for FEProjectID {
+    fn from(value: ProjectID) -> Self {
+        FEProjectID(value.0)
+    }
+}
+
+impl From<FEProjectID> for ProjectID {
+    fn from(value: FEProjectID) -> Self {
+        ProjectID(value.0)
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEVersionID(pub String);
+
+impl Deref for FEVersionID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<VersionID> for FEVersionID {
+    fn from(value: VersionID) -> Self {
+        FEVersionID(value.0)
+    }
+}
+
+impl From<FEVersionID> for VersionID {
+    fn from(value: FEVersionID) -> Self {
+        VersionID(value.0)
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEProjectIDs(pub Vec<String>);
+
+impl Deref for FEProjectIDs {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for FEProjectIDs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<String> for FEProjectIDs {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        FEProjectIDs(c)
+    }
+}
+
+impl From<ProjectIDs> for FEProjectIDs {
+    fn from(value: ProjectIDs) -> Self {
+        FEProjectIDs(value.ids)
+    }
+}
+
+impl From<FEProjectIDs> for ProjectIDs {
+    fn from(value: FEProjectIDs) -> Self {
+        ProjectIDs { ids: value.0 }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEVersionIDs(pub Vec<String>);
+
+impl Deref for FEVersionIDs {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for FEVersionIDs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<String> for FEVersionIDs {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        FEVersionIDs(c)
+    }
+}
+
+impl From<VersionIDs> for FEVersionIDs {
+    fn from(value: VersionIDs) -> Self {
+        FEVersionIDs(value.ids)
+    }
+}
+
+impl From<FEVersionIDs> for VersionIDs {
+    fn from(value: FEVersionIDs) -> Self {
+        VersionIDs { ids: value.0 }
     }
 }

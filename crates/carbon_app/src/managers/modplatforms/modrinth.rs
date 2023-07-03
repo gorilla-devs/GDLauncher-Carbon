@@ -7,8 +7,11 @@ use url::Url;
 
 use crate::domain::modplatforms::modrinth::{
     project::Project,
-    search::{ProjectSearchParameters, ProjectSearchResponse, VersionHashesQuery, VersionsQuery},
-    tag::Category,
+    responses::{CategoriesResponse, ProjectsResponse, VersionsResponse},
+    search::{
+        ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, VersionHashesQuery,
+        VersionID, VersionIDs,
+    },
     version::Version,
 };
 
@@ -29,7 +32,7 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_categories(&self) -> anyhow::Result<Vec<Category>> {
+    pub async fn get_categories(&self) -> anyhow::Result<CategoriesResponse> {
         let url = self.base_url.join("/tag/category")?;
 
         trace!("GET {}", url);
@@ -39,7 +42,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json::<Vec<Category>>()
+            .json::<CategoriesResponse>()
             .await?;
         Ok(resp)
     }
@@ -66,8 +69,8 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_project(&self, project_id: &str) -> anyhow::Result<Project> {
-        let url = self.base_url.join("project")?.join(project_id)?;
+    pub async fn get_project(&self, project: ProjectID) -> anyhow::Result<Project> {
+        let url = self.base_url.join("project")?.join(&project)?;
 
         trace!("GET {}", url);
 
@@ -82,8 +85,26 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_version(&self, version_id: &str) -> anyhow::Result<Version> {
-        let url = self.base_url.join("version")?.join(version_id)?;
+    pub async fn get_projects(&self, projects: ProjectIDs) -> anyhow::Result<ProjectsResponse> {
+        let mut url = self.base_url.join("projects")?;
+        let query = projects.into_query_parameters()?;
+        url.set_query(Some(&query));
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json::<ProjectsResponse>()
+            .await?;
+        Ok(resp)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_version(&self, version: VersionID) -> anyhow::Result<Version> {
+        let url = self.base_url.join("version")?.join(&version)?;
 
         trace!("GET {}", url);
 
@@ -98,7 +119,7 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_versions(&self, version_ids: &VersionsQuery) -> anyhow::Result<Vec<Version>> {
+    pub async fn get_versions(&self, version_ids: VersionIDs) -> anyhow::Result<VersionsResponse> {
         let mut url = self.base_url.join("versions")?;
         let query = version_ids.into_query_parameters()?;
         url.set_query(Some(&query));
@@ -110,7 +131,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json::<Vec<Version>>()
+            .json::<VersionsResponse>()
             .await?;
         Ok(resp)
     }

@@ -19,7 +19,7 @@ pub struct Version {
     pub loaders: Vec<String>,
     pub featured: bool,
     pub status: Option<Status>,
-    pub requested_status: Option<RequestedStatus>,
+    pub requested_status: Option<RequestedVersionStatus>,
     pub id: String,
     /// The ID of the project this version is for
     pub project_id: String,
@@ -119,7 +119,7 @@ pub enum Status {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum RequestedStatus {
+pub enum RequestedVersionStatus {
     Listed,
     Archived,
     Draft,

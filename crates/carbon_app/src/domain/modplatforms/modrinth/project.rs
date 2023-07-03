@@ -2,6 +2,8 @@
 //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_model)
 
+use std::ops::Deref;
+
 use super::*;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -101,7 +103,7 @@ pub struct GalleryItem {
     pub created: UtcDateTime,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: isize,
+    pub ordering: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -158,7 +160,7 @@ pub enum ProjectStatus {
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum RequestedStatus {
+pub enum RequestedProjectStatus {
     Approved,
     Archived,
     Unlisted,

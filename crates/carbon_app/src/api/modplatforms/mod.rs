@@ -6,7 +6,8 @@ use crate::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
             CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
             CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
-            MODRINTH_SEARCH,
+            MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT, MODRINTH_GET_PROJECTS,
+            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
         },
         router::router,
     },
@@ -90,6 +91,35 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(modrinth::responses::FEProjectSearchResponse::from(response))
 
         }
-        // query MODRINTH_GET_CATEGORIES[app ]
+        query MODRINTH_GET_CATEGORIES[app, args: () ] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_categories().await?;
+
+            Ok(modrinth::responses::FECategoriesResponse::from(response))
+        }
+        query MODRINTH_GET_PROJECT[app, project: modrinth::filters::FEProjectID  ] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_project(project.into()).await?;
+
+            Ok(modrinth::structs::FEProject::from(response))
+        }
+        query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::FEProjectIDs] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_projects(projects.into()).await?;
+
+            Ok(modrinth::responses::FEProjectsResponse::from(response))
+        }
+        query MODRINTH_GET_VERSION[app, version: modrinth::filters::FEVersionID] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_version(version.into()).await?;
+
+            Ok(modrinth::structs::FEVersion::from(response))
+        }
+        query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::FEVersionIDs] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_versions(versions.into()).await?;
+
+            Ok(modrinth::responses::FEVersionsResponse::from(response))
+        }
     }
 }

@@ -162,7 +162,9 @@ impl IntoIterator for SearchFacetOr {
 
 impl FromIterator<SearchFacet> for SearchFacetOr {
     fn from_iter<I: IntoIterator<Item = SearchFacet>>(iter: I) -> Self {
-        let mut c = Vec::new();
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
@@ -203,7 +205,9 @@ impl IntoIterator for SearchFacetAnd {
 
 impl FromIterator<SearchFacetOr> for SearchFacetAnd {
     fn from_iter<I: IntoIterator<Item = SearchFacetOr>>(iter: I) -> Self {
-        let mut c = Vec::new();
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
@@ -261,9 +265,36 @@ pub struct ProjectSearchResponse {
 
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct VersionsQuery {
+pub struct VersionIDs {
     /// list of version ids to fetch
     pub ids: Vec<String>,
+}
+
+impl Deref for VersionIDs {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.ids
+    }
+}
+
+impl IntoIterator for VersionIDs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.ids.into_iter()
+    }
+}
+
+impl FromIterator<String> for VersionIDs {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        VersionIDs { ids: c }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -272,4 +303,57 @@ pub struct VersionHashesQuery {
     pub hashes: Vec<String>,
     /// algorithm used by hashes
     pub algorithm: HashAlgorithm,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ProjectID(pub String);
+
+impl Deref for ProjectID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct VersionID(pub String);
+
+impl Deref for VersionID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[into_query_parameters]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ProjectIDs {
+    pub ids: Vec<String>,
+}
+
+impl Deref for ProjectIDs {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.ids
+    }
+}
+
+impl IntoIterator for ProjectIDs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.ids.into_iter()
+    }
+}
+
+impl FromIterator<String> for ProjectIDs {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        ProjectIDs { ids: c }
+    }
 }
