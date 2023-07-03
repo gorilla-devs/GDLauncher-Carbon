@@ -16,6 +16,9 @@ type Props = {
   content: JSX.Element | string | number;
   placement?: Placement;
   color?: string;
+  noTip?: boolean;
+  noPadding?: boolean;
+  opened?: boolean;
 };
 
 const Tooltip = (props: Props) => {
@@ -29,7 +32,7 @@ const Tooltip = (props: Props) => {
 
   const position = useFloating(elementRef, toolTipRef, {
     placement: props.placement || "top",
-    middleware: [offset(5), flip(), shift(), hide(), size()],
+    middleware: [offset(10), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
         animationFrame: true,
@@ -40,13 +43,15 @@ const Tooltip = (props: Props) => {
     if (position.middlewareData.hide?.referenceHidden) setTooltipOpened(false);
   });
 
+  let hoverTimeout: ReturnType<typeof setTimeout>;
+
   return (
     <>
-      <Show when={tooltipOpened()}>
+      <Show when={props.opened || tooltipOpened()}>
         <Portal>
           <div
             ref={(el) => setToolTipRef(el)}
-            class={`absolute rounded-lg px-2 py-1 ${props.color || ""}`}
+            class={`absolute rounded-lg ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
@@ -54,19 +59,22 @@ const Tooltip = (props: Props) => {
             }}
             classList={{
               "bg-darkSlate-900": !props.color,
+              "px-2 py-1": !props.noPadding,
             }}
           >
             <div class="relative z-20">{props.content}</div>
-            <div
-              class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
-              classList={{
-                "bg-darkSlate-900": !props.color,
-                "left-1/2 -translate-x-1/2 -bottom-1":
-                  props.placement?.includes("top") || !props.placement,
-                "top-1/2 -translate-y-1/2 -left-1":
-                  props.placement?.includes("right"),
-              }}
-            />
+            <Show when={!props.noTip}>
+              <div
+                class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
+                classList={{
+                  "bg-darkSlate-900": !props.color,
+                  "left-1/2 -translate-x-1/2 -bottom-1":
+                    props.placement?.includes("top") || !props.placement,
+                  "top-1/2 -translate-y-1/2 -left-1":
+                    props.placement?.includes("right"),
+                }}
+              />
+            </Show>
           </div>
         </Portal>
       </Show>
@@ -74,9 +82,12 @@ const Tooltip = (props: Props) => {
       <div
         ref={(el) => setElementRef(el)}
         onMouseOver={() => {
-          setTooltipOpened(true);
+          hoverTimeout = setTimeout(() => {
+            setTooltipOpened(true);
+          }, 400);
         }}
         onMouseOut={() => {
+          clearTimeout(hoverTimeout);
           setTooltipOpened(false);
         }}
       >

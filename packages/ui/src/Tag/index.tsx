@@ -4,6 +4,7 @@ type Props = {
   name?: string;
   img?: string | undefined | null;
   type?: "fixed" | "default";
+  size?: "medium" | "small";
   onClose?: (_name: string) => void;
 };
 
@@ -12,10 +13,12 @@ export const Tag = (props: Props) => {
 
   return (
     <div
-      class="flex gap-2 items-center px-3 py-2 bg-darkSlate-700 rounded-md max-h-8 h-full box-border select-none"
+      class="flex gap-2 items-center bg-darkSlate-700 rounded-md max-h-8 h-full box-border select-none"
       classList={{
         "bg-darkSlate-700": mergedProps.type === "default",
         "bg-darkSlate-900": mergedProps.type === "fixed",
+        "px-3 py-2": props.size === "medium" || !props.size,
+        "px-2 py-1": props.size === "small",
       }}
     >
       <Show when={props.img}>

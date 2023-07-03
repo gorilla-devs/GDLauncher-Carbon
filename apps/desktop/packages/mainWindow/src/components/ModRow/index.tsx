@@ -174,6 +174,82 @@ const ModRow = (props: Props) => {
     }
   });
 
+  const OverviewTooltip = () => {
+    return (
+      <div class="flex flex-col w-70 pb-4">
+        <h4 class="w-full px-4"> {props.data?.name}</h4>
+        <div
+          class="select-none w-full h-20 bg-cover bg-center"
+          style={{
+            "background-image": `url('${props.data.logo.thumbnailUrl}')`,
+          }}
+        />
+        <div class="px-4 pt-4">
+          <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis">
+            {props.data?.summary}
+          </p>
+          <div class="flex gap-2 scrollbar-hide mt-4">
+            <For each={props.data.categories}>
+              {(tag) => <Tag img={tag.iconUrl} type="fixed" size="small" />}
+            </For>
+          </div>
+          <div class="flex flex-col gap-2 items-start mt-4">
+            <div class="flex flex-col gap-2 items-start text-darkSlate-100">
+              <p class="m-0 text-lightSlate-100">
+                <Trans
+                  key="modpack.authors"
+                  options={{
+                    defaultValue: "Authors: ",
+                  }}
+                />
+              </p>
+              <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
+                <For each={props.data.authors}>
+                  {(author, i) => (
+                    <>
+                      <p class="m-0">{author?.name}</p>
+                      <Show when={i() !== props.data.authors.length - 1}>
+                        <span class="text-lightSlate-100">•</span>
+                      </Show>
+                    </>
+                  )}
+                </For>
+              </div>
+            </div>
+            <div class="flex gap-2 items-center text-darkSlate-100">
+              <p class="m-0 text-lightSlate-100">
+                <Trans
+                  key="modpack.last_updated"
+                  options={{
+                    defaultValue: "Last time updated: ",
+                  }}
+                />
+              </p>
+              <div class="whitespace-nowrap text-sm">
+                {formatDistanceToNowStrict(
+                  new Date(props.data.dateModified).getTime()
+                )}
+              </div>
+            </div>
+            <div class="flex gap-2 items-center text-darkSlate-100">
+              <p class="m-0 text-lightSlate-100">
+                <Trans
+                  key="modpack.total_download"
+                  options={{
+                    defaultValue: "Total download",
+                  }}
+                />
+              </p>
+              <div class="text-sm whitespace-nowrap">
+                {formatDownloadCount(props.data.downloadCount)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       ref={(el) => (containrRef = el)}
@@ -188,15 +264,22 @@ const ModRow = (props: Props) => {
             />
           </Show>
           <div class="flex flex-col gap-2 w-full">
-            {/* TODO: add tooltip when there are multiples authors and/or multiple categories */}
             <div class="flex flex-col justify-between">
               <div class="flex justify-between w-full">
-                <h2
-                  class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer max-w-92 hover:underline"
-                  onClick={() => handleExplore()}
+                <Tooltip
+                  noPadding
+                  noTip
+                  content={<OverviewTooltip />}
+                  placement="right-start"
+                  color="bg-darkSlate-900"
                 >
-                  {props.data?.name}
-                </h2>
+                  <h2
+                    class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer max-w-80 hover:underline"
+                    onClick={() => handleExplore()}
+                  >
+                    {props.data?.name}
+                  </h2>
+                </Tooltip>
                 <div class="flex gap-2 scrollbar-hide">
                   <Switch>
                     <Match when={!isRowSmall()}>

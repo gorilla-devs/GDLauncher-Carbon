@@ -59,7 +59,6 @@ const defaultModals: Hash = {
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance",
-    preventClose: true,
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),

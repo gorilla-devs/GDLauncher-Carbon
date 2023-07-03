@@ -27,7 +27,6 @@ import { ModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
-
   const [t] = useTransContext();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
@@ -222,7 +221,7 @@ const Sidebar = () => {
         </div>
         {/* <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
-            type="outline"
+            type="primary"
             onClick={() => {
               modalsContext?.openModal({
                 name: "instanceCreation",
