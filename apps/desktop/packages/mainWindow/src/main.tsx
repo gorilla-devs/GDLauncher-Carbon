@@ -130,7 +130,7 @@ const TransWrapper = (props: TransWrapperProps) => {
             [language]: (await loadLanguageResources(language)) as any,
           },
           partialBundledLanguages: true,
-          debug: true,
+          // debug: true,
         });
 
         setIsI18nReady(true);
