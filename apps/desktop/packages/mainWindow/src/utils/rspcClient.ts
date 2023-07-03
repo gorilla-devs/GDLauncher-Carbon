@@ -37,21 +37,32 @@ export default function initRspc(_port: number) {
     const context = rspc.useContext();
     let subscription: Unsubscribable | null = null;
 
+    function init() {
+      if (!subscription) {
+        subscription = client.subscription(["invalidateQuery"], {
+          onData: (invalidateOperation) => {
+            const key = [invalidateOperation!.key];
+            if (invalidateOperation.args !== null) {
+              key.concat(invalidateOperation.args);
+            }
+            context.queryClient.invalidateQueries(key);
+          },
+        });
+      }
+    }
+
     wsClient.getConnection()?.addEventListener("open", (_event) => {
-      subscription = client.subscription(["invalidateQuery"], {
-        onData: (invalidateOperation) => {
-          const key = [invalidateOperation!.key];
-          if (invalidateOperation.args !== null) {
-            key.concat(invalidateOperation.args);
-          }
-          context.queryClient.invalidateQueries(key);
-        },
-      });
+      init();
     });
 
     wsClient.getConnection()?.addEventListener("close", (_event) => {
       subscription?.unsubscribe();
+      subscription = null;
     });
+
+    if (!subscription) {
+      init();
+    }
   };
 
   return {

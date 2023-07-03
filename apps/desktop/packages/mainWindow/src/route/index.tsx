@@ -7,7 +7,6 @@ import AppData from "@/pages/app.data";
 import BrowserData from "@/pages/Modpacks/browser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
-import ModpackChangelogData from "@/pages/Modpacks/modpack.changelog";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
 import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";
@@ -111,7 +110,6 @@ export const routes: RouteDefinition[] = [
           {
             path: "/changelog",
             component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
-            data: ModpackChangelogData,
           },
           {
             path: "/screenshots",
@@ -132,6 +130,10 @@ export const routes: RouteDefinition[] = [
             component: lazy(() => import("@/pages/Settings/General")),
           },
           {
+            path: "/language",
+            component: lazy(() => import("@/pages/Settings/Language")),
+          },
+          {
             path: "/appearance",
             component: lazy(() => import("@/pages/Settings/Appearance")),
           },
@@ -139,6 +141,10 @@ export const routes: RouteDefinition[] = [
             path: "/java",
             component: lazy(() => import("@/pages/Settings/Java")),
             data: SettingsJavaData,
+          },
+          {
+            path: "/privacy",
+            component: lazy(() => import("@/pages/Settings/Privacy")),
           },
         ],
       },

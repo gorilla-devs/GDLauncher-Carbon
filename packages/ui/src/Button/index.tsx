@@ -67,7 +67,8 @@ const getVariant = (
     "rounded-full": rounded,
     "rounded-md": !rounded,
     uppercase,
-    "cursor-pointer": !isLoading,
+    "cursor-pointer": !isLoading && !isDisabled,
+    "cursor-not-allowed": isDisabled,
     "box-border": true,
     "border-solid": true,
     "scale-x-100": isLoading,
@@ -79,7 +80,7 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`bg-${variant}-500`]: true,
+      [`bg-${variant}-500`]: !isDisabled,
       [`hover:bg-${variant}-300`]: !isDisabled,
       "bg-darkSlate-800": isDisabled,
       "text-darkSlate-500": isDisabled,
@@ -116,7 +117,7 @@ const getVariant = (
     },
     transparent: {
       ...commonStyle,
-      "backdrop-blur-md": true,
+      // "backdrop-blur-md": true,
       "bg-darkSlate-800": true,
       "text-darkSlate-500": isDisabled,
       "border-0": true,

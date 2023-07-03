@@ -11,6 +11,7 @@ import { mappedMcVersions } from "@/utils/mcVersion";
 import { SortFields } from "@/utils/constants";
 import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
+import skull from "/assets/images/icons/skull.png";
 
 const NoMoreModpacks = () => {
   return (
@@ -21,6 +22,25 @@ const NoMoreModpacks = () => {
             key="instance.fetching_no_more_modpacks"
             options={{
               defaultValue: "No more modpacks to load",
+            }}
+          />
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const NoModpacksAvailable = () => {
+  return (
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+      <div class="flex justify-center items-center flex-col text-center">
+        <img src={skull} class="w-16 h-16" />
+
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_no_modpacks_available"
+            options={{
+              defaultValue: "No modpacks available",
             }}
           />
         </p>
@@ -177,8 +197,8 @@ export default function Browser() {
           </Button> */}
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700">
+      <div class="flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
+        <div class="flex flex-col gap-4 rounded-xl py-4 px-5 bg-darkSlate-700 mx-5">
           <div class="flex justify-between items-center">
             <span class="flex gap-4">
               <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
@@ -232,7 +252,7 @@ export default function Browser() {
             }
           >
             <div
-              class="w-full h-full overflow-y-auto overflow-x-hidden"
+              class="h-full overflow-y-auto overflow-x-hidden pr-2 rounded-xl ml-5"
               ref={(el) => {
                 infiniteQuery.setParentRef(el);
               }}
@@ -301,7 +321,18 @@ export default function Browser() {
               infiniteQuery?.infiniteQuery.isInitialLoading
             }
           >
-            <Skeleton.modpacksList />
+            <div class="m-x-5">
+              <Skeleton.modpacksList />
+            </div>
+          </Match>
+          <Match
+            when={
+              modpacks().length === 0 &&
+              !infiniteQuery?.infiniteQuery.isLoading &&
+              !infiniteQuery?.infiniteQuery.isInitialLoading
+            }
+          >
+            <NoModpacksAvailable />
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
             <ErrorFetchingModpacks

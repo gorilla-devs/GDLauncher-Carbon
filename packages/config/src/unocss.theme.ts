@@ -134,9 +134,12 @@ const theme = {
     keyframes: {
       loadingbar:
         "{ 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }",
+      enterScaleIn:
+        "{ 0% { transform: scale(.9); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }",
     },
-    duration: { loadingbar: "1s" },
-    timingFns: { loadingbar: "linear" },
+
+    durations: { loadingbar: "1s", enterScaleIn: "200ms" },
+    timingFns: { loadingbar: "linear", enterScaleIn: "ease-in-out" },
     counts: { loadingbar: "infinite" },
   },
 };

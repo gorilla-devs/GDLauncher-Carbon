@@ -1,4 +1,4 @@
-import { Link, useLocation, useMatch, useRouteData } from "@solidjs/router";
+import { useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Show, createEffect, onMount } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
@@ -7,16 +7,10 @@ import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
-import { AccountType, Procedures } from "@gd/core_module/bindings";
+import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
-import updateAvailable, { checkForUpdates } from "@/utils/updaterhelper";
-
-type EnrollStatusResult = Extract<
-  Procedures["queries"],
-  { key: "account.getAccountStatus" }
->["result"];
+import { checkForUpdates } from "@/utils/updaterhelper";
 
 interface AccountsStatus {
   label: {
@@ -24,7 +18,7 @@ interface AccountsStatus {
     icon: string | undefined;
     uuid: string;
     type: AccountType;
-    status: EnrollStatusResult | undefined;
+    status: AccountStatus | undefined;
   };
   key: string;
 }
@@ -32,7 +26,6 @@ interface AccountsStatus {
 const AppNavbar = () => {
   const location = useLocation();
   const navigate = useGDNavigate();
-  const modalsContext = useModal();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
 
   const isLogin = useMatch(() => "/");
@@ -41,7 +34,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 4
+      ? 3
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -66,9 +59,6 @@ const AppNavbar = () => {
       setAccounts(mappedAccounts);
     }
   });
-
-  // const runningInstances = () =>
-  //   Object.values(activeInstances).filter((running) => running).length;
 
   onMount(() => {
     checkForUpdates();
@@ -107,7 +97,10 @@ const AppNavbar = () => {
                           }}
                         >
                           <Tab>
-                            <li class="no-underline">{route.label}</li>
+                            <div class="flex items-center gap-2">
+                              <i class={"w-5 h-5 " + route.icon} />
+                              <li class="no-underline">{route.label}</li>
+                            </div>
                           </Tab>
                         </div>
                       );
@@ -116,32 +109,13 @@ const AppNavbar = () => {
                 </div>
                 <Spacing class="w-full" />
                 <div class="flex gap-6 items-center">
-                  <Show when={updateAvailable()}>
-                    <Tab ignored>
-                      <div
-                        class="cursor-pointer text-2xl i-ri:download-fill text-green-500"
-                        onClick={() => {
-                          window.checkUpdate();
-                        }}
-                      />
-                    </Tab>
-                  </Show>
-                  {/* <Tab ignored noPointer={true}>
-                    <div class="relative">
-                      <Show when={runningInstances() > 0}>
-                        <div class="absolute w-4 h-4 rounded-full text-white flex justify-center items-center text-xs -top-1 -right-1 bg-red-500 z-30">
-                          {runningInstances()}
-                        </div>
-                      </Show>
-                      <div
-                        class="text-2xl z-20 cursor-pointer i-ri:terminal-box-fill text-dark-slate-50"
-                        onClick={() => {
-                          modalsContext?.openModal({ name: "logViewer" });
-                        }}
-                      />
-                    </div>
-                  </Tab> */}
-                  <Link href="/settings" class="no-underline">
+                  <div
+                    onClick={() =>
+                      navigate("/settings", {
+                        getLastInstance: true,
+                      })
+                    }
+                  >
                     <Tab>
                       <div
                         class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
@@ -151,13 +125,13 @@ const AppNavbar = () => {
                         }}
                       />
                     </Tab>
-                  </Link>
-                  <div
+                  </div>
+                  {/* <div
                     class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
                     onClick={() =>
                       modalsContext?.openModal({ name: "notification" })
                     }
-                  />
+                  /> */}
                 </div>
               </TabList>
             </Tabs>

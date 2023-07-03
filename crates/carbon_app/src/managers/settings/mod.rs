@@ -139,10 +139,23 @@ impl ManagerRef<'_, SettingsManager> {
             ));
             something_changed = true;
         }
+
         if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::is_legal_accepted::set(is_legal_accepted)],
+            ));
+            something_changed = true;
+        }
+
+        if let Some(metrics_level) = incoming_settings.metrics_level {
+            if !(0..=3).contains(&metrics_level) {
+                return Err(anyhow::anyhow!("Invalid metrics level"));
+            }
+
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::metrics_level::set(Some(metrics_level))],
             ));
             something_changed = true;
         }

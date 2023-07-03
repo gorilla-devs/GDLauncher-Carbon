@@ -21,6 +21,7 @@ declare global {
     releaseChannel: (releaseChannel: string) => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
+    openCMPWindow: () => void;
     getCoreModulePort: () => Promise<number>;
     getCurrentOS: () => Promise<{ platform: string; arch: string }>;
   }

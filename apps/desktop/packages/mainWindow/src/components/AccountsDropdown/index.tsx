@@ -8,7 +8,12 @@ import {
 } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
 import { queryClient, rspc } from "@/utils/rspcClient";
-import { AccountType, DeviceCode, Procedures } from "@gd/core_module/bindings";
+import {
+  AccountEntry,
+  AccountStatus,
+  AccountType,
+  DeviceCode,
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
@@ -19,7 +24,7 @@ export type Label = {
   icon: string | undefined;
   uuid: string;
   type: AccountType;
-  status: EnrollStatusResult | undefined;
+  status: AccountStatus | undefined;
 };
 
 export type Account = {
@@ -40,22 +45,7 @@ export type Props = {
   id?: string;
 };
 
-type Accounts = Extract<
-  Procedures["queries"],
-  { key: "account.getAccounts" }
->["result"];
-
-type ActiveUUID = Extract<
-  Procedures["queries"],
-  { key: "account.setActiveUuid" }
->["result"];
-
-type EnrollStatusResult = Extract<
-  Procedures["queries"],
-  { key: "account.getAccountStatus" }
->["result"];
-
-const mapStatus = (status: EnrollStatusResult | undefined) => {
+const mapStatus = (status: AccountStatus | undefined) => {
   return (
     <Switch
       fallback={
@@ -206,11 +196,12 @@ export const AccountsDropdown = (props: Props) => {
   const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
     onMutate: async (
       uuid
-    ): Promise<{ previousActiveUUID: ActiveUUID } | undefined> => {
+    ): Promise<{ previousActiveUUID: string } | undefined> => {
       await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
 
-      const previousActiveUUID: ActiveUUID | undefined =
-        queryClient.getQueryData(["account.setActiveUuid"]);
+      const previousActiveUUID: string | undefined = queryClient.getQueryData([
+        "account.setActiveUuid",
+      ]);
 
       queryClient.setQueryData(["account.setActiveUuid", null], uuid);
 
@@ -219,7 +210,7 @@ export const AccountsDropdown = (props: Props) => {
     onError: (
       error,
       _variables,
-      context: { previousActiveUUID: ActiveUUID } | undefined
+      context: { previousActiveUUID: string } | undefined
     ) => {
       addNotification(error.message, "error");
 
@@ -284,23 +275,24 @@ export const AccountsDropdown = (props: Props) => {
     onMutate: async (
       uuid
     ): Promise<
-      { previousAccounts: Accounts; previousActiveUUID: ActiveUUID } | undefined
+      | { previousAccounts: AccountEntry[]; previousActiveUUID: string }
+      | undefined
     > => {
       await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
       await queryClient.cancelQueries({ queryKey: ["account.getActiveUuid"] });
 
-      const previousAccounts: Accounts | undefined = queryClient.getQueryData([
-        "account.getAccounts",
+      const previousAccounts: AccountEntry[] | undefined =
+        queryClient.getQueryData(["account.getAccounts"]);
+
+      const previousActiveUUID: string | undefined = queryClient.getQueryData([
+        "account.getActiveUuid",
       ]);
 
-      const previousActiveUUID: ActiveUUID | undefined =
-        queryClient.getQueryData(["account.getActiveUuid"]);
-
-      queryClient.setQueryData(["account.getActiveUuid", null], null);
+      queryClient.setQueryData(["account.getActiveUuid"], null);
 
       queryClient.setQueryData(
         ["account.getAccounts", null],
-        (old: Accounts | undefined) => {
+        (old: AccountEntry[] | undefined) => {
           const filteredAccounts = old?.filter(
             (account) => account.uuid !== uuid
           );
@@ -316,7 +308,7 @@ export const AccountsDropdown = (props: Props) => {
       error,
       _variables,
       context:
-        | { previousAccounts: Accounts; previousActiveUUID: ActiveUUID }
+        | { previousAccounts: AccountEntry[]; previousActiveUUID: string }
         | undefined
     ) => {
       if (routeData.accounts.data?.length === 0) {
@@ -442,9 +434,7 @@ export const AccountsDropdown = (props: Props) => {
         </div>
 
         <span
-          class={`i-ri:arrow-drop-up-line text-3xl ease-in-out duration-100 ${
-            menuOpened() ? "rotate-180" : "rotate-0"
-          }`}
+          class="text-3xl ease-in-out duration-100 i-ri:arrow-drop-down-line"
           classList={{
             "text-darkSlate-50 group-hover:text-white": !props.disabled,
             "text-darkSlate-500": props.disabled,
@@ -499,7 +489,7 @@ export const AccountsDropdown = (props: Props) => {
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
               <div
-                class="text-darkSlate-50 cursor-pointer transition ease-in-out i-ri:file-copy-fill text-sm hover:text-white"
+                class="text-darkSlate-50 ease-in-out cursor-pointer transition i-ri:file-copy-fill text-sm hover:text-white"
                 onClick={() => {
                   navigator.clipboard.writeText(
                     (activeAccount() as Label)?.uuid
