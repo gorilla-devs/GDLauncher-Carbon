@@ -11,7 +11,7 @@ use anyhow::anyhow;
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
-pub enum FESearchIndex {
+pub enum FEModrinthSearchIndex {
     Relevance,
     Downloads,
     Follows,
@@ -19,39 +19,39 @@ pub enum FESearchIndex {
     Updated,
 }
 
-impl From<SearchIndex> for FESearchIndex {
+impl From<SearchIndex> for FEModrinthSearchIndex {
     fn from(search_index: SearchIndex) -> Self {
         match search_index {
-            SearchIndex::Relevance => FESearchIndex::Relevance,
-            SearchIndex::Downloads => FESearchIndex::Downloads,
-            SearchIndex::Follows => FESearchIndex::Follows,
-            SearchIndex::Newest => FESearchIndex::Newest,
-            SearchIndex::Updated => FESearchIndex::Updated,
+            SearchIndex::Relevance => FEModrinthSearchIndex::Relevance,
+            SearchIndex::Downloads => FEModrinthSearchIndex::Downloads,
+            SearchIndex::Follows => FEModrinthSearchIndex::Follows,
+            SearchIndex::Newest => FEModrinthSearchIndex::Newest,
+            SearchIndex::Updated => FEModrinthSearchIndex::Updated,
         }
     }
 }
 
-impl From<FESearchIndex> for SearchIndex {
-    fn from(search_index: FESearchIndex) -> Self {
+impl From<FEModrinthSearchIndex> for SearchIndex {
+    fn from(search_index: FEModrinthSearchIndex) -> Self {
         match search_index {
-            FESearchIndex::Relevance => SearchIndex::Relevance,
-            FESearchIndex::Downloads => SearchIndex::Downloads,
-            FESearchIndex::Follows => SearchIndex::Follows,
-            FESearchIndex::Newest => SearchIndex::Newest,
-            FESearchIndex::Updated => SearchIndex::Updated,
+            FEModrinthSearchIndex::Relevance => SearchIndex::Relevance,
+            FEModrinthSearchIndex::Downloads => SearchIndex::Downloads,
+            FEModrinthSearchIndex::Follows => SearchIndex::Follows,
+            FEModrinthSearchIndex::Newest => SearchIndex::Newest,
+            FEModrinthSearchIndex::Updated => SearchIndex::Updated,
         }
     }
 }
 
 #[derive(Type, Debug, Clone)]
-pub enum FESearchFacet {
+pub enum FEModrinthSearchFacet {
     Category(String),
     Version(String),
     License(String),
     ProjectType(String),
 }
 
-impl FromStr for FESearchFacet {
+impl FromStr for FEModrinthSearchFacet {
     type Err = anyhow::Error;
 
     fn from_str(facet: &str) -> Result<Self, Self::Err> {
@@ -59,35 +59,37 @@ impl FromStr for FESearchFacet {
             return Err(anyhow!("Improperly formatted search facet `{}`", facet));
         };
         match facet_type {
-            "categories" => Ok(FESearchFacet::Category(value.to_string())),
-            "versions" => Ok(FESearchFacet::Version(value.to_string())),
-            "license" => Ok(FESearchFacet::License(value.to_string())),
-            "project_type" => Ok(FESearchFacet::ProjectType(value.to_string())),
+            "categories" => Ok(FEModrinthSearchFacet::Category(value.to_string())),
+            "versions" => Ok(FEModrinthSearchFacet::Version(value.to_string())),
+            "license" => Ok(FEModrinthSearchFacet::License(value.to_string())),
+            "project_type" => Ok(FEModrinthSearchFacet::ProjectType(value.to_string())),
             _ => Err(anyhow!("Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`", facet_type))
         }
     }
 }
 
-impl TryFrom<&str> for FESearchFacet {
+impl TryFrom<&str> for FEModrinthSearchFacet {
     type Error = anyhow::Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         value.parse()
     }
 }
 
-impl Display for FESearchFacet {
+impl Display for FEModrinthSearchFacet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
-            FESearchFacet::Category(category) => format!("categories:{}", category),
-            FESearchFacet::Version(version) => format!("version:{}", version),
-            FESearchFacet::License(license) => format!("license:{}", license),
-            FESearchFacet::ProjectType(project_type) => format!("project_type:{}", project_type),
+            FEModrinthSearchFacet::Category(category) => format!("categories:{}", category),
+            FEModrinthSearchFacet::Version(version) => format!("version:{}", version),
+            FEModrinthSearchFacet::License(license) => format!("license:{}", license),
+            FEModrinthSearchFacet::ProjectType(project_type) => {
+                format!("project_type:{}", project_type)
+            }
         };
         write!(f, "{}", out)
     }
 }
 
-impl Serialize for FESearchFacet {
+impl Serialize for FEModrinthSearchFacet {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -96,7 +98,7 @@ impl Serialize for FESearchFacet {
     }
 }
 
-impl<'de> Deserialize<'de> for FESearchFacet {
+impl<'de> Deserialize<'de> for FEModrinthSearchFacet {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -107,145 +109,149 @@ impl<'de> Deserialize<'de> for FESearchFacet {
     }
 }
 
-impl From<SearchFacet> for FESearchFacet {
+impl From<SearchFacet> for FEModrinthSearchFacet {
     fn from(facet: SearchFacet) -> Self {
         match facet {
-            SearchFacet::Category(category) => FESearchFacet::Category(category),
-            SearchFacet::Version(version) => FESearchFacet::Version(version),
-            SearchFacet::License(license) => FESearchFacet::License(license),
-            SearchFacet::ProjectType(project_type) => FESearchFacet::ProjectType(project_type),
+            SearchFacet::Category(category) => FEModrinthSearchFacet::Category(category),
+            SearchFacet::Version(version) => FEModrinthSearchFacet::Version(version),
+            SearchFacet::License(license) => FEModrinthSearchFacet::License(license),
+            SearchFacet::ProjectType(project_type) => {
+                FEModrinthSearchFacet::ProjectType(project_type)
+            }
         }
     }
 }
 
-impl From<FESearchFacet> for SearchFacet {
-    fn from(facet: FESearchFacet) -> Self {
+impl From<FEModrinthSearchFacet> for SearchFacet {
+    fn from(facet: FEModrinthSearchFacet) -> Self {
         match facet {
-            FESearchFacet::Category(category) => SearchFacet::Category(category),
-            FESearchFacet::Version(version) => SearchFacet::Version(version),
-            FESearchFacet::License(license) => SearchFacet::License(license),
-            FESearchFacet::ProjectType(project_type) => SearchFacet::ProjectType(project_type),
+            FEModrinthSearchFacet::Category(category) => SearchFacet::Category(category),
+            FEModrinthSearchFacet::Version(version) => SearchFacet::Version(version),
+            FEModrinthSearchFacet::License(license) => SearchFacet::License(license),
+            FEModrinthSearchFacet::ProjectType(project_type) => {
+                SearchFacet::ProjectType(project_type)
+            }
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FESearchFacetOr(pub Vec<FESearchFacet>);
+pub struct FEModrinthSearchFacetOr(pub Vec<FEModrinthSearchFacet>);
 
-impl From<FESearchFacet> for FESearchFacetOr {
-    fn from(facet: FESearchFacet) -> Self {
-        FESearchFacetOr(vec![facet])
+impl From<FEModrinthSearchFacet> for FEModrinthSearchFacetOr {
+    fn from(facet: FEModrinthSearchFacet) -> Self {
+        FEModrinthSearchFacetOr(vec![facet])
     }
 }
 
-impl Deref for FESearchFacetOr {
-    type Target = Vec<FESearchFacet>;
+impl Deref for FEModrinthSearchFacetOr {
+    type Target = Vec<FEModrinthSearchFacet>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FESearchFacetOr {
-    type Item = FESearchFacet;
+impl IntoIterator for FEModrinthSearchFacetOr {
+    type Item = FEModrinthSearchFacet;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FESearchFacet> for FESearchFacetOr {
-    fn from_iter<I: IntoIterator<Item = FESearchFacet>>(iter: I) -> Self {
+impl FromIterator<FEModrinthSearchFacet> for FEModrinthSearchFacetOr {
+    fn from_iter<I: IntoIterator<Item = FEModrinthSearchFacet>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FESearchFacetOr(c)
+        FEModrinthSearchFacetOr(c)
     }
 }
 
-impl From<SearchFacetOr> for FESearchFacetOr {
+impl From<SearchFacetOr> for FEModrinthSearchFacetOr {
     fn from(facets: SearchFacetOr) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FESearchFacetOr> for SearchFacetOr {
-    fn from(facets: FESearchFacetOr) -> Self {
+impl From<FEModrinthSearchFacetOr> for SearchFacetOr {
+    fn from(facets: FEModrinthSearchFacetOr) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FESearchFacetAnd(pub Vec<FESearchFacetOr>);
+pub struct FEModrinthSearchFacetAnd(pub Vec<FEModrinthSearchFacetOr>);
 
-impl From<FESearchFacetOr> for FESearchFacetAnd {
-    fn from(facets: FESearchFacetOr) -> Self {
-        FESearchFacetAnd(vec![facets])
+impl From<FEModrinthSearchFacetOr> for FEModrinthSearchFacetAnd {
+    fn from(facets: FEModrinthSearchFacetOr) -> Self {
+        FEModrinthSearchFacetAnd(vec![facets])
     }
 }
 
-impl Deref for FESearchFacetAnd {
-    type Target = Vec<FESearchFacetOr>;
+impl Deref for FEModrinthSearchFacetAnd {
+    type Target = Vec<FEModrinthSearchFacetOr>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<FESearchFacet> for FESearchFacetAnd {
-    fn from(facet: FESearchFacet) -> Self {
-        FESearchFacetAnd(vec![facet.into()])
+impl From<FEModrinthSearchFacet> for FEModrinthSearchFacetAnd {
+    fn from(facet: FEModrinthSearchFacet) -> Self {
+        FEModrinthSearchFacetAnd(vec![facet.into()])
     }
 }
 
-impl IntoIterator for FESearchFacetAnd {
-    type Item = FESearchFacetOr;
+impl IntoIterator for FEModrinthSearchFacetAnd {
+    type Item = FEModrinthSearchFacetOr;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FESearchFacetOr> for FESearchFacetAnd {
-    fn from_iter<I: IntoIterator<Item = FESearchFacetOr>>(iter: I) -> Self {
+impl FromIterator<FEModrinthSearchFacetOr> for FEModrinthSearchFacetAnd {
+    fn from_iter<I: IntoIterator<Item = FEModrinthSearchFacetOr>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FESearchFacetAnd(c)
+        FEModrinthSearchFacetAnd(c)
     }
 }
 
-impl From<SearchFacetAnd> for FESearchFacetAnd {
+impl From<SearchFacetAnd> for FEModrinthSearchFacetAnd {
     fn from(facets: SearchFacetAnd) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FESearchFacetAnd> for SearchFacetAnd {
-    fn from(facets: FESearchFacetAnd) -> Self {
+impl From<FEModrinthSearchFacetAnd> for SearchFacetAnd {
+    fn from(facets: FEModrinthSearchFacetAnd) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectSearchParameters {
+pub struct FEModrinthProjectSearchParameters {
     pub query: Option<String>,
-    pub facets: Option<FESearchFacetAnd>,
-    pub index: Option<FESearchIndex>,
+    pub facets: Option<FEModrinthSearchFacetAnd>,
+    pub index: Option<FEModrinthSearchIndex>,
     pub offset: Option<u32>,
     pub limit: Option<u32>,
     pub filters: Option<String>,
 }
 
-impl From<ProjectSearchParameters> for FEProjectSearchParameters {
+impl From<ProjectSearchParameters> for FEModrinthProjectSearchParameters {
     fn from(value: ProjectSearchParameters) -> Self {
-        FEProjectSearchParameters {
+        FEModrinthProjectSearchParameters {
             query: value.query,
             facets: value.facets.map(Into::into),
             index: value.index.map(Into::into),
@@ -256,8 +262,8 @@ impl From<ProjectSearchParameters> for FEProjectSearchParameters {
     }
 }
 
-impl From<FEProjectSearchParameters> for ProjectSearchParameters {
-    fn from(value: FEProjectSearchParameters) -> Self {
+impl From<FEModrinthProjectSearchParameters> for ProjectSearchParameters {
+    fn from(value: FEModrinthProjectSearchParameters) -> Self {
         ProjectSearchParameters {
             query: value.query,
             facets: value.facets.map(Into::into),
@@ -270,60 +276,60 @@ impl From<FEProjectSearchParameters> for ProjectSearchParameters {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectID(pub String);
+pub struct FEModrinthProjectID(pub String);
 
-impl Deref for FEProjectID {
+impl Deref for FEModrinthProjectID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<ProjectID> for FEProjectID {
+impl From<ProjectID> for FEModrinthProjectID {
     fn from(value: ProjectID) -> Self {
-        FEProjectID(value.0)
+        FEModrinthProjectID(value.0)
     }
 }
 
-impl From<FEProjectID> for ProjectID {
-    fn from(value: FEProjectID) -> Self {
+impl From<FEModrinthProjectID> for ProjectID {
+    fn from(value: FEModrinthProjectID) -> Self {
         ProjectID(value.0)
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersionID(pub String);
+pub struct FEModrinthVersionID(pub String);
 
-impl Deref for FEVersionID {
+impl Deref for FEModrinthVersionID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<VersionID> for FEVersionID {
+impl From<VersionID> for FEModrinthVersionID {
     fn from(value: VersionID) -> Self {
-        FEVersionID(value.0)
+        FEModrinthVersionID(value.0)
     }
 }
 
-impl From<FEVersionID> for VersionID {
-    fn from(value: FEVersionID) -> Self {
+impl From<FEModrinthVersionID> for VersionID {
+    fn from(value: FEModrinthVersionID) -> Self {
         VersionID(value.0)
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectIDs(pub Vec<String>);
+pub struct FEModrinthProjectIDs(pub Vec<String>);
 
-impl Deref for FEProjectIDs {
+impl Deref for FEModrinthProjectIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEProjectIDs {
+impl IntoIterator for FEModrinthProjectIDs {
     type Item = String;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -331,7 +337,7 @@ impl IntoIterator for FEProjectIDs {
     }
 }
 
-impl FromIterator<String> for FEProjectIDs {
+impl FromIterator<String> for FEModrinthProjectIDs {
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
@@ -339,33 +345,33 @@ impl FromIterator<String> for FEProjectIDs {
         for i in iter {
             c.push(i);
         }
-        FEProjectIDs(c)
+        FEModrinthProjectIDs(c)
     }
 }
 
-impl From<ProjectIDs> for FEProjectIDs {
+impl From<ProjectIDs> for FEModrinthProjectIDs {
     fn from(value: ProjectIDs) -> Self {
-        FEProjectIDs(value.ids)
+        FEModrinthProjectIDs(value.ids)
     }
 }
 
-impl From<FEProjectIDs> for ProjectIDs {
-    fn from(value: FEProjectIDs) -> Self {
+impl From<FEModrinthProjectIDs> for ProjectIDs {
+    fn from(value: FEModrinthProjectIDs) -> Self {
         ProjectIDs { ids: value.0 }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersionIDs(pub Vec<String>);
+pub struct FEModrinthVersionIDs(pub Vec<String>);
 
-impl Deref for FEVersionIDs {
+impl Deref for FEModrinthVersionIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEVersionIDs {
+impl IntoIterator for FEModrinthVersionIDs {
     type Item = String;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -373,7 +379,7 @@ impl IntoIterator for FEVersionIDs {
     }
 }
 
-impl FromIterator<String> for FEVersionIDs {
+impl FromIterator<String> for FEModrinthVersionIDs {
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
@@ -381,18 +387,18 @@ impl FromIterator<String> for FEVersionIDs {
         for i in iter {
             c.push(i);
         }
-        FEVersionIDs(c)
+        FEModrinthVersionIDs(c)
     }
 }
 
-impl From<VersionIDs> for FEVersionIDs {
+impl From<VersionIDs> for FEModrinthVersionIDs {
     fn from(value: VersionIDs) -> Self {
-        FEVersionIDs(value.ids)
+        FEModrinthVersionIDs(value.ids)
     }
 }
 
-impl From<FEVersionIDs> for VersionIDs {
-    fn from(value: FEVersionIDs) -> Self {
+impl From<FEModrinthVersionIDs> for VersionIDs {
+    fn from(value: FEModrinthVersionIDs) -> Self {
         VersionIDs { ids: value.0 }
     }
 }

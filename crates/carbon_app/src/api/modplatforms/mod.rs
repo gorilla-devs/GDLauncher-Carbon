@@ -84,42 +84,42 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         // Modrinth
-        query MODRINTH_SEARCH[app, search_params: modrinth::filters::FEProjectSearchParameters] {
+        query MODRINTH_SEARCH[app, search_params: modrinth::filters::FEModrinthProjectSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.search(search_params.into()).await?;
 
-            Ok(modrinth::responses::FEProjectSearchResponse::from(response))
+            Ok(modrinth::responses::FEModrinthProjectSearchResponse::from(response))
 
         }
         query MODRINTH_GET_CATEGORIES[app, args: () ] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_categories().await?;
 
-            Ok(modrinth::responses::FECategoriesResponse::from(response))
+            Ok(modrinth::responses::FEModrinthCategoriesResponse::from(response))
         }
-        query MODRINTH_GET_PROJECT[app, project: modrinth::filters::FEProjectID  ] {
+        query MODRINTH_GET_PROJECT[app, project: modrinth::filters::FEModrinthProjectID  ] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_project(project.into()).await?;
 
-            Ok(modrinth::structs::FEProject::from(response))
+            Ok(modrinth::structs::FEModrinthProject::from(response))
         }
-        query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::FEProjectIDs] {
+        query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::FEModrinthProjectIDs] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_projects(projects.into()).await?;
 
-            Ok(modrinth::responses::FEProjectsResponse::from(response))
+            Ok(modrinth::responses::FEModrinthProjectsResponse::from(response))
         }
-        query MODRINTH_GET_VERSION[app, version: modrinth::filters::FEVersionID] {
+        query MODRINTH_GET_VERSION[app, version: modrinth::filters::FEModrinthVersionID] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_version(version.into()).await?;
 
-            Ok(modrinth::structs::FEVersion::from(response))
+            Ok(modrinth::structs::FEModrinthVersion::from(response))
         }
-        query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::FEVersionIDs] {
+        query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::FEModrinthVersionIDs] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_versions(versions.into()).await?;
 
-            Ok(modrinth::responses::FEVersionsResponse::from(response))
+            Ok(modrinth::responses::FEModrinthVersionsResponse::from(response))
         }
     }
 }

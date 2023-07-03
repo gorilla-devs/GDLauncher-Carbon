@@ -18,7 +18,7 @@ use crate::domain::modplatforms::modrinth::{
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEProjectSupportRange {
+pub enum FEModrinthProjectSupportRange {
     /// The mod is required on this side to function
     Required,
     /// The mod is not required on this side to function.
@@ -30,31 +30,31 @@ pub enum FEProjectSupportRange {
     Unknown,
 }
 
-impl From<ProjectSupportRange> for FEProjectSupportRange {
+impl From<ProjectSupportRange> for FEModrinthProjectSupportRange {
     fn from(value: ProjectSupportRange) -> Self {
         match value {
-            ProjectSupportRange::Required => FEProjectSupportRange::Required,
-            ProjectSupportRange::Unsupported => FEProjectSupportRange::Unsupported,
-            ProjectSupportRange::Optional => FEProjectSupportRange::Optional,
-            ProjectSupportRange::Unknown => FEProjectSupportRange::Unknown,
+            ProjectSupportRange::Required => FEModrinthProjectSupportRange::Required,
+            ProjectSupportRange::Unsupported => FEModrinthProjectSupportRange::Unsupported,
+            ProjectSupportRange::Optional => FEModrinthProjectSupportRange::Optional,
+            ProjectSupportRange::Unknown => FEModrinthProjectSupportRange::Unknown,
         }
     }
 }
 
-impl From<FEProjectSupportRange> for ProjectSupportRange {
-    fn from(value: FEProjectSupportRange) -> Self {
+impl From<FEModrinthProjectSupportRange> for ProjectSupportRange {
+    fn from(value: FEModrinthProjectSupportRange) -> Self {
         match value {
-            FEProjectSupportRange::Required => ProjectSupportRange::Required,
-            FEProjectSupportRange::Unsupported => ProjectSupportRange::Unsupported,
-            FEProjectSupportRange::Optional => ProjectSupportRange::Optional,
-            FEProjectSupportRange::Unknown => ProjectSupportRange::Unknown,
+            FEModrinthProjectSupportRange::Required => ProjectSupportRange::Required,
+            FEModrinthProjectSupportRange::Unsupported => ProjectSupportRange::Unsupported,
+            FEModrinthProjectSupportRange::Optional => ProjectSupportRange::Optional,
+            FEModrinthProjectSupportRange::Unknown => ProjectSupportRange::Unknown,
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEProjectType {
+pub enum FEModrinthProjectType {
     /// WARNING: Can also be a plugin or data pack.
     /// You will have to read the loaders to get more specific information.
     Mod,
@@ -63,30 +63,30 @@ pub enum FEProjectType {
     ResourcePack,
 }
 
-impl From<ProjectType> for FEProjectType {
+impl From<ProjectType> for FEModrinthProjectType {
     fn from(value: ProjectType) -> Self {
         match value {
-            ProjectType::Mod => FEProjectType::Mod,
-            ProjectType::Shader => FEProjectType::Shader,
-            ProjectType::Modpack => FEProjectType::Modpack,
-            ProjectType::ResourcePack => FEProjectType::ResourcePack,
+            ProjectType::Mod => FEModrinthProjectType::Mod,
+            ProjectType::Shader => FEModrinthProjectType::Shader,
+            ProjectType::Modpack => FEModrinthProjectType::Modpack,
+            ProjectType::ResourcePack => FEModrinthProjectType::ResourcePack,
         }
     }
 }
 
-impl From<FEProjectType> for ProjectType {
-    fn from(value: FEProjectType) -> Self {
+impl From<FEModrinthProjectType> for ProjectType {
+    fn from(value: FEModrinthProjectType) -> Self {
         match value {
-            FEProjectType::Mod => ProjectType::Mod,
-            FEProjectType::Shader => ProjectType::Shader,
-            FEProjectType::Modpack => ProjectType::Modpack,
-            FEProjectType::ResourcePack => ProjectType::ResourcePack,
+            FEModrinthProjectType::Mod => ProjectType::Mod,
+            FEModrinthProjectType::Shader => ProjectType::Shader,
+            FEModrinthProjectType::Modpack => ProjectType::Modpack,
+            FEModrinthProjectType::ResourcePack => ProjectType::ResourcePack,
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectSearchResult {
+pub struct FEModrinthProjectSearchResult {
     /// The slug of a project used for vanity urls.
     pub slug: String,
     /// The title or name of the project
@@ -96,11 +96,11 @@ pub struct FEProjectSearchResult {
     /// A list of the categories that the project has
     pub categories: Option<Vec<String>>,
     /// The client side support of the project
-    pub client_side: FEProjectSupportRange,
+    pub client_side: FEModrinthProjectSupportRange,
     /// The server side support of the project
-    pub server_side: FEProjectSupportRange,
+    pub server_side: FEModrinthProjectSupportRange,
     /// The project type of the project
-    pub project_type: FEProjectType,
+    pub project_type: FEModrinthProjectType,
     /// The total number of downloads of the project
     pub downloads: u32,
     /// The URL of the project's icon
@@ -131,9 +131,9 @@ pub struct FEProjectSearchResult {
     pub featured_gallery: Option<String>,
 }
 
-impl From<ProjectSearchResult> for FEProjectSearchResult {
+impl From<ProjectSearchResult> for FEModrinthProjectSearchResult {
     fn from(value: ProjectSearchResult) -> Self {
-        FEProjectSearchResult {
+        FEModrinthProjectSearchResult {
             slug: value.slug,
             title: value.title,
             description: value.description,
@@ -159,9 +159,9 @@ impl From<ProjectSearchResult> for FEProjectSearchResult {
     }
 }
 
-impl TryFrom<FEProjectSearchResult> for ProjectSearchResult {
+impl TryFrom<FEModrinthProjectSearchResult> for ProjectSearchResult {
     type Error = anyhow::Error;
-    fn try_from(value: FEProjectSearchResult) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthProjectSearchResult) -> Result<Self, Self::Error> {
         Ok(ProjectSearchResult {
             slug: value.slug,
             title: value.title,
@@ -192,19 +192,19 @@ impl TryFrom<FEProjectSearchResult> for ProjectSearchResult {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FECategory {
+pub struct FEModrinthCategory {
     /// An SVG icon for the category
     pub icon: String,
     pub name: String,
     /// The project type this category is applicable to
-    pub project_type: FEProjectType,
+    pub project_type: FEModrinthProjectType,
     /// The header under which the category should go
     pub header: String,
 }
 
-impl From<Category> for FECategory {
+impl From<Category> for FEModrinthCategory {
     fn from(value: Category) -> Self {
-        FECategory {
+        FEModrinthCategory {
             icon: value.icon,
             name: value.name,
             project_type: value.project_type.into(),
@@ -213,8 +213,8 @@ impl From<Category> for FECategory {
     }
 }
 
-impl From<FECategory> for Category {
-    fn from(value: FECategory) -> Self {
+impl From<FEModrinthCategory> for Category {
+    fn from(value: FEModrinthCategory) -> Self {
         Category {
             icon: value.icon,
             name: value.name,
@@ -225,20 +225,20 @@ impl From<FECategory> for Category {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersion {
+pub struct FEModrinthVersion {
     pub name: String,
     /// The version number.
     /// Ideally, this will follow semantic versioning.
     pub version_number: String,
     pub changelog: Option<String>,
-    pub dependencies: Vec<FEDependency>,
+    pub dependencies: Vec<FEModrinthDependency>,
     pub game_versions: Vec<String>,
     /// The release channel for this version
-    pub version_type: FEVersionType,
+    pub version_type: FEModrinthVersionType,
     pub loaders: Vec<String>,
     pub featured: bool,
-    pub status: Option<FEStatus>,
-    pub requested_status: Option<FERequestedVersionStatus>,
+    pub status: Option<FEModrinthStatus>,
+    pub requested_status: Option<FEModrinthRequestedVersionStatus>,
     pub id: String,
     /// The ID of the project this version is for
     pub project_id: String,
@@ -247,12 +247,12 @@ pub struct FEVersion {
     pub date_published: String,
     pub downloads: u32,
     /// A list of files available for download
-    pub files: Vec<FEVersionFile>,
+    pub files: Vec<FEModrinthVersionFile>,
 }
 
-impl From<Version> for FEVersion {
+impl From<Version> for FEModrinthVersion {
     fn from(value: Version) -> Self {
-        FEVersion {
+        FEModrinthVersion {
             name: value.name,
             version_number: value.version_number,
             changelog: value.changelog,
@@ -273,10 +273,10 @@ impl From<Version> for FEVersion {
     }
 }
 
-impl TryFrom<FEVersion> for Version {
+impl TryFrom<FEModrinthVersion> for Version {
     type Error = anyhow::Error;
 
-    fn try_from(value: FEVersion) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthVersion) -> Result<Self, Self::Error> {
         #[allow(deprecated)]
         Ok(Version {
             name: value.name,
@@ -305,8 +305,8 @@ impl TryFrom<FEVersion> for Version {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersionFile {
-    pub hashes: FEHashes,
+pub struct FEModrinthVersionFile {
+    pub hashes: FEModrinthHashes,
     pub url: String,
     pub filename: String,
     /// Whether the file is the primary file of its version.
@@ -317,12 +317,12 @@ pub struct FEVersionFile {
     /// The size of the file in bytes
     pub size: u32,
     /// The type of the additional file, used mainly for adding resource packs to datapacks
-    pub file_type: Option<FEAdditionalFileType>,
+    pub file_type: Option<FEModrinthAdditionalFileType>,
 }
 
-impl From<VersionFile> for FEVersionFile {
+impl From<VersionFile> for FEModrinthVersionFile {
     fn from(value: VersionFile) -> Self {
-        FEVersionFile {
+        FEModrinthVersionFile {
             hashes: value.hashes.into(),
             url: value.url.into(),
             filename: value.filename,
@@ -333,10 +333,10 @@ impl From<VersionFile> for FEVersionFile {
     }
 }
 
-impl TryFrom<FEVersionFile> for VersionFile {
+impl TryFrom<FEModrinthVersionFile> for VersionFile {
     type Error = anyhow::Error;
 
-    fn try_from(value: FEVersionFile) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthVersionFile) -> Result<Self, Self::Error> {
         Ok(VersionFile {
             hashes: value.hashes.into(),
             url: value.url.parse()?,
@@ -349,7 +349,7 @@ impl TryFrom<FEVersionFile> for VersionFile {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEHashes {
+pub struct FEModrinthHashes {
     pub sha512: String,
     pub sha1: String,
     /// A map of other hashes that may have been provided
@@ -357,9 +357,9 @@ pub struct FEHashes {
     pub others: HashMap<String, String>,
 }
 
-impl From<Hashes> for FEHashes {
+impl From<Hashes> for FEModrinthHashes {
     fn from(value: Hashes) -> Self {
-        FEHashes {
+        FEModrinthHashes {
             sha512: value.sha512,
             sha1: value.sha1,
             others: value.others,
@@ -367,8 +367,8 @@ impl From<Hashes> for FEHashes {
     }
 }
 
-impl From<FEHashes> for Hashes {
-    fn from(value: FEHashes) -> Self {
+impl From<FEModrinthHashes> for Hashes {
+    fn from(value: FEModrinthHashes) -> Self {
         Hashes {
             sha512: value.sha512,
             sha1: value.sha1,
@@ -378,16 +378,16 @@ impl From<FEHashes> for Hashes {
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug)]
-pub struct FEDependency {
+pub struct FEModrinthDependency {
     pub version_id: Option<String>,
     pub project_id: Option<String>,
     pub file_name: Option<String>,
-    pub dependency_type: FEDependencyType,
+    pub dependency_type: FEModrinthDependencyType,
 }
 
-impl From<Dependency> for FEDependency {
+impl From<Dependency> for FEModrinthDependency {
     fn from(value: Dependency) -> Self {
-        FEDependency {
+        FEModrinthDependency {
             version_id: value.version_id,
             project_id: value.project_id,
             file_name: value.file_name,
@@ -396,8 +396,8 @@ impl From<Dependency> for FEDependency {
     }
 }
 
-impl From<FEDependency> for Dependency {
-    fn from(value: FEDependency) -> Self {
+impl From<FEModrinthDependency> for Dependency {
+    fn from(value: FEModrinthDependency) -> Self {
         Dependency {
             version_id: value.version_id,
             project_id: value.project_id,
@@ -409,91 +409,91 @@ impl From<FEDependency> for Dependency {
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEHashAlgorithm {
+pub enum FEModrinthHashAlgorithm {
     SHA512,
     SHA1,
 }
 
-impl From<HashAlgorithm> for FEHashAlgorithm {
+impl From<HashAlgorithm> for FEModrinthHashAlgorithm {
     fn from(value: HashAlgorithm) -> Self {
         match value {
-            HashAlgorithm::SHA512 => FEHashAlgorithm::SHA512,
-            HashAlgorithm::SHA1 => FEHashAlgorithm::SHA1,
+            HashAlgorithm::SHA512 => FEModrinthHashAlgorithm::SHA512,
+            HashAlgorithm::SHA1 => FEModrinthHashAlgorithm::SHA1,
         }
     }
 }
 
-impl From<FEHashAlgorithm> for HashAlgorithm {
-    fn from(value: FEHashAlgorithm) -> Self {
+impl From<FEModrinthHashAlgorithm> for HashAlgorithm {
+    fn from(value: FEModrinthHashAlgorithm) -> Self {
         match value {
-            FEHashAlgorithm::SHA512 => HashAlgorithm::SHA512,
-            FEHashAlgorithm::SHA1 => HashAlgorithm::SHA1,
+            FEModrinthHashAlgorithm::SHA512 => HashAlgorithm::SHA512,
+            FEModrinthHashAlgorithm::SHA1 => HashAlgorithm::SHA1,
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEVersionType {
+pub enum FEModrinthVersionType {
     Alpha,
     Beta,
     Release,
 }
 
-impl From<VersionType> for FEVersionType {
+impl From<VersionType> for FEModrinthVersionType {
     fn from(value: VersionType) -> Self {
         match value {
-            VersionType::Alpha => FEVersionType::Alpha,
-            VersionType::Beta => FEVersionType::Beta,
-            VersionType::Release => FEVersionType::Release,
+            VersionType::Alpha => FEModrinthVersionType::Alpha,
+            VersionType::Beta => FEModrinthVersionType::Beta,
+            VersionType::Release => FEModrinthVersionType::Release,
         }
     }
 }
 
-impl From<FEVersionType> for VersionType {
-    fn from(value: FEVersionType) -> Self {
+impl From<FEModrinthVersionType> for VersionType {
+    fn from(value: FEModrinthVersionType) -> Self {
         match value {
-            FEVersionType::Alpha => VersionType::Alpha,
-            FEVersionType::Beta => VersionType::Beta,
-            FEVersionType::Release => VersionType::Release,
+            FEModrinthVersionType::Alpha => VersionType::Alpha,
+            FEModrinthVersionType::Beta => VersionType::Beta,
+            FEModrinthVersionType::Release => VersionType::Release,
         }
     }
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEDependencyType {
+pub enum FEModrinthDependencyType {
     Required,
     Optional,
     Incompatible,
     Embedded,
 }
 
-impl From<DependencyType> for FEDependencyType {
+impl From<DependencyType> for FEModrinthDependencyType {
     fn from(value: DependencyType) -> Self {
         match value {
-            DependencyType::Required => FEDependencyType::Required,
-            DependencyType::Optional => FEDependencyType::Optional,
-            DependencyType::Incompatible => FEDependencyType::Incompatible,
-            DependencyType::Embedded => FEDependencyType::Embedded,
+            DependencyType::Required => FEModrinthDependencyType::Required,
+            DependencyType::Optional => FEModrinthDependencyType::Optional,
+            DependencyType::Incompatible => FEModrinthDependencyType::Incompatible,
+            DependencyType::Embedded => FEModrinthDependencyType::Embedded,
         }
     }
 }
 
-impl From<FEDependencyType> for DependencyType {
-    fn from(value: FEDependencyType) -> Self {
+impl From<FEModrinthDependencyType> for DependencyType {
+    fn from(value: FEModrinthDependencyType) -> Self {
         match value {
-            FEDependencyType::Required => DependencyType::Required,
-            FEDependencyType::Optional => DependencyType::Optional,
-            FEDependencyType::Incompatible => DependencyType::Incompatible,
-            FEDependencyType::Embedded => DependencyType::Embedded,
+            FEModrinthDependencyType::Required => DependencyType::Required,
+            FEModrinthDependencyType::Optional => DependencyType::Optional,
+            FEModrinthDependencyType::Incompatible => DependencyType::Incompatible,
+            FEModrinthDependencyType::Embedded => DependencyType::Embedded,
         }
     }
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEStatus {
+pub enum FEModrinthStatus {
     Listed,
     Archived,
     Draft,
@@ -502,90 +502,98 @@ pub enum FEStatus {
     Unknown,
 }
 
-impl From<Status> for FEStatus {
+impl From<Status> for FEModrinthStatus {
     fn from(value: Status) -> Self {
         match value {
-            Status::Listed => FEStatus::Listed,
-            Status::Archived => FEStatus::Archived,
-            Status::Draft => FEStatus::Draft,
-            Status::Unlisted => FEStatus::Unlisted,
-            Status::Scheduled => FEStatus::Scheduled,
-            Status::Unknown => FEStatus::Unknown,
+            Status::Listed => FEModrinthStatus::Listed,
+            Status::Archived => FEModrinthStatus::Archived,
+            Status::Draft => FEModrinthStatus::Draft,
+            Status::Unlisted => FEModrinthStatus::Unlisted,
+            Status::Scheduled => FEModrinthStatus::Scheduled,
+            Status::Unknown => FEModrinthStatus::Unknown,
         }
     }
 }
 
-impl From<FEStatus> for Status {
-    fn from(value: FEStatus) -> Self {
+impl From<FEModrinthStatus> for Status {
+    fn from(value: FEModrinthStatus) -> Self {
         match value {
-            FEStatus::Listed => Status::Listed,
-            FEStatus::Archived => Status::Archived,
-            FEStatus::Draft => Status::Draft,
-            FEStatus::Unlisted => Status::Unlisted,
-            FEStatus::Scheduled => Status::Scheduled,
-            FEStatus::Unknown => Status::Unknown,
+            FEModrinthStatus::Listed => Status::Listed,
+            FEModrinthStatus::Archived => Status::Archived,
+            FEModrinthStatus::Draft => Status::Draft,
+            FEModrinthStatus::Unlisted => Status::Unlisted,
+            FEModrinthStatus::Scheduled => Status::Scheduled,
+            FEModrinthStatus::Unknown => Status::Unknown,
         }
     }
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FERequestedVersionStatus {
+pub enum FEModrinthRequestedVersionStatus {
     Listed,
     Archived,
     Draft,
     Unlisted,
 }
 
-impl From<RequestedVersionStatus> for FERequestedVersionStatus {
+impl From<RequestedVersionStatus> for FEModrinthRequestedVersionStatus {
     fn from(value: RequestedVersionStatus) -> Self {
         match value {
-            RequestedVersionStatus::Listed => FERequestedVersionStatus::Listed,
-            RequestedVersionStatus::Archived => FERequestedVersionStatus::Archived,
-            RequestedVersionStatus::Draft => FERequestedVersionStatus::Draft,
-            RequestedVersionStatus::Unlisted => FERequestedVersionStatus::Unlisted,
+            RequestedVersionStatus::Listed => FEModrinthRequestedVersionStatus::Listed,
+            RequestedVersionStatus::Archived => FEModrinthRequestedVersionStatus::Archived,
+            RequestedVersionStatus::Draft => FEModrinthRequestedVersionStatus::Draft,
+            RequestedVersionStatus::Unlisted => FEModrinthRequestedVersionStatus::Unlisted,
         }
     }
 }
 
-impl From<FERequestedVersionStatus> for RequestedVersionStatus {
-    fn from(value: FERequestedVersionStatus) -> Self {
+impl From<FEModrinthRequestedVersionStatus> for RequestedVersionStatus {
+    fn from(value: FEModrinthRequestedVersionStatus) -> Self {
         match value {
-            FERequestedVersionStatus::Listed => RequestedVersionStatus::Listed,
-            FERequestedVersionStatus::Archived => RequestedVersionStatus::Archived,
-            FERequestedVersionStatus::Draft => RequestedVersionStatus::Draft,
-            FERequestedVersionStatus::Unlisted => RequestedVersionStatus::Unlisted,
+            FEModrinthRequestedVersionStatus::Listed => RequestedVersionStatus::Listed,
+            FEModrinthRequestedVersionStatus::Archived => RequestedVersionStatus::Archived,
+            FEModrinthRequestedVersionStatus::Draft => RequestedVersionStatus::Draft,
+            FEModrinthRequestedVersionStatus::Unlisted => RequestedVersionStatus::Unlisted,
         }
     }
 }
 
 #[derive(Type, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub enum FEAdditionalFileType {
+pub enum FEModrinthAdditionalFileType {
     RequiredResourcePack,
     OptionalResourcePack,
 }
 
-impl From<AdditionalFileType> for FEAdditionalFileType {
+impl From<AdditionalFileType> for FEModrinthAdditionalFileType {
     fn from(value: AdditionalFileType) -> Self {
         match value {
-            AdditionalFileType::RequiredResourcePack => FEAdditionalFileType::RequiredResourcePack,
-            AdditionalFileType::OptionalResourcePack => FEAdditionalFileType::OptionalResourcePack,
+            AdditionalFileType::RequiredResourcePack => {
+                FEModrinthAdditionalFileType::RequiredResourcePack
+            }
+            AdditionalFileType::OptionalResourcePack => {
+                FEModrinthAdditionalFileType::OptionalResourcePack
+            }
         }
     }
 }
 
-impl From<FEAdditionalFileType> for AdditionalFileType {
-    fn from(value: FEAdditionalFileType) -> Self {
+impl From<FEModrinthAdditionalFileType> for AdditionalFileType {
+    fn from(value: FEModrinthAdditionalFileType) -> Self {
         match value {
-            FEAdditionalFileType::RequiredResourcePack => AdditionalFileType::RequiredResourcePack,
-            FEAdditionalFileType::OptionalResourcePack => AdditionalFileType::OptionalResourcePack,
+            FEModrinthAdditionalFileType::RequiredResourcePack => {
+                AdditionalFileType::RequiredResourcePack
+            }
+            FEModrinthAdditionalFileType::OptionalResourcePack => {
+                AdditionalFileType::OptionalResourcePack
+            }
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProject {
+pub struct FEModrinthProject {
     /// The project's slug, used for vanity URLs.
     /// This can change at any time, so use the [`Project::id`] for long term storage.
     pub slug: String,
@@ -593,8 +601,8 @@ pub struct FEProject {
     /// A short description of the project
     pub description: String,
     pub categories: Vec<String>,
-    pub client_side: FEProjectSupportRange,
-    pub server_side: FEProjectSupportRange,
+    pub client_side: FEModrinthProjectSupportRange,
+    pub server_side: FEModrinthProjectSupportRange,
     /// A long form description of the project
     pub body: String,
     /// A list of categories which are searchable but non-primary
@@ -607,8 +615,8 @@ pub struct FEProject {
     pub wiki_url: Option<String>,
     /// The project's Discord server invite
     pub discord_url: Option<String>,
-    pub donation_urls: Vec<FEDonationLink>,
-    pub project_type: FEProjectType,
+    pub donation_urls: Vec<FEModrinthDonationLink>,
+    pub project_type: FEModrinthProjectType,
     pub downloads: u32,
     pub icon_url: Option<String>,
     /// The RGB color of the project, automatically generated from the project icon
@@ -617,14 +625,14 @@ pub struct FEProject {
     /// The ID of the team that has ownership of this project
     pub team: String,
     /// A link to the long description of the project (only present for old projects)
-    pub moderator_message: Option<FEModeratorMessage>,
+    pub moderator_message: Option<FEModrinthModeratorMessage>,
     pub published: String,
     pub updated: String,
     /// The date the project's status was set to approved or unlisted
     pub approved: Option<String>,
     pub followers: u32,
-    pub status: FEProjectStatus,
-    pub license: FELicense,
+    pub status: FEModrinthProjectStatus,
+    pub license: FEModrinthLicense,
     /// A list of the version IDs of the project.
     /// This will only ever be empty if the project is a draft.
     pub versions: Vec<String>,
@@ -633,12 +641,12 @@ pub struct FEProject {
     /// A list of all of the loaders supported by the project
     pub loaders: Vec<String>,
     /// A list of images that have been uploaded to the project's gallery
-    pub gallery: Vec<FEGalleryItem>,
+    pub gallery: Vec<FEModrinthGalleryItem>,
 }
 
-impl From<Project> for FEProject {
+impl From<Project> for FEModrinthProject {
     fn from(value: Project) -> Self {
-        FEProject {
+        FEModrinthProject {
             slug: value.slug,
             title: value.title,
             description: value.description,
@@ -673,9 +681,9 @@ impl From<Project> for FEProject {
     }
 }
 
-impl TryFrom<FEProject> for Project {
+impl TryFrom<FEModrinthProject> for Project {
     type Error = anyhow::Error;
-    fn try_from(value: FEProject) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthProject) -> Result<Self, Self::Error> {
         #[allow(deprecated)]
         Ok(Project {
             slug: value.slug,
@@ -740,23 +748,23 @@ impl TryFrom<FEProject> for Project {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModeratorMessage {
+pub struct FEModrinthModeratorMessage {
     pub message: String,
     /// The longer body of the message
     pub body: Option<String>,
 }
 
-impl From<ModeratorMessage> for FEModeratorMessage {
+impl From<ModeratorMessage> for FEModrinthModeratorMessage {
     fn from(value: ModeratorMessage) -> Self {
-        FEModeratorMessage {
+        FEModrinthModeratorMessage {
             message: value.message,
             body: value.body,
         }
     }
 }
 
-impl From<FEModeratorMessage> for ModeratorMessage {
-    fn from(value: FEModeratorMessage) -> Self {
+impl From<FEModrinthModeratorMessage> for ModeratorMessage {
+    fn from(value: FEModrinthModeratorMessage) -> Self {
         ModeratorMessage {
             message: value.message,
             body: value.body,
@@ -765,7 +773,7 @@ impl From<FEModeratorMessage> for ModeratorMessage {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FELicense {
+pub struct FEModrinthLicense {
     /// The SPDX license ID of a project
     pub id: String,
     /// The license's long name
@@ -774,9 +782,9 @@ pub struct FELicense {
     pub url: Option<String>,
 }
 
-impl From<License> for FELicense {
+impl From<License> for FEModrinthLicense {
     fn from(value: License) -> Self {
-        FELicense {
+        FEModrinthLicense {
             id: value.id,
             name: value.name,
             url: value.url.map(Into::into),
@@ -784,9 +792,9 @@ impl From<License> for FELicense {
     }
 }
 
-impl TryFrom<FELicense> for License {
+impl TryFrom<FEModrinthLicense> for License {
     type Error = anyhow::Error;
-    fn try_from(value: FELicense) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthLicense) -> Result<Self, Self::Error> {
         Ok(License {
             id: value.id,
             name: value.name,
@@ -799,7 +807,7 @@ impl TryFrom<FELicense> for License {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEDonationLink {
+pub struct FEModrinthDonationLink {
     /// The donation platform's ID
     pub id: String,
     pub platform: String,
@@ -807,9 +815,9 @@ pub struct FEDonationLink {
     pub url: String,
 }
 
-impl From<DonationLink> for FEDonationLink {
+impl From<DonationLink> for FEModrinthDonationLink {
     fn from(value: DonationLink) -> Self {
-        FEDonationLink {
+        FEModrinthDonationLink {
             id: value.id,
             platform: value.platform,
             url: value.url.to_string(),
@@ -817,9 +825,9 @@ impl From<DonationLink> for FEDonationLink {
     }
 }
 
-impl TryFrom<FEDonationLink> for DonationLink {
+impl TryFrom<FEModrinthDonationLink> for DonationLink {
     type Error = anyhow::Error;
-    fn try_from(value: FEDonationLink) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthDonationLink) -> Result<Self, Self::Error> {
         Ok(DonationLink {
             id: value.id,
             platform: value.platform,
@@ -830,7 +838,7 @@ impl TryFrom<FEDonationLink> for DonationLink {
 
 /// An image that have been uploaded to a project's gallery
 #[derive(Type, Serialize, Deserialize, Debug, Clone)]
-pub struct FEGalleryItem {
+pub struct FEModrinthGalleryItem {
     pub url: String,
     pub featured: bool,
     pub title: Option<String>,
@@ -841,9 +849,9 @@ pub struct FEGalleryItem {
     pub ordering: u32,
 }
 
-impl From<GalleryItem> for FEGalleryItem {
+impl From<GalleryItem> for FEModrinthGalleryItem {
     fn from(value: GalleryItem) -> Self {
-        FEGalleryItem {
+        FEModrinthGalleryItem {
             url: value.url.to_string(),
             featured: value.featured,
             title: value.title,
@@ -854,9 +862,9 @@ impl From<GalleryItem> for FEGalleryItem {
     }
 }
 
-impl TryFrom<FEGalleryItem> for GalleryItem {
+impl TryFrom<FEModrinthGalleryItem> for GalleryItem {
     type Error = anyhow::Error;
-    fn try_from(value: FEGalleryItem) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthGalleryItem) -> Result<Self, Self::Error> {
         Ok(GalleryItem {
             url: value.url.parse()?,
             featured: value.featured,
@@ -870,7 +878,7 @@ impl TryFrom<FEGalleryItem> for GalleryItem {
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
-pub enum FEProjectStatus {
+pub enum FEModrinthProjectStatus {
     Approved,
     /// A moderator's message should be available on the project struct
     Rejected,
@@ -883,30 +891,30 @@ pub enum FEProjectStatus {
     Unknown,
 }
 
-impl From<ProjectStatus> for FEProjectStatus {
+impl From<ProjectStatus> for FEModrinthProjectStatus {
     fn from(value: ProjectStatus) -> Self {
         match value {
-            ProjectStatus::Approved => FEProjectStatus::Approved,
-            ProjectStatus::Rejected => FEProjectStatus::Rejected,
-            ProjectStatus::Draft => FEProjectStatus::Draft,
-            ProjectStatus::Unlisted => FEProjectStatus::Unlisted,
-            ProjectStatus::Archived => FEProjectStatus::Archived,
-            ProjectStatus::Processing => FEProjectStatus::Processing,
-            ProjectStatus::Unknown => FEProjectStatus::Unknown,
+            ProjectStatus::Approved => FEModrinthProjectStatus::Approved,
+            ProjectStatus::Rejected => FEModrinthProjectStatus::Rejected,
+            ProjectStatus::Draft => FEModrinthProjectStatus::Draft,
+            ProjectStatus::Unlisted => FEModrinthProjectStatus::Unlisted,
+            ProjectStatus::Archived => FEModrinthProjectStatus::Archived,
+            ProjectStatus::Processing => FEModrinthProjectStatus::Processing,
+            ProjectStatus::Unknown => FEModrinthProjectStatus::Unknown,
         }
     }
 }
 
-impl From<FEProjectStatus> for ProjectStatus {
-    fn from(value: FEProjectStatus) -> Self {
+impl From<FEModrinthProjectStatus> for ProjectStatus {
+    fn from(value: FEModrinthProjectStatus) -> Self {
         match value {
-            FEProjectStatus::Approved => ProjectStatus::Approved,
-            FEProjectStatus::Rejected => ProjectStatus::Rejected,
-            FEProjectStatus::Draft => ProjectStatus::Draft,
-            FEProjectStatus::Unlisted => ProjectStatus::Unlisted,
-            FEProjectStatus::Archived => ProjectStatus::Archived,
-            FEProjectStatus::Processing => ProjectStatus::Processing,
-            FEProjectStatus::Unknown => ProjectStatus::Unknown,
+            FEModrinthProjectStatus::Approved => ProjectStatus::Approved,
+            FEModrinthProjectStatus::Rejected => ProjectStatus::Rejected,
+            FEModrinthProjectStatus::Draft => ProjectStatus::Draft,
+            FEModrinthProjectStatus::Unlisted => ProjectStatus::Unlisted,
+            FEModrinthProjectStatus::Archived => ProjectStatus::Archived,
+            FEModrinthProjectStatus::Processing => ProjectStatus::Processing,
+            FEModrinthProjectStatus::Unknown => ProjectStatus::Unknown,
         }
     }
 }

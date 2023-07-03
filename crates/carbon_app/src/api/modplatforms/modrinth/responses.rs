@@ -13,13 +13,13 @@ use crate::domain::modplatforms::modrinth::{
 };
 
 use crate::api::modplatforms::modrinth::structs::{
-    FECategory, FEProject, FEProjectSearchResult, FEVersion,
+    FEModrinthCategory, FEModrinthProject, FEModrinthProjectSearchResult, FEModrinthVersion,
 };
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectSearchResponse {
+pub struct FEModrinthProjectSearchResponse {
     /// The List of Results
-    pub hits: Vec<FEProjectSearchResult>,
+    pub hits: Vec<FEModrinthProjectSearchResult>,
     /// The number of results that were skipped by the query
     pub offset: u32,
     /// the number of results that were returned by the query
@@ -28,9 +28,9 @@ pub struct FEProjectSearchResponse {
     pub total_hits: u32,
 }
 
-impl From<ProjectSearchResponse> for FEProjectSearchResponse {
+impl From<ProjectSearchResponse> for FEModrinthProjectSearchResponse {
     fn from(results: ProjectSearchResponse) -> Self {
-        FEProjectSearchResponse {
+        FEModrinthProjectSearchResponse {
             hits: results.hits.into_iter().map(Into::into).collect(),
             offset: results.offset,
             limit: results.limit,
@@ -39,10 +39,10 @@ impl From<ProjectSearchResponse> for FEProjectSearchResponse {
     }
 }
 
-impl TryFrom<FEProjectSearchResponse> for ProjectSearchResponse {
+impl TryFrom<FEModrinthProjectSearchResponse> for ProjectSearchResponse {
     type Error = anyhow::Error;
 
-    fn try_from(results: FEProjectSearchResponse) -> Result<Self, Self::Error> {
+    fn try_from(results: FEModrinthProjectSearchResponse) -> Result<Self, Self::Error> {
         Ok(ProjectSearchResponse {
             hits: results
                 .hits
@@ -57,87 +57,87 @@ impl TryFrom<FEProjectSearchResponse> for ProjectSearchResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FECategoriesResponse(Vec<FECategory>);
+pub struct FEModrinthCategoriesResponse(Vec<FEModrinthCategory>);
 
-impl Deref for FECategoriesResponse {
-    type Target = Vec<FECategory>;
+impl Deref for FEModrinthCategoriesResponse {
+    type Target = Vec<FEModrinthCategory>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FECategoriesResponse {
-    type Item = FECategory;
+impl IntoIterator for FEModrinthCategoriesResponse {
+    type Item = FEModrinthCategory;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FECategory> for FECategoriesResponse {
-    fn from_iter<I: IntoIterator<Item = FECategory>>(iter: I) -> Self {
+impl FromIterator<FEModrinthCategory> for FEModrinthCategoriesResponse {
+    fn from_iter<I: IntoIterator<Item = FEModrinthCategory>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FECategoriesResponse(c)
+        FEModrinthCategoriesResponse(c)
     }
 }
 
-impl From<CategoriesResponse> for FECategoriesResponse {
+impl From<CategoriesResponse> for FEModrinthCategoriesResponse {
     fn from(value: CategoriesResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FECategoriesResponse> for CategoriesResponse {
-    fn from(value: FECategoriesResponse) -> Self {
+impl From<FEModrinthCategoriesResponse> for CategoriesResponse {
+    fn from(value: FEModrinthCategoriesResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEProjectsResponse(pub Vec<FEProject>);
+pub struct FEModrinthProjectsResponse(pub Vec<FEModrinthProject>);
 
-impl Deref for FEProjectsResponse {
-    type Target = Vec<FEProject>;
+impl Deref for FEModrinthProjectsResponse {
+    type Target = Vec<FEModrinthProject>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEProjectsResponse {
-    type Item = FEProject;
+impl IntoIterator for FEModrinthProjectsResponse {
+    type Item = FEModrinthProject;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEProject> for FEProjectsResponse {
-    fn from_iter<I: IntoIterator<Item = FEProject>>(iter: I) -> Self {
+impl FromIterator<FEModrinthProject> for FEModrinthProjectsResponse {
+    fn from_iter<I: IntoIterator<Item = FEModrinthProject>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEProjectsResponse(c)
+        FEModrinthProjectsResponse(c)
     }
 }
 
-impl From<ProjectsResponse> for FEProjectsResponse {
+impl From<ProjectsResponse> for FEModrinthProjectsResponse {
     fn from(value: ProjectsResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl TryFrom<FEProjectsResponse> for ProjectsResponse {
+impl TryFrom<FEModrinthProjectsResponse> for ProjectsResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEProjectsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthProjectsResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(TryInto::try_into)
@@ -146,44 +146,44 @@ impl TryFrom<FEProjectsResponse> for ProjectsResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersionsResponse(pub Vec<FEVersion>);
+pub struct FEModrinthVersionsResponse(pub Vec<FEModrinthVersion>);
 
-impl Deref for FEVersionsResponse {
-    type Target = Vec<FEVersion>;
+impl Deref for FEModrinthVersionsResponse {
+    type Target = Vec<FEModrinthVersion>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEVersionsResponse {
-    type Item = FEVersion;
+impl IntoIterator for FEModrinthVersionsResponse {
+    type Item = FEModrinthVersion;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEVersion> for FEVersionsResponse {
-    fn from_iter<I: IntoIterator<Item = FEVersion>>(iter: I) -> Self {
+impl FromIterator<FEModrinthVersion> for FEModrinthVersionsResponse {
+    fn from_iter<I: IntoIterator<Item = FEModrinthVersion>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEVersionsResponse(c)
+        FEModrinthVersionsResponse(c)
     }
 }
 
-impl From<VersionsResponse> for FEVersionsResponse {
+impl From<VersionsResponse> for FEModrinthVersionsResponse {
     fn from(value: VersionsResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl TryFrom<FEVersionsResponse> for VersionsResponse {
+impl TryFrom<FEModrinthVersionsResponse> for VersionsResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEVersionsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthVersionsResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(TryInto::try_into)
@@ -192,36 +192,36 @@ impl TryFrom<FEVersionsResponse> for VersionsResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEVersionHashesResponse(pub HashMap<String, FEVersion>);
+pub struct FEModrinthVersionHashesResponse(pub HashMap<String, FEModrinthVersion>);
 
-impl Deref for FEVersionHashesResponse {
-    type Target = HashMap<String, FEVersion>;
+impl Deref for FEModrinthVersionHashesResponse {
+    type Target = HashMap<String, FEModrinthVersion>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEVersionHashesResponse {
-    type Item = (String, FEVersion);
-    type IntoIter = std::collections::hash_map::IntoIter<String, FEVersion>;
+impl IntoIterator for FEModrinthVersionHashesResponse {
+    type Item = (String, FEModrinthVersion);
+    type IntoIter = std::collections::hash_map::IntoIter<String, FEModrinthVersion>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<(String, FEVersion)> for FEVersionHashesResponse {
-    fn from_iter<I: IntoIterator<Item = (String, FEVersion)>>(iter: I) -> Self {
+impl FromIterator<(String, FEModrinthVersion)> for FEModrinthVersionHashesResponse {
+    fn from_iter<I: IntoIterator<Item = (String, FEModrinthVersion)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = HashMap::with_capacity(size_lower);
         for (hash, version) in iter {
             c.insert(hash, version);
         }
-        FEVersionHashesResponse(c)
+        FEModrinthVersionHashesResponse(c)
     }
 }
 
-impl From<VersionHashesResponse> for FEVersionHashesResponse {
+impl From<VersionHashesResponse> for FEModrinthVersionHashesResponse {
     fn from(value: VersionHashesResponse) -> Self {
         value
             .into_iter()
@@ -230,9 +230,9 @@ impl From<VersionHashesResponse> for FEVersionHashesResponse {
     }
 }
 
-impl TryFrom<FEVersionHashesResponse> for VersionHashesResponse {
+impl TryFrom<FEModrinthVersionHashesResponse> for VersionHashesResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEVersionHashesResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: FEModrinthVersionHashesResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(|(key, version)| match version.try_into() {
