@@ -1,4 +1,4 @@
-import { JSX, createSignal, Show, createEffect, onCleanup } from "solid-js";
+import { JSX, createSignal, Show, createEffect } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
 import {
@@ -18,7 +18,6 @@ type Props = {
   color?: string;
   noTip?: boolean;
   noPadding?: boolean;
-  delay?: number;
   opened?: boolean;
 };
 
@@ -40,70 +39,10 @@ const Tooltip = (props: Props) => {
       }),
   });
 
+  let hoverTimeout: ReturnType<typeof setTimeout>;
+
   createEffect(() => {
     if (position.middlewareData.hide?.referenceHidden) setTooltipOpened(false);
-  });
-
-  const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 });
-  const [triangleEnd, setTriangleEnd] = createSignal({ x: 0, y: 0 });
-
-  let hoverTimeout: ReturnType<typeof setTimeout> | undefined;
-  let closeTimeout: ReturnType<typeof setTimeout> | undefined;
-
-  function handleMouseMove(e: MouseEvent) {
-    const x = e.clientX;
-    const y = e.clientY;
-
-    if (!toolTipRef() || !elementRef()) return;
-
-    const toolTipRect = (
-      toolTipRef() as HTMLDivElement
-    ).getBoundingClientRect();
-    const elementRect = (
-      elementRef() as HTMLDivElement
-    ).getBoundingClientRect();
-
-    // if the mouse is over the tooltip content or the tooltip reference, return
-    if (
-      (x >= toolTipRect.left &&
-        x <= toolTipRect.right &&
-        y >= toolTipRect.top &&
-        y <= toolTipRect.bottom) ||
-      (x >= elementRect.left &&
-        x <= elementRect.right &&
-        y >= elementRect.top &&
-        y <= elementRect.bottom)
-    ) {
-      if (typeof closeTimeout !== "undefined") {
-        clearTimeout(closeTimeout);
-        closeTimeout = undefined;
-      }
-      return;
-    }
-
-    // check if the mouse is outside of the safe triangle
-    if (
-      (x < triangleStart().x && x < triangleEnd().x) ||
-      (x > triangleStart().x && x > triangleEnd().x)
-    ) {
-      // delay closing the tooltip to allow time for the mouse to move to the tooltip content
-      closeTimeout = setTimeout(() => {
-        setTooltipOpened(false);
-        closeTimeout = undefined;
-      }, 400);
-    }
-  }
-
-  window.addEventListener("mousemove", handleMouseMove);
-
-  onCleanup(() => {
-    window.removeEventListener("mousemove", handleMouseMove);
-    if (typeof closeTimeout !== "undefined") {
-      clearTimeout(closeTimeout);
-    }
-    if (typeof hoverTimeout !== "undefined") {
-      clearTimeout(hoverTimeout);
-    }
   });
 
   return (
@@ -142,14 +81,14 @@ const Tooltip = (props: Props) => {
 
       <div
         ref={(el) => setElementRef(el)}
-        onMouseEnter={(e) => {
-          setTriangleStart({ x: e.clientX, y: e.clientY });
+        onMouseEnter={() => {
           hoverTimeout = setTimeout(() => {
             setTooltipOpened(true);
-          }, props.delay ?? 400);
+          }, 400);
         }}
-        onMouseLeave={(e) => {
-          setTriangleEnd({ x: e.clientX, y: e.clientY });
+        onMouseLeave={() => {
+          clearInterval(hoverTimeout);
+          setTooltipOpened(false);
         }}
       >
         {props.children}
