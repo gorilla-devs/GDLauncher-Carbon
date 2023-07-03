@@ -74,7 +74,7 @@ const AddMod = (props: ModalProps) => {
         : allRows().length;
     },
     getScrollElement: () => parentRef(),
-    estimateSize: () => 170,
+    estimateSize: () => 150,
     overscan: 15,
   });
 

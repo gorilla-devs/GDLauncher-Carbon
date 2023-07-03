@@ -209,7 +209,7 @@ const ModRow = (props: Props) => {
                     <>
                       <p class="m-0">{author?.name}</p>
                       <Show when={i() !== props.data.authors.length - 1}>
-                        <span class="text-lightSlate-100">•</span>
+                        <span class="text-lightSlate-100">{"•"}</span>
                       </Show>
                     </>
                   )}
@@ -253,17 +253,17 @@ const ModRow = (props: Props) => {
   return (
     <div
       ref={(el) => (containrRef = el)}
-      class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-40"
+      class="relative flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-36"
     >
+      <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-r from-darkSlate-700 z-10 from-50%" />
+      <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-t from-darkSlate-700 z-10" />
+      <img
+        class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
+        src={props.data.logo.thumbnailUrl}
+      />
       <div class="flex w-full">
         <div class="flex gap-4 w-full">
-          <Show when={!isRowSmall()}>
-            <img
-              class="select-none rounded-xl h-20 w-20"
-              src={props.data.logo.thumbnailUrl}
-            />
-          </Show>
-          <div class="flex flex-col gap-2 w-full">
+          <div class="flex flex-col gap-2 w-full bg-repeat-none z-10">
             <div class="flex flex-col justify-between">
               <div class="flex justify-between w-full">
                 <Tooltip
@@ -274,8 +274,12 @@ const ModRow = (props: Props) => {
                   color="bg-darkSlate-900"
                 >
                   <h2
-                    class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer max-w-80 hover:underline"
+                    class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer hover:underline"
                     onClick={() => handleExplore()}
+                    classList={{
+                      "max-w-140": !isRowSmall(),
+                      "max-w-90": isRowSmall(),
+                    }}
                   >
                     {props.data?.name}
                   </h2>
@@ -284,7 +288,11 @@ const ModRow = (props: Props) => {
                   <Switch>
                     <Match when={!isRowSmall()}>
                       <For each={props.data.categories}>
-                        {(tag) => <Tag img={tag.iconUrl} type="fixed" />}
+                        {(tag) => (
+                          <Tooltip content={tag.name}>
+                            <Tag img={tag.iconUrl} type="fixed" />
+                          </Tooltip>
+                        )}
                       </For>
                     </Match>
                     <Match when={isRowSmall()}>
@@ -298,7 +306,11 @@ const ModRow = (props: Props) => {
                             <div class="flex">
                               <For each={props.data.categories.slice(1)}>
                                 {(tag) => (
-                                  <Tag img={tag.iconUrl} type="fixed" />
+                                  <Tag
+                                    img={tag.iconUrl}
+                                    name={tag.name}
+                                    type="fixed"
+                                  />
                                 )}
                               </For>
                             </div>
@@ -334,9 +346,38 @@ const ModRow = (props: Props) => {
                   <div class="text-sm whitespace-nowrap flex gap-2">
                     <Switch>
                       <Match when={!isRowSmall()}>
-                        <For each={props.data.authors}>
-                          {(author) => <p class="m-0">{author?.name}</p>}
+                        <For each={props.data.authors.slice(0, 2)}>
+                          {(author, i) => (
+                            <>
+                              <p class="m-0">{author?.name}</p>
+                              <Show
+                                when={
+                                  i() !==
+                                  props.data.authors.slice(0, 2).length - 1
+                                }
+                              >
+                                <span class="text-lightSlate-100">{"•"}</span>
+                              </Show>
+                            </>
+                          )}
                         </For>
+                        <Show when={props.data.authors.length > 2}>
+                          <Tooltip
+                            content={
+                              <div class="flex gap-2">
+                                <For each={props.data.authors.slice(3)}>
+                                  {(author) => (
+                                    <p class="m-0">{author?.name}</p>
+                                  )}
+                                </For>
+                              </div>
+                            }
+                          >
+                            <p class="m-0">{`+${
+                              props.data.authors.slice(3).length
+                            }`}</p>
+                          </Tooltip>
+                        </Show>
                       </Match>
                       <Match when={isRowSmall()}>
                         <p class="m-0">{props.data.authors[0]?.name}</p>
@@ -365,7 +406,14 @@ const ModRow = (props: Props) => {
             </div>
             <div class="flex justify-between w-full">
               <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15 max-w-full">
-                {truncateText(props.data?.summary, 137)}
+                <Switch>
+                  <Match when={isRowSmall()}>
+                    {truncateText(props.data?.summary, 60)}
+                  </Match>
+                  <Match when={!isRowSmall()}>
+                    {truncateText(props.data?.summary, 120)}
+                  </Match>
+                </Switch>
               </p>
               <div class="flex w-full justify-end items-end">
                 <Switch>
