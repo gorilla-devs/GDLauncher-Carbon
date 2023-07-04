@@ -9,7 +9,7 @@ pub struct Manifest {
     pub minecraft: Minecraft,
     pub manifest_type: String,
     pub name: String,
-    pub version: String,
+    pub version: Option<String>,
     pub author: String,
     pub overrides: String,
     pub files: Vec<ManifestFileReference>,
