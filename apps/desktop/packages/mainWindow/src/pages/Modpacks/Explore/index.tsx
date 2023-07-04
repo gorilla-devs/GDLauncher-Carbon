@@ -97,8 +97,9 @@ const Modpack = () => {
       >
         <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
           <div class="relative h-full">
+            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 from-30% z-20" />
             <div
-              class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
+              class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat z-10"
               style={{
                 "background-image": `url("${
                   (routeData.modpackDetails?.data as FEModResponse)?.data.logo
@@ -107,12 +108,12 @@ const Modpack = () => {
                 "background-position": "right-5rem",
               }}
             />
-            <div class="top-5 sticky left-5 w-fit">
+            <div class="top-5 sticky left-5 w-fit z-20">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
-                type="transparent"
+                type="secondary"
               >
                 <Trans
                   key="instance.step_back"
@@ -122,7 +123,7 @@ const Modpack = () => {
                 />
               </Button>
             </div>
-            <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10%">
+            <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
               <div class="flex gap-4 w-full lg:flex-row">
                 <div
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
