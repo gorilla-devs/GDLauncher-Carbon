@@ -29,6 +29,7 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
+import OverviewPopover from "../OverviewPopover";
 
 type BaseProps = {
   data: FEMod;
@@ -175,91 +176,136 @@ const ModRow = (props: Props) => {
     }
   });
 
-  const OverviewTooltip = () => {
+  const Title = () => {
     return (
-      <div class="relative flex flex-col overflow-hidden w-70 pb-4">
-        <Show when={props.data.links.websiteUrl}>
-          <div
-            class="w-6 h-6 rounded-lg bg-darkSlate-900 cursor-pointer"
-            onClick={() =>
-              window.openExternalLink(props.data.links.websiteUrl as string)
-            }
+      <div class="flex flex-col justify-between">
+        <div class="flex justify-between w-full">
+          <Popover
+            noPadding
+            noTip
+            content={<OverviewPopover data={props.data} />}
+            placement="right-start"
+            color="bg-darkSlate-900"
           >
-            <div class="i-ri:external-link-line w-4 h-4 text-lightSlate-100 z-30 absolute top-4 right-4" />
-          </div>
-        </Show>
-        <h4 class="text-xl z-30 text-lightSlate-100 px-4 mb-2">
-          {props.data?.name}
-        </h4>
-        <div class="absolute top-0 bottom-0 right-0 left-0 z-20 bg-gradient-to-t from-darkSlate-900 from-70%" />
-        <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 bg-gradient-to-l from-darkSlate-900 z-20" />
-        <img
-          class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"
-          src={props.data.logo.thumbnailUrl}
-        />
-        <div class="px-4 z-30">
-          <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis">
-            {props.data?.summary}
-          </p>
-          <div class="flex gap-2 scrollbar-hide mt-4">
-            <For each={props.data.categories}>
-              {(tag) => <Tag img={tag.iconUrl} type="fixed" size="small" />}
-            </For>
-          </div>
-          <div class="flex flex-col gap-2 items-start mt-4">
-            <div class="flex gap-2 items-start text-darkSlate-100">
-              <span class="flex gap-2 items-center">
-                <div class="text-lightSlate-100 w-4 h-4 i-ri:user-fill" />
-                <p class="m-0 text-lightSlate-100 text-sm">
-                  <Trans key="modpack.authors" />
-                </p>
-              </span>
-              <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
-                <For each={props.data.authors}>
-                  {(author, i) => (
-                    <>
-                      <p class="m-0 text-sm">{author?.name}</p>
-                      <Show when={i() !== props.data.authors.length - 1}>
-                        <span class="text-lightSlate-100">{"•"}</span>
-                      </Show>
-                    </>
+            <h2
+              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer hover:underline"
+              onClick={() => handleExplore()}
+              classList={{
+                "max-w-140": !isRowSmall(),
+                "max-w-90": isRowSmall(),
+              }}
+            >
+              {props.data?.name}
+            </h2>
+          </Popover>
+          <div class="flex gap-2 scrollbar-hide">
+            <Switch>
+              <Match when={!isRowSmall()}>
+                <For each={props.data.categories}>
+                  {(tag) => (
+                    <Tooltip content={tag.name}>
+                      <Tag img={tag.iconUrl} type="fixed" />
+                    </Tooltip>
                   )}
                 </For>
-              </div>
+              </Match>
+              <Match when={isRowSmall()}>
+                <Tooltip content={props.data.categories[0].name}>
+                  <Tag img={props.data.categories[0].iconUrl} type="fixed" />
+                </Tooltip>
+                <Show when={props.data.categories.length - 1 > 0}>
+                  <Tooltip
+                    content={
+                      <div class="flex">
+                        <For each={props.data.categories.slice(1)}>
+                          {(tag) => (
+                            <Tag
+                              img={tag.iconUrl}
+                              name={tag.name}
+                              type="fixed"
+                            />
+                          )}
+                        </For>
+                      </div>
+                    }
+                  >
+                    <Tag
+                      name={`+${props.data.categories.length - 1}`}
+                      type="fixed"
+                    />
+                  </Tooltip>
+                </Show>
+              </Match>
+            </Switch>
+          </div>
+        </div>
+        <div class="flex gap-4 items-center">
+          <div class="flex gap-2 items-center text-darkSlate-100">
+            <i class="text-darkSlate-100 i-ri:time-fill" />
+            <div class="whitespace-nowrap text-sm">
+              {formatDistanceToNowStrict(
+                new Date(props.data.dateCreated).getTime()
+              )}
             </div>
-            <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="text-lightSlate-100 i-ri:time-fill" />
-              <p class="m-0 text-lightSlate-100 text-sm">
-                <Trans key="modpack.last_updated" />
-              </p>
-              <div class="whitespace-nowrap text-sm">
-                <Trans
-                  key="modpack.last_updated_time"
-                  options={{
-                    time: formatDistanceToNowStrict(
-                      new Date(props.data.dateModified).getTime()
-                    ),
-                  }}
-                />
-              </div>
+          </div>
+          <div class="flex gap-2 items-center text-darkSlate-100">
+            <i class="text-darkSlate-100 i-ri:download-fill" />
+            <div class="text-sm whitespace-nowrap">
+              {formatDownloadCount(props.data.downloadCount)}
             </div>
-            <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="text-lightSlate-100 i-ri:download-fill" />
-              <p class="m-0 text-lightSlate-100 text-sm">
-                <Trans key="modpack.total_download" />
-              </p>
-              <div class="text-sm whitespace-nowrap">
-                {formatDownloadCount(props.data.downloadCount)}
-              </div>
-            </div>
-            <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="text-lightSlate-100 i-ri:gamepad-fill" />
-              <p class="m-0 text-lightSlate-100 text-sm">
-                <Trans key="modpack.mcVersion" />
-              </p>
-              <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full text-sm">
-                {props.data.latestFilesIndexes[0].gameVersion}
-              </div>
+          </div>
+          <div class="flex gap-2 items-center text-darkSlate-100">
+            <i class="text-darkSlate-100 i-ri:user-fill" />
+            <div class="text-sm whitespace-nowrap flex gap-2">
+              <Switch>
+                <Match when={!isRowSmall()}>
+                  <For each={props.data.authors.slice(0, 2)}>
+                    {(author, i) => (
+                      <>
+                        <p class="m-0">{author?.name}</p>
+                        <Show
+                          when={
+                            i() !== props.data.authors.slice(0, 2).length - 1
+                          }
+                        >
+                          <span class="text-lightSlate-100">{"•"}</span>
+                        </Show>
+                      </>
+                    )}
+                  </For>
+                  <Show when={props.data.authors.length > 2}>
+                    <Tooltip
+                      content={
+                        <div class="flex gap-2">
+                          <For each={props.data.authors.slice(3)}>
+                            {(author) => <p class="m-0">{author?.name}</p>}
+                          </For>
+                        </div>
+                      }
+                    >
+                      <p class="m-0">{`+${
+                        props.data.authors.slice(3).length
+                      }`}</p>
+                    </Tooltip>
+                  </Show>
+                </Match>
+                <Match when={isRowSmall()}>
+                  <p class="m-0">{props.data.authors[0]?.name}</p>
+                  <Show when={props.data.authors.length - 1 > 0}>
+                    <Tooltip
+                      content={
+                        <div class="flex gap-2">
+                          <For each={props.data.authors.slice(1)}>
+                            {(author) => <p class="m-0">{author?.name}</p>}
+                          </For>
+                        </div>
+                      }
+                    >
+                      <p class="m-0">{`+${props.data.authors.length - 1}`}</p>
+                    </Tooltip>
+                  </Show>
+                </Match>
+              </Switch>
             </div>
           </div>
         </div>
@@ -281,148 +327,7 @@ const ModRow = (props: Props) => {
       <div class="flex w-full">
         <div class="flex gap-4 w-full">
           <div class="flex flex-col gap-2 w-full z-10 bg-repeat-none">
-            <div class="flex flex-col justify-between">
-              <div class="flex justify-between w-full">
-                <Popover
-                  noPadding
-                  noTip
-                  content={<OverviewTooltip />}
-                  placement="right-start"
-                  color="bg-darkSlate-900"
-                >
-                  <h2
-                    class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer hover:underline"
-                    onClick={() => handleExplore()}
-                    classList={{
-                      "max-w-140": !isRowSmall(),
-                      "max-w-90": isRowSmall(),
-                    }}
-                  >
-                    {props.data?.name}
-                  </h2>
-                </Popover>
-                <div class="flex gap-2 scrollbar-hide">
-                  <Switch>
-                    <Match when={!isRowSmall()}>
-                      <For each={props.data.categories}>
-                        {(tag) => (
-                          <Tooltip content={tag.name}>
-                            <Tag img={tag.iconUrl} type="fixed" />
-                          </Tooltip>
-                        )}
-                      </For>
-                    </Match>
-                    <Match when={isRowSmall()}>
-                      <Tooltip content={props.data.categories[0].name}>
-                        <Tag
-                          img={props.data.categories[0].iconUrl}
-                          type="fixed"
-                        />
-                      </Tooltip>
-                      <Show when={props.data.categories.length - 1 > 0}>
-                        <Tooltip
-                          content={
-                            <div class="flex">
-                              <For each={props.data.categories.slice(1)}>
-                                {(tag) => (
-                                  <Tag
-                                    img={tag.iconUrl}
-                                    name={tag.name}
-                                    type="fixed"
-                                  />
-                                )}
-                              </For>
-                            </div>
-                          }
-                        >
-                          <Tag
-                            name={`+${props.data.categories.length - 1}`}
-                            type="fixed"
-                          />
-                        </Tooltip>
-                      </Show>
-                    </Match>
-                  </Switch>
-                </div>
-              </div>
-              <div class="flex gap-4 items-center">
-                <div class="flex gap-2 items-center text-darkSlate-100">
-                  <i class="text-darkSlate-100 i-ri:time-fill" />
-                  <div class="whitespace-nowrap text-sm">
-                    {formatDistanceToNowStrict(
-                      new Date(props.data.dateCreated).getTime()
-                    )}
-                  </div>
-                </div>
-                <div class="flex gap-2 items-center text-darkSlate-100">
-                  <i class="text-darkSlate-100 i-ri:download-fill" />
-                  <div class="text-sm whitespace-nowrap">
-                    {formatDownloadCount(props.data.downloadCount)}
-                  </div>
-                </div>
-                <div class="flex gap-2 items-center text-darkSlate-100">
-                  <i class="text-darkSlate-100 i-ri:user-fill" />
-                  <div class="text-sm whitespace-nowrap flex gap-2">
-                    <Switch>
-                      <Match when={!isRowSmall()}>
-                        <For each={props.data.authors.slice(0, 2)}>
-                          {(author, i) => (
-                            <>
-                              <p class="m-0">{author?.name}</p>
-                              <Show
-                                when={
-                                  i() !==
-                                  props.data.authors.slice(0, 2).length - 1
-                                }
-                              >
-                                <span class="text-lightSlate-100">{"•"}</span>
-                              </Show>
-                            </>
-                          )}
-                        </For>
-                        <Show when={props.data.authors.length > 2}>
-                          <Tooltip
-                            content={
-                              <div class="flex gap-2">
-                                <For each={props.data.authors.slice(3)}>
-                                  {(author) => (
-                                    <p class="m-0">{author?.name}</p>
-                                  )}
-                                </For>
-                              </div>
-                            }
-                          >
-                            <p class="m-0">{`+${
-                              props.data.authors.slice(3).length
-                            }`}</p>
-                          </Tooltip>
-                        </Show>
-                      </Match>
-                      <Match when={isRowSmall()}>
-                        <p class="m-0">{props.data.authors[0]?.name}</p>
-                        <Show when={props.data.authors.length - 1 > 0}>
-                          <Tooltip
-                            content={
-                              <div class="flex gap-2">
-                                <For each={props.data.authors.slice(1)}>
-                                  {(author) => (
-                                    <p class="m-0">{author?.name}</p>
-                                  )}
-                                </For>
-                              </div>
-                            }
-                          >
-                            <p class="m-0">{`+${
-                              props.data.authors.length - 1
-                            }`}</p>
-                          </Tooltip>
-                        </Show>
-                      </Match>
-                    </Switch>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Title />
             <div class="flex justify-between w-full">
               <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-w-full max-h-15">
                 <Switch>
