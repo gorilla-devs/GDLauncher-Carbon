@@ -176,11 +176,11 @@ const ModRow = (props: Props) => {
 
   const OverviewTooltip = () => {
     return (
-      <div class="relative flex flex-col w-70 pb-4 overflow-hidden">
-        <h4 class="w-full px-4 z-30 text-lightSlate-100 mb-2 text-xl">
+      <div class="relative flex flex-col overflow-hidden w-70 pb-4">
+        <h4 class="w-full px-4 mb-2 text-xl z-30 text-lightSlate-100">
           {props.data?.name}
         </h4>
-        <div class="absolute top-0 bottom-0 right-0 left-0 from-darkSlate-900 z-20 from-70% bg-gradient-to-t" />
+        <div class="absolute top-0 bottom-0 right-0 left-0 z-20 bg-gradient-to-t from-darkSlate-900 from-70%" />
         <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 bg-gradient-to-l from-darkSlate-900 z-20" />
         <img
           class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"
@@ -198,7 +198,7 @@ const ModRow = (props: Props) => {
           <div class="flex flex-col gap-2 items-start mt-4">
             <div class="flex gap-2 items-start text-darkSlate-100">
               <span class="flex gap-2 items-center">
-                <div class="i-ri:user-fill text-lightSlate-100 w-4 h-4" />
+                <div class="text-lightSlate-100 w-4 h-4 i-ri:user-fill" />
                 <p class="m-0 text-lightSlate-100 text-sm">
                   <Trans key="modpack.authors" />
                 </p>
@@ -217,7 +217,7 @@ const ModRow = (props: Props) => {
               </div>
             </div>
             <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="i-ri:time-fill text-lightSlate-100" />
+              <div class="text-lightSlate-100 i-ri:time-fill" />
               <p class="m-0 text-lightSlate-100 text-sm">
                 <Trans key="modpack.last_updated" />
               </p>
@@ -233,7 +233,7 @@ const ModRow = (props: Props) => {
               </div>
             </div>
             <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="i-ri:download-fill text-lightSlate-100" />
+              <div class="text-lightSlate-100 i-ri:download-fill" />
               <p class="m-0 text-lightSlate-100 text-sm">
                 <Trans key="modpack.total_download" />
               </p>
@@ -242,7 +242,7 @@ const ModRow = (props: Props) => {
               </div>
             </div>
             <div class="flex gap-2 items-center text-darkSlate-100">
-              <div class="i-ri:gamepad-fill text-lightSlate-100" />
+              <div class="text-lightSlate-100 i-ri:gamepad-fill" />
               <p class="m-0 text-lightSlate-100 text-sm">
                 <Trans key="modpack.mcVersion" />
               </p>
@@ -261,7 +261,7 @@ const ModRow = (props: Props) => {
       ref={(el) => (containrRef = el)}
       class="relative flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-36"
     >
-      <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-r from-darkSlate-700 z-10 from-50%" />
+      <div class="absolute top-0 right-0 bottom-0 left-0 z-10 bg-gradient-to-r from-darkSlate-700 from-50%" />
       <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-t from-darkSlate-700 z-10" />
       <img
         class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
@@ -269,7 +269,7 @@ const ModRow = (props: Props) => {
       />
       <div class="flex w-full">
         <div class="flex gap-4 w-full">
-          <div class="flex flex-col gap-2 w-full bg-repeat-none z-10">
+          <div class="flex flex-col gap-2 w-full z-10 bg-repeat-none">
             <div class="flex flex-col justify-between">
               <div class="flex justify-between w-full">
                 <Tooltip
@@ -411,7 +411,7 @@ const ModRow = (props: Props) => {
               </div>
             </div>
             <div class="flex justify-between w-full">
-              <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-h-15 max-w-full">
+              <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-w-full max-h-15">
                 <Switch>
                   <Match when={isRowSmall()}>
                     {truncateText(props.data?.summary, 60)}

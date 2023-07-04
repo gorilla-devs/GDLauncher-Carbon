@@ -1,5 +1,4 @@
 import { useLocation } from "@solidjs/router";
-import { createEffect } from "solid-js";
 
 interface Props {
   children: any;
