@@ -176,15 +176,17 @@ const ModRow = (props: Props) => {
 
   const OverviewTooltip = () => {
     return (
-      <div class="flex flex-col w-70 pb-4">
-        <h4 class="w-full px-4"> {props.data?.name}</h4>
-        <div
-          class="select-none w-full h-20 bg-cover bg-center"
-          style={{
-            "background-image": `url('${props.data.logo.thumbnailUrl}')`,
-          }}
+      <div class="relative flex flex-col w-70 pb-4 overflow-hidden">
+        <h4 class="w-full px-4 z-30 text-lightSlate-100 mb-2 text-xl">
+          {props.data?.name}
+        </h4>
+        <div class="absolute top-0 bottom-0 right-0 left-0 from-darkSlate-900 z-20 from-70% bg-gradient-to-t" />
+        <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 bg-gradient-to-l from-darkSlate-900 z-20" />
+        <img
+          class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"
+          src={props.data.logo.thumbnailUrl}
         />
-        <div class="px-4 pt-4">
+        <div class="px-4 z-30">
           <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis">
             {props.data?.summary}
           </p>
@@ -194,20 +196,18 @@ const ModRow = (props: Props) => {
             </For>
           </div>
           <div class="flex flex-col gap-2 items-start mt-4">
-            <div class="flex flex-col gap-2 items-start text-darkSlate-100">
-              <p class="m-0 text-lightSlate-100">
-                <Trans
-                  key="modpack.authors"
-                  options={{
-                    defaultValue: "Authors: ",
-                  }}
-                />
-              </p>
+            <div class="flex gap-2 items-start text-darkSlate-100">
+              <span class="flex gap-2 items-center">
+                <div class="i-ri:user-fill text-lightSlate-100 w-4 h-4" />
+                <p class="m-0 text-lightSlate-100 text-sm">
+                  <Trans key="modpack.authors" />
+                </p>
+              </span>
               <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
                 <For each={props.data.authors}>
                   {(author, i) => (
                     <>
-                      <p class="m-0">{author?.name}</p>
+                      <p class="m-0 text-sm">{author?.name}</p>
                       <Show when={i() !== props.data.authors.length - 1}>
                         <span class="text-lightSlate-100">{"•"}</span>
                       </Show>
@@ -217,31 +217,37 @@ const ModRow = (props: Props) => {
               </div>
             </div>
             <div class="flex gap-2 items-center text-darkSlate-100">
-              <p class="m-0 text-lightSlate-100">
-                <Trans
-                  key="modpack.last_updated"
-                  options={{
-                    defaultValue: "Last time updated: ",
-                  }}
-                />
+              <div class="i-ri:time-fill text-lightSlate-100" />
+              <p class="m-0 text-lightSlate-100 text-sm">
+                <Trans key="modpack.last_updated" />
               </p>
               <div class="whitespace-nowrap text-sm">
-                {formatDistanceToNowStrict(
-                  new Date(props.data.dateModified).getTime()
-                )}
+                <Trans
+                  key="modpack.last_updated_time"
+                  options={{
+                    time: formatDistanceToNowStrict(
+                      new Date(props.data.dateModified).getTime()
+                    ),
+                  }}
+                />
               </div>
             </div>
             <div class="flex gap-2 items-center text-darkSlate-100">
-              <p class="m-0 text-lightSlate-100">
-                <Trans
-                  key="modpack.total_download"
-                  options={{
-                    defaultValue: "Total download",
-                  }}
-                />
+              <div class="i-ri:download-fill text-lightSlate-100" />
+              <p class="m-0 text-lightSlate-100 text-sm">
+                <Trans key="modpack.total_download" />
               </p>
               <div class="text-sm whitespace-nowrap">
                 {formatDownloadCount(props.data.downloadCount)}
+              </div>
+            </div>
+            <div class="flex gap-2 items-center text-darkSlate-100">
+              <div class="i-ri:gamepad-fill text-lightSlate-100" />
+              <p class="m-0 text-lightSlate-100 text-sm">
+                <Trans key="modpack.mcVersion" />
+              </p>
+              <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full text-sm">
+                {props.data.latestFilesIndexes[0].gameVersion}
               </div>
             </div>
           </div>
