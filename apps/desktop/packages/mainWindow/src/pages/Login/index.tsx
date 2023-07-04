@@ -1,11 +1,13 @@
 import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match } from "solid-js";
+import { createSignal, Switch, Match, Show } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { useTransContext } from "@gd/i18n";
+import { supportedLanguages, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
+import TermsAndConditions from "./TermsAndConditions";
+import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -31,6 +33,10 @@ export default function Login() {
     },
   });
 
+  const nextStep = () => {
+    setStep((prev) => prev + 1);
+  };
+
   return (
     <Switch>
       <Match when={isAlreadyAuthenticated()}>
@@ -44,13 +50,17 @@ export default function Login() {
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
           />
-          <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
+          <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
             <Dropdown
-              value={routeData.settings.data?.language || "en"}
-              options={[
-                { label: t("languages.english"), key: "eng" },
-                { label: t("languages.italian"), key: "it" },
-              ]}
+              value={routeData.settings.data?.language}
+              options={Object.keys(supportedLanguages).map((lang) => ({
+                label: (
+                  <div class="whitespace-nowrap">
+                    {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
+                  </div>
+                ),
+                key: lang,
+              }))}
               onChange={(lang) => {
                 settingsMutation.mutate({ language: lang.key as string });
               }}
@@ -58,25 +68,49 @@ export default function Login() {
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 0 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
-              "overflow-hidden": step() === 1,
+              "overflow-hidden": step() === 2,
             }}
           >
+            <Show when={step() < 1}>
+              <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
+                <img class="w-30" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
+            <Show when={step() === 1}>
+              <div class="absolute right-0 flex justify-center items-center flex-col left-0 -top-15 m-auto">
+                <img class="w-30" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
             <Switch>
               <Match when={step() === 0}>
+                <TermsAndConditions nextStep={nextStep} />
+              </Match>
+              {/* <Match when={step() === 1}>
+                <TrackingSettings prevStep={prevStep} nextStep={nextStep} />
+              </Match> */}
+              <Match when={step() === 1}>
                 <Auth
-                  setStep={setStep}
+                  nextStep={nextStep}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />
               </Match>
-              <Match when={step() === 1}>
+              <Match when={step() === 2}>
                 <CodeStep
-                  setStep={setStep}
+                  nextStep={nextStep}
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />

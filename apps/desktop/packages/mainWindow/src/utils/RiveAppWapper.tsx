@@ -4,6 +4,8 @@ import { createSignal, onCleanup, onMount } from "solid-js";
 type Props = {
   src: string;
   onStop?: () => void;
+  width?: number;
+  height?: number;
 };
 
 const RiveAppWapper = (props: Props) => {
@@ -42,11 +44,11 @@ const RiveAppWapper = (props: Props) => {
   return (
     <canvas
       ref={canvas}
-      width={600}
-      height={600}
+      width={props.width || 600}
+      height={props.height || 600}
       style={{
-        width: "600px",
-        height: "600px",
+        width: `${props.width || 600}px`,
+        height: `${props.height || 600}px`,
       }}
     />
   );

@@ -8,6 +8,7 @@ interface Props {
 
 function Checkbox(props: Props) {
   const isChecked = () => props.checked;
+  // eslint-disable-next-line solid/reactivity
   const [checked, setChecked] = createSignal(isChecked());
 
   createEffect(() => {

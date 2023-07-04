@@ -4,13 +4,17 @@
   "exports": {
     ".": {
       "import": "./index.ts"
+    },
+    "./supportedLanguages.json": {
+      "import": "./supportedLanguages.json",
+      "default": "./supportedLanguages.json"
     }
   },
   "devDependencies": {
     "@mbarzda/solid-i18next": "^1.2.2",
-    "html-parse-string": "^0.0.8",
-    "i18next": "^22.4.13",
-    "i18next-icu": "^2.1.0",
-    "intl-messageformat": "^10.3.3"
+    "html-parse-string": "^0.0.9",
+    "i18next": "^23.2.6",
+    "i18next-icu": "^2.3.0",
+    "intl-messageformat": "^10.5.0"
   }
 }

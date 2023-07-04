@@ -154,7 +154,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
-                println!("_STATUS_: READY|{port}");
+                println!("_STATUS_:READY|{port}");
                 break;
             }
         }

@@ -44,11 +44,8 @@ const Modpack = () => {
     },
   ];
 
-  // eslint-disable-next-line no-unused-vars
-  // let containerRef: HTMLDivElement;
-  // let bgRef: HTMLDivElement;
-  // let innerContainerRef: HTMLDivElement;
-  // let refStickyContainer: HTMLDivElement;
+  let refStickyTabs: HTMLDivElement;
+  const [isSticky, setIsSticky] = createSignal(false);
 
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
@@ -93,19 +90,13 @@ const Modpack = () => {
         style={{
           "scrollbar-gutter": "stable",
         }}
+        onScroll={() => {
+          const rect = refStickyTabs.getBoundingClientRect();
+          setIsSticky(rect.top <= 80);
+        }}
       >
-        <div
-          class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
-          // ref={(el) => {
-          //   containerRef = el;
-          // }}
-        >
-          <div
-            class="relative h-full"
-            // ref={(el) => {
-            //   innerContainerRef = el;
-            // }}
-          >
+        <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
+          <div class="relative h-full">
             <div
               class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
               style={{
@@ -115,11 +106,8 @@ const Modpack = () => {
                 }")`,
                 "background-position": "right-5rem",
               }}
-              // ref={(el) => {
-              //   bgRef = el;
-              // }}
             />
-            <div class="z-10 top-5 sticky left-5 w-fit">
+            <div class="top-5 sticky left-5 w-fit">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -145,7 +133,7 @@ const Modpack = () => {
                     }")`,
                   }}
                 />
-                <div class="flex flex-1 flex-col max-w-185">
+                <div class="flex flex-1 flex-col">
                   <div class="flex gap-4 items-center cursor-pointer">
                     <Switch>
                       <Match when={!isFetching()}>
@@ -269,9 +257,31 @@ const Modpack = () => {
           </div>
         </div>
         <div class="bg-darkSlate-800">
-          <div class="flex justify-center px-4 pb-4">
+          <div class="flex justify-center pb-4">
             <div class="bg-darkSlate-800 w-full">
-              <div class="sticky top-0 flex flex-col mb-4 z-0">
+              <div
+                ref={(el) => {
+                  refStickyTabs = el;
+                }}
+                class="sticky top-0 flex items-center justify-between mb-4 px-4 z-10 bg-darkSlate-800"
+              >
+                <span class="mr-4">
+                  <Show when={isSticky()}>
+                    <Button
+                      onClick={() => navigate("/modpacks")}
+                      size="small"
+                      type="secondary"
+                    >
+                      <div class="text-2xl i-ri:arrow-drop-left-line" />
+                      <Trans
+                        key="instance.step_back"
+                        options={{
+                          defaultValue: "Back",
+                        }}
+                      />
+                    </Button>
+                  </Show>
+                </span>
                 <Tabs>
                   <TabList>
                     <For each={instancePages()}>
@@ -283,8 +293,46 @@ const Modpack = () => {
                     </For>
                   </TabList>
                 </Tabs>
+                <Show when={isSticky()}>
+                  <Button
+                    uppercase
+                    size="small"
+                    onClick={() => {
+                      const modpack = routeData.modpackDetails
+                        ?.data as FEModResponse;
+
+                      loadIconMutation.mutate(modpack.data.logo.url);
+                      createInstanceMutation.mutate({
+                        group: defaultGroup.data || 1,
+                        use_loaded_icon: true,
+                        notes: "",
+                        name: modpack.data.name,
+                        version: {
+                          Modpack: {
+                            Curseforge: {
+                              file_id: modpack.data.mainFileId,
+                              project_id: modpack.data.id,
+                            },
+                          },
+                        },
+                      });
+                    }}
+                  >
+                    <Show when={loading()}>
+                      <Spinner />
+                    </Show>
+                    <Show when={!loading()}>
+                      <Trans
+                        key="modpack.download"
+                        options={{
+                          defaultValue: "Download",
+                        }}
+                      />
+                    </Show>
+                  </Button>
+                </Show>
               </div>
-              <div>
+              <div class="z-0 px-4">
                 <Outlet />
               </div>
             </div>

@@ -14,7 +14,7 @@ const Mod = (props: Props) => {
   const modalsContext = useModal();
   const [loading, setLoading] = createSignal(false);
 
-  const latestFIlesIndexes = () =>
+  const latestFilesIndexes = () =>
     props.mod.latestFilesIndexes.filter(
       (file) => file.gameVersion === props.mcVersion
     );
@@ -25,7 +25,7 @@ const Mod = (props: Props) => {
   ]);
 
   const mappedVersions = () =>
-    latestFIlesIndexes().map((version) => ({
+    latestFilesIndexes().map((version) => ({
       key: version.fileId,
       label: version.filename,
     }));
@@ -48,7 +48,7 @@ const Mod = (props: Props) => {
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
         <img
-          class="select-none rounded-xl h-30 w-30"
+          class="rounded-xl select-none h-30 w-30"
           src={props.mod.logo.thumbnailUrl}
         />
         <div class="flex flex-col gap-2">
@@ -117,11 +117,16 @@ const Mod = (props: Props) => {
                 rounded
                 value={mappedVersions()[0]?.key}
                 onClick={() => {
-                  installModMutation.mutate({
-                    file_id: props.mod.mainFileId,
-                    instance_id: parseInt(lastInstanceOpened(), 10),
-                    project_id: props.mod.id,
-                  });
+                  const fileVersion = props.mod.latestFilesIndexes.find(
+                    (file) => file.gameVersion === props.mcVersion
+                  );
+                  if (fileVersion) {
+                    installModMutation.mutate({
+                      file_id: fileVersion?.fileId,
+                      instance_id: parseInt(lastInstanceOpened(), 10),
+                      project_id: props.mod.id,
+                    });
+                  }
                 }}
                 onChange={(val) => {
                   const file = props.mod.latestFiles.find(
