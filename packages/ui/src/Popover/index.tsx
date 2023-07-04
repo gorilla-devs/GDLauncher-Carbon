@@ -29,6 +29,19 @@ type Props = {
   opened?: boolean;
 };
 
+type Point = { x: number; y: number };
+
+const area = (a: Point, b: Point, c: Point) =>
+  Math.abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2.0);
+
+const isInside = (a: Point, b: Point, c: Point, p: Point) => {
+  const total = area(a, b, c);
+  const A = area(p, b, c);
+  const B = area(a, p, c);
+  const C = area(a, b, p);
+  return total === A + B + C;
+};
+
 const Popover = (props: Props) => {
   const [PopoverOpened, setPopoverOpened] = createSignal(false);
   const [elementRef, setElementRef] = createSignal<
@@ -37,11 +50,14 @@ const Popover = (props: Props) => {
   const [PopoverRef, setPopoverRef] = createSignal<
     HTMLDivElement | undefined
   >();
-  // const [isSubMenuOpen, setSubMenuOpen] = createSignal(false);
   const [timer, setTimer] = createSignal<ReturnType<typeof setTimeout> | null>(
     null
   );
   const [lastPos, setLastPos] = createSignal({ x: 0, y: 0 });
+  const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 });
+  const [openTimer, setOpenTimer] = createSignal<ReturnType<
+    typeof setTimeout
+  > | null>(null);
 
   const trackMouse = (e: MouseEvent) => {
     setLastPos({ x: e.clientX, y: e.clientY });
@@ -54,9 +70,12 @@ const Popover = (props: Props) => {
         const menuRect = (
           PopoverRef() as HTMLDivElement
         ).getBoundingClientRect();
+        const a = triangleStart();
+        const b = { x: menuRect.left, y: menuRect.bottom };
+        const c = { x: menuRect.right, y: menuRect.bottom };
 
         // check if the last mouse position is within the safe triangle
-        if (lastPos().x > menuRect.right && lastPos().y > menuRect.top) {
+        if (isInside(a, b, c, lastPos())) {
           return;
         }
 
@@ -131,8 +150,18 @@ const Popover = (props: Props) => {
 
       <div
         ref={(el) => setElementRef(el)}
-        onMouseEnter={() => setPopoverOpened(true)}
-        onMouseLeave={startTimer}
+        onMouseEnter={() => {
+          setOpenTimer(
+            setTimeout(() => {
+              setPopoverOpened(true);
+            }, 300)
+          );
+        }}
+        onMouseLeave={(e) => {
+          clearTimeout(openTimer() as ReturnType<typeof setTimeout>);
+          setTriangleStart({ x: e.clientX, y: e.clientY });
+          startTimer();
+        }}
       >
         {props.children}
       </div>
