@@ -8,6 +8,7 @@ import { Trans } from "@gd/i18n";
 import {
   Button,
   Dropdown,
+  Popover,
   Spinner,
   Tag,
   Tooltip,
@@ -177,7 +178,17 @@ const ModRow = (props: Props) => {
   const OverviewTooltip = () => {
     return (
       <div class="relative flex flex-col overflow-hidden w-70 pb-4">
-        <h4 class="w-full px-4 mb-2 text-xl z-30 text-lightSlate-100">
+        <Show when={props.data.links.websiteUrl}>
+          <div
+            class="w-6 h-6 rounded-lg bg-darkSlate-900 cursor-pointer"
+            onClick={() =>
+              window.openExternalLink(props.data.links.websiteUrl as string)
+            }
+          >
+            <div class="i-ri:external-link-line w-4 h-4 text-lightSlate-100 z-30 absolute top-4 right-4" />
+          </div>
+        </Show>
+        <h4 class="text-xl z-30 text-lightSlate-100 px-4 mb-2">
           {props.data?.name}
         </h4>
         <div class="absolute top-0 bottom-0 right-0 left-0 z-20 bg-gradient-to-t from-darkSlate-900 from-70%" />
@@ -272,7 +283,7 @@ const ModRow = (props: Props) => {
           <div class="flex flex-col gap-2 w-full z-10 bg-repeat-none">
             <div class="flex flex-col justify-between">
               <div class="flex justify-between w-full">
-                <Tooltip
+                <Popover
                   noPadding
                   noTip
                   content={<OverviewTooltip />}
@@ -289,7 +300,7 @@ const ModRow = (props: Props) => {
                   >
                     {props.data?.name}
                   </h2>
-                </Tooltip>
+                </Popover>
                 <div class="flex gap-2 scrollbar-hide">
                   <Switch>
                     <Match when={!isRowSmall()}>
@@ -302,10 +313,12 @@ const ModRow = (props: Props) => {
                       </For>
                     </Match>
                     <Match when={isRowSmall()}>
-                      <Tag
-                        img={props.data.categories[0].iconUrl}
-                        type="fixed"
-                      />
+                      <Tooltip content={props.data.categories[0].name}>
+                        <Tag
+                          img={props.data.categories[0].iconUrl}
+                          type="fixed"
+                        />
+                      </Tooltip>
                       <Show when={props.data.categories.length - 1 > 0}>
                         <Tooltip
                           content={

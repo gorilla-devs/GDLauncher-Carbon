@@ -22,4 +22,5 @@ export {
 } from "./NotificationManager";
 export { Dropdown } from "./Dropdown";
 export { Tooltip } from "./Tooltip";
+export { Popover } from "./Popover";
 export * from "./themes";
