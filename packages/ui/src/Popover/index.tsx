@@ -16,6 +16,7 @@ import {
   hide,
   size,
   Placement,
+  autoPlacement,
 } from "@floating-ui/dom";
 
 type Props = {
@@ -44,20 +45,13 @@ const isInside = (a: Point, b: Point, c: Point, p: Point) => {
 
 const Popover = (props: Props) => {
   const [PopoverOpened, setPopoverOpened] = createSignal(false);
-  const [elementRef, setElementRef] = createSignal<
-    HTMLDivElement | undefined
-  >();
-  const [PopoverRef, setPopoverRef] = createSignal<
-    HTMLDivElement | undefined
-  >();
-  const [timer, setTimer] = createSignal<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const [elementRef, setElementRef] = createSignal<HTMLDivElement>();
+  const [PopoverRef, setPopoverRef] = createSignal<HTMLDivElement>();
+  const [timer, setTimer] = createSignal<ReturnType<typeof setTimeout>>();
   const [lastPos, setLastPos] = createSignal({ x: 0, y: 0 });
   const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 });
-  const [openTimer, setOpenTimer] = createSignal<ReturnType<
-    typeof setTimeout
-  > | null>(null);
+  const [openTimer, setOpenTimer] =
+    createSignal<ReturnType<typeof setTimeout>>();
 
   const trackMouse = (e: MouseEvent) => {
     setLastPos({ x: e.clientX, y: e.clientY });
@@ -86,26 +80,28 @@ const Popover = (props: Props) => {
 
   const stopTimer = () => {
     if (timer()) {
-      clearTimeout(timer() as ReturnType<typeof setTimeout>);
-      setTimer(null);
+      clearTimeout(timer());
+      setTimer(undefined);
     }
     if (openTimer()) {
-      clearTimeout(openTimer() as ReturnType<typeof setTimeout>);
-      setOpenTimer(null);
+      clearTimeout(openTimer());
+      setOpenTimer(undefined);
     }
   };
 
   onMount(() => {
     window.addEventListener("mousemove", trackMouse);
+    window.addEventListener("mouseleave", () => setPopoverOpened(false));
   });
 
   onCleanup(() => {
     window.removeEventListener("mousemove", trackMouse);
+    window.removeEventListener("mouseleave", () => setPopoverOpened(false));
   });
 
   const position = useFloating(elementRef, PopoverRef, {
     placement: props.placement || "top",
-    middleware: [offset(10), flip(), shift(), hide(), size()],
+    middleware: [offset(10), flip(), shift(), hide(), size(), autoPlacement()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
         animationFrame: true,
@@ -123,7 +119,7 @@ const Popover = (props: Props) => {
           <div
             onMouseEnter={stopTimer}
             onMouseLeave={startTimer}
-            ref={(el) => setPopoverRef(el)}
+            ref={setPopoverRef}
             class={`absolute rounded-lg z-[100] ${props.color || ""}`}
             style={{
               position: "absolute",
@@ -153,7 +149,7 @@ const Popover = (props: Props) => {
       </Show>
 
       <div
-        ref={(el) => setElementRef(el)}
+        ref={setElementRef}
         onMouseEnter={() => {
           stopTimer();
           setOpenTimer(
@@ -163,7 +159,7 @@ const Popover = (props: Props) => {
           );
         }}
         onMouseLeave={(e) => {
-          clearTimeout(openTimer() as ReturnType<typeof setTimeout>);
+          clearTimeout(openTimer());
           setTriangleStart({ x: e.clientX, y: e.clientY });
           startTimer();
         }}
