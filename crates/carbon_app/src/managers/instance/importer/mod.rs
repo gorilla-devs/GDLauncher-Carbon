@@ -1,19 +1,37 @@
-use std::path::Path;
+use std::{any::Any, path::Path, sync::Arc};
 
-mod legacy_gdlauncher;
+use serde::{Deserialize, Serialize};
 
+use crate::managers::AppInner;
+
+pub mod legacy_gdlauncher;
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Entity {
     LegacyGDLauncher,
 }
 
-#[async_trait::async_trait]
-pub trait InstanceImporter {
-    async fn scan(&self, path: &Path) -> anyhow::Result<()>;
-    async fn import(&self, path: &Path) -> anyhow::Result<()>;
+pub struct ImportableInstance {
+    pub name: String,
 }
 
-pub fn get_importer(entity: Entity) -> impl InstanceImporter {
-    match entity {
-        Entity::LegacyGDLauncher => legacy_gdlauncher::LegacyGDLauncherImporter,
+#[async_trait::async_trait]
+pub trait InstanceImporter {
+    type Config: Sized;
+
+    async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()>;
+    async fn get_available(&self) -> anyhow::Result<Vec<ImportableInstance>>;
+    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<()>;
+}
+
+pub struct Importer {
+    pub legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter,
+}
+
+impl Importer {
+    pub fn new() -> Self {
+        Self {
+            legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter::default(),
+        }
     }
 }

@@ -93,6 +93,9 @@ keys! {
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
+        SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
+        GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
+        IMPORT_INSTANCE                             = "importInstance";
     }
 
     vtask {
