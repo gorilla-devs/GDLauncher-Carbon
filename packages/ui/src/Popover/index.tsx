@@ -87,8 +87,12 @@ const Popover = (props: Props) => {
   const stopTimer = () => {
     if (timer()) {
       clearTimeout(timer() as ReturnType<typeof setTimeout>);
+      setTimer(null);
     }
-    setTimer(null);
+    if (openTimer()) {
+      clearTimeout(openTimer() as ReturnType<typeof setTimeout>);
+      setOpenTimer(null);
+    }
   };
 
   onMount(() => {
@@ -151,6 +155,7 @@ const Popover = (props: Props) => {
       <div
         ref={(el) => setElementRef(el)}
         onMouseEnter={() => {
+          stopTimer();
           setOpenTimer(
             setTimeout(() => {
               setPopoverOpened(true);

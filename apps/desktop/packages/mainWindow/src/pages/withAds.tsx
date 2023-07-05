@@ -31,7 +31,10 @@ function withAdsLayout() {
             }}
           >
             <Outlet />
-            <div class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 w-100 flex-initial">
+            <div
+              id="ads-layout-container"
+              class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 w-100 flex-initial"
+            >
               <AdsBanner />
             </div>
             <div class="absolute top-0 left-0 right-0 bottom-0 bg-image-gdlauncher_pattern.svg -z-10" />
