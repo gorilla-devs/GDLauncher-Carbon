@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button } from "@gd/ui";
 import {
   Link,
@@ -31,6 +31,8 @@ import { getPreparingState, getRunningState } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { RSPCError } from "@rspc/client";
+import { ContextMenu } from "@/components/ContextMenu";
+import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 
 type InstancePage = {
@@ -48,6 +50,8 @@ const Instance = () => {
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   );
+  const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -215,7 +219,7 @@ const Instance = () => {
   };
 
   let nameRef: HTMLHeadingElement | undefined;
-  let headerRef: HTMLElement | undefined;
+  let headerRef: HTMLElement;
   let innerContainerRef: HTMLDivElement | undefined;
 
   const checkContainerSize = () => {
@@ -248,17 +252,69 @@ const Instance = () => {
 
   onCleanup(() => window?.removeEventListener("resize", checkContainerSize));
 
+  let refStickyTabs: HTMLDivElement;
+  const [isSticky, setIsSticky] = createSignal(false);
+
+  const openFolderMutation = rspc.createMutation([
+    "instance.openInstanceFolder",
+  ]);
+
+  const handleEdit = () => {
+    modalsContext?.openModal(
+      {
+        name: "instanceCreation",
+      },
+      {
+        id: params.id,
+        modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
+        title: routeData.instanceDetails.data?.name,
+        mcVersion: routeData.instanceDetails.data?.version,
+        modloaderVersion:
+          routeData.instanceDetails.data?.modloaders[0]?.version,
+      }
+    );
+  };
+
+  const handleOpenFolder = () => {
+    openFolderMutation.mutate({
+      instance_id: parseInt(params.id, 10),
+      folder: "Root",
+    });
+  };
+
+  const menuItems = () => [
+    {
+      icon: "i-ri:pencil-fill",
+      label: t("instance.action_edit"),
+      action: handleEdit,
+    },
+    {
+      icon: "i-ri:folder-open-fill",
+      label: t("instance.action_open_folder"),
+      action: handleOpenFolder,
+    },
+  ];
+
   return (
-    <main class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col">
+    <main
+      class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
+      onScroll={() => {
+        const rect = refStickyTabs.getBoundingClientRect();
+        setIsSticky(rect.top <= 80);
+      }}
+    >
       <header
-        ref={headerRef}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out min-h-52 transition-100"
+        ref={(el) => {
+          headerRef = el;
+        }}
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
           "background-image": routeData.image()
             ? `url("${routeData.image()}")`
             : `url("${DefaultImg}")`,
           "background-position": "center",
+          "background-repeat": "repeat",
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
@@ -277,7 +333,7 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 px-6">
+          <div class="flex sticky bg-gradient-to-t from-darkSlate-800 justify-center h-24 top-52 z-20 w-full pb-2 px-6">
             <div class="flex justify-center w-full">
               <div class="flex justify-between w-full max-w-185 items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
@@ -292,7 +348,7 @@ const Instance = () => {
 
                   <div class="flex flex-col max-w-185 flex-1">
                     <div
-                      class="flex gap-4 items-center w-fit pl-1"
+                      class="flex gap-4 w-fit items-center pl-1"
                       classList={{
                         "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
@@ -306,7 +362,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="m-0 border-box cursor-pointer z-10 focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
+                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
@@ -322,7 +378,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="transition-color ease-in-out duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
+                            class="ease-in-out transition-color duration-100 i-ri:pencil-fill hover:text-darkSlate-50"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -332,14 +388,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out text-white transition i-ri:check-fill text-3xl z-10 duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName(),
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition i-ri:close-fill text-3xl duration-50 hover:text-red-500 z-10"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName(),
                           }}
@@ -362,7 +418,7 @@ const Instance = () => {
                       class="flex justify-between cursor-default flex-row"
                     >
                       <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-start">
+                        <div class="m-0 flex gap-2 items-center h-full">
                           <span>
                             {routeData.instanceDetails.data?.modloaders[0]
                               ?.type_ || "Vanilla"}
@@ -375,7 +431,7 @@ const Instance = () => {
                             undefined
                           }
                         >
-                          <div class="flex gap-2 items-start">
+                          <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:time-fill" />
                             <span>
                               {convertSecondsToHumanTime(
@@ -393,7 +449,7 @@ const Instance = () => {
                               .length > 0
                           }
                         >
-                          <div class="flex gap-2 items-start">
+                          <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:user-fill" />
                             <For each={modpackDetails()?.data?.data.authors}>
                               {(author) => <p class="m-0">{author.name}</p>}
@@ -402,6 +458,16 @@ const Instance = () => {
                         </Show>
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                        <ContextMenu menuItems={menuItems()} trigger="click">
+                          <div
+                            class="flex justify-center items-center cursor-pointer rounded-full h-8 w-8"
+                            style={{
+                              background: "rgba(255, 255, 255, 0.1)",
+                            }}
+                          >
+                            <div class="text-xl i-ri:more-2-fill" />
+                          </div>
+                        </ContextMenu>
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
@@ -472,7 +538,29 @@ const Instance = () => {
       <div class="bg-darkSlate-800 sticky">
         <div class="flex justify-center p-6">
           <div class="bg-darkSlate-800 w-full">
-            <div class="sticky z-20 flex flex-col bg-darkSlate-800 mb-4 top-0">
+            <div
+              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
+              ref={(el) => {
+                refStickyTabs = el;
+              }}
+            >
+              <span class="mr-4">
+                <Show when={isSticky()}>
+                  <Button
+                    onClick={() => navigate("/library")}
+                    icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
+                    size="small"
+                    type="secondary"
+                  >
+                    <Trans
+                      key="instance.step_back"
+                      options={{
+                        defaultValue: "Back",
+                      }}
+                    />
+                  </Button>
+                </Show>
+              </span>
               <Tabs index={selectedIndex()}>
                 <TabList>
                   <For each={instancePages()}>
@@ -484,6 +572,41 @@ const Instance = () => {
                   </For>
                 </TabList>
               </Tabs>
+              <Show when={isSticky()}>
+                <Button
+                  uppercase
+                  type="glow"
+                  size="small"
+                  variant={isRunning() && "red"}
+                  loading={isPreparing() !== undefined}
+                  onClick={() => {
+                    if (isRunning()) {
+                      killInstanceMutation.mutate(parseInt(params.id, 10));
+                    } else {
+                      launchInstanceMutation.mutate(parseInt(params.id, 10));
+                    }
+                  }}
+                >
+                  <Switch>
+                    <Match when={!isRunning()}>
+                      <Trans
+                        key="instance.play"
+                        options={{
+                          defaultValue: "play",
+                        }}
+                      />
+                    </Match>
+                    <Match when={isRunning()}>
+                      <Trans
+                        key="instance.stop"
+                        options={{
+                          defaultValue: "stop",
+                        }}
+                      />
+                    </Match>
+                  </Switch>
+                </Button>
+              </Show>
             </div>
             <Outlet />
           </div>

@@ -44,7 +44,10 @@ const InstanceTile = (props: {
     percentage: 0,
     subTasks: undefined,
   });
-  const [imageResource] = createResource(() => props.instance.id, fetchImage);
+  const [imageResource, { refetch }] = createResource(
+    () => props.instance.id,
+    fetchImage
+  );
   const navigate = useGDNavigate();
 
   const validInstance = () => getValideInstance(props.instance.status);
@@ -60,8 +63,6 @@ const InstanceTile = (props: {
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
-  // const task = useConditionalQuery("vtask.getTask", taskId());
-
   const [task, setTask] = createSignal<CreateQueryResult<
     Task | null,
     RSPCError
@@ -70,6 +71,12 @@ const InstanceTile = (props: {
   createEffect(() => {
     if (taskId() !== undefined) {
       setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
+    }
+  });
+
+  createEffect(() => {
+    if (props.instance.icon_revision !== undefined) {
+      refetch();
     }
   });
 
@@ -111,6 +118,7 @@ const InstanceTile = (props: {
 
   createEffect(() => {
     if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+      if (taskId()) dismissTaskMutation.mutate(taskId() as number);
       setFailError(failedTask.data.progress.Failed.cause[0].display);
     }
   });
@@ -122,8 +130,7 @@ const InstanceTile = (props: {
   return (
     <Tile
       onClick={() => navigate(`/library/${props.instance.id}`)}
-      title={props.instance.name}
-      instanceId={props.instance.id}
+      instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}
       isInvalid={!isListInstanceValid(props.instance.status)}

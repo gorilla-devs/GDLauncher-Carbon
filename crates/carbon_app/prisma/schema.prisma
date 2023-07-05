@@ -12,7 +12,7 @@ model AppConfiguration {
   id                   Int     @id @unique @default(0)
   theme                String  @default("main")
   reducedMotion        Boolean @default(false)
-  language             String  @default("en")
+  language             String  @default("english")
   discordIntegration   Boolean @default(true)
   releaseChannel       String  @default("stable")
   activeAccountUuid    String?
@@ -26,6 +26,7 @@ model AppConfiguration {
   isFirstLaunch        Boolean @default(true)
   autoManageJava       Boolean @default(true)
   isLegalAccepted      Boolean @default(false)
+  metricsLevel         Int? // 0 = disabled, 1 = anonymous, 2 = anonymous + sessions, 3 = authenticated + sessions
 }
 
 model Java {

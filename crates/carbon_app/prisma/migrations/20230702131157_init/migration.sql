@@ -3,7 +3,7 @@ CREATE TABLE "AppConfiguration" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT DEFAULT 0,
     "theme" TEXT NOT NULL DEFAULT 'main',
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
-    "language" TEXT NOT NULL DEFAULT 'en',
+    "language" TEXT NOT NULL DEFAULT 'english',
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
     "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
     "activeAccountUuid" TEXT,
@@ -16,7 +16,8 @@ CREATE TABLE "AppConfiguration" (
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
-    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false
+    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
+    "metricsLevel" INTEGER
 );
 
 -- CreateTable

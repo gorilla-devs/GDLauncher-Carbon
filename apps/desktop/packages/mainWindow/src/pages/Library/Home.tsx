@@ -31,7 +31,7 @@ const Home = () => {
   });
 
   return (
-    <div class="pb-0 p-6">
+    <div>
       <div>
         <Switch>
           <Match when={news.length > 0 && isNewsVisible()}>

@@ -96,6 +96,11 @@ async function createWindow() {
     return { platform: os.platform(), arch: os.arch() };
   });
 
+  ipcMain.handle("openCMPWindow", async () => {
+    // @ts-ignore
+    app.overwolf.openCMPWindow();
+  });
+
   win.webContents.on("will-navigate", (e, url) => {
     if (win && url !== win.webContents.getURL()) {
       e.preventDefault();
