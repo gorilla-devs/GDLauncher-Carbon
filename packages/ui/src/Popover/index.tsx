@@ -10,7 +10,6 @@ import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
 import {
   offset,
-  flip,
   shift,
   autoUpdate,
   hide,
@@ -101,7 +100,19 @@ const Popover = (props: Props) => {
 
   const position = useFloating(elementRef, PopoverRef, {
     placement: props.placement || "top",
-    middleware: [offset(10), flip(), shift(), hide(), size(), autoPlacement()],
+    middleware: [
+      offset(10),
+      //   flip(),
+      shift(),
+      hide(),
+      size(),
+      autoPlacement({
+        padding: {
+          top: 0,
+          right: 200,
+        },
+      }),
+    ],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
         animationFrame: true,
