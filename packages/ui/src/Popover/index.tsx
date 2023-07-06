@@ -86,12 +86,22 @@ const Popover = (props: Props) => {
     } else setPopoverOpened(true);
   };
 
+  let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  const debouncedTrackMouse = (e: MouseEvent) => {
+    if (debounceTimeout) clearTimeout(debounceTimeout);
+
+    debounceTimeout = setTimeout(() => {
+      trackMouse(e);
+    }, 50);
+  };
+
   onMount(() => {
-    window.addEventListener("mousemove", trackMouse);
+    window.addEventListener("mousemove", debouncedTrackMouse);
   });
 
   onCleanup(() => {
-    window.removeEventListener("mousemove", trackMouse);
+    window.removeEventListener("mousemove", debouncedTrackMouse);
   });
 
   const position = useFloating(elementRef, PopoverRef, {
@@ -126,7 +136,7 @@ const Popover = (props: Props) => {
             onMouseEnter={() => setSsHoveringCard(true)}
             onMouseLeave={() => setSsHoveringCard(false)}
             ref={setPopoverRef}
-            class={`rounded-lg z-[100] ${props.color || ""}`}
+            class={`rounded-lg will-change z-[100] ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
