@@ -1,10 +1,10 @@
 import { Button, LoadingBar } from "@gd/ui";
-import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { DeviceCodeObjectType } from ".";
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper";
@@ -12,6 +12,7 @@ import GateAnimation from "../../gate_animation.riv";
 import { handleStatus } from "@/utils/login";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "./auth.login.data";
+import { EnrollmentError } from "@gd/core_module/bindings";
 
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
@@ -53,6 +54,7 @@ const CodeStep = (props: Props) => {
     `${minutes()}:${parseTwoDigitNumber(seconds())}`
   );
   const [expired, setExpired] = createSignal(false);
+  const [t] = useTransContext();
 
   const resetCountDown = () => {
     setExpired(false);
@@ -61,7 +63,6 @@ const CodeStep = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
 
   const handleRefersh = async () => {
-    console.log("REFRRH", routeData.status.data);
     resetCountDown();
     if (routeData.status.data) {
       accountEnrollCancelMutation.mutate(undefined);
@@ -83,7 +84,6 @@ const CodeStep = (props: Props) => {
 
   createEffect(() => {
     if (expired()) {
-      console.log("TEST-4", routeData.status.data);
       if (routeData.status.data) accountEnrollCancelMutation.mutate(undefined);
       setLoading(false);
       clearInterval(interval);
@@ -101,13 +101,28 @@ const CodeStep = (props: Props) => {
     }
   });
 
+  const handleErrorMessages = (error: EnrollmentError) => {
+    const isCodeExpired = error === "deviceCodeExpired";
+
+    if (isCodeExpired) {
+      handleRefersh();
+    } else if (typeof error === "string") {
+      addNotification(t(`error.${error}`), "error");
+    } else {
+      if (typeof error.xboxAccount === "string")
+        addNotification(t(`error.xbox_${error.xboxAccount}`), "error");
+      else
+        addNotification(
+          `${t("error.xbox_code")} ${error.xboxAccount.unknown}`,
+          "error"
+        );
+    }
+  };
+
   createEffect(() => {
     handleStatus(routeData.status, {
       onFail(error) {
-        console.log("ERROR", error);
-        const isCodeExpired = error === "deviceCodeExpired";
-
-        if (isCodeExpired) handleRefersh();
+        handleErrorMessages(error);
       },
     });
   });

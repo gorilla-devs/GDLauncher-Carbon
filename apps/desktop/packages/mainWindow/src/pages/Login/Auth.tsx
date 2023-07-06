@@ -1,5 +1,5 @@
 import { useRouteData } from "@solidjs/router";
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
@@ -28,7 +28,6 @@ const Auth = () => {
   const retryLogin = () => {
     while (retry() <= 3) {
       if (!routeData.status.data) {
-        console.log("TEST-1");
         accountEnrollCancelMutation.mutate(undefined);
       }
       accountEnrollBeginMutation.mutate(undefined);
@@ -37,8 +36,6 @@ const Auth = () => {
     if (retry() > 3) {
       setError("Something went wrong while logging in, try again!");
       if (routeData.status.data) {
-        console.log("TEST-2");
-
         accountEnrollCancelMutation.mutate(undefined);
       }
       setClicked(false);
@@ -51,7 +48,6 @@ const Auth = () => {
     if (!routeData.status.data) {
       accountEnrollBeginMutation.mutate(undefined);
     } else {
-      console.log("TEST-3");
       accountEnrollCancelMutation.mutate(undefined);
       accountEnrollBeginMutation.mutate(undefined);
     }
@@ -72,7 +68,7 @@ const Auth = () => {
           }}
         />
       </Button>
-      <p class="text-darkSlate-50 text-sm max-w-90 mb-10">
+      <p class="text-darkSlate-50 text-sm mb-10 max-w-90">
         <Trans
           key="login.sign_in_with_microsoft_text"
           options={{

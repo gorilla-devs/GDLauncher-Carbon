@@ -40,14 +40,12 @@ export default function Login() {
   ]);
 
   const nextStep = () => {
-    console.log("STEP", step());
     if (step() < 2) {
       setStep((prev) => prev + 1);
     }
   };
 
   const prevStep = () => {
-    console.log("PREV", step());
     if (step() >= 0) {
       setStep((prev) => prev - 1);
     }
@@ -63,7 +61,6 @@ export default function Login() {
           link: info.verificationUri,
           expiresAt: info.expiresAt,
         });
-        console.log("AAAAAA", routeData.status.data);
         if (routeData.status.data) setStep(2);
       },
       onError(error) {
@@ -76,9 +73,9 @@ export default function Login() {
     });
   });
 
-  // createEffect(() => {
-  //   console.log("TEST", step(), isAlreadyAuthenticated());
-  // });
+  createEffect(() => {
+    if (routeData.settings.data?.isLegalAccepted) setStep(1);
+  });
 
   return (
     <Switch>
