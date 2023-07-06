@@ -31,78 +31,73 @@ type Props = {
 
 type Point = { x: number; y: number };
 
-const area = (a: Point, b: Point, c: Point) =>
-  Math.abs((a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2.0);
-
-const isInside = (a: Point, b: Point, c: Point, p: Point) => {
-  const total = area(a, b, c);
-  const A = area(p, b, c);
-  const B = area(a, p, c);
-  const C = area(a, b, p);
-  return total === A + B + C;
-};
+function isPointInTriangle(
+  pt: Point,
+  v1: Point,
+  v2: Point,
+  v3: Point
+): boolean {
+  const dX = pt.x - v3.x;
+  const dY = pt.y - v3.y;
+  const dX21 = v3.x - v2.x;
+  const dY12 = v2.y - v3.y;
+  const D = dY12 * (v1.x - v3.x) + dX21 * (v1.y - v3.y);
+  const s = dY12 * dX + dX21 * dY;
+  const t = (v3.y - v1.y) * dX + (v1.x - v3.x) * dY;
+  if (D < 0) return s <= 0 && t <= 0 && s + t >= D;
+  return s >= 0 && t >= 0 && s + t <= D;
+}
 
 const Popover = (props: Props) => {
+  const [isHoveringCard, setSsHoveringCard] = createSignal(false);
   const [PopoverOpened, setPopoverOpened] = createSignal(false);
   const [elementRef, setElementRef] = createSignal<HTMLDivElement>();
   const [PopoverRef, setPopoverRef] = createSignal<HTMLDivElement>();
-  const [timer, setTimer] = createSignal<ReturnType<typeof setTimeout>>();
-  const [lastPos, setLastPos] = createSignal({ x: 0, y: 0 });
   const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 });
   const [openTimer, setOpenTimer] =
     createSignal<ReturnType<typeof setTimeout>>();
 
-  const trackMouse = (e: MouseEvent) => {
-    setLastPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const startTimer = () => {
+  const menuRect = () => {
     if (!PopoverRef()) return;
-    setTimer(
-      setTimeout(() => {
-        const menuRect = (
-          PopoverRef() as HTMLDivElement
-        ).getBoundingClientRect();
-        const a = triangleStart();
-        const b = { x: menuRect.left, y: menuRect.bottom };
-        const c = { x: menuRect.right, y: menuRect.bottom };
-
-        // check if the last mouse position is within the safe triangle
-        if (isInside(a, b, c, lastPos())) {
-          return;
-        }
-
-        setPopoverOpened(false);
-      }, 300)
-    );
+    const popover = PopoverRef() as HTMLDivElement;
+    return popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
+      ? popover.getBoundingClientRect()
+      : undefined;
   };
 
-  const stopTimer = () => {
-    if (timer()) {
-      clearTimeout(timer());
-      setTimer(undefined);
-    }
-    if (openTimer()) {
-      clearTimeout(openTimer());
-      setOpenTimer(undefined);
-    }
+  const trackMouse = (e: MouseEvent) => {
+    if (!menuRect()) return;
+    const b = {
+      x: (menuRect() as DOMRect).left,
+      y: (menuRect() as DOMRect).top,
+    };
+    const c = {
+      x: (menuRect() as DOMRect).left,
+      y: (menuRect() as DOMRect).bottom,
+    };
+
+    const a = triangleStart();
+
+    if (
+      !isPointInTriangle({ x: e.clientX, y: e.clientY }, a, b, c) &&
+      !isHoveringCard()
+    ) {
+      setPopoverOpened(false);
+    } else setPopoverOpened(true);
   };
 
   onMount(() => {
     window.addEventListener("mousemove", trackMouse);
-    window.addEventListener("mouseleave", () => setPopoverOpened(false));
   });
 
   onCleanup(() => {
     window.removeEventListener("mousemove", trackMouse);
-    window.removeEventListener("mouseleave", () => setPopoverOpened(false));
   });
 
   const position = useFloating(elementRef, PopoverRef, {
     placement: props.placement || "top",
     middleware: [
       offset(10),
-      //   flip(),
       shift(),
       hide(),
       size(),
@@ -128,10 +123,10 @@ const Popover = (props: Props) => {
       <Show when={props.opened || PopoverOpened()}>
         <Portal>
           <div
-            onMouseEnter={stopTimer}
-            onMouseLeave={startTimer}
+            onMouseEnter={() => setSsHoveringCard(true)}
+            onMouseLeave={() => setSsHoveringCard(false)}
             ref={setPopoverRef}
-            class={`absolute rounded-lg z-[100] ${props.color || ""}`}
+            class={`rounded-lg z-[100] ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
@@ -161,18 +156,18 @@ const Popover = (props: Props) => {
 
       <div
         ref={setElementRef}
-        onMouseEnter={() => {
-          stopTimer();
+        onMouseEnter={(e) => {
+          setTriangleStart({ x: e.clientX, y: e.clientY });
+          setSsHoveringCard(true);
           setOpenTimer(
             setTimeout(() => {
               setPopoverOpened(true);
             }, 300)
           );
         }}
-        onMouseLeave={(e) => {
+        onMouseLeave={() => {
           clearTimeout(openTimer());
-          setTriangleStart({ x: e.clientX, y: e.clientY });
-          startTimer();
+          setSsHoveringCard(false);
         }}
       >
         {props.children}
