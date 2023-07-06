@@ -1,29 +1,26 @@
 import { Button, LoadingBar } from "@gd/ui";
-import { useRouteData } from "@solidjs/router";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
 import { createNotification } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
-import fetchData from "./auth.login.data";
-import { handleStatus } from "@/utils/login";
-import { useGDNavigate } from "@/managers/NavigationManager";
+import { rspc } from "@/utils/rspcClient";
 import { DeviceCodeObjectType } from ".";
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper";
 import GateAnimation from "../../gate_animation.riv";
+import { handleStatus } from "@/utils/login";
+import { useRouteData } from "@solidjs/router";
+import fetchData from "./auth.login.data";
 
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
   setDeviceCodeObject: Setter<DeviceCodeObjectType>;
   nextStep: () => void;
+  prevStep: () => void;
 }
 
 const CodeStep = (props: Props) => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const navigate = useGDNavigate();
-  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
   const [error, setError] = createSignal<null | string>(null);
 
   const accountEnrollCancelMutation = rspc.createMutation(
@@ -43,45 +40,6 @@ const CodeStep = (props: Props) => {
       },
     }
   );
-
-  const finalizeMutation = rspc.createMutation(["account.enroll.finalize"]);
-
-  const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
-    onMutate: async (
-      uuid
-    ): Promise<{ previousActiveUUID: string } | undefined> => {
-      await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
-
-      const previousActiveUUID: string | undefined = queryClient.getQueryData([
-        "account.setActiveUuid",
-      ]);
-
-      queryClient.setQueryData(["account.setActiveUuid", null], uuid);
-
-      if (previousActiveUUID) return { previousActiveUUID };
-    },
-    onError: (
-      error,
-      _variables,
-      context: { previousActiveUUID: string } | undefined
-    ) => {
-      addNotification(error.message, "error");
-
-      if (context?.previousActiveUUID) {
-        queryClient.setQueryData(
-          ["account.setActiveUuid"],
-          context.previousActiveUUID
-        );
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
-    },
-    onSuccess() {
-      navigate("/library");
-      setEnrollmentInProgress(false);
-    },
-  });
 
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
@@ -103,6 +61,11 @@ const CodeStep = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
 
   const handleRefersh = async () => {
+    console.log("REFRRH", routeData.status.data);
+    resetCountDown();
+    if (routeData.status.data) {
+      accountEnrollCancelMutation.mutate(undefined);
+    }
     accountEnrollBeginMutation.mutate(undefined);
   };
 
@@ -116,48 +79,12 @@ const CodeStep = (props: Props) => {
   };
 
   let interval: ReturnType<typeof setTimeout>;
-
-  createEffect(() => {
-    if (routeData.status.isSuccess && !routeData.status.data) {
-      setEnrollmentInProgress(false);
-    } else {
-      setEnrollmentInProgress(true);
-    }
-
-    handleStatus(routeData.status, {
-      onPolling: (info) => {
-        setEnrollmentInProgress(true);
-        props.setDeviceCodeObject({
-          userCode: info.userCode,
-          link: info.verificationUri,
-          expiresAt: info.expiresAt,
-        });
-        setExpired(false);
-        setError(null);
-      },
-      onFail() {
-        setEnrollmentInProgress(false);
-        setError("Something went wrong while logging in");
-        accountEnrollCancelMutation.mutate(undefined);
-        props.nextStep();
-      },
-      onComplete(account) {
-        finalizeMutation.mutate(undefined);
-        // if (finalizeMutation.isSuccess) {
-        setActiveUUIDMutation.mutate(account.uuid);
-        // }
-      },
-      onError() {
-        setError("Something went wrong while logging in");
-        accountEnrollCancelMutation.mutate(undefined);
-        props.nextStep();
-      },
-    });
-  });
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   createEffect(() => {
     if (expired()) {
-      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
+      console.log("TEST-4", routeData.status.data);
+      if (routeData.status.data) accountEnrollCancelMutation.mutate(undefined);
       setLoading(false);
       clearInterval(interval);
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
@@ -174,6 +101,17 @@ const CodeStep = (props: Props) => {
     }
   });
 
+  createEffect(() => {
+    handleStatus(routeData.status, {
+      onFail(error) {
+        console.log("ERROR", error);
+        const isCodeExpired = error === "deviceCodeExpired";
+
+        if (isCodeExpired) handleRefersh();
+      },
+    });
+  });
+
   onCleanup(() => clearInterval(interval));
 
   const addNotification = createNotification();
@@ -181,6 +119,21 @@ const CodeStep = (props: Props) => {
   return (
     <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
       <GateAnimationRiveWrapper width={80} height={80} src={GateAnimation} />
+      <div class="absolute top-4 left-4">
+        <Button
+          type="secondary"
+          onClick={() => {
+            props.prevStep();
+          }}
+        >
+          <Trans
+            key="login.step_back"
+            options={{
+              defaultValue: "Back",
+            }}
+          />
+        </Button>
+      </div>
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode
@@ -193,7 +146,7 @@ const CodeStep = (props: Props) => {
             }}
           />
           <Show when={expired()}>
-            <p class="mb-0 mt-2 text-[#E54B4B]">
+            <p class="mb-0 mt-2 text-red-500">
               <Trans
                 key="login.code_expired_message"
                 options={{
