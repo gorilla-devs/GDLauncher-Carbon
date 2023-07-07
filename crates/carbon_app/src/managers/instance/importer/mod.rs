@@ -24,14 +24,7 @@ pub trait InstanceImporter {
     async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<()>;
 }
 
+#[derive(Debug, Default)]
 pub struct Importer {
     pub legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter,
-}
-
-impl Importer {
-    pub fn new() -> Self {
-        Self {
-            legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter::default(),
-        }
-    }
 }

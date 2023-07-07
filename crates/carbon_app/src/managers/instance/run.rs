@@ -33,6 +33,7 @@ use crate::{
 
 use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
+#[derive(Debug)]
 pub struct PersistenceManager {
     ensure_lock: Semaphore,
 }

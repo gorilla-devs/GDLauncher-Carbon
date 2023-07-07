@@ -21,6 +21,7 @@ impl From<FEEntity> for importer::Entity {
     }
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
 pub struct FEImportableInstance {
     pub name: String,
 }
@@ -31,6 +32,12 @@ impl From<importer::ImportableInstance> for FEImportableInstance {
             name: instance.name,
         }
     }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct FEImportInstance {
+    pub entity: FEEntity,
+    pub index: u32,
 }
 
 pub async fn scan_importable_instances(app: Arc<AppInner>, entity: FEEntity) -> anyhow::Result<()> {
@@ -50,6 +57,24 @@ pub async fn get_importable_instances(
     let locker = locker.importer.lock().await;
 
     match entity {
-        FEEntity::LegacyGDLauncher => locker.legacy_gdlauncher.get_available().await,
+        FEEntity::LegacyGDLauncher => locker
+            .legacy_gdlauncher
+            .get_available()
+            .await
+            .map(|instances| instances.into_iter().map(Into::into).collect()),
+    }
+}
+
+pub async fn import_instance(app: Arc<AppInner>, args: FEImportInstance) -> anyhow::Result<()> {
+    let locker = app.instance_manager();
+    let locker = locker.importer.lock().await;
+
+    match args.entity {
+        FEEntity::LegacyGDLauncher => {
+            locker
+                .legacy_gdlauncher
+                .import(app.clone(), args.index)
+                .await
+        }
     }
 }

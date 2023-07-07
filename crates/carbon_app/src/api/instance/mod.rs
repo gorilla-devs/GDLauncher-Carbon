@@ -255,6 +255,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
             import::get_importable_instances(app, entity).await
         }
+
+        mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
+            import::import_instance(app, args).await
+        }
     }
 }
 
