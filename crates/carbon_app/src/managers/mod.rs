@@ -51,8 +51,13 @@ mod app {
     use crate::cache_middleware;
 
     use super::{
-        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
-        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+        instance::importer::{legacy_gdlauncher::LegacyGDLauncherImporter, InstanceImporter},
+        java::JavaManager,
+        metadata::cache::MetaCacheManager,
+        metrics::MetricsManager,
+        modplatforms::ModplatformsManager,
+        system_info::SystemInfoManager,
+        *,
     };
 
     pub struct AppInner {

@@ -27,6 +27,8 @@ use super::vtask::TaskId;
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
 
+mod import;
+
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query DEFAULT_GROUP[app, args: ()] {
@@ -244,6 +246,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 folder.folder.into(),
             )
             .await
+        }
+
+        mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
+            import::scan_importable_instances(app, entity).await
+        }
+
+        query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
+            import::get_importable_instances(app, entity).await
+        }
+
+        mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
+            import::import_instance(app, args).await
         }
     }
 }
