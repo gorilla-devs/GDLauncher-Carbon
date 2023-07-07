@@ -401,12 +401,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <Switch>
               <Match when={!bgPreview()}>
                 <h3 class="text-center">
-                  <Trans
-                    key="instance.upload_image"
-                    options={{
-                      defaultValue: "Upload image",
-                    }}
-                  />
+                  <Trans key="instance.select_image" />
                 </h3>
               </Match>
               <Match when={bgPreview()}>
