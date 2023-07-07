@@ -1,6 +1,9 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
+use tokio::sync::Mutex;
+
 use crate::{
+    api::{instance::import::FEEntity, keys},
     domain::instance::{
         info::{
             CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
@@ -10,11 +13,11 @@ use crate::{
     managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::InstanceImporter;
+use super::{Entity, InstanceImporter};
 
 #[derive(Debug, Default)]
 pub struct LegacyGDLauncherImporter {
-    results: Vec<LegacyGDLauncherConfigWrapper>,
+    results: Mutex<Vec<LegacyGDLauncherConfigWrapper>>,
 }
 
 #[async_trait::async_trait]
@@ -46,10 +49,17 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     continue;
                 };
 
-                self.results.push(LegacyGDLauncherConfigWrapper {
+                let mut lock = self.results.lock().await;
+
+                lock.push(LegacyGDLauncherConfigWrapper {
                     name: child.file_name().into_string().unwrap(),
                     config,
                 });
+
+                app.invalidate(
+                    keys::instance::GET_IMPORTABLE_INSTANCES,
+                    Some(serde_json::to_value(FEEntity::LegacyGDLauncher).unwrap()),
+                );
             }
         }
 
@@ -59,7 +69,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
         let mut instances = Vec::new();
 
-        for instance in &self.results {
+        let lock = self.results.lock().await;
+        for instance in lock.iter() {
             instances.push(super::ImportableInstance {
                 name: instance.name.clone(),
             });
@@ -69,8 +80,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     }
 
     async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<()> {
-        let instance = self
-            .results
+        let lock = self.results.lock().await;
+        let instance = lock
             .get(index as usize)
             .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
 

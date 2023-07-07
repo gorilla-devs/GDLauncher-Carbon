@@ -27,7 +27,7 @@ use super::vtask::TaskId;
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
 
-mod import;
+pub mod import;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
