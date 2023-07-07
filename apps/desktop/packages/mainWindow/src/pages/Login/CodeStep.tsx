@@ -58,7 +58,9 @@ const CodeStep = (props: Props) => {
 
   const resetCountDown = () => {
     setExpired(false);
-    setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    if (minutes() >= 0 && seconds() > 0) {
+      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
+    }
   };
   const [loading, setLoading] = createSignal(false);
 
