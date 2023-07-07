@@ -33,6 +33,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
         let mut all_instances = tokio::fs::read_dir(&old_gdl_base_path).await?;
 
+        self.results.lock().await.clear();
+        app.invalidate(
+            keys::instance::GET_IMPORTABLE_INSTANCES,
+            Some(serde_json::to_value(FEEntity::LegacyGDLauncher).unwrap()),
+        );
+
         while let Some(child) = all_instances.next_entry().await? {
             if child.metadata().await?.is_dir() {
                 let config = child.path().join("config.json");
