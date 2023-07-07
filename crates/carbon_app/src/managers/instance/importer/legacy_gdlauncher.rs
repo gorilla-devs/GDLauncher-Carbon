@@ -38,7 +38,13 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
 
                 let config = tokio::fs::read_to_string(config).await?;
-                let config: LegacyGDLauncherConfig = serde_json::from_str(&config)?;
+                let Ok(config): Result<LegacyGDLauncherConfig, serde_json::Error> = serde_json::from_str(&config) else {
+                    tracing::info!(
+                        "Failed to parse legacy gdlauncher config: {}",
+                        child.path().display()
+                    );
+                    continue;
+                };
 
                 self.results.push(LegacyGDLauncherConfigWrapper {
                     name: child.file_name().into_string().unwrap(),
@@ -147,7 +153,7 @@ pub struct LegacyGDLauncherConfigWrapper {
 pub struct LegacyGDLauncherConfig {
     loader: _Loader,
     time_played: u64,
-    last_played: u64,
+    last_played: Option<u64>,
     background: Option<String>,
 }
 
