@@ -1,4 +1,8 @@
-use std::{fmt::Display, ops::Deref, str::FromStr};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+    str::FromStr,
+};
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -152,6 +156,12 @@ impl Deref for FEModrinthSearchFacetOr {
     }
 }
 
+impl DerefMut for FEModrinthSearchFacetOr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl IntoIterator for FEModrinthSearchFacetOr {
     type Item = FEModrinthSearchFacet;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -187,6 +197,12 @@ impl From<FEModrinthSearchFacetOr> for SearchFacetOr {
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct FEModrinthSearchFacetAnd(pub Vec<FEModrinthSearchFacetOr>);
 
+impl FEModrinthSearchFacetAnd {
+    pub fn new() -> Self {
+        FEModrinthSearchFacetAnd(Vec::new())
+    }
+}
+
 impl From<FEModrinthSearchFacetOr> for FEModrinthSearchFacetAnd {
     fn from(facets: FEModrinthSearchFacetOr) -> Self {
         FEModrinthSearchFacetAnd(vec![facets])
@@ -198,6 +214,12 @@ impl Deref for FEModrinthSearchFacetAnd {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for FEModrinthSearchFacetAnd {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -329,6 +351,12 @@ impl Deref for FEModrinthProjectIDs {
     }
 }
 
+impl DerefMut for FEModrinthProjectIDs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl IntoIterator for FEModrinthProjectIDs {
     type Item = String;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -368,6 +396,12 @@ impl Deref for FEModrinthVersionIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for FEModrinthVersionIDs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

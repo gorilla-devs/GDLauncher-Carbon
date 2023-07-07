@@ -1,4 +1,5 @@
-use rspc::RouterBuilderLike;
+use rspc::{RouterBuilderLike, Type};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::{
@@ -7,7 +8,7 @@ use crate::{
             CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
             CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
             MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT, MODRINTH_GET_PROJECTS,
-            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
+            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
         },
         router::router,
     },
@@ -15,14 +16,23 @@ use crate::{
 };
 
 mod curseforge;
+mod filters;
 mod modrinth;
+mod responses;
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum FESearchAPI {
+    Curseforge,
+    Modrinth,
+}
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         // Curseforge
         query CURSEFORGE_SEARCH[app, filters: curseforge::filters::FEModSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
-                let response = modplatforms.curseforge.search(filters.into()).await?;
+            let response = modplatforms.curseforge.search(filters.into()).await?;
 
             Ok(curseforge::responses::FEModSearchResponse::from(response))
         }
@@ -120,6 +130,25 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             let response = modplatforms.modrinth.get_versions(versions.into()).await?;
 
             Ok(modrinth::responses::FEModrinthVersionsResponse::from(response))
+        }
+
+        query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
+            match search_params.search_api {
+                FESearchAPI::Curseforge => {
+                    let search_params: curseforge::filters::FEModSearchParameters = search_params.try_into()?;
+                    let modplatforms = &app.modplatforms_manager;
+                    let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
+                    let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);
+                    Ok(responses::FEUnifiedSearchResponse::from(fe_curseforge_response))
+                }
+                FESearchAPI::Modrinth => {
+                    let search_params:  modrinth::filters::FEModrinthProjectSearchParameters = search_params.try_into()?;
+                    let modplatforms = &app.modplatforms_manager;
+                    let modrinth_response = modplatforms.modrinth.search(search_params.into()).await?;
+                    let fe_modrinth_response = modrinth::responses::FEModrinthProjectSearchResponse::from(modrinth_response);
+                    Ok(responses::FEUnifiedSearchResponse::from(fe_modrinth_response))
+                }
+            }
         }
     }
 }
