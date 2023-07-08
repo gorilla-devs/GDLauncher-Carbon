@@ -21,6 +21,14 @@ impl From<FEEntity> for importer::Entity {
     }
 }
 
+impl From<importer::Entity> for FEEntity {
+    fn from(entity: importer::Entity) -> Self {
+        match entity {
+            importer::Entity::LegacyGDLauncher => Self::LegacyGDLauncher,
+        }
+    }
+}
+
 #[derive(Type, Debug, Serialize, Deserialize)]
 pub struct FEImportableInstance {
     pub name: String,
