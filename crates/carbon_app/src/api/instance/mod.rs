@@ -15,6 +15,7 @@ use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+use crate::api::instance::import::FEEntity;
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
@@ -246,6 +247,13 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 folder.folder.into(),
             )
             .await
+        }
+
+        query GET_IMPORTABLE_ENTITIES[_, args: ()] {
+            Ok(manager::importer::Entity::get_available()
+                .into_iter()
+                .map(FEEntity::from)
+                .collect::<Vec<_>>())
         }
 
         mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {

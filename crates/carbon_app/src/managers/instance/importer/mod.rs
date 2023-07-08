@@ -1,14 +1,22 @@
 use std::{any::Any, path::Path, sync::Arc};
 
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 use crate::managers::AppInner;
 
 pub mod legacy_gdlauncher;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, EnumIter)]
 pub enum Entity {
     LegacyGDLauncher,
+}
+
+impl Entity {
+    pub fn get_available() -> Vec<Self> {
+        use strum::IntoEnumIterator;
+        Self::iter().collect()
+    }
 }
 
 pub struct ImportableInstance {

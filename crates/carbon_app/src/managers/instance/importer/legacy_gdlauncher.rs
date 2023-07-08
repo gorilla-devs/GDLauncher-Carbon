@@ -64,7 +64,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
                 app.invalidate(
                     keys::instance::GET_IMPORTABLE_INSTANCES,
-                    Some(serde_json::to_value(FEEntity::LegacyGDLauncher).unwrap()),
+                    Some(serde_json::to_value(FEEntity::LegacyGDLauncher)?),
                 );
             }
         }
@@ -126,7 +126,6 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 };
                 let Some(file_id) = instance.config.loader.file_id else {
                         return Err(anyhow::anyhow!("Missing file id"));
-
                 };
 
                 let curseforge_modpack = CurseforgeModpack {
