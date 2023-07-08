@@ -2,7 +2,7 @@ import { Show, mergeProps } from "solid-js";
 
 type Props = {
   name: string;
-  img: string | undefined | null;
+  img?: string | undefined | null;
   type?: "fixed" | "default";
   onClose?: (_name: string) => void;
 };

@@ -25,7 +25,8 @@ function Checkbox(props: Props) {
       }}
       onClick={() => {
         if (!props.disabled) {
-          props.onChange?.(setChecked(!checked()));
+          const check = setChecked(!checked());
+          props.onChange?.(check);
         }
       }}
     >

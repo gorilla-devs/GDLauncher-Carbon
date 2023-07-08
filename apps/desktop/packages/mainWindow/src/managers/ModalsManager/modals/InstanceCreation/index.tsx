@@ -1,22 +1,11 @@
-import { Button, Tab, TabList, TabPanel, Tabs } from "@gd/ui";
+import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { Trans, useTransContext } from "@gd/i18n";
-import { onMount } from "solid-js";
-import { rspc } from "@/utils/rspcClient";
+import { Trans } from "@gd/i18n";
 import Custom from "./Custom";
+import Import from "./Import";
 
 const InstanceCreation = (props: ModalProps) => {
-  const [t] = useTransContext();
-
-  const scanImportableInstancesMutation = rspc.createMutation([
-    "instance.scanImportableInstances",
-  ]);
-
-  onMount(() => {
-    scanImportableInstancesMutation.mutate("LegacyGDLauncher");
-  });
-
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -38,12 +27,7 @@ const InstanceCreation = (props: ModalProps) => {
             <Custom data={props.data} />
           </TabPanel>
           <TabPanel>
-            <div class="p-5">
-              <Button>
-                <div class="i-ri:folder-open-fill" />
-                <Trans key="instance.import_instance" />
-              </Button>
-            </div>
+            <Import />
           </TabPanel>
         </Tabs>
       </div>
