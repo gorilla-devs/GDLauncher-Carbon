@@ -151,7 +151,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .create_instance(
                 app.instance_manager().get_default_group().await?,
                 instance.name.clone(),
-                false,
+                true,
                 instance_version_source,
                 "".to_string(),
             )
