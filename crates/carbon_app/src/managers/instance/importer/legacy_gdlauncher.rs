@@ -4,16 +4,13 @@ use tokio::sync::Mutex;
 
 use crate::{
     api::{instance::import::FEEntity, keys},
-    domain::instance::{
-        info::{
-            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
-        },
-        GroupId,
+    domain::instance::info::{
+        CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::{Entity, InstanceImporter};
+use super::InstanceImporter;
 
 #[derive(Debug, Default)]
 pub struct LegacyGDLauncherImporter {
@@ -151,7 +148,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .create_instance(
                 app.instance_manager().get_default_group().await?,
                 instance.name.clone(),
-                true,
+                instance.config.background.is_some(),
                 instance_version_source,
                 "".to_string(),
             )
