@@ -187,7 +187,13 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
             });
 
-        let instance_path = PathBuf::from(
+        let instances_path = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path();
+
+        let instance_path = instances_path.join(
             &app.instance_manager()
                 .instances
                 .read()
