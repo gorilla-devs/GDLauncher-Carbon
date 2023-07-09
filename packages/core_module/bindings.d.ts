@@ -80,8 +80,6 @@ export type Procedures = {
         { key: "invalidateQuery", input: never, result: InvalidationEvent }
 };
 
-export type FEImportableInstance = { name: string }
-
 export type Mod = { id: string; filename: string; enabled: boolean; modloaders: ModLoaderType[]; metadata: ModFileMetadata }
 
 export type Task = { name: Translation; progress: Progress; downloaded: number; download_total: number; active_subtasks: Subtask[] }
@@ -109,8 +107,6 @@ export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVers
 export type ManifestVersion = { id: string; type: McType }
 
 export type GroupId = number
-
-export type FEImportInstance = { entity: FEEntity; index: number }
 
 export type MoveGroup = { group: GroupId; before: GroupId | null }
 
@@ -244,13 +240,15 @@ export type FEFileStatus = "processing" | "changesRequired" | "underReview" | "a
 
 export type FEModFilesParameters = { modId: number; query: FEModFilesParametersQuery }
 
-export type FEEntity = "LegacyGDLauncher"
+export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
 
 export type FEHashAlgo = "sha1" | "md5"
 
 export type FEEvent = { name: FEEventName; properties: { [key: string]: string } }
 
 export type ConfigurationParseErrorType = "Syntax" | "Data" | "Eof"
+
+export type FEImportableInstance = { name: string }
 
 export type FEModsResponse = { data: FEMod[]; pagination: FEPagination | null }
 
@@ -299,6 +297,8 @@ export type FEModLinks = { websiteUrl: string | null; wikiUrl: string | null; is
 export type FESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
 
 export type Modpack = { Curseforge: CurseforgeModpack }
+
+export type FEImportInstance = { entity: FEEntity; index: number }
 
 export type FEModFileResponse = { data: FEFile; pagination: FEPagination | null }
 

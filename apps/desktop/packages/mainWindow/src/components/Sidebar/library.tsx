@@ -78,12 +78,15 @@ const Sidebar = () => {
 
   const mapIconToKey = (key: string) => {
     return (
-      <Switch>
+      <Switch fallback={t("vanilla")}>
         <Match when={isSidebarOpened() && key === "vanilla"}>
           {t("vanilla")}
         </Match>
         <Match when={isSidebarOpened() && key === "Forge"}>
           {t("vanilla")}
+        </Match>
+        <Match when={isSidebarOpened() && key === "Fabric"}>
+          {t("fabric")}
         </Match>
         <Match when={!isSidebarOpened() && key === "vanilla"}>
           <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />

@@ -134,6 +134,7 @@
   "instance.create_instance_btn": "Create",
   "instance.import_instance_amount": "Import intance {{instances_amount}}",
   "instance.import_instance": "Import intance",
+  "instance.import_no_instances": "There is no importable instance",
   "instance.instance_creation_custom_tab": "Custom",
   "instance.instance_import_tab": "Import",
   "instance.clear_filters_modpacks": "Clear filters",

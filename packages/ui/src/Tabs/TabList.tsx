@@ -68,7 +68,7 @@ const TabList = (props: Props) => {
 
   return (
     <div
-      class="flex relative items-center h-auto w-full"
+      class="flex relative items-start h-auto w-full"
       classList={{
         "bg-darkSlate-800": tabsContext?.variant === "underline",
         "bg-darkSlate-900": tabsContext?.variant === "block",
