@@ -294,12 +294,12 @@ pub async fn generate_startup_command(
 
                         classifiers.get(native_name).unwrap().path.clone()
                     } else {
-                        panic!("Library has no artifact or classifier");
+                        panic!("Library has no artifact or classifier {:?}", library);
                     }
                 } else if library.url.is_some() {
                     library.name.path()
                 } else {
-                    panic!("Library has no method of retrieval");
+                    panic!("Library has no method of retrieval {:?}", library);
                 }
             });
 
