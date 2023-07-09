@@ -1,6 +1,10 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use tokio::sync::Mutex;
+use tokio::{
+    fs::create_dir_all,
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::Mutex,
+};
 
 use crate::{
     api::{instance::import::FEEntity, keys},
@@ -157,6 +161,65 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         app.instance_manager()
             .prepare_game(created_instance_id, None)
             .await?;
+
+        let walked_dir = walkdir::WalkDir::new(&instance.full_path)
+            .into_iter()
+            .filter_map(|entry| {
+                let Ok(entry) = entry else {
+                    return None;
+                };
+
+                let Some(file_name) = entry.file_name().to_str() else {
+                    return None;
+                };
+
+                match file_name {
+                    "config.json" => None,
+                    _ => {
+                        if let Some(ref background) = instance.config.background {
+                            if file_name == background {
+                                return None;
+                            }
+                        }
+
+                        Some(entry)
+                    }
+                }
+            });
+
+        let instance_path = PathBuf::from(
+            &app.instance_manager()
+                .instances
+                .read()
+                .await
+                .get(&created_instance_id)
+                .unwrap()
+                .shortpath,
+        );
+
+        for entry in walked_dir {
+            let is_dir = entry.file_type().is_dir();
+            let path = entry.path();
+            let relative_path = path.strip_prefix(&instance.full_path).unwrap();
+
+            let destination = instance_path.join(relative_path);
+
+            if destination.exists() {
+                // TODO: Check checksum
+                continue;
+            }
+
+            if is_dir {
+                create_dir_all(destination).await?;
+            } else {
+                let mut file = tokio::fs::File::open(path).await?;
+                let mut buffer = Vec::new();
+                file.read_to_end(&mut buffer).await?;
+
+                let mut file = tokio::fs::File::create(destination).await?;
+                file.write_all(&buffer).await?;
+            }
+        }
 
         Ok(())
     }
