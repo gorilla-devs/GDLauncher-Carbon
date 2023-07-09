@@ -9,6 +9,7 @@ use crate::managers::{
 };
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum FEEntity {
     LegacyGDLauncher,
 }
@@ -30,6 +31,7 @@ impl From<importer::Entity> for FEEntity {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEImportableInstance {
     pub name: String,
 }
@@ -43,6 +45,7 @@ impl From<importer::ImportableInstance> for FEImportableInstance {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEImportInstance {
     pub entity: FEEntity,
     pub index: u32,
