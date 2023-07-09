@@ -10,6 +10,15 @@ pub mod legacy_gdlauncher;
 #[derive(Debug, Serialize, Deserialize, EnumIter)]
 pub enum Entity {
     LegacyGDLauncher,
+    MRPack,
+    Modrinth,
+    CurseForgeZip,
+    CurseForge,
+    ATLauncher,
+    Technic,
+    FTB,
+    MultiMC,
+    PrismLauncher,
 }
 
 impl Entity {
