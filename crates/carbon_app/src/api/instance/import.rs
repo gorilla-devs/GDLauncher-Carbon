@@ -12,12 +12,30 @@ use crate::managers::{
 #[serde(rename_all = "camelCase")]
 pub enum FEEntity {
     LegacyGDLauncher,
+    MRPack,
+    Modrinth,
+    CurseForgeZip,
+    CurseForge,
+    ATLauncher,
+    Technic,
+    FTB,
+    MultiMC,
+    PrismLauncher,
 }
 
 impl From<FEEntity> for importer::Entity {
     fn from(entity: FEEntity) -> Self {
         match entity {
             FEEntity::LegacyGDLauncher => Self::LegacyGDLauncher,
+            FEEntity::MRPack => Self::MRPack,
+            FEEntity::Modrinth => Self::Modrinth,
+            FEEntity::CurseForgeZip => Self::CurseForgeZip,
+            FEEntity::CurseForge => Self::CurseForge,
+            FEEntity::ATLauncher => Self::ATLauncher,
+            FEEntity::Technic => Self::Technic,
+            FEEntity::FTB => Self::FTB,
+            FEEntity::MultiMC => Self::MultiMC,
+            FEEntity::PrismLauncher => Self::PrismLauncher,
         }
     }
 }
@@ -26,6 +44,15 @@ impl From<importer::Entity> for FEEntity {
     fn from(entity: importer::Entity) -> Self {
         match entity {
             importer::Entity::LegacyGDLauncher => Self::LegacyGDLauncher,
+            importer::Entity::MRPack => Self::MRPack,
+            importer::Entity::Modrinth => Self::Modrinth,
+            importer::Entity::CurseForgeZip => Self::CurseForgeZip,
+            importer::Entity::CurseForge => Self::CurseForge,
+            importer::Entity::ATLauncher => Self::ATLauncher,
+            importer::Entity::Technic => Self::Technic,
+            importer::Entity::FTB => Self::FTB,
+            importer::Entity::MultiMC => Self::MultiMC,
+            importer::Entity::PrismLauncher => Self::PrismLauncher,
         }
     }
 }
@@ -57,6 +84,7 @@ pub async fn scan_importable_instances(app: Arc<AppInner>, entity: FEEntity) -> 
 
     match entity {
         FEEntity::LegacyGDLauncher => locker.legacy_gdlauncher.scan(app.clone()).await,
+        _ => anyhow::bail!("Unsupported entity"),
     }
 }
 
@@ -73,6 +101,7 @@ pub async fn get_importable_instances(
             .get_available()
             .await
             .map(|instances| instances.into_iter().map(Into::into).collect()),
+        _ => anyhow::bail!("Unsupported entity"),
     }
 }
 
@@ -87,5 +116,6 @@ pub async fn import_instance(app: Arc<AppInner>, args: FEImportInstance) -> anyh
                 .import(app.clone(), args.index)
                 .await
         }
+        _ => anyhow::bail!("Unsupported entity"),
     }
 }
