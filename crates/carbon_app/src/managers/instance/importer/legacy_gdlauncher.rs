@@ -59,6 +59,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
                 lock.push(LegacyGDLauncherConfigWrapper {
                     name: child.file_name().into_string().unwrap(),
+                    full_path: child.path(),
                     config,
                 });
 
@@ -90,6 +91,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         let instance = lock
             .get(index as usize)
             .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
+
+        if let Some(ref background) = instance.config.background {
+            app.instance_manager()
+                .load_icon(instance.full_path.join(background))
+                .await?;
+        }
 
         let instance_version_source = 'a: {
             let modloader = match &*instance.config.loader.loader_type {
@@ -161,6 +168,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 #[derive(Debug)]
 pub struct LegacyGDLauncherConfigWrapper {
     name: String,
+    full_path: PathBuf,
     config: LegacyGDLauncherConfig,
 }
 
