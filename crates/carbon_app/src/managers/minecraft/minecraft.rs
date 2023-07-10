@@ -439,22 +439,33 @@ pub async fn generate_startup_command(
         }
     }
 
-    let mut arguments = version.arguments.clone().unwrap_or_else(|| {
-        let mut arguments = HashMap::new();
-        arguments.insert(
-            ArgumentType::Game,
-            version
-                .minecraft_arguments
-                .unwrap_or_default()
-                .split(' ')
-                .map(|s| Argument::Normal(s.to_string()))
-                .collect(),
-        );
+    let mut arguments = version
+        .arguments
+        .clone()
+        .map(|mut args| {
+            let jvm = args.get(&ArgumentType::Jvm);
+            if jvm.is_none() {
+                args.insert(ArgumentType::Jvm, get_default_jvm_args());
+            }
 
-        arguments.insert(ArgumentType::Jvm, get_default_jvm_args());
+            args
+        })
+        .unwrap_or_else(|| {
+            let mut arguments = HashMap::new();
+            arguments.insert(
+                ArgumentType::Game,
+                version
+                    .minecraft_arguments
+                    .unwrap_or_default()
+                    .split(' ')
+                    .map(|s| Argument::Normal(s.to_string()))
+                    .collect(),
+            );
 
-        arguments
-    });
+            arguments.insert(ArgumentType::Jvm, get_default_jvm_args());
+
+            arguments
+        });
 
     // remove --clientId, ${clientid}, --xuid, ${auth_xuid}
     arguments
@@ -471,8 +482,9 @@ pub async fn generate_startup_command(
             }
         });
 
-    let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
-    substitute_arguments(&mut command, jvm_arguments);
+    if let Some(jvm_arguments) = arguments.get(&ArgumentType::Jvm) {
+        substitute_arguments(&mut command, jvm_arguments);
+    }
 
     for cap in extra_args_regex.captures_iter(extra_java_args) {
         let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };
