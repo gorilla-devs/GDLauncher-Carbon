@@ -5,7 +5,7 @@ export const NAVBAR_ROUTES = [
     icon: "i-ri:ancient-pavilion-fill",
   },
   {
-    label: "explore",
+    label: "modpacks",
     path: "/modpacks",
     icon: "i-ri:compass-line",
   },

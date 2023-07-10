@@ -11,7 +11,7 @@ import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
-import { Spinner, createNotification } from "@gd/ui";
+import { Spinner, Tooltip, createNotification } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
@@ -221,6 +221,11 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
+          {/* <Tooltip
+            content="TEST"
+            placement="right-start"
+            color="bg-darkSlate-400"
+          > */}
           <div
             class="flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
@@ -370,6 +375,7 @@ const Tile = (props: Props) => {
               </Match>
             </Switch>
           </div>
+          {/* </Tooltip> */}
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
@@ -482,75 +488,81 @@ const Tile = (props: Props) => {
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar-small"}>
-        <div
-          onClick={(e) => {
-            if (
-              !props.isLoading &&
-              !isInQueue() &&
-              !props.isInvalid &&
-              !props.failError
-            ) {
-              props?.onClick?.(e);
-            }
-          }}
-          class="group h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
+        <Tooltip
+          content={props.instance.name}
+          placement="right"
+          // color="bg-darkSlate-400"
         >
-          <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition hover:bg-primary-500" />
-
-          <Show when={props.selected && !props.isLoading}>
-            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-            <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
-          </Show>
-          <Show when={props.isRunning && !props.isLoading}>
-            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
-            <div class="absolute right-0 top-0 bottom-0 w-1" />
-          </Show>
           <div
-            class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center"
-            style={{
-              "background-image": props.img
-                ? `url("${props.img as string}")`
-                : `url("${DefaultImg}")`,
+            onClick={(e) => {
+              if (
+                !props.isLoading &&
+                !isInQueue() &&
+                !props.isInvalid &&
+                !props.failError
+              ) {
+                props?.onClick?.(e);
+              }
             }}
-            classList={{
-              grayscale: props.isLoading || isInQueue(),
-            }}
+            class="group h-14 px-3 flex justify-center items-center relative cursor-pointer relative"
           >
-            <Show when={props.isInvalid}>
-              <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
-            </Show>
-            <Show when={props.failError}>
-              <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
-            </Show>
+            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition hover:bg-primary-500" />
 
+            <Show when={props.selected && !props.isLoading}>
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
+              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+            </Show>
+            <Show when={props.isRunning && !props.isLoading}>
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
+              <div class="absolute right-0 top-0 bottom-0 w-1" />
+            </Show>
             <div
-              class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform"
+              class="relative group h-10 w-10 rounded-lg flex justify-center items-center bg-cover bg-center"
+              style={{
+                "background-image": props.img
+                  ? `url("${props.img as string}")`
+                  : `url("${DefaultImg}")`,
+              }}
               classList={{
-                "bg-primary-500": !props.isRunning,
-                "scale-0": !props.isRunning,
-                "bg-red-500 scale-100": props.isRunning,
-                "group-hover:scale-100":
-                  !props.isLoading &&
-                  !isInQueue() &&
-                  !props.isInvalid &&
-                  !props.failError &&
-                  !props.isRunning,
+                grayscale: props.isLoading || isInQueue(),
               }}
             >
+              <Show when={props.isInvalid}>
+                <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+              </Show>
+              <Show when={props.failError}>
+                <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+              </Show>
+
               <div
-                class="text-white text-lg"
+                class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform"
                 classList={{
-                  "i-ri:play-fill": !props.isRunning,
-                  "i-ri:stop-fill": props.isRunning,
+                  "bg-primary-500": !props.isRunning,
+                  "scale-0": !props.isRunning,
+                  "bg-red-500 scale-100": props.isRunning,
+                  "group-hover:scale-100":
+                    !props.isLoading &&
+                    !isInQueue() &&
+                    !props.isInvalid &&
+                    !props.failError &&
+                    !props.isRunning,
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-              />
+              >
+                <div
+                  class="text-white text-lg"
+                  classList={{
+                    "i-ri:play-fill": !props.isRunning,
+                    "i-ri:stop-fill": props.isRunning,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </Tooltip>
       </Match>
     </Switch>
   );

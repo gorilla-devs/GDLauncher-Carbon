@@ -303,6 +303,7 @@ pub fn get_default_jvm_args() -> Vec<Argument> {
                 "-Dos.version=10.0".to_string(),
             ]),
         },
+        Argument::Normal("-Dfml.ignoreInvalidMinecraftCertificates=true".to_string()),
         Argument::Normal("-Djava.library.path=${natives_directory}".to_string()),
         Argument::Normal("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
         Argument::Normal("-Dminecraft.launcher.version=${launcher_version}".to_string()),
