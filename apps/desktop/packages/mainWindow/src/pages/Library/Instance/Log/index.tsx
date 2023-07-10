@@ -152,7 +152,7 @@ const Logs = () => {
   return (
     <div>
       <Show when={showButton()}>
-        <div class="fixed bottom-4 right-[470px] rounded-full">
+        <div class="fixed bottom-4 right-[490px] rounded-full">
           <Button typeof="secondary" onClick={scrollTop}>
             <Trans key="logs.scroll_top" />
           </Button>
@@ -168,15 +168,15 @@ const Logs = () => {
           </Button>
         </Tooltip>
       </div>
-      <div class="overflow-y-auto pb-4 max-h-full divide-y divide-darkSlate-500 select-text">
+      <div class="overflow-y-auto pb-4 max-h-full flex flex-col divide-y divide-x-none divide-solid divide-darkSlate-500 select-text">
         <Switch>
           <Match when={(instanceLogss().length || 0) > 0}>
             <For each={instanceLogss()}>
               {(log) => {
                 return (
                   <div class="flex flex-col justify-center items-center w-full">
-                    <pre class="m-0 w-full box-border py-2 leading-8 whitespace-pre-wrap pl-4">
-                      <code class="text-darkSlate-50 text-md select-text">
+                    <pre class="m-0 w-full box-border leading-8">
+                      <code class="text-darkSlate-50 text-sm select-text">
                         {log?.line}
                       </code>
                     </pre>
