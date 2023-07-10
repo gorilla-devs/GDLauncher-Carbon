@@ -168,13 +168,13 @@ const Logs = () => {
           </Button>
         </Tooltip>
       </div>
-      <div class="overflow-y-auto pb-4 max-h-full flex flex-col divide-y divide-x-none divide-solid divide-darkSlate-500 select-text">
+      <div class="pb-4 max-h-full flex flex-col divide-y divide-x-none divide-solid divide-darkSlate-500 select-text">
         <Switch>
           <Match when={(instanceLogss().length || 0) > 0}>
             <For each={instanceLogss()}>
               {(log) => {
                 return (
-                  <div class="flex flex-col justify-center items-center w-full">
+                  <div class="flex flex-col justify-center items-center w-full overflow-x-auto scrollbar-hide">
                     <pre class="m-0 w-full box-border leading-8">
                       <code class="text-darkSlate-50 text-sm select-text">
                         {log?.line}
