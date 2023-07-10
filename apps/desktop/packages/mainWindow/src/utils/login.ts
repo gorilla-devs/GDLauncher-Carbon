@@ -18,7 +18,7 @@ type EventsCallbacks = {
 };
 
 export const handleStatus = (
-  routeData: RouteData,
+  routeData: RouteData | CreateQueryResult<any, RSPCError>,
   callbacks: EventsCallbacks
 ) => {
   if (routeData.isSuccess) {

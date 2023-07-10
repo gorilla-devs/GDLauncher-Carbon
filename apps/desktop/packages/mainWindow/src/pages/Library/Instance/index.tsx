@@ -300,7 +300,7 @@ const Instance = () => {
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();
-        setIsSticky(rect.top <= 80);
+        setIsSticky(rect.top <= 104);
       }}
     >
       <header
@@ -333,9 +333,9 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex sticky bg-gradient-to-t from-darkSlate-800 justify-center h-24 top-52 z-20 w-full pb-2 px-6">
-            <div class="flex justify-center w-full">
-              <div class="flex justify-between w-full max-w-185 items-end">
+          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 box-border px-6">
+            <div class="flex w-full justify-start">
+              <div class="flex justify-between w-full items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
@@ -346,7 +346,7 @@ const Instance = () => {
                     }}
                   />
 
-                  <div class="flex flex-col max-w-185 flex-1">
+                  <div class="flex flex-col flex-1">
                     <div
                       class="flex gap-4 w-fit items-center pl-1"
                       classList={{
@@ -536,7 +536,7 @@ const Instance = () => {
         </div>
       </header>
       <div class="bg-darkSlate-800 sticky">
-        <div class="flex justify-center p-6">
+        <div class="flex justify-center p-6 min-h-150">
           <div class="bg-darkSlate-800 w-full">
             <div
               class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
@@ -573,39 +573,41 @@ const Instance = () => {
                 </TabList>
               </Tabs>
               <Show when={isSticky()}>
-                <Button
-                  uppercase
-                  type="glow"
-                  size="small"
-                  variant={isRunning() && "red"}
-                  loading={isPreparing() !== undefined}
-                  onClick={() => {
-                    if (isRunning()) {
-                      killInstanceMutation.mutate(parseInt(params.id, 10));
-                    } else {
-                      launchInstanceMutation.mutate(parseInt(params.id, 10));
-                    }
-                  }}
-                >
-                  <Switch>
-                    <Match when={!isRunning()}>
-                      <Trans
-                        key="instance.play"
-                        options={{
-                          defaultValue: "play",
-                        }}
-                      />
-                    </Match>
-                    <Match when={isRunning()}>
-                      <Trans
-                        key="instance.stop"
-                        options={{
-                          defaultValue: "stop",
-                        }}
-                      />
-                    </Match>
-                  </Switch>
-                </Button>
+                <span class="ml-4">
+                  <Button
+                    uppercase
+                    type="glow"
+                    size="small"
+                    variant={isRunning() && "red"}
+                    loading={isPreparing() !== undefined}
+                    onClick={() => {
+                      if (isRunning()) {
+                        killInstanceMutation.mutate(parseInt(params.id, 10));
+                      } else {
+                        launchInstanceMutation.mutate(parseInt(params.id, 10));
+                      }
+                    }}
+                  >
+                    <Switch>
+                      <Match when={!isRunning()}>
+                        <Trans
+                          key="instance.play"
+                          options={{
+                            defaultValue: "play",
+                          }}
+                        />
+                      </Match>
+                      <Match when={isRunning()}>
+                        <Trans
+                          key="instance.stop"
+                          options={{
+                            defaultValue: "stop",
+                          }}
+                        />
+                      </Match>
+                    </Switch>
+                  </Button>
+                </span>
               </Show>
             </div>
             <Outlet />

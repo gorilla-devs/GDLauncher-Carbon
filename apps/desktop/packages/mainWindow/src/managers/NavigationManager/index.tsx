@@ -1,7 +1,6 @@
 import {
   getInstanceIdFromPath,
   isLibraryPath,
-  lastInstanceOpened,
   setLastInstanceOpened,
 } from "@/utils/routes";
 import { useNavigate } from "@solidjs/router";
@@ -24,8 +23,8 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
       const parameters = path.split("?")[1];
       const instanceId = getInstanceIdFromPath(path);
       if (instanceId) setLastInstanceOpened(instanceId);
-
-      const route = `/library/${lastInstanceOpened()}/${parameters || ""}`;
+      if (instanceId === undefined) return;
+      const route = `/library/${instanceId as string}/${parameters || ""}`;
       setLastPathVisited(route);
       navigate(route);
     } else {

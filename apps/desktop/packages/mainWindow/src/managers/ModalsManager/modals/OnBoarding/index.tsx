@@ -45,7 +45,7 @@ const OnBoarding = (props: ModalProps) => {
       title={props?.title}
       background={
         <img
-          class="absolute w-190 -top-15 z-0 -left-10 opacity-70"
+          class="absolute w-190 z-0 -top-15 -left-10 opacity-70"
           src={mcCubes}
         />
       }

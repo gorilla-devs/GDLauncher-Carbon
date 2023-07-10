@@ -58,7 +58,7 @@ Skeleton.news = () => {
 
 const Modpack = () => {
   return (
-    <div class="flex justify-between h-[220px] w-full rounded-xl bg-darkSlate-700 p-4 gap-4 box-border">
+    <div class="flex justify-between h-40 w-full rounded-xl bg-darkSlate-700 p-4 gap-4 box-border">
       <div class="rounded-xl select-none h-30 w-30 bg-darkSlate-500" />
       <div class="flex flex-col space-between gap-2 flex-1">
         <div class="w-full h-4 rounded-md bg-darkSlate-500" />

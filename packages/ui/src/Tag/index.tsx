@@ -1,9 +1,10 @@
 import { Show, mergeProps } from "solid-js";
 
 type Props = {
-  name: string;
+  name?: string;
   img?: string | undefined | null;
   type?: "fixed" | "default";
+  size?: "medium" | "small";
   onClose?: (_name: string) => void;
 };
 
@@ -12,10 +13,12 @@ export const Tag = (props: Props) => {
 
   return (
     <div
-      class="flex gap-2 items-center px-3 py-2 bg-darkSlate-700 rounded-md max-h-8 h-full box-border select-none"
+      class="flex gap-2 items-center bg-darkSlate-700 rounded-md max-h-8 h-full box-border select-none"
       classList={{
         "bg-darkSlate-700": mergedProps.type === "default",
         "bg-darkSlate-900": mergedProps.type === "fixed",
+        "px-3 py-2": props.size === "medium" || !props.size,
+        "px-2 py-1": props.size === "small",
       }}
     >
       <Show when={props.img}>
@@ -25,11 +28,15 @@ export const Tag = (props: Props) => {
           alt={`icon_${props.name}`}
         />
       </Show>
-      <p class="m-0 text-darkSlate-100 whitespace-nowrap">{props.name}</p>
+      <Show when={props.name}>
+        <p class="m-0 text-darkSlate-100 whitespace-nowrap">{props.name}</p>
+      </Show>
       <Show when={mergedProps.type === "default"}>
         <div
           class="i-ri:close-fill text-lg text-darkSlate-200 cursor-pointer"
-          onClick={() => props.onClose?.(props.name)}
+          onClick={() => {
+            if (props.name) props.onClose?.(props.name);
+          }}
         />
       </Show>
     </div>
