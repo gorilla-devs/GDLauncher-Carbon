@@ -5,6 +5,60 @@
 use super::*;
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackIndex {
+    pub format_version: u32,
+    pub game: ModrinthGame,
+    pub version_id: String,
+    pub name: String,
+    pub summary: Option<String>,
+    pub files: Vec<ModrinthFile>,
+    pub dependencies: ModrinthPackDependencies,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModrinthGame {
+    Minecraft
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModrinthFile {
+    /// path relative to the Minecraft instance directory
+    pub path: String,
+    pub hashes: Hashes,
+    pub env: Option<ModrinthFileEnvironment>,
+    /// list of valid https URLs to the file. Each url is a full path. Functions as a mirror list.
+    pub downloads: Vec<Url>,
+    pub file_size: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModrinthFileEnvironment {
+    pub client: ModrinthEnvironmentSupport,
+    pub server: ModrinthEnvironmentSupport,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ModrinthEnvironmentSupport {
+    Required,
+    Unsupported,
+    Optional,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ModrinthPackDependencies {
+    pub minecraft: Option<String>,
+    pub forge: Option<String>,
+    pub fabric_loader: Option<String>,
+    pub quilt_loader: Option<String>,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Version {
     pub name: String,

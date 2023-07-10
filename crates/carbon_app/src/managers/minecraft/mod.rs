@@ -19,6 +19,7 @@ use super::ManagerRef;
 
 mod assets;
 pub mod curseforge;
+pub mod modrinth;
 pub mod fabric;
 pub mod forge;
 pub mod minecraft;
