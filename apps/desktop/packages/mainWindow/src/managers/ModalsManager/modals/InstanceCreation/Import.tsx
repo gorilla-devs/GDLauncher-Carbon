@@ -1,7 +1,7 @@
 import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FEImportInstance } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Checkbox } from "@gd/ui";
+import { Button, Checkbox, Spinner } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
 import { CreateMutationResult } from "@tanstack/solid-query";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
@@ -76,6 +76,11 @@ const Import = () => {
       }
     }
   }
+
+  createEffect(() => {
+    if (importedInstances().length === instances.data?.length)
+      setIsLoading(false);
+  });
 
   return (
     <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
@@ -173,17 +178,13 @@ const Import = () => {
         </div>
       </div>
       <Button
-        disabled={
-          isLoading() || importedInstances().length === instances.data?.length
-        }
+        disabled={importedInstances().length === instances.data?.length}
         onClick={() => {
           const entries = Object.entries(selectedInstancesIds);
           setIsLoading(true);
           processEntries(entries, importInstanceMutation, selectedEntity);
-          setIsLoading(false);
         }}
       >
-        <div class="i-ri:folder-open-fill" />
         <Switch>
           <Match
             when={
@@ -191,6 +192,7 @@ const Import = () => {
                 0 && !isLoading()
             }
           >
+            <div class="i-ri:folder-open-fill" />
             <Trans
               key="instance.import_instance_amount"
               options={{
@@ -203,10 +205,14 @@ const Import = () => {
           <Match
             when={
               Object.values(selectedInstancesIds).filter((id) => id).length ===
-              0
+                0 && !isLoading()
             }
           >
+            <div class="i-ri:folder-open-fill" />
             <Trans key="instance.import_instance" />
+          </Match>
+          <Match when={isLoading()}>
+            <Spinner />
           </Match>
         </Switch>
       </Button>
