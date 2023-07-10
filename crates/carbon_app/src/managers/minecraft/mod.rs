@@ -78,12 +78,14 @@ impl ManagerRef<'_, MinecraftManager> {
         let lwjgl =
             get_lwjgl_meta(&self.app.reqwest_client, &version_info, &self.meta_base_url).await?;
 
+        let tmp: Vec<_> = version_info
+            .libraries
+            .into_iter()
+            .chain(lwjgl.libraries.into_iter())
+            .collect();
+
         let libraries = libraries_into_vec_downloadable(
-            version_info
-                .libraries
-                .into_iter()
-                .chain(lwjgl.libraries.into_iter())
-                .collect(),
+            &tmp,
             &runtime_path.get_libraries().to_path(),
             java_arch,
         );
