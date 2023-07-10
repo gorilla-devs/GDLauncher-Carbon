@@ -1,4 +1,4 @@
-import { Button, Collapsable, Input, Skeleton } from "@gd/ui";
+import { Collapsable, Input, Skeleton } from "@gd/ui";
 import SiderbarWrapper from "./wrapper";
 import {
   For,
@@ -21,16 +21,13 @@ import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
-import { useModal } from "@/managers/ModalsManager";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { ModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
-
   const [t] = useTransContext();
-  const modalsContext = useModal();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -82,9 +79,7 @@ const Sidebar = () => {
         <Match when={isSidebarOpened() && key === "vanilla"}>
           {t("vanilla")}
         </Match>
-        <Match when={isSidebarOpened() && key === "Forge"}>
-          {t("vanilla")}
-        </Match>
+        <Match when={isSidebarOpened() && key === "Forge"}>{t("forge")}</Match>
         <Match when={!isSidebarOpened() && key === "vanilla"}>
           <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
         </Match>
@@ -103,7 +98,7 @@ const Sidebar = () => {
             when={isSidebarOpened()}
             fallback={
               <div
-                class="flex justify-center items-center group w-10 h-10 rounded-full bg-darkSlate-700 cursor-pointer"
+                class="flex justify-center items-center cursor-pointer group w-10 h-10 rounded-full bg-darkSlate-700"
                 onClick={() => {
                   toggleSidebar();
                   inputRef?.focus();
@@ -138,7 +133,7 @@ const Sidebar = () => {
                 isSidebarOpened() ? (
                   t("favorite")
                 ) : (
-                  <div class="text-yellow-500 w-6 h-6 i-ri:star-s-fill" />
+                  <div class="w-6 h-6 text-yellow-500 i-ri:star-s-fill" />
                 )
               }
               size={isSidebarOpened() ? "standard" : "small"}
@@ -203,22 +198,30 @@ const Sidebar = () => {
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center">
-              <img src={skull} class="w-16 h-16" />
-              <p class="text-darkSlate-50 text-center text-xs max-w-100">
-                <Trans
-                  key="instance.no_instances_text"
-                  options={{
-                    defaultValue:
-                      "At the moment there are not instances. Add one to start playing!",
-                  }}
-                />
-              </p>
+              <img
+                src={skull}
+                classList={{
+                  "w-16 h-16": isSidebarOpened(),
+                  "w-10 h-10": !isSidebarOpened(),
+                }}
+              />
+              <Show when={isSidebarOpened()}>
+                <p class="text-darkSlate-50 text-center text-xs max-w-50">
+                  <Trans
+                    key="instance.no_instances_text"
+                    options={{
+                      defaultValue:
+                        "At the moment there are not instances. Add one to start playing!",
+                    }}
+                  />
+                </p>
+              </Show>
             </div>
           </Show>
         </div>
-        <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
+        {/* <div class="absolute left-0 right-0 bottom-0 w-full flex justify-center bg-darkSlate-800 py-5">
           <Button
-            type="outline"
+            type="primary"
             onClick={() => {
               modalsContext?.openModal({
                 name: "instanceCreation",
@@ -239,7 +242,7 @@ const Sidebar = () => {
               />
             </Show>
           </Button>
-        </div>
+        </div> */}
       </div>
     </SiderbarWrapper>
   );

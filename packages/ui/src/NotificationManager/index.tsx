@@ -137,6 +137,7 @@ const createNotification = () => {
       "`createNotification` must be used within a `NotificationContext`"
     );
   }
+
   return context;
 };
 

@@ -86,19 +86,20 @@ const Modpack = () => {
   return (
     <ContentWrapper>
       <div
-        class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
+        class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
           "scrollbar-gutter": "stable",
         }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
-          setIsSticky(rect.top <= 80);
+          setIsSticky(rect.top <= 104);
         }}
       >
         <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
           <div class="relative h-full">
+            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 from-30% z-20" />
             <div
-              class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
+              class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat z-10"
               style={{
                 "background-image": `url("${
                   (routeData.modpackDetails?.data as FEModResponse)?.data.logo
@@ -107,12 +108,12 @@ const Modpack = () => {
                 "background-position": "right-5rem",
               }}
             />
-            <div class="top-5 sticky left-5 w-fit">
+            <div class="top-5 sticky left-5 w-fit z-20">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
-                type="transparent"
+                type="secondary"
               >
                 <Trans
                   key="instance.step_back"
@@ -122,7 +123,7 @@ const Modpack = () => {
                 />
               </Button>
             </div>
-            <div class="flex justify-center sticky px-4 h-24 top-52 z-20 bg-gradient-to-t from-darkSlate-800 from-10%">
+            <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
               <div class="flex gap-4 w-full lg:flex-row">
                 <div
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
@@ -152,7 +153,7 @@ const Modpack = () => {
                     </Switch>
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
-                    <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
+                    <div class="flex flex-col lg:flex-row text-darkSlate-50 items-start gap-1 lg:items-center lg:gap-0">
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                         <Switch>
                           <Match when={!isFetching()}>
@@ -194,7 +195,7 @@ const Modpack = () => {
                       </div>
                       <div class="p-0 lg:px-4 flex gap-2 items-center">
                         <div class="i-ri:user-fill" />
-                        <div class="text-sm flex gap-2 overflow-x-auto whitespace-nowrap max-w-52">
+                        <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                           <Switch>
                             <Match when={!isFetching()}>
                               <For
@@ -332,7 +333,7 @@ const Modpack = () => {
                   </Button>
                 </Show>
               </div>
-              <div class="z-0 px-4">
+              <div class="px-4 z-0">
                 <Outlet />
               </div>
             </div>

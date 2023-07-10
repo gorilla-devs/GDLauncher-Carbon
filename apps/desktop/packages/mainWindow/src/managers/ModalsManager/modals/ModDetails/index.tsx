@@ -114,7 +114,7 @@ const ModDetails = (props: ModalProps) => {
                             </Show>
                             <div class="p-0 lg:px-4 flex gap-2 items-center">
                               <div class="i-ri:user-fill" />
-                              <div class="text-sm flex gap-2 overflow-x-auto whitespace-nowrap max-w-52">
+                              <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                                 <For each={modDetails()?.authors}>
                                   {(author) => <p class="m-0">{author.name}</p>}
                                 </For>
