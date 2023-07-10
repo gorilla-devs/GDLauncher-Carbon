@@ -132,5 +132,12 @@
   "onboarding.welcome_gdlauncher_title": "Welcome to GDLauncher",
   "onboarding.welcome_gdlauncher_text": "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
   "onboarding.add_instance": "+ Add Instance",
-  "onboarding.import_instance_or_zip": "Import instance / Zip"
+  "onboarding.import_instance_or_zip": "Import instance / Zip",
+  "error.noGameOwnership": "In order to login you need to owen the game",
+  "error.noGameProfile": "There is no game profile associated to thi account",
+  "error.xbox_noAccount": "No xbox account",
+  "error.xbox_xboxServicesBanned": "Xbox account banned",
+  "error.xbox_adultVerificationRequired": "You need to verify your xbox account age before proceeding",
+  "error.xbox_childAccount": "Your account have an age restriction",
+  "error.xbox_code": "Code error:"
 }

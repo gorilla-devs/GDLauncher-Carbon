@@ -48,7 +48,7 @@ const Mod = (props: Props) => {
     <div class="flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl max-h-60">
       <div class="flex gap-4">
         <img
-          class="rounded-xl select-none h-30 w-30"
+          class="select-none rounded-xl h-30 w-30"
           src={props.mod.logo.thumbnailUrl}
         />
         <div class="flex flex-col gap-2">
