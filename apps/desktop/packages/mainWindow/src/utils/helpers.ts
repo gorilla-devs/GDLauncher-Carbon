@@ -1,3 +1,5 @@
+import { RSPCError } from "@rspc/client";
+
 export const parseTwoDigitNumber = (number: number) => {
   return number.toString().length === 1 ? `0${number}` : number;
 };
@@ -167,4 +169,10 @@ export const generateSequence = (
   }
 
   return sequence;
+};
+
+export const parseError = (error: RSPCError) => {
+  const parsedError = JSON.parse(error.message);
+
+  return parsedError.cause[0].display;
 };
