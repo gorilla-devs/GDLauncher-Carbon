@@ -55,7 +55,6 @@ const Logs = () => {
     }
 
     // Read the stream
-    let result = "";
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const { value, done } = await reader.read();
@@ -65,15 +64,13 @@ const Logs = () => {
         break;
       }
 
-      // Add value to the result
-      result += new TextDecoder("utf-8").decode(value);
+      const fixedJson =
+        "[" +
+        new TextDecoder("utf-8").decode(value).replace(/}{/g, "},{") +
+        "]";
+      const json = JSON.parse(fixedJson);
+      setLogsObj(instanceId(), (prev) => [...(prev || []), ...json]);
     }
-
-    // Fix and parse broken JSON
-    const fixedJson = "[" + result.replace(/}{/g, "},{") + "]";
-    const json = JSON.parse(fixedJson);
-    if (!readableStream.locked) readableStream.cancel();
-    return json;
   }
 
   createEffect(() => {
@@ -87,11 +84,7 @@ const Logs = () => {
 
   createEffect(() => {
     if (allLogs()?.body) {
-      streamToJson((allLogs() as any).body).then((logs) => {
-        setLogsObj(instanceId(), () => {
-          return logs;
-        });
-      });
+      streamToJson((allLogs() as any).body);
     }
   });
 
@@ -161,7 +154,7 @@ const Logs = () => {
       <Show when={showButton()}>
         <div class="fixed bottom-4 right-[470px] rounded-full">
           <Button typeof="secondary" onClick={scrollTop}>
-            Scroll to top
+            <Trans key="logs.scroll_top" />
           </Button>
         </div>
       </Show>
