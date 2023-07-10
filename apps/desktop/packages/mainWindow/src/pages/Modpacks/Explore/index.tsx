@@ -34,10 +34,10 @@ const Modpack = () => {
       label: "Changelog",
       path: `/modpacks/${params.id}/changelog`,
     },
-    // {
-    //   label: "Screenshots",
-    //   path: `/modpacks/${params.id}/screenshots`,
-    // },
+    {
+      label: "Screenshots",
+      path: `/modpacks/${params.id}/screenshots`,
+    },
     {
       label: "Versions",
       path: `/modpacks/${params.id}/versions`,
