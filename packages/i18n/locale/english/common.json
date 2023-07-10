@@ -135,6 +135,7 @@
   "instance.sort_by_name": "Name",
   "instance.sort_by_totalDownloads": "Total downloads",
   "instance.import": "Import",
+  "instances.import_entity_coming_soon": "Coming soon",
   "instance.create_new_instance_title": "New instance",
   "instance.create_new_instance_text": "Create your own empty instance",
   "instance.create_instance_btn": "Create",

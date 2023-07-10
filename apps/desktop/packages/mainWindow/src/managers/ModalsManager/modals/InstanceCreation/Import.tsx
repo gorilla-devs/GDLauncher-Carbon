@@ -1,9 +1,13 @@
 import { rspc } from "@/utils/rspcClient";
-import { FEEntity, FEImportInstance } from "@gd/core_module/bindings";
+import {
+  FEEntity,
+  FEImportInstance,
+  FEImportableInstance,
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox, Spinner } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
-import { CreateMutationResult } from "@tanstack/solid-query";
+import { CreateMutationResult, CreateQueryResult } from "@tanstack/solid-query";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 
@@ -14,6 +18,9 @@ const Import = () => {
   const [selectedInstancesIds, setSelectedInstancesIds] = createStore<{
     [id: number]: boolean;
   }>({});
+  const [instances, setInstances] =
+    createSignal<CreateQueryResult<FEImportableInstance[], RSPCError>>();
+
   const [importedInstances, setImportedInstances] = createSignal<number[]>([]);
 
   const scanImportableInstancesMutation = rspc.createMutation([
@@ -29,10 +36,15 @@ const Import = () => {
     }
   );
 
-  const instances = rspc.createQuery(() => [
-    "instance.getImportableInstances",
-    selectedEntity(),
-  ]);
+  createEffect(() => {
+    setInstances(
+      // eslint-disable-next-line solid/reactivity
+      rspc.createQuery(() => [
+        "instance.getImportableInstances",
+        selectedEntity(),
+      ])
+    );
+  });
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
 
@@ -43,7 +55,7 @@ const Import = () => {
   });
 
   const selectAll = (checked: boolean) => {
-    instances.data?.forEach((_instance, i) => {
+    instances()?.data?.forEach((_instance, i) => {
       setSelectedInstancesIds((prev) => ({
         ...prev,
         [i]: checked,
@@ -53,7 +65,7 @@ const Import = () => {
 
   const areAllSelected = () =>
     Object.values(selectedInstancesIds).filter((instance) => instance)
-      .length === instances.data?.length;
+      .length === instances()?.data?.length;
 
   async function processEntries(
     entries: [string, boolean][],
@@ -78,7 +90,7 @@ const Import = () => {
   }
 
   createEffect(() => {
-    if (importedInstances().length === instances.data?.length)
+    if (importedInstances().length === instances()?.data?.length)
       setIsLoading(false);
   });
 
@@ -106,7 +118,7 @@ const Import = () => {
                 >
                   <Show when={entity !== "legacyGDLauncher"}>
                     <span class="absolute rounded-full text-white text-xs -top-2 -right-4 bg-green-500 px-1">
-                      Coming soon
+                      <Trans key="instances.import_entity_coming_soon" />
                     </span>
                   </Show>
                   {entity}
@@ -140,9 +152,9 @@ const Import = () => {
             </span>
           </div>
           <Switch>
-            <Match when={(instances.data?.length || 0) > 0}>
+            <Match when={(instances()?.data?.length || 0) > 0}>
               <div class="p-4 h-full w-full box-border flex flex-col gap-4">
-                <For each={instances.data}>
+                <For each={instances()?.data}>
                   {(instance, i) => (
                     <div class="flex gap-2 w-full">
                       <Checkbox
@@ -169,7 +181,7 @@ const Import = () => {
                 </For>
               </div>
             </Match>
-            <Match when={(instances.data?.length || 0) === 0}>
+            <Match when={(instances()?.data?.length || 0) === 0}>
               <div class="p-4 h-full w-full box-border flex flex-col justify-center items-center">
                 <Trans key="instance.import_no_instances" />
               </div>
@@ -178,7 +190,7 @@ const Import = () => {
         </div>
       </div>
       <Button
-        disabled={importedInstances().length === instances.data?.length}
+        disabled={importedInstances().length === instances()?.data?.length}
         onClick={() => {
           const entries = Object.entries(selectedInstancesIds);
           setIsLoading(true);
