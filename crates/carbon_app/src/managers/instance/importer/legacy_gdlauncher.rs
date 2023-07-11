@@ -50,12 +50,14 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
         let instances_path = old_gdl_base_path.join("instances");
 
-        let mut all_instances = tokio::fs::read_dir(&instances_path).await?;
+        let Ok(mut all_instances) = tokio::fs::read_dir(&instances_path).await else {
+            return Ok(());
+        };
 
         self.results.lock().await.clear();
         app.invalidate(
             keys::instance::GET_IMPORTABLE_INSTANCES,
-            Some(serde_json::to_value(FEEntity::LegacyGDLauncher).unwrap()),
+            Some(serde_json::to_value(FEEntity::LegacyGDLauncher)?),
         );
 
         while let Some(child) = all_instances.next_entry().await? {
@@ -176,9 +178,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             )
             .await?;
 
-        app.instance_manager()
+        let installation_task = app
+            .instance_manager()
             .prepare_game(created_instance_id, None)
             .await?;
+
+        installation_task.await?;
 
         let walked_dir = walkdir::WalkDir::new(&instance.full_path)
             .into_iter()
