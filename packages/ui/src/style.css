@@ -27,3 +27,7 @@
   transition: none !important;
   backdrop-filter: none !important;
 }
+
+* {
+  user-select: none;
+}

@@ -18,7 +18,7 @@ const TabList = (props: Props) => {
 
   const getPositionPx = (index: number) => {
     const filteredTabs = tabs()?.slice(0, index);
-    const gap = tabsContext?.gap ?? 24;
+    const gap = tabsContext?.gap?.() ?? 24;
 
     if (index < 0 || index > tabs()?.length) return 0;
 
@@ -27,7 +27,7 @@ const TabList = (props: Props) => {
       const isSpacing =
         typeof tab === "object" && (tab as SpacingTab)?.type === "spacing";
 
-      if (tabsContext?.orientation === "horizontal") {
+      if (tabsContext?.orientation() === "horizontal") {
         if (isSpacing) {
           if (isSpacing) dimension += (tab as SpacingTab).space + gap;
         } else {
@@ -70,22 +70,22 @@ const TabList = (props: Props) => {
     <div
       class="flex relative items-center h-auto w-full"
       classList={{
-        "bg-darkSlate-800": tabsContext?.variant === "underline",
-        "bg-darkSlate-900": tabsContext?.variant === "block",
+        "bg-darkSlate-800": tabsContext?.variant() === "underline",
+        "bg-darkSlate-900": tabsContext?.variant() === "block",
       }}
     >
       <Switch>
-        <Match when={tabsContext?.variant === "underline"}>
+        <Match when={tabsContext?.variant() === "underline"}>
           <div
             class="flex border-b-darkSlate-800 border-b-1 box-border overflow-auto w-full"
             classList={{
-              "gap-6": tabsContext?.orientation !== undefined,
-              "flex-row": tabsContext?.orientation === "horizontal",
-              "flex-col": tabsContext?.orientation === "vertical",
+              "gap-6": tabsContext?.orientation() !== undefined,
+              "flex-row": tabsContext?.orientation() === "horizontal",
+              "flex-col": tabsContext?.orientation() === "vertical",
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}
@@ -93,18 +93,19 @@ const TabList = (props: Props) => {
               <div
                 class="absolute bottom-1 h-1 bg-primary-500 transition-all duration-100 ease-in-out"
                 classList={{
-                  "top-0 w-1 right-0": tabsContext?.orientation === "vertical",
-                  "left-0": tabsContext?.orientation === "horizontal",
+                  "top-0 w-1 right-0":
+                    tabsContext?.orientation() === "vertical",
+                  "left-0": tabsContext?.orientation() === "horizontal",
                 }}
                 style={{
-                  ...(tabsContext?.orientation === "horizontal"
+                  ...(tabsContext?.orientation() === "horizontal"
                     ? {
                         width: `${getWidth(currentIndex())}px`,
                       }
                     : {
                         height: `${getHeight(currentIndex())}px`,
                       }),
-                  ...(tabsContext?.orientation === "horizontal"
+                  ...(tabsContext?.orientation() === "horizontal"
                     ? {
                         transform: `translateX(${getPositionPx(
                           currentIndex()
@@ -120,32 +121,32 @@ const TabList = (props: Props) => {
             </Show>
           </div>
         </Match>
-        <Match when={tabsContext?.variant === "block"}>
+        <Match when={tabsContext?.variant() === "block"}>
           <div
             class="flex items-center p-2 rounded-xl box-border overflow-auto w-full"
             classList={{
-              "gap-6": tabsContext?.orientation !== undefined,
-              "flex-row": tabsContext?.orientation === "horizontal",
-              "flex-col": tabsContext?.orientation === "vertical",
+              "gap-6": tabsContext?.orientation() !== undefined,
+              "flex-row": tabsContext?.orientation() === "horizontal",
+              "flex-col": tabsContext?.orientation() === "vertical",
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}
           </div>
         </Match>
-        <Match when={tabsContext?.variant === "traditional"}>
+        <Match when={tabsContext?.variant() === "traditional"}>
           <div
             class="flex items-center box-border overflow-auto w-full scrollbar-hide"
             classList={{
-              "flex-row": tabsContext?.orientation === "horizontal",
-              "flex-col": tabsContext?.orientation === "vertical",
+              "flex-row": tabsContext?.orientation() === "horizontal",
+              "flex-col": tabsContext?.orientation() === "vertical",
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.toString(),
+              gap: tabsContext?.gap?.()?.toString(),
             }}
           >
             {props.children}

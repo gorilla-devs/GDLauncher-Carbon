@@ -46,7 +46,7 @@ const Sidebar = () => {
         orientation="vertical"
         variant="underline"
         gap={0}
-        paddingY="p-y-3.5"
+        paddingY="py-3.5"
       >
         <TabList>
           <For each={settings}>
