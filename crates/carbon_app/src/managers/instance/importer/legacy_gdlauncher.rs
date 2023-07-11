@@ -26,13 +26,28 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     type Config = LegacyGDLauncherConfigWrapper;
 
     async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()> {
-        let old_gdl_base_path = directories::BaseDirs::new()
+        let mut old_gdl_base_path = directories::BaseDirs::new()
             .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
             .data_dir()
-            .join("gdlauncher_next")
-            .join("instances");
+            .join("gdlauncher_next");
 
-        let mut all_instances = tokio::fs::read_dir(&old_gdl_base_path).await?;
+        let override_path = old_gdl_base_path.join("override.data");
+
+        if override_path.exists() {
+            let override_path = tokio::fs::read_to_string(override_path).await;
+
+            if let Ok(override_path) = override_path {
+                let override_path = PathBuf::from(override_path);
+
+                if override_path.exists() {
+                    old_gdl_base_path = override_path;
+                }
+            }
+        }
+
+        let instances_path = old_gdl_base_path.join("instances");
+
+        let mut all_instances = tokio::fs::read_dir(&instances_path).await?;
 
         self.results.lock().await.clear();
         app.invalidate(
