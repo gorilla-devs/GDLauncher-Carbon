@@ -162,7 +162,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .prepare_game(id.into(), None)
-                .await
+                .await?;
+
+            Ok(())
         }
 
         mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
@@ -176,7 +178,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
             app.instance_manager()
                 .prepare_game(id.into(), Some(account))
-                .await
+                .await?;
+
+            Ok(())
         }
 
         mutation KILL_INSTANCE[app, id: FEInstanceId] {
