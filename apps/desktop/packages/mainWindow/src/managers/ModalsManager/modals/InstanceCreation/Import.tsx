@@ -32,11 +32,7 @@ const Import = () => {
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
-      onMutate(entity) {
-        setLoadingInstances(entity.index, true);
-      },
       onSuccess(_data, entity) {
-        setLoadingInstances(entity.index, false);
         setImportedInstances((prev) => [...prev, entity.index]);
       },
     }
@@ -85,12 +81,15 @@ const Import = () => {
   ) {
     for (let index = 0; index < entries.length; index++) {
       const [i, isSelected] = entries[index];
+      setLoadingInstances(parseInt(i, 10), true);
+
       if (isSelected) {
         await importInstanceMutation.mutate({
           entity: selectedEntity(),
           index: parseInt(i, 10),
         });
       }
+      setLoadingInstances(parseInt(i, 10), false);
     }
   }
 
