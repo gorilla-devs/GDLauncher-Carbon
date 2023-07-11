@@ -12,7 +12,7 @@ function Checkbox(props: Props) {
   const [checked, setChecked] = createSignal(isChecked());
 
   createEffect(() => {
-    setChecked(props.checked);
+    if (!props.disabled) setChecked(props.checked);
   });
 
   return (

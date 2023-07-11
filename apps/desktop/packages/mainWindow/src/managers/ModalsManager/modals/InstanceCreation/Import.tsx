@@ -1,3 +1,4 @@
+import { importedInstances, setImportedInstances } from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
 import {
   FEEntity,
@@ -18,10 +19,11 @@ const Import = () => {
   const [selectedInstancesIds, setSelectedInstancesIds] = createStore<{
     [id: number]: boolean;
   }>({});
+  const [loadingInstances, setLoadingInstances] = createStore<{
+    [id: number]: boolean;
+  }>({});
   const [instances, setInstances] =
     createSignal<CreateQueryResult<FEImportableInstance[], RSPCError>>();
-
-  const [importedInstances, setImportedInstances] = createSignal<number[]>([]);
 
   const scanImportableInstancesMutation = rspc.createMutation([
     "instance.scanImportableInstances",
@@ -30,7 +32,11 @@ const Import = () => {
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
+      onMutate(entity) {
+        setLoadingInstances(entity.index, true);
+      },
       onSuccess(_data, entity) {
+        setLoadingInstances(entity.index, false);
         setImportedInstances((prev) => [...prev, entity.index]);
       },
     }
@@ -78,9 +84,8 @@ const Import = () => {
     selectedEntity: any
   ) {
     for (let index = 0; index < entries.length; index++) {
-      const [i, boolean] = entries[index];
-
-      if (boolean) {
+      const [i, isSelected] = entries[index];
+      if (isSelected) {
         await importInstanceMutation.mutate({
           entity: selectedEntity(),
           index: parseInt(i, 10),
@@ -89,15 +94,17 @@ const Import = () => {
     }
   }
 
+  const isAllImported = () =>
+    importedInstances().length === instances()?.data?.length;
+
   createEffect(() => {
-    if (importedInstances().length === instances()?.data?.length)
-      setIsLoading(false);
+    if (isAllImported()) setIsLoading(false);
   });
 
   return (
     <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
       <div class="flex flex-col gap-4 w-full">
-        <div class="scrollbar-hide overflow-x-auto w-fill">
+        <div class="overflow-x-auto w-fill">
           <div class="flex gap-4 py-2">
             <For each={entities.data}>
               {(entity) => (
@@ -130,6 +137,7 @@ const Import = () => {
         <div class="w-full bg-darkSlate-800 rounded-xl box-border flex flex-col overflow-hidden h-50">
           <div class="flex justify-between w-full bg-darkSlate-900 px-4 py-2 box-border">
             <Checkbox
+              disabled={isAllImported()}
               checked={areAllSelected()}
               onChange={(checked) => {
                 selectAll(checked);
@@ -137,8 +145,11 @@ const Import = () => {
             />
             <span
               class="cursor-pointer"
+              classList={{
+                "text-darkSlate-600": isAllImported(),
+              }}
               onClick={() => {
-                selectAll(!areAllSelected());
+                if (!isAllImported()) selectAll(!areAllSelected());
               }}
             >
               <Switch>
@@ -156,26 +167,31 @@ const Import = () => {
               <div class="p-4 h-full w-full box-border flex flex-col gap-4">
                 <For each={instances()?.data}>
                   {(instance, i) => (
-                    <div class="flex gap-2 w-full">
-                      <Checkbox
-                        disabled={importedInstances().includes(i())}
-                        checked={selectedInstancesIds[i()]}
-                        onChange={(checked) => {
-                          setSelectedInstancesIds((prev) => ({
-                            ...prev,
-                            [i()]: checked,
-                          }));
-                        }}
-                      />
-                      <span
-                        classList={{
-                          "text-darkSlate-500": importedInstances().includes(
-                            i()
-                          ),
-                        }}
-                      >
-                        {instance.name}
-                      </span>
+                    <div class="flex justify-between">
+                      <div class="flex gap-2 w-full">
+                        <Checkbox
+                          disabled={importedInstances().includes(i())}
+                          checked={selectedInstancesIds[i()]}
+                          onChange={(checked) => {
+                            setSelectedInstancesIds((prev) => ({
+                              ...prev,
+                              [i()]: checked,
+                            }));
+                          }}
+                        />
+                        <span
+                          classList={{
+                            "text-darkSlate-500": importedInstances().includes(
+                              i()
+                            ),
+                          }}
+                        >
+                          {instance.name}
+                        </span>
+                      </div>
+                      <Show when={loadingInstances[i()]}>
+                        <Spinner />
+                      </Show>
                     </div>
                   )}
                 </For>

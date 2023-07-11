@@ -11,6 +11,7 @@ import {
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
 import { port } from "./rspcClient";
+import { createSignal } from "solid-js";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -200,3 +201,7 @@ export type Instance = InvalidInstanceType | ValidInstanceType;
 export interface InstancesStore {
   [modloader: string]: UngroupedInstance[];
 }
+
+export const [importedInstances, setImportedInstances] = createSignal<number[]>(
+  []
+);
