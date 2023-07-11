@@ -62,7 +62,7 @@ module.exports = {
     target: ["dir", "zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
-    entitlementsInherit: "./entitlements.mac.plist",
+    extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
     target: ["dir", "zip"],
