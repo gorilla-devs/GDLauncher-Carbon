@@ -36,11 +36,7 @@ const getRootPath = () => {
   } else if (process.platform === "linux") {
     basePath = path.join(basePath, "linux-unpacked");
   } else if (process.platform === "darwin") {
-    basePath = path.join(
-      basePath,
-      isArm64() ? "mac-arm64" : "mac",
-      "GDLauncher.app"
-    );
+    basePath = path.join(basePath, "mac-universal", "GDLauncher.app");
   }
 
   return basePath;
