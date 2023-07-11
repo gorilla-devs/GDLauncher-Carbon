@@ -8,6 +8,8 @@ use crate::managers::{
     AppInner,
 };
 
+use super::FEInstanceId;
+
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEEntity {
@@ -105,17 +107,19 @@ pub async fn get_importable_instances(
     }
 }
 
-pub async fn import_instance(app: Arc<AppInner>, args: FEImportInstance) -> anyhow::Result<()> {
+pub async fn import_instance(
+    app: Arc<AppInner>,
+    args: FEImportInstance,
+) -> anyhow::Result<FEInstanceId> {
     let locker = app.instance_manager();
     let locker = locker.importer.lock().await;
 
     match args.entity {
-        FEEntity::LegacyGDLauncher => {
-            locker
-                .legacy_gdlauncher
-                .import(app.clone(), args.index)
-                .await
-        }
+        FEEntity::LegacyGDLauncher => locker
+            .legacy_gdlauncher
+            .import(app.clone(), args.index)
+            .await
+            .map(|instance_id| instance_id.into()),
         _ => anyhow::bail!("Unsupported entity"),
     }
 }

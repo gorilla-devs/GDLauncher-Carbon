@@ -8,8 +8,11 @@ use tokio::{
 
 use crate::{
     api::{instance::import::FEEntity, keys},
-    domain::instance::info::{
-        CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
+    domain::instance::{
+        info::{
+            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
+        },
+        InstanceId,
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
@@ -102,7 +105,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(instances)
     }
 
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<()> {
+    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<InstanceId> {
         let lock = self.results.lock().await;
         let instance = lock
             .get(index as usize)
@@ -242,7 +245,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
         }
 
-        Ok(())
+        Ok(created_instance_id)
     }
 }
 
