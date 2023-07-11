@@ -68,7 +68,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .create_group(name)
                 .await
-                .map(GroupId::from)
+                .map(FEGroupId::from)
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
@@ -81,7 +81,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.notes,
                 )
                 .await
-                .map(InstanceId::from)
+                .map(FEInstanceId::from)
         }
 
         mutation LOAD_ICON_URL[app, url: String] {
@@ -90,13 +90,13 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        mutation DELETE_GROUP[app, id: GroupId] {
+        mutation DELETE_GROUP[app, id: FEGroupId] {
             app.instance_manager()
                 .delete_group(id.into())
                 .await
         }
 
-        mutation DELETE_INSTANCE[app, id: InstanceId] {
+        mutation DELETE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .delete_instance(id.into())
                 .await
@@ -134,7 +134,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.new_name,
                 )
                 .await
-                .map(InstanceId::from)
+                .map(FEInstanceId::from)
         }
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
@@ -152,20 +152,20 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: InstanceId] {
+        query INSTANCE_DETAILS[app, id: FEInstanceId] {
             app.instance_manager()
                 .instance_details(id.into())
                 .await
                 .map(InstanceDetails::from)
         }
 
-        mutation PREPARE_INSTANCE[app, id: InstanceId] {
+        mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .prepare_game(id.into(), None)
                 .await
         }
 
-        mutation LAUNCH_INSTANCE[app, id: InstanceId] {
+        mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
             let account = app.account_manager()
                 .get_active_account()
                 .await?;
@@ -179,7 +179,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        mutation KILL_INSTANCE[app, id: InstanceId] {
+        mutation KILL_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .kill_instance(id.into())
                 .await
@@ -390,45 +390,45 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         )
 }
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct GroupId(i32);
+pub struct FEGroupId(i32);
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct InstanceId(i32);
+pub struct FEInstanceId(i32);
 
-impl From<domain::GroupId> for GroupId {
+impl From<domain::GroupId> for FEGroupId {
     fn from(value: domain::GroupId) -> Self {
         Self(*value)
     }
 }
 
-impl From<domain::InstanceId> for InstanceId {
+impl From<domain::InstanceId> for FEInstanceId {
     fn from(value: domain::InstanceId) -> Self {
         Self(*value)
     }
 }
 
-impl From<GroupId> for domain::GroupId {
-    fn from(value: GroupId) -> Self {
+impl From<FEGroupId> for domain::GroupId {
+    fn from(value: FEGroupId) -> Self {
         Self(value.0)
     }
 }
 
-impl From<InstanceId> for domain::InstanceId {
-    fn from(value: InstanceId) -> Self {
+impl From<FEInstanceId> for domain::InstanceId {
+    fn from(value: FEInstanceId) -> Self {
         Self(value.0)
     }
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListGroup {
-    id: GroupId,
+    id: FEGroupId,
     name: String,
     instances: Vec<ListInstance>,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListInstance {
-    id: InstanceId,
+    id: FEInstanceId,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -485,7 +485,7 @@ enum ConfigurationParseErrorType {
 
 #[derive(Type, Debug, Deserialize)]
 struct CreateInstance {
-    group: GroupId,
+    group: FEGroupId,
     name: String,
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
@@ -494,7 +494,7 @@ struct CreateInstance {
 
 #[derive(Type, Debug, Deserialize)]
 struct UpdateInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     #[specta(optional)]
     name: Option<Set<String>>,
     #[specta(optional)]
@@ -515,13 +515,13 @@ struct UpdateInstance {
 
 #[derive(Type, Debug, Deserialize)]
 struct DuplicateInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     new_name: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
 struct SetFavorite {
-    instance: InstanceId,
+    instance: FEInstanceId,
     favorite: bool,
 }
 
@@ -540,13 +540,13 @@ impl<T> Set<T> {
 
 #[derive(Type, Debug, Deserialize)]
 struct InstanceMod {
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     mod_id: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
 struct InstallMod {
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     project_id: u32,
     file_id: u32,
 }
@@ -557,7 +557,7 @@ struct GameLogId(i32);
 #[derive(Type, Debug, Serialize)]
 struct GameLogEntry {
     id: GameLogId,
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     active: bool,
 }
 
@@ -592,21 +592,21 @@ struct StandardVersion {
 
 #[derive(Type, Debug, Deserialize)]
 struct MoveGroup {
-    group: GroupId,
-    before: Option<GroupId>,
+    group: FEGroupId,
+    before: Option<FEGroupId>,
 }
 
 #[derive(Type, Debug, Deserialize)]
 struct MoveInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     target: MoveInstanceTarget,
 }
 
 #[derive(Type, Debug, Deserialize)]
 enum MoveInstanceTarget {
-    BeforeInstance(InstanceId),
-    BeginningOfGroup(GroupId),
-    EndOfGroup(GroupId),
+    BeforeInstance(FEInstanceId),
+    BeginningOfGroup(FEGroupId),
+    EndOfGroup(FEGroupId),
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -635,7 +635,7 @@ pub struct MemoryRange {
 
 #[derive(Type, Debug, Deserialize)]
 struct OpenInstanceFolder {
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     folder: InstanceFolder,
 }
 

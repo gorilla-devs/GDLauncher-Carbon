@@ -3,7 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
-use crate::managers::AppInner;
+use crate::{domain::instance::InstanceId, managers::AppInner};
 
 pub mod legacy_gdlauncher;
 
@@ -38,7 +38,7 @@ pub trait InstanceImporter {
 
     async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()>;
     async fn get_available(&self) -> anyhow::Result<Vec<ImportableInstance>>;
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<()>;
+    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<InstanceId>;
 }
 
 #[derive(Debug, Default)]
