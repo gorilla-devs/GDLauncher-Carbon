@@ -3,7 +3,11 @@
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/version_model)
 
 use super::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
+
+use anyhow::anyhow;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +61,32 @@ pub struct ModrinthPackDependencies {
     pub forge: Option<String>,
     pub fabric_loader: Option<String>,
     pub quilt_loader: Option<String>,
+}
+
+
+
+impl TryFrom<ModrinthPackDependencies> for StandardVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModrinthPackDependencies) -> Result<Self, Self::Error> {
+        let minecraft_version = value.minecraft.ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
+        let mut modloaders = HashSet::new();
+        if let Some(forge_version) = value.forge {
+            modloaders.insert(ModLoader{type_: ModLoaderType::Forge, version: format!("{}-{}", &minecraft_version, forge_version)});
+        }
+        if let Some(fabric_version) = value.fabric_loader {
+
+            modloaders.insert(ModLoader{type_: ModLoaderType::Fabric, version: format!("{}-{}", &minecraft_version, fabric_version)});
+        }
+        if let Some(quilt_version) = value.quilt_loader {
+
+            modloaders.insert(ModLoader{type_: ModLoaderType::Quilt, version: format!("{}-{}", &minecraft_version, quilt_version)});
+        }
+        Ok(StandardVersion{
+            release: minecraft_version,
+            modloaders,
+        })
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

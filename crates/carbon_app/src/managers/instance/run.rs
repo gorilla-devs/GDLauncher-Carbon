@@ -1,9 +1,11 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
+use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
-use crate::managers::minecraft::curseforge::{self, ProgressState};
+use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
+use crate::managers::minecraft::modrinth;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -219,22 +221,22 @@ impl ManagerRef<'_, InstanceManager> {
                                 t_request.complete_opaque();
 
                                 let (modpack_progress_tx, mut modpack_progress_rx) =
-                                    tokio::sync::watch::channel(ProgressState::Idle);
+                                    tokio::sync::watch::channel(curseforge::ProgressState::Idle);
 
                                 tokio::spawn(async move {
                                     while modpack_progress_rx.changed().await.is_ok() {
                                         {
                                             let progress = modpack_progress_rx.borrow();
                                             match *progress {
-                                                ProgressState::Idle => {}
-                                                ProgressState::DownloadingAddonZip(downloaded, total) => {
+                                                curseforge::ProgressState::Idle => {}
+                                                curseforge::ProgressState::DownloadingAddonZip(downloaded, total) => {
                                                     t_download_files
                                                         .update_download(downloaded as u32, total as u32)
                                                 }
-                                                ProgressState::ExtractingAddonOverrides(count, total) => {
+                                                curseforge::ProgressState::ExtractingAddonOverrides(count, total) => {
                                                     t_extract_files.update_items(count as u32, total as u32)
                                                 }
-                                                ProgressState::AcquiringAddonsMetadata(count, total) => {
+                                                curseforge::ProgressState::AcquiringAddonsMetadata(count, total) => {
                                                     t_addon_metadata
                                                         .update_items(count as u32, total as u32)
                                                 }
@@ -279,22 +281,22 @@ impl ManagerRef<'_, InstanceManager> {
                                 t_request.complete_opaque();
 
                                 let (modpack_progress_tx, mut modpack_progress_rx) =
-                                    tokio::sync::watch::channel(ProgressState::Idle);
+                                    tokio::sync::watch::channel(modrinth::ProgressState::Idle);
 
                                 tokio::spawn(async move {
                                     while modpack_progress_rx.changed().await.is_ok() {
                                         {
                                             let progress = modpack_progress_rx.borrow();
                                             match *progress {
-                                                ProgressState::Idle => {}
-                                                ProgressState::DownloadingAddonZip(downloaded, total) => {
+                                                modrinth::ProgressState::Idle => {}
+                                                modrinth::ProgressState::DownloadingMRPack(downloaded, total) => {
                                                     t_download_files
                                                         .update_download(downloaded as u32, total as u32)
                                                 }
-                                                ProgressState::ExtractingAddonOverrides(count, total) => {
+                                                modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
                                                     t_extract_files.update_items(count as u32, total as u32)
                                                 }
-                                                ProgressState::AcquiringAddonsMetadata(count, total) => {
+                                                modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
                                                     t_addon_metadata
                                                         .update_items(count as u32, total as u32)
                                                 }
@@ -306,6 +308,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                                     t_download_files.complete_download();
                                 });
+
+                                let modpack_info = modrinth::prepare_modpack_from_file(&app, &file, instance_path.clone(), modpack_progress_tx).await?;
+
+                                downloads.extend(modpack_info.downloadables);
+
+                                modpack_info.index.dependencies.try_into()?
 
                             }
                         };
