@@ -5,14 +5,18 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
 };
+use tracing::info;
 
 use crate::{
     api::{instance::import::FEEntity, keys},
-    domain::instance::{
-        info::{
-            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
+    domain::{
+        instance::{
+            info::{
+                CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
+            },
+            InstanceId,
         },
-        InstanceId,
+        vtask::VisualTaskId,
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
@@ -107,7 +111,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(instances)
     }
 
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<InstanceId> {
+    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
         let lock = self.results.lock().await;
         let instance = lock
             .get(index as usize)
@@ -178,12 +182,10 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             )
             .await?;
 
-        let installation_task = app
+        let (_, task_id) = app
             .instance_manager()
             .prepare_game(created_instance_id, None)
             .await?;
-
-        installation_task.await?;
 
         let walked_dir = walkdir::WalkDir::new(&instance.full_path)
             .into_iter()
@@ -250,7 +252,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
         }
 
-        Ok(created_instance_id)
+        Ok(task_id)
     }
 }
 

@@ -3,9 +3,12 @@ use std::sync::Arc;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
-use crate::managers::{
-    instance::importer::{self, InstanceImporter},
-    AppInner,
+use crate::{
+    api::vtask::FETaskId,
+    managers::{
+        instance::importer::{self, InstanceImporter},
+        AppInner,
+    },
 };
 
 use super::FEInstanceId;
@@ -110,7 +113,7 @@ pub async fn get_importable_instances(
 pub async fn import_instance(
     app: Arc<AppInner>,
     args: FEImportInstance,
-) -> anyhow::Result<FEInstanceId> {
+) -> anyhow::Result<FETaskId> {
     let locker = app.instance_manager();
     let locker = locker.importer.lock().await;
 
@@ -119,7 +122,7 @@ pub async fn import_instance(
             .legacy_gdlauncher
             .import(app.clone(), args.index)
             .await
-            .map(|instance_id| instance_id.into()),
+            .map(|task_id| task_id.into()),
         _ => anyhow::bail!("Unsupported entity"),
     }
 }
