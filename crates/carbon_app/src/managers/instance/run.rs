@@ -266,7 +266,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 let file = app
                                     .modplatforms_manager()
                                     .modrinth
-                                    .get_version(VersionID(modpack.version_id))
+                                    .get_version(VersionID(modpack.version_id.clone()))
                                     .await?
                                     .files
                                     .into_iter()

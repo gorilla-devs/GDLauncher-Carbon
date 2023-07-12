@@ -55,6 +55,7 @@ trash = { workspace = true }
 toml = { workspace = true }
 opener = { workspace = true }
 md-5 = { workspace = true }
+sha1 = { workspace = true }
 hex = { workspace = true }
 murmurhash32 = { workspace = true }
 fs_extra = { workspace = true }

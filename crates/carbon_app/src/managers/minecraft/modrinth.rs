@@ -175,7 +175,7 @@ pub async fn prepare_modpack_from_mrpack(
         .files
         .iter()
         .filter(|&file| {
-            file.env.map_or(true, |env| match env.client {
+            file.env.as_ref().map_or(true, |env| match env.client {
                 ModrinthEnvironmentSupport::Required => true,
                 _ => false,
             })
@@ -187,7 +187,7 @@ pub async fn prepare_modpack_from_mrpack(
         .files
         .iter()
         .filter(|&file| {
-            file.env.map_or(false, |env| match env.client {
+            file.env.as_ref().map_or(false, |env| match env.client {
                 ModrinthEnvironmentSupport::Optional => true,
                 _ => false,
             })

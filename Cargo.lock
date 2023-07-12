@@ -450,6 +450,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "serde_urlencoded",
+ "sha1 0.10.5",
  "strum",
  "strum_macros",
  "sysinfo",
