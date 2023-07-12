@@ -23,7 +23,7 @@ use crate::managers::{App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
-use super::vtask::TaskId;
+use super::vtask::FETaskId;
 
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
@@ -242,7 +242,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 )
                 .await?;
 
-            Ok(super::vtask::TaskId::from(task))
+            Ok(super::vtask::FETaskId::from(task))
         }
 
         mutation OPEN_INSTANCE_FOLDER[app, folder: OpenInstanceFolder] {
@@ -675,9 +675,9 @@ enum ModLoaderType {
 #[derive(Type, Debug, Serialize)]
 enum LaunchState {
     Inactive {
-        failed_task: Option<TaskId>,
+        failed_task: Option<FETaskId>,
     },
-    Preparing(TaskId),
+    Preparing(FETaskId),
     Running {
         start_time: DateTime<Utc>,
         log_id: i32,

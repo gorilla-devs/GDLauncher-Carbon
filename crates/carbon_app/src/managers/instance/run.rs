@@ -52,7 +52,7 @@ impl ManagerRef<'_, InstanceManager> {
         self,
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
-    ) -> anyhow::Result<JoinHandle<()>> {
+    ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -775,7 +775,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         });
 
-        Ok(installation_task)
+        Ok((installation_task, id))
     }
 
     async fn change_launch_state(
