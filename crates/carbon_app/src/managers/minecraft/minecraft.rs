@@ -8,7 +8,8 @@ use crate::{
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
-            get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
+            chain_lwjgl_libs_with_base_libs, get_default_jvm_args, is_rule_allowed,
+            library_is_allowed, OsExt, ARCH_WIDTH,
         },
     },
 };
@@ -269,45 +270,13 @@ pub async fn generate_startup_command(
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Vec<String>> {
-    let mut libraries = version
-        .libraries
-        .iter()
-        .chain(lwjgl_group.libraries.iter())
-        .filter_map(|library| {
-            if !library_is_allowed(library.clone(), &java_component.arch)
-                || !library.include_in_classpath
-            {
-                return None;
-            }
-
-            let path = runtime_path.get_libraries().get_library_path({
-                if let Some(downloads) = library.downloads.as_ref() {
-                    if let Some(artifact) = downloads.artifact.as_ref() {
-                        artifact.path.clone()
-                    } else if let Some(classifiers) = downloads.classifiers.as_ref() {
-                        let Some(native_name) = library
-                            .natives
-                            .as_ref()
-                            .and_then(|natives| natives.get(&Os::native())) else {
-                                return None;
-                            };
-
-                        classifiers.get(native_name).unwrap().path.clone()
-                    } else {
-                        panic!("Library has no artifact or classifier");
-                    }
-                } else if library.url.is_some() {
-                    library.name.path()
-                } else {
-                    panic!("Library has no method of retrieval");
-                }
-            });
-
-            Some(path.display().to_string())
-        })
-        .collect::<Vec<String>>();
-
-    libraries.dedup();
+    let libraries = chain_lwjgl_libs_with_base_libs(
+        &version.libraries,
+        &lwjgl_group.libraries,
+        &java_component.arch,
+        &runtime_path.get_libraries(),
+        true,
+    );
 
     let libraries = libraries
         .into_iter()
@@ -404,7 +373,7 @@ pub async fn generate_startup_command(
                 Argument::Ruled { rules, value } => {
                     let is_allowed = rules
                         .iter()
-                        .all(|rule| is_rule_allowed(rule.clone(), &java_component.arch));
+                        .all(|rule| is_rule_allowed(rule, &java_component.arch));
 
                     match (is_allowed, value) {
                         (false, _) => {}
@@ -599,7 +568,7 @@ pub async fn extract_natives(
         .libraries
         .iter()
         .chain(lwjgl_group.libraries.iter())
-        .filter(|&lib| library_is_allowed(lib.clone(), java_arch))
+        .filter(|&lib| library_is_allowed(lib, java_arch))
     {
         match &library.natives {
             Some(natives) => {

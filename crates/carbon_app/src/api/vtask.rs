@@ -15,45 +15,45 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_TASKS[app, args: ()] {
             Ok(app.task_manager().get_tasks().await
                .into_iter()
-               .map(Task::from)
+               .map(FETask::from)
                .collect::<Vec<_>>())
         }
 
-        query GET_TASK[app, task: TaskId] {
+        query GET_TASK[app, task: FETaskId] {
             Ok(app.task_manager()
                .get_task(task.into())
                .await
-               .map(Task::from))
+               .map(FETask::from))
         }
 
-        mutation DISMISS_TASK[app, task: TaskId] {
+        mutation DISMISS_TASK[app, task: FETaskId] {
             app.task_manager().dismiss_task(task.into()).await
         }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-pub struct TaskId(pub i32);
+pub struct FETaskId(pub i32);
 
-impl From<domain::VisualTaskId> for TaskId {
+impl From<domain::VisualTaskId> for FETaskId {
     fn from(value: domain::VisualTaskId) -> Self {
         Self(value.0)
     }
 }
 
-impl From<TaskId> for domain::VisualTaskId {
-    fn from(value: TaskId) -> Self {
+impl From<FETaskId> for domain::VisualTaskId {
+    fn from(value: FETaskId) -> Self {
         Self(value.0)
     }
 }
 
 #[derive(Type, Serialize)]
-pub struct Task {
+pub struct FETask {
     name: Translation,
     progress: Progress,
     downloaded: u32,
     download_total: u32,
-    active_subtasks: Vec<Subtask>,
+    active_subtasks: Vec<FESubtask>,
 }
 
 #[derive(Type, Serialize)]
@@ -64,20 +64,20 @@ pub enum Progress {
 }
 
 #[derive(Type, Serialize)]
-pub struct Subtask {
+pub struct FESubtask {
     name: Translation,
-    progress: SubtaskProgress,
+    progress: FESubtaskProgress,
 }
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum SubtaskProgress {
+pub enum FESubtaskProgress {
     Download { downloaded: u32, total: u32 },
     Item { current: u32, total: u32 },
     Opaque,
 }
 
-impl From<domain::Task> for Task {
+impl From<domain::Task> for FETask {
     fn from(value: domain::Task) -> Self {
         Self {
             name: value.name.into(),
@@ -103,7 +103,7 @@ impl From<domain::Progress> for Progress {
     }
 }
 
-impl From<domain::Subtask> for Subtask {
+impl From<domain::Subtask> for FESubtask {
     fn from(value: domain::Subtask) -> Self {
         Self {
             name: value.name.into(),
@@ -112,7 +112,7 @@ impl From<domain::Subtask> for Subtask {
     }
 }
 
-impl From<domain::SubtaskProgress> for SubtaskProgress {
+impl From<domain::SubtaskProgress> for FESubtaskProgress {
     fn from(value: domain::SubtaskProgress) -> Self {
         match value {
             domain::SubtaskProgress::Download { downloaded, total } => {
