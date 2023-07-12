@@ -24,7 +24,7 @@ pub enum InstanceIcon {
 #[derive(Debug, Clone)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
-    Modrinth(ModrinthModpack)
+    Modrinth(ModrinthModpack),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

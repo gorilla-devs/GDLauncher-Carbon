@@ -44,7 +44,6 @@ pub struct CurseforgeModpack {
     pub file_id: u32,
 }
 
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModrinthModpack {
     pub project_id: String,

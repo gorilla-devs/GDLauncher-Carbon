@@ -323,7 +323,6 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-
         let t_download_file = task
             .subtask(Translation::InstanceTaskInstallModDownloadFile)
             .await;
@@ -402,7 +401,6 @@ impl ManagerRef<'_, InstanceManager> {
         });
 
         Ok(id)
-
     }
 }
 

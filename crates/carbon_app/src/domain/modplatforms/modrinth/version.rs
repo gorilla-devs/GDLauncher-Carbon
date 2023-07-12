@@ -24,7 +24,7 @@ pub struct ModpackIndex {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ModrinthGame {
-    Minecraft
+    Minecraft,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -63,26 +63,33 @@ pub struct ModrinthPackDependencies {
     pub quilt_loader: Option<String>,
 }
 
-
-
 impl TryFrom<ModrinthPackDependencies> for StandardVersion {
     type Error = anyhow::Error;
 
     fn try_from(value: ModrinthPackDependencies) -> Result<Self, Self::Error> {
-        let minecraft_version = value.minecraft.ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
+        let minecraft_version = value
+            .minecraft
+            .ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
         let mut modloaders = HashSet::new();
         if let Some(forge_version) = value.forge {
-            modloaders.insert(ModLoader{type_: ModLoaderType::Forge, version: format!("{}-{}", &minecraft_version, forge_version)});
+            modloaders.insert(ModLoader {
+                type_: ModLoaderType::Forge,
+                version: format!("{}-{}", &minecraft_version, forge_version),
+            });
         }
         if let Some(fabric_version) = value.fabric_loader {
-
-            modloaders.insert(ModLoader{type_: ModLoaderType::Fabric, version: format!("{}-{}", &minecraft_version, fabric_version)});
+            modloaders.insert(ModLoader {
+                type_: ModLoaderType::Fabric,
+                version: format!("{}-{}", &minecraft_version, fabric_version),
+            });
         }
         if let Some(quilt_version) = value.quilt_loader {
-
-            modloaders.insert(ModLoader{type_: ModLoaderType::Quilt, version: format!("{}-{}", &minecraft_version, quilt_version)});
+            modloaders.insert(ModLoader {
+                type_: ModLoaderType::Quilt,
+                version: format!("{}-{}", &minecraft_version, quilt_version),
+            });
         }
-        Ok(StandardVersion{
+        Ok(StandardVersion {
             release: minecraft_version,
             modloaders,
         })
