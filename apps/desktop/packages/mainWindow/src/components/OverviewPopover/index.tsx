@@ -1,39 +1,65 @@
+import {
+  ModRowProps,
+  getAuthors,
+  getCategories,
+  getDateModification,
+  getDownloads,
+  getLatestVersion,
+  getLogoUrl,
+  getName,
+  getSummary,
+  getWebsiteUrl,
+  isCurseForgeData,
+} from "@/utils/Mods";
 import { formatDownloadCount } from "@/utils/helpers";
-import { FEMod } from "@gd/core_module/bindings";
+import { FECategory } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Tag } from "@gd/ui";
 import { formatDistanceToNowStrict } from "date-fns";
 import { For, Show } from "solid-js";
 
-const OverviewPopover = (props: { data: FEMod }) => {
+const OverviewPopover = (props: { data: ModRowProps }) => {
   return (
     <div class="relative flex flex-col overflow-hidden w-70 pb-4">
-      <Show when={props.data.links.websiteUrl}>
+      <Show when={getWebsiteUrl(props.data)}>
         <div
           class="rounded-lg bg-darkSlate-900 cursor-pointer w-6 h-6"
-          onClick={() =>
-            window.openExternalLink(props.data.links.websiteUrl as string)
-          }
+          onClick={() => {
+            const url = getWebsiteUrl(props.data);
+            if (url) window.openExternalLink(url);
+          }}
         >
           <div class="w-4 h-4 text-lightSlate-100 absolute i-ri:external-link-line z-30 top-4 right-4" />
         </div>
       </Show>
       <h4 class="text-xl z-30 text-lightSlate-100 px-4 mb-2">
-        {props.data?.name}
+        {getName(props.data)}
       </h4>
       <div class="absolute top-0 bottom-0 right-0 left-0 z-20 bg-gradient-to-t from-darkSlate-900 from-70%" />
       <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 bg-gradient-to-l from-darkSlate-900 z-20" />
-      <img
-        class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"
-        src={props.data.logo.thumbnailUrl}
-      />
+      <Show when={getLogoUrl(props.data)}>
+        <img
+          class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"
+          src={getLogoUrl(props.data) as string}
+        />
+      </Show>
       <div class="px-4 z-30">
         <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis">
-          {props.data?.summary}
+          {getSummary(props.data)}
         </p>
         <div class="flex gap-2 scrollbar-hide mt-4">
-          <For each={props.data.categories}>
-            {(tag) => <Tag img={tag.iconUrl} type="fixed" size="small" />}
+          <For each={getCategories(props.data)}>
+            {(tag) => (
+              <Tag
+                img={
+                  isCurseForgeData(props.data.data)
+                    ? (tag as FECategory).iconUrl
+                    : null
+                }
+                type="fixed"
+                size="small"
+              />
+            )}
           </For>
         </div>
         <div class="flex flex-col gap-2 items-start mt-4">
@@ -45,11 +71,11 @@ const OverviewPopover = (props: { data: FEMod }) => {
               </p>
             </span>
             <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
-              <For each={props.data.authors}>
+              <For each={getAuthors(props.data)}>
                 {(author, i) => (
                   <>
                     <p class="m-0 text-sm">{author?.name}</p>
-                    <Show when={i() !== props.data.authors.length - 1}>
+                    <Show when={i() !== getAuthors(props.data).length - 1}>
                       <span class="text-lightSlate-100">{"•"}</span>
                     </Show>
                   </>
@@ -67,7 +93,7 @@ const OverviewPopover = (props: { data: FEMod }) => {
                 key="modpack.last_updated_time"
                 options={{
                   time: formatDistanceToNowStrict(
-                    new Date(props.data.dateModified).getTime()
+                    new Date(getDateModification(props.data)).getTime()
                   ),
                 }}
               />
@@ -79,7 +105,7 @@ const OverviewPopover = (props: { data: FEMod }) => {
               <Trans key="modpack.total_download" />
             </p>
             <div class="text-sm whitespace-nowrap">
-              {formatDownloadCount(props.data.downloadCount)}
+              {formatDownloadCount(getDownloads(props.data))}
             </div>
           </div>
           <div class="flex gap-2 items-center text-darkSlate-100">
@@ -88,7 +114,7 @@ const OverviewPopover = (props: { data: FEMod }) => {
               <Trans key="modpack.mcVersion" />
             </p>
             <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full text-sm">
-              {props.data.latestFilesIndexes[0].gameVersion}
+              {getLatestVersion(props.data)}
             </div>
           </div>
         </div>

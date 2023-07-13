@@ -1,9 +1,12 @@
-import { FEModSearchSortField } from "@gd/core_module/bindings";
+import {
+  FEModSearchSortField,
+  FEModrinthSearchIndex,
+} from "@gd/core_module/bindings";
 
 export const NEWS_URL =
   "https://www.minecraft.net/en-us/feeds/community-content/rss";
 
-export const SortFields: Array<FEModSearchSortField> = [
+export const CurseForgeSortFields: FEModSearchSortField[] = [
   "featured",
   "popularity",
   "lastUpdated",
@@ -12,4 +15,12 @@ export const SortFields: Array<FEModSearchSortField> = [
   "totalDownloads",
   "category",
   "gameVersion",
+];
+
+export const ModrinthSortFields: FEModrinthSearchIndex[] = [
+  "relevance",
+  "downloads",
+  "follows",
+  "newest",
+  "updated",
 ];

@@ -14,7 +14,7 @@ import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
-import { SortFields } from "@/utils/constants";
+import { CurseForgeSortFields } from "@/utils/constants";
 import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
@@ -109,7 +109,7 @@ export default function Browser() {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.query.index) {
+    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
       return;
     }
 
@@ -160,7 +160,7 @@ export default function Browser() {
             class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
-              infiniteQuery?.setQuery({ searchFilter: target.value });
+              infiniteQuery?.setQuery({ searchQuery: target.value });
             }}
           />
           <div class="flex items-center gap-3">
@@ -173,13 +173,19 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={SortFields.map((field) => ({
+              options={CurseForgeSortFields.map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}
               onChange={(val) => {
+                // infiniteQuery?.setQuery({
+                //   sortIndex: val.key as FEModSearchSortField,
+                // });
+
                 infiniteQuery?.setQuery({
-                  sortField: val.key as FEModSearchSortField,
+                  sortIndex: {
+                    curseForge: val.key as FEModSearchSortField,
+                  },
                 });
               }}
               value={0}
@@ -192,7 +198,9 @@ export default function Browser() {
                 rounded
                 value={mappedMcVersions()[0].key}
                 onChange={(val) => {
-                  infiniteQuery?.setQuery({ gameVersion: val.key as string });
+                  infiniteQuery?.setQuery({
+                    gameVersions: [val.key as string],
+                  });
                 }}
               />
             </Show>
@@ -218,14 +226,11 @@ export default function Browser() {
           <div
             class="cursor-pointer text-2xl"
             classList={{
-              "i-ri:sort-asc":
-                infiniteQuery?.query.query.sortOrder === "ascending",
-              "i-ri:sort-desc":
-                infiniteQuery?.query.query.sortOrder === "descending",
+              "i-ri:sort-asc": infiniteQuery?.query.sortOrder === "ascending",
+              "i-ri:sort-desc": infiniteQuery?.query.sortOrder === "descending",
             }}
             onClick={() => {
-              const isAsc =
-                infiniteQuery?.query.query.sortOrder === "ascending";
+              const isAsc = infiniteQuery?.query.sortOrder === "ascending";
               infiniteQuery?.setQuery({
                 sortOrder: isAsc ? "descending" : "ascending",
               });

@@ -4,8 +4,8 @@ import {
   LaunchState,
   ListInstanceStatus,
   Progress,
-  Subtask,
-  TaskId,
+  FESubtask,
+  FETaskId,
   UngroupedInstance,
   ValidListInstance,
 } from "@gd/core_module/bindings";
@@ -44,7 +44,10 @@ export const isListInstanceInvalid = (
 
 export const getLaunchState = (
   launchState: LaunchState
-): { Preparing: TaskId } | { Running: { start_time: string } } | undefined => {
+):
+  | { Preparing: FETaskId }
+  | { Running: { start_time: string } }
+  | undefined => {
   if (typeof launchState === "object" && "Preparing" in launchState) {
     return { Preparing: launchState.Preparing };
   } else if (typeof launchState === "object" && "Running" in launchState) {
@@ -118,11 +121,11 @@ export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
   }
 };
 
-export const isSubTaskDownload = (input: Subtask): input is Subtask => {
+export const isSubTaskDownload = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "download" in input;
 };
 
-export const isSubTaskItem = (input: Subtask): input is Subtask => {
+export const isSubTaskItem = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "item" in input;
 };
 
@@ -148,7 +151,7 @@ export const getRunningState = (status: ListInstanceStatus | LaunchState) => {
 
 export const isInstancePreparing = (
   launchState: LaunchState
-): launchState is { Preparing: TaskId } => {
+): launchState is { Preparing: FETaskId } => {
   return typeof launchState === "object" && "Preparing" in launchState;
 };
 

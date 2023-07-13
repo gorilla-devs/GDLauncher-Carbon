@@ -18,9 +18,10 @@ import {
   FEModLoaderType,
   FEModSearchParametersQuery,
   FEModSearchSortField,
+  FEQueryModLoaderType,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { SortFields } from "@/utils/constants";
+import { CurseForgeSortFields } from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 
@@ -125,11 +126,9 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (FEModLoaderType | "Any")[] = [
+  const modloaders: (FEQueryModLoaderType | "Any")[] = [
     "Any",
     "forge",
-    "cauldron",
-    "liteLoader",
     "fabric",
     "quilt",
   ];
@@ -232,7 +231,7 @@ const AddMod = (props: ModalProps) => {
                 />
               </p>
               <Dropdown
-                options={SortFields.map((field) => ({
+                options={CurseForgeSortFields.map((field) => ({
                   label: t(`instance.sort_by_${field}`),
                   key: field,
                 }))}
@@ -252,7 +251,7 @@ const AddMod = (props: ModalProps) => {
                 onChange={(val) => {
                   const mappedValue = val.key === "Any" ? null : val.key;
                   setQueryWrapper({
-                    modLoaderType: mappedValue as FEModLoaderType | null,
+                    modLoaderType: mappedValue as FEQueryModLoaderType | null,
                   });
                 }}
                 value={query.query.modLoaderType}

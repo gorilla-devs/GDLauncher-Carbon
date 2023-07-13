@@ -14,9 +14,8 @@ import {
   useContext,
 } from "solid-js";
 import {
-  FEMod,
-  FEModSearchParameters,
-  FEModSearchParametersQuery,
+  FEUnifiedSearchParameters,
+  FEUnifiedSearchResult,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
@@ -24,12 +23,12 @@ import { scrollTop } from "@/utils/browser";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
-  query: FEModSearchParameters;
-  setQuery: (_newValue: Partial<FEModSearchParametersQuery>) => void;
+  query: FEUnifiedSearchParameters;
+  setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
   resetList: () => void;
-  allRows: () => FEMod[];
+  allRows: () => FEUnifiedSearchResult[];
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
@@ -40,33 +39,30 @@ export const useInfiniteModpacksQuery = () => {
 
 function ModpacksLayout() {
   const [query, setQuery] = useModpacksQuery({
-    categoryId: null,
-    classId: "modpacks",
-    gameId: 432,
-    gameVersion: "",
-    modLoaderType: null,
-    sortField: "featured",
+    searchQuery: "",
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    projectType: "modPack",
+    sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
-    pageSize: 40,
-    slug: "",
-    searchFilter: "",
-    gameVersionTypeId: null,
-    authorId: null,
     index: 0,
+    pageSize: 40,
+    searchApi: "curseforge",
   });
 
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.curseforgeSearch"],
+    queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      setQuery({ index: ctx.pageParam + (query.query.pageSize || 20) + 1 });
-      return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
+      setQuery({ index: ctx.pageParam + (query.pageSize || 20) + 1 });
+      return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
-      const pageSize = query.query.pageSize || 20;
+      const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
     },
@@ -94,7 +90,7 @@ function ModpacksLayout() {
     parentRef()?.scrollTo(0, scrollTop());
   });
 
-  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
