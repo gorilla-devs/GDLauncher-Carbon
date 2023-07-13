@@ -328,45 +328,45 @@ const ModRow = (props: ModRowProps) => {
                             rounded
                             value={mappedVersions()[0]?.key}
                             onClick={() => {
-                              // if (props.type !== "Mod") return;
-                              // const fileVersion =
-                              //   props.data.latestFilesIndexes.find(
-                              //     (file) => file.gameVersion === props.mcVersion
-                              //   );
-                              // if (fileVersion && instanceId()) {
-                              //   installModMutation.mutate({
-                              //     mod_source: {
-                              //       Curseforge: {
-                              //         file_id: fileVersion?.fileId,
-                              //         project_id: props.data.id,
-                              //       },
-                              //     },
-                              //     instance_id: parseInt(
-                              //       instanceId() as string,
-                              //       10
-                              //     ),
-                              //   });
-                              // }
+                              if (props.type !== "Mod") return;
+                              const fileVersion =
+                                props.data.latestFilesIndexes.find(
+                                  (file) => file.gameVersion === props.mcVersion
+                                );
+                              if (fileVersion && instanceId()) {
+                                installModMutation.mutate({
+                                  mod_source: {
+                                    Curseforge: {
+                                      file_id: fileVersion?.fileId,
+                                      project_id: props.data.id,
+                                    },
+                                  },
+                                  instance_id: parseInt(
+                                    instanceId() as string,
+                                    10
+                                  ),
+                                });
+                              }
                             }}
                             onChange={(val) => {
-                              // const file = props.data.latestFiles.find(
-                              //   (file) =>
-                              //     file.id === parseInt(val.key as string, 10)
-                              // );
-                              // if (file && instanceId()) {
-                              //   installModMutation.mutate({
-                              //     mod_source: {
-                              //       Curseforge: {
-                              //         file_id: file.id,
-                              //         project_id: props.data.id,
-                              //       },
-                              //     },
-                              //     instance_id: parseInt(
-                              //       instanceId() as string,
-                              //       10
-                              //     ),
-                              //   });
-                              // }
+                              const file = props.data.latestFiles.find(
+                                (file) =>
+                                  file.id === parseInt(val.key as string, 10)
+                              );
+                              if (file && instanceId()) {
+                                installModMutation.mutate({
+                                  mod_source: {
+                                    Curseforge: {
+                                      file_id: file.id,
+                                      project_id: props.data.id,
+                                    },
+                                  },
+                                  instance_id: parseInt(
+                                    instanceId() as string,
+                                    10
+                                  ),
+                                });
+                              }
                             }}
                           >
                             <Show when={loading()}>
