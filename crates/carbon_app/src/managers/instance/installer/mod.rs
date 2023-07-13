@@ -12,7 +12,7 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{metadata, vtask::VisualTask, AppInner, instance::Mod},
+    managers::{instance::Mod, metadata, vtask::VisualTask, AppInner},
 };
 
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
