@@ -33,7 +33,7 @@ impl Modrinth {
 
     #[tracing::instrument(skip(self))]
     pub async fn get_categories(&self) -> anyhow::Result<CategoriesResponse> {
-        let url = self.base_url.join("/tag/category")?;
+        let url = self.base_url.join("tag/category")?;
 
         trace!("GET {}", url);
 
@@ -205,5 +205,20 @@ mod test {
 
         let results = modrinth.search(search_params).await.unwrap();
         assert!(!results.hits.is_empty());
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_fetch_categories() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+
+        let results = modrinth.get_categories().await.unwrap();
+        tracing::debug!("Categories: {:?}", results);
+        assert!(!results.is_empty());
     }
 }
