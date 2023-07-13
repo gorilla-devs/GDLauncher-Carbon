@@ -496,6 +496,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "hex",
+ "md-5",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
