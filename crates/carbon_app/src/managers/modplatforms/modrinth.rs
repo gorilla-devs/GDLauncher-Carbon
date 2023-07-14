@@ -177,10 +177,11 @@ impl Modrinth {
         Ok(resp)
     }
 
-
     #[tracing::instrument(skip(self))]
     pub async fn get_project_team(&self, project: ProjectID) -> anyhow::Result<TeamResponse> {
-        let url = self.base_url.join(&format!("project/{}/members", &*project))?;
+        let url = self
+            .base_url
+            .join(&format!("project/{}/members", &*project))?;
 
         trace!("GET {}", url);
 
@@ -298,7 +299,6 @@ mod test {
         Ok(())
     }
 
-
     #[tokio::test]
     #[traced_test]
     async fn test_get_project_team() -> anyhow::Result<()> {
@@ -316,7 +316,6 @@ mod test {
         Ok(())
     }
 
-
     #[tokio::test]
     #[traced_test]
     async fn test_get_team() -> anyhow::Result<()> {
@@ -326,9 +325,7 @@ mod test {
         let client = reqwest_middleware::ClientBuilder::new(client).build();
         let modrinth = Modrinth::new(client);
 
-        let results = modrinth
-            .get_team(TeamID("SfcwZ8an".to_string()))
-            .await?;
+        let results = modrinth.get_team(TeamID("SfcwZ8an".to_string())).await?;
         tracing::debug!("Team: {:?}", results);
         assert!(!results.is_empty());
         Ok(())

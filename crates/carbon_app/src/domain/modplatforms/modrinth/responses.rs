@@ -126,7 +126,6 @@ impl FromIterator<(String, Version)> for VersionHashesResponse {
     }
 }
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TeamResponse(pub Vec<TeamMember>);
 impl Deref for TeamResponse {

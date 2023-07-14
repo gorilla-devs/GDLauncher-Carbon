@@ -8,7 +8,9 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
-    responses::{CategoriesResponse, ProjectsResponse, VersionHashesResponse, VersionsResponse, TeamResponse},
+    responses::{
+        CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse, VersionsResponse,
+    },
     search::ProjectSearchResponse,
 };
 
@@ -244,7 +246,6 @@ impl TryFrom<FEModrinthVersionHashesResponse> for VersionHashesResponse {
             .collect::<Result<_, _>>()
     }
 }
-
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct FEModrinthTeamResponse(pub Vec<FEModrinthTeamMember>);

@@ -10,10 +10,11 @@ use crate::domain::modplatforms::modrinth::{
     },
     search::ProjectSearchResult,
     tag::Category,
+    user::{TeamMember, User, UserRole},
     version::{
         AdditionalFileType, Dependency, DependencyType, HashAlgorithm, Hashes,
         RequestedVersionStatus, Status, Version, VersionFile, VersionType,
-    }, user::{UserRole, User, TeamMember},
+    },
 };
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
@@ -965,7 +966,6 @@ pub struct FEModrinthTeamMember {
     pub team_id: String,
     pub user: FEModrinthUser,
     pub role: String,
-    /// The proportion of payouts they get is their split divided by the sum of the splits of all members.
     pub ordering: Option<u32>,
 }
 

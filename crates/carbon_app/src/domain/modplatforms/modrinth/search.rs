@@ -359,7 +359,6 @@ impl Deref for VersionID {
     }
 }
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TeamID(pub String);
 
