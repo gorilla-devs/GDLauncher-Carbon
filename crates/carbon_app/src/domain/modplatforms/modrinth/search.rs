@@ -2,7 +2,13 @@
 //! //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_result_model)
 
-use std::{fmt::Display, ops::Deref, str::FromStr};
+use std::{
+    convert::TryFrom,
+    fmt::Display,
+    iter::{FromIterator, IntoIterator},
+    ops::Deref,
+    str::FromStr,
+};
 
 use crate::domain::modplatforms::modrinth::{
     project::{ProjectSupportRange, ProjectType},
@@ -10,10 +16,12 @@ use crate::domain::modplatforms::modrinth::{
 };
 use anyhow::anyhow;
 use carbon_macro::into_query_parameters;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 use url::Url;
 
 use super::version::HashAlgorithm;
+
+use serde_json::{self, value::RawValue};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectSearchResult {
@@ -107,7 +115,7 @@ impl Display for SearchFacet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
             SearchFacet::Category(category) => format!("categories:{}", category),
-            SearchFacet::Version(version) => format!("version:{}", version),
+            SearchFacet::Version(version) => format!("versions:{}", version),
             SearchFacet::License(license) => format!("license:{}", license),
             SearchFacet::ProjectType(project_type) => format!("project_type:{}", project_type),
         };
@@ -133,6 +141,24 @@ impl<'de> Deserialize<'de> for SearchFacet {
             .parse()
             .map_err(serde::de::Error::custom)
     }
+}
+
+fn serialize_as_raw_json<S, T>(value: T, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    let json = serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
+    s.serialize_str(&json)
+}
+
+fn deserialize_from_raw_json<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: DeserializeOwned,
+{
+    let json = String::deserialize(d)?;
+    serde_json::from_str(&json).map_err(serde::de::Error::custom)
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -231,6 +257,10 @@ pub struct ProjectSearchParameters {
     /// let facets = Some(SearchFacetAnd(vec![SearchFacet::Category("forge".to_string()).into(), SearchFacet::Version("1.17.1".to_string()).into(),
     ///                   SearchFacet::ProjectType("mod".to_string()).into(), SearchFacetAnd::License("mit".to_string()).into()]));
     /// ```
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json"
+    )]
     pub facets: Option<SearchFacetAnd>,
     /// The sorting method to use for sorting search results.
     /// Default: `Relevance`
@@ -355,5 +385,35 @@ impl FromIterator<String> for ProjectIDs {
             c.push(i);
         }
         ProjectIDs { ids: c }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::domain::modplatforms::modrinth::search::SearchFacet;
+
+    use super::{ProjectSearchParameters, SearchFacetAnd};
+    use tracing_test::traced_test;
+
+    fn test_project_into_query() -> anyhow::Result<()> {
+        let facets = vec![
+            SearchFacet::Category("forge".to_string()),
+            SearchFacet::Version("1.17.1".to_string()),
+        ];
+        let project = ProjectSearchParameters {
+            query: Some("jei".to_string()),
+            facets: Some(facets.into_iter().map(Into::into).collect()),
+            index: None,
+            offset: None,
+            limit: None,
+            filters: None,
+        };
+        tracing::debug!("Search params are: {:?}", &project);
+        println!("search is: {:?}", &project);
+
+        let query = project.into_query_parameters()?;
+        println!("Query is: {}", query);
+        assert!(!query.is_empty());
+        Ok(())
     }
 }

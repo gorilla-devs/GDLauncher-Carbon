@@ -163,6 +163,8 @@ impl Modrinth {
 mod test {
     use tracing_test::traced_test;
 
+    use crate::domain::modplatforms::modrinth::search::SearchFacet;
+
     #[tokio::test]
     #[traced_test]
     async fn test_search_no_query() {
@@ -187,24 +189,39 @@ mod test {
 
     #[tokio::test]
     #[traced_test]
-    async fn test_search_with_query() {
+    async fn test_search_with_query() -> anyhow::Result<()> {
         use super::*;
 
         let client = reqwest::Client::builder().build().unwrap();
         let client = reqwest_middleware::ClientBuilder::new(client).build();
         let modrinth = Modrinth::new(client);
 
+        let facets = vec![
+            SearchFacet::Category("forge".to_string()),
+            SearchFacet::Version("1.17.1".to_string()),
+        ];
+
         let search_params = ProjectSearchParameters {
             query: Some("jei".to_string()),
-            facets: None,
+            facets: Some(facets.into_iter().map(Into::into).collect()),
             index: None,
             offset: None,
             limit: None,
             filters: None,
         };
 
-        let results = modrinth.search(search_params).await.unwrap();
+        let facets_json = serde_json::to_string(&search_params.facets)?;
+        tracing::info!("Search Facet's string: {:?}", facets_json);
+
+        tracing::info!("Modrinth Search perams are: {:?}", search_params);
+
+        let query = search_params.into_query_parameters()?;
+        tracing::info!("URL query is: {:?}", query);
+
+        let results = modrinth.search(search_params).await?;
+        tracing::info!("Modringth Search results are: {:?}", results);
         assert!(!results.hits.is_empty());
+        Ok(())
     }
 
     #[tokio::test]
@@ -215,7 +232,6 @@ mod test {
         let client = reqwest::Client::builder().build().unwrap();
         let client = reqwest_middleware::ClientBuilder::new(client).build();
         let modrinth = Modrinth::new(client);
-
 
         let results = modrinth.get_categories().await.unwrap();
         tracing::debug!("Categories: {:?}", results);
