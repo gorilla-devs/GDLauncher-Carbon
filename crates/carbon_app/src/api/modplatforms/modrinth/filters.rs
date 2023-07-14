@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::search::{
     ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
-    SearchIndex, VersionID, VersionIDs,
+    SearchIndex, VersionID, VersionIDs, TeamID,
 };
 use anyhow::anyhow;
 
@@ -316,6 +316,29 @@ impl From<ProjectID> for FEModrinthProjectID {
 impl From<FEModrinthProjectID> for ProjectID {
     fn from(value: FEModrinthProjectID) -> Self {
         ProjectID(value.0)
+    }
+}
+
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthTeamID(pub String);
+
+impl Deref for FEModrinthTeamID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<TeamID> for FEModrinthTeamID {
+    fn from(value: TeamID) -> Self {
+        FEModrinthTeamID(value.0)
+    }
+}
+
+impl From<FEModrinthTeamID> for TeamID {
+    fn from(value: FEModrinthTeamID) -> Self {
+        TeamID(value.0)
     }
 }
 

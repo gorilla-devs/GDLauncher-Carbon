@@ -19,7 +19,7 @@ pub struct User {
     pub id: String,
     /// The user's GitHub ID
     pub github_id: Option<u32>,
-    pub avatar_url: Url,
+    pub avatar_url: String,
     pub created: UtcDateTime,
     pub role: UserRole,
     /// Any badges applicable to this user.

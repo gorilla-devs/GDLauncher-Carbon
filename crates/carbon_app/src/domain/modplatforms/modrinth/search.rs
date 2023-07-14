@@ -359,6 +359,17 @@ impl Deref for VersionID {
     }
 }
 
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TeamID(pub String);
+
+impl Deref for TeamID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectIDs {

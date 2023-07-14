@@ -7,10 +7,10 @@ use url::Url;
 
 use crate::domain::modplatforms::modrinth::{
     project::Project,
-    responses::{CategoriesResponse, ProjectsResponse, VersionsResponse},
+    responses::{CategoriesResponse, ProjectsResponse, TeamResponse, VersionsResponse},
     search::{
-        ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, VersionHashesQuery,
-        VersionID, VersionIDs,
+        ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
+        VersionHashesQuery, VersionID, VersionIDs,
     },
     version::Version,
 };
@@ -157,13 +157,55 @@ impl Modrinth {
             .await?;
         Ok(resp)
     }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_team(&self, team: TeamID) -> anyhow::Result<TeamResponse> {
+        let url = self.base_url.join(&format!("team/{}/members", &*team))?;
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json::<TeamResponse>()
+            .await?
+            .into_iter()
+            .filter(|member| member.accepted)
+            .collect::<TeamResponse>();
+        Ok(resp)
+    }
+
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_project_team(&self, project: ProjectID) -> anyhow::Result<TeamResponse> {
+        let url = self.base_url.join(&format!("project/{}/members", &*project))?;
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json::<TeamResponse>()
+            .await?
+            .into_iter()
+            .filter(|member| member.accepted)
+            .collect::<TeamResponse>();
+        Ok(resp)
+    }
 }
 
 #[cfg(test)]
 mod test {
     use tracing_test::traced_test;
 
-    use crate::domain::modplatforms::modrinth::{search::{SearchFacet, SearchIndex}, version::HashAlgorithm};
+    use crate::domain::modplatforms::modrinth::{
+        search::{SearchFacet, SearchIndex},
+        version::HashAlgorithm,
+    };
 
     #[tokio::test]
     #[traced_test]
@@ -253,6 +295,42 @@ mod test {
         tracing::debug!("Project: {:?}", result);
         assert!(result.id == "u6dRKJwZ");
         assert!(result.title == "Just Enough Items");
+        Ok(())
+    }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_project_team() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth
+            .get_project_team(ProjectID("u6dRKJwZ".to_string()))
+            .await?;
+        tracing::debug!("Project Team: {:?}", results);
+        assert!(!results.is_empty());
+        Ok(())
+    }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_team() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth
+            .get_team(TeamID("SfcwZ8an".to_string()))
+            .await?;
+        tracing::debug!("Team: {:?}", results);
+        assert!(!results.is_empty());
         Ok(())
     }
 

@@ -8,13 +8,15 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
-    responses::{CategoriesResponse, ProjectsResponse, VersionHashesResponse, VersionsResponse},
+    responses::{CategoriesResponse, ProjectsResponse, VersionHashesResponse, VersionsResponse, TeamResponse},
     search::ProjectSearchResponse,
 };
 
 use crate::api::modplatforms::modrinth::structs::{
     FEModrinthCategory, FEModrinthProject, FEModrinthProjectSearchResult, FEModrinthVersion,
 };
+
+use super::structs::FEModrinthTeamMember;
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct FEModrinthProjectSearchResponse {
@@ -240,5 +242,41 @@ impl TryFrom<FEModrinthVersionHashesResponse> for VersionHashesResponse {
                 Err(err) => Err(err),
             })
             .collect::<Result<_, _>>()
+    }
+}
+
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthTeamResponse(pub Vec<FEModrinthTeamMember>);
+impl Deref for FEModrinthTeamResponse {
+    type Target = Vec<FEModrinthTeamMember>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for FEModrinthTeamResponse {
+    type Item = FEModrinthTeamMember;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<FEModrinthTeamMember> for FEModrinthTeamResponse {
+    fn from_iter<I: IntoIterator<Item = FEModrinthTeamMember>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        FEModrinthTeamResponse(c)
+    }
+}
+
+impl From<TeamResponse> for FEModrinthTeamResponse {
+    fn from(value: TeamResponse) -> Self {
+        value.into_iter().map(Into::into).collect()
     }
 }
