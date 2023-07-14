@@ -7,18 +7,18 @@ use sysinfo::SystemExt;
 use crate::domain::{
     java::JavaArch,
     maven::MavenCoordinates,
-    runtime_path::{AssetsPath, RuntimePath},
+    runtime_path::{AssetsPath, LibrariesPath, RuntimePath},
 };
 
 pub fn libraries_into_vec_downloadable(
-    libraries: Vec<Library>,
+    libraries: &[Library],
     base_path: &std::path::Path,
     java_arch: &JavaArch,
 ) -> Vec<carbon_net::Downloadable> {
     let mut files = vec![];
 
     for library in libraries {
-        if !library_is_allowed(library.clone(), java_arch) {
+        if !library_is_allowed(library, java_arch) {
             continue;
         }
 
@@ -59,7 +59,7 @@ pub fn libraries_into_vec_downloadable(
 }
 
 // Use java arch instead of system arch
-pub fn is_rule_allowed(rule: Rule, java_arch: &JavaArch) -> bool {
+pub fn is_rule_allowed(rule: &Rule, java_arch: &JavaArch) -> bool {
     let res = match rule {
         Rule {
             os: Some(ref os), ..
@@ -119,7 +119,7 @@ pub fn library_into_lib_downloadable(
     } else if let Some(base_url) = &library.url {
         return Some(carbon_net::Downloadable {
             url: format!("{}{}", base_url, library.name.path()),
-            path: PathBuf::from(base_path.join(library.name.path())),
+            path: base_path.join(library.name.path()),
             checksum: None,
             size: None,
         });
@@ -170,6 +170,59 @@ pub fn version_download_into_downloadable(
         .with_size(version_download.size as u64)
 }
 
+pub fn chain_lwjgl_libs_with_base_libs(
+    lwjgl_libs: &[Library],
+    all_libs: &[Library],
+    java_component_arch: &JavaArch,
+    libraries_path: &LibrariesPath,
+    only_classpath_visible: bool,
+) -> Vec<String> {
+    let mut libraries = all_libs
+        .iter()
+        .chain(lwjgl_libs.iter())
+        .filter_map(|library| {
+            if !library_is_allowed(library, java_component_arch)
+                || (only_classpath_visible && !library.include_in_classpath)
+            {
+                return None;
+            }
+
+            let path = libraries_path.get_library_path({
+                if let Some(downloads) = library.downloads.as_ref() {
+                    if let Some(artifact) = downloads.artifact.as_ref() {
+                        artifact.path.clone()
+                    } else if let Some(classifiers) = downloads.classifiers.as_ref() {
+                        let Some(native_name) = library
+                        .natives
+                        .as_ref()
+                        .and_then(|natives| natives.get(&Os::native())) else {
+                            return None;
+                        };
+
+                        classifiers.get(native_name).unwrap().path.clone()
+                    } else {
+                        panic!("Library has no artifact or classifier");
+                    }
+                } else if library.url.is_some() {
+                    let Ok(maven) = MavenCoordinates::try_from(library.name.to_string(), None) else {
+                        return None;
+                    };
+
+                    maven.into_path().to_string_lossy().to_string()
+                } else {
+                    panic!("Library has no method of retrieval");
+                }
+            });
+
+            Some(path.display().to_string())
+        })
+        .collect::<Vec<String>>();
+
+    libraries.dedup();
+
+    libraries
+}
+
 pub fn assets_index_into_vec_downloadable(
     assets_index: AssetsIndex,
     assets_path: &AssetsPath,
@@ -213,8 +266,8 @@ pub fn assets_index_into_vec_downloadable(
     files
 }
 
-pub fn library_is_allowed(library: Library, java_arch: &JavaArch) -> bool {
-    let Some(rules) = library.rules else {
+pub fn library_is_allowed(library: &Library, java_arch: &JavaArch) -> bool {
+    let Some(rules) = library.rules.as_ref() else {
         return true;
     };
 
@@ -303,6 +356,7 @@ pub fn get_default_jvm_args() -> Vec<Argument> {
                 "-Dos.version=10.0".to_string(),
             ]),
         },
+        Argument::Normal("-Dfml.ignoreInvalidMinecraftCertificates=true".to_string()),
         Argument::Normal("-Djava.library.path=${natives_directory}".to_string()),
         Argument::Normal("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
         Argument::Normal("-Dminecraft.launcher.version=${launcher_version}".to_string()),

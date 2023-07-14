@@ -193,12 +193,12 @@ impl std::ops::Deref for TestEnv {
     }
 }
 
-#[cfg(test)]
-impl Drop for TestEnv {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.tmpdir);
-    }
-}
+// #[cfg(test)]
+// impl Drop for TestEnv {
+//     fn drop(&mut self) {
+//         let _ = std::fs::remove_dir_all(&self.tmpdir);
+//     }
+// }
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {

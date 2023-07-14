@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -18,6 +18,7 @@ use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
 use tokio::sync::Semaphore;
+use tokio::task::JoinHandle;
 
 use anyhow::{anyhow, bail};
 
@@ -33,6 +34,7 @@ use crate::{
 
 use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
+#[derive(Debug)]
 pub struct PersistenceManager {
     ensure_lock: Semaphore,
 }
@@ -50,7 +52,7 @@ impl ManagerRef<'_, InstanceManager> {
         self,
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -144,7 +146,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let app = self.app.clone();
         let instance_shortpath = instance.shortpath.clone();
-        tokio::spawn(async move {
+        let installation_task = tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
             let _lock = instance_manager
@@ -779,7 +781,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         });
 
-        Ok(())
+        Ok((installation_task, id))
     }
 
     async fn change_launch_state(

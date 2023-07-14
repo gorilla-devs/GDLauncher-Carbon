@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
 mod account;
-mod instance;
+pub mod instance;
 mod java;
 pub mod keys;
 mod mc;

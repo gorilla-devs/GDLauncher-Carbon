@@ -12,11 +12,11 @@ export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
 
 type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
 interface ITabsContext {
-  gap?: number;
-  paddingX?: string;
-  paddingY?: string;
-  variant: string;
-  orientation: string;
+  gap?: () => number | undefined;
+  paddingX?: () => string | undefined;
+  paddingY?: () => string | undefined;
+  variant: () => string;
+  orientation: () => string;
   clearTabs: () => void;
   setSelectedIndex: (_: number) => void;
   registerTab: (_obj: TabType, _index?: number) => number;
@@ -129,16 +129,11 @@ function Tabs(props: Props) {
     getRegisteredTabs,
     registerTabSpacing,
     registerTabPanel,
-    // eslint-disable-next-line solid/reactivity
-    gap: gap(),
-    // eslint-disable-next-line solid/reactivity
-    variant: variant(),
-    // eslint-disable-next-line solid/reactivity
-    orientation: orientation(),
-    // eslint-disable-next-line solid/reactivity
-    paddingX: paddingX(),
-    // eslint-disable-next-line solid/reactivity
-    paddingY: paddingY(),
+    gap,
+    variant,
+    orientation,
+    paddingX,
+    paddingY,
   };
 
   return (

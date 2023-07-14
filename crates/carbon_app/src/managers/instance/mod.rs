@@ -31,12 +31,15 @@ use super::ManagerRef;
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
+pub mod importer;
 pub mod log;
 mod mods;
 mod run;
 mod schema;
 
+#[derive(Debug)]
 pub struct InstanceManager {
+    pub importer: Mutex<importer::Importer>,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
@@ -46,9 +49,16 @@ pub struct InstanceManager {
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
+impl Default for InstanceManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InstanceManager {
     pub fn new() -> Self {
         Self {
+            importer: Mutex::new(importer::Importer::default()),
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),

@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = require("path");
+
 let arch = process.argv[4].replace(/-/g, "");
 let os = process.argv[5].replace(/-/g, "");
 let profile = process.argv[7].replace(/-/g, "");
@@ -5,13 +8,25 @@ let profile = process.argv[7].replace(/-/g, "");
 let carbonAppBinName = os === "win" ? "carbon_app.exe" : "carbon_app";
 let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
 let targetTripleLookup = {
-  "win-x64": "x86_64-pc-windows-msvc",
-  "linux-x64": "x86_64-unknown-linux-gnu",
-  "mac-x64": "x86_64-apple-darwin",
-  "mac-arm64": "aarch64-apple-darwin",
+  "win-x64": ["x86_64-pc-windows-msvc"],
+  "linux-x64": ["x86_64-unknown-linux-gnu"],
+  "mac-universal": ["x86_64-apple-darwin", "aarch64-apple-darwin"],
 };
 
-let targetTriple = targetTripleLookup[`${os}-${arch}`];
+let files = targetTripleLookup[`${os}-${arch}`].map((targetTriple) => {
+  return {
+    from: `../../target/${targetTriple}/${profile}/${carbonAppBinName}`,
+    to: `./binaries/${
+      targetTriple.includes("aarch") ? "arm64" : "x64"
+    }/${coreModuleBinName}`,
+  };
+});
+
+for (file of files) {
+  let dirname = path.dirname(file.to);
+  fs.mkdirSync(dirname, { recursive: true });
+  fs.copyFileSync(file.from, file.to);
+}
 
 let appChannel = require("../../packages/config/version.json").channel;
 let publish =
@@ -35,8 +50,8 @@ module.exports = {
   files: ["dist", "package.json"],
   extraResources: [
     {
-      from: `../../target/${targetTriple}/${profile}/${carbonAppBinName}`,
-      to: coreModuleBinName,
+      from: "binaries/${arch}",
+      to: `.`,
     },
   ],
   npmRebuild: false,
@@ -62,7 +77,7 @@ module.exports = {
     target: ["dir", "zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
-    entitlementsInherit: "./entitlements.mac.plist",
+    extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
     target: ["dir", "zip"],

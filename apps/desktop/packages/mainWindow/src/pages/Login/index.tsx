@@ -1,5 +1,5 @@
-import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match, Show } from "solid-js";
+import { Dropdown, createNotification } from "@gd/ui";
+import { createSignal, Switch, Match, Show, createEffect } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
@@ -8,6 +8,8 @@ import { supportedLanguages, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+import { handleStatus } from "@/utils/login";
+import { parseError } from "@/utils/helpers";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -33,9 +35,47 @@ export default function Login() {
     },
   });
 
+  const accountEnrollFinalizeMutation = rspc.createMutation([
+    "account.enroll.finalize",
+  ]);
+
   const nextStep = () => {
-    setStep((prev) => prev + 1);
+    if (step() < 2) {
+      setStep((prev) => prev + 1);
+    }
   };
+
+  const prevStep = () => {
+    if (step() >= 0) {
+      setStep((prev) => prev - 1);
+    }
+  };
+
+  const addNotification = createNotification();
+
+  createEffect(() => {
+    handleStatus(routeData.status, {
+      onPolling: (info) => {
+        setDeviceCodeObject({
+          userCode: info.userCode,
+          link: info.verificationUri,
+          expiresAt: info.expiresAt,
+        });
+        if (routeData.status.data) setStep(2);
+      },
+      onError(error) {
+        if (error) addNotification(parseError(error), "error");
+        setStep(1);
+      },
+      onComplete() {
+        accountEnrollFinalizeMutation.mutate(undefined);
+      },
+    });
+  });
+
+  createEffect(() => {
+    if (routeData.settings.data?.isLegalAccepted) setStep(1);
+  });
 
   return (
     <Switch>
@@ -99,18 +139,13 @@ export default function Login() {
               <Match when={step() === 0}>
                 <TermsAndConditions nextStep={nextStep} />
               </Match>
-              {/* <Match when={step() === 1}>
-                <TrackingSettings prevStep={prevStep} nextStep={nextStep} />
-              </Match> */}
               <Match when={step() === 1}>
-                <Auth
-                  nextStep={nextStep}
-                  setDeviceCodeObject={setDeviceCodeObject}
-                />
+                <Auth />
               </Match>
               <Match when={step() === 2}>
                 <CodeStep
                   nextStep={nextStep}
+                  prevStep={prevStep}
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />

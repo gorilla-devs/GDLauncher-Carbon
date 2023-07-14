@@ -51,8 +51,13 @@ mod app {
     use crate::cache_middleware;
 
     use super::{
-        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
-        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+        instance::importer::{legacy_gdlauncher::LegacyGDLauncherImporter, InstanceImporter},
+        java::JavaManager,
+        metadata::cache::MetaCacheManager,
+        metrics::MetricsManager,
+        modplatforms::ModplatformsManager,
+        system_info::SystemInfoManager,
+        *,
     };
 
     pub struct AppInner {
@@ -165,7 +170,9 @@ mod app {
                 .invalidation_channel
                 .send(InvalidationEvent::new(key.full, args))
             {
-                Ok(_) => (),
+                Ok(_) => {
+                    tracing::debug!("invalidated {}", key.full);
+                }
                 Err(e) => {
                     error!("Error sending invalidation request: {e}");
                 }

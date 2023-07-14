@@ -1,9 +1,9 @@
-import { lastInstanceOpened } from "@/utils/routes";
+import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
 import { getModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
-import { useParams } from "@solidjs/router";
+import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction } from "solid-js/store";
 import { For } from "solid-js";
 
@@ -22,6 +22,10 @@ const Mod = (props: Props) => {
   const disableModMutation = rspc.createMutation(["instance.disableMod"]);
   const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const params = useParams();
+
+  const location = useLocation();
+
+  const instanceId = () => getInstanceIdFromPath(location.pathname);
 
   return (
     <div class="w-full h-14 flex items-center py-2 box-border">
@@ -63,7 +67,7 @@ const Mod = (props: Props) => {
         <span class="flex gap-4 justify-center items-center">
           {/* //TODO: ADD CONFIRMATION MODAL */}
           <div
-            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color i-ri:delete-bin-2-fill hover:text-red-500"
+            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-red-500 i-ri:delete-bin-2-fill"
             onClick={() => {
               deleteModMutation.mutate({
                 instance_id: parseInt(params.id, 10),
@@ -74,14 +78,15 @@ const Mod = (props: Props) => {
           <Switch
             checked={props.mod.enabled}
             onChange={(e) => {
+              if (instanceId() === undefined) return;
               if (e.target.checked) {
                 enableModMutation.mutate({
-                  instance_id: parseInt(lastInstanceOpened(), 10),
+                  instance_id: parseInt(instanceId() as string, 10),
                   mod_id: props.mod.id,
                 });
               } else {
                 disableModMutation.mutate({
-                  instance_id: parseInt(lastInstanceOpened(), 10),
+                  instance_id: parseInt(instanceId() as string, 10),
                   mod_id: props.mod.id,
                 });
               }
