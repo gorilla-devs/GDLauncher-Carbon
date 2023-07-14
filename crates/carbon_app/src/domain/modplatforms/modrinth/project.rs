@@ -22,22 +22,17 @@ pub struct Project {
     /// A list of categories which are searchable but non-primary
     pub additional_categories: Vec<String>,
     /// A link to submit bugs or issues with the project
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub issues_url: Option<Url>,
+    pub issues_url: Option<String>,
     /// A link to the project's source code
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub source_url: Option<Url>,
+    pub source_url: Option<String>,
     /// A link to the project's wiki page or other relevant information
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub wiki_url: Option<Url>,
+    pub wiki_url: Option<String>,
     /// The project's Discord server invite
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub discord_url: Option<Url>,
+    pub discord_url: Option<String>,
     pub donation_urls: Vec<DonationLink>,
     pub project_type: ProjectType,
     pub downloads: u32,
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub icon_url: Option<Url>,
+    pub icon_url: Option<String>,
     /// The RGB color of the project, automatically generated from the project icon
     pub color: Option<u32>,
     pub id: String,
@@ -45,8 +40,7 @@ pub struct Project {
     pub team: String,
     /// A link to the long description of the project (only present for old projects)
     #[deprecated = "Read from `body` instead"]
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub body_url: Option<Url>,
+    pub body_url: Option<String>,
     pub moderator_message: Option<ModeratorMessage>,
     pub published: UtcDateTime,
     pub updated: UtcDateTime,
@@ -80,8 +74,7 @@ pub struct License {
     /// The license's long name
     pub name: String,
     /// The URL to this license
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub url: Option<Url>,
+    pub url: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -90,13 +83,13 @@ pub struct DonationLink {
     pub id: String,
     pub platform: String,
     /// A link to the donation platform and user
-    pub url: Url,
+    pub url: String,
 }
 
 /// An image that have been uploaded to a project's gallery
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GalleryItem {
-    pub url: Url,
+    pub url: String,
     pub featured: bool,
     pub title: Option<String>,
     pub description: Option<String>,
