@@ -59,13 +59,18 @@ pub trait ResourceInstaller: Sync {
     ) -> anyhow::Result<()>;
 }
 
+pub struct InstallResult {
+    task: VisualTaskId,
+    dependency_tasks: Vec<VisualTaskId>,
+}
+
 #[async_trait::async_trait]
 pub trait InstallResource: Sync {
     async fn install(
         &self,
         app: Arc<AppInner>,
         instance_id: &InstanceId,
-    ) -> anyhow::Result<(VisualTaskId, Vec<anyhow::Result<VisualTaskId>>)>;
+    ) -> anyhow::Result<InstallResult>;
 }
 
 // #[async_trait::async_trait]
@@ -88,7 +93,7 @@ where
         &self,
         app: Arc<AppInner>,
         instance_id: &InstanceId,
-    ) -> anyhow::Result<(VisualTaskId, Vec<anyhow::Result<VisualTaskId>>)> {
+    ) -> anyhow::Result<InstallResult> {
         let (task, task_id, shortpath) = {
             let instance_manager = app.instance_manager();
             let mut instances = instance_manager.instances.write().await;
@@ -126,7 +131,9 @@ where
         for dep in dep_iter {
             match dep {
                 Err(err) => {
-                    dep_results.push(Err(err));
+                    unimplemented!();
+                    self.rollback();
+                    // dep_results.push(Err(err));
                 }
                 Ok(dep) => {
                     let app_clone = Arc::clone(&app);
@@ -134,11 +141,12 @@ where
                     let results = install_future.await;
                     match results {
                         Err(err) => {
-                            dep_results.push(Err(err));
+                            unimplemented!();
+                            // self.rollback;
                         }
-                        Ok((dep_task, mut deps_dep_results)) => {
-                            dep_results.push(Ok(dep_task));
-                            dep_results.append(&mut deps_dep_results);
+                        Ok(mut results) => {
+                            dep_results.push(results.task);
+                            dep_results.append(&mut results.dependency_tasks);
                         }
                     }
                 }
