@@ -142,7 +142,7 @@ impl From<ProjectSearchResult> for FEModrinthProjectSearchResult {
             server_side: value.server_side.into(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
-            icon_url: value.icon_url.map(Into::into),
+            icon_url: value.icon_url,
             color: value.color,
             project_id: value.project_id,
             author: value.author,
@@ -171,10 +171,7 @@ impl TryFrom<FEModrinthProjectSearchResult> for ProjectSearchResult {
             server_side: value.server_side.into(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
-            icon_url: value
-                .icon_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
+            icon_url: value.icon_url,
             color: value.color,
             project_id: value.project_id,
             author: value.author,
@@ -324,7 +321,7 @@ impl From<VersionFile> for FEModrinthVersionFile {
     fn from(value: VersionFile) -> Self {
         FEModrinthVersionFile {
             hashes: value.hashes.into(),
-            url: value.url.into(),
+            url: value.url,
             filename: value.filename,
             primary: value.primary,
             size: value.size,
@@ -333,18 +330,16 @@ impl From<VersionFile> for FEModrinthVersionFile {
     }
 }
 
-impl TryFrom<FEModrinthVersionFile> for VersionFile {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEModrinthVersionFile) -> Result<Self, Self::Error> {
-        Ok(VersionFile {
+impl From<FEModrinthVersionFile> for VersionFile {
+    fn from(value: FEModrinthVersionFile) -> Self {
+        VersionFile {
             hashes: value.hashes.into(),
-            url: value.url.parse()?,
+            url: value.url,
             filename: value.filename,
             primary: value.primary,
             size: value.size,
             file_type: value.file_type.map(Into::into),
-        })
+        }
     }
 }
 
@@ -655,14 +650,14 @@ impl From<Project> for FEModrinthProject {
             server_side: value.server_side.into(),
             body: value.body,
             additional_categories: value.additional_categories,
-            issues_url: value.issues_url.map(Into::into),
-            source_url: value.source_url.map(Into::into),
-            wiki_url: value.wiki_url.map(Into::into),
-            discord_url: value.discord_url.map(Into::into),
+            issues_url: value.issues_url,
+            source_url: value.source_url,
+            wiki_url: value.wiki_url,
+            discord_url: value.discord_url,
             donation_urls: value.donation_urls.into_iter().map(Into::into).collect(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
-            icon_url: value.icon_url.map(Into::into),
+            icon_url: value.icon_url,
             color: value.color,
             id: value.id,
             team: value.team,
@@ -694,33 +689,14 @@ impl TryFrom<FEModrinthProject> for Project {
             server_side: value.server_side.into(),
             body: value.body,
             additional_categories: value.additional_categories,
-            issues_url: value
-                .issues_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
-            source_url: value
-                .source_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
-            wiki_url: value
-                .wiki_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
-            discord_url: value
-                .discord_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
-            donation_urls: value
-                .donation_urls
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
+            issues_url: value.issues_url,
+            source_url: value.source_url,
+            wiki_url: value.wiki_url,
+            discord_url: value.discord_url,
+            donation_urls: value.donation_urls.into_iter().map(Into::into).collect(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
-            icon_url: value
-                .icon_url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
+            icon_url: value.icon_url,
             color: value.color,
             id: value.id,
             team: value.team,
@@ -787,22 +763,18 @@ impl From<License> for FEModrinthLicense {
         FEModrinthLicense {
             id: value.id,
             name: value.name,
-            url: value.url.map(Into::into),
+            url: value.url,
         }
     }
 }
 
-impl TryFrom<FEModrinthLicense> for License {
-    type Error = anyhow::Error;
-    fn try_from(value: FEModrinthLicense) -> Result<Self, Self::Error> {
-        Ok(License {
+impl From<FEModrinthLicense> for License {
+    fn from(value: FEModrinthLicense) -> Self {
+        License {
             id: value.id,
             name: value.name,
-            url: value
-                .url
-                .map(|url| url.parse())
-                .map_or(Ok(None), |url| url.map(Some))?,
-        })
+            url: value.url,
+        }
     }
 }
 
@@ -820,19 +792,18 @@ impl From<DonationLink> for FEModrinthDonationLink {
         FEModrinthDonationLink {
             id: value.id,
             platform: value.platform,
-            url: value.url.to_string(),
+            url: value.url,
         }
     }
 }
 
-impl TryFrom<FEModrinthDonationLink> for DonationLink {
-    type Error = anyhow::Error;
-    fn try_from(value: FEModrinthDonationLink) -> Result<Self, Self::Error> {
-        Ok(DonationLink {
+impl From<FEModrinthDonationLink> for DonationLink {
+    fn from(value: FEModrinthDonationLink) -> Self {
+        DonationLink {
             id: value.id,
             platform: value.platform,
-            url: value.url.parse()?,
-        })
+            url: value.url,
+        }
     }
 }
 
@@ -852,7 +823,7 @@ pub struct FEModrinthGalleryItem {
 impl From<GalleryItem> for FEModrinthGalleryItem {
     fn from(value: GalleryItem) -> Self {
         FEModrinthGalleryItem {
-            url: value.url.to_string(),
+            url: value.url,
             featured: value.featured,
             title: value.title,
             description: value.description,
@@ -866,7 +837,7 @@ impl TryFrom<FEModrinthGalleryItem> for GalleryItem {
     type Error = anyhow::Error;
     fn try_from(value: FEModrinthGalleryItem) -> Result<Self, Self::Error> {
         Ok(GalleryItem {
-            url: value.url.parse()?,
+            url: value.url,
             featured: value.featured,
             title: value.title,
             description: value.description,

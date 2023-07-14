@@ -35,7 +35,7 @@ pub struct ModrinthFile {
     pub hashes: Hashes,
     pub env: Option<ModrinthFileEnvironment>,
     /// list of valid https URLs to the file. Each url is a full path. Functions as a mirror list.
-    pub downloads: Vec<Url>,
+    pub downloads: Vec<String>,
     pub file_size: u32,
 }
 
@@ -120,8 +120,7 @@ pub struct Version {
     pub downloads: u32,
     /// A link to the version's changelog (only present for old versions)
     #[deprecated = "Read from `changelog` instead"]
-    #[serde(deserialize_with = "deserialise_optional_url")]
-    pub changelog_url: Option<Url>,
+    pub changelog_url: Option<String>,
     /// A list of files available for download
     pub files: Vec<VersionFile>,
 }
@@ -129,7 +128,7 @@ pub struct Version {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct VersionFile {
     pub hashes: Hashes,
-    pub url: Url,
+    pub url: String,
     pub filename: String,
     /// Whether the file is the primary file of its version.
     ///

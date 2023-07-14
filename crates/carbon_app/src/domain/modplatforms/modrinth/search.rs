@@ -42,7 +42,7 @@ pub struct ProjectSearchResult {
     /// The total number of downloads of the project
     pub downloads: u32,
     /// The URL of the project's icon
-    pub icon_url: Option<Url>,
+    pub icon_url: Option<String>,
     /// The RGB color of the project, automatically generated form the project icon.
     pub color: Option<u32>,
     /// The ID of the project
