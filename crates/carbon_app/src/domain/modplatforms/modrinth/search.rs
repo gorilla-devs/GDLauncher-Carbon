@@ -297,6 +297,10 @@ pub struct ProjectSearchResponse {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct VersionIDs {
     /// list of version ids to fetch
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json"
+    )]
     pub ids: Vec<String>,
 }
 
@@ -358,6 +362,10 @@ impl Deref for VersionID {
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectIDs {
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json"
+    )]
     pub ids: Vec<String>,
 }
 
