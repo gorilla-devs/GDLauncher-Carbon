@@ -70,7 +70,7 @@ impl Modrinth {
 
     #[tracing::instrument(skip(self))]
     pub async fn get_project(&self, project: ProjectID) -> anyhow::Result<Project> {
-        let url = self.base_url.join("project")?.join(&project)?;
+        let url = self.base_url.join(&format!("project/{}", &*project))?;
 
         trace!("GET {}", url);
 
@@ -104,7 +104,7 @@ impl Modrinth {
 
     #[tracing::instrument(skip(self))]
     pub async fn get_version(&self, version: VersionID) -> anyhow::Result<Version> {
-        let url = self.base_url.join("version")?.join(&version)?;
+        let url = self.base_url.join(&format!("version/{}", &*version))?;
 
         trace!("GET {}", url);
 
@@ -150,7 +150,7 @@ impl Modrinth {
         let resp = self
             .client
             .post(url.as_str())
-            .body(body)
+            .json(&hashes_query)
             .send()
             .await?
             .json::<HashMap<String, Version>>()
@@ -163,7 +163,7 @@ impl Modrinth {
 mod test {
     use tracing_test::traced_test;
 
-    use crate::domain::modplatforms::modrinth::search::SearchFacet;
+    use crate::domain::modplatforms::modrinth::{search::{SearchFacet, SearchIndex}, version::HashAlgorithm};
 
     #[tokio::test]
     #[traced_test]
@@ -204,7 +204,7 @@ mod test {
         let search_params = ProjectSearchParameters {
             query: Some("jei".to_string()),
             facets: Some(facets.into_iter().map(Into::into).collect()),
-            index: None,
+            index: Some(SearchIndex::Updated),
             offset: None,
             limit: None,
             filters: None,
@@ -213,13 +213,13 @@ mod test {
         let facets_json = serde_json::to_string(&search_params.facets)?;
         tracing::info!("Search Facet's string: {:?}", facets_json);
 
-        tracing::info!("Modrinth Search perams are: {:?}", search_params);
+        tracing::info!("Modrinth Search params are: {:?}", search_params);
 
         let query = search_params.into_query_parameters()?;
         tracing::info!("URL query is: {:?}", query);
 
         let results = modrinth.search(search_params).await?;
-        tracing::info!("Modringth Search results are: {:?}", results);
+        tracing::info!("Modrinth Search results are: {:?}", results);
         assert!(!results.hits.is_empty());
         Ok(())
     }
@@ -236,5 +236,66 @@ mod test {
         let results = modrinth.get_categories().await.unwrap();
         tracing::debug!("Categories: {:?}", results);
         assert!(!results.is_empty());
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_project() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let result = modrinth
+            .get_project(ProjectID("u6dRKJwZ".to_string()))
+            .await?;
+        tracing::debug!("Project: {:?}", result);
+        assert!(result.id == "u6dRKJwZ");
+        assert!(result.title == "Just Enough Items");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_version() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let result = modrinth
+            .get_version(VersionID("6QsZu0uX".to_string()))
+            .await?;
+        tracing::debug!("Version: {:?}", result);
+        assert!(result.project_id == "u6dRKJwZ");
+        assert!(result.name == "1.0.1 for 1.8");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_versions_from_hash() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth
+            .get_versions_from_hash(&VersionHashesQuery {
+                hashes: vec!["09b63cb3bf2bf6ea89967684d352f58f7951b242".to_string()],
+                algorithm: HashAlgorithm::SHA1,
+            })
+            .await?;
+        tracing::debug!("Versions: {:?}", results);
+        assert!(!results.is_empty());
+        let result = results
+            .get(&"09b63cb3bf2bf6ea89967684d352f58f7951b242".to_string())
+            .ok_or_else(|| anyhow::anyhow!("Hash not found"))?;
+        assert!(result.project_id == "u6dRKJwZ");
+        assert!(result.name == "1.0.1 for 1.8");
+        Ok(())
     }
 }
