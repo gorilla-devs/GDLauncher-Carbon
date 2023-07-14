@@ -10,6 +10,7 @@ import {
   FECategory,
   FEModrinthCategory,
   FEQueryModLoaderType,
+  FESearchAPI,
   ModpackPlatform,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
@@ -92,10 +93,6 @@ const Sidebar = () => {
       ? forgeCategories()
       : modrinthCategories();
 
-  createEffect(() => {
-    console.log("AAAA", infiniteQuery?.query.categories);
-  });
-
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -104,6 +101,10 @@ const Sidebar = () => {
             <Radio.group
               onChange={(val) => {
                 setCurrentPlatform(val as ModpackPlatform);
+
+                infiniteQuery.setQuery({
+                  searchApi: (val as string).toLowerCase() as FESearchAPI,
+                });
               }}
               value={currentPlatform()}
             >

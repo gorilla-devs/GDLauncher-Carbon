@@ -1,17 +1,35 @@
 import { rspc } from "@/utils/rspcClient";
+import { FESearchAPI } from "@gd/core_module/bindings";
+import { createEffect } from "solid-js";
 
-const fetchData = ({ params }: { params: any }) => {
-  const modpackDetails = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetMod",
-    { modId: parseInt(params.id, 10) },
-  ]);
+type Params = {
+  id: string;
+  platform: FESearchAPI;
+};
 
-  const modpackDescription = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetModDescription",
-    { modId: parseInt(params.id, 10) },
-  ]);
+const fetchData = ({ params }: { params: Params }) => {
+  const isCurseforge = params.platform === "curseforge";
+  if (isCurseforge) {
+    const numericId = parseInt(params.id, 10);
+    const modpackDetails = rspc.createQuery(() => [
+      "modplatforms.curseforgeGetMod",
+      { modId: numericId },
+    ]);
 
-  return { modpackDetails, modpackDescription };
+    const modpackDescription = rspc.createQuery(() => [
+      "modplatforms.curseforgeGetModDescription",
+      { modId: numericId },
+    ]);
+
+    return { modpackDetails, modpackDescription, isCurseforge };
+  } else {
+    const modpackDetails = rspc.createQuery(() => [
+      "modplatforms.modrinthGetProject",
+      params.id,
+    ]);
+
+    return { modpackDetails, isCurseforge };
+  }
 };
 
 export default fetchData;

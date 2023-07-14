@@ -1,4 +1,5 @@
 import { FEMod, FEUnifiedSearchResult } from "@gd/core_module/bindings";
+import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 
 type BaseProps = {
   data: FEUnifiedSearchResult;
@@ -73,9 +74,7 @@ export const getLogoUrl = (prop: ModRowProps) => {
 export const getWebsiteUrl = (prop: ModRowProps) => {
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.links.websiteUrl;
-    //TODO: website url
-  } else "";
-  // } else return prop.data.modrinth.;
+  } else `${MODRNITH_WEBSITE_MODPACKS}${prop.data.modrinth.slug}`;
 };
 
 export const getFEMod = (prop: ModRowProps) => {

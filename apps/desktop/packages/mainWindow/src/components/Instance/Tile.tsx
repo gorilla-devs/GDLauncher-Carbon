@@ -3,7 +3,7 @@ import { getModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
   ModLoaderType,
-  Subtask,
+  FESubtask,
   Translation,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
@@ -33,7 +33,7 @@ type Props = {
   totalDownload?: number;
   isRunning?: boolean;
   isPreparing?: boolean;
-  subTasks?: Subtask[] | undefined;
+  subTasks?: FESubtask[] | undefined;
   failError?: string;
   onClick?: (_e: MouseEvent) => void;
 };

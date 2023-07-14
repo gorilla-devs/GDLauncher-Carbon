@@ -10,16 +10,20 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { FEModSearchSortField } from "@gd/core_module/bindings";
+import {
+  FEModSearchSortField,
+  FEModrinthSearchIndex,
+} from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
-import { CurseForgeSortFields } from "@/utils/constants";
+import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { useModal } from "@/managers/ModalsManager";
+import { isCurseForgeData } from "@/utils/Mods";
 
 const NoMoreModpacks = () => {
   return (
@@ -147,6 +151,11 @@ export default function Browser() {
     }
   });
 
+  const isCurseForge = () => infiniteQuery.query.searchApi === "curseforge";
+
+  const sortingFields = () =>
+    isCurseForge() ? CurseForgeSortFields : ModrinthSortFields;
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -173,19 +182,21 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={CurseForgeSortFields.map((field) => ({
+              options={sortingFields().map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}
               onChange={(val) => {
-                // infiniteQuery?.setQuery({
-                //   sortIndex: val.key as FEModSearchSortField,
-                // });
+                const sortIndex = isCurseForge()
+                  ? {
+                      curseForge: val.key as FEModSearchSortField,
+                    }
+                  : {
+                      modrinth: val.key as FEModrinthSearchIndex,
+                    };
 
                 infiniteQuery?.setQuery({
-                  sortIndex: {
-                    curseForge: val.key as FEModSearchSortField,
-                  },
+                  sortIndex: sortIndex,
                 });
               }}
               value={0}

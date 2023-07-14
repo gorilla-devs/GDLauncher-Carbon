@@ -94,7 +94,7 @@ export const routes: RouteDefinition[] = [
         ],
       },
       {
-        path: "/modpacks/:id",
+        path: "/modpacks/:id/:platform",
         component: lazy(() => import("@/pages/Modpacks/Explore")),
         data: ModpackData,
         children: [

@@ -28,19 +28,19 @@ const Modpack = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/modpacks/${params.id}`,
+      path: `/modpacks/${params.id}/${params.platform}`,
     },
     {
       label: "Changelog",
-      path: `/modpacks/${params.id}/changelog`,
+      path: `/modpacks/${params.id}/${params.platform}/changelog`,
     },
     {
       label: "Screenshots",
-      path: `/modpacks/${params.id}/screenshots`,
+      path: `/modpacks/${params.id}/${params.platform}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/modpacks/${params.id}/versions`,
+      path: `/modpacks/${params.id}/${params.platform}/versions`,
     },
   ];
 
@@ -97,9 +97,9 @@ const Modpack = () => {
       >
         <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
           <div class="relative h-full">
-            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 from-30% z-20" />
+            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 z-20 from-30%" />
             <div
-              class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat z-10"
+              class="h-full absolute left-0 right-0 top-0 z-10 bg-cover bg-center bg-fixed bg-no-repeat"
               style={{
                 "background-image": `url("${
                   (routeData.modpackDetails?.data as FEModResponse)?.data.logo
@@ -108,7 +108,7 @@ const Modpack = () => {
                 "background-position": "right-5rem",
               }}
             />
-            <div class="top-5 sticky left-5 w-fit z-20">
+            <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -174,7 +174,10 @@ const Modpack = () => {
                           <Match when={!isFetching()}>
                             <Show
                               when={
-                                routeData.modpackDetails.data?.data.dateCreated
+                                routeData.isCurseforge
+                                  ? routeData.modpackDetails.data?.data
+                                      .dateCreated
+                                  : routeData.modpackDetails.data?.published
                               }
                             >
                               {format(
@@ -264,7 +267,7 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex items-center justify-between mb-4 px-4 z-10 bg-darkSlate-800"
+                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
               >
                 <span class="mr-4">
                   <Show when={isSticky()}>

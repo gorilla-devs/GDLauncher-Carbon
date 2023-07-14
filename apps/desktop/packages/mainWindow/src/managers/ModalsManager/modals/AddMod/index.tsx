@@ -15,7 +15,6 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
-  FEModLoaderType,
   FEModSearchParametersQuery,
   FEModSearchSortField,
   FEQueryModLoaderType,
@@ -29,33 +28,30 @@ const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
 
   const [query, setQuery] = useModsQuery({
-    categoryId: null,
-    classId: "mods",
-    gameId: 432,
-    gameVersion: "",
-    modLoaderType: null,
-    sortField: "featured",
+    searchQuery: "",
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    projectType: "mod",
+    sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
-    pageSize: 40,
-    slug: "",
-    searchFilter: "",
-    gameVersionTypeId: null,
-    authorId: null,
     index: 0,
+    pageSize: 40,
+    searchApi: "curseforge",
   });
 
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.curseforgeSearch"],
+    queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      setQuery({ index: ctx.pageParam + (query.query.pageSize || 20) + 1 });
-      return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
+      setQuery({ index: ctx.pageParam + (query.pageSize || 20) + 1 });
+      return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
-      const pageSize = query.query.pageSize || 20;
+      const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
     },
@@ -99,7 +95,7 @@ const AddMod = (props: ModalProps) => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
-    if (!lastItem() || lastItem().index === query.query.index) {
+    if (!lastItem() || lastItem().index === query.index) {
       return;
     }
 
@@ -254,18 +250,18 @@ const AddMod = (props: ModalProps) => {
                     modLoaderType: mappedValue as FEQueryModLoaderType | null,
                   });
                 }}
-                value={query.query.modLoaderType}
+                value={query.modloaders}
                 rounded
               />
             </div>
             <div
               class="cursor-pointer text-2xl"
               classList={{
-                "i-ri:sort-asc": query.query.sortOrder === "ascending",
-                "i-ri:sort-desc": query.query.sortOrder === "descending",
+                "i-ri:sort-asc": query.sortOrder === "ascending",
+                "i-ri:sort-desc": query.sortOrder === "descending",
               }}
               onClick={() => {
-                const isAsc = query.query.sortOrder === "ascending";
+                const isAsc = query.sortOrder === "ascending";
                 setQueryWrapper({
                   sortOrder: isAsc ? "descending" : "ascending",
                 });

@@ -1,4 +1,4 @@
-import { FEFile, FEMod, Task } from "@gd/core_module/bindings";
+import { FEFile, FEMod, FETask } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
@@ -24,7 +24,7 @@ const VersionRow = (props: Props) => {
 
   const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
   const [task, setTask] = createSignal<CreateQueryResult<
-    Task | null,
+    FETask | null,
     RSPCError
   > | null>(null);
 
