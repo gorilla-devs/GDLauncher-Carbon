@@ -101,7 +101,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         let mut lock = self.scanned_instances.lock().await;
 
-        if force_recache || lock.contains(&instance_id) {
+        if force_recache || !lock.contains(&instance_id) {
             self.waiting_instances.write().await.insert(instance_id);
             let _ = self.waiting_notify.send(());
 
