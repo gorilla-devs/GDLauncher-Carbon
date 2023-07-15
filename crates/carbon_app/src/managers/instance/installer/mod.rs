@@ -138,11 +138,9 @@ pub trait InstallResource: Sync {
     ) -> anyhow::Result<InstallResult>;
 }
 
-
 pub trait IntoInstaller: Sized {
     fn into_installer(self) -> Installer;
 }
-
 
 #[async_trait::async_trait]
 impl InstallResource for Installer {
@@ -380,7 +378,11 @@ pub struct CurseforgeModInstaller {
 }
 
 impl CurseforgeModInstaller {
-    pub async fn create(app: &Arc<AppInner>, project_id: u32, file_id: u32) -> anyhow::Result<Self> {
+    pub async fn create(
+        app: &Arc<AppInner>,
+        project_id: u32,
+        file_id: u32,
+    ) -> anyhow::Result<Self> {
         let file = app
             .modplatforms_manager()
             .curseforge
@@ -402,9 +404,7 @@ impl CurseforgeModInstaller {
         })
     }
 
-    pub fn from_file(
-        file: crate::domain::modplatforms::curseforge::File,
-    ) -> anyhow::Result<Self> {
+    pub fn from_file(file: crate::domain::modplatforms::curseforge::File) -> anyhow::Result<Self> {
         let download_url = file.download_url.clone().ok_or_else(|| {
             anyhow::anyhow!("mod cannot be downloaded without privileged api key")
         })?;
@@ -563,8 +563,6 @@ impl ResourceInstaller for CurseforgeModInstaller {
         Ok(())
     }
 }
-
-
 
 impl IntoInstaller for CurseforgeModInstaller {
     fn into_installer(self) -> Installer {

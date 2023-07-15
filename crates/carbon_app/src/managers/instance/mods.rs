@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    installer::{CurseforgeModInstaller, IntoInstaller, InstallResource},
+    installer::{CurseforgeModInstaller, InstallResource, IntoInstaller},
     Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError, Mod,
 };
 
