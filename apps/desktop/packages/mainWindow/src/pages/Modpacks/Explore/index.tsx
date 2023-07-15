@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse } from "@gd/core_module/bindings";
+import { FEModResponse, FEModrinthProject } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -13,10 +13,11 @@ import {
   createNotification,
 } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
+import Authors from "@/pages/Library/Instance/Info/Authors";
 
 const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
@@ -82,6 +83,32 @@ const Modpack = () => {
       },
     }
   );
+
+  const modpack = () =>
+    routeData.modpackDetails.data &&
+    (routeData.isCurseforge
+      ? {
+          Curseforge: {
+            file_id: routeData.modpackDetails.data?.data.mainFileId,
+            project_id: routeData.modpackDetails.data?.data.id,
+          },
+        }
+      : {
+          Modrinth: {
+            project_id: routeData.modpackDetails.data?.versions[0],
+            version_id: routeData.modpackDetails.data?.id,
+          },
+        });
+
+  const instanceName = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data.name
+      : routeData.modpackDetails.data?.title;
+
+  const icon = () =>
+    routeData.isCurseforge
+      ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
+      : (routeData.modpackDetails?.data as FEModrinthProject).icon_url;
 
   return (
     <ContentWrapper>
@@ -203,16 +230,11 @@ const Modpack = () => {
                         <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                           <Switch>
                             <Match when={!isFetching()}>
-                              <For
-                                each={
-                                  routeData.isCurseforge
-                                    ? routeData.modpackDetails.data?.data
-                                        .authors
-                                    : routeData.modpackDetails.data?.team
-                                }
-                              >
-                                {(author) => <p class="m-0">{author.name}</p>}
-                              </For>
+                              <Authors
+                                isCurseforge={routeData.isCurseforge}
+                                isModrinth={routeData.isModrinth}
+                                modpackDetails={routeData.modpackDetails.data}
+                              />
                             </Match>
                             <Match when={isFetching()}>
                               <Skeleton />
@@ -226,24 +248,23 @@ const Modpack = () => {
                         uppercase
                         size="large"
                         onClick={() => {
-                          const modpack = routeData.modpackDetails
-                            ?.data as FEModResponse;
+                          const instanceIcon = icon();
 
-                          loadIconMutation.mutate(modpack.data.logo.url);
-                          createInstanceMutation.mutate({
-                            group: defaultGroup.data || 1,
-                            use_loaded_icon: true,
-                            notes: "",
-                            name: modpack.data.name,
-                            version: {
-                              Modpack: {
-                                Curseforge: {
-                                  file_id: modpack.data.mainFileId,
-                                  project_id: modpack.data.id,
-                                },
+                          if (instanceIcon)
+                            loadIconMutation.mutate(instanceIcon);
+
+                          const name = instanceName();
+                          const modpackObj = modpack();
+                          if (name && modpackObj)
+                            createInstanceMutation.mutate({
+                              group: defaultGroup.data || 1,
+                              use_loaded_icon: true,
+                              notes: "",
+                              name: name,
+                              version: {
+                                Modpack: modpackObj,
                               },
-                            },
-                          });
+                            });
                         }}
                       >
                         <Show when={loading()}>
@@ -307,24 +328,22 @@ const Modpack = () => {
                     uppercase
                     size="small"
                     onClick={() => {
-                      const modpack = routeData.modpackDetails
-                        ?.data as FEModResponse;
+                      const instanceIcon = icon();
 
-                      loadIconMutation.mutate(modpack.data.logo.url);
-                      createInstanceMutation.mutate({
-                        group: defaultGroup.data || 1,
-                        use_loaded_icon: true,
-                        notes: "",
-                        name: modpack.data.name,
-                        version: {
-                          Modpack: {
-                            Curseforge: {
-                              file_id: modpack.data.mainFileId,
-                              project_id: modpack.data.id,
-                            },
+                      if (instanceIcon) loadIconMutation.mutate(instanceIcon);
+
+                      const name = instanceName();
+                      const modpackObj = modpack();
+                      if (name && modpackObj)
+                        createInstanceMutation.mutate({
+                          group: defaultGroup.data || 1,
+                          use_loaded_icon: true,
+                          notes: "",
+                          name: name,
+                          version: {
+                            Modpack: modpackObj,
                           },
-                        },
-                      });
+                        });
                     }}
                   >
                     <Show when={loading()}>

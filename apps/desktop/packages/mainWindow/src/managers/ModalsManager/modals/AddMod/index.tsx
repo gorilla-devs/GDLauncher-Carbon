@@ -250,7 +250,7 @@ const AddMod = (props: ModalProps) => {
                     modLoaderType: mappedValue as FEQueryModLoaderType | null,
                   });
                 }}
-                value={query.modloaders}
+                // value={query.modloaders}
                 rounded
               />
             </div>

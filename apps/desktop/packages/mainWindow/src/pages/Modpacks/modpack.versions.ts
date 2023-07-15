@@ -1,5 +1,4 @@
 import { rspc } from "@/utils/rspcClient";
-import { createEffect } from "solid-js";
 
 const fetchData = ({ params }: { params: any }) => {
   const isCurseforge = params.platform === "curseforge";
@@ -13,6 +12,7 @@ const fetchData = ({ params }: { params: any }) => {
       "modplatforms.curseforgeGetMod",
       { modId: parseInt(params.id, 10) },
     ]);
+
     return { curseforgeGetModFiles, curseforgeGetMod, isCurseforge };
   } else {
     const modrinthGetProject = rspc.createQuery(() => [

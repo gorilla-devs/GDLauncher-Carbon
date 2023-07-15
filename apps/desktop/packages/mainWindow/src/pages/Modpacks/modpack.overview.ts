@@ -2,6 +2,7 @@ import { rspc } from "@/utils/rspcClient";
 
 const fetchData = ({ params }: { params: any }) => {
   const isCurseforge = params.platform === "curseforge";
+  const isModrinth = params.platform === "Modrinth";
 
   if (isCurseforge) {
     const numericId = parseInt(params.id, 10);
@@ -15,14 +16,14 @@ const fetchData = ({ params }: { params: any }) => {
       { modId: numericId },
     ]);
 
-    return { modpackDetails, modpackDescription, isCurseforge };
+    return { modpackDetails, modpackDescription, isCurseforge, isModrinth };
   } else {
     const modpackDetails = rspc.createQuery(() => [
       "modplatforms.modrinthGetProject",
       params.id,
     ]);
 
-    return { modpackDetails, isCurseforge };
+    return { modpackDetails, isCurseforge, isModrinth };
   }
 };
 

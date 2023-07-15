@@ -150,10 +150,10 @@ export default function Browser() {
     }
   });
 
-  const isCurseForge = () => infiniteQuery.query.searchApi === "curseforge";
+  const isCurseforge = () => infiniteQuery.query.searchApi === "curseforge";
 
   const sortingFields = () =>
-    isCurseForge() ? CurseForgeSortFields : ModrinthSortFields;
+    isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
   return (
     <div class="box-border h-full w-full relative">
@@ -186,7 +186,7 @@ export default function Browser() {
                 key: field,
               }))}
               onChange={(val) => {
-                const sortIndex = isCurseForge()
+                const sortIndex = isCurseforge()
                   ? {
                       curseForge: val.key as FEModSearchSortField,
                     }

@@ -24,16 +24,21 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import {
   FEModResponse,
+  FEModrinthProject,
   InstanceDetails,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { getPreparingState, getRunningState } from "@/utils/instances";
+import {
+  getCurseForgeData,
+  getModrinthData,
+  getPreparingState,
+  getRunningState,
+} from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { CreateQueryResult } from "@tanstack/solid-query";
-import { RSPCError } from "@rspc/client";
 import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
+import Authors from "./Info/Authors";
 
 type InstancePage = {
   label: string;
@@ -50,6 +55,10 @@ const Instance = () => {
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   );
+  const [modpackDetails, setModpackDetails] = createSignal<
+    FEModResponse | FEModrinthProject | undefined
+  >(undefined);
+
   const [t] = useTransContext();
   const modalsContext = useModal();
 
@@ -126,6 +135,14 @@ const Instance = () => {
       setIsFavorite(routeData.instanceDetails.data?.favorite);
   });
 
+  createEffect(() => {
+    console.log(
+      "AAAAA",
+      routeData.instanceDetails.data,
+      routeData.instanceDetails.data?.modloaders[0]?.type_
+    );
+  });
+
   const instancePages = () => [
     {
       label: "Overview",
@@ -183,24 +200,37 @@ const Instance = () => {
     routeData.instanceDetails.data?.state &&
     getPreparingState(routeData.instanceDetails.data?.state);
 
-  const [modpackDetails, setModpackDetails] = createSignal<CreateQueryResult<
-    FEModResponse,
-    RSPCError
-  > | null>(null);
+  const curseforgeData = () =>
+    routeData.instanceDetails.data?.modpack &&
+    getCurseForgeData(routeData.instanceDetails.data.modpack);
 
   createEffect(() => {
-    if (
-      routeData.instanceDetails.data?.modpack?.Curseforge.project_id !==
-      undefined
-    ) {
+    const isCurseforge = curseforgeData();
+    if (isCurseforge) {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.curseforgeGetMod",
           {
-            modId: routeData.instanceDetails.data?.modpack?.Curseforge
-              .project_id as number,
+            modId: isCurseforge.project_id as number,
           },
-        ])
+        ]).data
+      );
+    }
+  });
+
+  const modrinthData = () =>
+    routeData.instanceDetails.data?.modpack &&
+    getModrinthData(routeData.instanceDetails.data.modpack);
+
+  createEffect(() => {
+    const isModrninth = modrinthData();
+
+    if (isModrninth) {
+      setModpackDetails(
+        rspc.createQuery(() => [
+          "modplatforms.modrinthGetProject",
+          isModrninth.project_id,
+        ]).data
       );
     }
   });
@@ -443,19 +473,11 @@ const Instance = () => {
                             </span>
                           </div>
                         </Show>
-                        <Show
-                          when={
-                            (modpackDetails()?.data?.data.authors || [])
-                              .length > 0
-                          }
-                        >
-                          <div class="flex gap-2 items-center h-full">
-                            <div class="i-ri:user-fill" />
-                            <For each={modpackDetails()?.data?.data.authors}>
-                              {(author) => <p class="m-0">{author.name}</p>}
-                            </For>
-                          </div>
-                        </Show>
+                        <Authors
+                          modpackDetails={modpackDetails()}
+                          isCurseforge={!!curseforgeData()}
+                          isModrinth={!!modrinthData()}
+                        />
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <ContextMenu menuItems={menuItems()} trigger="click">

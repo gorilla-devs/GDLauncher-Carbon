@@ -8,6 +8,9 @@ import {
   FETaskId,
   UngroupedInstance,
   ValidListInstance,
+  Modpack,
+  CurseforgeModpack,
+  ModrinthModpack,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
 import { port } from "./rspcClient";
@@ -171,6 +174,26 @@ export const isProgressFailed = (
   progress: Progress
 ): progress is { Failed: FeError } => {
   return (progress as { Failed: FeError }).Failed !== undefined;
+};
+
+export const isModpackCurseforge = (
+  modpack: Modpack
+): modpack is { Curseforge: CurseforgeModpack } => {
+  return "Curseforge" in modpack;
+};
+
+export const getCurseForgeData = (modpack: Modpack) => {
+  if ("Curseforge" in modpack) return modpack.Curseforge;
+};
+
+export const isModpackModrinth = (
+  modpack: Modpack
+): modpack is { Modrinth: ModrinthModpack } => {
+  return "Modrinth" in modpack;
+};
+
+export const getModrinthData = (modpack: Modpack) => {
+  if ("Modrinth" in modpack) return modpack.Modrinth;
 };
 
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {

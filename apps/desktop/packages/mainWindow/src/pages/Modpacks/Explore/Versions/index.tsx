@@ -15,7 +15,6 @@ const Versions = () => {
     createSignal<FEModrinthVersionsResponse>([]);
 
   createEffect(() => {
-    console.log("VERSIONS", routeData.modrinthGetProject);
     if (!routeData.modrinthGetProject?.data) return;
     const versions = routeData.modrinthGetProject.data.versions;
     if (!routeData.isCurseforge && versions) {
@@ -24,7 +23,6 @@ const Versions = () => {
         versions,
       ]);
 
-      console.log("query", query);
       if (query.data) setModrnithVersions(query.data);
     }
   });
@@ -46,7 +44,7 @@ const Versions = () => {
                   routeData.modrinthGetProject?.data
                 }
                 modVersion={modFile}
-                isCurseForge={routeData.isCurseforge}
+                isCurseforge={routeData.isCurseforge}
               />
             )}
           </For>
@@ -54,8 +52,9 @@ const Versions = () => {
         <Match
           when={
             versions()?.length === 0 ||
-            !routeData.curseforgeGetModFiles?.isLoading ||
-            (!routeData.isCurseforge && routeData.modrinthGetProject.isLoading)
+            !routeData.isCurseforge ||
+            !(routeData.modrinthGetProject as any)?.isLoading ||
+            !(routeData.curseforgeGetModFiles as any)?.isLoading
           }
         >
           <Skeleton.modpackVersionList />

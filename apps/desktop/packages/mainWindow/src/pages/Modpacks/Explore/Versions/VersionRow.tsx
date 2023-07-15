@@ -17,7 +17,7 @@ import { CreateQueryResult } from "@tanstack/solid-query";
 type Props = {
   modVersion: FEModrinthVersion | FEFile;
   project: FEMod | FEModrinthProject | undefined;
-  isCurseForge?: boolean;
+  isCurseforge?: boolean;
 };
 
 const VersionRow = (props: Props) => {
@@ -73,34 +73,34 @@ const VersionRow = (props: Props) => {
   );
 
   // const getUrl = () => {
-  //   if (props.isCurseForge) {
+  //   if (props.isCurseforge) {
   //     return (props.modVersion as FEFile).displayName;
   //   }
   //   return (props.modVersion as FEModrinthVersion).;
   // };
   const getName = () => {
-    if (props.isCurseForge) {
+    if (props.isCurseforge) {
       return (props.modVersion as FEFile).displayName;
     }
     return (props.modVersion as FEModrinthVersion).name;
   };
 
   const getDate = () => {
-    if (props.isCurseForge) {
+    if (props.isCurseforge) {
       return (props.modVersion as FEFile).fileDate;
     }
     return (props.modVersion as FEModrinthVersion).date_published;
   };
 
   const getLastGameVersion = () => {
-    if (props.isCurseForge) {
+    if (props.isCurseforge) {
       return (props.modVersion as FEFile).gameVersions[0];
     }
     return (props.modVersion as FEModrinthVersion).version_number;
   };
 
   const getReleaseType = () => {
-    if (props.isCurseForge) {
+    if (props.isCurseforge) {
       return (props.modVersion as FEFile).releaseType;
     }
     return (props.modVersion as FEModrinthVersion).version_type;
@@ -136,11 +136,11 @@ const VersionRow = (props: Props) => {
       <span
         class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
         onClick={() => {
-          const icon = props.isCurseForge
+          const icon = props.isCurseforge
             ? (props.project as FEMod).logo.url
             : (props.project as FEModrinthProject).icon_url;
 
-          const modpack = props.isCurseForge
+          const modpack = props.isCurseforge
             ? {
                 Curseforge: {
                   file_id: (props.modVersion as FEFile).id,
@@ -162,7 +162,7 @@ const VersionRow = (props: Props) => {
             group: defaultGroup.data || 1,
             use_loaded_icon: true,
             notes: "",
-            name: props.isCurseForge
+            name: props.isCurseforge
               ? (props.modVersion as FEFile).displayName
               : (props.project as FEModrinthProject).title,
             version: {

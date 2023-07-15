@@ -46,35 +46,39 @@ export const routes: RouteDefinition[] = [
               },
               {
                 path: "/mods",
-                component: lazy(() => import("@/pages/Library/Instance/Mods")),
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Tabs/Mods")
+                ),
               },
               {
                 path: "/settings",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Settings")
+                  () => import("@/pages/Library/Instance/Tabs/Settings")
                 ),
               },
               {
                 path: "/logs",
-                component: lazy(() => import("@/pages/Library/Instance/Log")),
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Tabs/Log")
+                ),
                 data: InstanceLogsData,
               },
               {
                 path: "/resourcepacks",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/ResourcePacks")
+                  () => import("@/pages/Library/Instance/Tabs/ResourcePacks")
                 ),
               },
               {
                 path: "/screenshots",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Screenshots")
+                  () => import("@/pages/Library/Instance/Tabs/Screenshots")
                 ),
               },
               {
                 path: "/versions",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Versions")
+                  () => import("@/pages/Library/Instance/Tabs/Versions")
                 ),
               },
             ],

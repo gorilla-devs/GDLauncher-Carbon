@@ -4,9 +4,10 @@ import { Trans } from "@gd/i18n";
 import Version from "./Version";
 import skull from "/assets/images/icons/skull.png";
 import { useRouteData } from "@solidjs/router";
-import fetchData from "../instance.data";
+import fetchData from "../../instance.data";
 import { rspc } from "@/utils/rspcClient";
-import { FEFile, InstanceDetails, Modpack } from "@gd/core_module/bindings";
+import { FEFile } from "@gd/core_module/bindings";
+import { getCurseForgeData } from "@/utils/instances";
 
 const NoVersions = () => {
   return (
@@ -43,14 +44,14 @@ const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const modId = () =>
-    ((routeData.instanceDetails.data as InstanceDetails).modpack as Modpack)
-      .Curseforge.project_id;
+    routeData.instanceDetails.data?.modpack &&
+    getCurseForgeData(routeData.instanceDetails.data.modpack)?.project_id;
 
-  if (routeData.instanceDetails.data?.modpack?.Curseforge.project_id) {
+  if (modId()) {
     const instanceDetails = rspc.createQuery(() => [
       "modplatforms.curseforgeGetMod",
       {
-        modId: modId(),
+        modId: modId() as number,
       },
     ]);
 
