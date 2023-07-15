@@ -61,7 +61,7 @@ pub enum ResourceFingerprint {
 #[async_trait::async_trait]
 pub trait ResourceInstaller: Sync {
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
-    fn dependencies(&self) -> DependencyIterator;
+    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator;
     fn is_already_installed(&self, instance_data: &InstanceData) -> bool;
     fn display_name(&self) -> String;
     async fn perform_install(
@@ -79,8 +79,8 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
         (**self).downloadable(instance_path).await
     }
     #[inline]
-    fn dependencies(&self) -> DependencyIterator {
-        (**self).dependencies()
+    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator {
+        (**self).dependencies(app)
     }
 
     #[inline]
@@ -106,8 +106,8 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
 }
 
 pub struct InstallResult {
-    task: VisualTaskId,
-    dependency_tasks: Vec<VisualTaskId>,
+    pub task: VisualTaskId,
+    pub dependency_tasks: Vec<VisualTaskId>,
 }
 
 pub struct Installer {
@@ -133,27 +133,22 @@ impl Installer {
 pub trait InstallResource: Sync {
     async fn install(
         &self,
-        app: Arc<AppInner>,
+        app: &Arc<AppInner>,
         instance_id: &InstanceId,
     ) -> anyhow::Result<InstallResult>;
 }
 
-// #[async_trait::async_trait]
-// impl InstallResource for Pin<Box<dyn ResourceInstaller + Send>> {
-//     async fn install(
-//         &self,
-//         app: Arc<AppInner>,
-//         instance_id: &InstanceId,
-//     ) -> anyhow::Result<(VisualTaskId, Vec<anyhow::Result<VisualTaskId>>)> {
-//         self.install(app, instance_id).await
-//     }
-// }
+
+pub trait IntoInstaller: Sized {
+    fn into_installer(self) -> Installer;
+}
+
 
 #[async_trait::async_trait]
 impl InstallResource for Installer {
     async fn install(
         &self,
-        app: Arc<AppInner>,
+        app: &Arc<AppInner>,
         instance_id: &InstanceId,
     ) -> anyhow::Result<InstallResult> {
         let (task, task_id, instance_path) = async {
@@ -196,7 +191,7 @@ impl InstallResource for Installer {
         let (installer_name, dep_error, processed_deps, dep_tasks) = {
             let lock = self.inner.lock().await;
             let installer_name = lock.display_name();
-            let dep_iter = lock.dependencies();
+            let dep_iter = lock.dependencies(app);
 
             let mut dep_tasks = Vec::new();
 
@@ -216,8 +211,7 @@ impl InstallResource for Installer {
                     Ok(dep) => {
                         let dep_name = dep.display_name();
                         let dep = Installer::new(dep);
-                        let app_clone = Arc::clone(&app);
-                        let install_future = dep.install(app_clone, instance_id);
+                        let install_future = dep.install(app, instance_id);
                         let results = install_future.await;
                         match results {
                             Err(err) => {
@@ -242,7 +236,7 @@ impl InstallResource for Installer {
 
         async fn resource_installer_rollback(
             parent: String,
-            app: Arc<AppInner>,
+            app: &Arc<AppInner>,
             instance_id: &InstanceId,
             processed_deps: Vec<Installer>,
             inciting_error: anyhow::Error,
@@ -277,7 +271,7 @@ impl InstallResource for Installer {
         if let Some(dep_error) = dep_error {
             return Err(resource_installer_rollback(
                 installer_name,
-                app.clone(),
+                app,
                 instance_id,
                 processed_deps,
                 dep_error,
@@ -292,6 +286,7 @@ impl InstallResource for Installer {
         let instance_id = *instance_id;
         let instance_path = instance_path.clone();
         let inner = Arc::clone(&self.inner);
+        let app_clone = Arc::clone(app);
 
         tokio::spawn(async move {
             let r = (|| async {
@@ -326,7 +321,7 @@ impl InstallResource for Installer {
                     {
                         return Err(resource_installer_rollback(
                             installer_name,
-                            app.clone(),
+                            &app_clone,
                             &instance_id,
                             processed_deps,
                             err.into(),
@@ -337,7 +332,7 @@ impl InstallResource for Installer {
 
                 let install_result = {
                     // context to drop instance lock after install attempt
-                    let instance_manager = app.instance_manager();
+                    let instance_manager = app_clone.instance_manager();
                     let mut instances = instance_manager.instances.write().await;
                     let instance = instances
                         .get_mut(&instance_id)
@@ -352,7 +347,7 @@ impl InstallResource for Installer {
                 if let Err(err) = install_result {
                     return Err(resource_installer_rollback(
                         installer_name,
-                        app.clone(),
+                        &app_clone,
                         &instance_id,
                         processed_deps,
                         err,
@@ -360,7 +355,7 @@ impl InstallResource for Installer {
                     .await);
                 }
 
-                app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                 Ok::<_, anyhow::Error>(())
             })()
             .await;
@@ -379,14 +374,13 @@ impl InstallResource for Installer {
 }
 
 pub struct CurseforgeModInstaller {
-    app: Arc<AppInner>,
     file: crate::domain::modplatforms::curseforge::File,
     download_url: String,
     applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
 }
 
 impl CurseforgeModInstaller {
-    pub async fn create(app: Arc<AppInner>, project_id: u32, file_id: u32) -> anyhow::Result<Self> {
+    pub async fn create(app: &Arc<AppInner>, project_id: u32, file_id: u32) -> anyhow::Result<Self> {
         let file = app
             .modplatforms_manager()
             .curseforge
@@ -402,7 +396,6 @@ impl CurseforgeModInstaller {
         })?;
 
         Ok(Self {
-            app,
             file,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
@@ -410,7 +403,6 @@ impl CurseforgeModInstaller {
     }
 
     pub fn from_file(
-        app: Arc<AppInner>,
         file: crate::domain::modplatforms::curseforge::File,
     ) -> anyhow::Result<Self> {
         let download_url = file.download_url.clone().ok_or_else(|| {
@@ -418,7 +410,6 @@ impl CurseforgeModInstaller {
         })?;
 
         Ok(Self {
-            app,
             file,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
@@ -451,10 +442,10 @@ impl ResourceInstaller for CurseforgeModInstaller {
         )
     }
 
-    fn dependencies(&self) -> DependencyIterator {
+    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator {
         let mut installers: Vec<ResourceInstallerGetter> = Vec::new();
         for dep in &self.file.dependencies {
-            let app_clone = Arc::clone(&self.app);
+            let app_clone = Arc::clone(app);
             let mod_id = dep.mod_id;
             installers.push(Box::new(move || {
                 Box::pin(async move {
@@ -480,7 +471,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
                         })
                         .and_then(|file| {
                             // let app_clone = Arc::clone(&self.app);
-                            CurseforgeModInstaller::from_file(app_clone, file)
+                            CurseforgeModInstaller::from_file(file)
                                 .map(|installer| Box::new(installer) as BoxedResourceInstaller)
                         })
                 })
@@ -570,5 +561,15 @@ impl ResourceInstaller for CurseforgeModInstaller {
         *lock = None;
 
         Ok(())
+    }
+}
+
+
+
+impl IntoInstaller for CurseforgeModInstaller {
+    fn into_installer(self) -> Installer {
+        Installer {
+            inner: Arc::new(Mutex::new(Box::new(self) as BoxedResourceInstaller)),
+        }
     }
 }
