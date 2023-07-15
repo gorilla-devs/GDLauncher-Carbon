@@ -139,6 +139,8 @@ keys! {
         MODRINTH_GET_PROJECTS                       = "modrinthGetProjects";
         MODRINTH_GET_VERSION                        = "modrinthGetVersion";
         MODRINTH_GET_VERSIONS                       = "modrinthGetVersions";
+        MODRINTH_GET_PROJECT_TEAM                   = "modrinthGetProjectTeam";
+        MODRINTH_GET_TEAM                           = "modrinthGetTeam";
 
         UNIFIED_SEARCH                              = "unifiedSearch";
     }

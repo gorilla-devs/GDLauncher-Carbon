@@ -8,7 +8,8 @@ use crate::{
             CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
             CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
             MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT, MODRINTH_GET_PROJECTS,
-            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
+            MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_TEAM, MODRINTH_GET_VERSION,
+            MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
         },
         router::router,
     },
@@ -130,6 +131,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             let response = modplatforms.modrinth.get_versions(versions.into()).await?;
 
             Ok(modrinth::responses::FEModrinthVersionsResponse::from(response))
+        }
+        query MODRINTH_GET_PROJECT_TEAM[app, project: modrinth::filters::FEModrinthProjectID] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_project_team(project.into()).await?;
+
+            Ok(modrinth::responses::FEModrinthTeamResponse::from(response))
+        }
+        query MODRINTH_GET_TEAM[app, team: modrinth::filters::FEModrinthTeamID] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_team(team.into()).await?;
+
+            Ok(modrinth::responses::FEModrinthTeamResponse::from(response))
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {

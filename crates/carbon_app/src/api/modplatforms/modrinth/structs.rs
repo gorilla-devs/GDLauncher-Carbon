@@ -10,6 +10,7 @@ use crate::domain::modplatforms::modrinth::{
     },
     search::ProjectSearchResult,
     tag::Category,
+    user::{TeamMember, User, UserRole},
     version::{
         AdditionalFileType, Dependency, DependencyType, HashAlgorithm, Hashes,
         RequestedVersionStatus, Status, Version, VersionFile, VersionType,
@@ -886,6 +887,95 @@ impl From<FEModrinthProjectStatus> for ProjectStatus {
             FEModrinthProjectStatus::Archived => ProjectStatus::Archived,
             FEModrinthProjectStatus::Processing => ProjectStatus::Processing,
             FEModrinthProjectStatus::Unknown => ProjectStatus::Unknown,
+        }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FEModrinthUserRole {
+    Developer,
+    Moderator,
+    Admin,
+}
+
+impl From<UserRole> for FEModrinthUserRole {
+    fn from(value: UserRole) -> Self {
+        match value {
+            UserRole::Admin => Self::Admin,
+            UserRole::Developer => Self::Developer,
+            UserRole::Moderator => Self::Moderator,
+        }
+    }
+}
+
+impl From<FEModrinthUserRole> for UserRole {
+    fn from(value: FEModrinthUserRole) -> Self {
+        match value {
+            FEModrinthUserRole::Admin => Self::Admin,
+            FEModrinthUserRole::Developer => Self::Developer,
+            FEModrinthUserRole::Moderator => Self::Moderator,
+        }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthUser {
+    pub username: String,
+    /// The user's display name
+    pub name: Option<String>,
+    /// The user's email, only visible to the user itself when authenticated
+    pub email: Option<String>,
+    /// A description of the user
+    pub bio: Option<String>,
+    /// Various data relating to the user's payouts status,
+    /// only visible to the user itself when authenticated
+    pub id: String,
+    /// The user's GitHub ID
+    pub github_id: Option<u32>,
+    pub avatar_url: String,
+    pub created: String,
+    pub role: FEModrinthUserRole,
+    /// Any badges applicable to this user.
+    /// These are currently unused and not displayed, and as such are subject to change.
+    ///
+    /// [documentation](https://docs.modrinth.com/api-spec/#tag/user_model)
+    pub badges: u32,
+}
+
+impl From<User> for FEModrinthUser {
+    fn from(value: User) -> Self {
+        Self {
+            username: value.username,
+            name: value.name,
+            email: value.email,
+            bio: value.bio,
+            id: value.id,
+            github_id: value.github_id,
+            avatar_url: value.avatar_url,
+            created: value.created.to_rfc3339(),
+            role: value.role.into(),
+            badges: value.badges,
+        }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthTeamMember {
+    /// The ID of the member's team
+    pub team_id: String,
+    pub user: FEModrinthUser,
+    pub role: String,
+    pub ordering: Option<u32>,
+}
+
+impl From<TeamMember> for FEModrinthTeamMember {
+    fn from(value: TeamMember) -> Self {
+        Self {
+            team_id: value.team_id,
+            user: value.user.into(),
+            role: value.role,
+            ordering: value.ordering,
         }
     }
 }

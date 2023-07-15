@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{project::Project, tag::Category, version::Version};
 
+use super::user::TeamMember;
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CategoriesResponse(pub Vec<Category>);
 
@@ -121,5 +123,34 @@ impl FromIterator<(String, Version)> for VersionHashesResponse {
             c.insert(hash, version);
         }
         VersionHashesResponse(c)
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TeamResponse(pub Vec<TeamMember>);
+impl Deref for TeamResponse {
+    type Target = Vec<TeamMember>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for TeamResponse {
+    type Item = TeamMember;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<TeamMember> for TeamResponse {
+    fn from_iter<I: IntoIterator<Item = TeamMember>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        TeamResponse(c)
     }
 }
