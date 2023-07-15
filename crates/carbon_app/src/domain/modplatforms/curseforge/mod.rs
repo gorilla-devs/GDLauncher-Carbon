@@ -43,21 +43,21 @@ pub struct File {
     pub modules: Vec<FileModule>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDependency {
     pub mod_id: i32,
     pub relation_type: FileRelationType,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileHash {
     pub value: String,
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -65,7 +65,7 @@ pub enum FileReleaseType {
     Alpha = 3,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum FileStatus {
     Processing = 1,
@@ -85,7 +85,7 @@ pub enum FileStatus {
     FailedPublishing = 15,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum FileRelationType {
     EmbeddedLibrary = 1,
@@ -96,14 +96,14 @@ pub enum FileRelationType {
     Include = 6,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum HashAlgo {
     Sha1 = 1,
     Md5 = 2,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileModule {
     pub name: String,
@@ -298,7 +298,7 @@ pub struct ModFileVersion {
     pub game_version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SortableGameVersion {
     pub game_version_name: String,
