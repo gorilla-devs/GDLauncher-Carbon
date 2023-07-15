@@ -23,7 +23,6 @@ import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { useModal } from "@/managers/ModalsManager";
-import { isCurseForgeData } from "@/utils/Mods";
 
 const NoMoreModpacks = () => {
   return (

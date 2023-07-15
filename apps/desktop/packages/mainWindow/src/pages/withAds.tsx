@@ -10,7 +10,7 @@ function withAdsLayout() {
 
   const location = useLocation();
 
-  const modpackPathRegex = /\/modpacks\/(\d+)(\/.*)?/;
+  const modpackPathRegex = /modpacks\/(\w+)(\/.*)?/;
   const isModpackDetails = () => modpackPathRegex.test(location.pathname);
 
   createEffect(() => {

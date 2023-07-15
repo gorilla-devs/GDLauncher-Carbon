@@ -3,27 +3,37 @@ import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch } from "solid-js";
 import fetchData from "../modpack.screenshots";
 import { Skeleton } from "@gd/ui";
+import { FEModAsset } from "@gd/core_module/bindings";
 
 const Screenshots = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const screenshots = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data?.screenshots
+      : routeData.modpackDetails.data?.gallery;
 
   return (
     <div>
       <Switch>
         <Match
           when={
-            routeData.modpackDetails.data?.data.screenshots.length! > 0 &&
+            (screenshots()?.length || 0) > 0 &&
             !routeData.modpackDetails.isLoading
           }
         >
           <div class="flex flex-col gap-4">
             <div class="flex gap-4 flex-wrap">
-              <For each={routeData.modpackDetails.data?.data.screenshots}>
+              <For each={screenshots()}>
                 {(screenshot) => (
                   <img
-                    src={screenshot.thumbnailUrl}
+                    src={
+                      routeData.isCurseforge
+                        ? (screenshot as FEModAsset).thumbnailUrl
+                        : screenshot.url
+                    }
                     class="rounded-xl w-72 h-44"
-                    alt={screenshot.description}
+                    alt={screenshot.description || ""}
                   />
                 )}
               </For>
@@ -32,7 +42,7 @@ const Screenshots = () => {
         </Match>
         <Match
           when={
-            routeData.modpackDetails.data?.data.screenshots.length! === 0 &&
+            (screenshots()?.length || 0) === 0 &&
             !routeData.modpackDetails.isLoading
           }
         >

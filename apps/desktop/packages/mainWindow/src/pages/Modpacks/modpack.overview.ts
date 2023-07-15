@@ -1,14 +1,8 @@
 import { rspc } from "@/utils/rspcClient";
-import { FESearchAPI } from "@gd/core_module/bindings";
-import { createEffect } from "solid-js";
 
-type Params = {
-  id: string;
-  platform: FESearchAPI;
-};
-
-const fetchData = ({ params }: { params: Params }) => {
+const fetchData = ({ params }: { params: any }) => {
   const isCurseforge = params.platform === "curseforge";
+
   if (isCurseforge) {
     const numericId = parseInt(params.id, 10);
     const modpackDetails = rspc.createQuery(() => [

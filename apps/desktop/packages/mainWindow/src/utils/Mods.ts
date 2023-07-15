@@ -1,5 +1,24 @@
-import { FEMod, FEUnifiedSearchResult } from "@gd/core_module/bindings";
+import {
+  FEFileIndex,
+  FEMod,
+  FEModrinthVersion,
+  FEUnifiedSearchResult,
+} from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
+import useModpacksQuery from "@/pages/Modpacks/useModpacksQuery";
+
+export const [query, setQuery] = useModpacksQuery({
+  searchQuery: "",
+  categories: null,
+  gameVersions: null,
+  modloaders: null,
+  projectType: "modPack",
+  sortIndex: { curseForge: "featured" },
+  sortOrder: "descending",
+  index: 0,
+  pageSize: 40,
+  searchApi: "curseforge",
+});
 
 type BaseProps = {
   data: FEUnifiedSearchResult;
@@ -99,4 +118,34 @@ export const getLatestVersion = (prop: ModRowProps) => {
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.latestFilesIndexes[0].gameVersion;
   } else return prop.data.modrinth.versions;
+};
+
+export const sortArrayByGameVersion = (
+  arr: FEFileIndex[] | FEModrinthVersion[]
+): (FEFileIndex | FEModrinthVersion)[] => {
+  let sortedArr = [...arr];
+
+  const isCurseForgeFile = (
+    arr: FEFileIndex | FEModrinthVersion
+  ): arr is FEFileIndex => "gameVersion" in arr;
+
+  sortedArr.sort((a, b) => {
+    const aGameVersion = isCurseForgeFile(a) ? a.gameVersion : a.version_number;
+    const bGameVersion = isCurseForgeFile(b) ? b.gameVersion : b.version_number;
+    let aVersion = aGameVersion.split(".").map(Number);
+    let bVersion = bGameVersion.split(".").map(Number);
+
+    for (let i = 0; i < aVersion.length; i++) {
+      if (aVersion[i] > bVersion[i]) {
+        return -1;
+      }
+      if (aVersion[i] < bVersion[i]) {
+        return 1;
+      }
+    }
+
+    return 0;
+  });
+
+  return sortedArr;
 };

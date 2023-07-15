@@ -20,6 +20,7 @@ import {
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
 import { scrollTop } from "@/utils/browser";
+import { query, setQuery } from "@/utils/Mods";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -38,19 +39,6 @@ export const useInfiniteModpacksQuery = () => {
 };
 
 function ModpacksLayout() {
-  const [query, setQuery] = useModpacksQuery({
-    searchQuery: "",
-    categories: null,
-    gameVersions: null,
-    modloaders: null,
-    projectType: "modPack",
-    sortIndex: { curseForge: "featured" },
-    sortOrder: "descending",
-    index: 0,
-    pageSize: 40,
-    searchApi: "curseforge",
-  });
-
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({

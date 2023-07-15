@@ -13,7 +13,7 @@ import {
   createNotification,
 } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
@@ -102,8 +102,9 @@ const Modpack = () => {
               class="h-full absolute left-0 right-0 top-0 z-10 bg-cover bg-center bg-fixed bg-no-repeat"
               style={{
                 "background-image": `url("${
-                  (routeData.modpackDetails?.data as FEModResponse)?.data.logo
-                    .url
+                  routeData.isCurseforge
+                    ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                    : routeData.modpackDetails.data?.icon_url
                 }")`,
                 "background-position": "right-5rem",
               }}
@@ -129,8 +130,9 @@ const Modpack = () => {
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                   style={{
                     "background-image": `url("${
-                      (routeData.modpackDetails?.data as FEModResponse)?.data
-                        .logo.thumbnailUrl
+                      routeData.isCurseforge
+                        ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                        : routeData.modpackDetails.data?.icon_url
                     }")`,
                   }}
                 />
@@ -139,10 +141,9 @@ const Modpack = () => {
                     <Switch>
                       <Match when={!isFetching()}>
                         <h1 class="m-0 h-9">
-                          {
-                            (routeData.modpackDetails?.data as FEModResponse)
-                              ?.data.name
-                          }
+                          {routeData.isCurseforge
+                            ? routeData.modpackDetails.data?.data.name
+                            : routeData.modpackDetails.data?.title}
                         </h1>
                       </Match>
                       <Match when={isFetching()}>
@@ -157,10 +158,10 @@ const Modpack = () => {
                       <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
                         <Switch>
                           <Match when={!isFetching()}>
-                            {
-                              routeData.modpackDetails.data?.data
-                                .latestFilesIndexes[0].gameVersion
-                            }
+                            {routeData.isCurseforge
+                              ? routeData.modpackDetails.data?.data
+                                  .latestFilesIndexes[0].gameVersion
+                              : routeData.modpackDetails.data?.game_versions[0]}
                           </Match>
                           <Match when={isFetching()}>
                             <Skeleton />
@@ -182,10 +183,11 @@ const Modpack = () => {
                             >
                               {format(
                                 new Date(
-                                  (
-                                    routeData.modpackDetails
-                                      .data as FEModResponse
-                                  ).data.dateCreated
+                                  routeData.isCurseforge
+                                    ? (routeData.modpackDetails.data?.data
+                                        .dateCreated as string)
+                                    : (routeData.modpackDetails.data
+                                        ?.published as string)
                                 ).getTime(),
                                 "P"
                               )}
@@ -203,7 +205,10 @@ const Modpack = () => {
                             <Match when={!isFetching()}>
                               <For
                                 each={
-                                  routeData.modpackDetails.data?.data.authors
+                                  routeData.isCurseforge
+                                    ? routeData.modpackDetails.data?.data
+                                        .authors
+                                    : routeData.modpackDetails.data?.team
                                 }
                               >
                                 {(author) => <p class="m-0">{author.name}</p>}
