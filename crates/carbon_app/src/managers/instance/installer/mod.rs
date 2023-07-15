@@ -121,8 +121,7 @@ impl Deref for Installer {
     }
 }
 
-impl Installer
-{
+impl Installer {
     pub fn new(resource_installer: BoxedResourceInstaller) -> Self {
         Self {
             inner: Arc::new(Mutex::new(resource_installer)),
@@ -151,8 +150,7 @@ pub trait InstallResource: Sync {
 // }
 
 #[async_trait::async_trait]
-impl InstallResource for Installer
-{
+impl InstallResource for Installer {
     async fn install(
         &self,
         app: Arc<AppInner>,
@@ -240,9 +238,7 @@ impl InstallResource for Installer
             }
 
             (installer_name, dep_error, processed_deps, dep_tasks)
-
         };
-
 
         async fn resource_installer_rollback(
             parent: String,
