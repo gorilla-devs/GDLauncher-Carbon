@@ -1,4 +1,10 @@
-import { FEFile, FEMod, FETask } from "@gd/core_module/bindings";
+import {
+  FEFile,
+  FEMod,
+  FEModrinthProject,
+  FEModrinthVersion,
+  FETask,
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
@@ -9,8 +15,9 @@ import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 
 type Props = {
-  modVersion: FEFile;
-  project: FEMod;
+  modVersion: FEModrinthVersion | FEFile;
+  project: FEMod | FEModrinthProject | undefined;
+  isCurseForge?: boolean;
 };
 
 const VersionRow = (props: Props) => {
@@ -65,29 +72,63 @@ const VersionRow = (props: Props) => {
     }
   );
 
+  // const getUrl = () => {
+  //   if (props.isCurseForge) {
+  //     return (props.modVersion as FEFile).displayName;
+  //   }
+  //   return (props.modVersion as FEModrinthVersion).;
+  // };
+  const getName = () => {
+    if (props.isCurseForge) {
+      return (props.modVersion as FEFile).displayName;
+    }
+    return (props.modVersion as FEModrinthVersion).name;
+  };
+
+  const getDate = () => {
+    if (props.isCurseForge) {
+      return (props.modVersion as FEFile).fileDate;
+    }
+    return (props.modVersion as FEModrinthVersion).date_published;
+  };
+
+  const getLastGameVersion = () => {
+    if (props.isCurseForge) {
+      return (props.modVersion as FEFile).gameVersions[0];
+    }
+    return (props.modVersion as FEModrinthVersion).version_number;
+  };
+
+  const getReleaseType = () => {
+    if (props.isCurseForge) {
+      return (props.modVersion as FEFile).releaseType;
+    }
+    return (props.modVersion as FEModrinthVersion).version_type;
+  };
+
   return (
     <div class="group flex justify-between items-center py-2 rounded-md px-2 hover:bg-darkSlate-900">
       <div class="flex flex-col">
         <h4 class="m-0 font-medium group-hover:text-lightSlate-200">
-          {props.modVersion.displayName}
+          {getName()}
         </h4>
         <div class="flex justify-between items-center">
           <div class="flex justify-between">
             <div class="flex justify-between text-sm divide-darkSlate-500 text-lightGray-800 divide-x-1">
-              <span class="pr-3">{props.modVersion.gameVersions[0]}</span>
+              <span class="pr-3">{getLastGameVersion()}</span>
               <span class="px-3">
-                {format(new Date(props.modVersion.fileDate), "dd-MM-yyyy")}
+                {format(new Date(getDate()), "dd-MM-yyyy")}
               </span>
             </div>
             <span
               class="pl-3"
               classList={{
-                "text-green-500": props.modVersion.releaseType === "stable",
-                "text-yellow-500": props.modVersion.releaseType === "beta",
-                "text-red-500": props.modVersion.releaseType === "alpha",
+                "text-green-500": getReleaseType() === "stable",
+                "text-yellow-500": getReleaseType() === "beta",
+                "text-red-500": getReleaseType() === "alpha",
               }}
             >
-              {props.modVersion.releaseType}
+              {getReleaseType()}
             </span>
           </div>
         </div>
@@ -95,19 +136,37 @@ const VersionRow = (props: Props) => {
       <span
         class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
         onClick={() => {
-          loadIconMutation.mutate(props.project.logo.url);
+          const icon = props.isCurseForge
+            ? (props.project as FEMod).logo.url
+            : (props.project as FEModrinthProject).icon_url;
+
+          const modpack = props.isCurseForge
+            ? {
+                Curseforge: {
+                  file_id: (props.modVersion as FEFile).id,
+                  project_id: (props.modVersion as FEFile).modId,
+                },
+              }
+            : {
+                Modrinth: {
+                  project_id: (props.modVersion as FEModrinthVersion)
+                    .project_id,
+                  version_id: (props.modVersion as FEModrinthVersion).id,
+                },
+              };
+
+          if (icon) {
+            loadIconMutation.mutate(icon);
+          }
           createInstanceMutation.mutate({
             group: defaultGroup.data || 1,
             use_loaded_icon: true,
             notes: "",
-            name: props.modVersion.displayName,
+            name: props.isCurseForge
+              ? (props.modVersion as FEFile).displayName
+              : (props.project as FEModrinthProject).title,
             version: {
-              Modpack: {
-                Curseforge: {
-                  file_id: props.modVersion.id,
-                  project_id: props.modVersion.modId,
-                },
-              },
+              Modpack: modpack,
             },
           });
         }}
