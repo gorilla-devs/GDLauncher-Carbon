@@ -1,4 +1,5 @@
 pub mod request;
+pub mod json;
 
 use std::fmt::{Debug, Display};
 
