@@ -166,9 +166,16 @@ impl From<FEUnifiedSearchType> for curseforge::structs::FEClassId {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub enum FEUnifiedSearchCategoryID {
+    Curseforge(i32),
+    Modrinth(String),
+}
+
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
-    pub categories: Option<And<String>>,
+    pub categories: Option<And<FEUnifiedSearchCategoryID>>,
     pub game_versions: Option<Or<String>>,
     pub modloaders: Option<Or<FEQueryModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
@@ -188,13 +195,14 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
                 game_id: 432,
                 search_filter: value.search_query,
                 game_version: value.game_versions.and_then(|vers| vers.first().cloned()),
-                category_id: value
-                    .categories
-                    .and_then(|cats| {
-                        cats.first()
-                            .and_then(|cator| cator.first().cloned().map(|cat| cat.parse::<i32>()))
+                category_id: value.categories.and_then(|cat_groups| {
+                    cat_groups.first().and_then(|cats| {
+                        cats.into_iter().find_map(|cat| match cat {
+                            FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
+                            FEUnifiedSearchCategoryID::Modrinth(_) => None,
+                        })
                     })
-                    .map_or(Ok(None), |cat_id| cat_id.map(Some))?,
+                }),
                 sort_order: value.sort_order,
                 sort_field: match value.sort_index {
                     Some(FEUnifiedModSortIndex::CurseForge(field)) => Some(field),
@@ -220,8 +228,8 @@ impl TryFrom<FEUnifiedSearchParameters>
     type Error = anyhow::Error;
 
     fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        let serach_params: curseforge::filters::FEModSearchParameters = value.try_into()?;
-        Ok(serach_params.into())
+        let search_params: curseforge::filters::FEModSearchParameters = value.try_into()?;
+        Ok(search_params.into())
     }
 }
 
@@ -233,7 +241,11 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProject
             for cat_or in categories {
                 let category_or = cat_or
                     .into_iter()
-                    .map(modrinth::filters::FEModrinthSearchFacet::Category)
+                    .filter_map(|cat| {match cat {
+                            FEUnifiedSearchCategoryID::Curseforge(_) => None,
+                            FEUnifiedSearchCategoryID::Modrinth(id) => Some(modrinth::filters::FEModrinthSearchFacet::Category(id)),
+
+                    }})
                     .collect();
                 facets.push(category_or);
             }
