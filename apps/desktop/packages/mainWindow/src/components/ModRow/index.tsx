@@ -260,7 +260,7 @@ const ModRow = (props: ModRowProps) => {
           Modrinth: {
             project_id: projectId?.toString() || props.data.modrinth.project_id,
             version_id:
-              fileId?.toString() || props.data.modrinth.latest_version || "",
+              fileId?.toString() || props.data.modrinth.versions[0] || "",
           },
         };
   };
