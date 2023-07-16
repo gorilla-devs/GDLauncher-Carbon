@@ -1,7 +1,8 @@
 use anyhow::{bail, Context};
 use carbon_net::{Checksum, Downloadable};
 use std::{
-    cell::RefCell, ffi::OsString, ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration,
+    cell::RefCell, collections::HashSet, ffi::OsString, ops::Deref, path::PathBuf, pin::Pin,
+    sync::Arc, time::Duration,
 };
 use tokio::{sync::Mutex, task::AbortHandle};
 
@@ -10,9 +11,12 @@ use crate::{
     domain::{
         self,
         instance::{self, InstanceId},
-        modplatforms::curseforge::{filters::{
-            ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
-        }, self},
+        modplatforms::curseforge::{
+            self,
+            filters::{
+                ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
+            },
+        },
         runtime_path::InstancePath,
         vtask::VisualTaskId,
     },
@@ -65,7 +69,8 @@ pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
-    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator;
+    fn dependencies(&self, app: &Arc<AppInner>, instance_data: &InstanceData)
+        -> DependencyIterator;
     fn is_already_installed(&self, instance_data: &InstanceData) -> bool;
     fn display_name(&self) -> String;
     async fn perform_install(
@@ -89,8 +94,12 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator {
-        (**self).dependencies(app)
+    fn dependencies(
+        &self,
+        app: &Arc<AppInner>,
+        instance_data: &InstanceData,
+    ) -> DependencyIterator {
+        (**self).dependencies(app, instance_data)
     }
 
     #[inline]
@@ -268,7 +277,7 @@ impl Installer {
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
         self.install_inner(app, instance_id, &instance_path, &task, &visited_ids)
-            .await;
+            .await?;
 
         Ok(task_id)
     }
@@ -285,7 +294,7 @@ impl Installer {
         {
             let mut lock = visited_ids.lock().await;
             let installer_id = self.inner.lock().await.id();
-            if lock.iter().find(|&id| id == &installer_id).is_none() {
+            if !lock.iter().any(|id| id == &installer_id) {
                 // not found, add ourselves
                 lock.push(installer_id);
             } else {
@@ -294,10 +303,19 @@ impl Installer {
             }
         }
 
-        let (installer_name, dep_error, processed_deps) = {
+        let (dep_error, processed_deps) = {
             let lock = self.inner.lock().await;
             let installer_name = lock.display_name();
-            let dep_iter = lock.dependencies(app);
+            let dep_iter = {
+                let instance_manager = app.instance_manager();
+                let instances = instance_manager.instances.read().await;
+                let instance = instances
+                    .get(instance_id)
+                    .expect("instance should still be valid");
+                let instance_data = instance.data().expect("instance should still be valid");
+
+                lock.dependencies(app, instance_data)
+            };
 
             let mut processed_deps = Vec::new();
             let mut dep_error = None;
@@ -339,7 +357,7 @@ impl Installer {
                 }
             }
 
-            (installer_name, dep_error, processed_deps)
+            (dep_error, processed_deps)
         };
 
         {
@@ -427,7 +445,11 @@ impl Installer {
                         Ok(()) => {}
                         Err(e) => {
                             let rollback_lock = rollback_context.lock().await;
-                            rollback_lock.as_ref().expect("valid rollback context in spawned task").rollback(Some(&e)).await;
+                            rollback_lock
+                                .as_ref()
+                                .expect("valid rollback context in spawned task")
+                                .rollback(Some(&e))
+                                .await;
 
                             let parent_task = parent_task.lock().await;
                             parent_task.clone().fail(e).await
@@ -439,7 +461,6 @@ impl Installer {
             }
         }
         Ok(())
-
     }
 }
 
@@ -518,11 +539,29 @@ impl ResourceInstaller for CurseforgeModInstaller {
         )
     }
 
-    fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator {
+    fn dependencies(
+        &self,
+        app: &Arc<AppInner>,
+        instance_data: &InstanceData,
+    ) -> DependencyIterator {
+        let game_version = instance_data
+            .config
+            .game_configuration
+            .version
+            .clone()
+            .and_then(|ver| match ver {
+                instance::info::GameVersion::Standard(version) => {
+                    Some((version.release, version.modloaders))
+                }
+                _ => None,
+            });
+
         let mut installers: Vec<ResourceInstallerGetter> = Vec::new();
         for dep in &self.file.dependencies {
             let app_clone = Arc::clone(app);
             let mod_id = dep.mod_id;
+            let game_version = game_version.clone();
+
             if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
@@ -541,10 +580,45 @@ impl ResourceInstaller for CurseforgeModInstaller {
                             })
                             .await
                             .and_then(|res| {
-                                res.data
-                                    .first()
-                                    .cloned()
-                                    .ok_or_else(|| anyhow::anyhow!("no files found"))
+                                // select an appropriate file based on game version and loader, or
+                                // the first file if that fails
+                                if let Some((release, modloaders)) = game_version {
+                                    let modloader_strings: Vec<String> = modloaders
+                                        .iter()
+                                        .filter_map(|modloader| match modloader.type_ {
+                                            domain::instance::info::ModLoaderType::Forge => {
+                                                Some("forge".to_string())
+                                            }
+                                            domain::instance::info::ModLoaderType::Fabric => {
+                                                Some("fabric".to_string())
+                                            }
+                                            domain::instance::info::ModLoaderType::Quilt => {
+                                                Some("quilt".to_string())
+                                            }
+                                            domain::instance::info::ModLoaderType::Unknown => None,
+                                        })
+                                        .collect();
+                                    if let Some(file) = res.data.iter().find(|&file| {
+                                        let has_release = file.game_versions.contains(&release);
+                                        let has_one_of_our_modloaders =
+                                            file.game_versions.iter().any(|ver| {
+                                                modloader_strings.contains(&ver.to_lowercase())
+                                            });
+                                        has_release && has_one_of_our_modloaders
+                                    }) {
+                                        Ok(file.clone())
+                                    } else {
+                                        res.data
+                                            .first()
+                                            .cloned()
+                                            .ok_or_else(|| anyhow::anyhow!("no files found"))
+                                    }
+                                } else {
+                                    res.data
+                                        .first()
+                                        .cloned()
+                                        .ok_or_else(|| anyhow::anyhow!("no files found"))
+                                }
                             })
                             .and_then(|file| {
                                 // let app_clone = Arc::clone(&self.app);
