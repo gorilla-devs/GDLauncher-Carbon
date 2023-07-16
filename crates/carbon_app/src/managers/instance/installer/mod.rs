@@ -1,16 +1,18 @@
 use anyhow::{bail, Context};
 use carbon_net::{Checksum, Downloadable};
-use std::{cell::RefCell, ffi::OsString, ops::Deref, pin::Pin, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use std::{
+    cell::RefCell, ffi::OsString, ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration,
+};
+use tokio::{sync::Mutex, task::AbortHandle};
 
 use crate::{
     api::{keys::instance::INSTANCE_DETAILS, translation::Translation},
     domain::{
         self,
         instance::{self, InstanceId},
-        modplatforms::curseforge::filters::{
+        modplatforms::curseforge::{filters::{
             ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
-        },
+        }, self},
         runtime_path::InstancePath,
         vtask::VisualTaskId,
     },
@@ -60,6 +62,8 @@ pub enum ResourceFingerprint {
 
 #[async_trait::async_trait]
 pub trait ResourceInstaller: Sync {
+    /// a unique ID to identify dependency loops
+    fn id(&self) -> String;
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
     fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator;
     fn is_already_installed(&self, instance_data: &InstanceData) -> bool;
@@ -75,9 +79,15 @@ pub trait ResourceInstaller: Sync {
 #[async_trait::async_trait]
 impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     #[inline]
+    fn id(&self) -> String {
+        (**self).id()
+    }
+
+    #[inline]
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
         (**self).downloadable(instance_path).await
     }
+
     #[inline]
     fn dependencies(&self, app: &Arc<AppInner>) -> DependencyIterator {
         (**self).dependencies(app)
@@ -91,6 +101,7 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     fn display_name(&self) -> String {
         (**self).display_name()
     }
+
     #[inline]
     async fn perform_install(
         &self,
@@ -99,6 +110,7 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     ) -> anyhow::Result<()> {
         (**self).perform_install(instance_data, downloadable).await
     }
+
     #[inline]
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
         (**self).rollback(instance_data).await
@@ -110,8 +122,62 @@ pub struct InstallResult {
     pub dependency_tasks: Vec<VisualTaskId>,
 }
 
+struct InstallerRollbackContext {
+    inner: Arc<Mutex<BoxedResourceInstaller>>,
+    processed_deps: Arc<Mutex<Vec<Installer>>>,
+    instance_id: InstanceId,
+    app: Arc<AppInner>,
+}
+
+impl InstallerRollbackContext {
+    pub async fn rollback(&self, inciting_error: Option<&anyhow::Error>) {
+        let instance_manager = self.app.instance_manager();
+        let mut instances = instance_manager.instances.write().await;
+        let instance = instances
+            .get_mut(&self.instance_id)
+            .expect("rollback should be called only when operating on a valid instance");
+
+        let data = instance
+            .data_mut()
+            .expect("rollback should be called only when operating on a valid instance");
+
+        let parent_name = {
+            let lock = self.inner.lock().await;
+            lock.display_name()
+        };
+
+        let processed_deps = self.processed_deps.lock().await;
+
+        for dep in processed_deps.iter() {
+            let abort_handle = dep.abort_handle.lock().await;
+            if let Some(handle) = &abort_handle.handle {
+                handle.abort();
+            }
+            let lock = dep.inner.lock().await;
+            match lock.rollback(data).await {
+                Ok(_) => {}
+                Err(err) => {
+                    // report this error but continue with others
+                    tracing::error!({error = ?err, inciting_error = ?inciting_error},
+                        "Error rolling back install of {name:?} during rollback of {parent:?} install",
+                        name = lock.display_name(),
+                        parent = parent_name
+                    );
+                }
+            }
+        }
+    }
+}
+
 pub struct Installer {
     inner: Arc<Mutex<BoxedResourceInstaller>>,
+    rollback_context: Arc<Mutex<Option<InstallerRollbackContext>>>,
+    abort_handle: Arc<Mutex<InstallerAbortHandle>>,
+}
+
+struct InstallerAbortHandle {
+    pub handle: Option<AbortHandle>,
+    pub aborted: bool,
 }
 
 impl Deref for Installer {
@@ -121,34 +187,48 @@ impl Deref for Installer {
     }
 }
 
-impl Installer {
-    pub fn new(resource_installer: BoxedResourceInstaller) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(resource_installer)),
-        }
-    }
-}
-
-#[async_trait::async_trait]
-pub trait InstallResource: Sync {
-    async fn install(
-        &self,
-        app: &Arc<AppInner>,
-        instance_id: &InstanceId,
-    ) -> anyhow::Result<InstallResult>;
-}
-
 pub trait IntoInstaller: Sized {
     fn into_installer(self) -> Installer;
 }
 
-#[async_trait::async_trait]
-impl InstallResource for Installer {
-    async fn install(
+impl Installer {
+    pub fn new(resource_installer: BoxedResourceInstaller) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(resource_installer)),
+            rollback_context: Arc::new(Mutex::new(None)),
+            abort_handle: Arc::new(Mutex::new(InstallerAbortHandle {
+                handle: None,
+                aborted: false,
+            })),
+        }
+    }
+
+    pub async fn abort(&self, inciting_error: Option<&anyhow::Error>) {
+        {
+            let mut abort_handle = self.abort_handle.lock().await;
+            if let Some(handle) = &abort_handle.handle {
+                if !handle.is_finished() {
+                    handle.abort();
+                }
+            }
+            abort_handle.aborted = true;
+        }
+
+        self.rollback(inciting_error).await;
+    }
+
+    async fn rollback(&self, inciting_error: Option<&anyhow::Error>) {
+        let lock = self.rollback_context.lock().await;
+        if let Some(context) = &*lock {
+            context.rollback(inciting_error).await;
+        }
+    }
+
+    pub async fn install(
         &self,
         app: &Arc<AppInner>,
         instance_id: &InstanceId,
-    ) -> anyhow::Result<InstallResult> {
+    ) -> anyhow::Result<VisualTaskId> {
         let (task, task_id, instance_path) = async {
             let instance_manager = app.instance_manager();
             let instances = instance_manager.instances.write().await;
@@ -185,13 +265,39 @@ impl InstallResource for Installer {
             Ok((task, id, instance_path))
         }
         .await?;
+        let visited_ids = Arc::new(Mutex::new(Vec::new()));
+        let task = Arc::new(Mutex::new(task));
+        self.install_inner(app, instance_id, &instance_path, &task, &visited_ids)
+            .await;
 
-        let (installer_name, dep_error, processed_deps, dep_tasks) = {
+        Ok(task_id)
+    }
+
+    #[async_recursion::async_recursion]
+    async fn install_inner(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: &InstanceId,
+        instance_path: &InstancePath,
+        parent_task: &Arc<Mutex<VisualTask>>,
+        visited_ids: &Arc<Mutex<Vec<String>>>,
+    ) -> anyhow::Result<()> {
+        {
+            let mut lock = visited_ids.lock().await;
+            let installer_id = self.inner.lock().await.id();
+            if lock.iter().find(|&id| id == &installer_id).is_none() {
+                // not found, add ourselves
+                lock.push(installer_id);
+            } else {
+                // already being installed
+                return Ok(());
+            }
+        }
+
+        let (installer_name, dep_error, processed_deps) = {
             let lock = self.inner.lock().await;
             let installer_name = lock.display_name();
             let dep_iter = lock.dependencies(app);
-
-            let mut dep_tasks = Vec::new();
 
             let mut processed_deps = Vec::new();
             let mut dep_error = None;
@@ -209,7 +315,13 @@ impl InstallResource for Installer {
                     Ok(dep) => {
                         let dep_name = dep.display_name();
                         let dep = Installer::new(dep);
-                        let install_future = dep.install(app, instance_id);
+                        let install_future = dep.install_inner(
+                            app,
+                            instance_id,
+                            instance_path,
+                            parent_task,
+                            visited_ids,
+                        );
                         let results = install_future.await;
                         match results {
                             Err(err) => {
@@ -219,9 +331,7 @@ impl InstallResource for Installer {
                                 )));
                                 break;
                             }
-                            Ok(mut results) => {
-                                dep_tasks.push(results.task);
-                                dep_tasks.append(&mut results.dependency_tasks);
+                            Ok(()) => {
                                 processed_deps.push(dep);
                             }
                         }
@@ -229,145 +339,107 @@ impl InstallResource for Installer {
                 }
             }
 
-            (installer_name, dep_error, processed_deps, dep_tasks)
+            (installer_name, dep_error, processed_deps)
         };
 
-        async fn resource_installer_rollback(
-            parent: String,
-            app: &Arc<AppInner>,
-            instance_id: &InstanceId,
-            processed_deps: Vec<Installer>,
-            inciting_error: anyhow::Error,
-        ) -> anyhow::Error {
-            let instance_manager = app.instance_manager();
-            let mut instances = instance_manager.instances.write().await;
-            let instance = instances
-                .get_mut(instance_id)
-                .expect("rollback should be called only when operating on a valid instance");
-
-            let data = instance
-                .data_mut()
-                .expect("rollback should be called only when operating on a valid instance");
-
-            for dep in processed_deps {
-                let lock = dep.lock().await;
-                match lock.rollback(data).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        // report this error but continue with others
-                        tracing::error!({error = ?err, inciting_error = ?inciting_error},
-                            "Error rolling back install of {name:?} during rollback of {parent:?} install",
-                            name = lock.display_name(),
-                            parent = parent
-                        );
-                    }
-                }
-            }
-            inciting_error
+        {
+            let mut lock = self.rollback_context.lock().await;
+            *lock = Some(InstallerRollbackContext {
+                inner: Arc::clone(&self.inner),
+                processed_deps: Arc::new(Mutex::new(processed_deps)),
+                instance_id: *instance_id,
+                app: Arc::clone(app),
+            })
         }
 
         if let Some(dep_error) = dep_error {
-            return Err(resource_installer_rollback(
-                installer_name,
-                app,
-                instance_id,
-                processed_deps,
-                dep_error,
-            )
-            .await);
+            self.rollback(Some(&dep_error)).await;
+            return Err(dep_error);
         }
 
-        let t_download_file = task
-            .subtask(Translation::InstanceTaskInstallModDownloadFile)
-            .await;
+        let t_download_file = {
+            let lock = parent_task.lock().await;
+            lock.subtask(Translation::InstanceTaskInstallModDownloadFile)
+                .await
+        };
 
         let instance_id = *instance_id;
         let instance_path = instance_path.clone();
         let inner = Arc::clone(&self.inner);
         let app_clone = Arc::clone(app);
+        let rollback_context = Arc::clone(&self.rollback_context);
+        let parent_task = Arc::clone(parent_task);
 
-        tokio::spawn(async move {
-            let r = (|| async {
-                let downloadable = {
-                    let lock = inner.lock().await;
-                    lock.downloadable(&instance_path).await
-                };
+        {
+            let mut abort_handle = self.abort_handle.lock().await;
+            if !abort_handle.aborted {
+                let task_handle = tokio::spawn(async move {
+                    let r = (|| async {
+                        let downloadable = {
+                            let lock = inner.lock().await;
+                            lock.downloadable(&instance_path).await
+                        };
 
-                if let Some(downloadable) = &downloadable {
-                    let (progress_watch_tx, mut progress_watch_rx) =
-                        tokio::sync::watch::channel(carbon_net::Progress::new());
+                        if let Some(downloadable) = &downloadable {
+                            let (progress_watch_tx, mut progress_watch_rx) =
+                                tokio::sync::watch::channel(carbon_net::Progress::new());
 
-                    // dropped when the sender is dropped
-                    tokio::spawn(async move {
-                        while progress_watch_rx.changed().await.is_ok() {
-                            {
-                                let progress = progress_watch_rx.borrow();
-                                t_download_file.update_download(
-                                    progress.current_size as u32,
-                                    progress.total_size as u32,
-                                );
-                            }
+                            // dropped when the sender is dropped
+                            tokio::spawn(async move {
+                                while progress_watch_rx.changed().await.is_ok() {
+                                    {
+                                        let progress = progress_watch_rx.borrow();
+                                        t_download_file.update_download(
+                                            progress.current_size as u32,
+                                            progress.total_size as u32,
+                                        );
+                                    }
 
-                            tokio::time::sleep(Duration::from_millis(200)).await;
+                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                }
+
+                                t_download_file.complete_download();
+                            });
+
+                            carbon_net::download_file(downloadable, Some(progress_watch_tx)).await?
                         }
 
-                        t_download_file.complete_download();
-                    });
+                        {
+                            // context to drop instance lock after install attempt
+                            let instance_manager = app_clone.instance_manager();
+                            let mut instances = instance_manager.instances.write().await;
+                            let instance = instances
+                                .get_mut(&instance_id)
+                                .expect("instance should still be valid");
 
-                    if let Err(err) =
-                        carbon_net::download_file(downloadable, Some(progress_watch_tx)).await
-                    {
-                        return Err(resource_installer_rollback(
-                            installer_name,
-                            &app_clone,
-                            &instance_id,
-                            processed_deps,
-                            err.into(),
-                        )
-                        .await);
+                            let data = instance.data_mut().expect("instance should still be valid");
+                            let lock = inner.lock().await;
+
+                            lock.perform_install(data, downloadable).await
+                        }?;
+
+                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                        Ok::<_, anyhow::Error>(())
+                    })()
+                    .await;
+
+                    match r {
+                        Ok(()) => {}
+                        Err(e) => {
+                            let rollback_lock = rollback_context.lock().await;
+                            rollback_lock.as_ref().expect("valid rollback context in spawned task").rollback(Some(&e)).await;
+
+                            let parent_task = parent_task.lock().await;
+                            parent_task.clone().fail(e).await
+                        }
                     }
-                }
+                });
 
-                let install_result = {
-                    // context to drop instance lock after install attempt
-                    let instance_manager = app_clone.instance_manager();
-                    let mut instances = instance_manager.instances.write().await;
-                    let instance = instances
-                        .get_mut(&instance_id)
-                        .expect("instance should still be valid");
-
-                    let data = instance.data_mut().expect("instance should still be valid");
-                    let lock = inner.lock().await;
-
-                    lock.perform_install(data, downloadable).await
-                };
-
-                if let Err(err) = install_result {
-                    return Err(resource_installer_rollback(
-                        installer_name,
-                        &app_clone,
-                        &instance_id,
-                        processed_deps,
-                        err,
-                    )
-                    .await);
-                }
-
-                app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
-                Ok::<_, anyhow::Error>(())
-            })()
-            .await;
-
-            match r {
-                Ok(()) => {}
-                Err(e) => task.fail(e).await,
+                abort_handle.handle = Some(task_handle.abort_handle());
             }
-        });
+        }
+        Ok(())
 
-        Ok(InstallResult {
-            task: task_id,
-            dependency_tasks: dep_tasks,
-        })
     }
 }
 
@@ -419,6 +491,10 @@ impl CurseforgeModInstaller {
 
 #[async_trait::async_trait]
 impl ResourceInstaller for CurseforgeModInstaller {
+    fn id(&self) -> String {
+        format!("curseforge:{}:{}", &self.file.mod_id, &self.file.id)
+    }
+
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
         let install_path = instance_path.get_mods_path().join(&self.file.file_name);
 
@@ -447,35 +523,37 @@ impl ResourceInstaller for CurseforgeModInstaller {
         for dep in &self.file.dependencies {
             let app_clone = Arc::clone(app);
             let mod_id = dep.mod_id;
-            installers.push(Box::new(move || {
-                Box::pin(async move {
-                    app_clone
-                        .modplatforms_manager()
-                        .curseforge
-                        .get_mod_files(ModFilesParameters {
-                            mod_id,
-                            query: ModFilesParametersQuery {
-                                game_version: None,
-                                game_version_type_id: None,
-                                index: None,
-                                page_size: None,
-                                mod_loader_type: None,
-                            },
-                        })
-                        .await
-                        .and_then(|res| {
-                            res.data
-                                .first()
-                                .cloned()
-                                .ok_or_else(|| anyhow::anyhow!("no files found"))
-                        })
-                        .and_then(|file| {
-                            // let app_clone = Arc::clone(&self.app);
-                            CurseforgeModInstaller::from_file(file)
-                                .map(|installer| Box::new(installer) as BoxedResourceInstaller)
-                        })
-                })
-            }));
+            if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
+                installers.push(Box::new(move || {
+                    Box::pin(async move {
+                        app_clone
+                            .modplatforms_manager()
+                            .curseforge
+                            .get_mod_files(ModFilesParameters {
+                                mod_id,
+                                query: ModFilesParametersQuery {
+                                    game_version: None,
+                                    game_version_type_id: None,
+                                    index: None,
+                                    page_size: None,
+                                    mod_loader_type: None,
+                                },
+                            })
+                            .await
+                            .and_then(|res| {
+                                res.data
+                                    .first()
+                                    .cloned()
+                                    .ok_or_else(|| anyhow::anyhow!("no files found"))
+                            })
+                            .and_then(|file| {
+                                // let app_clone = Arc::clone(&self.app);
+                                CurseforgeModInstaller::from_file(file)
+                                    .map(|installer| Box::new(installer) as BoxedResourceInstaller)
+                            })
+                    })
+                }));
+            }
         }
         DependencyIterator::new(installers.into_iter())
     }
@@ -501,6 +579,12 @@ impl ResourceInstaller for CurseforgeModInstaller {
         let Some(downloadable) = downloadable else {
             return Err(anyhow::anyhow!("Perform install called before file was downloaded."))
         };
+
+        tracing::info!(
+            "Installing {} from {}",
+            self.file.display_name,
+            downloadable.path.to_string_lossy()
+        );
 
         let file_data = tokio::fs::read(&downloadable.path).await.with_context(|| {
             format!(
@@ -566,8 +650,6 @@ impl ResourceInstaller for CurseforgeModInstaller {
 
 impl IntoInstaller for CurseforgeModInstaller {
     fn into_installer(self) -> Installer {
-        Installer {
-            inner: Arc::new(Mutex::new(Box::new(self) as BoxedResourceInstaller)),
-        }
+        Installer::new(Box::new(self) as BoxedResourceInstaller)
     }
 }

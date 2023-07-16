@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{
-    installer::{CurseforgeModInstaller, InstallResource, IntoInstaller},
+    installer::{CurseforgeModInstaller, IntoInstaller},
     Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError, Mod,
 };
 
@@ -142,7 +142,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let install_result = installer.install(self.app, &instance_id).await?;
 
-        Ok(install_result.task)
+        Ok(install_result)
     }
 }
 
