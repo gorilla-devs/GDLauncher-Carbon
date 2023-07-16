@@ -11,7 +11,9 @@ use serde_json::json;
 use thiserror::Error;
 use tracing::info;
 
-use crate::error::request::{censor_error, RequestContext, RequestError, RequestErrorDetails};
+use crate::error::request::{
+    censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
+};
 
 const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
 
@@ -280,7 +282,9 @@ impl XboxAuth {
                         .ok_or_else(|| {
                             anyhow!(RequestError {
                                 context: RequestContext::none(),
-                                error: RequestErrorDetails::MalformedResponse,
+                                error: RequestErrorDetails::MalformedResponse {
+                                    details: MalformedResponseDetails::UnknownDecodeError
+                                },
                             })
                         })?
                         .uhs
