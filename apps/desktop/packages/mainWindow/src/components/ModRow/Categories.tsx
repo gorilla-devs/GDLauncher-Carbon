@@ -1,5 +1,5 @@
 import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/Mods";
-import { Accessor, For, Match, Show, Switch, createEffect } from "solid-js";
+import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tag, Tooltip } from "@gd/ui";
 import { FECategory } from "@gd/core_module/bindings";
 

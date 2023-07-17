@@ -5,7 +5,6 @@ import {
   CreateInfiniteQueryResult,
   createInfiniteQuery,
 } from "@tanstack/solid-query";
-import useModpacksQuery from "./useModpacksQuery";
 import {
   Setter,
   createContext,
