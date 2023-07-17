@@ -40,7 +40,7 @@ export const useInfiniteModpacksQuery = () => {
 
 function ModpacksLayout() {
   const [query, setQuery] = useModpacksQuery({
-    categoryId: null,
+    categoryIds: null,
     classId: "modpacks",
     gameId: 432,
     gameVersion: "",
