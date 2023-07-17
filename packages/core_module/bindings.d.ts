@@ -161,6 +161,8 @@ export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationR
 
 export type FEImportInstance = { entity: FEEntity; index: number }
 
+export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedSearchCategoryID> | null; gameVersions: Or<string> | null; modloaders: Or<FEQueryModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: FEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
+
 export type FEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
 
 export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
@@ -251,6 +253,8 @@ export type ListInstance = { id: FEInstanceId; name: string; favorite: boolean; 
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
 
 export type FEModParameters = { modId: number }
+
+export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: string }
 
 export type FEModrinthDependencyType = "required" | "optional" | "incompatible" | "embedded"
 
@@ -403,8 +407,6 @@ export type FEModrinthProjectIDs = string[]
 export type FEModdedManifestLoaderVersion = { id: string }
 
 export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: ModLoaderType[] | null }
-
-export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<string> | null; gameVersions: Or<string> | null; modloaders: Or<FEQueryModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: FEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
 
 export type FEModDescriptionParameters = { modId: number }
 

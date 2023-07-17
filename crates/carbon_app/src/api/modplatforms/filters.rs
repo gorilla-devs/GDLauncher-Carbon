@@ -194,9 +194,9 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
             query: FEModSearchParametersQuery {
                 game_id: 432,
                 search_filter: value.search_query,
-                game_version: value.game_versions.and_then(|vers| vers.first().cloned()),
+                game_version: value.game_versions.and_then(|vers| vers.into_iter().next()),
                 category_id: value.categories.and_then(|cat_groups| {
-                    cat_groups.first().and_then(|cats| {
+                    cat_groups.into_iter().next().and_then(|cats| {
                         cats.into_iter().find_map(|cat| match cat {
                             FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
                             FEUnifiedSearchCategoryID::Modrinth(_) => None,
@@ -211,7 +211,7 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
                 class_id: value.project_type.map(Into::into),
                 mod_loader_type: value
                     .modloaders
-                    .and_then(|loaders| loaders.first().cloned().map(Into::into)),
+                    .and_then(|loaders| loaders.into_iter().next().map(Into::into)),
                 author_id: None,
                 game_version_type_id: None,
                 slug: None,
