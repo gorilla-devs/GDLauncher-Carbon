@@ -1,5 +1,4 @@
 /* eslint-disable solid/no-innerhtml */
-/* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
@@ -11,11 +10,14 @@ import {
   FEModrinthCategory,
   FEQueryModLoaderType,
   FESearchAPI,
+  FEUnifiedSearchCategoryID,
+  ModLoaderType,
   ModpackPlatform,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
+import { capitalize } from "@/utils/helpers";
 
 const getIcon = (category: FECategory | FEModrinthCategory) => {
   if ("iconUrl" in category) {
@@ -64,7 +66,11 @@ const Sidebar = () => {
 
   createEffect(() => {
     if (routeData.modrinthCategories.data) {
-      setModrinthCategories(routeData.modrinthCategories.data);
+      setModrinthCategories(
+        routeData.modrinthCategories.data.filter(
+          (category) => category.project_type === "modpack"
+        )
+      );
     }
   });
 
@@ -93,6 +99,18 @@ const Sidebar = () => {
       ? forgeCategories()
       : modrinthCategories();
 
+  function getCategoryId(searchCategory: FEUnifiedSearchCategoryID) {
+    if ("curseforge" in searchCategory) {
+      return searchCategory.curseforge;
+    } else if ("modrinth" in searchCategory) {
+      return searchCategory.modrinth;
+    }
+  }
+
+  const isCurseforge = () => infiniteQuery.query?.searchApi === "curseforge";
+
+  const modloaders = ["any", "forge", "fabric", "quilt"];
+
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -104,9 +122,10 @@ const Sidebar = () => {
 
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
+                  categories: [],
                 });
               }}
-              value={infiniteQuery.query.searchApi}
+              value={infiniteQuery.query?.searchApi}
             >
               <For each={ModpackPlatforms}>
                 {(platform) => (
@@ -124,36 +143,31 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
-                const mappedValue = val === "any" ? null : val;
+                const mappedValue =
+                  val === "any" ? null : [val as FEQueryModLoaderType];
                 infiniteQuery?.setQuery({
-                  modloaders: [mappedValue as FEQueryModLoaderType],
+                  modloaders: mappedValue,
                 });
               }}
-              value={infiniteQuery?.query.modloaders || "any"}
+              // value={infiniteQuery?.query.modloaders}
             >
-              <Radio name="modloader" value="any">
-                <div class="flex items-center gap-2">
-                  <p class="m-0">Any</p>
-                </div>
-              </Radio>
-              <Radio name="modloader" value="forge">
-                <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("Forge")} />
-                  <p class="m-0">Forge</p>
-                </div>
-              </Radio>
-              <Radio name="modloader" value="fabric">
-                <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("Fabric")} />
-                  <p class="m-0">Fabric</p>
-                </div>
-              </Radio>
-              <Radio name="modloader" value="quilt">
-                <div class="flex items-center gap-2">
-                  <img class="h-4 w-4" src={getModloaderIcon("Quilt")} />
-                  <p class="m-0">Quilt</p>
-                </div>
-              </Radio>
+              <For each={modloaders}>
+                {(modloader) => (
+                  <Radio name="modloader" value={modloader}>
+                    <div class="flex items-center gap-2">
+                      <Show when={modloader !== "any"}>
+                        <img
+                          class="h-4 w-4"
+                          src={getModloaderIcon(
+                            capitalize(modloader) as ModLoaderType
+                          )}
+                        />
+                      </Show>
+                      <p class="m-0">{capitalize(modloader)}</p>
+                    </div>
+                  </Radio>
+                )}
+              </For>
             </Radio.group>
           </div>
         </Collapsable>
@@ -163,12 +177,44 @@ const Sidebar = () => {
               <div class="flex flex-col gap-3">
                 <For each={categories()}>
                   {(category) => {
+                    const categoryObj = () =>
+                      isCurseforge()
+                        ? { curseforge: (category as FECategory).id }
+                        : { modrinth: (category as FEModrinthCategory).name };
+
+                    const categoryId = () =>
+                      isCurseforge()
+                        ? (category as FECategory).id
+                        : (category as FEModrinthCategory).name;
+
+                    const isCategoryIncluded =
+                      infiniteQuery?.query.categories?.some(
+                        (item) =>
+                          ("curseforge" in item &&
+                            item.curseforge === categoryId()) ||
+                          ("modrinth" in item && item.modrinth === categoryId())
+                      );
+
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={infiniteQuery?.query.categories?.includes(
-                            category.name
-                          )}
+                          checked={!!isCategoryIncluded}
+                          onChange={(checked) => {
+                            const prevCategories =
+                              infiniteQuery?.query.categories || [];
+
+                            const newCategories = checked
+                              ? [...prevCategories, [categoryObj()]]
+                              : prevCategories.filter(
+                                  (categ) =>
+                                    getCategoryId(categ[0]) !==
+                                    getCategoryId(categoryObj())
+                                );
+
+                            infiniteQuery.setQuery({
+                              categories: newCategories,
+                            });
+                          }}
                         />
                         <div class="flex items-center gap-2 max-w-32">
                           <Icon category={category} />
