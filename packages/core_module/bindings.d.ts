@@ -109,8 +109,6 @@ export type FEModrinthProjectSupportRange = "required" | "optional" | "unsupport
 
 export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
-export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<string> | null; gameVersions: Or<string> | null; modloaders: Or<FEQueryModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: FEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
-
 export type And<T> = Or<T>[]
 
 export type FEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryId: number | null; sortOrder: FEModSearchSortOrder | null; sortField: FEModSearchSortField | null; classId: FEClassId | null; modLoaderType: FEModLoaderType | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
@@ -126,6 +124,8 @@ export type ManifestVersion = { id: string; type: McType }
 export type FEModrinthVersionsResponse = FEModrinthVersion[]
 
 export type GameLogId = number
+
+export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedSearchCategoryID> | null; gameVersions: Or<string> | null; modloaders: Or<FEQueryModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: FEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
 
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
 
@@ -276,6 +276,8 @@ export type FEFileDependency = { modId: number; relationType: FEFileRelationType
 export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
+
+export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: string }
 
 export type FEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
