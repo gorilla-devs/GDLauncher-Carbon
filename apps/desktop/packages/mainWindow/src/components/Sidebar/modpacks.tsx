@@ -99,15 +99,20 @@ const Sidebar = () => {
                           checked={infiniteQuery?.query.query.categoryIds?.includes(
                             category.id
                           )}
-                          onChange={() =>
+                          onChange={(checked) => {
+                            const prevIds =
+                              infiniteQuery?.query.query?.categoryIds || [];
+
+                            const newCategories = checked
+                              ? [...prevIds, category.id]
+                              : prevIds.filter(
+                                  (categ) => categ !== category.id
+                                );
+
                             infiniteQuery.setQuery({
-                              categoryIds: [
-                                ...(infiniteQuery?.query.query.categoryIds ||
-                                  []),
-                                category.id,
-                              ],
-                            })
-                          }
+                              categoryIds: newCategories,
+                            });
+                          }}
                         />
                         <div class="flex items-center gap-2 max-w-32">
                           <img src={category.iconUrl} class="h-4 w-4" />
