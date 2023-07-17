@@ -12,7 +12,7 @@ type Props = {
   setSelectedMods: SetStoreFunction<{
     [id: string]: boolean;
   }>;
-  selectedMods: {
+  selectMods: {
     [id: string]: boolean;
   };
 };
@@ -32,7 +32,7 @@ const Mod = (props: Props) => {
       <div class="flex gap-4 justify-between items-center w-full">
         <div class="flex gap-4 justify-between items-center">
           <Checkbox
-            checked={props.selectedMods[props.mod.id]}
+            checked={props.selectMods[props.mod.id]}
             onChange={(e) => {
               props.setSelectedMods(props.mod.id, e);
             }}

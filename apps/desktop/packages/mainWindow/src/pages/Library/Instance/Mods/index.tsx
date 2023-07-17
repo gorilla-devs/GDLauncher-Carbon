@@ -13,7 +13,7 @@ const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
   const modalsContext = useModal();
-  const [selectedMods, setSelectedMods] = createStore<{
+  const [selectMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -63,6 +63,9 @@ const Mods = () => {
   };
 
   const mods = () => routeData.instanceMods.data || [];
+
+  const selectedMods = () =>
+    Object.entries(selectMods).filter(([_id, selected]) => selected);
 
   return (
     <div>
@@ -151,7 +154,7 @@ const Mods = () => {
             <div
               class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
               onClick={() => {
-                Object.keys(selectedMods).forEach((mod) => {
+                Object.keys(selectMods).forEach((mod) => {
                   deleteModMutation.mutate({
                     instance_id: parseInt(params.id, 10),
                     mod_id: mod,
@@ -167,16 +170,18 @@ const Mods = () => {
                 }}
               />
             </div>
-            <Show when={Object.keys(selectedMods).length > 0}>
+            <Show
+              when={Object.values(selectMods).filter((val) => val).length > 0}
+            >
               <div
                 class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
                 onClick={() => {
                   const areSelectedEnabled = mods()
-                    .filter((mod) => selectedMods[mod.id])
+                    .filter((mod) => selectMods[mod.id])
                     .every((mod) => mod.enabled);
 
                   mods()
-                    .filter((mod) => selectedMods[mod.id])
+                    .filter((mod) => selectMods[mod.id])
                     .forEach((mod) => {
                       if (areSelectedEnabled) {
                         disableModMutation.mutate({
@@ -194,7 +199,7 @@ const Mods = () => {
               >
                 <Show
                   when={mods()
-                    .filter((mod) => selectedMods[mod.id])
+                    .filter((mod) => selectMods[mod.id])
                     .every((mod) => mod.enabled)}
                   fallback={
                     <Trans
@@ -216,7 +221,7 @@ const Mods = () => {
             </Show>
           </div>
           <div class="flex gap-1">
-            <span>{mods().length}</span>
+            <span>{selectedMods().length || mods().length}</span>
 
             <Trans
               key="instance.mods"
@@ -239,7 +244,7 @@ const Mods = () => {
               <Mod
                 mod={props}
                 setSelectedMods={setSelectedMods}
-                selectedMods={selectedMods}
+                selectMods={selectMods}
               />
             )}
           </For>
