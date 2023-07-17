@@ -259,7 +259,8 @@ pub struct ProjectSearchParameters {
     /// ```
     #[serde(
         serialize_with = "serialize_as_raw_json",
-        deserialize_with = "deserialize_from_raw_json"
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
     )]
     pub facets: Option<SearchFacetAnd>,
     /// The sorting method to use for sorting search results.
@@ -299,7 +300,9 @@ pub struct VersionIDs {
     /// list of version ids to fetch
     #[serde(
         serialize_with = "serialize_as_raw_json",
-        deserialize_with = "deserialize_from_raw_json"
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+
     )]
     pub ids: Vec<String>,
 }
@@ -374,7 +377,9 @@ impl Deref for TeamID {
 pub struct ProjectIDs {
     #[serde(
         serialize_with = "serialize_as_raw_json",
-        deserialize_with = "deserialize_from_raw_json"
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+
     )]
     pub ids: Vec<String>,
 }
