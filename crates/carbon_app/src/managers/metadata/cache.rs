@@ -258,7 +258,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                             async move {
                                 let mut path = pathbuf.join(&subpath);
                                 if !enabled {
-                                    path.push(".disabled")
+                                    path.set_extension("jar.disabled");
                                 }
 
                                 let mut content = tokio::fs::read(path).await?;
