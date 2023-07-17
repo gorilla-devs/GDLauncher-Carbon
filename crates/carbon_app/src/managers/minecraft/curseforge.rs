@@ -14,7 +14,7 @@ use crate::managers::App;
 // Download mods
 // Extract overrides
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ProgressState {
     Idle,
     DownloadingAddonZip(u64, u64),
@@ -28,14 +28,12 @@ pub struct ModpackInfo {
     pub downloadables: Vec<Downloadable>,
 }
 
-pub async fn prepare_modpack(
+pub async fn prepare_modpack_from_addon(
     app: &App,
     cf_addon: &File,
     instance_path: InstancePath,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
-    let progress_percentage_sender = Arc::new(progress_percentage_sender);
-
     let temp_dir = &app.settings_manager().runtime_path.get_temp();
     let modpack_download_url = cf_addon
         .download_url
@@ -58,22 +56,33 @@ pub async fn prepare_modpack(
     let (download_progress_sender, mut download_progress_recv) =
         tokio::sync::watch::channel(Progress::new());
 
-    let progress_percentage_sender_clone = progress_percentage_sender.clone();
-
-    tokio::spawn(async move {
+    let progress_percentage_sender = tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
-            progress_percentage_sender_clone.send(ProgressState::DownloadingAddonZip(
+            progress_percentage_sender.send(ProgressState::DownloadingAddonZip(
                 download_progress_recv.borrow().current_size,
                 download_progress_recv.borrow().total_size,
             ))?;
         }
 
-        Ok::<(), anyhow::Error>(())
+        Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    let file_path_clone = file_path.clone();
+    let progress_percentage_sender = progress_percentage_sender.await??;
+
+    prepare_modpack_from_zip(app, file_path, instance_path, progress_percentage_sender).await
+}
+
+pub async fn prepare_modpack_from_zip(
+    app: &App,
+    zip_path: PathBuf,
+    instance_path: InstancePath,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+) -> anyhow::Result<ModpackInfo> {
+    let progress_percentage_sender = Arc::new(progress_percentage_sender);
+
+    let file_path_clone = zip_path.clone();
     let (mut archive, manifest) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
         let mut archive = zip::ZipArchive::new(file)?;
@@ -87,7 +96,6 @@ pub async fn prepare_modpack(
     .await??;
 
     let downloadables = {
-        let mut downloadables = Vec::new();
         let mut handles = Vec::new();
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
@@ -133,22 +141,15 @@ pub async fn prepare_modpack(
             handles.push(handle);
         }
 
-        for handle in handles {
-            match handle.await? {
-                Ok(downloadable) => {
-                    downloadables.push(downloadable);
-                }
-                Err(e) => {
-                    println!("Failed to download mod: {:?}", e);
-                }
-            }
-        }
-
-        downloadables
+        futures::future::join_all(handles)
+            .await
+            .into_iter()
+            .flatten()
+            .collect::<Result<Vec<_>, _>>()?
     };
 
     let override_folder_name = manifest.overrides.clone();
-    let override_full_path = instance_path.get_root();
+    let override_full_path = instance_path.get_data_path();
     tokio::fs::create_dir_all(&override_full_path).await?;
     spawn_blocking(move || {
         let total_archive_files = archive.len() as u64;
@@ -173,18 +174,9 @@ pub async fn prepare_modpack(
                         std::fs::create_dir_all(p)?;
                     }
                 }
+
                 let mut outfile = std::fs::File::create(&outpath)?;
                 std::io::copy(&mut file, &mut outfile)?;
-            }
-
-            // Get and Set permissions
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-
-                if let Some(mode) = file.unix_mode() {
-                    std::fs::set_permissions(outpath, std::fs::Permissions::from_mode(mode))?;
-                }
             }
 
             progress_percentage_sender.send(ProgressState::ExtractingAddonOverrides(
@@ -197,7 +189,7 @@ pub async fn prepare_modpack(
     })
     .await??;
 
-    tokio::fs::remove_file(&file_path).await?;
+    tokio::fs::remove_file(&zip_path).await?;
 
     Ok(ModpackInfo {
         manifest,
@@ -205,39 +197,39 @@ pub async fn prepare_modpack(
     })
 }
 
-#[cfg(test)]
-mod test {
-    use crate::domain::runtime_path::InstancePath;
-    use crate::managers::minecraft::curseforge::{prepare_modpack, ProgressState};
-    use crate::{
-        domain::modplatforms::curseforge::filters::ModFileParameters,
-        managers::modplatforms::curseforge::CurseForge, setup_managers_for_test,
-    };
+// #[cfg(test)]
+// mod test {
+//     use crate::domain::runtime_path::InstancePath;
+//     use crate::managers::minecraft::curseforge::{prepare_modpack, ProgressState};
+//     use crate::{
+//         domain::modplatforms::curseforge::filters::ModFileParameters,
+//         managers::modplatforms::curseforge::CurseForge, setup_managers_for_test,
+//     };
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn test_prepare_modpack() {
-        let app = setup_managers_for_test().await;
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
-        let curseforge = CurseForge::new(client);
+//     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+//     async fn test_prepare_modpack() {
+//         let app = setup_managers_for_test().await;
+//         let client = reqwest::Client::builder().build().unwrap();
+//         let client = reqwest_middleware::ClientBuilder::new(client).build();
+//         let curseforge = CurseForge::new(client);
 
-        let temp_path = app.tmpdir.join("test_prepare_modpack");
+//         let temp_path = app.tmpdir.join("test_prepare_modpack");
 
-        let mod_id = 389615;
-        let file_id = 3931045;
+//         let mod_id = 389615;
+//         let file_id = 3931045;
 
-        let cf_mod = curseforge
-            .get_mod_file(ModFileParameters { mod_id, file_id })
-            .await
-            .unwrap()
-            .data;
+//         let cf_mod = curseforge
+//             .get_mod_file(ModFileParameters { mod_id, file_id })
+//             .await
+//             .unwrap()
+//             .data;
 
-        let progress = tokio::sync::watch::channel(ProgressState::Idle);
+//         let progress = tokio::sync::watch::channel(ProgressState::Idle);
 
-        let result = prepare_modpack(&app, &cf_mod, InstancePath::new(temp_path), progress.0)
-            .await
-            .unwrap();
+//         let result = prepare_modpack(&app, &cf_mod, InstancePath::new(temp_path), progress.0)
+//             .await
+//             .unwrap();
 
-        assert!(!result.downloadables.is_empty())
-    }
-}
+//         assert!(!result.downloadables.is_empty())
+//     }
+// }

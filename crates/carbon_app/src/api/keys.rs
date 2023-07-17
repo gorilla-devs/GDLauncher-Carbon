@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 macro_rules! keys {
     {$($group:ident { $($name:ident = $value:literal;)* })*} => {
         $(pub mod $group {
@@ -7,6 +9,7 @@ macro_rules! keys {
                 pub const $name: $crate::api::keys::Key = $crate::api::keys::Key {
                     local: $value,
                     full: concat!(stringify!($group), ".", $value),
+                    span_key: concat!("api::", stringify!($group), ".", $value)
                 };
             )*
         })*
@@ -20,6 +23,14 @@ pub struct Key {
     pub local: &'static str,
     /// full keypath `mygroup.mykey`
     pub full: &'static str,
+    /// span key `api::mygroup.mykey`
+    pub span_key: &'static str,
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.full)
+    }
 }
 
 keys! {
@@ -51,30 +62,47 @@ keys! {
     }
 
     mc {
-        GET_FORGE_VERSIONS                          = "getForgeVersions";
-        GET_INSTANCES                               = "getInstances";
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
-        GET_INSTANCE_DETAILS                        = "getInstanceDetails";
-        OPEN_INSTANCE_FOLDER_PATH                   = "openInstanceFolderPath";
-        START_INSTANCE                              = "startInstance";
-        STOP_INSTANCE                               = "stopInstance";
+        GET_FORGE_VERSIONS                          = "getForgeVersions";
+        GET_FABRIC_VERSIONS                         = "getFabricVersions";
+        GET_QUILT_VERSIONS                          = "getQuiltVersions";
+    }
+
+    instance {
+        DEFAULT_GROUP                               = "getDefaultGroup";
+        GET_GROUPS                                  = "getGroups";
+        GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
+        CREATE_GROUP                                = "createGroup";
+        CREATE_INSTANCE                             = "createInstance";
+        LOAD_ICON_URL                               = "loadIconUrl";
+        DELETE_GROUP                                = "deleteGroup";
         DELETE_INSTANCE                             = "deleteInstance";
+        MOVE_GROUP                                  = "moveGroup";
+        MOVE_INSTANCE                               = "moveInstance";
+        DUPLICATE_INSTANCE                          = "duplicateInstance";
+        UPDATE_INSTANCE                             = "updateInstance";
+        SET_FAVORITE                                = "setFavorite";
+        INSTANCE_DETAILS                            = "getInstanceDetails";
+        PREPARE_INSTANCE                            = "prepareInstance";
+        LAUNCH_INSTANCE                             = "launchInstance";
+        KILL_INSTANCE                               = "killInstance";
+        GET_LOGS                                    = "getLogs";
+        DELETE_LOG                                  = "deleteLog";
+        OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
-        REMOVE_MOD                                  = "removeMod";
-        REMOVE_MODS                                 = "removeMods";
-        SWITCH_MINECRAFT_VERSION                    = "switchMinecraftVersion";
-        SWITCH_MODLOADER                            = "switchModloader";
-        SWITCH_MODLOADER_VERSION                    = "switchModloaderVersion";
-        UPDATE_INSTANCE_NAME                        = "updateInstanceName";
-        GET_INSTANCE_MEMORY                         = "getInstanceMemory";
-        UPDATE_INSTANCE_MEMORY                      = "updateInstanceMemory";
-        GET_INSTANCE_JAVA_ARGS                      = "getInstanceJavaArgs";
-        UPDATE_INSTANCE_JAVA_ARGS                   = "updateInstanceJavaArgs";
+        DELETE_MOD                                  = "deleteMod";
+        INSTALL_MOD                                 = "installMod";
+        GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
+        SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
+        GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
+        IMPORT_INSTANCE                             = "importInstance";
     }
 
     vtask {
         GET_TASKS                                   = "getTasks";
+        GET_TASK                                    = "getTask";
+        DISMISS_TASK                                = "dismissTask";
     }
 
     settings {

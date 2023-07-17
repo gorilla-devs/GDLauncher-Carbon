@@ -1,10 +1,15 @@
-import { Dropdown } from "@gd/ui";
-import { createSignal, Switch, Match } from "solid-js";
+import { Dropdown, createNotification } from "@gd/ui";
+import { createSignal, Switch, Match, Show, createEffect } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { useTransContext } from "@gd/i18n";
+import { supportedLanguages, useTransContext } from "@gd/i18n";
+import { queryClient, rspc } from "@/utils/rspcClient";
+import TermsAndConditions from "./TermsAndConditions";
+import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+import { handleStatus } from "@/utils/login";
+import { parseError } from "@/utils/helpers";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -17,11 +22,60 @@ export default function Login() {
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
 
-  const [, { changeLanguage }] = useTransContext();
+  const [t, { changeLanguage }] = useTransContext();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data && routeData?.accounts?.data?.length! > 0;
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (newSettings) => {
+      if (newSettings.language) changeLanguage(newSettings.language as string);
+      queryClient.setQueryData(["settings.getSettings"], newSettings);
+    },
+  });
+
+  const accountEnrollFinalizeMutation = rspc.createMutation([
+    "account.enroll.finalize",
+  ]);
+
+  const nextStep = () => {
+    if (step() < 2) {
+      setStep((prev) => prev + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (step() >= 0) {
+      setStep((prev) => prev - 1);
+    }
+  };
+
+  const addNotification = createNotification();
+
+  createEffect(() => {
+    handleStatus(routeData.status, {
+      onPolling: (info) => {
+        setDeviceCodeObject({
+          userCode: info.userCode,
+          link: info.verificationUri,
+          expiresAt: info.expiresAt,
+        });
+        if (routeData.status.data) setStep(2);
+      },
+      onError(error) {
+        if (error) addNotification(parseError(error), "error");
+        setStep(1);
+      },
+      onComplete() {
+        accountEnrollFinalizeMutation.mutate(undefined);
+      },
+    });
+  });
+
+  createEffect(() => {
+    if (routeData.settings.data?.isLegalAccepted) setStep(1);
+  });
 
   return (
     <Switch>
@@ -36,39 +90,62 @@ export default function Login() {
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
           />
-          <div class="absolute top-0 top-5 z-10 left-1/2 -translate-x-1/2">
+          <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
             <Dropdown
-              options={[
-                { label: "english", key: "en" },
-                { label: "italian", key: "it" },
-              ]}
-              value={"asc"}
+              value={routeData.settings.data?.language}
+              options={Object.keys(supportedLanguages).map((lang) => ({
+                label: (
+                  <div class="whitespace-nowrap">
+                    {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
+                  </div>
+                ),
+                key: lang,
+              }))}
               onChange={(lang) => {
-                changeLanguage(lang.key as string);
+                settingsMutation.mutate({ language: lang.key as string });
               }}
               rounded
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-120 h-100"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 0 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
-              "overflow-hidden": step() === 1,
+              "overflow-hidden": step() === 2,
             }}
           >
+            <Show when={step() < 1}>
+              <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
+                <img class="w-30" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
+            <Show when={step() === 1}>
+              <div class="absolute right-0 flex justify-center items-center flex-col left-0 -top-15 m-auto">
+                <img class="w-30" src={Logo} />
+                <p class="text-darkSlate-50">
+                  {"v"}
+                  {__APP_VERSION__}
+                </p>
+              </div>
+            </Show>
             <Switch>
               <Match when={step() === 0}>
-                <Auth
-                  setStep={setStep}
-                  setDeviceCodeObject={setDeviceCodeObject}
-                />
+                <TermsAndConditions nextStep={nextStep} />
               </Match>
               <Match when={step() === 1}>
+                <Auth />
+              </Match>
+              <Match when={step() === 2}>
                 <CodeStep
-                  setStep={setStep}
+                  nextStep={nextStep}
+                  prevStep={prevStep}
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />

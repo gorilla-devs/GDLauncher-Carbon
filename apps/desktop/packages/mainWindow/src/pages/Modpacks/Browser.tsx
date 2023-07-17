@@ -1,13 +1,25 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect, onMount } from "solid-js";
-import Modpack from "./Modpack";
-import LogoDark from "/assets/images/logo-dark.svg";
-import { useModal } from "@/managers/ModalsManager";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { FEModSearchSortField } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteQuery } from ".";
+import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
+import { SortFields } from "@/utils/constants";
+import { rspc } from "@/utils/rspcClient";
+import { setScrollTop } from "@/utils/browser";
+import skull from "/assets/images/icons/skull.png";
+import ModRow from "@/components/ModRow";
+import { useModal } from "@/managers/ModalsManager";
 
 const NoMoreModpacks = () => {
   return (
@@ -18,6 +30,25 @@ const NoMoreModpacks = () => {
             key="instance.fetching_no_more_modpacks"
             options={{
               defaultValue: "No more modpacks to load",
+            }}
+          />
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const NoModpacksAvailable = () => {
+  return (
+    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+      <div class="flex justify-center items-center flex-col text-center">
+        <img src={skull} class="w-16 h-16" />
+
+        <p class="text-darkSlate-50 max-w-100">
+          <Trans
+            key="instance.fetching_no_modpacks_available"
+            options={{
+              defaultValue: "No modpacks available",
             }}
           />
         </p>
@@ -64,29 +95,17 @@ const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
   );
 };
 
-const sortFields: Array<FEModSearchSortField> = [
-  "featured",
-  "popularity",
-  "lastUpdated",
-  "name",
-  "author",
-  "totalDownloads",
-  "category",
-  "gameVersion",
-];
-
 export default function Browser() {
-  const modalsContext = useModal();
   const [t] = useTransContext();
+  const modalsContext = useModal();
 
-  const infiniteQuery = useInfiniteQuery();
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
-  const modpacks = () =>
-    infiniteQuery?.infiniteQuery.data
-      ? infiniteQuery?.infiniteQuery.data.pages.flatMap((d) => d.data)
-      : [];
+  const infiniteQuery = useInfiniteModpacksQuery();
 
-  const allVirtualRows = () => infiniteQuery?.rowVirtualizer.getVirtualItems();
+  const modpacks = () => infiniteQuery.allRows();
+
+  const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
@@ -107,14 +126,33 @@ export default function Browser() {
     }
   });
 
+  const [headerHeight, setHeaderHeight] = createSignal(90);
+
+  let containrRef: HTMLDivElement;
+  let resizeObserver: ResizeObserver;
+
   onMount(() => {
-    if (modpacks().length > 0 && !infiniteQuery?.infiniteQuery.isInitialLoading)
-      infiniteQuery?.resetList();
+    resizeObserver = new ResizeObserver((entries) => {
+      window.requestAnimationFrame(() => {
+        setHeaderHeight(entries[0].target.getBoundingClientRect().height);
+      });
+    });
+
+    resizeObserver.observe(containrRef);
+  });
+
+  onCleanup(() => {
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+    }
   });
 
   return (
     <div class="box-border h-full w-full relative">
-      <div class="flex flex-col bg-darkSlate-800 pt-5 sticky top-0 left-0 right-0 z-10 px-5">
+      <div
+        ref={(el) => (containrRef = el)}
+        class="flex flex-col bg-darkSlate-800 pt-5 z-10 px-5"
+      >
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -135,7 +173,7 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={sortFields.map((field) => ({
+              options={SortFields.map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}
@@ -152,8 +190,6 @@ export default function Browser() {
                 options={mappedMcVersions()}
                 icon={<div class="i-ri:price-tag-3-fill" />}
                 rounded
-                bgColorClass="bg-darkSlate-400"
-                textColorClass="text-white"
                 value={mappedMcVersions()[0].key}
                 onChange={(val) => {
                   infiniteQuery?.setQuery({ gameVersion: val.key as string });
@@ -164,6 +200,21 @@ export default function Browser() {
               <Skeleton.select />
             </Show>
           </div>
+          <Button
+            type="outline"
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "instanceCreation",
+              });
+            }}
+          >
+            <Trans
+              key="sidebar.plus_add_instance"
+              options={{
+                defaultValue: "+ Add Instance",
+              }}
+            />
+          </Button>
           <div
             class="cursor-pointer text-2xl"
             classList={{
@@ -180,8 +231,8 @@ export default function Browser() {
               });
             }}
           />
-          <Button
-            variant="outline"
+          {/* <Button
+            type="outline"
             size="medium"
             icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
           >
@@ -191,56 +242,15 @@ export default function Browser() {
                 defaultValue: "Import",
               }}
             />
-          </Button>
+          </Button> */}
         </div>
       </div>
-      <div class="px-5 flex flex-col pb-5 gap-2 left-0 right-0 overflow-y-hidden absolute bottom-0 top-[90px]">
-        <div class="flex flex-col gap-4 rounded-xl p-5 bg-darkSlate-700">
-          <div class="flex justify-between items-center">
-            <span class="flex gap-4">
-              <div class="flex justify-center items-center rounded-xl bg-darkSlate-900 h-22 w-22">
-                <img class="h-14" src={LogoDark} />
-              </div>
-              <div class="flex flex-col justify-center">
-                <div class="flex flex-col gap-2">
-                  <h2 class="m-0">
-                    <Trans
-                      key="instance.create_new_instance_title"
-                      options={{
-                        defaultValue: "New instance",
-                      }}
-                    />
-                  </h2>
-                  <p class="m-0 text-darkSlate-50">
-                    <Trans
-                      key="instance.create_new_instance_text"
-                      options={{
-                        defaultValue: "Create your own empty instance",
-                      }}
-                    />
-                  </p>
-                </div>
-              </div>
-            </span>
-            <div class="flex gap-3">
-              <Button
-                variant="glow"
-                onClick={() =>
-                  modalsContext?.openModal({ name: "instanceCreation" })
-                }
-              >
-                <span class="uppercase">
-                  <Trans
-                    key="instance.create_instance_btn"
-                    options={{
-                      defaultValue: "Create",
-                    }}
-                  />
-                </span>
-              </Button>
-            </div>
-          </div>
-        </div>
+      <div
+        class="flex flex-col pb-5 gap-2 left-0 right-0 absolute bottom-0 overflow-y-hidden"
+        style={{
+          top: `${headerHeight()}px`,
+        }}
+      >
         <Switch>
           <Match
             when={
@@ -249,9 +259,12 @@ export default function Browser() {
             }
           >
             <div
-              class="w-full h-full scrollbar-hide overflow-auto"
+              class="h-full overflow-y-auto rounded-xl overflow-x-hidden pr-2 ml-5"
               ref={(el) => {
-                infiniteQuery?.setParentRef(el);
+                infiniteQuery.setParentRef(el);
+              }}
+              onScroll={(e) => {
+                setScrollTop(e.target.scrollTop);
               }}
             >
               <div
@@ -291,7 +304,11 @@ export default function Browser() {
                             }
                           >
                             <Match when={!isLoaderRow() && modpack()}>
-                              <Modpack modpack={modpack()} />
+                              <ModRow
+                                type="Modpack"
+                                data={modpack()}
+                                defaultGroup={defaultGroup.data}
+                              />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
                               <NoMoreModpacks />
@@ -308,11 +325,22 @@ export default function Browser() {
           <Match
             when={
               modpacks().length === 0 &&
-              infiniteQuery?.infiniteQuery.isFetching &&
+              infiniteQuery?.infiniteQuery.isLoading &&
               infiniteQuery?.infiniteQuery.isInitialLoading
             }
           >
-            <Skeleton.modpacksList />
+            <div class="m-x-5">
+              <Skeleton.modpacksList />
+            </div>
+          </Match>
+          <Match
+            when={
+              modpacks().length === 0 &&
+              !infiniteQuery?.infiniteQuery.isLoading &&
+              !infiniteQuery?.infiniteQuery.isInitialLoading
+            }
+          >
+            <NoModpacksAvailable />
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
             <ErrorFetchingModpacks

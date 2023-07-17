@@ -11,12 +11,12 @@ export type SpacingTab = { ref: HTMLDivElement; type: string; space: number };
 export type TabType = { ref: HTMLDivElement; type: string; ignored?: boolean };
 
 type TabArrayElement = HTMLDivElement | SpacingTab | TabType;
-export interface ITabsContext {
-  gap?: number;
-  paddingX?: string;
-  paddingY?: string;
-  variant: string;
-  orientation: string;
+interface ITabsContext {
+  gap?: () => number | undefined;
+  paddingX?: () => string | undefined;
+  paddingY?: () => string | undefined;
+  variant: () => string;
+  orientation: () => string;
   clearTabs: () => void;
   setSelectedIndex: (_: number) => void;
   registerTab: (_obj: TabType, _index?: number) => number;
@@ -27,7 +27,7 @@ export interface ITabsContext {
   isSelectedIndex: (_: number) => boolean;
 }
 
-export interface Props {
+interface Props {
   children: Element[] | JSXElement;
   defaultIndex?: number;
   index?: number;
@@ -129,11 +129,11 @@ function Tabs(props: Props) {
     getRegisteredTabs,
     registerTabSpacing,
     registerTabPanel,
-    gap: gap(),
-    variant: variant(),
-    orientation: orientation(),
-    paddingX: paddingX(),
-    paddingY: paddingY(),
+    gap,
+    variant,
+    orientation,
+    paddingX,
+    paddingY,
   };
 
   return (

@@ -1,6 +1,6 @@
 use crate::{
     api::{
-        keys::settings::{GET_IS_FIRST_LAUNCH, GET_SETTINGS, SET_IS_FIRST_LAUNCH, SET_SETTINGS},
+        keys::settings::{GET_SETTINGS, SET_SETTINGS},
         router::router,
     },
     managers::App,
@@ -13,7 +13,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()
                     .get_settings()
-                    .await.unwrap();
+                    .await?;
 
             Ok(Into::<FESettings>::into(response))
         }
@@ -42,6 +42,8 @@ struct FESettings {
     startup_resolution: String,
     java_custom_args: String,
     auto_manage_java: bool,
+    is_legal_accepted: bool,
+    metrics_level: Option<i32>,
 }
 
 impl From<crate::db::app_configuration::Data> for FESettings {
@@ -60,12 +62,14 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             startup_resolution: data.startup_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
+            is_legal_accepted: data.is_legal_accepted,
+            metrics_level: data.metrics_level,
         }
     }
 }
 
 // When updating this, make sure to also update set_settings
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
     #[specta(optional)]
@@ -94,4 +98,8 @@ pub struct FESettingsUpdate {
     pub java_custom_args: Option<String>,
     #[specta(optional)]
     pub auto_manage_java: Option<bool>,
+    #[specta(optional)]
+    pub is_legal_accepted: Option<bool>,
+    #[specta(optional)]
+    pub metrics_level: Option<i32>,
 }

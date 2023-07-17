@@ -1,78 +1,24 @@
-import Tile from "@/components/Instance/Tile";
-import { Carousel, News } from "@gd/ui";
+import { Carousel, News, Skeleton } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createSignal } from "solid-js";
-import { useTransContext } from "@gd/i18n";
-import { ModloaderType } from "@/utils/sidebar";
+import {
+  For,
+  Match,
+  Suspense,
+  Switch,
+  createEffect,
+  createSignal,
+} from "solid-js";
+import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
-import { useGDNavigate } from "@/managers/NavigationManager";
-import fetchData from "../home.data";
-
-type MockInstance = {
-  title: string;
-  modloader: ModloaderType;
-  mcVersion: string;
-  id: string;
-};
-
-const mockCarousel: MockInstance[] = [
-  {
-    title: "Minecraft forge 1",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "ABDFEAD",
-  },
-  {
-    title: "Minecraft forge 2",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "DDAEDF",
-  },
-  {
-    title: "Minecraft forge 3",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HDHEJA",
-  },
-  {
-    title: "Minecraft forge 4",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HUSER",
-  },
-  {
-    title: "Minecraft forge 5",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "PDODK",
-  },
-  {
-    title: "Minecraft forge 6",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AKFBI",
-  },
-  {
-    title: "Minecraft forge 7",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "AHUUIO",
-  },
-  {
-    title: "Minecraft forge 8",
-    modloader: "forge",
-    mcVersion: "1.19.2",
-    id: "HFHDJ",
-  },
-];
+import fetchData from "../Library/library.data";
+import InstanceTile from "@/components/InstanceTile";
+import skull from "/assets/images/icons/skull.png";
 
 const Home = () => {
-  const navigate = useGDNavigate();
   const [t] = useTransContext();
   const [news, setNews] = createStore([]);
   const [isNewsVisible, setIsNewVisible] = createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const showNews = () => routeData.settings.data?.showNews;
 
   createEffect(() => {
     routeData.news.then((newss) => {
@@ -81,68 +27,79 @@ const Home = () => {
   });
 
   createEffect(() => {
-    setIsNewVisible(!!showNews());
+    setIsNewVisible(!!routeData.settings.data?.showNews);
   });
 
   return (
-    <div class="p-6">
+    <div>
       <div>
-        <Show when={news.length > 0 && isNewsVisible()}>
-          <News
-            slides={news}
-            onClick={(news) => {
-              window.openExternalLink(news.url || "");
-            }}
-          />
-        </Show>
-        <div class="mt-4">
-          <Carousel title={t("recent_played")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div>
-        <div class="mt-4">
-          <Carousel title={t("your_instances")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div>
-        <div class="mt-4">
-          <Carousel title={t("popular_modpacks")}>
-            <For each={mockCarousel}>
-              {(instance) => (
-                <div id={instance.id}>
-                  <Tile
-                    onClick={() => navigate(`/library/${instance.id}`)}
-                    title={instance.title}
-                    modloader={instance.modloader}
-                    version={instance.mcVersion}
-                  />
-                </div>
-              )}
-            </For>
-          </Carousel>
-        </div>
+        <Switch>
+          <Match when={news.length > 0 && isNewsVisible()}>
+            <News
+              slides={news}
+              onClick={(news) => {
+                window.openExternalLink(news.url || "");
+              }}
+            />
+          </Match>
+          <Match
+            when={
+              (news.length === 0 && isNewsVisible()) ||
+              routeData.settings.isLoading
+            }
+          >
+            <Skeleton.news />
+          </Match>
+        </Switch>
+        <Switch>
+          <Match
+            when={
+              routeData.instancesUngrouped.data &&
+              routeData.instancesUngrouped.data.length > 0 &&
+              !routeData.instancesUngrouped.isLoading
+            }
+          >
+            <div class="mt-4">
+              <Carousel title={t("your_instances")}>
+                <For each={routeData.instancesUngrouped.data}>
+                  {(instance) => (
+                    <Suspense fallback={<Skeleton.instance />}>
+                      <InstanceTile instance={instance} />
+                    </Suspense>
+                  )}
+                </For>
+              </Carousel>
+            </div>
+          </Match>
+          <Match
+            when={
+              routeData.instancesUngrouped.isLoading &&
+              routeData.instancesUngrouped.isInitialLoading
+            }
+          >
+            <Skeleton.instances />
+          </Match>
+          <Match
+            when={
+              routeData.instancesUngrouped.data &&
+              routeData.instancesUngrouped.data.length === 0 &&
+              !routeData.instancesUngrouped.isLoading
+            }
+          >
+            <div class="w-full h-full flex flex-col justify-center items-center mt-12">
+              <img src={skull} class="w-16 h-16" />
+              <p class="text-darkSlate-50 max-w-100 text-center">
+                <Trans
+                  key="instance.no_instances_text"
+                  options={{
+                    defaultValue:
+                      "At the moment there are not instances. Add one to start playing!",
+                  }}
+                />
+              </p>
+            </div>
+          </Match>
+        </Switch>
       </div>
     </div>
   );

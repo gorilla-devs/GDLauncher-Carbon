@@ -1,7 +1,5 @@
-/* eslint-disable i18next/no-literal-string */
-import { Button, Dropdown, Input, Switch } from "@gd/ui";
-import GDLauncherWideLogo from "/assets/images/gdlauncher_logo.svg";
-import GDLauncherText from "/assets/images/GDLauncher_text.svg";
+import { Button, Dropdown, Switch } from "@gd/ui";
+import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import SettingsData from "./settings.general.data";
@@ -9,10 +7,15 @@ import { useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 import { FESettings } from "@gd/core_module/bindings";
+import Row from "./components/Row";
+import RightHandSide from "./components/RightHandSide";
+import PageTitle from "./components/PageTitle";
+import Title from "./components/Title";
+import RowsContainer from "./components/RowsContainer";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
-  const [t, { changeLanguage }] = useTransContext();
+  const [t] = useTransContext();
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -21,7 +24,6 @@ const General = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
-      if (newSettings.language) changeLanguage(newSettings.language as string);
       queryClient.setQueryData(["settings.getSettings"], newSettings);
     },
   });
@@ -31,331 +33,274 @@ const General = () => {
   });
 
   return (
-    <div class="w-full flex flex-col py-5 box-border bg-darkSlate-800 h-auto px-6">
-      <h2 class="m-0 mb-7 text-4">
+    <>
+      <PageTitle>
         <Trans
           key="settings.general"
           options={{
             defaultValue: "General",
           }}
         />
-      </h2>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.choose_a_language_title"
-            options={{
-              defaultValue: "Language",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="m-0 text-darkSlate-300 max-w-96">
+      </PageTitle>
+      <RowsContainer>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.release_channel_text"
+                options={{
+                  defaultValue: "Select the preferred release channel",
+                }}
+              />
+            }
+          >
             <Trans
-              key="settings.choose_a_language_text"
+              key="settings.release_channel_title"
               options={{
-                defaultValue:
-                  "Choose a language that is convenient for you and the launcher will be restarted",
+                defaultValue: "Release Channel",
               }}
             />
-          </p>
-          <Dropdown
-            value={settings.language || "en"}
-            options={[
-              { label: t("languages.english"), key: "eng" },
-              { label: t("languages.italian"), key: "it" },
-            ]}
-            onChange={(lang) => {
-              settingsMutation.mutate({ language: lang.key as string });
-            }}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.release_channel_title"
-            options={{
-              defaultValue: "Release Channel",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 m-0 max-w-96">
-            <Trans
-              key="settings.release_channel_text"
-              options={{
-                defaultValue: "Select the preferred release channel",
+          </Title>
+          <RightHandSide>
+            <Dropdown
+              value={settings.releaseChannel || "stable"}
+              options={[
+                { label: t("settings.release_channel_stable"), key: "stable" },
+                { label: t("settings.release_channel_beta"), key: "beta" },
+                { label: t("settings.release_channel_alpha"), key: "alpha" },
+              ]}
+              onChange={(channel) => {
+                settingsMutation.mutate({
+                  releaseChannel: channel.key as string,
+                });
               }}
             />
-          </p>
-          <Dropdown
-            value={settings.releaseChannel || "stable"}
-            options={[
-              { label: t("settings.release_channel_stable"), key: "stable" },
-              { label: t("settings.release_channel_beta"), key: "beta" },
-              { label: t("settings.release_channel_alpha"), key: "alpha" },
-            ]}
-            onChange={(channel) => {
-              settingsMutation.mutate({
-                releaseChannel: channel.key as string,
-              });
-            }}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.concurrent_downloads_title"
-            options={{
-              defaultValue: "Concurrent Downloads",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 m-0 max-w-96">
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.concurrent_downloads_text"
+                options={{
+                  defaultValue:
+                    "Select the number of concurrent downloads. If you have slow connection, select at most 3",
+                }}
+              />
+            }
+          >
             <Trans
-              key="settings.concurrent_downloads_text"
+              key="settings.concurrent_downloads_title"
               options={{
-                defaultValue:
-                  "Select the number of concurrent downloads. If you have slow connection, select at most 3",
+                defaultValue: "Concurrent Downloads",
               }}
             />
-          </p>
-          <Dropdown
-            value={(settings.concurrentDownloads || "1").toString()}
-            options={Array.from({ length: 20 }, (_, i) => ({
-              label: (i + 1).toString(),
-              key: (i + 1).toString(),
-            }))}
-            onChange={(downloads) => {
-              settingsMutation.mutate({
-                concurrentDownloads: parseInt(downloads.key as string, 10),
-              });
-            }}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.game_resolution_title"
-            options={{
-              defaultValue: "Game Resolution",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <div class="flex items-center gap-4">
-            <Input
-              class="w-20"
-              placeholder={t("settings.resolution_width") || ""}
-              value={"1024"}
-            />
-            x
-            <Input
-              class="w-20"
-              placeholder={t("settings.resolution_height") || ""}
-              value={"768"}
-            />
-          </div>
-          <Dropdown
-            value="en"
-            placeholder={t("settings.resolution_presets") || ""}
-            options={[
-              { label: "800x600", key: "800x600" },
-              { label: "1024x768", key: "1024x768" },
-              { label: "1920x1080", key: "1920x1080" },
-            ]}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.instance_sorting_title"
-            options={{
-              defaultValue: "Instance Sorting",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
-            <Trans
-              key="settings.instance_sorting_text"
-              options={{
-                defaultValue:
-                  "Select the method in which instances should be sorted.",
+          </Title>
+          <RightHandSide>
+            <Dropdown
+              value={(settings.concurrentDownloads || "1").toString()}
+              options={Array.from({ length: 20 }, (_, i) => ({
+                label: (i + 1).toString(),
+                key: (i + 1).toString(),
+              }))}
+              onChange={(downloads) => {
+                settingsMutation.mutate({
+                  concurrentDownloads: parseInt(downloads.key as string, 10),
+                });
               }}
             />
-          </p>
-          <Dropdown
-            value="en"
-            options={[
-              { label: "Alphabetical", key: "alphabetical" },
-              { label: "creation", key: "creation" },
-            ]}
-          />
-        </div>
-      </div>
-      {/* <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="expert_user_mod"
-            options={{
-              defaultValue: "Expert user mod",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title>
             <Trans
-              key="settings_more_control"
+              key="settings.game_resolution_title"
               options={{
-                defaultValue:
-                  "Adds more control over the settings of your instances and java.",
+                defaultValue: "Game Resolution",
               }}
             />
-          </p>
-          <Switch checked={true} />
-        </div>
-      </div> */}
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.show_news_title"
-            options={{
-              defaultValue: "Show news",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
+          </Title>
+          <RightHandSide>
+            <Dropdown
+              placeholder={t("settings.resolution_presets") || ""}
+              options={[
+                { label: "800x600", key: "800x600" },
+                { label: "1024x768", key: "1024x768" },
+                { label: "1920x1080", key: "1920x1080" },
+              ]}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.instance_sorting_text"
+                options={{
+                  defaultValue:
+                    "Select the method in which instances should be sorted.",
+                }}
+              />
+            }
+          >
             <Trans
-              key="settings.show_news_text"
+              key="settings.instance_sorting_title"
               options={{
-                defaultValue: "Show or hide the news",
+                defaultValue: "Instance Sorting",
               }}
             />
-          </p>
-          <Switch
-            checked={settings.showNews}
-            onChange={(e) => {
-              settingsMutation.mutate({
-                showNews: e.currentTarget.checked,
-              });
-            }}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.discord_integration_title"
-            options={{
-              defaultValue: "Discord Integration",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
+          </Title>
+          <RightHandSide>
+            <Dropdown
+              options={[
+                { label: "Alphabetical", key: "alphabetical" },
+                { label: "Creation Date", key: "creation" },
+              ]}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.show_news_text"
+                options={{
+                  defaultValue: "Show or hide the news",
+                }}
+              />
+            }
+          >
             <Trans
-              key="settings.discord_integration_text"
+              key="settings.show_news_title"
               options={{
-                defaultValue:
-                  "Enable or disable discord integration. This display what are you playing in discord",
+                defaultValue: "Show news",
               }}
             />
-          </p>
-          <Switch
-            checked={settings.discordIntegration}
-            onChange={(e) => {
-              settingsMutation.mutate({
-                discordIntegration: e.currentTarget.checked,
-              });
-            }}
-          />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.hide_launcher_playing_title"
-            options={{
-              defaultValue: "Hide launcher while playing",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
-            <Trans
-              key="settings.hide_launcher_playing_text"
-              options={{
-                defaultValue:
-                  "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.showNews}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  showNews: e.currentTarget.checked,
+                });
               }}
             />
-          </p>
-          <Switch checked={false} />
-        </div>
-      </div>
-      <div class="mb-6">
-        <h5 class="mt-0 mb-2">
-          <Trans
-            key="settings.potato_mode_title"
-            options={{
-              defaultValue: "Potato PC mode",
-            }}
-          />
-        </h5>
-        <div class="flex w-full justify-between">
-          <p class="text-darkSlate-300 max-w-96 m-0">
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.discord_integration_text"
+                options={{
+                  defaultValue:
+                    "Enable or disable discord integration. This display what are you playing in discord",
+                }}
+              />
+            }
+          >
             <Trans
-              key="settings.potato_mode_text"
+              key="settings.discord_integration_title"
               options={{
-                defaultValue:
-                  "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
+                defaultValue: "Discord Integration",
               }}
             />
-          </p>
-          <Switch
-            checked={settings.reducedMotion}
-            onChange={(e) => {
-              settingsMutation.mutate({
-                reducedMotion: e.currentTarget.checked,
-              });
-            }}
-          />
-        </div>
-      </div>
-      <Button rounded={false} variant="secondary" textColor="text-red-500">
-        <Trans
-          key="settings.reset"
-          options={{
-            defaultValue: "Reset all to default",
-          }}
-        />
-      </Button>
-      <div class="flex mb-6 mt-16 gap-24">
-        <div class="flex gap-5">
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.discordIntegration}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  discordIntegration: e.currentTarget.checked,
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.hide_launcher_playing_text"
+                options={{
+                  defaultValue:
+                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
+                }}
+              />
+            }
+          >
+            <Trans
+              key="settings.hide_launcher_playing_title"
+              options={{
+                defaultValue: "Hide launcher while playing",
+              }}
+            />
+          </Title>
+          <RightHandSide>
+            <Switch checked={false} />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans
+                key="settings.potato_mode_text"
+                options={{
+                  defaultValue:
+                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
+                }}
+              />
+            }
+          >
+            <Trans
+              key="settings.potato_mode_title"
+              options={{
+                defaultValue: "Potato PC mode",
+              }}
+            />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.reducedMotion}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  reducedMotion: e.currentTarget.checked,
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
           <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
-          <div class="flex flex-col">
-            <img src={GDLauncherText} class="cursor-pointer h-5" />
-            <p class="mb-0 mt-2">v.1.1.26</p>
-          </div>
-        </div>
-        <p class="m-0 text-darkSlate-500">
-          <Trans
-            key="settings.last_version"
-            options={{
-              defaultValue:
-                "You're currently on the latest version. We automatically check for updates and we will inform you whenever one is available.",
-            }}
-          />
-        </p>
-      </div>
-    </div>
+          <RightHandSide>
+            <div>
+              <div class="flex justify-end gap-4 flex-col items-center 2xl:flex-row">
+                <Button type="secondary">
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:restart-line" />
+                    <div>
+                      <Trans key="settings.restart_app" />
+                    </div>
+                  </div>
+                </Button>
+                <Button type="secondary">
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:delete-bin-7-line" />
+                    <div>
+                      <Trans key="settings.reset_all_data" />
+                    </div>
+                  </div>
+                </Button>
+              </div>
+              <div class="text-darkSlate-300 mt-4 text-4">
+                {"v"} {__APP_VERSION__}
+              </div>
+            </div>
+          </RightHandSide>
+        </Row>
+      </RowsContainer>
+    </>
   );
 };
 

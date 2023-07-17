@@ -1,5 +1,6 @@
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
+use tracing::{debug, error, trace};
 
 use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
 
@@ -7,11 +8,15 @@ use super::ManagerRef;
 use crate::{
     api::keys::java::GET_SYSTEM_JAVA_PROFILES,
     db::PrismaClient,
-    domain::java::{Java, JavaComponentType, SystemJavaProfile, SystemJavaProfileName},
+    domain::java::{
+        Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
+        SystemJavaProfileName,
+    },
+    managers::java::java_checker::RealJavaChecker,
 };
 use std::{
     collections::HashMap,
-    path::{Component, PathBuf},
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -35,6 +40,7 @@ impl JavaManager {
     }
 
     pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+        debug!("Ensuring system java profiles are in db");
         for profile in SystemJavaProfileName::iter() {
             let creation: Result<crate::db::java_system_profile::Data, QueryError> = db_client
                 .java_system_profile()
@@ -44,13 +50,14 @@ impl JavaManager {
 
             match creation {
                 Err(error) if error.is_prisma_error::<UniqueKeyViolation>() => {
-                    // Good, already exists
+                    trace!("Profile {profile:?} already exists");
                 }
                 Err(error) => {
+                    error!("Error creating profile {profile:?}: {error}");
                     return Err(error.into());
                 }
                 Ok(_) => {
-                    // Good, created
+                    trace!("Profile {profile:?} created");
                 }
             }
         }
@@ -107,7 +114,7 @@ impl ManagerRef<'_, JavaManager> {
         Ok(all_profiles)
     }
 
-    pub async fn update_system_java_profile_path(
+    pub async fn update_system_java_profile(
         &self,
         profile_name: SystemJavaProfileName,
         java_id: String,
@@ -199,6 +206,129 @@ impl ManagerRef<'_, JavaManager> {
 
         Ok(())
     }
+
+    pub async fn get_usable_java(
+        self,
+        target_profile: SystemJavaProfileName,
+    ) -> anyhow::Result<Option<JavaComponent>> {
+        use crate::db::java::UniqueWhereParam;
+
+        let profile = self
+            .get_system_java_profiles()
+            .await?
+            .into_iter()
+            .find(|profile| profile.name == target_profile)
+            .ok_or_else(|| {
+                anyhow::anyhow!("system java profile not found for {target_profile:?}")
+            })?;
+
+        let java = match profile.java_id {
+            Some(java_id) => {
+                self.app
+                    .prisma_client
+                    .java()
+                    .find_unique(UniqueWhereParam::IdEquals(java_id))
+                    .exec()
+                    .await?
+            }
+            None => None,
+        };
+
+        let java = match java {
+            Some(java) => RealJavaChecker::get_bin_info(
+                &RealJavaChecker,
+                Path::new(&java.path),
+                (&*java.r#type).try_into()?,
+            )
+            .await
+            .ok(),
+            None => None,
+        };
+
+        Ok(java)
+    }
+
+    /// Will return Some(path) if configured to automatically install.
+    /// Will return None if user intervention is required.
+    pub async fn require_java_install(
+        self,
+        target_profile: SystemJavaProfileName,
+        update_target_profile: bool,
+    ) -> anyhow::Result<Option<JavaComponent>> {
+        use crate::db::java::UniqueWhereParam;
+
+        let versions = self
+            .app
+            .java_manager()
+            .managed_service
+            .get_versions_for_vendor(JavaVendor::Azul)
+            .await?;
+
+        let current_os = JavaOs::get_current_os()?;
+        let current_arch = JavaArch::get_current_arch()?;
+
+        let id = self
+            .managed_service
+            .setup_managed(
+                current_os,
+                current_arch,
+                JavaVendor::Azul,
+                versions
+                    .get(&current_os)
+                    .and_then(|for_arch| for_arch.get(&current_arch))
+                    .and_then(|versions| {
+                        versions
+                            .iter()
+                            .find(|v| target_profile.is_java_version_compatible(&v.java_version))
+                    })
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("unable to find automatically installable java version")
+                    })?
+                    .id
+                    .clone(),
+                self.app.clone(),
+            )
+            .await?;
+
+        if update_target_profile {
+            self.app
+                .prisma_client
+                .java_system_profile()
+                .update(
+                    crate::db::java_system_profile::UniqueWhereParam::NameEquals(
+                        target_profile.to_string(),
+                    ),
+                    vec![crate::db::java_system_profile::SetParam::ConnectJava(
+                        crate::db::java::UniqueWhereParam::IdEquals(id.clone()),
+                    )],
+                )
+                .exec()
+                .await?;
+
+            self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+        }
+
+        let java = self
+            .app
+            .prisma_client
+            .java()
+            .find_unique(UniqueWhereParam::IdEquals(id))
+            .exec()
+            .await?;
+
+        let java = match java {
+            Some(java) => RealJavaChecker::get_bin_info(
+                &RealJavaChecker,
+                Path::new(&java.path),
+                (&*java.r#type).try_into()?,
+            )
+            .await
+            .map_err(|_| anyhow::anyhow!("downloaded java was not runnable"))?,
+            None => anyhow::bail!("downloaded java was not present in db"),
+        };
+
+        Ok(Some(java))
+    }
 }
 
 #[cfg(test)]
@@ -240,7 +370,6 @@ mod test {
             )
             .await
             .unwrap();
-
         let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
         assert_eq!(count, 1);
 

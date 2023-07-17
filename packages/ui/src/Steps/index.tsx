@@ -3,6 +3,7 @@ import { For, Show, JSX, mergeProps, Switch, Match } from "solid-js";
 type CustomStep = {
   icon?: string | JSX.Element;
   label: string;
+  onClick?: () => void;
 };
 
 type Props = {
@@ -21,11 +22,14 @@ const Steps = (props: Props) => {
           {(step, i) => (
             <>
               <div
-                class="relative bg-primary-500 w-6 h-6 rounded-full flex justify-center items-center"
+                class="relative bg-primary-500 w-6 h-6 rounded-full flex justify-center items-center cursor-pointer"
                 classList={{
                   "text-sm": typeof step === "string",
                   "bg-primary-500": i() <= mergedProps.currentStep,
                   "bg-darkSlate-500": i() > mergedProps.currentStep,
+                }}
+                onClick={() => {
+                  if (typeof step === "object" && step?.onClick) step.onClick();
                 }}
               >
                 <Switch>

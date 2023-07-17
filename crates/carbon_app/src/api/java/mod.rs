@@ -140,7 +140,7 @@ async fn get_system_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FES
         .collect())
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEUpdateSystemJavaProfileArgs {
     pub profile_name: FESystemJavaProfileName,
@@ -152,7 +152,7 @@ async fn update_system_java_profile_path(
     args: FEUpdateSystemJavaProfileArgs,
 ) -> anyhow::Result<()> {
     app.java_manager()
-        .update_system_java_profile_path(args.profile_name.into(), args.java_id)
+        .update_system_java_profile(args.profile_name.into(), args.java_id)
         .await
 }
 
@@ -212,7 +212,7 @@ struct SetDefaultArgs {
     id: String,
 }
 
-#[derive(Type, Serialize, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FESystemJavaProfileName {
     Legacy,

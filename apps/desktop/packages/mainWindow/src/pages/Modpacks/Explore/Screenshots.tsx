@@ -13,7 +13,7 @@ const Screenshots = () => {
         <Match
           when={
             routeData.modpackDetails.data?.data.screenshots.length! > 0 &&
-            !routeData.modpackDetails.isFetching
+            !routeData.modpackDetails.isLoading
           }
         >
           <div class="flex flex-col gap-4">
@@ -33,7 +33,7 @@ const Screenshots = () => {
         <Match
           when={
             routeData.modpackDetails.data?.data.screenshots.length! === 0 &&
-            !routeData.modpackDetails.isFetching
+            !routeData.modpackDetails.isLoading
           }
         >
           <Trans
@@ -43,7 +43,7 @@ const Screenshots = () => {
             }}
           />
         </Match>
-        <Match when={routeData.modpackDetails.isFetching}>
+        <Match when={routeData.modpackDetails.isLoading}>
           <Skeleton.modpackScreenshotsPage />
         </Match>
       </Switch>

@@ -182,7 +182,7 @@ const Screenshots = () => {
                           <p class="m-0 text-darkSlate-50 text-md">
                             {format(new Date(screenshot.date), "dd-MM-yyyy")}
                           </p>
-                          <div class="i-ri:more-2-fill text-darkSlate-50" />
+                          <div class="text-darkSlate-50 i-ri:more-2-fill" />
                         </div>
                       </div>
                     )}

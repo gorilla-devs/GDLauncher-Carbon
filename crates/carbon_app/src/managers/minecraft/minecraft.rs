@@ -1,14 +1,20 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
-use crate::domain::{
-    java::{JavaArch, JavaComponent},
-    maven::MavenCoordinates,
-    minecraft::minecraft::{
-        get_default_jvm_args, is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
+use crate::{
+    app_version::APP_VERSION,
+    domain::{
+        java::{JavaArch, JavaComponent},
+        minecraft::minecraft::{
+            chain_lwjgl_libs_with_base_libs, get_default_jvm_args, is_rule_allowed,
+            library_is_allowed, OsExt, ARCH_WIDTH,
+        },
     },
 };
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, DownloadType, Library, Os, Version, VersionInfo,
+    Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
 };
 use prisma_client_rust::QueryError;
@@ -17,6 +23,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::process::Child;
+use tracing::{info, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -64,15 +71,44 @@ pub async fn get_version(
     Ok(version_meta)
 }
 
-pub async fn save_meta_to_disk(version: VersionInfo, clients_path: PathBuf) -> anyhow::Result<()> {
-    tokio::fs::create_dir_all(&clients_path).await?;
-    tokio::fs::write(
-        clients_path.join(format!("{}.json", version.id)),
-        serde_json::to_string(&version)?,
-    )
-    .await?;
+pub async fn get_lwjgl_meta(
+    reqwest_client: &reqwest_middleware::ClientWithMiddleware,
+    version_info: &VersionInfo,
+    meta_base_url: &Url,
+) -> anyhow::Result<LibraryGroup> {
+    // TODO: Hardcoded. Fix
+    let version_info_lwjgl_requirement = version_info
+        .requires
+        .as_ref()
+        .ok_or(anyhow::anyhow!("Version info requires not provided."))?;
+    let version_info_lwjgl_requirement = version_info_lwjgl_requirement
+        .first()
+        .ok_or(anyhow::anyhow!("Version info requires has no elements."))?;
 
-    Ok(())
+    let lwjgl_suggest = version_info_lwjgl_requirement
+        .rule
+        .as_ref()
+        .map(|rule| match rule {
+            daedalus::minecraft::DependencyRule::Equals(version) => version,
+            daedalus::minecraft::DependencyRule::Suggests(version) => version,
+        })
+        .ok_or(anyhow::anyhow!("Can't find lwjgl version."))?;
+
+    let lwjgl_json_url = meta_base_url.join(&format!(
+        "minecraft/v0/libraries/{}/{}.json",
+        version_info_lwjgl_requirement.uid, lwjgl_suggest
+    ))?;
+
+    tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
+
+    let lwjgl = reqwest_client
+        .get(lwjgl_json_url)
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(lwjgl)
 }
 
 #[cfg(target_os = "windows")]
@@ -98,6 +134,8 @@ enum ArgPlaceholder {
     NativesDirectory,
     LauncherName,
     LauncherVersion,
+    ClasspathSeparator,
+    LibraryDirectory,
 }
 
 impl TryFrom<&str> for ArgPlaceholder {
@@ -121,6 +159,8 @@ impl TryFrom<&str> for ArgPlaceholder {
             "natives_directory" => ArgPlaceholder::NativesDirectory,
             "launcher_name" => ArgPlaceholder::LauncherName,
             "launcher_version" => ArgPlaceholder::LauncherVersion,
+            "classpath_separator" => ArgPlaceholder::ClasspathSeparator,
+            "library_directory" => ArgPlaceholder::LibraryDirectory,
             _ => anyhow::bail!("Unknown argument placeholder: {arg}"),
         };
 
@@ -147,6 +187,8 @@ impl From<ArgPlaceholder> for &str {
             ArgPlaceholder::NativesDirectory => "natives_directory",
             ArgPlaceholder::LauncherName => "launcher_name",
             ArgPlaceholder::LauncherVersion => "launcher_version",
+            ArgPlaceholder::ClasspathSeparator => "classpath_separator",
+            ArgPlaceholder::LibraryDirectory => "library_directory",
         }
     }
 }
@@ -157,7 +199,7 @@ struct ReplacerArgs {
     version_name: String,
     game_directory: InstancePath,
     game_assets: PathBuf,
-    target_directory: PathBuf,
+    library_directory: PathBuf,
     natives_path: PathBuf,
     assets_root: PathBuf,
     assets_index_name: String,
@@ -176,7 +218,7 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::VersionName => replacer_args.version_name.clone(),
         ArgPlaceholder::GameDirectory => replacer_args
             .game_directory
-            .get_root()
+            .get_data_path()
             .display()
             .to_string(),
         ArgPlaceholder::AssetsRoot => replacer_args.assets_root.display().to_string(),
@@ -190,8 +232,13 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
         ArgPlaceholder::UserProperties => replacer_args.user_properties.clone(), // Not sure what this is,
         ArgPlaceholder::ClassPath => replacer_args.libraries.clone(),
         ArgPlaceholder::NativesDirectory => replacer_args.natives_path.display().to_string(),
-        ArgPlaceholder::LauncherName => "minecraft-launcher".to_string(),
-        ArgPlaceholder::LauncherVersion => "2".to_string(),
+        ArgPlaceholder::LauncherName => "GDLauncher".to_string(),
+        ArgPlaceholder::LauncherVersion => APP_VERSION.to_string(),
+        ArgPlaceholder::ClasspathSeparator => CLASSPATH_SEPARATOR.to_string(),
+        ArgPlaceholder::LibraryDirectory => replacer_args
+            .library_directory
+            .to_string_lossy()
+            .to_string(),
     }
 }
 
@@ -211,172 +258,60 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
     arg.to_string()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_startup_command(
     java_component: JavaComponent,
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
+    lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Vec<String>> {
-    let mut libraries = version
-        .libraries
-        .iter()
-        .filter_map(|library| {
-            if !library_is_allowed(library.clone(), &java_component.arch)
-                || !library.include_in_classpath
-            {
-                return None;
-            }
-
-            let path = runtime_path.get_libraries().get_library_path({
-                if let Some(artifact) = &library.downloads.as_ref().unwrap().artifact {
-                    artifact.path.clone()
-                } else if let Some(classifiers) = &library.downloads.as_ref().unwrap().classifiers {
-                    let Some(native_name) = library
-                        .natives
-                        .as_ref()
-                        .and_then(|natives| natives.get(&Os::native())) else {
-                            return None;
-                        };
-
-                    classifiers.get(native_name).unwrap().path.clone()
-                } else {
-                    panic!("Library has no artifact or classifier");
-                }
-            });
-
-            Some(path.display().to_string())
-        })
-        .collect::<Vec<String>>();
-
-    libraries.dedup();
+    let libraries = chain_lwjgl_libs_with_base_libs(
+        &version.libraries,
+        &lwjgl_group.libraries,
+        &java_component.arch,
+        &runtime_path.get_libraries(),
+        true,
+    );
 
     let libraries = libraries
         .into_iter()
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
         .unwrap();
 
-    let mut command = Vec::with_capacity(100);
-
-    command.push(format!("-Xmx{xmx_memory}m"));
-    command.push(format!("-Xms{xms_memory}m"));
-
-    let arguments = version.arguments.clone().unwrap_or_else(|| {
-        let mut arguments = HashMap::new();
-        arguments.insert(
-            ArgumentType::Game,
-            version
-                .minecraft_arguments
-                .unwrap_or_default()
-                .split(' ')
-                .map(|s| Argument::Normal(s.to_string()))
-                .collect(),
-        );
-
-        arguments.insert(ArgumentType::Jvm, get_default_jvm_args());
-
-        arguments
-    });
-
-    let game_arguments = arguments.get(&ArgumentType::Game).unwrap();
-    let jvm_arguments = arguments.get(&ArgumentType::Jvm).unwrap();
-
-    for arg in jvm_arguments.clone() {
-        match arg {
-            Argument::Normal(string) => command.push(string),
-            Argument::Ruled { rules, value } => {
-                let is_allowed = rules
-                    .iter()
-                    .all(|rule| is_rule_allowed(rule.clone(), &java_component.arch));
-
-                if is_allowed {
-                    match value {
-                        ArgumentValue::Single(string) => command.push(string),
-                        ArgumentValue::Many(arr) => command.extend(arr),
-                    }
-                }
-            }
-        }
-    }
-
-    if Os::native() == Os::Osx {
-        let lwjgl_version = version
-            .libraries
-            .iter()
-            .find(|&library| library.name.contains("org.lwjgl"))
-            .map(|library| MavenCoordinates::try_from(library.name.clone(), None))
-            .ok_or(anyhow::anyhow!("LWJGL not found"))??;
-        let lwjgl_version = lwjgl_version
-            .version
-            .get(0..1)
-            .ok_or(anyhow::anyhow!("LWJGL version not found"))?;
-
-        let is_x_start_on_first_thread_needed = lwjgl_version.parse::<u8>()? >= 3;
-
-        let can_find_start_on_first_thread = command
-            .iter()
-            .any(|arg| arg.contains("XstartOnFirstThread"));
-
-        if !can_find_start_on_first_thread && is_x_start_on_first_thread_needed {
-            command.push("-XstartOnFirstThread".to_string());
-        }
-    }
-
-    command.push("-Dorg.lwjgl.util.Debug=true".to_string());
-
-    command.push(version.main_class.clone());
-
-    for arg in game_arguments.clone() {
-        match arg {
-            Argument::Normal(string) => command.push(string),
-            Argument::Ruled { rules, value } => {
-                let is_allowed = rules
-                    .iter()
-                    .all(|rule| is_rule_allowed(rule.clone(), &java_component.arch));
-
-                if is_allowed {
-                    match value {
-                        ArgumentValue::Single(string) => command.push(string),
-                        ArgumentValue::Many(arr) => command.extend(arr),
-                    }
-                }
-            }
-        }
-    }
-
     let regex =
         Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
             .unwrap();
 
-    let player_name = full_account.username;
-    let player_uuid = full_account.uuid;
+    let extra_args_regex = Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
+
     let player_token = match full_account.type_ {
         FullAccountType::Offline => "offline".to_owned(),
         FullAccountType::Microsoft { access_token, .. } => access_token,
     };
 
-    let version_name = version.id.clone();
-    let game_directory = instance_path;
-    let assets_root = runtime_path.get_assets().to_path();
-    let game_assets = runtime_path.get_assets().to_path();
-    let assets_index_name = version.assets.clone();
-    let client_jar_path = runtime_path.get_versions().get_clients_path().join(format!(
-        "{}.jar",
-        version.downloads.get(&DownloadType::Client).unwrap().sha1
-    ));
+    let client_jar_path = runtime_path
+        .get_libraries()
+        .get_mc_client(version.inherits_from.as_ref().unwrap_or(&version.id));
 
     let replacer_args = ReplacerArgs {
-        player_name,
+        player_name: full_account.username,
         player_token: player_token.clone(),
-        version_name,
-        game_directory,
-        game_assets,
-        target_directory: PathBuf::new(),
+        version_name: version
+            .inherits_from
+            .as_ref()
+            .unwrap_or(&version.id)
+            .clone(),
+        game_directory: instance_path,
+        game_assets: runtime_path.get_assets().to_path(),
+        library_directory: runtime_path.get_libraries().to_path(),
         natives_path: runtime_path.get_natives().get_versioned(&version.id),
-        assets_root,
-        assets_index_name,
+        assets_root: runtime_path.get_assets().to_path(),
+        assets_index_name: version.assets.clone(),
         // Patch libraries adding client jar at the end
         libraries: format!(
             "{}{}{}",
@@ -384,7 +319,7 @@ pub async fn generate_startup_command(
             CLASSPATH_SEPARATOR,
             client_jar_path.display()
         ),
-        auth_uuid: player_uuid,
+        auth_uuid: full_account.uuid,
         auth_access_token: player_token.clone(),
         auth_session: player_token,
         user_type: "mojang".to_owned(),
@@ -392,48 +327,172 @@ pub async fn generate_startup_command(
         user_properties: "{}".to_owned(),
     };
 
-    let result = command
-        .into_iter()
-        .map(|argument| {
-            regex
-                .replace_all(&argument, |caps: &Captures| {
-                    if let Some(value) = caps.name("value") {
-                        let Ok(value) = value.as_str().try_into() else {
-                            return "".to_owned();
-                        };
-                        let value = replace_placeholder(&replacer_args, value);
-                        return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
-                    } else if let Some(standalone) = caps.name("standalone") {
-                        let Ok(standalone) = standalone.as_str().try_into() else {
-                            return "".to_owned();
-                        };
-                        let value = replace_placeholder(&replacer_args, standalone);
-                        return value;
-                    }
-                    if let Some(arg) = caps.name("arg") {
-                        return arg.as_str().to_string();
-                    } else {
-                        unreachable!("No capturing group matched")
-                    }
-                })
-                .to_string()
-        })
-        .map(|argument| {
-            // unescape " and \ characters
-            argument.replace("\\\"", "\"").replace("\\\\", "\\")
-        })
-        .collect();
+    let substitute_argument = |argument: &str| {
+        let mut argument = argument.to_string();
+        if argument.starts_with("-DignoreList=") {
+            argument.push_str(&format!(
+                ",{}.jar",
+                version.inherits_from.as_ref().unwrap_or(&version.id)
+            ));
+        }
 
-    Ok(result)
+        regex
+            .replace_all(&argument, |caps: &Captures| {
+                if let Some(value) = caps.name("value") {
+                    let value = match value.as_str().try_into() {
+                        Ok(value) => replace_placeholder(&replacer_args, value),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
+                    };
+                    return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
+                } else if let Some(standalone) = caps.name("standalone") {
+                    return match standalone.as_str().try_into() {
+                        Ok(standalone) => replace_placeholder(&replacer_args, standalone),
+                        Err(err) => {
+                            warn!("Failed to parse argument: {}", err);
+                            return String::new();
+                        }
+                    };
+                }
+                if let Some(arg) = caps.name("arg") {
+                    return arg.as_str().to_string();
+                } else {
+                    unreachable!("No capturing group matched")
+                }
+            })
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
+    };
+
+    let substitute_arguments = |command: &mut Vec<String>, arguments: &Vec<Argument>| {
+        for arg in arguments {
+            match arg {
+                Argument::Normal(arg) => command.push(substitute_argument(arg)),
+                Argument::Ruled { rules, value } => {
+                    let is_allowed = rules
+                        .iter()
+                        .all(|rule| is_rule_allowed(rule, &java_component.arch));
+
+                    match (is_allowed, value) {
+                        (false, _) => {}
+                        (true, ArgumentValue::Single(arg)) => {
+                            command.push(substitute_argument(arg))
+                        }
+                        (true, ArgumentValue::Many(arr)) => {
+                            command.extend(arr.iter().map(|arg| substitute_argument(arg)))
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    let mut command = Vec::with_capacity(100);
+
+    command.push(format!("-Xmx{xmx_memory}m"));
+    command.push(format!("-Xms{xms_memory}m"));
+
+    if let Some(logging_xml) = version.logging {
+        if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+            let logging_path = runtime_path
+                .get_logging_configs()
+                .get_client_path(&client.file.id);
+
+            let argument_replaced = client
+                .argument
+                .replace("${path}", &logging_path.to_string_lossy());
+
+            command.push(argument_replaced);
+        }
+    }
+
+    let mut arguments = version
+        .arguments
+        .clone()
+        .map(|mut args| {
+            let jvm = args.get(&ArgumentType::Jvm);
+            if jvm.is_none() {
+                args.insert(ArgumentType::Jvm, get_default_jvm_args());
+            }
+
+            args
+        })
+        .unwrap_or_else(|| {
+            let mut arguments = HashMap::new();
+            arguments.insert(
+                ArgumentType::Game,
+                version
+                    .minecraft_arguments
+                    .unwrap_or_default()
+                    .split(' ')
+                    .map(|s| Argument::Normal(s.to_string()))
+                    .collect(),
+            );
+
+            arguments.insert(ArgumentType::Jvm, get_default_jvm_args());
+
+            arguments
+        });
+
+    // remove --clientId, ${clientid}, --xuid, ${auth_xuid}
+    arguments
+        .get_mut(&ArgumentType::Game)
+        .unwrap()
+        .retain(|arg| {
+            if let Argument::Normal(arg) = arg {
+                !arg.starts_with("--clientId")
+                    && !arg.starts_with("--xuid")
+                    && !arg.starts_with("${auth_xuid}")
+                    && !arg.starts_with("${clientid}")
+            } else {
+                true
+            }
+        });
+
+    if let Some(jvm_arguments) = arguments.get(&ArgumentType::Jvm) {
+        substitute_arguments(&mut command, jvm_arguments);
+    }
+
+    for cap in extra_args_regex.captures_iter(extra_java_args) {
+        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };
+        command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
+    }
+
+    if Os::native() == Os::Osx {
+        let lwjgl_3 = version
+            .requires
+            .map(|requires| requires.iter().any(|require| require.uid == "org.lwjgl3"))
+            .unwrap_or(false);
+
+        let can_find_start_on_first_thread = command
+            .iter()
+            .any(|arg| arg.contains("XstartOnFirstThread"));
+
+        if !can_find_start_on_first_thread && lwjgl_3 {
+            command.push("-XstartOnFirstThread".to_string());
+        }
+    }
+
+    command.push("-Dorg.lwjgl.util.Debug=true".to_string());
+
+    command.push(version.main_class);
+    substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
+
+    Ok(command)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn launch_minecraft(
     java_component: JavaComponent,
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
+    lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Child> {
     let startup_command = generate_startup_command(
@@ -441,21 +500,25 @@ pub async fn launch_minecraft(
         full_account,
         xmx_memory,
         xms_memory,
+        extra_java_args,
         runtime_path,
         version,
+        lwjgl_group,
         instance_path.clone(),
     )
     .await?;
 
-    println!(
-        "Starting Minecraft with command: {:?}",
+    info!(
+        "Starting Minecraft with command: {} {}",
+        java_component.path,
         startup_command.join(" ")
     );
 
     let mut command_exec = tokio::process::Command::new(java_component.path);
-    command_exec.current_dir(instance_path.get_root());
+    command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
+    command_exec.stderr(std::process::Stdio::piped());
 
     let child = command_exec.args(startup_command);
 
@@ -465,14 +528,15 @@ pub async fn launch_minecraft(
 pub async fn extract_natives(
     runtime_path: &RuntimePath,
     version: &VersionInfo,
+    lwjgl_group: &LibraryGroup,
     java_arch: &JavaArch,
-) {
+) -> anyhow::Result<()> {
     async fn extract_single_library_natives(
         runtime_path: &RuntimePath,
         library: &Library,
-        version_id: &str,
+        dest: &Path,
         native_name: &str,
-    ) {
+    ) -> anyhow::Result<()> {
         let native_name = native_name.replace("${arch}", ARCH_WIDTH);
         let path = runtime_path.get_libraries().get_library_path({
             library
@@ -487,29 +551,37 @@ pub async fn extract_natives(
                 .path
                 .clone()
         });
-        let dest = runtime_path.get_natives().get_versioned(version_id);
-        tokio::fs::create_dir_all(&dest).await.unwrap();
 
-        println!("Extracting natives from {}", path.display());
+        info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, &dest).await.unwrap();
+        carbon_compression::decompress(path, dest).await?;
+
+        Ok(())
     }
+
+    info!("Start natives extraction for id {}", version.id);
+
+    let dest = runtime_path.get_natives().get_versioned(&version.id);
+    tokio::fs::create_dir_all(&dest).await?;
 
     for library in version
         .libraries
         .iter()
-        .filter(|&lib| library_is_allowed(lib.clone(), java_arch))
+        .chain(lwjgl_group.libraries.iter())
+        .filter(|&lib| library_is_allowed(lib, java_arch))
     {
         match &library.natives {
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
-                    extract_single_library_natives(runtime_path, library, &version.id, native_name)
-                        .await;
+                    extract_single_library_natives(runtime_path, library, &dest, native_name)
+                        .await?;
                 }
             }
             None => continue,
         };
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -534,7 +606,7 @@ mod tests {
         }
     }
 
-    async fn run_test_generate_startup_command(mc_version: &str) {
+    async fn run_test_generate_startup_command(_mc_version: &str) {
         let app = setup_managers_for_test().await;
 
         let version = app
@@ -552,6 +624,14 @@ mod tests {
             .get_minecraft_version(version)
             .await
             .unwrap();
+
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version,
+            &app.minecraft_manager().meta_base_url,
+        )
+        .await
+        .unwrap();
 
         let full_account = FullAccount {
             username: "test".to_owned(),
@@ -578,8 +658,10 @@ mod tests {
             full_account,
             2048,
             2048,
+            "",
             &runtime_path,
             version,
+            &lwjgl_group,
             instance_id,
         )
         .await
@@ -619,9 +701,18 @@ mod tests {
             .await
             .unwrap();
 
+        let lwjgl_group = get_lwjgl_meta(
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version,
+            &app.minecraft_manager().meta_base_url,
+        )
+        .await
+        .unwrap();
+
         let natives = version
             .libraries
             .iter()
+            .chain(lwjgl_group.libraries.iter())
             .filter(|&lib| lib.natives.is_some())
             .collect::<Vec<_>>();
 
@@ -640,6 +731,8 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version, &JavaArch::X86_64).await;
+        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
+            .await
+            .unwrap();
     }
 }

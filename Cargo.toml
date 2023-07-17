@@ -1,5 +1,5 @@
 [workspace]
-members = ["packages/core_module", "crates/*"]
+members = ["crates/*"]
 resolver = "2"
 exclude = ["crates/iridium"]
 
@@ -16,28 +16,24 @@ split-debuginfo = "unpacked"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.51", features = ["backtrace"] }
-async-recursion = "1.0.0"
 async-stream = "0.3.3"
 async-trait = "0.1.61"
 axum = "0.6.2"
 chrono = "0.4.23"
 derive_more = "0.99.17"
 directories = "4.0.1"
-dirs = "4.0.0"
 dotenvy = "0.15.6"
-env_logger = "0.10.0"
 flate2 = "1.0.25"
+fs_extra = "1.3.0"
 futures = "0.3.25"
-http = "0.2.9"
 httpdate = "1.0.2"
 hyper = "0.14.25"
 image = { version = "0.24.5", features = ["png"], default-features = false }
 jsonwebtoken = "8.2.0"
-lazy_static = "1.4.0"
-libc = "0.2"
-log = "0.4.17"
-mockall = "0.11.3"
-ntest = "0.9.0"
+# libc = "0.2"
+md-5 = "0.10.5"
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
+opener = "0.6.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
@@ -55,7 +51,7 @@ reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
 serde = "1.0.147"
 serde_json = "1.0.89"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "29a5461282cec7dbc0c148115cf499a6a15fd398" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "d4a6a11021972ad2e57603feaf7c65f612cc84d2" }
 sha1 = "0.10.5"
 sha2 = "0.10.6"
 tar = "0.4.38"
@@ -65,10 +61,20 @@ thiserror = "1.0.38"
 task-local-extensions = "0.1.4"
 tokio = "1.25.0"
 tokio-stream = "0.1.11"
+toml = "0.7.3"
 tower-http = "0.3.4"
 hex = "0.4"
 tracing = "0.1.37"
-tracing-test = "0.2.3"
+walkdir = "2.3"
+tracing-subscriber = { version = "0.3.17", features = ["ansi", "env-filter"] }
+tracing-appender = "0.2.2"
+# tracing-forest = { version = "0.1.5", features = [
+#   "smallvec",
+#   "chrono",
+#   "tokio",
+#   "serde",
+#   "env-filter",
+# ] }
 trash = "3.0.0"
 uuid = "1.2.2"
 winreg = "0.10.1"
@@ -79,5 +85,4 @@ syn = "2.0.11"
 quote = "1.0.26"
 url = "2.3.1"
 serde_repr = "0.1"
-proc-macro2 = "1.0.56"
 sysinfo = "0.29.0"

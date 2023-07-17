@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::bail;
 use tokio::process::Command;
+use tracing::instrument;
 
 use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion};
 
@@ -23,6 +24,7 @@ pub struct RealJavaChecker;
 
 #[async_trait::async_trait]
 impl JavaChecker for RealJavaChecker {
+    #[instrument(skip(self))]
     async fn get_bin_info(
         &self,
         java_bin_path: &Path,

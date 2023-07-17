@@ -2,7 +2,9 @@ use std::path::PathBuf;
 
 use regex::Regex;
 use thiserror::Error;
+use url::Url;
 
+#[derive(Debug, Clone)]
 pub struct MavenCoordinates {
     pub group_id: String,
     pub artifact_id: String,
@@ -45,6 +47,30 @@ impl MavenCoordinates {
         ));
 
         path
+    }
+
+    pub fn into_url(self, base_url: &str) -> anyhow::Result<Url> {
+        let mut url = Url::parse(base_url)?;
+
+        for part in self.group_id.split('.') {
+            url = url.join(&format!("{}/", part))?;
+        }
+
+        url = url.join(&format!("{}/", &self.artifact_id))?;
+        url = url.join(&format!("{}/", &self.version))?;
+
+        let version = format!("-{}", self.version);
+
+        let identifier = self.identifier.map(|a| format!("-{a}")).unwrap_or_default();
+
+        let additional = self.additional.map(|a| format!("-{a}")).unwrap_or_default();
+
+        url = url.join(&format!(
+            "{}{}{}{}.{}",
+            self.artifact_id, version, identifier, additional, self.extension
+        ))?;
+
+        Ok(url)
     }
 }
 

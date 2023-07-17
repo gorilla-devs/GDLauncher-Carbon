@@ -9,16 +9,18 @@ import useModpacksQuery from "./useModpacksQuery";
 import {
   Setter,
   createContext,
-  createEffect,
   createSignal,
+  onMount,
   useContext,
 } from "solid-js";
 import {
+  FEMod,
   FEModSearchParameters,
   FEModSearchParametersQuery,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
+import { scrollTop } from "@/utils/browser";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -27,12 +29,13 @@ type InfiniteQueryType = {
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
   resetList: () => void;
+  allRows: () => FEMod[];
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
 
-export const useInfiniteQuery = () => {
-  return useContext(InfiniteQueryContext);
+export const useInfiniteModpacksQuery = () => {
+  return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
 function ModpacksLayout() {
@@ -83,14 +86,12 @@ function ModpacksLayout() {
         : allRows().length;
     },
     getScrollElement: () => parentRef(),
-    estimateSize: () => 230,
+    estimateSize: () => 150,
     overscan: 15,
   });
 
-  createEffect(() => {
-    rowVirtualizer.setOptions({
-      getScrollElement: () => parentRef(),
-    });
+  onMount(() => {
+    parentRef()?.scrollTo(0, scrollTop());
   });
 
   const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
@@ -113,16 +114,17 @@ function ModpacksLayout() {
     rowVirtualizer,
     setParentRef,
     resetList,
+    allRows,
   };
 
   return (
     <InfiniteQueryContext.Provider value={context}>
-      <div class="flex w-full">
+      <>
         <Sidebar />
         <ContentWrapper>
           <Outlet />
         </ContentWrapper>
-      </div>
+      </>
     </InfiniteQueryContext.Provider>
   );
 }

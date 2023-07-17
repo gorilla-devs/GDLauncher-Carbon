@@ -9,6 +9,7 @@ use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, S
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::process::Command;
+use tracing::info;
 
 use crate::{
     domain::{
@@ -36,7 +37,8 @@ pub async fn get_manifest(
         .send()
         .await?
         .json::<Manifest>()
-        .await?;
+        .await
+        .map_err(ForgeManifestError::from)?;
 
     Ok(new_manifest)
 }
@@ -179,7 +181,7 @@ pub async fn execute_processors(
             client => game_version,
             server => "";
         "ROOT":
-            client => instance_path.get_root().to_string_lossy(),
+            client => instance_path.get_data_path().to_string_lossy(),
             server => "";
         "LIBRARY_DIR":
             client => libraries_path.to_path().to_string_lossy(),
@@ -218,7 +220,7 @@ pub async fn execute_processors(
                 anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
             })?;
 
-        // println!("{}", String::from_utf8_lossy(&child.stdout));
+        info!("{}", String::from_utf8_lossy(&child.stdout));
 
         if !child.status.success() {
             bail!(
