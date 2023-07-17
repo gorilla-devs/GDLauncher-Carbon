@@ -8,7 +8,10 @@ use url::Url;
 use crate::{
     domain::modplatforms::modrinth::{
         project::Project,
-        responses::{CategoriesResponse, ProjectsResponse, TeamResponse, VersionsResponse, VersionHashesResponse},
+        responses::{
+            CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
+            VersionsResponse,
+        },
         search::{
             ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
             VersionHashesQuery, VersionID, VersionIDs,

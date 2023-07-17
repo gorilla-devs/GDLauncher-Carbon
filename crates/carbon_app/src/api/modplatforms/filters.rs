@@ -241,11 +241,12 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProject
             for cat_or in categories {
                 let category_or = cat_or
                     .into_iter()
-                    .filter_map(|cat| {match cat {
-                            FEUnifiedSearchCategoryID::Curseforge(_) => None,
-                            FEUnifiedSearchCategoryID::Modrinth(id) => Some(modrinth::filters::FEModrinthSearchFacet::Category(id)),
-
-                    }})
+                    .filter_map(|cat| match cat {
+                        FEUnifiedSearchCategoryID::Curseforge(_) => None,
+                        FEUnifiedSearchCategoryID::Modrinth(id) => {
+                            Some(modrinth::filters::FEModrinthSearchFacet::Category(id))
+                        }
+                    })
                     .collect();
                 facets.push(category_or);
             }
