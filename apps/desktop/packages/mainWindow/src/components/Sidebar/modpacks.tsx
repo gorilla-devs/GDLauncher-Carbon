@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import { getModloaderIcon } from "@/utils/sidebar";
 import SiderbarWrapper from "./wrapper";
-import { Collapsable, Radio, Skeleton } from "@gd/ui";
+import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createSignal } from "solid-js";
@@ -91,44 +91,36 @@ const Sidebar = () => {
           <Match when={modpacksCategories().length > 0}>
             <Collapsable title="Categories">
               <div class="flex flex-col gap-3">
-                <Radio.group
-                  onChange={(val) => {
-                    const isAll = val === "all";
-
-                    infiniteQuery?.setQuery({
-                      categoryId: isAll ? null : (val as number),
-                    });
-                  }}
-                  value={
-                    infiniteQuery?.query.query.categoryId?.toString() ?? "all"
-                  }
-                >
-                  <Radio name="category" value="all">
-                    <div class="flex items-center gap-3">
-                      <div class="flex items-center gap-2 max-w-32">
-                        {/* <img class="h-4 w-4" src={category.iconUrl} /> */}
-                        <p class="m-0">All categories</p>
+                <For each={modpacksCategories()}>
+                  {(category) => {
+                    return (
+                      <div class="flex items-center gap-3">
+                        <Checkbox
+                          checked={infiniteQuery?.query.query.categoryIds?.includes(
+                            category.id
+                          )}
+                          onChange={() =>
+                            infiniteQuery.setQuery({
+                              categoryIds: [
+                                ...(infiniteQuery?.query.query.categoryIds ||
+                                  []),
+                                category.id,
+                              ],
+                            })
+                          }
+                        />
+                        <div class="flex items-center gap-2 max-w-32">
+                          <img src={category.iconUrl} class="h-4 w-4" />
+                          <p class="m-0">{category.name}</p>
+                        </div>
                       </div>
-                    </div>
-                  </Radio>
-                  <For each={modpacksCategories()}>
-                    {(category) => {
-                      return (
-                        <Radio name="category" value={category.id}>
-                          <div class="flex items-center gap-3">
-                            <div class="flex items-center gap-2 max-w-32">
-                              <img class="h-4 w-4" src={category.iconUrl} />
-                              <p class="m-0">{category.name}</p>
-                            </div>
-                          </div>
-                        </Radio>
-                      );
-                    }}
-                  </For>
-                </Radio.group>
+                    );
+                  }}
+                </For>
               </div>
             </Collapsable>
           </Match>
+
           <Match when={modpacksCategories().length === 0}>
             <Skeleton.modpackSidebarCategories />
           </Match>

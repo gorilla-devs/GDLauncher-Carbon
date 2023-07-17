@@ -204,14 +204,14 @@ const ModRow = (props: Props) => {
                 <For each={props.data.categories}>
                   {(tag) => (
                     <Tooltip content={tag.name}>
-                      <Tag img={tag.iconUrl} type="fixed" />
+                      <Tag img={tag?.iconUrl} type="fixed" />
                     </Tooltip>
                   )}
                 </For>
               </Match>
               <Match when={isRowSmall()}>
                 <Tooltip content={props.data.categories[0].name}>
-                  <Tag img={props.data.categories[0].iconUrl} type="fixed" />
+                  <Tag img={props.data.categories[0]?.iconUrl} type="fixed" />
                 </Tooltip>
                 <Show when={props.data.categories.length - 1 > 0}>
                   <Tooltip
