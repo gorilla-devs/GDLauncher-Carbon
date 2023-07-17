@@ -27,6 +27,7 @@ interface Props
   size?: Size;
   percentage?: number;
   variant?: string;
+  cursor?: string;
 }
 
 const getVariant = (
@@ -38,6 +39,7 @@ const getVariant = (
   iconRight: boolean,
   isLoading: boolean,
   variant: string,
+  cursor: string | undefined,
   textColor?: string
 ) => {
   const isLarge = size === "large";
@@ -67,8 +69,8 @@ const getVariant = (
     "rounded-full": rounded,
     "rounded-md": !rounded,
     uppercase,
-    "cursor-pointer": !isLoading && !isDisabled,
-    "cursor-not-allowed": isDisabled,
+    "cursor-pointer": !isLoading && !isDisabled && !cursor,
+    "cursor-not-allowed": isDisabled && !cursor,
     "box-border": true,
     "border-solid": true,
     "scale-x-100": isLoading,
@@ -189,6 +191,7 @@ function Button(props: Props) {
         !!props.iconRight,
         !!props.loading,
         props.variant || "primary",
+        props.cursor,
         props.textColor
       )}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}

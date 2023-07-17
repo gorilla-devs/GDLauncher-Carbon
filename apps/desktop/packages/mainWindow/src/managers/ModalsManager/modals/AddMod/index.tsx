@@ -317,10 +317,10 @@ const AddMod = (props: ModalProps) => {
                               </div>
                             }
                           >
-                            <Match when={!isLoaderRow() && modpack()}>
+                            <Match when={!isLoaderRow() && mod()}>
                               <ModRow
                                 type="Mod"
-                                data={modpack()}
+                                data={mod()}
                                 mcVersion={props.data as string}
                               />
                             </Match>

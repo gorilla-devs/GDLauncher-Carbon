@@ -3,7 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
-import { FEMod, InstanceDetails } from "@gd/core_module/bindings";
+import { FEMod, InstanceDetails, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -49,8 +49,8 @@ type Props = ModProps | ModpackProps;
 
 const ModRow = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
-  const [instanceDetails, setInstanceDetails] = createSignal<
-    CreateQueryResult<InstanceDetails, RSPCError> | undefined
+  const [mods, setMods] = createSignal<
+    CreateQueryResult<Mod[], RSPCError> | undefined
   >(undefined);
   const [isRowSmall, setIsRowSmall] = createSignal(false);
   const mergedProps = mergeProps({ type: "Modpack" }, props);
@@ -121,9 +121,9 @@ const ModRow = (props: Props) => {
 
   createEffect(() => {
     if (instanceId() !== undefined) {
-      setInstanceDetails(
+      setMods(
         rspc.createQuery(() => [
-          "instance.getInstanceDetails",
+          "instance.getInstanceMods",
           parseInt(instanceId() as string, 10),
         ])
       );
@@ -146,9 +146,13 @@ const ModRow = (props: Props) => {
   });
 
   const isModInstalled = () =>
-    instanceDetails()?.data?.mods.find(
-      (mod) => parseInt(mod.id, 10) === props.data.id
+    mods()?.data?.find(
+      (mod) => mod.curseforge?.project_id === props.data.id
     ) !== undefined;
+
+  createEffect(() => {
+    console.log("AAA", mods()?.data, props.data.id);
+  });
 
   let containrRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
@@ -476,7 +480,10 @@ const ModRow = (props: Props) => {
                           </Dropdown.button>
                         </Match>
                         <Match when={isModInstalled()}>
-                          <Button>
+                          <Button
+                            cursor="cursor-default"
+                            variant={isModInstalled() ? "green" : "primary"}
+                          >
                             <Trans
                               key="mod.downloaded"
                               options={{
