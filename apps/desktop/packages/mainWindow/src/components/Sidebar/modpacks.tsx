@@ -109,7 +109,7 @@ const Sidebar = () => {
 
   const isCurseforge = () => infiniteQuery.query?.searchApi === "curseforge";
 
-  const modloaders = ["any", "forge", "fabric", "quilt"];
+  const modloaders = ["forge", "fabric", "quilt"];
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -141,34 +141,36 @@ const Sidebar = () => {
         </Collapsable>
         <Collapsable title="Modloader">
           <div class="flex flex-col gap-3">
-            <Radio.group
-              onChange={(val) => {
-                const mappedValue =
-                  val === "any" ? null : [val as FEQueryModLoaderType];
-                infiniteQuery?.setQuery({
-                  modloaders: mappedValue,
-                });
-              }}
-              // value={infiniteQuery?.query.modloaders}
-            >
-              <For each={modloaders}>
-                {(modloader) => (
-                  <Radio name="modloader" value={modloader}>
-                    <div class="flex items-center gap-2">
-                      <Show when={modloader !== "any"}>
-                        <img
-                          class="h-4 w-4"
-                          src={getModloaderIcon(
-                            capitalize(modloader) as FEInstanceModLoaderType
-                          )}
-                        />
-                      </Show>
-                      <p class="m-0">{capitalize(modloader)}</p>
-                    </div>
-                  </Radio>
-                )}
-              </For>
-            </Radio.group>
+            <For each={modloaders}>
+              {(modloader) => (
+                <div class="flex items-center gap-2">
+                  <Checkbox
+                    onChange={(checked) => {
+                      const prevModloaders =
+                        infiniteQuery?.query.modloaders || [];
+
+                      const newModloaders = checked
+                        ? [...prevModloaders, modloader as FEQueryModLoaderType]
+                        : prevModloaders.filter(
+                            (categ) =>
+                              categ !== (modloader as FEQueryModLoaderType)
+                          );
+
+                      infiniteQuery.setQuery({
+                        modloaders: newModloaders,
+                      });
+                    }}
+                  />
+                  <img
+                    class="h-4 w-4"
+                    src={getModloaderIcon(
+                      capitalize(modloader) as FEInstanceModLoaderType
+                    )}
+                  />
+                  <p class="m-0">{capitalize(modloader)}</p>
+                </div>
+              )}
+            </For>
           </div>
         </Collapsable>
         <Switch>
