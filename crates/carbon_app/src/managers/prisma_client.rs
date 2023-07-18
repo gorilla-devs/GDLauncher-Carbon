@@ -63,9 +63,10 @@ async fn find_appropriate_default_xmx() -> i32 {
     memory.refresh_memory();
 
     match memory.total_memory() / 1024 / 1024 {
-        0..=4096 => 2048,
-        4097..=8192 => 4096,
-        _ => 6144,
+        0..=4096 => 1024,
+        4097..=6144 => 2048,
+        6145..=8192 => 3072,
+        _ => 4096,
     }
 }
 
