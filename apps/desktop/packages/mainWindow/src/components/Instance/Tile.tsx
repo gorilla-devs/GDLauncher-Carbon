@@ -6,8 +6,9 @@ import {
   FESubtask,
   Translation,
   UngroupedInstance,
+  ModpackPlatform,
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, createEffect, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -15,7 +16,7 @@ import { Spinner, Tooltip, createNotification } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
-import { getValideInstance } from "@/utils/instances";
+import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -356,7 +357,15 @@ const Tile = (props: Props) => {
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-2">
-                    <Show when={!props.isInvalid && !props.failError}>
+                    <Show when={validInstance()?.modpack_platform}>
+                      <img
+                        class="w-4 h-4"
+                        src={getModpackPlatformIcon(
+                          validInstance()?.modpack_platform as ModpackPlatform
+                        )}
+                      />
+                    </Show>
+                    <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
                         src={getModloaderIcon(
@@ -473,7 +482,15 @@ const Tile = (props: Props) => {
               </h4>
               <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">
-                  <Show when={!props.isInvalid && !props.failError}>
+                  <Show when={validInstance()?.modpack_platform}>
+                    <img
+                      class="w-4 h-4"
+                      src={getModpackPlatformIcon(
+                        validInstance()?.modpack_platform as ModpackPlatform
+                      )}
+                    />
+                  </Show>
+                  <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
                       src={getModloaderIcon(

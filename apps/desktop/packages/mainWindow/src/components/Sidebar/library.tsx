@@ -76,17 +76,8 @@ const Sidebar = () => {
   const mapIconToKey = (key: string) => {
     return (
       <Switch>
-        <Match when={isSidebarOpened() && key === "vanilla"}>
-          {t("vanilla")}
-        </Match>
-        <Match when={isSidebarOpened() && key === "Forge"}>{t("forge")}</Match>
-        <Match when={!isSidebarOpened() && key === "vanilla"}>
-          <img
-            class="w-6 h-6"
-            src={getModloaderIcon(key as FEInstanceModLoaderType)}
-          />
-        </Match>
-        <Match when={!isSidebarOpened() && key === "Forge"}>
+        <Match when={isSidebarOpened()}>{t(key)}</Match>
+        <Match when={!isSidebarOpened()}>
           <img
             class="w-6 h-6"
             src={getModloaderIcon(key as FEInstanceModLoaderType)}
@@ -116,7 +107,7 @@ const Sidebar = () => {
           >
             <Input
               ref={inputRef}
-              placeholder={t("general.search") || ""}
+              placeholder={t("general.search") as string}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}

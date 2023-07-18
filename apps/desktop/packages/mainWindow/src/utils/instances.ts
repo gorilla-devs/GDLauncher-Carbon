@@ -11,9 +11,12 @@ import {
   Modpack,
   CurseforgeModpack,
   ModrinthModpack,
+  ModpackPlatform,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
 import { port } from "./rspcClient";
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -226,3 +229,14 @@ export type Instance = InvalidInstanceType | ValidInstanceType;
 export interface InstancesStore {
   [modloader: string]: UngroupedInstance[];
 }
+
+export const getModpackPlatformIcon = (platform: ModpackPlatform) => {
+  switch (platform) {
+    case "Curseforge":
+      return CurseforgeLogo;
+    case "Modrinth":
+      return ModrinthLogo;
+    default:
+      return CurseforgeLogo;
+  }
+};
