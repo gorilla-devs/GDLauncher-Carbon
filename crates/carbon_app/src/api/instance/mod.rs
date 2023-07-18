@@ -161,7 +161,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query INSTANCE_MODS[app, id: FEInstanceId] {
             app.meta_cache_manager()
-                .prioritize_instance(id.into())
+                .focus_instance(id.into())
                 .await;
 
             Ok(app.instance_manager()

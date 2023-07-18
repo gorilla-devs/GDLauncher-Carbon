@@ -116,6 +116,25 @@ impl ManagerRef<'_, MetaCacheManager> {
         *self.priority_instance.lock().await = Some(instance_id);
     }
 
+    pub async fn focus_instance(self, instance_id: InstanceId) {
+        let mut lock = self.scanned_instances.lock().await;
+        if lock.contains(&instance_id) {
+            info!("queueing remote metadata download for instance {instance_id}");
+
+            let _ = self.app
+                .meta_cache_manager()
+                .remote_instance
+                .send(Some(instance_id));
+        } else {
+            self.prioritize_instance(instance_id).await;
+
+            self.waiting_instances.write().await.insert(instance_id);
+            let _ = self.waiting_notify.send(());
+            lock.insert(instance_id);
+            info!("queued instance {instance_id} for recaching");
+        }
+    }
+
     /// Panics if called more than once
     pub async fn launch_background_tasks(self) {
         let (mut local_notify, mut remote_watch) = self
@@ -422,7 +441,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
                                 fcdb::WhereParam::MetadataIs(vec![
                                     metadb::WhereParam::CurseforgeIsNot(vec![
-                                        cfdb::WhereParam::CachedAt(DateTimeFilter::Lt(
+                                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
                                             (chrono::Utc::now() - chrono::Duration::days(1)).into(),
                                         )),
                                     ]),
