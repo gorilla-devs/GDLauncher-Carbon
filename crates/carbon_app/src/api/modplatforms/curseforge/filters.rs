@@ -102,7 +102,7 @@ pub struct FEModSearchParametersQuery {
     pub sort_order: Option<FEModSearchSortOrder>,
     pub sort_field: Option<FEModSearchSortField>,
     pub class_id: Option<FEClassId>,
-    pub mod_loader_type: Option<FEModLoaderType>,
+    pub mod_loader_types: Option<Vec<FEModLoaderType>>,
     pub game_version_type_id: Option<i32>,
     pub author_id: Option<i32>,
     pub slug: Option<String>,
@@ -112,6 +112,10 @@ pub struct FEModSearchParametersQuery {
 
 impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
     fn from(params: FEModSearchParametersQuery) -> Self {
+        let mod_loader_types = params
+            .mod_loader_types
+            .map(|types| types.into_iter().map(|t| t.into()).collect());
+
         Self {
             game_id: params.game_id,
             search_filter: params.search_filter,
@@ -120,7 +124,7 @@ impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
             sort_order: params.sort_order.map(Into::into),
             sort_field: params.sort_field.map(Into::into),
             class_id: params.class_id.map(Into::into),
-            mod_loader_type: params.mod_loader_type.map(Into::into),
+            mod_loader_types,
             game_version_type_id: params.game_version_type_id,
             author_id: params.author_id,
             slug: params.slug,

@@ -11,7 +11,7 @@ thiserror = { workspace = true }
 sentry = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
-serde_urlencoded = "0.7.1"
+serde_qs = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 futures = { workspace = true }

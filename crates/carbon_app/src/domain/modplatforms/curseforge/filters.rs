@@ -2,6 +2,8 @@ use carbon_macro::into_query_parameters;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+use crate::domain::url::serialize_as_raw_json;
+
 use super::{ClassId, ModLoaderType};
 
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
@@ -39,11 +41,15 @@ pub struct ModSearchParametersQuery {
     pub game_id: i32,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
+    #[serde(serialize_with = "serialize_as_raw_json")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub category_ids: Option<Vec<i32>>,
     pub sort_order: Option<ModSearchSortOrder>,
     pub sort_field: Option<ModSearchSortField>,
     pub class_id: Option<ClassId>,
-    pub mod_loader_type: Option<ModLoaderType>,
+    #[serde(serialize_with = "serialize_as_raw_json")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mod_loader_types: Option<Vec<ModLoaderType>>,
     pub game_version_type_id: Option<i32>,
     pub author_id: Option<i32>,
     pub slug: Option<String>,
