@@ -301,8 +301,6 @@ pub struct VersionIDs {
     #[serde(
         serialize_with = "serialize_as_raw_json",
         deserialize_with = "deserialize_from_raw_json",
-        skip_serializing_if = "Option::is_none"
-
     )]
     pub ids: Vec<String>,
 }
@@ -378,8 +376,6 @@ pub struct ProjectIDs {
     #[serde(
         serialize_with = "serialize_as_raw_json",
         deserialize_with = "deserialize_from_raw_json",
-        skip_serializing_if = "Option::is_none"
-
     )]
     pub ids: Vec<String>,
 }
