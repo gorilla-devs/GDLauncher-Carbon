@@ -63,6 +63,7 @@ indexmap = { version = "1.9.3", features = ["serde"] }
 tracing-test = "0.2.4"
 walkdir = { workspace = true }
 serde_qs = "0.12.0"
+async-recursion = "1.0.4"
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
