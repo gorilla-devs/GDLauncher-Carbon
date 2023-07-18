@@ -76,10 +76,7 @@ const Sidebar = () => {
                       }}
                     />
                     <div class="flex items-center gap-2 max-w-32">
-                      <img
-                        src={getModloaderIcon(modloader as any)}
-                        class="h-4 w-4"
-                      />
+                      <img src={getModloaderIcon(modloader)} class="h-4 w-4" />
                       <p class="m-0">{modloader}</p>
                     </div>
                   </div>
