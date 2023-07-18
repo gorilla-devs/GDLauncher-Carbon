@@ -195,13 +195,18 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
                 game_id: 432,
                 search_filter: value.search_query,
                 game_version: value.game_versions.and_then(|vers| vers.into_iter().next()),
-                category_id: value.categories.and_then(|cat_groups| {
-                    cat_groups.into_iter().next().and_then(|cats| {
-                        cats.into_iter().find_map(|cat| match cat {
-                            FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
-                            FEUnifiedSearchCategoryID::Modrinth(_) => None,
+                category_ids: value.categories.map(|cat_groups| {
+                    cat_groups
+                        .into_iter()
+                        .filter_map(|cats| {
+                            // Curseforge does't support ORs of categories, take only the first of each
+                            // group
+                            cats.into_iter().find_map(|cat| match cat {
+                                FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
+                                FEUnifiedSearchCategoryID::Modrinth(_) => None,
+                            })
                         })
-                    })
+                        .collect()
                 }),
                 sort_order: value.sort_order,
                 sort_field: match value.sort_index {
@@ -209,9 +214,12 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
                     _ => None,
                 },
                 class_id: value.project_type.map(Into::into),
-                mod_loader_type: value
-                    .modloaders
-                    .and_then(|loaders| loaders.into_iter().next().map(Into::into)),
+                mod_loader_types: value.modloaders.map(|loaders| {
+                    loaders
+                        .into_iter()
+                        .map(Into::<curseforge::structs::FEModLoaderType>::into)
+                        .collect()
+                }),
                 author_id: None,
                 game_version_type_id: None,
                 slug: None,

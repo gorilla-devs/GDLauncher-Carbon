@@ -1,16 +1,18 @@
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
 
 use crate::{
     api::{
         keys::modplatforms::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
-            CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE,
-            CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH,
-            MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT, MODRINTH_GET_PROJECTS,
-            MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_TEAM, MODRINTH_GET_VERSION,
-            MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
+            CURSEFORGE_GET_MODLOADERS, CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION,
+            CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG,
+            CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT,
+            MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_TEAM,
+            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
         },
+        modplatforms::curseforge::structs::FEModLoaderType,
         router::router,
     },
     managers::App,
@@ -36,6 +38,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             let response = modplatforms.curseforge.search(filters.into()).await?;
 
             Ok(curseforge::responses::FEModSearchResponse::from(response))
+        }
+
+        query CURSEFORGE_GET_MODLOADERS[_, _args: ()] {
+            Ok(FEModLoaderType::iter().collect::<Vec<_>>())
         }
 
         query CURSEFORGE_GET_CATEGORIES[app, args: ()] {

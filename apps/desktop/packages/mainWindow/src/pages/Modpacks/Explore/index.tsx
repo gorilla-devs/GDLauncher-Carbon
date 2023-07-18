@@ -13,7 +13,7 @@ import {
   createNotification,
 } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
@@ -47,7 +47,9 @@ const Modpack = () => {
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
-
+  const [lastVersionId, setLastVersionId] = createSignal<string | undefined>(
+    undefined
+  );
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
   const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
@@ -84,21 +86,29 @@ const Modpack = () => {
     }
   );
 
-  const modpack = () =>
-    routeData.modpackDetails.data &&
-    (routeData.isCurseforge
+  const modpack = () => {
+    const versionId = lastVersionId();
+    if (!routeData.modpackDetails.data) return;
+
+    const modrinth =
+      !routeData.isCurseforge && versionId
+        ? {
+            Modrinth: {
+              project_id: routeData.modpackDetails.data?.id,
+              version_id: versionId,
+            },
+          }
+        : undefined;
+
+    return routeData.isCurseforge
       ? {
           Curseforge: {
             file_id: routeData.modpackDetails.data?.data.mainFileId,
             project_id: routeData.modpackDetails.data?.data.id,
           },
         }
-      : {
-          Modrinth: {
-            project_id: routeData.modpackDetails.data?.versions[0],
-            version_id: routeData.modpackDetails.data?.id,
-          },
-        });
+      : modrinth;
+  };
 
   const instanceName = () =>
     routeData.isCurseforge
@@ -109,6 +119,43 @@ const Modpack = () => {
     routeData.isCurseforge
       ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
       : (routeData.modpackDetails?.data as FEModrinthProject).icon_url;
+
+  createEffect(() => {
+    if (!routeData.isCurseforge) {
+      const versions = routeData.modpackDetails.data?.versions;
+      if (versions) {
+        const modrinthVersions = rspc.createQuery(() => [
+          "modplatforms.modrinthGetVersions",
+          versions,
+        ]);
+        const lastVersion = modrinthVersions.data?.[0];
+
+        const fileID = lastVersion?.id;
+        if (fileID) setLastVersionId(fileID);
+      }
+    }
+  });
+
+  const handleDownload = () => {
+    setLoading(true);
+    const instanceIcon = icon();
+
+    if (instanceIcon) loadIconMutation.mutate(instanceIcon);
+
+    const name = instanceName();
+    const modpackObj = modpack();
+
+    if (name && modpackObj)
+      createInstanceMutation.mutate({
+        group: defaultGroup.data || 1,
+        use_loaded_icon: true,
+        notes: "",
+        name: name,
+        version: {
+          Modpack: modpackObj,
+        },
+      });
+  };
 
   return (
     <ContentWrapper>
@@ -247,25 +294,7 @@ const Modpack = () => {
                       <Button
                         uppercase
                         size="large"
-                        onClick={() => {
-                          const instanceIcon = icon();
-
-                          if (instanceIcon)
-                            loadIconMutation.mutate(instanceIcon);
-
-                          const name = instanceName();
-                          const modpackObj = modpack();
-                          if (name && modpackObj)
-                            createInstanceMutation.mutate({
-                              group: defaultGroup.data || 1,
-                              use_loaded_icon: true,
-                              notes: "",
-                              name: name,
-                              version: {
-                                Modpack: modpackObj,
-                              },
-                            });
-                        }}
+                        onClick={() => handleDownload()}
                       >
                         <Show when={loading()}>
                           <Spinner />
@@ -327,24 +356,7 @@ const Modpack = () => {
                   <Button
                     uppercase
                     size="small"
-                    onClick={() => {
-                      const instanceIcon = icon();
-
-                      if (instanceIcon) loadIconMutation.mutate(instanceIcon);
-
-                      const name = instanceName();
-                      const modpackObj = modpack();
-                      if (name && modpackObj)
-                        createInstanceMutation.mutate({
-                          group: defaultGroup.data || 1,
-                          use_loaded_icon: true,
-                          notes: "",
-                          name: name,
-                          version: {
-                            Modpack: modpackObj,
-                          },
-                        });
-                    }}
+                    onClick={() => handleDownload()}
                   >
                     <Show when={loading()}>
                       <Spinner />

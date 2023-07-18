@@ -40,6 +40,9 @@ const ModRow = (props: ModRowProps) => {
   const [instanceDetails, setInstanceDetails] = createSignal<
     CreateQueryResult<InstanceDetails, RSPCError> | undefined
   >(undefined);
+  const [currentProjectId, setCurrentProjectId] = createSignal<
+    string | number | undefined
+  >(undefined);
   const [isRowSmall, setIsRowSmall] = createSignal(false);
   const mergedProps = mergeProps({ type: "Modpack" }, props);
   const navigate = useGDNavigate();
@@ -245,6 +248,44 @@ const ModRow = (props: ModRowProps) => {
     );
   };
 
+  createEffect(() => {
+    if (props.type !== "Modpack") return;
+    if (!isCurseForgeData(props.data) && currentProjectId()) {
+      setLoading(true);
+      // eslint-disable-next-line solid/reactivity
+      const modrinthProject = rspc.createQuery(() => [
+        "modplatforms.modrinthGetProject",
+        currentProjectId() as string,
+      ]);
+
+      if (modrinthProject.data?.versions) {
+        const modrinthVersions = rspc.createQuery(() => [
+          "modplatforms.modrinthGetVersions",
+          modrinthProject.data?.versions,
+        ]);
+        const lastVersion = modrinthVersions.data?.[0];
+        console.log("modrinthVersions", modrinthVersions);
+
+        if (lastVersion) {
+          const modpack = instanceCreationObj(
+            lastVersion.id,
+            lastVersion.project_id
+          );
+
+          createInstanceMutation.mutate({
+            group: props.defaultGroup || 1,
+            use_loaded_icon: true,
+            notes: "",
+            name: getName(props),
+            version: {
+              Modpack: modpack,
+            },
+          });
+        }
+      }
+    }
+  });
+
   const instanceCreationObj = (
     fileId?: number | string,
     projectId?: number | string
@@ -259,8 +300,7 @@ const ModRow = (props: ModRowProps) => {
       : {
           Modrinth: {
             project_id: projectId?.toString() || props.data.modrinth.project_id,
-            version_id:
-              fileId?.toString() || props.data.modrinth.versions[0] || "",
+            version_id: fileId?.toString() as string,
           },
         };
   };
@@ -323,15 +363,25 @@ const ModRow = (props: ModRowProps) => {
                             if (props.type !== "Modpack") return;
                             const imgUrl = getLogoUrl(props);
                             if (imgUrl) loadIconMutation.mutate(imgUrl);
-                            createInstanceMutation.mutate({
-                              group: props.defaultGroup || 1,
-                              use_loaded_icon: true,
-                              notes: "",
-                              name: getName(props),
-                              version: {
-                                Modpack: instanceCreationObj(),
-                              },
-                            });
+
+                            const projectId = isCurseForgeData(props.data)
+                              ? props.data.curseforge.id
+                              : props.data.modrinth.project_id;
+
+                            if (!isCurseForgeData(props.data))
+                              setCurrentProjectId(projectId);
+
+                            if (isCurseForgeData(props.data)) {
+                              createInstanceMutation.mutate({
+                                group: props.defaultGroup || 1,
+                                use_loaded_icon: true,
+                                notes: "",
+                                name: getName(props),
+                                version: {
+                                  Modpack: instanceCreationObj(),
+                                },
+                              });
+                            }
                           }}
                         >
                           <Show when={loading()}>

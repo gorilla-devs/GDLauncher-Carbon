@@ -10,7 +10,11 @@ const fetchData = () => {
   ]);
   const minecraftVersions = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
 
-  return { forgeCategories, minecraftVersions, modrinthCategories };
+  return {
+    forgeCategories,
+    minecraftVersions,
+    modrinthCategories,
+  };
 };
 
 export default fetchData;
