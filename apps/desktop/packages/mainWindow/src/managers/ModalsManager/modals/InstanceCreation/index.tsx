@@ -8,7 +8,7 @@ import {
   FEModdedManifestLoaderVersion,
   ManifestVersion,
   McType,
-  ModLoaderType,
+  FEInstanceModLoaderType,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
@@ -20,7 +20,7 @@ type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
 
 type Instancetype = {
   id: string;
-  modloader: ModLoaderType | undefined;
+  modloader: FEInstanceModLoaderType | undefined;
   title: string | undefined;
   mcVersion: string | undefined;
   modloaderVersion: string | undefined;
@@ -39,7 +39,7 @@ const InstanceCreation = (props: ModalProps) => {
   const [bgPreview, setBgPreview] = createSignal<string | null>(
     instanceData()?.img || null
   );
-  const [loader, setLoader] = createSignal<ModLoaderType | undefined>(
+  const [loader, setLoader] = createSignal<FEInstanceModLoaderType | undefined>(
     instanceData()?.modloader || undefined
   );
   const [loaderVersions, setLoaderVersions] = createSignal<
@@ -95,7 +95,7 @@ const InstanceCreation = (props: ModalProps) => {
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
 
   createEffect(() => {
-    if (forgeVersionsQuery.data && loader() === "Forge") {
+    if (forgeVersionsQuery.data && loader() === "forge") {
       const versions = forgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
@@ -107,7 +107,7 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    if (fabricVersionsQuery.data && loader() === "Fabric") {
+    if (fabricVersionsQuery.data && loader() === "fabric") {
       const supported =
         fabricVersionsQuery?.data?.gameVersions.find(
           (v) =>
@@ -128,7 +128,7 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    if (quiltVersionsQuery.data && loader() === "Quilt") {
+    if (quiltVersionsQuery.data && loader() === "quilt") {
       const supported =
         quiltVersionsQuery?.data?.gameVersions.find(
           (v) =>
@@ -295,18 +295,18 @@ const InstanceCreation = (props: ModalProps) => {
       setError("");
 
       let versions: FEModdedManifestLoaderVersion[];
-      if (loader() == "Forge") {
+      if (loader() == "forge") {
         const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
         versions =
           forgeVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === (mcVersion() || mcVers?.id)
           )?.loaders || [];
-      } else if (loader() == "Fabric") {
+      } else if (loader() == "fabric") {
         versions =
           fabricVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === DUMMY_META_VERSION
           )?.loaders || [];
-      } else if (loader() == "Quilt") {
+      } else if (loader() == "quilt") {
         versions =
           quiltVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === DUMMY_META_VERSION
@@ -332,7 +332,7 @@ const InstanceCreation = (props: ModalProps) => {
               modloaders: loader()
                 ? [
                     {
-                      type_: loader() as ModLoaderType,
+                      type_: loader() as FEInstanceModLoaderType,
                       version: chosenLoaderVersion() || versions[0].id,
                     },
                   ]
@@ -364,7 +364,7 @@ const InstanceCreation = (props: ModalProps) => {
         modloader: {
           Set: loader()
             ? {
-                type_: loader() as ModLoaderType,
+                type_: loader() as FEInstanceModLoaderType,
                 version: chosenLoaderVersion() || versions[0].id,
               }
             : null,
@@ -374,7 +374,7 @@ const InstanceCreation = (props: ModalProps) => {
   };
 
   createEffect(() => {
-    if (instanceData()?.modloader === "Forge") {
+    if (instanceData()?.modloader === "forge") {
       forgeVersionsQuery.refetch();
     }
   });
@@ -480,7 +480,7 @@ const InstanceCreation = (props: ModalProps) => {
                       setLoader(
                         modloader.key === "Vanilla"
                           ? undefined
-                          : (modloader.key as ModLoaderType)
+                          : (modloader.key as FEInstanceModLoaderType)
                       );
                     }}
                   >
@@ -536,14 +536,14 @@ const InstanceCreation = (props: ModalProps) => {
 
                     if (!loader) {
                       setLoaderVersions([]);
-                    } else if (loader() === "Forge") {
+                    } else if (loader() === "forge") {
                       const versions =
                         forgeVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
                         )?.loaders;
 
                       setLoaderVersions(versions || []);
-                    } else if (loader() === "Fabric") {
+                    } else if (loader() === "fabric") {
                       const supported =
                         fabricVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
@@ -557,7 +557,7 @@ const InstanceCreation = (props: ModalProps) => {
                           : [];
 
                       setLoaderVersions(versions || []);
-                    } else if (loader() === "Quilt") {
+                    } else if (loader() === "quilt") {
                       const supported =
                         quiltVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key

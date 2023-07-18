@@ -2,7 +2,7 @@
 import { getModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
-  ModLoaderType,
+  FEInstanceModLoaderType,
   FESubtask,
   Translation,
   UngroupedInstance,
@@ -20,7 +20,7 @@ import { getValideInstance } from "@/utils/instances";
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
-  modloader: ModLoaderType | null | undefined;
+  modloader: FEInstanceModLoaderType | null | undefined;
   instance: UngroupedInstance | ListInstance;
   selected?: boolean;
   isLoading?: boolean;
@@ -359,7 +359,9 @@ const Tile = (props: Props) => {
                     <Show when={!props.isInvalid && !props.failError}>
                       <img
                         class="w-4 h-4"
-                        src={getModloaderIcon(props.modloader as ModLoaderType)}
+                        src={getModloaderIcon(
+                          props.modloader as FEInstanceModLoaderType
+                        )}
                       />
                     </Show>
                     <p class="m-0">{props.modloader || "Vanilla"}</p>
@@ -474,7 +476,9 @@ const Tile = (props: Props) => {
                   <Show when={!props.isInvalid && !props.failError}>
                     <img
                       class="w-4 h-4"
-                      src={getModloaderIcon(props.modloader as ModLoaderType)}
+                      src={getModloaderIcon(
+                        props.modloader as FEInstanceModLoaderType
+                      )}
                     />
                   </Show>
                   <Show when={props.modloader}>

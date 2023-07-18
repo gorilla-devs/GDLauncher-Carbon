@@ -264,7 +264,6 @@ const ModRow = (props: ModRowProps) => {
           modrinthProject.data?.versions,
         ]);
         const lastVersion = modrinthVersions.data?.[0];
-        console.log("modrinthVersions", modrinthVersions);
 
         if (lastVersion) {
           const modpack = instanceCreationObj(
@@ -336,7 +335,7 @@ const ModRow = (props: ModRowProps) => {
               <div class="flex w-full justify-end items-end">
                 <Switch>
                   <Match when={mergedProps.type === "Modpack"}>
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 items-center">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
                         type="outline"

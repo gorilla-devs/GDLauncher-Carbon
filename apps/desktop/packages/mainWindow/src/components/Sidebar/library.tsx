@@ -23,7 +23,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
-import { ModLoaderType } from "@gd/core_module/bindings";
+import { FEInstanceModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -81,10 +81,16 @@ const Sidebar = () => {
         </Match>
         <Match when={isSidebarOpened() && key === "Forge"}>{t("forge")}</Match>
         <Match when={!isSidebarOpened() && key === "vanilla"}>
-          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
+          <img
+            class="w-6 h-6"
+            src={getModloaderIcon(key as FEInstanceModLoaderType)}
+          />
         </Match>
         <Match when={!isSidebarOpened() && key === "Forge"}>
-          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
+          <img
+            class="w-6 h-6"
+            src={getModloaderIcon(key as FEInstanceModLoaderType)}
+          />
         </Match>
       </Switch>
     );

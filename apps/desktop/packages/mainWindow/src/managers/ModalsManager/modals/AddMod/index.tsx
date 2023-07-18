@@ -15,6 +15,7 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
+  FEModLoaderType,
   FEModSearchParametersQuery,
   FEModSearchSortField,
   FEQueryModLoaderType,
@@ -122,8 +123,8 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (FEQueryModLoaderType | "Any")[] = [
-    "Any",
+  const modloaders: (FEQueryModLoaderType | "any")[] = [
+    "any",
     "forge",
     "fabric",
     "quilt",
@@ -245,12 +246,15 @@ const AddMod = (props: ModalProps) => {
                   key: modloader,
                 }))}
                 onChange={(val) => {
-                  const mappedValue = val.key === "Any" ? null : val.key;
+                  const prevModloaders = query.modloaders || [];
+                  const mappedValue =
+                    val.key === "any"
+                      ? null
+                      : [...prevModloaders, val.key as FEModLoaderType];
                   setQueryWrapper({
-                    modLoaderType: mappedValue as FEQueryModLoaderType | null,
+                    modLoaderTypes: mappedValue,
                   });
                 }}
-                // value={query.modloaders}
                 rounded
               />
             </div>

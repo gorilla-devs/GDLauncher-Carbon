@@ -135,14 +135,6 @@ const Instance = () => {
       setIsFavorite(routeData.instanceDetails.data?.favorite);
   });
 
-  createEffect(() => {
-    console.log(
-      "AAAAA",
-      routeData.instanceDetails.data,
-      routeData.instanceDetails.data?.modloaders[0]?.type_
-    );
-  });
-
   const instancePages = () => [
     {
       label: "Overview",

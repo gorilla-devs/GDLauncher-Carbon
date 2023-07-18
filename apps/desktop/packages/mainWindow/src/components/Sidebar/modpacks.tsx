@@ -11,7 +11,7 @@ import {
   FEQueryModLoaderType,
   FESearchAPI,
   FEUnifiedSearchCategoryID,
-  ModLoaderType,
+  FEInstanceModLoaderType,
   ModpackPlatform,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
@@ -159,7 +159,7 @@ const Sidebar = () => {
                         <img
                           class="h-4 w-4"
                           src={getModloaderIcon(
-                            capitalize(modloader) as ModLoaderType
+                            capitalize(modloader) as FEInstanceModLoaderType
                           )}
                         />
                       </Show>
