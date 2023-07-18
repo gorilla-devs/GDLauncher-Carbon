@@ -86,3 +86,5 @@ quote = "1.0.26"
 url = "2.3.1"
 serde_repr = "0.1"
 sysinfo = "0.29.0"
+serde_qs = "0.12"
+

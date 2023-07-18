@@ -468,7 +468,7 @@ enum ListInstanceStatus {
 #[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
-    modloader: Option<ModLoaderType>,
+    modloader: Option<FEInstanceModLoaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
 }
@@ -698,12 +698,13 @@ enum InstanceFolder {
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
-    type_: ModLoaderType,
+    type_: FEInstanceModLoaderType,
     version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-enum ModLoaderType {
+#[serde(rename_all = "camelCase")]
+enum FEInstanceModLoaderType {
     Forge,
     Fabric,
     Quilt,
@@ -727,7 +728,7 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
-    modloaders: Vec<ModLoaderType>,
+    modloaders: Vec<FEInstanceModLoaderType>,
     metadata: ModFileMetadata,
 }
 
@@ -738,7 +739,7 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Option<Vec<ModLoaderType>>,
+    modloaders: Option<Vec<FEInstanceModLoaderType>>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -780,7 +781,7 @@ impl From<domain::info::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::info::ModLoaderType> for ModLoaderType {
+impl From<domain::info::ModLoaderType> for FEInstanceModLoaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         use domain::info::ModLoaderType as domain;
 
@@ -882,13 +883,13 @@ impl From<ModLoader> for domain::info::ModLoader {
     }
 }
 
-impl From<ModLoaderType> for domain::info::ModLoaderType {
-    fn from(value: ModLoaderType) -> Self {
+impl From<FEInstanceModLoaderType> for domain::info::ModLoaderType {
+    fn from(value: FEInstanceModLoaderType) -> Self {
         match value {
-            ModLoaderType::Forge => Self::Forge,
-            ModLoaderType::Fabric => Self::Fabric,
-            ModLoaderType::Quilt => Self::Quilt,
-            ModLoaderType::Unknown => Self::Unknown,
+            FEInstanceModLoaderType::Forge => Self::Forge,
+            FEInstanceModLoaderType::Fabric => Self::Fabric,
+            FEInstanceModLoaderType::Quilt => Self::Quilt,
+            FEInstanceModLoaderType::Unknown => Self::Unknown,
         }
     }
 }
