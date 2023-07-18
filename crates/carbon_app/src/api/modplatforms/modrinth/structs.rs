@@ -9,7 +9,7 @@ use crate::domain::modplatforms::modrinth::{
         ProjectSupportRange, ProjectType,
     },
     search::ProjectSearchResult,
-    tag::Category,
+    tag::{Category, Loader, LoaderType},
     user::{TeamMember, User, UserRole},
     version::{
         AdditionalFileType, Dependency, DependencyType, HashAlgorithm, Hashes,
@@ -218,6 +218,138 @@ impl From<FEModrinthCategory> for Category {
             name: value.name,
             project_type: value.project_type.into(),
             header: value.header,
+        }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthLoader {
+    /// An SVG icon for the loader
+    pub icon: String,
+    pub name: FEModrinthLoaderType,
+    /// The project types that this loader can load
+    pub supported_project_types: Vec<FEModrinthProjectType>,
+}
+
+impl From<Loader> for FEModrinthLoader {
+    fn from(value: Loader) -> Self {
+        Self {
+            icon: value.icon,
+            name: value.name.into(),
+            supported_project_types: value
+                .supported_project_types
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
+impl From<FEModrinthLoader> for Loader {
+    fn from(value: FEModrinthLoader) -> Self {
+        Self {
+            icon: value.icon,
+            name: value.name.into(),
+            supported_project_types: value
+                .supported_project_types
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        }
+    }
+}
+
+#[derive(
+    Type,
+    serde_enum_str::Deserialize_enum_str,
+    serde_enum_str::Serialize_enum_str,
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    strum_macros::EnumIter,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum FEModrinthLoaderType {
+    Bukkit,
+    Bungeecord,
+    Canvas,
+    Datapack,
+    Fabric,
+    Folia,
+    Forge,
+    Iris,
+    Liteloader,
+    Minecraft,
+    Modloader,
+    Optifine,
+    Paper,
+    Purpur,
+    Quilt,
+    Rift,
+    Spigot,
+    Sponge,
+    Vanilla,
+    Velocity,
+    Waterfall,
+    #[serde(other)]
+    Other(String),
+}
+
+impl From<LoaderType> for FEModrinthLoaderType {
+    fn from(value: LoaderType) -> Self {
+        match value {
+            LoaderType::Bukkit => FEModrinthLoaderType::Bukkit,
+            LoaderType::Bungeecord => FEModrinthLoaderType::Bungeecord,
+            LoaderType::Canvas => FEModrinthLoaderType::Canvas,
+            LoaderType::Datapack => FEModrinthLoaderType::Datapack,
+            LoaderType::Fabric => FEModrinthLoaderType::Fabric,
+            LoaderType::Folia => FEModrinthLoaderType::Folia,
+            LoaderType::Forge => FEModrinthLoaderType::Forge,
+            LoaderType::Iris => FEModrinthLoaderType::Iris,
+            LoaderType::Liteloader => FEModrinthLoaderType::Liteloader,
+            LoaderType::Minecraft => FEModrinthLoaderType::Minecraft,
+            LoaderType::Modloader => FEModrinthLoaderType::Modloader,
+            LoaderType::Optifine => FEModrinthLoaderType::Optifine,
+            LoaderType::Paper => FEModrinthLoaderType::Paper,
+            LoaderType::Purpur => FEModrinthLoaderType::Purpur,
+            LoaderType::Quilt => FEModrinthLoaderType::Quilt,
+            LoaderType::Rift => FEModrinthLoaderType::Rift,
+            LoaderType::Spigot => FEModrinthLoaderType::Spigot,
+            LoaderType::Sponge => FEModrinthLoaderType::Sponge,
+            LoaderType::Vanilla => FEModrinthLoaderType::Vanilla,
+            LoaderType::Velocity => FEModrinthLoaderType::Velocity,
+            LoaderType::Waterfall => FEModrinthLoaderType::Waterfall,
+            LoaderType::Other(other) => FEModrinthLoaderType::Other(other),
+        }
+    }
+}
+
+impl From<FEModrinthLoaderType> for LoaderType {
+    fn from(value: FEModrinthLoaderType) -> Self {
+        match value {
+            FEModrinthLoaderType::Bukkit => LoaderType::Bukkit,
+            FEModrinthLoaderType::Bungeecord => LoaderType::Bungeecord,
+            FEModrinthLoaderType::Canvas => LoaderType::Canvas,
+            FEModrinthLoaderType::Datapack => LoaderType::Datapack,
+            FEModrinthLoaderType::Fabric => LoaderType::Fabric,
+            FEModrinthLoaderType::Folia => LoaderType::Folia,
+            FEModrinthLoaderType::Forge => LoaderType::Forge,
+            FEModrinthLoaderType::Iris => LoaderType::Iris,
+            FEModrinthLoaderType::Liteloader => LoaderType::Liteloader,
+            FEModrinthLoaderType::Minecraft => LoaderType::Minecraft,
+            FEModrinthLoaderType::Modloader => LoaderType::Modloader,
+            FEModrinthLoaderType::Optifine => LoaderType::Optifine,
+            FEModrinthLoaderType::Paper => LoaderType::Paper,
+            FEModrinthLoaderType::Purpur => LoaderType::Purpur,
+            FEModrinthLoaderType::Quilt => LoaderType::Quilt,
+            FEModrinthLoaderType::Rift => LoaderType::Rift,
+            FEModrinthLoaderType::Spigot => LoaderType::Spigot,
+            FEModrinthLoaderType::Sponge => LoaderType::Sponge,
+            FEModrinthLoaderType::Vanilla => LoaderType::Vanilla,
+            FEModrinthLoaderType::Velocity => LoaderType::Velocity,
+            FEModrinthLoaderType::Waterfall => LoaderType::Waterfall,
+            FEModrinthLoaderType::Other(other) => LoaderType::Other(other),
         }
     }
 }

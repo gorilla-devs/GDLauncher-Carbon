@@ -8,11 +8,10 @@ use crate::{
             CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
             CURSEFORGE_GET_MODLOADERS, CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION,
             CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG,
-            CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_PROJECT,
+            CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_LOADERS, MODRINTH_GET_PROJECT,
             MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_TEAM,
             MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
         },
-        modplatforms::curseforge::structs::FEModLoaderType,
         router::router,
     },
     managers::App,
@@ -41,7 +40,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query CURSEFORGE_GET_MODLOADERS[_, _args: ()] {
-            Ok(FEModLoaderType::iter().collect::<Vec<_>>())
+            Ok(curseforge::structs::FEModLoaderType::iter().collect::<Vec<_>>())
         }
 
         query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
@@ -107,6 +106,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
             Ok(modrinth::responses::FEModrinthProjectSearchResponse::from(response))
 
+        }
+        query MODRINTH_GET_LOADERS[app, _args: ()] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_loaders().await?;
+
+            Ok(modrinth::responses::FEModrinthLoadersResponse::from(response))
         }
         query MODRINTH_GET_CATEGORIES[app, args: () ] {
             let modplatforms = &app.modplatforms_manager;

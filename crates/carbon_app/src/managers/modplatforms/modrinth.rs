@@ -10,7 +10,7 @@ use crate::{
         project::Project,
         responses::{
             CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
-            VersionsResponse,
+            VersionsResponse, LoadersResponse,
         },
         search::{
             ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
@@ -40,6 +40,27 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_categories(&self) -> anyhow::Result<CategoriesResponse> {
         let url = self.base_url.join("tag/category")?;
+
+        trace!("GET {}", url);
+
+        let body = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(RequestError::from_error)?
+            .text()
+            .await
+            .map_err(RequestError::from_error)?;
+        let categories = serde_json::from_str(&body)
+            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+        Ok(categories)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_loaders(&self) -> anyhow::Result<LoadersResponse> {
+        let url = self.base_url.join("tag/loader")?;
 
         trace!("GET {}", url);
 
@@ -329,6 +350,21 @@ mod test {
 
         let results = modrinth.get_categories().await.unwrap();
         tracing::debug!("Categories: {:?}", results);
+        assert!(!results.is_empty());
+    }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_fetch_loaders() {
+        use super::*;
+
+        let client = reqwest::Client::builder().build().unwrap();
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth.get_loaders().await.unwrap();
+        tracing::debug!("Modloaders: {:?}", results);
         assert!(!results.is_empty());
     }
 

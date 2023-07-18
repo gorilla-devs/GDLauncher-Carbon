@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
     responses::{
-        CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse, VersionsResponse,
+        CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse, VersionsResponse, LoadersResponse,
     },
     search::ProjectSearchResponse,
 };
@@ -18,7 +18,7 @@ use crate::api::modplatforms::modrinth::structs::{
     FEModrinthCategory, FEModrinthProject, FEModrinthProjectSearchResult, FEModrinthVersion,
 };
 
-use super::structs::FEModrinthTeamMember;
+use super::structs::{FEModrinthTeamMember, FEModrinthLoader};
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct FEModrinthProjectSearchResponse {
@@ -99,6 +99,48 @@ impl From<CategoriesResponse> for FEModrinthCategoriesResponse {
 
 impl From<FEModrinthCategoriesResponse> for CategoriesResponse {
     fn from(value: FEModrinthCategoriesResponse) -> Self {
+        value.into_iter().map(Into::into).collect()
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct FEModrinthLoadersResponse(pub Vec<FEModrinthLoader>);
+
+impl Deref for FEModrinthLoadersResponse {
+    type Target = Vec<FEModrinthLoader>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for FEModrinthLoadersResponse {
+    type Item = FEModrinthLoader;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<FEModrinthLoader> for FEModrinthLoadersResponse {
+    fn from_iter<I: IntoIterator<Item = FEModrinthLoader>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        FEModrinthLoadersResponse(c)
+    }
+}
+
+impl From<LoadersResponse> for FEModrinthLoadersResponse {
+    fn from(value: LoadersResponse) -> Self {
+        value.into_iter().map(Into::into).collect()
+    }
+}
+
+impl From<FEModrinthLoadersResponse> for LoadersResponse {
+    fn from(value: FEModrinthLoadersResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }

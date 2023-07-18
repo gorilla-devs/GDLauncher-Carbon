@@ -2,7 +2,11 @@ use std::{collections::HashMap, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::modplatforms::modrinth::{project::Project, tag::Category, version::Version};
+use crate::domain::modplatforms::modrinth::{
+    project::Project,
+    tag::{Category, Loader},
+    version::Version,
+};
 
 use super::user::TeamMember;
 
@@ -33,6 +37,36 @@ impl FromIterator<Category> for CategoriesResponse {
             c.push(i);
         }
         CategoriesResponse(c)
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct LoadersResponse(pub Vec<Loader>);
+
+impl Deref for LoadersResponse {
+    type Target = Vec<Loader>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for LoadersResponse {
+    type Item = Loader;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<Loader> for LoadersResponse {
+    fn from_iter<I: IntoIterator<Item = Loader>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        LoadersResponse(c)
     }
 }
 
