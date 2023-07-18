@@ -4,7 +4,7 @@ import {
   LaunchState,
   ListInstanceStatus,
   Progress,
-  Subtask,
+  FESubtask,
   TaskId,
   UngroupedInstance,
   ValidListInstance,
@@ -118,11 +118,11 @@ export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
   }
 };
 
-export const isSubTaskDownload = (input: Subtask): input is Subtask => {
+export const isSubTaskDownload = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "download" in input;
 };
 
-export const isSubTaskItem = (input: Subtask): input is Subtask => {
+export const isSubTaskItem = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "item" in input;
 };
 

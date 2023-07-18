@@ -14,7 +14,7 @@ import {
 import {
   ListInstance,
   UngroupedInstance,
-  Subtask,
+  FESubtask,
   Task,
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -28,7 +28,7 @@ type InstanceDownloadProgress = {
   totalDownload: number;
   downloaded: number;
   percentage: number;
-  subTasks: Subtask[] | undefined;
+  subTasks: FESubtask[] | undefined;
 };
 
 const InstanceTile = (props: {
