@@ -23,8 +23,8 @@ pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl #struct_name {
-            pub fn into_query_parameters(&self) -> Result<String, serde_urlencoded::ser::Error> {
-                serde_urlencoded::to_string(self)
+            pub fn into_query_parameters(&self) -> Result<String, serde_qs::Error> {
+                serde_qs::to_string(self)
             }
         }
     };

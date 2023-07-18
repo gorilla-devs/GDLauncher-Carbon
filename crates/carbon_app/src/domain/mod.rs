@@ -6,4 +6,5 @@ pub mod metrics;
 pub mod minecraft;
 pub mod modplatforms;
 pub mod runtime_path;
+pub mod url;
 pub mod vtask;
