@@ -121,7 +121,8 @@ impl ManagerRef<'_, MetaCacheManager> {
         if lock.contains(&instance_id) {
             info!("queueing remote metadata download for instance {instance_id}");
 
-            let _ = self.app
+            let _ = self
+                .app
                 .meta_cache_manager()
                 .remote_instance
                 .send(Some(instance_id));
