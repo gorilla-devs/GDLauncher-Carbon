@@ -149,6 +149,8 @@ export type AccountEntry = { username: string; uuid: string; lastUsed: string; t
 
 export type FEMod = { id: number; gameId: number; name: string; slug: string; links: FEModLinks; summary: string; status: FEModStatus; downloadCount: number; isFeatured: boolean; primaryCategoryId: number; categories: FECategory[]; classId: number | null; authors: FEModAuthor[]; logo: FEModAsset; screenshots: FEModAsset[]; mainFileId: number; latestFiles: FEFile[]; latestFilesIndexes: FEFileIndex[]; dateCreated: string; dateModified: string; dateReleased: string; allowModDistribution: boolean | null; gamePopularityRank: number; isAvailable: boolean; thumbsUpCount: number }
 
+export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
+
 export type FEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
@@ -209,6 +211,10 @@ export type FEInstanceId = number
 
 export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationParseError } | { Other: string }
 
+export type FEInstanceId = number
+
+export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationParseError } | { Other: string }
+
 export type FEEventName = "AppClosed"
 
 export type FEModFileResponse = { data: FEFile; pagination: FEPagination | null }
@@ -251,7 +257,7 @@ export type FEClassId = "mods" | "modpacks"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
-export type ListInstanceStatus = { Valid: ValidListInstance } | { Invalid: InvalidListInstance }
+export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: ModLoaderType[] | null }
 
 export type FEModSearchSortOrder = "ascending" | "descending"
 
