@@ -72,17 +72,13 @@ const VersionRow = (props: Props) => {
     }
   );
 
-  // const getUrl = () => {
-  //   if (props.isCurseforge) {
-  //     return (props.modVersion as CFFEFile).displayName;
-  //   }
-  //   return (props.modVersion as MRFEVersion).;
-  // };
   const getName = () => {
     if (props.isCurseforge) {
       return (props.modVersion as CFFEFile).displayName;
     }
-    return (props.modVersion as MRFEVersion).name;
+    return `${(props.project as MRFEProject).title} ${
+      (props.modVersion as MRFEVersion).name
+    }`;
   };
 
   const getDate = () => {
@@ -123,7 +119,9 @@ const VersionRow = (props: Props) => {
             <span
               class="pl-3"
               classList={{
-                "text-green-500": getReleaseType() === "stable",
+                "text-green-500":
+                  getReleaseType() === "stable" ||
+                  getReleaseType() === "release",
                 "text-yellow-500": getReleaseType() === "beta",
                 "text-red-500": getReleaseType() === "alpha",
               }}
