@@ -127,6 +127,27 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
+    pub async fn get_project_versions(&self, project: ProjectID) -> anyhow::Result<VersionsResponse> {
+        let url = self.base_url.join(&format!("project/{}/version", &*project))?;
+
+        trace!("GET {}", url);
+
+        let body = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .error_for_status()
+            .map_err(RequestError::from_error)?
+            .text()
+            .await
+            .map_err(RequestError::from_error)?;
+        let proj = serde_json::from_str(&body)
+            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+        Ok(proj)
+    }
+
+    #[tracing::instrument(skip(self))]
     pub async fn get_projects(&self, projects: ProjectIDs) -> anyhow::Result<ProjectsResponse> {
         let mut url = self.base_url.join("projects")?;
         let query = projects.into_query_parameters()?;
@@ -382,6 +403,24 @@ mod test {
         tracing::debug!("Project: {:?}", result);
         assert!(result.id == "u6dRKJwZ");
         assert!(result.title == "Just Enough Items");
+        Ok(())
+    }
+
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_project_versions() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth
+            .get_project_versions(ProjectID("u6dRKJwZ".to_string()))
+            .await?;
+        tracing::debug!("Versions: {:?}", results);
+        assert!(!results.is_empty());
         Ok(())
     }
 

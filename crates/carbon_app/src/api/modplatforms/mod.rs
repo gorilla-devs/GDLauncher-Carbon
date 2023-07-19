@@ -9,8 +9,9 @@ use crate::{
             CURSEFORGE_GET_MODLOADERS, CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION,
             CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG,
             CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_LOADERS, MODRINTH_GET_PROJECT,
-            MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_TEAM,
-            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
+            MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_PROJECT_VERSIONS,
+            MODRINTH_GET_TEAM, MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
+            UNIFIED_SEARCH,
         },
         router::router,
     },
@@ -130,6 +131,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             let response = modplatforms.modrinth.get_projects(projects.into()).await?;
 
             Ok(modrinth::responses::MRFEProjectsResponse::from(response))
+        }
+        query MODRINTH_GET_PROJECT_VERSIONS[app, project: modrinth::filters::MRFEProjectID] {
+            let modplatforms = &app.modplatforms_manager;
+            let response = modplatforms.modrinth.get_project_versions(project.into()).await?;
+
+            Ok(modrinth::responses::MRFEVersionsResponse::from(response))
         }
         query MODRINTH_GET_VERSION[app, version: modrinth::filters::MRFEVersionID] {
             let modplatforms = &app.modplatforms_manager;
