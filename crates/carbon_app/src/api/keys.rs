@@ -136,9 +136,10 @@ keys! {
 
         MODRINTH_GET_LOADERS                        = "modrinth.getLoaders";
         MODRINTH_GET_CATEGORIES                     = "modrinth.getCategories";
-        MODRINTH_SEARCH                             = "modrinthSearch";
+        MODRINTH_SEARCH                             = "modrinth.search";
         MODRINTH_GET_PROJECT                        = "modrinth.getProject";
         MODRINTH_GET_PROJECTS                       = "modrinth.getProjects";
+        MODRINTH_GET_PROJECT_VERSIONS               = "modrinth.getProjectVersions";
         MODRINTH_GET_VERSION                        = "modrinth.getVersion";
         MODRINTH_GET_VERSIONS                       = "modrinth.getVersions";
         MODRINTH_GET_PROJECT_TEAM                   = "modrinth.getProjectTeam";

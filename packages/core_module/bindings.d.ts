@@ -41,11 +41,12 @@ export type Procedures = {
         { key: "modplatforms.modrinth.getLoaders", input: never, result: MRFELoadersResponse } | 
         { key: "modplatforms.modrinth.getProject", input: MRFEProjectID, result: MRFEProject } | 
         { key: "modplatforms.modrinth.getProjectTeam", input: MRFEProjectID, result: MRFETeamResponse } | 
+        { key: "modplatforms.modrinth.getProjectVersions", input: MRFEProjectID, result: MRFEVersionsResponse } | 
         { key: "modplatforms.modrinth.getProjects", input: MRFEProjectIDs, result: MRFEProjectsResponse } | 
         { key: "modplatforms.modrinth.getTeam", input: MRFETeamID, result: MRFETeamResponse } | 
         { key: "modplatforms.modrinth.getVersion", input: MRFEVersionID, result: MRFEVersion } | 
         { key: "modplatforms.modrinth.getVersions", input: MRFEVersionIDs, result: MRFEVersionsResponse } | 
-        { key: "modplatforms.modrinthSearch", input: MRFEProjectSearchParameters, result: MRFEProjectSearchResponse } | 
+        { key: "modplatforms.modrinth.search", input: MRFEProjectSearchParameters, result: MRFEProjectSearchResponse } | 
         { key: "modplatforms.unifiedSearch", input: FEUnifiedSearchParameters, result: FEUnifiedSearchResponse } | 
         { key: "settings.getSettings", input: never, result: FESettings } | 
         { key: "systeminfo.getTotalRAM", input: never, result: string } | 
