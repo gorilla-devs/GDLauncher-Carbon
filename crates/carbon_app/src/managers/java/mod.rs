@@ -221,7 +221,7 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use crate::db::java::UniqueWhereParam;
+        use crate::db::{java, java_system_profile};
 
         let profile = self
             .get_system_java_profiles()
@@ -237,7 +237,7 @@ impl ManagerRef<'_, JavaManager> {
                 self.app
                     .prisma_client
                     .java()
-                    .find_unique(UniqueWhereParam::IdEquals(java_id))
+                    .find_unique(java::id::equals(java_id))
                     .exec()
                     .await?
             }
@@ -245,13 +245,41 @@ impl ManagerRef<'_, JavaManager> {
         };
 
         let java = match java {
-            Some(java) => RealJavaChecker::get_bin_info(
-                &RealJavaChecker,
-                Path::new(&java.path),
-                (&*java.r#type).try_into()?,
-            )
-            .await
-            .ok(),
+            Some(java) => {
+                let bin_result = RealJavaChecker::get_bin_info(
+                    &RealJavaChecker,
+                    Path::new(&java.path),
+                    (&*java.r#type).try_into()?,
+                )
+                .await;
+
+                match bin_result {
+                    Ok(bin_info) => Some(bin_info),
+                    Err(err) => {
+                        tracing::warn!(
+                            "Java {} is not usable: {}. Cleaning it up from db",
+                            java.id,
+                            err
+                        );
+
+                        self.app
+                            .prisma_client
+                            ._batch((
+                                self.app.prisma_client.java_system_profile().update(
+                                    java_system_profile::name::equals(profile.name.to_string()),
+                                    vec![java_system_profile::java::disconnect()],
+                                ),
+                                self.app
+                                    .prisma_client
+                                    .java()
+                                    .delete(java::id::equals(java.id)),
+                            ))
+                            .await?;
+
+                        None
+                    }
+                }
+            }
             None => None,
         };
 
