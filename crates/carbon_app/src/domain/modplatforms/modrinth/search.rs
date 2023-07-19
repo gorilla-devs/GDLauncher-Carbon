@@ -17,11 +17,10 @@ use crate::domain::modplatforms::modrinth::{
 use anyhow::anyhow;
 use carbon_macro::into_query_parameters;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
-use url::Url;
 
 use super::version::HashAlgorithm;
 
-use serde_json::{self, value::RawValue};
+use serde_json;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectSearchResult {
@@ -411,8 +410,7 @@ impl FromIterator<String> for ProjectIDs {
 mod test {
     use crate::domain::modplatforms::modrinth::search::SearchFacet;
 
-    use super::{ProjectSearchParameters, SearchFacetAnd};
-    use tracing_test::traced_test;
+    use super::ProjectSearchParameters;
 
     fn test_project_into_query() -> anyhow::Result<()> {
         let facets = vec![

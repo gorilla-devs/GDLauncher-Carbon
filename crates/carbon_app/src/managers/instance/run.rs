@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
-use crate::domain::instance::{self as domain, GameLogId, InstanceSettingsUpdate};
+use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
@@ -20,7 +20,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 use anyhow::{anyhow, bail};
 

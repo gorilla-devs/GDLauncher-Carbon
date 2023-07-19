@@ -114,7 +114,7 @@ pub async fn prepare_modpack_from_file(
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let temp_dir = &app.settings_manager().runtime_path.get_temp();
-    let pack_download_url = mrpack_file.url.clone();
+    let _pack_download_url = mrpack_file.url.clone();
 
     // generate uuid
     let uuid = uuid::Uuid::new_v4();
@@ -183,7 +183,7 @@ pub async fn prepare_modpack_from_mrpack(
         .cloned()
         .collect();
 
-    let optional_files: Vec<_> = index
+    let _optional_files: Vec<_> = index
         .files
         .iter()
         .filter(|&file| {
@@ -208,7 +208,7 @@ pub async fn prepare_modpack_from_mrpack(
 
         for file in required_files {
             let semaphore = semaphore.clone();
-            let app = app.clone();
+            let _app = app.clone();
             let instance_path = instance_path.clone();
             let progress_percentage_sender_clone = progress_percentage_sender.clone();
             let atomic_counter = atomic_counter_download_metadata.clone();

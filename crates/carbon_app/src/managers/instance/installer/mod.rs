@@ -1,7 +1,7 @@
 use anyhow::{bail, Context};
 use carbon_net::{Checksum, Downloadable};
 use std::{
-    cell::RefCell, collections::HashSet, ffi::OsString, ops::Deref, path::PathBuf, pin::Pin,
+    ffi::OsString, ops::Deref, pin::Pin,
     sync::Arc, time::Duration,
 };
 use tokio::{sync::Mutex, task::AbortHandle};
@@ -14,7 +14,7 @@ use crate::{
         modplatforms::curseforge::{
             self,
             filters::{
-                ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
+                ModFileParameters, ModFilesParameters, ModFilesParametersQuery,
             },
         },
         runtime_path::InstancePath,
@@ -25,7 +25,7 @@ use crate::{
 
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
 
-use futures::future::{BoxFuture, Future};
+use futures::future::{Future};
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
