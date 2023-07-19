@@ -1,14 +1,18 @@
-import { importedInstances, setImportedInstances } from "@/utils/instances";
+import {
+  importedInstances,
+  isProgressFailed,
+  setImportedInstances,
+} from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
 import {
   FEEntity,
-  FEImportInstance,
   FEImportableInstance,
+  FETask,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox, Spinner } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
-import { CreateMutationResult, CreateQueryResult } from "@tanstack/solid-query";
+import { CreateQueryResult } from "@tanstack/solid-query";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 
@@ -20,23 +24,74 @@ const Import = () => {
     [id: number]: boolean;
   }>({});
   const [loadingInstances, setLoadingInstances] = createStore<{
-    [id: number]: boolean;
+    [id: number]: FETask | null | undefined;
   }>({});
   const [instances, setInstances] =
     createSignal<CreateQueryResult<FEImportableInstance[], RSPCError>>();
+  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+  const [currentInstanceIndex, setCurrentInstanceIndex] = createSignal(0);
 
   const scanImportableInstancesMutation = rspc.createMutation([
     "instance.scanImportableInstances",
   ]);
 
+  const entries = () => Object.entries(selectedInstancesIds);
+  const filteredEntries = () =>
+    entries().filter(([_i, isSelected]) => isSelected);
+
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
-      onSuccess(_data, entity) {
-        setImportedInstances((prev) => [...prev, entity.index]);
+      onSuccess(taskId, entity) {
+        console.log("ONSUCCESS", taskId, entity.index);
+        setTaskId(taskId);
       },
     }
   );
+
+  createEffect(() => {
+    if (taskId() !== undefined) {
+      console.log("TASK ID", taskId());
+
+      const task = rspc.createQuery(() => [
+        "vtask.getTask",
+        taskId() as number,
+      ]);
+
+      const isFailed = task.data && isProgressFailed(task.data.progress);
+      const isDownloaded =
+        task.data &&
+        task.data?.download_total > 0 &&
+        task.data?.downloaded === task.data?.download_total;
+
+      const nextInstance = filteredEntries()[currentInstanceIndex()];
+      if (!nextInstance) return;
+      const instanceIndex = parseInt(nextInstance[0], 10);
+      console.log(
+        "TASK",
+        instanceIndex,
+        task.data,
+        (isDownloaded || isFailed) && !task.isLoading,
+        task.data && !task.isInitialLoading
+      );
+
+      setLoadingInstances(instanceIndex, task.data);
+
+      if (isDownloaded || isFailed) {
+        setLoadingInstances(instanceIndex, undefined);
+
+        console.log("NEXT");
+        setImportedInstances((prev) => [...prev, instanceIndex]);
+
+        importInstanceMutation.mutate({
+          entity: selectedEntity(),
+          index: instanceIndex,
+        });
+
+        setCurrentInstanceIndex((prev) => prev + 1);
+      }
+    }
+  });
 
   createEffect(() => {
     setInstances(
@@ -68,30 +123,6 @@ const Import = () => {
   const areAllSelected = () =>
     Object.values(selectedInstancesIds).filter((instance) => instance)
       .length === instances()?.data?.length;
-
-  async function processEntries(
-    entries: [string, boolean][],
-    importInstanceMutation: CreateMutationResult<
-      null,
-      RSPCError,
-      FEImportInstance,
-      unknown
-    >,
-    selectedEntity: any
-  ) {
-    for (let index = 0; index < entries.length; index++) {
-      const [i, isSelected] = entries[index];
-      setLoadingInstances(parseInt(i, 10), true);
-
-      if (isSelected) {
-        await importInstanceMutation.mutate({
-          entity: selectedEntity(),
-          index: parseInt(i, 10),
-        });
-      }
-      setLoadingInstances(parseInt(i, 10), false);
-    }
-  }
 
   const isAllImported = () =>
     importedInstances().length === instances()?.data?.length;
@@ -188,7 +219,15 @@ const Import = () => {
                           {instance.name}
                         </span>
                       </div>
-                      <Show when={loadingInstances[i()]}>
+                      <Show
+                        when={
+                          loadingInstances[i()]
+
+                          // loadingInstances[i()] &&
+                          // loadingInstances[i()]?.downloaded <
+                          //   loadingInstances[i()]?.download_total
+                        }
+                      >
                         <Spinner />
                       </Show>
                     </div>
@@ -207,9 +246,13 @@ const Import = () => {
       <Button
         disabled={importedInstances().length === instances()?.data?.length}
         onClick={() => {
-          const entries = Object.entries(selectedInstancesIds);
           setIsLoading(true);
-          processEntries(entries, importInstanceMutation, selectedEntity);
+          const indexFirstElement = parseInt(filteredEntries()[0][0], 10);
+          console.log("entries()", entries());
+          importInstanceMutation.mutate({
+            entity: selectedEntity(),
+            index: indexFirstElement,
+          });
         }}
       >
         <Switch>
