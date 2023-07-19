@@ -119,7 +119,12 @@ impl ManagerRef<'_, JavaManager> {
         profile_name: SystemJavaProfileName,
         java_id: String,
     ) -> anyhow::Result<()> {
-        let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
+        let auto_manage_java = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java;
 
         if auto_manage_java {
             anyhow::bail!("Auto manage java is enabled");
@@ -145,7 +150,12 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
-        let auto_manage_java = self.app.settings_manager().get().await?.auto_manage_java;
+        let auto_manage_java = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java;
 
         if auto_manage_java {
             anyhow::bail!("Auto manage java is enabled");
