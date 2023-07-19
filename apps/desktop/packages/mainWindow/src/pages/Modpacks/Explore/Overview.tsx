@@ -1,7 +1,7 @@
 /* eslint-disable solid/no-innerhtml */
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../modpack.overview";
-import { Match, Switch } from "solid-js";
+import { Match, Suspense, Switch } from "solid-js";
 import { Skeleton } from "@gd/ui";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
@@ -12,28 +12,32 @@ const Overview = () => {
 
   const Description = () => {
     return (
-      <Switch>
-        <Match when={routeData.isCurseforge}>
-          {/* I don't sanitize the curseforge one otherwise the embed video do are not gonna work */}
-          <div innerHTML={routeData.modpackDescription?.data?.data} />
-        </Match>
-        <Match when={!routeData.isCurseforge}>
-          <div
-            class="w-full"
-            innerHTML={marked.parse(
-              sanitizeHtml(
-                (routeData.modpackDetails.data as MRFEProject)?.body || ""
-              )
-            )}
-          />
-        </Match>
-      </Switch>
+      <Suspense fallback={<Skeleton.modpackScreenshotsPage />}>
+        <div>
+          <Switch fallback={<Skeleton.modpackScreenshotsPage />}>
+            <Match when={routeData.isCurseforge}>
+              {/* I don't sanitize the curseforge one otherwise the embed video do are not gonna work */}
+              <div innerHTML={routeData.modpackDescription?.data?.data} />
+            </Match>
+            <Match when={!routeData.isCurseforge}>
+              <div
+                class="w-full"
+                innerHTML={marked.parse(
+                  sanitizeHtml(
+                    (routeData.modpackDetails.data as MRFEProject)?.body || ""
+                  )
+                )}
+              />
+            </Match>
+          </Switch>
+        </div>
+      </Suspense>
     );
   };
 
   return (
     <div>
-      <Switch>
+      <Switch fallback={<Skeleton.modpackOverviewPage />}>
         <Match when={!routeData.modpackDescription?.isLoading}>
           <Description />
         </Match>

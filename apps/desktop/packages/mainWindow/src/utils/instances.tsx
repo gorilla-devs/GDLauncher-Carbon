@@ -20,7 +20,7 @@ import { blobToBase64 } from "./helpers";
 import { port } from "./rspcClient";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
-import { Show, Switch, Match, createEffect } from "solid-js";
+import { Show, Switch, Match } from "solid-js";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus

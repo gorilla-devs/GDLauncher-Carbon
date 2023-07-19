@@ -1,6 +1,13 @@
 /* eslint-disable solid/no-innerhtml */
 import { useParams, useRouteData } from "@solidjs/router";
-import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  Match,
+  Show,
+  Suspense,
+  Switch,
+  createEffect,
+  createSignal,
+} from "solid-js";
 import { Dropdown, Skeleton } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "../modpack.overview";
@@ -104,24 +111,29 @@ const Changelog = () => {
   });
 
   return (
-    <div>
-      <Show when={routeData.modpackDetails.data}>
-        <Dropdown
-          options={options()}
-          onChange={(fileId) => {
-            setFileId(fileId.key);
-          }}
-        />
-      </Show>
-      <Switch fallback={<Skeleton.modpackChangelogPage />}>
-        <Match when={changeLog() && routeData.isCurseforge}>
-          <div innerHTML={changeLog()} />
-        </Match>
-        <Match when={changeLog() && !routeData.isCurseforge}>
-          <pre>{changeLog()}</pre>
-        </Match>
-      </Switch>
-    </div>
+    <Suspense fallback={<Skeleton.modpackChangelogPage />}>
+      <div>
+        <Show
+          when={routeData.modpackDetails.data}
+          fallback={<div>Loading...</div>}
+        >
+          <Dropdown
+            options={options()}
+            onChange={(fileId) => {
+              setFileId(fileId.key);
+            }}
+          />
+        </Show>
+        <Switch fallback={<Skeleton.modpackChangelogPage />}>
+          <Match when={changeLog() && routeData.isCurseforge}>
+            <div innerHTML={changeLog()} />
+          </Match>
+          <Match when={changeLog() && !routeData.isCurseforge}>
+            <pre>{changeLog()}</pre>
+          </Match>
+        </Switch>
+      </div>
+    </Suspense>
   );
 };
 

@@ -168,7 +168,7 @@ const VersionRow = (props: Props) => {
           });
         }}
       >
-        <Switch>
+        <Switch fallback={<div>Loading...</div>}>
           <Match when={task()}>
             <Trans
               key="modpack.version_downloading"

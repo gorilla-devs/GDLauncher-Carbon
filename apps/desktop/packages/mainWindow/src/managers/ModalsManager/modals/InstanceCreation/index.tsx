@@ -8,7 +8,7 @@ import {
   FEModdedManifestLoaderVersion,
   ManifestVersion,
   McType,
-  FEInstanceModLoaderType,
+  CFFEModLoaderType,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
@@ -20,7 +20,7 @@ type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
 
 type Instancetype = {
   id: string;
-  modloader: FEInstanceModLoaderType | undefined;
+  modloader: CFFEModLoaderType | undefined;
   title: string | undefined;
   mcVersion: string | undefined;
   modloaderVersion: string | undefined;
@@ -39,7 +39,7 @@ const InstanceCreation = (props: ModalProps) => {
   const [bgPreview, setBgPreview] = createSignal<string | null>(
     instanceData()?.img || null
   );
-  const [loader, setLoader] = createSignal<FEInstanceModLoaderType | undefined>(
+  const [loader, setLoader] = createSignal<CFFEModLoaderType | undefined>(
     instanceData()?.modloader || undefined
   );
   const [loaderVersions, setLoaderVersions] = createSignal<
@@ -176,7 +176,7 @@ const InstanceCreation = (props: ModalProps) => {
 
   const modloaders: {
     label: string;
-    key: FEInstanceModLoaderType | undefined;
+    key: CFFEModLoaderType | undefined;
   }[] = [
     { label: t("instance.vanilla"), key: undefined },
     { label: t("instance.forge"), key: "forge" },
@@ -335,7 +335,7 @@ const InstanceCreation = (props: ModalProps) => {
               modloaders: loader()
                 ? [
                     {
-                      type_: loader() as FEInstanceModLoaderType,
+                      type_: loader() as CFFEModLoaderType,
                       version: chosenLoaderVersion() || versions[0].id,
                     },
                   ]
@@ -367,7 +367,7 @@ const InstanceCreation = (props: ModalProps) => {
         modloader: {
           Set: loader()
             ? {
-                type_: loader() as FEInstanceModLoaderType,
+                type_: loader() as CFFEModLoaderType,
                 version: chosenLoaderVersion() || versions[0].id,
               }
             : null,
@@ -483,7 +483,7 @@ const InstanceCreation = (props: ModalProps) => {
                       setLoader(
                         !modloader.key
                           ? undefined
-                          : (modloader.key as FEInstanceModLoaderType)
+                          : (modloader.key as CFFEModLoaderType)
                       );
                     }}
                   >

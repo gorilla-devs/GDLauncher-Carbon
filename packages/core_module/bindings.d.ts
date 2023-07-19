@@ -198,8 +198,6 @@ export type MRFEDonationLink = { id: string; platform: string; url: string }
 
 export type FEPageview = { path: string }
 
-export type FEInstanceModLoaderType = "forge" | "fabric" | "quilt" | "unknown"
-
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
 
 export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
@@ -254,7 +252,7 @@ export type AccountEntry = { username: string; uuid: string; lastUsed: string; t
 
 export type MRFECategoriesResponse = MRFECategory[]
 
-export type ModLoader = { type_: FEInstanceModLoaderType; version: string }
+export type ModLoader = { type_: CFFEModLoaderType; version: string }
 
 export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; isLegalAccepted?: boolean | null; metricsLevel?: number | null }
 
@@ -277,6 +275,8 @@ export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 export type MRFESearchFacetOr = MRFESearchFacet[]
 
 export type CFFEHashAlgo = "sha1" | "md5"
+
+export type CFFEModLoaderType = "forge" | "fabric" | "quilt" | "unknown"
 
 export type MRFELoaderType = "bukkit" | "bungeecord" | "canvas" | "datapack" | "fabric" | "folia" | "forge" | "iris" | "liteloader" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "quilt" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall" | { other: string }
 
@@ -316,7 +316,7 @@ export type MRFEVersionType = "alpha" | "beta" | "release"
 
 export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: number | null }
 
-export type Mod = { id: string; filename: string; enabled: boolean; modloaders: FEInstanceModLoaderType[]; metadata: ModFileMetadata }
+export type Mod = { id: string; filename: string; enabled: boolean; modloaders: CFFEModLoaderType[]; metadata: ModFileMetadata }
 
 export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: string }
 
@@ -330,7 +330,7 @@ export type UpdateInstance = { instance: FEInstanceId; name?: Set<string> | null
 
 export type FEEvent = { name: FEEventName; properties: { [key: string]: string } }
 
-export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: FEInstanceModLoaderType[] | null }
+export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: CFFEModLoaderType[] | null }
 
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
 
@@ -390,7 +390,7 @@ export type CFFEModsParametersBody = { modIds: number[] }
 
 export type FeError = { cause: CauseSegment[]; backtrace: string }
 
-export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModLoaderType | null; modpack_platform: ModpackPlatform | null; state: LaunchState }
+export type ValidListInstance = { mc_version: string | null; modloader: CFFEModLoaderType | null; modpack_platform: ModpackPlatform | null; state: LaunchState }
 
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 

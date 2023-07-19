@@ -18,7 +18,6 @@ import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
-import { rspc } from "@/utils/rspcClient";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
