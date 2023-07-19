@@ -1,43 +1,16 @@
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../../modpack.versions";
-import {
-  For,
-  Match,
-  Suspense,
-  Switch,
-  createEffect,
-  createSignal,
-} from "solid-js";
+import { For, Match, Suspense, Switch } from "solid-js";
 import VersionRow from "./VersionRow";
 import { Skeleton } from "@gd/ui";
-import {
-  FEModFilesResponse,
-  MRFEVersionsResponse,
-} from "@gd/core_module/bindings";
-import { rspc } from "@/utils/rspcClient";
 
 const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const [modrinthVersions, setModrnithVersions] =
-    createSignal<MRFEVersionsResponse>([]);
-
-  createEffect(() => {
-    if (!routeData.modrinthGetProject?.data) return;
-    const versions = routeData.modrinthGetProject.data.versions;
-    if (!routeData.isCurseforge && versions) {
-      const query = rspc.createQuery(() => [
-        "modplatforms.modrinth.getVersions",
-        versions,
-      ]);
-
-      if (query.data) setModrnithVersions(query.data);
-    }
-  });
 
   const versions = () =>
-    routeData.isCurseforge
-      ? (routeData.curseforgeGetModFiles.data as FEModFilesResponse)?.data
-      : modrinthVersions();
+    (routeData.isCurseforge
+      ? routeData.curseforgeGetModFiles.data?.data
+      : routeData.modrinthProjectVersions.data) || [];
 
   return (
     <Suspense fallback={<Skeleton.modpackVersionList />}>

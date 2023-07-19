@@ -13,7 +13,7 @@ import {
   createNotification,
 } from "@gd/ui";
 import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
@@ -47,9 +47,7 @@ const Modpack = () => {
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
-  const [lastVersionId, setLastVersionId] = createSignal<string | undefined>(
-    undefined
-  );
+
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
   const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
@@ -87,15 +85,16 @@ const Modpack = () => {
   );
 
   const modpack = () => {
-    const versionId = lastVersionId();
-    if (!routeData.modpackDetails.data) return;
+    const versions = routeData.modrinthProjectVersions?.data;
+    if (!routeData.modpackDetails.data || !versions) return;
+    const versionId = versions[versions.length - 1];
 
     const modrinth =
       !routeData.isCurseforge && versionId
         ? {
             Modrinth: {
               project_id: routeData.modpackDetails.data?.id,
-              version_id: versionId,
+              version_id: versionId.id,
             },
           }
         : undefined;
@@ -119,22 +118,6 @@ const Modpack = () => {
     routeData.isCurseforge
       ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
       : (routeData.modpackDetails?.data as MRFEProject).icon_url;
-
-  createEffect(() => {
-    if (!routeData.isCurseforge) {
-      const versions = routeData.modpackDetails.data?.versions;
-      if (versions) {
-        const modrinthVersions = rspc.createQuery(() => [
-          "modplatforms.modrinth.getVersions",
-          versions,
-        ]);
-        const lastVersion = modrinthVersions.data?.[0];
-
-        const fileID = lastVersion?.id;
-        if (fileID) setLastVersionId(fileID);
-      }
-    }
-  });
 
   const handleDownload = () => {
     setLoading(true);

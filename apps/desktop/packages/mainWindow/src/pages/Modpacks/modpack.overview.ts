@@ -20,8 +20,17 @@ const fetchData = ({ params }: { params: any }) => {
       "modplatforms.modrinth.getProject",
       params.id,
     ]);
+    const modrinthProjectVersions = rspc.createQuery(() => [
+      "modplatforms.modrinth.getProjectVersions",
+      params.id,
+    ]);
 
-    return { modpackDetails, isCurseforge, isModrinth };
+    return {
+      modpackDetails,
+      isCurseforge,
+      isModrinth,
+      modrinthProjectVersions,
+    };
   }
 };
 

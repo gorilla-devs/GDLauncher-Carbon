@@ -263,34 +263,27 @@ const ModRow = (props: ModRowProps) => {
     if (!isCurseForgeData(props.data) && currentProjectId()) {
       setLoading(true);
       // eslint-disable-next-line solid/reactivity
-      const modrinthProject = rspc.createQuery(() => [
-        "modplatforms.modrinth.getProject",
+      const modrinthVersions = rspc.createQuery(() => [
+        "modplatforms.modrinth.getProjectVersions",
         currentProjectId() as string,
       ]);
+      const lastVersion = modrinthVersions.data?.[0];
 
-      if (modrinthProject.data?.versions) {
-        const modrinthVersions = rspc.createQuery(() => [
-          "modplatforms.modrinth.getVersions",
-          modrinthProject.data?.versions,
-        ]);
-        const lastVersion = modrinthVersions.data?.[0];
+      if (lastVersion) {
+        const modpack = instanceCreationObj(
+          lastVersion.id,
+          lastVersion.project_id
+        );
 
-        if (lastVersion) {
-          const modpack = instanceCreationObj(
-            lastVersion.id,
-            lastVersion.project_id
-          );
-
-          createInstanceMutation.mutate({
-            group: props.defaultGroup || 1,
-            use_loaded_icon: true,
-            notes: "",
-            name: getName(props),
-            version: {
-              Modpack: modpack,
-            },
-          });
-        }
+        createInstanceMutation.mutate({
+          group: props.defaultGroup || 1,
+          use_loaded_icon: true,
+          notes: "",
+          name: getName(props),
+          version: {
+            Modpack: modpack,
+          },
+        });
       }
     }
   });

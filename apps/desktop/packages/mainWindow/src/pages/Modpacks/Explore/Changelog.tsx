@@ -15,8 +15,6 @@ import {
   CFFEFile,
   CFFEFileIndex,
   FEModResponse,
-  MRFEProject,
-  MRFEVersion,
 } from "@gd/core_module/bindings";
 import { sortArrayByGameVersion } from "@/utils/Mods";
 
@@ -41,20 +39,11 @@ const Changelog = () => {
   createEffect(() => {
     if (!routeData.modpackDetails.data) return;
     if (!routeData.isCurseforge) {
-      const query = rspc.createQuery(() => [
-        "modplatforms.modrinth.getVersions",
-        (routeData.modpackDetails.data as MRFEProject).versions,
-      ]);
-
-      if (query.data) {
-        const sortedVersions = sortArrayByGameVersion(
-          query.data as MRFEVersion[]
-        ) as MRFEVersion[];
-
-        setFileId(sortedVersions[0].id);
+      if (routeData.modrinthProjectVersions.data) {
+        setFileId(routeData.modrinthProjectVersions.data[0].id);
 
         setOptions(
-          sortedVersions.map((file) => ({
+          routeData.modrinthProjectVersions.data.map((file) => ({
             key: file.id,
             label: file.version_number,
           }))

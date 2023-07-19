@@ -219,8 +219,6 @@ export type MRFEProjectSearchParameters = { query: string | null; facets: MRFESe
 
 export type MRFELoader = { icon: string; name: MRFELoaderType; supported_project_types: MRFEProjectType[] }
 
-export type FESearchAPI = "curseforge" | "modrinth"
-
 export type FEUnifiedModSortIndex = { curseForge: CFFEModSearchSortField } | { modrinth: MRFESearchIndex }
 
 export type CFFEModsParameters = { body: CFFEModsParametersBody }
@@ -228,6 +226,8 @@ export type CFFEModsParameters = { body: CFFEModsParametersBody }
 export type Or<T> = T[]
 
 export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
+
+export type FESearchAPI = "curseforge" | "modrinth"
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
