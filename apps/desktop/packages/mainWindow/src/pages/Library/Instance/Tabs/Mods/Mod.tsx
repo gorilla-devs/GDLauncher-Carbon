@@ -1,10 +1,7 @@
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
-import { getModloaderIcon } from "@/utils/sidebar";
-import {
-  FEInstanceModLoaderType,
-  Mod as ModType,
-} from "@gd/core_module/bindings";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { CFFEModLoaderType, Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction } from "solid-js/store";
@@ -51,8 +48,8 @@ const Mod = (props: Props) => {
                       <Show when={modloader}>
                         <img
                           class="w-4 h-4"
-                          src={getModloaderIcon(
-                            modloader as FEInstanceModLoaderType
+                          src={getForgeModloaderIcon(
+                            modloader as CFFEModLoaderType
                           )}
                         />
                       </Show>

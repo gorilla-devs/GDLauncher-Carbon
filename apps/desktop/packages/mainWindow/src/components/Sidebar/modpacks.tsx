@@ -1,5 +1,4 @@
 /* eslint-disable solid/no-innerhtml */
-import { getModloaderIcon } from "@/utils/sidebar";
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Modpacks/browser.data";
@@ -20,26 +19,56 @@ import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
 
-const getIcon = (category: CFFECategory | MRFECategory) => {
+const getCategoryIcon = (category: CFFECategory | MRFECategory) => {
   if ("iconUrl" in category) {
     return category.iconUrl;
   } else return category.icon;
 };
 
-const Icon = (props: { category: CFFECategory | MRFECategory }) => {
+const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
+  if (typeof category === "string") {
+    return getForgeModloaderIcon(category);
+  } else return category.icon;
+};
+
+const CategoryIcon = (props: { category: CFFECategory | MRFECategory }) => {
   return (
     <Switch
       fallback={
         <>
-          <Show when={getIcon(props.category)}>
-            <div class="w-4 h-4" innerHTML={getIcon(props.category)} />
+          <Show when={getCategoryIcon(props.category)}>
+            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
           </Show>
         </>
       }
     >
       <Match when={"iconUrl" in props.category}>
-        <img class="h-4 w-4" src={getIcon(props.category)} />
+        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+      </Match>
+    </Switch>
+  );
+};
+
+const ModloaderIcon = (props: {
+  modloader: CFFEModLoaderType | MRFELoader;
+}) => {
+  return (
+    <Switch
+      fallback={
+        <>
+          <Show when={getModloaderIcon(props.modloader)}>
+            <div
+              class="w-4 h-4"
+              innerHTML={getModloaderIcon(props.modloader)}
+            />
+          </Show>
+        </>
+      }
+    >
+      <Match when={typeof props.modloader === "string"}>
+        <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
       </Match>
     </Switch>
   );
@@ -189,10 +218,7 @@ const Sidebar = () => {
                         });
                       }}
                     />
-                    <img
-                      class="h-4 w-4"
-                      src={getModloaderIcon(modloaderName())}
-                    />
+                    <ModloaderIcon modloader={modloader} />
                     <p class="m-0">{capitalize(modloaderName())}</p>
                   </div>
                 );
@@ -246,7 +272,7 @@ const Sidebar = () => {
                           }}
                         />
                         <div class="flex items-center gap-2 max-w-32">
-                          <Icon category={category} />
+                          <CategoryIcon category={category} />
                           <p class="m-0">{category.name}</p>
                         </div>
                       </div>

@@ -11,7 +11,7 @@ import {
   createSignal,
 } from "solid-js";
 import {
-  getModloaderIcon,
+  getForgeModloaderIcon,
   isSidebarOpened,
   toggleSidebar,
 } from "@/utils/sidebar";
@@ -23,7 +23,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
-import { FEInstanceModLoaderType } from "@gd/core_module/bindings";
+import { CFFEModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -80,7 +80,7 @@ const Sidebar = () => {
         <Match when={!isSidebarOpened()}>
           <img
             class="w-6 h-6"
-            src={getModloaderIcon(key as FEInstanceModLoaderType)}
+            src={getForgeModloaderIcon(key as CFFEModLoaderType)}
           />
         </Match>
       </Switch>

@@ -1,8 +1,8 @@
 /* eslint-disable i18next/no-literal-string */
-import { getModloaderIcon } from "@/utils/sidebar";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
-  FEInstanceModLoaderType,
+  CFFEModLoaderType,
   FESubtask,
   Translation,
   UngroupedInstance,
@@ -21,7 +21,7 @@ import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
-  modloader: FEInstanceModLoaderType | null | undefined;
+  modloader: CFFEModLoaderType | null | undefined;
   instance: UngroupedInstance | ListInstance;
   selected?: boolean;
   isLoading?: boolean;
@@ -368,8 +368,8 @@ const Tile = (props: Props) => {
                     <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
-                        src={getModloaderIcon(
-                          props.modloader as FEInstanceModLoaderType
+                        src={getForgeModloaderIcon(
+                          props.modloader as CFFEModLoaderType
                         )}
                       />
                     </Show>
@@ -493,8 +493,8 @@ const Tile = (props: Props) => {
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
-                      src={getModloaderIcon(
-                        props.modloader as FEInstanceModLoaderType
+                      src={getForgeModloaderIcon(
+                        props.modloader as CFFEModLoaderType
                       )}
                     />
                   </Show>
