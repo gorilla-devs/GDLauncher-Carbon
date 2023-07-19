@@ -32,7 +32,7 @@ pub enum FESearchAPI {
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         // Curseforge
-        query CURSEFORGE_SEARCH[app, filters: curseforge::filters::FEModSearchParameters] {
+        query CURSEFORGE_SEARCH[app, filters: curseforge::filters::CFFEModSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.search(filters.into()).await?;
 
@@ -40,7 +40,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query CURSEFORGE_GET_MODLOADERS[_, _args: ()] {
-            Ok(curseforge::structs::FEModLoaderType::iter().collect::<Vec<_>>())
+            Ok(curseforge::structs::CFFEModLoaderType::iter().collect::<Vec<_>>())
         }
 
         query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
@@ -50,49 +50,49 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(curseforge::responses::FECategoriesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD[app, mod_parameters: curseforge::filters::FEModParameters] {
+        query CURSEFORGE_GET_MOD[app, mod_parameters: curseforge::filters::CFFEModParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEModResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MODS[app, mod_parameters: curseforge::filters::FEModsParameters] {
+        query CURSEFORGE_GET_MODS[app, mod_parameters: curseforge::filters::CFFEModsParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mods(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEModsResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_DESCRIPTION[app, mod_parameters: curseforge::filters::FEModDescriptionParameters] {
+        query CURSEFORGE_GET_MOD_DESCRIPTION[app, mod_parameters: curseforge::filters::CFFEModDescriptionParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_description(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEModDescriptionResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: curseforge::filters::FEModFileParameters] {
+        query CURSEFORGE_GET_MOD_FILE[app, mod_parameters: curseforge::filters::CFFEModFileParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_file(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEModFileResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILES[app, mod_parameters: curseforge::filters::FEModFilesParameters] {
+        query CURSEFORGE_GET_MOD_FILES[app, mod_parameters: curseforge::filters::CFFEModFilesParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_files(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEModFilesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_FILES[app, mod_parameters: curseforge::filters::FEFilesParameters] {
+        query CURSEFORGE_GET_FILES[app, mod_parameters: curseforge::filters::CFFEFilesParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_files(mod_parameters.into()).await?;
 
             Ok(curseforge::responses::FEFilesResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MOD_FILE_CHANGELOG[app, mod_parameters: curseforge::filters::FEModFileChangelogParameters] {
+        query CURSEFORGE_GET_MOD_FILE_CHANGELOG[app, mod_parameters: curseforge::filters::CFFEModFileChangelogParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.curseforge.get_mod_file_changelog(mod_parameters.into()).await?;
 
@@ -159,7 +159,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
             match search_params.search_api {
                 FESearchAPI::Curseforge => {
-                    let search_params: curseforge::filters::FEModSearchParameters = search_params.try_into()?;
+                    let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;
                     let modplatforms = &app.modplatforms_manager;
                     let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
                     let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);

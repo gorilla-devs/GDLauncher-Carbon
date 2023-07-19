@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
-use super::curseforge::filters::FEModSearchParametersQuery;
+use super::curseforge::filters::CFFEModSearchParametersQuery;
 use super::modrinth;
 use super::{curseforge, FESearchAPI};
 
@@ -105,7 +105,7 @@ impl<T> From<Or<T>> for And<T> {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedModSortIndex {
-    CurseForge(curseforge::filters::FEModSearchSortField),
+    CurseForge(curseforge::filters::CFFEModSearchSortField),
     Modrinth(modrinth::filters::MRFESearchIndex),
 }
 
@@ -128,12 +128,12 @@ impl Display for FEQueryModLoaderType {
     }
 }
 
-impl From<FEQueryModLoaderType> for curseforge::structs::FEModLoaderType {
+impl From<FEQueryModLoaderType> for curseforge::structs::CFFEModLoaderType {
     fn from(value: FEQueryModLoaderType) -> Self {
         match value {
-            FEQueryModLoaderType::Forge => curseforge::structs::FEModLoaderType::Forge,
-            FEQueryModLoaderType::Fabric => curseforge::structs::FEModLoaderType::Fabric,
-            FEQueryModLoaderType::Quilt => curseforge::structs::FEModLoaderType::Quilt,
+            FEQueryModLoaderType::Forge => curseforge::structs::CFFEModLoaderType::Forge,
+            FEQueryModLoaderType::Fabric => curseforge::structs::CFFEModLoaderType::Fabric,
+            FEQueryModLoaderType::Quilt => curseforge::structs::CFFEModLoaderType::Quilt,
         }
     }
 }
@@ -155,11 +155,11 @@ impl Display for FEUnifiedSearchType {
     }
 }
 
-impl From<FEUnifiedSearchType> for curseforge::structs::FEClassId {
+impl From<FEUnifiedSearchType> for curseforge::structs::CFFEClassId {
     fn from(value: FEUnifiedSearchType) -> Self {
         match value {
-            FEUnifiedSearchType::Mod => curseforge::structs::FEClassId::Mods,
-            FEUnifiedSearchType::ModPack => curseforge::structs::FEClassId::Modpacks,
+            FEUnifiedSearchType::Mod => curseforge::structs::CFFEClassId::Mods,
+            FEUnifiedSearchType::ModPack => curseforge::structs::CFFEClassId::Modpacks,
         }
     }
 }
@@ -180,18 +180,18 @@ pub struct FEUnifiedSearchParameters {
     pub modloaders: Option<Or<FEQueryModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
     pub sort_index: Option<FEUnifiedModSortIndex>,
-    pub sort_order: Option<curseforge::filters::FEModSearchSortOrder>,
+    pub sort_order: Option<curseforge::filters::CFFEModSearchSortOrder>,
     pub index: Option<u32>,
     pub page_size: Option<u32>,
     pub search_api: FESearchAPI,
 }
 
-impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchParameters {
+impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {
     type Error = anyhow::Error;
 
     fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        Ok(curseforge::filters::FEModSearchParameters {
-            query: FEModSearchParametersQuery {
+        Ok(curseforge::filters::CFFEModSearchParameters {
+            query: CFFEModSearchParametersQuery {
                 game_id: 432,
                 search_filter: value.search_query,
                 game_version: value.game_versions.and_then(|vers| vers.into_iter().next()),
@@ -217,7 +217,7 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::FEModSearchPara
                 mod_loader_types: value.modloaders.map(|loaders| {
                     loaders
                         .into_iter()
-                        .map(Into::<curseforge::structs::FEModLoaderType>::into)
+                        .map(Into::<curseforge::structs::CFFEModLoaderType>::into)
                         .collect()
                 }),
                 author_id: None,
@@ -236,7 +236,7 @@ impl TryFrom<FEUnifiedSearchParameters>
     type Error = anyhow::Error;
 
     fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        let search_params: curseforge::filters::FEModSearchParameters = value.try_into()?;
+        let search_params: curseforge::filters::CFFEModSearchParameters = value.try_into()?;
         Ok(search_params.into())
     }
 }
