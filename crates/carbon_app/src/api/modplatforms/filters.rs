@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
+use anyhow::anyhow;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
@@ -109,31 +110,114 @@ pub enum FEUnifiedModSortIndex {
     Modrinth(modrinth::filters::MRFESearchIndex),
 }
 
-#[derive(Type, Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum FEQueryModLoaderType {
+#[derive(
+    Type,
+    Debug,
+    serde_enum_str::Deserialize_enum_str,
+    serde_enum_str::Serialize_enum_str,
+    PartialEq,
+    Eq,
+    Clone,
+    strum_macros::EnumIter,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum FEUnifiedModLoaderType {
+    // all
     Forge,
     Fabric,
     Quilt,
+    Liteloader,
+
+    // curseforge
+    Cauldron,
+
+    // modrinth
+    Bukkit,
+    Bungeecord,
+    Canvas,
+    Datapack,
+    Folia,
+    Iris,
+    Minecraft,
+    Modloader,
+    Optifine,
+    Paper,
+    Purpur,
+    Rift,
+    Spigot,
+    Sponge,
+    Vanilla,
+    Velocity,
+    Waterfall,
+    #[serde(other)]
+    Other(String),
 }
 
-impl Display for FEQueryModLoaderType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let out = match self {
-            FEQueryModLoaderType::Forge => "forge",
-            FEQueryModLoaderType::Fabric => "fabric",
-            FEQueryModLoaderType::Quilt => "quilt",
-        };
-        write!(f, "{}", out)
+// impl Display for FEUnifiedModLoaderType {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         let out = match self {
+//             FEUnifiedModLoaderType::Forge => "forge",
+//             FEUnifiedModLoaderType::Fabric => "fabric",
+//             FEUnifiedModLoaderType::Quilt => "quilt",
+//         };
+//         write!(f, "{}", out)
+//     }
+// }
+
+impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
+        match value {
+            FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
+            FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
+            FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),
+            FEUnifiedModLoaderType::Liteloader => {
+                Ok(curseforge::structs::CFFEModLoaderType::LiteLoader)
+            }
+            FEUnifiedModLoaderType::Cauldron => {
+                Ok(curseforge::structs::CFFEModLoaderType::Cauldron)
+            }
+            value => Err(anyhow!(
+                "Curseforge does not support the `{}` loader",
+                value.to_string()
+            )),
+        }
     }
 }
 
-impl From<FEQueryModLoaderType> for curseforge::structs::CFFEModLoaderType {
-    fn from(value: FEQueryModLoaderType) -> Self {
+impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
         match value {
-            FEQueryModLoaderType::Forge => curseforge::structs::CFFEModLoaderType::Forge,
-            FEQueryModLoaderType::Fabric => curseforge::structs::CFFEModLoaderType::Fabric,
-            FEQueryModLoaderType::Quilt => curseforge::structs::CFFEModLoaderType::Quilt,
+            FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
+            FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
+            FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
+            FEUnifiedModLoaderType::Liteloader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
+            FEUnifiedModLoaderType::Bukkit => Ok(modrinth::structs::MRFELoaderType::Bukkit),
+            FEUnifiedModLoaderType::Bungeecord => Ok(modrinth::structs::MRFELoaderType::Bungeecord),
+            FEUnifiedModLoaderType::Canvas => Ok(modrinth::structs::MRFELoaderType::Canvas),
+            FEUnifiedModLoaderType::Datapack => Ok(modrinth::structs::MRFELoaderType::Datapack),
+            FEUnifiedModLoaderType::Folia => Ok(modrinth::structs::MRFELoaderType::Folia),
+            FEUnifiedModLoaderType::Iris => Ok(modrinth::structs::MRFELoaderType::Iris),
+            FEUnifiedModLoaderType::Minecraft => Ok(modrinth::structs::MRFELoaderType::Minecraft),
+            FEUnifiedModLoaderType::Modloader => Ok(modrinth::structs::MRFELoaderType::Modloader),
+            FEUnifiedModLoaderType::Optifine => Ok(modrinth::structs::MRFELoaderType::Optifine),
+            FEUnifiedModLoaderType::Paper => Ok(modrinth::structs::MRFELoaderType::Paper),
+            FEUnifiedModLoaderType::Purpur => Ok(modrinth::structs::MRFELoaderType::Purpur),
+            FEUnifiedModLoaderType::Rift => Ok(modrinth::structs::MRFELoaderType::Rift),
+            FEUnifiedModLoaderType::Spigot => Ok(modrinth::structs::MRFELoaderType::Spigot),
+            FEUnifiedModLoaderType::Sponge => Ok(modrinth::structs::MRFELoaderType::Sponge),
+            FEUnifiedModLoaderType::Vanilla => Ok(modrinth::structs::MRFELoaderType::Vanilla),
+            FEUnifiedModLoaderType::Velocity => Ok(modrinth::structs::MRFELoaderType::Velocity),
+            FEUnifiedModLoaderType::Waterfall => Ok(modrinth::structs::MRFELoaderType::Waterfall),
+            FEUnifiedModLoaderType::Other(other) => {
+                Ok(modrinth::structs::MRFELoaderType::Other(other))
+            }
+            FEUnifiedModLoaderType::Cauldron => {
+                Err(anyhow!("Modrinth does not support the `Cauldron` loader"))
+            }
         }
     }
 }
@@ -177,7 +261,7 @@ pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
     pub categories: Option<And<FEUnifiedSearchCategoryID>>,
     pub game_versions: Option<Or<String>>,
-    pub modloaders: Option<Or<FEQueryModLoaderType>>,
+    pub modloaders: Option<Or<FEUnifiedModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
     pub sort_index: Option<FEUnifiedModSortIndex>,
     pub sort_order: Option<curseforge::filters::CFFEModSearchSortOrder>,
@@ -186,11 +270,9 @@ pub struct FEUnifiedSearchParameters {
     pub search_api: FESearchAPI,
 }
 
-impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        Ok(curseforge::filters::CFFEModSearchParameters {
+impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {
+    fn from(value: FEUnifiedSearchParameters) -> Self {
+        curseforge::filters::CFFEModSearchParameters {
             query: CFFEModSearchParametersQuery {
                 game_id: 432,
                 search_filter: value.search_query,
@@ -217,7 +299,7 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchPa
                 mod_loader_types: value.modloaders.map(|loaders| {
                     loaders
                         .into_iter()
-                        .map(Into::<curseforge::structs::CFFEModLoaderType>::into)
+                        .filter_map(|loader| loader.try_into().ok())
                         .collect()
                 }),
                 author_id: None,
@@ -226,7 +308,7 @@ impl TryFrom<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchPa
                 index: value.index.map(|index| index as i32),
                 page_size: value.page_size.map(|page_size| page_size as i32),
             },
-        })
+        }
     }
 }
 
@@ -241,9 +323,8 @@ impl TryFrom<FEUnifiedSearchParameters>
     }
 }
 
-impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearchParameters {
-    type Error = anyhow::Error;
-    fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
+impl From<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearchParameters {
+    fn from(value: FEUnifiedSearchParameters) -> Self {
         let mut facets = modrinth::filters::MRFESearchFacetAnd::new();
         if let Some(categories) = value.categories {
             for cat_or in categories {
@@ -269,6 +350,9 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearch
         if let Some(modloaders) = value.modloaders {
             let modloaders_or = modloaders
                 .into_iter()
+                .filter_map(|loader| {
+                    TryInto::<modrinth::structs::MRFELoaderType>::try_into(loader).ok()
+                })
                 .map(|modloader| {
                     modrinth::filters::MRFESearchFacet::Category(modloader.to_string())
                 })
@@ -280,7 +364,7 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearch
                 modrinth::filters::MRFESearchFacet::ProjectType(project_type.to_string()),
             ]));
         }
-        Ok(modrinth::filters::MRFEProjectSearchParameters {
+        modrinth::filters::MRFEProjectSearchParameters {
             query: value.search_query,
             facets: if facets.is_empty() {
                 None
@@ -294,6 +378,6 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearch
             offset: value.index,
             limit: value.page_size,
             filters: None,
-        })
+        }
     }
 }
