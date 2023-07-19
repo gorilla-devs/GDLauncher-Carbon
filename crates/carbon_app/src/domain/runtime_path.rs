@@ -19,7 +19,6 @@ impl RootPath {
 
 pub struct LibrariesPath(PathBuf);
 
-// TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
     pub fn get_mc_client(&self, id: &str) -> PathBuf {
         self.0
