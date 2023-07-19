@@ -212,7 +212,7 @@ const Modpack = () => {
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 items-start gap-1 lg:items-center lg:gap-0">
-                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 lg:pr-2">
                         <Switch>
                           <Match when={!isFetching()}>
                             {routeData.isCurseforge
@@ -225,7 +225,7 @@ const Modpack = () => {
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                         <div class="i-ri:time-fill" />
 
                         <Switch>
@@ -255,8 +255,7 @@ const Modpack = () => {
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 lg:px-4 flex gap-2 items-center">
-                        <div class="i-ri:user-fill" />
+                      <div class="p-0 lg:px-2 flex gap-2 items-center">
                         <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                           <Switch>
                             <Match when={!isFetching()}>
