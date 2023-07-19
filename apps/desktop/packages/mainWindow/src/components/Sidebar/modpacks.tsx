@@ -117,15 +117,12 @@ const Sidebar = () => {
     else return modloaderName.other;
   };
 
-  const isCurseforge = () => infiniteQuery.query?.searchApi === "curseforge";
+  const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
-  const modloaders = isCurseforge()
-    ? routeData.curseForgeModloaders.data
-    : routeData.modrinthModloaders.data;
-
-  createEffect(() => {
-    console.log("MODLOADERS", modloaders);
-  });
+  const modloaders = () =>
+    isCurseforge()
+      ? routeData.curseForgeModloaders.data
+      : routeData.modrinthModloaders.data;
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -158,7 +155,7 @@ const Sidebar = () => {
         </Collapsable>
         <Collapsable title="Modloader">
           <div class="flex flex-col gap-3">
-            <For each={modloaders}>
+            <For each={modloaders()}>
               {(modloader) => {
                 const modloaderName = () =>
                   isCurseforge()
@@ -174,18 +171,21 @@ const Sidebar = () => {
                         const prevModloaders =
                           infiniteQuery?.query.modloaders || [];
 
+                        const filteredModloaders = prevModloaders.filter(
+                          (modloader) =>
+                            getModloaderName(modloader) !== modloaderName()
+                        );
+
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloader as FEUnifiedModLoaderType,
+                              modloaderName() as FEUnifiedModLoaderType,
                             ]
-                          : prevModloaders.filter(
-                              (categ) =>
-                                categ !== (modloader as FEUnifiedModLoaderType)
-                            );
+                          : filteredModloaders;
 
                         infiniteQuery.setQuery({
-                          modloaders: newModloaders,
+                          modloaders:
+                            newModloaders.length === 0 ? null : newModloaders,
                         });
                       }}
                     />
