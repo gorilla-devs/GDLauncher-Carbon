@@ -28,7 +28,7 @@ const ModDetails = (props: ModalProps) => {
   createEffect(() => {
     if (modId()) {
       const modpackDescription = rspc.createQuery(() => [
-        "modplatforms.curseforgeGetModDescription",
+        "modplatforms.curseforge.getModDescription",
         { modId: modId() },
       ]);
       if (modpackDescription.data?.data)
