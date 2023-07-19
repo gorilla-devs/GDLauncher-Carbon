@@ -11,8 +11,8 @@ import {
   onMount,
 } from "solid-js";
 import {
-  FEModSearchSortField,
-  FEModrinthSearchIndex,
+  CFFEModSearchSortField,
+  MRFESearchIndex,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
@@ -188,10 +188,10 @@ export default function Browser() {
               onChange={(val) => {
                 const sortIndex = isCurseforge()
                   ? {
-                      curseForge: val.key as FEModSearchSortField,
+                      curseForge: val.key as CFFEModSearchSortField,
                     }
                   : {
-                      modrinth: val.key as FEModrinthSearchIndex,
+                      modrinth: val.key as MRFESearchIndex,
                     };
 
                 infiniteQuery?.setQuery({

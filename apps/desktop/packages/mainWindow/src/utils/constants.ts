@@ -1,6 +1,6 @@
 import {
-  FEModSearchSortField,
-  FEModrinthSearchIndex,
+  CFFEModSearchSortField,
+  MRFESearchIndex,
   ModpackPlatform,
 } from "@gd/core_module/bindings";
 
@@ -10,7 +10,7 @@ export const NEWS_URL =
 export const MODRNITH_WEBSITE = "https://modrinth.com/";
 export const MODRNITH_WEBSITE_MODPACKS = `${MODRNITH_WEBSITE}/modpacks/`;
 
-export const CurseForgeSortFields: FEModSearchSortField[] = [
+export const CurseForgeSortFields: CFFEModSearchSortField[] = [
   "featured",
   "popularity",
   "lastUpdated",
@@ -21,7 +21,7 @@ export const CurseForgeSortFields: FEModSearchSortField[] = [
   "gameVersion",
 ];
 
-export const ModrinthSortFields: FEModrinthSearchIndex[] = [
+export const ModrinthSortFields: MRFESearchIndex[] = [
   "relevance",
   "downloads",
   "follows",

@@ -12,7 +12,7 @@ import {
   isCurseForgeData,
 } from "@/utils/Mods";
 import { formatDownloadCount } from "@/utils/helpers";
-import { FECategory } from "@gd/core_module/bindings";
+import { CFFECategory } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Tag } from "@gd/ui";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -53,7 +53,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
               <Tag
                 img={
                   isCurseForgeData(props.data.data)
-                    ? (tag as FECategory).iconUrl
+                    ? (tag as CFFECategory).iconUrl
                     : null
                 }
                 type="fixed"

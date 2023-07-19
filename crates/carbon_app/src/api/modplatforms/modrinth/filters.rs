@@ -15,7 +15,7 @@ use anyhow::anyhow;
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
-pub enum FEModrinthSearchIndex {
+pub enum MRFESearchIndex {
     Relevance,
     Downloads,
     Follows,
@@ -23,39 +23,39 @@ pub enum FEModrinthSearchIndex {
     Updated,
 }
 
-impl From<SearchIndex> for FEModrinthSearchIndex {
+impl From<SearchIndex> for MRFESearchIndex {
     fn from(search_index: SearchIndex) -> Self {
         match search_index {
-            SearchIndex::Relevance => FEModrinthSearchIndex::Relevance,
-            SearchIndex::Downloads => FEModrinthSearchIndex::Downloads,
-            SearchIndex::Follows => FEModrinthSearchIndex::Follows,
-            SearchIndex::Newest => FEModrinthSearchIndex::Newest,
-            SearchIndex::Updated => FEModrinthSearchIndex::Updated,
+            SearchIndex::Relevance => MRFESearchIndex::Relevance,
+            SearchIndex::Downloads => MRFESearchIndex::Downloads,
+            SearchIndex::Follows => MRFESearchIndex::Follows,
+            SearchIndex::Newest => MRFESearchIndex::Newest,
+            SearchIndex::Updated => MRFESearchIndex::Updated,
         }
     }
 }
 
-impl From<FEModrinthSearchIndex> for SearchIndex {
-    fn from(search_index: FEModrinthSearchIndex) -> Self {
+impl From<MRFESearchIndex> for SearchIndex {
+    fn from(search_index: MRFESearchIndex) -> Self {
         match search_index {
-            FEModrinthSearchIndex::Relevance => SearchIndex::Relevance,
-            FEModrinthSearchIndex::Downloads => SearchIndex::Downloads,
-            FEModrinthSearchIndex::Follows => SearchIndex::Follows,
-            FEModrinthSearchIndex::Newest => SearchIndex::Newest,
-            FEModrinthSearchIndex::Updated => SearchIndex::Updated,
+            MRFESearchIndex::Relevance => SearchIndex::Relevance,
+            MRFESearchIndex::Downloads => SearchIndex::Downloads,
+            MRFESearchIndex::Follows => SearchIndex::Follows,
+            MRFESearchIndex::Newest => SearchIndex::Newest,
+            MRFESearchIndex::Updated => SearchIndex::Updated,
         }
     }
 }
 
 #[derive(Type, Debug, Clone)]
-pub enum FEModrinthSearchFacet {
+pub enum MRFESearchFacet {
     Category(String),
     Version(String),
     License(String),
     ProjectType(String),
 }
 
-impl FromStr for FEModrinthSearchFacet {
+impl FromStr for MRFESearchFacet {
     type Err = anyhow::Error;
 
     fn from_str(facet: &str) -> Result<Self, Self::Err> {
@@ -63,29 +63,29 @@ impl FromStr for FEModrinthSearchFacet {
             return Err(anyhow!("Improperly formatted search facet `{}`", facet));
         };
         match facet_type {
-            "categories" => Ok(FEModrinthSearchFacet::Category(value.to_string())),
-            "versions" => Ok(FEModrinthSearchFacet::Version(value.to_string())),
-            "license" => Ok(FEModrinthSearchFacet::License(value.to_string())),
-            "project_type" => Ok(FEModrinthSearchFacet::ProjectType(value.to_string())),
+            "categories" => Ok(MRFESearchFacet::Category(value.to_string())),
+            "versions" => Ok(MRFESearchFacet::Version(value.to_string())),
+            "license" => Ok(MRFESearchFacet::License(value.to_string())),
+            "project_type" => Ok(MRFESearchFacet::ProjectType(value.to_string())),
             _ => Err(anyhow!("Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`", facet_type))
         }
     }
 }
 
-impl TryFrom<&str> for FEModrinthSearchFacet {
+impl TryFrom<&str> for MRFESearchFacet {
     type Error = anyhow::Error;
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         value.parse()
     }
 }
 
-impl Display for FEModrinthSearchFacet {
+impl Display for MRFESearchFacet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
-            FEModrinthSearchFacet::Category(category) => format!("categories:{}", category),
-            FEModrinthSearchFacet::Version(version) => format!("version:{}", version),
-            FEModrinthSearchFacet::License(license) => format!("license:{}", license),
-            FEModrinthSearchFacet::ProjectType(project_type) => {
+            MRFESearchFacet::Category(category) => format!("categories:{}", category),
+            MRFESearchFacet::Version(version) => format!("version:{}", version),
+            MRFESearchFacet::License(license) => format!("license:{}", license),
+            MRFESearchFacet::ProjectType(project_type) => {
                 format!("project_type:{}", project_type)
             }
         };
@@ -93,7 +93,7 @@ impl Display for FEModrinthSearchFacet {
     }
 }
 
-impl Serialize for FEModrinthSearchFacet {
+impl Serialize for MRFESearchFacet {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -102,7 +102,7 @@ impl Serialize for FEModrinthSearchFacet {
     }
 }
 
-impl<'de> Deserialize<'de> for FEModrinthSearchFacet {
+impl<'de> Deserialize<'de> for MRFESearchFacet {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -113,167 +113,163 @@ impl<'de> Deserialize<'de> for FEModrinthSearchFacet {
     }
 }
 
-impl From<SearchFacet> for FEModrinthSearchFacet {
+impl From<SearchFacet> for MRFESearchFacet {
     fn from(facet: SearchFacet) -> Self {
         match facet {
-            SearchFacet::Category(category) => FEModrinthSearchFacet::Category(category),
-            SearchFacet::Version(version) => FEModrinthSearchFacet::Version(version),
-            SearchFacet::License(license) => FEModrinthSearchFacet::License(license),
-            SearchFacet::ProjectType(project_type) => {
-                FEModrinthSearchFacet::ProjectType(project_type)
-            }
+            SearchFacet::Category(category) => MRFESearchFacet::Category(category),
+            SearchFacet::Version(version) => MRFESearchFacet::Version(version),
+            SearchFacet::License(license) => MRFESearchFacet::License(license),
+            SearchFacet::ProjectType(project_type) => MRFESearchFacet::ProjectType(project_type),
         }
     }
 }
 
-impl From<FEModrinthSearchFacet> for SearchFacet {
-    fn from(facet: FEModrinthSearchFacet) -> Self {
+impl From<MRFESearchFacet> for SearchFacet {
+    fn from(facet: MRFESearchFacet) -> Self {
         match facet {
-            FEModrinthSearchFacet::Category(category) => SearchFacet::Category(category),
-            FEModrinthSearchFacet::Version(version) => SearchFacet::Version(version),
-            FEModrinthSearchFacet::License(license) => SearchFacet::License(license),
-            FEModrinthSearchFacet::ProjectType(project_type) => {
-                SearchFacet::ProjectType(project_type)
-            }
+            MRFESearchFacet::Category(category) => SearchFacet::Category(category),
+            MRFESearchFacet::Version(version) => SearchFacet::Version(version),
+            MRFESearchFacet::License(license) => SearchFacet::License(license),
+            MRFESearchFacet::ProjectType(project_type) => SearchFacet::ProjectType(project_type),
         }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthSearchFacetOr(pub Vec<FEModrinthSearchFacet>);
+pub struct MRFESearchFacetOr(pub Vec<MRFESearchFacet>);
 
-impl From<FEModrinthSearchFacet> for FEModrinthSearchFacetOr {
-    fn from(facet: FEModrinthSearchFacet) -> Self {
-        FEModrinthSearchFacetOr(vec![facet])
+impl From<MRFESearchFacet> for MRFESearchFacetOr {
+    fn from(facet: MRFESearchFacet) -> Self {
+        MRFESearchFacetOr(vec![facet])
     }
 }
 
-impl Deref for FEModrinthSearchFacetOr {
-    type Target = Vec<FEModrinthSearchFacet>;
+impl Deref for MRFESearchFacetOr {
+    type Target = Vec<MRFESearchFacet>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FEModrinthSearchFacetOr {
+impl DerefMut for MRFESearchFacetOr {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl IntoIterator for FEModrinthSearchFacetOr {
-    type Item = FEModrinthSearchFacet;
+impl IntoIterator for MRFESearchFacetOr {
+    type Item = MRFESearchFacet;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthSearchFacet> for FEModrinthSearchFacetOr {
-    fn from_iter<I: IntoIterator<Item = FEModrinthSearchFacet>>(iter: I) -> Self {
+impl FromIterator<MRFESearchFacet> for MRFESearchFacetOr {
+    fn from_iter<I: IntoIterator<Item = MRFESearchFacet>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthSearchFacetOr(c)
+        MRFESearchFacetOr(c)
     }
 }
 
-impl From<SearchFacetOr> for FEModrinthSearchFacetOr {
+impl From<SearchFacetOr> for MRFESearchFacetOr {
     fn from(facets: SearchFacetOr) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FEModrinthSearchFacetOr> for SearchFacetOr {
-    fn from(facets: FEModrinthSearchFacetOr) -> Self {
+impl From<MRFESearchFacetOr> for SearchFacetOr {
+    fn from(facets: MRFESearchFacetOr) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthSearchFacetAnd(pub Vec<FEModrinthSearchFacetOr>);
+pub struct MRFESearchFacetAnd(pub Vec<MRFESearchFacetOr>);
 
-impl FEModrinthSearchFacetAnd {
+impl MRFESearchFacetAnd {
     pub fn new() -> Self {
-        FEModrinthSearchFacetAnd(Vec::new())
+        MRFESearchFacetAnd(Vec::new())
     }
 }
 
-impl From<FEModrinthSearchFacetOr> for FEModrinthSearchFacetAnd {
-    fn from(facets: FEModrinthSearchFacetOr) -> Self {
-        FEModrinthSearchFacetAnd(vec![facets])
+impl From<MRFESearchFacetOr> for MRFESearchFacetAnd {
+    fn from(facets: MRFESearchFacetOr) -> Self {
+        MRFESearchFacetAnd(vec![facets])
     }
 }
 
-impl Deref for FEModrinthSearchFacetAnd {
-    type Target = Vec<FEModrinthSearchFacetOr>;
+impl Deref for MRFESearchFacetAnd {
+    type Target = Vec<MRFESearchFacetOr>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FEModrinthSearchFacetAnd {
+impl DerefMut for MRFESearchFacetAnd {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl From<FEModrinthSearchFacet> for FEModrinthSearchFacetAnd {
-    fn from(facet: FEModrinthSearchFacet) -> Self {
-        FEModrinthSearchFacetAnd(vec![facet.into()])
+impl From<MRFESearchFacet> for MRFESearchFacetAnd {
+    fn from(facet: MRFESearchFacet) -> Self {
+        MRFESearchFacetAnd(vec![facet.into()])
     }
 }
 
-impl IntoIterator for FEModrinthSearchFacetAnd {
-    type Item = FEModrinthSearchFacetOr;
+impl IntoIterator for MRFESearchFacetAnd {
+    type Item = MRFESearchFacetOr;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthSearchFacetOr> for FEModrinthSearchFacetAnd {
-    fn from_iter<I: IntoIterator<Item = FEModrinthSearchFacetOr>>(iter: I) -> Self {
+impl FromIterator<MRFESearchFacetOr> for MRFESearchFacetAnd {
+    fn from_iter<I: IntoIterator<Item = MRFESearchFacetOr>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthSearchFacetAnd(c)
+        MRFESearchFacetAnd(c)
     }
 }
 
-impl From<SearchFacetAnd> for FEModrinthSearchFacetAnd {
+impl From<SearchFacetAnd> for MRFESearchFacetAnd {
     fn from(facets: SearchFacetAnd) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FEModrinthSearchFacetAnd> for SearchFacetAnd {
-    fn from(facets: FEModrinthSearchFacetAnd) -> Self {
+impl From<MRFESearchFacetAnd> for SearchFacetAnd {
+    fn from(facets: MRFESearchFacetAnd) -> Self {
         facets.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthProjectSearchParameters {
+pub struct MRFEProjectSearchParameters {
     pub query: Option<String>,
-    pub facets: Option<FEModrinthSearchFacetAnd>,
-    pub index: Option<FEModrinthSearchIndex>,
+    pub facets: Option<MRFESearchFacetAnd>,
+    pub index: Option<MRFESearchIndex>,
     pub offset: Option<u32>,
     pub limit: Option<u32>,
     pub filters: Option<String>,
 }
 
-impl From<ProjectSearchParameters> for FEModrinthProjectSearchParameters {
+impl From<ProjectSearchParameters> for MRFEProjectSearchParameters {
     fn from(value: ProjectSearchParameters) -> Self {
-        FEModrinthProjectSearchParameters {
+        MRFEProjectSearchParameters {
             query: value.query,
             facets: value.facets.map(Into::into),
             index: value.index.map(Into::into),
@@ -284,8 +280,8 @@ impl From<ProjectSearchParameters> for FEModrinthProjectSearchParameters {
     }
 }
 
-impl From<FEModrinthProjectSearchParameters> for ProjectSearchParameters {
-    fn from(value: FEModrinthProjectSearchParameters) -> Self {
+impl From<MRFEProjectSearchParameters> for ProjectSearchParameters {
+    fn from(value: MRFEProjectSearchParameters) -> Self {
         ProjectSearchParameters {
             query: value.query,
             facets: value.facets.map(Into::into),
@@ -298,88 +294,88 @@ impl From<FEModrinthProjectSearchParameters> for ProjectSearchParameters {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthProjectID(pub String);
+pub struct MRFEProjectID(pub String);
 
-impl Deref for FEModrinthProjectID {
+impl Deref for MRFEProjectID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<ProjectID> for FEModrinthProjectID {
+impl From<ProjectID> for MRFEProjectID {
     fn from(value: ProjectID) -> Self {
-        FEModrinthProjectID(value.0)
+        MRFEProjectID(value.0)
     }
 }
 
-impl From<FEModrinthProjectID> for ProjectID {
-    fn from(value: FEModrinthProjectID) -> Self {
+impl From<MRFEProjectID> for ProjectID {
+    fn from(value: MRFEProjectID) -> Self {
         ProjectID(value.0)
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthTeamID(pub String);
+pub struct MRFETeamID(pub String);
 
-impl Deref for FEModrinthTeamID {
+impl Deref for MRFETeamID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<TeamID> for FEModrinthTeamID {
+impl From<TeamID> for MRFETeamID {
     fn from(value: TeamID) -> Self {
-        FEModrinthTeamID(value.0)
+        MRFETeamID(value.0)
     }
 }
 
-impl From<FEModrinthTeamID> for TeamID {
-    fn from(value: FEModrinthTeamID) -> Self {
+impl From<MRFETeamID> for TeamID {
+    fn from(value: MRFETeamID) -> Self {
         TeamID(value.0)
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthVersionID(pub String);
+pub struct MRFEVersionID(pub String);
 
-impl Deref for FEModrinthVersionID {
+impl Deref for MRFEVersionID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl From<VersionID> for FEModrinthVersionID {
+impl From<VersionID> for MRFEVersionID {
     fn from(value: VersionID) -> Self {
-        FEModrinthVersionID(value.0)
+        MRFEVersionID(value.0)
     }
 }
 
-impl From<FEModrinthVersionID> for VersionID {
-    fn from(value: FEModrinthVersionID) -> Self {
+impl From<MRFEVersionID> for VersionID {
+    fn from(value: MRFEVersionID) -> Self {
         VersionID(value.0)
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthProjectIDs(pub Vec<String>);
+pub struct MRFEProjectIDs(pub Vec<String>);
 
-impl Deref for FEModrinthProjectIDs {
+impl Deref for MRFEProjectIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FEModrinthProjectIDs {
+impl DerefMut for MRFEProjectIDs {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl IntoIterator for FEModrinthProjectIDs {
+impl IntoIterator for MRFEProjectIDs {
     type Item = String;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -387,7 +383,7 @@ impl IntoIterator for FEModrinthProjectIDs {
     }
 }
 
-impl FromIterator<String> for FEModrinthProjectIDs {
+impl FromIterator<String> for MRFEProjectIDs {
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
@@ -395,39 +391,39 @@ impl FromIterator<String> for FEModrinthProjectIDs {
         for i in iter {
             c.push(i);
         }
-        FEModrinthProjectIDs(c)
+        MRFEProjectIDs(c)
     }
 }
 
-impl From<ProjectIDs> for FEModrinthProjectIDs {
+impl From<ProjectIDs> for MRFEProjectIDs {
     fn from(value: ProjectIDs) -> Self {
-        FEModrinthProjectIDs(value.ids)
+        MRFEProjectIDs(value.ids)
     }
 }
 
-impl From<FEModrinthProjectIDs> for ProjectIDs {
-    fn from(value: FEModrinthProjectIDs) -> Self {
+impl From<MRFEProjectIDs> for ProjectIDs {
+    fn from(value: MRFEProjectIDs) -> Self {
         ProjectIDs { ids: value.0 }
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthVersionIDs(pub Vec<String>);
+pub struct MRFEVersionIDs(pub Vec<String>);
 
-impl Deref for FEModrinthVersionIDs {
+impl Deref for MRFEVersionIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for FEModrinthVersionIDs {
+impl DerefMut for MRFEVersionIDs {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl IntoIterator for FEModrinthVersionIDs {
+impl IntoIterator for MRFEVersionIDs {
     type Item = String;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
@@ -435,7 +431,7 @@ impl IntoIterator for FEModrinthVersionIDs {
     }
 }
 
-impl FromIterator<String> for FEModrinthVersionIDs {
+impl FromIterator<String> for MRFEVersionIDs {
     fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
@@ -443,18 +439,18 @@ impl FromIterator<String> for FEModrinthVersionIDs {
         for i in iter {
             c.push(i);
         }
-        FEModrinthVersionIDs(c)
+        MRFEVersionIDs(c)
     }
 }
 
-impl From<VersionIDs> for FEModrinthVersionIDs {
+impl From<VersionIDs> for MRFEVersionIDs {
     fn from(value: VersionIDs) -> Self {
-        FEModrinthVersionIDs(value.ids)
+        MRFEVersionIDs(value.ids)
     }
 }
 
-impl From<FEModrinthVersionIDs> for VersionIDs {
-    fn from(value: FEModrinthVersionIDs) -> Self {
+impl From<MRFEVersionIDs> for VersionIDs {
+    fn from(value: MRFEVersionIDs) -> Self {
         VersionIDs { ids: value.0 }
     }
 }

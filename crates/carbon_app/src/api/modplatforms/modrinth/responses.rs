@@ -9,21 +9,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
     responses::{
-        CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse, VersionsResponse,
+        CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
+        VersionsResponse,
     },
     search::ProjectSearchResponse,
 };
 
 use crate::api::modplatforms::modrinth::structs::{
-    FEModrinthCategory, FEModrinthProject, FEModrinthProjectSearchResult, FEModrinthVersion,
+    MRFECategory, MRFEProject, MRFEProjectSearchResult, MRFEVersion,
 };
 
-use super::structs::FEModrinthTeamMember;
+use super::structs::{MRFELoader, MRFETeamMember};
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthProjectSearchResponse {
+pub struct MRFEProjectSearchResponse {
     /// The List of Results
-    pub hits: Vec<FEModrinthProjectSearchResult>,
+    pub hits: Vec<MRFEProjectSearchResult>,
     /// The number of results that were skipped by the query
     pub offset: u32,
     /// the number of results that were returned by the query
@@ -32,9 +33,9 @@ pub struct FEModrinthProjectSearchResponse {
     pub total_hits: u32,
 }
 
-impl From<ProjectSearchResponse> for FEModrinthProjectSearchResponse {
+impl From<ProjectSearchResponse> for MRFEProjectSearchResponse {
     fn from(results: ProjectSearchResponse) -> Self {
-        FEModrinthProjectSearchResponse {
+        MRFEProjectSearchResponse {
             hits: results.hits.into_iter().map(Into::into).collect(),
             offset: results.offset,
             limit: results.limit,
@@ -43,10 +44,10 @@ impl From<ProjectSearchResponse> for FEModrinthProjectSearchResponse {
     }
 }
 
-impl TryFrom<FEModrinthProjectSearchResponse> for ProjectSearchResponse {
+impl TryFrom<MRFEProjectSearchResponse> for ProjectSearchResponse {
     type Error = anyhow::Error;
 
-    fn try_from(results: FEModrinthProjectSearchResponse) -> Result<Self, Self::Error> {
+    fn try_from(results: MRFEProjectSearchResponse) -> Result<Self, Self::Error> {
         Ok(ProjectSearchResponse {
             hits: results
                 .hits
@@ -61,87 +62,129 @@ impl TryFrom<FEModrinthProjectSearchResponse> for ProjectSearchResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthCategoriesResponse(Vec<FEModrinthCategory>);
+pub struct MRFECategoriesResponse(Vec<MRFECategory>);
 
-impl Deref for FEModrinthCategoriesResponse {
-    type Target = Vec<FEModrinthCategory>;
+impl Deref for MRFECategoriesResponse {
+    type Target = Vec<MRFECategory>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEModrinthCategoriesResponse {
-    type Item = FEModrinthCategory;
+impl IntoIterator for MRFECategoriesResponse {
+    type Item = MRFECategory;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthCategory> for FEModrinthCategoriesResponse {
-    fn from_iter<I: IntoIterator<Item = FEModrinthCategory>>(iter: I) -> Self {
+impl FromIterator<MRFECategory> for MRFECategoriesResponse {
+    fn from_iter<I: IntoIterator<Item = MRFECategory>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthCategoriesResponse(c)
+        MRFECategoriesResponse(c)
     }
 }
 
-impl From<CategoriesResponse> for FEModrinthCategoriesResponse {
+impl From<CategoriesResponse> for MRFECategoriesResponse {
     fn from(value: CategoriesResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl From<FEModrinthCategoriesResponse> for CategoriesResponse {
-    fn from(value: FEModrinthCategoriesResponse) -> Self {
+impl From<MRFECategoriesResponse> for CategoriesResponse {
+    fn from(value: MRFECategoriesResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthProjectsResponse(pub Vec<FEModrinthProject>);
+pub struct MRFELoadersResponse(pub Vec<MRFELoader>);
 
-impl Deref for FEModrinthProjectsResponse {
-    type Target = Vec<FEModrinthProject>;
+impl Deref for MRFELoadersResponse {
+    type Target = Vec<MRFELoader>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEModrinthProjectsResponse {
-    type Item = FEModrinthProject;
+impl IntoIterator for MRFELoadersResponse {
+    type Item = MRFELoader;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthProject> for FEModrinthProjectsResponse {
-    fn from_iter<I: IntoIterator<Item = FEModrinthProject>>(iter: I) -> Self {
+impl FromIterator<MRFELoader> for MRFELoadersResponse {
+    fn from_iter<I: IntoIterator<Item = MRFELoader>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthProjectsResponse(c)
+        MRFELoadersResponse(c)
     }
 }
 
-impl From<ProjectsResponse> for FEModrinthProjectsResponse {
+impl From<LoadersResponse> for MRFELoadersResponse {
+    fn from(value: LoadersResponse) -> Self {
+        value.into_iter().map(Into::into).collect()
+    }
+}
+
+impl From<MRFELoadersResponse> for LoadersResponse {
+    fn from(value: MRFELoadersResponse) -> Self {
+        value.into_iter().map(Into::into).collect()
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct MRFEProjectsResponse(pub Vec<MRFEProject>);
+
+impl Deref for MRFEProjectsResponse {
+    type Target = Vec<MRFEProject>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl IntoIterator for MRFEProjectsResponse {
+    type Item = MRFEProject;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<MRFEProject> for MRFEProjectsResponse {
+    fn from_iter<I: IntoIterator<Item = MRFEProject>>(iter: I) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        MRFEProjectsResponse(c)
+    }
+}
+
+impl From<ProjectsResponse> for MRFEProjectsResponse {
     fn from(value: ProjectsResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl TryFrom<FEModrinthProjectsResponse> for ProjectsResponse {
+impl TryFrom<MRFEProjectsResponse> for ProjectsResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEModrinthProjectsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: MRFEProjectsResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(TryInto::try_into)
@@ -150,44 +193,44 @@ impl TryFrom<FEModrinthProjectsResponse> for ProjectsResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthVersionsResponse(pub Vec<FEModrinthVersion>);
+pub struct MRFEVersionsResponse(pub Vec<MRFEVersion>);
 
-impl Deref for FEModrinthVersionsResponse {
-    type Target = Vec<FEModrinthVersion>;
+impl Deref for MRFEVersionsResponse {
+    type Target = Vec<MRFEVersion>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEModrinthVersionsResponse {
-    type Item = FEModrinthVersion;
+impl IntoIterator for MRFEVersionsResponse {
+    type Item = MRFEVersion;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthVersion> for FEModrinthVersionsResponse {
-    fn from_iter<I: IntoIterator<Item = FEModrinthVersion>>(iter: I) -> Self {
+impl FromIterator<MRFEVersion> for MRFEVersionsResponse {
+    fn from_iter<I: IntoIterator<Item = MRFEVersion>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthVersionsResponse(c)
+        MRFEVersionsResponse(c)
     }
 }
 
-impl From<VersionsResponse> for FEModrinthVersionsResponse {
+impl From<VersionsResponse> for MRFEVersionsResponse {
     fn from(value: VersionsResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }
 }
 
-impl TryFrom<FEModrinthVersionsResponse> for VersionsResponse {
+impl TryFrom<MRFEVersionsResponse> for VersionsResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEModrinthVersionsResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: MRFEVersionsResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(TryInto::try_into)
@@ -196,36 +239,36 @@ impl TryFrom<FEModrinthVersionsResponse> for VersionsResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthVersionHashesResponse(pub HashMap<String, FEModrinthVersion>);
+pub struct MRFEVersionHashesResponse(pub HashMap<String, MRFEVersion>);
 
-impl Deref for FEModrinthVersionHashesResponse {
-    type Target = HashMap<String, FEModrinthVersion>;
+impl Deref for MRFEVersionHashesResponse {
+    type Target = HashMap<String, MRFEVersion>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEModrinthVersionHashesResponse {
-    type Item = (String, FEModrinthVersion);
-    type IntoIter = std::collections::hash_map::IntoIter<String, FEModrinthVersion>;
+impl IntoIterator for MRFEVersionHashesResponse {
+    type Item = (String, MRFEVersion);
+    type IntoIter = std::collections::hash_map::IntoIter<String, MRFEVersion>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<(String, FEModrinthVersion)> for FEModrinthVersionHashesResponse {
-    fn from_iter<I: IntoIterator<Item = (String, FEModrinthVersion)>>(iter: I) -> Self {
+impl FromIterator<(String, MRFEVersion)> for MRFEVersionHashesResponse {
+    fn from_iter<I: IntoIterator<Item = (String, MRFEVersion)>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = HashMap::with_capacity(size_lower);
         for (hash, version) in iter {
             c.insert(hash, version);
         }
-        FEModrinthVersionHashesResponse(c)
+        MRFEVersionHashesResponse(c)
     }
 }
 
-impl From<VersionHashesResponse> for FEModrinthVersionHashesResponse {
+impl From<VersionHashesResponse> for MRFEVersionHashesResponse {
     fn from(value: VersionHashesResponse) -> Self {
         value
             .into_iter()
@@ -234,9 +277,9 @@ impl From<VersionHashesResponse> for FEModrinthVersionHashesResponse {
     }
 }
 
-impl TryFrom<FEModrinthVersionHashesResponse> for VersionHashesResponse {
+impl TryFrom<MRFEVersionHashesResponse> for VersionHashesResponse {
     type Error = anyhow::Error;
-    fn try_from(value: FEModrinthVersionHashesResponse) -> Result<Self, Self::Error> {
+    fn try_from(value: MRFEVersionHashesResponse) -> Result<Self, Self::Error> {
         value
             .into_iter()
             .map(|(key, version)| match version.try_into() {
@@ -248,35 +291,35 @@ impl TryFrom<FEModrinthVersionHashesResponse> for VersionHashesResponse {
 }
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
-pub struct FEModrinthTeamResponse(pub Vec<FEModrinthTeamMember>);
-impl Deref for FEModrinthTeamResponse {
-    type Target = Vec<FEModrinthTeamMember>;
+pub struct MRFETeamResponse(pub Vec<MRFETeamMember>);
+impl Deref for MRFETeamResponse {
+    type Target = Vec<MRFETeamMember>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl IntoIterator for FEModrinthTeamResponse {
-    type Item = FEModrinthTeamMember;
+impl IntoIterator for MRFETeamResponse {
+    type Item = MRFETeamMember;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<FEModrinthTeamMember> for FEModrinthTeamResponse {
-    fn from_iter<I: IntoIterator<Item = FEModrinthTeamMember>>(iter: I) -> Self {
+impl FromIterator<MRFETeamMember> for MRFETeamResponse {
+    fn from_iter<I: IntoIterator<Item = MRFETeamMember>>(iter: I) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
             c.push(i);
         }
-        FEModrinthTeamResponse(c)
+        MRFETeamResponse(c)
     }
 }
 
-impl From<TeamResponse> for FEModrinthTeamResponse {
+impl From<TeamResponse> for MRFETeamResponse {
     fn from(value: TeamResponse) -> Self {
         value.into_iter().map(Into::into).collect()
     }

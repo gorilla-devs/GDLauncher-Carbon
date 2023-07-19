@@ -1,7 +1,7 @@
 import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/Mods";
 import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tag, Tooltip } from "@gd/ui";
-import { FECategory } from "@gd/core_module/bindings";
+import { CFFECategory } from "@gd/core_module/bindings";
 
 type Props = {
   modProps: ModRowProps;
@@ -18,14 +18,14 @@ const Categories = (props: Props) => {
               <Tooltip
                 content={
                   isCurseForgeData(props.modProps.data)
-                    ? (tag as FECategory).name
+                    ? (tag as CFFECategory).name
                     : (tag as string)
                 }
               >
                 <Tag
                   img={
                     isCurseForgeData(props.modProps.data)
-                      ? (tag as FECategory).iconUrl
+                      ? (tag as CFFECategory).iconUrl
                       : null
                   }
                   name={
@@ -43,14 +43,15 @@ const Categories = (props: Props) => {
           <Tooltip
             content={
               isCurseForgeData(props.modProps.data)
-                ? (getCategories(props.modProps)?.[0] as FECategory)?.name
+                ? (getCategories(props.modProps)?.[0] as CFFECategory)?.name
                 : (getCategories(props.modProps)?.[0] as string)
             }
           >
             <Tag
               img={
                 isCurseForgeData(props.modProps.data)
-                  ? (getCategories(props.modProps)?.[0] as FECategory)?.iconUrl
+                  ? (getCategories(props.modProps)?.[0] as CFFECategory)
+                      ?.iconUrl
                   : null
               }
               name={
@@ -70,8 +71,8 @@ const Categories = (props: Props) => {
                       <For each={getCategories(props.modProps).slice(1)}>
                         {(tag) => (
                           <Tag
-                            img={(tag as FECategory).iconUrl}
-                            name={(tag as FECategory).name}
+                            img={(tag as CFFECategory).iconUrl}
+                            name={(tag as CFFECategory).name}
                             type="fixed"
                           />
                         )}

@@ -6,7 +6,7 @@ import skull from "/assets/images/icons/skull.png";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
 import { rspc } from "@/utils/rspcClient";
-import { FEFile } from "@gd/core_module/bindings";
+import { CFFEFile } from "@gd/core_module/bindings";
 import { getCurseForgeData } from "@/utils/instances";
 
 const NoVersions = () => {
@@ -37,7 +37,7 @@ const NoVersions = () => {
 };
 
 const Versions = () => {
-  const [versions, setVersions] = createSignal<FEFile[]>([]);
+  const [versions, setVersions] = createSignal<CFFEFile[]>([]);
   const [mainFileId, setMainFileId] = createSignal<undefined | number>(
     undefined
   );
@@ -49,7 +49,7 @@ const Versions = () => {
 
   if (modId()) {
     const instanceDetails = rspc.createQuery(() => [
-      "modplatforms.curseforgeGetMod",
+      "modplatforms.curseforge.getMod",
       {
         modId: modId() as number,
       },

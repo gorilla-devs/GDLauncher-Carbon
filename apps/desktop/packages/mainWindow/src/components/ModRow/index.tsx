@@ -3,7 +3,11 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
-import { FEFile, FEFileIndex, InstanceDetails } from "@gd/core_module/bindings";
+import {
+  CFFEFile,
+  CFFEFileIndex,
+  InstanceDetails,
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Popover, Spinner, createNotification } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
@@ -254,13 +258,13 @@ const ModRow = (props: ModRowProps) => {
       setLoading(true);
       // eslint-disable-next-line solid/reactivity
       const modrinthProject = rspc.createQuery(() => [
-        "modplatforms.modrinthGetProject",
+        "modplatforms.modrinth.getProject",
         currentProjectId() as string,
       ]);
 
       if (modrinthProject.data?.versions) {
         const modrinthVersions = rspc.createQuery(() => [
-          "modplatforms.modrinthGetVersions",
+          "modplatforms.modrinth.getVersions",
           modrinthProject.data?.versions,
         ]);
         const lastVersion = modrinthVersions.data?.[0];
@@ -432,7 +436,7 @@ const ModRow = (props: ModRowProps) => {
                               const fileVersion = getCurrentMcVersion()[0];
                               if (fileVersion && instanceId()) {
                                 const fileId = isCurseForgeData(props.data)
-                                  ? (fileVersion as FEFileIndex).fileId
+                                  ? (fileVersion as CFFEFileIndex).fileId
                                   : (fileVersion as string);
 
                                 const projectId = isCurseForgeData(props.data)
@@ -464,7 +468,7 @@ const ModRow = (props: ModRowProps) => {
                                 installModMutation.mutate({
                                   mod_source: instanceCreationObj(
                                     isCurseForgeData(props.data)
-                                      ? (fileVersion as FEFile).id
+                                      ? (fileVersion as CFFEFile).id
                                       : (fileVersion as string),
                                     getProjectId(props)
                                   ),

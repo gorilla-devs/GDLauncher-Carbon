@@ -5,11 +5,11 @@ import { Dropdown, Skeleton } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "../modpack.overview";
 import {
-  FEFile,
-  FEFileIndex,
+  CFFEFile,
+  CFFEFileIndex,
   FEModResponse,
-  FEModrinthProject,
-  FEModrinthVersion,
+  MRFEProject,
+  MRFEVersion,
 } from "@gd/core_module/bindings";
 import { sortArrayByGameVersion } from "@/utils/Mods";
 
@@ -35,14 +35,14 @@ const Changelog = () => {
     if (!routeData.modpackDetails.data) return;
     if (!routeData.isCurseforge) {
       const query = rspc.createQuery(() => [
-        "modplatforms.modrinthGetVersions",
-        (routeData.modpackDetails.data as FEModrinthProject).versions,
+        "modplatforms.modrinth.getVersions",
+        (routeData.modpackDetails.data as MRFEProject).versions,
       ]);
 
       if (query.data) {
         const sortedVersions = sortArrayByGameVersion(
-          query.data as FEModrinthVersion[]
-        ) as FEModrinthVersion[];
+          query.data as MRFEVersion[]
+        ) as MRFEVersion[];
 
         setFileId(sortedVersions[0].id);
 
@@ -59,7 +59,7 @@ const Changelog = () => {
           .latestFilesIndexes
       );
       setOptions(
-        (sortedVersions as FEFileIndex[]).map((file) => ({
+        (sortedVersions as CFFEFileIndex[]).map((file) => ({
           key: file.fileId.toString(),
           label: file.filename,
         }))
@@ -73,14 +73,14 @@ const Changelog = () => {
     if (routeData.isCurseforge)
       if (
         fileId() !== undefined ||
-        (lastFile() && (lastFile() as FEFile).id !== undefined)
+        (lastFile() && (lastFile() as CFFEFile).id !== undefined)
       ) {
         // eslint-disable-next-line solid/reactivity
         const changelogQuery = rspc.createQuery(() => [
-          "modplatforms.curseforgeGetModFileChangelog",
+          "modplatforms.curseforge.getModFileChangelog",
           {
             modId: modpackId,
-            fileId: (fileId() as number) || (lastFile() as FEFile).id,
+            fileId: (fileId() as number) || (lastFile() as CFFEFile).id,
           },
         ]);
         setChangelog(changelogQuery.data?.data);
@@ -92,7 +92,7 @@ const Changelog = () => {
       if (fileId() !== undefined) {
         // eslint-disable-next-line solid/reactivity
         const changelogQuery = rspc.createQuery(() => [
-          "modplatforms.modrinthGetVersion",
+          "modplatforms.modrinth.getVersion",
           fileId() as string,
         ]);
 

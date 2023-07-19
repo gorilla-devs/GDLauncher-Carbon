@@ -1,31 +1,31 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import {
-  FEModAuthor,
+  CFFEModAuthor,
   FEModResponse,
-  FEModrinthProject,
-  FEModrinthTeamMember,
-  FEModrinthTeamResponse,
+  MRFEProject,
+  MRFETeamMember,
+  MRFETeamResponse,
 } from "@gd/core_module/bindings";
 import { rspc } from "@/utils/rspcClient";
 
 type Props = {
-  modpackDetails: FEModResponse | FEModrinthProject | undefined;
+  modpackDetails: FEModResponse | MRFEProject | undefined;
   isCurseforge: boolean;
   isModrinth: boolean;
 };
 
 const Authors = (props: Props) => {
-  const [authors, setAuthors] = createSignal<FEModrinthTeamResponse>([]);
+  const [authors, setAuthors] = createSignal<MRFETeamResponse>([]);
 
   createEffect(() => {
     if (
       props.modpackDetails &&
       props.isModrinth &&
-      (props.modpackDetails as FEModrinthProject)?.team
+      (props.modpackDetails as MRFEProject)?.team
     ) {
       const modrinthAuthorsQuery = rspc.createQuery(() => [
-        "modplatforms.modrinthGetTeam",
-        (props.modpackDetails as FEModrinthProject)?.team,
+        "modplatforms.modrinth.getTeam",
+        (props.modpackDetails as MRFEProject)?.team,
       ]);
 
       if (modrinthAuthorsQuery.data) setAuthors(modrinthAuthorsQuery.data);
@@ -49,8 +49,8 @@ const Authors = (props: Props) => {
           {(author) => (
             <p class="m-0">
               {props.isCurseforge
-                ? (author as FEModAuthor).name
-                : (author as FEModrinthTeamMember).user.username}
+                ? (author as CFFEModAuthor).name
+                : (author as MRFETeamMember).user.username}
             </p>
           )}
         </For>

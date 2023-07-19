@@ -19,9 +19,45 @@ pub struct Category {
 pub struct Loader {
     /// An SVG icon for the loader
     pub icon: String,
-    pub name: String,
+    pub name: LoaderType,
     /// The project types that this loader can load
     pub supported_project_types: Vec<project::ProjectType>,
+}
+
+#[derive(
+    serde_enum_str::Deserialize_enum_str,
+    serde_enum_str::Serialize_enum_str,
+    Debug,
+    PartialEq,
+    Eq,
+    Clone,
+    strum_macros::EnumIter,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum LoaderType {
+    Bukkit,
+    Bungeecord,
+    Canvas,
+    Datapack,
+    Fabric,
+    Folia,
+    Forge,
+    Iris,
+    Liteloader,
+    Minecraft,
+    Modloader,
+    Optifine,
+    Paper,
+    Purpur,
+    Quilt,
+    Rift,
+    Spigot,
+    Sponge,
+    Vanilla,
+    Velocity,
+    Waterfall,
+    #[serde(other)]
+    Other(String),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

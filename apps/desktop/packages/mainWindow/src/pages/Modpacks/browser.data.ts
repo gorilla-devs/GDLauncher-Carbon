@@ -1,19 +1,28 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
-  let forgeCategories = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetCategories",
+  const forgeCategories = rspc.createQuery(() => [
+    "modplatforms.curseforge.getCategories",
   ]);
 
-  let modrinthCategories = rspc.createQuery(() => [
-    "modplatforms.modrinthGetCategories",
+  const modrinthCategories = rspc.createQuery(() => [
+    "modplatforms.modrinth.getCategories",
   ]);
+
   const minecraftVersions = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
+  const modrinthModloaders = rspc.createQuery(() => [
+    "modplatforms.modrinth.getLoaders",
+  ]);
+  const curseForgeModloaders = rspc.createQuery(() => [
+    "modplatforms.curseforge.getModloaders",
+  ]);
 
   return {
     forgeCategories,
     minecraftVersions,
     modrinthCategories,
+    curseForgeModloaders,
+    modrinthModloaders,
   };
 };
 

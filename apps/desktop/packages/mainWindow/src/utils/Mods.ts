@@ -1,7 +1,7 @@
 import {
-  FEFileIndex,
-  FEMod,
-  FEModrinthVersion,
+  CFFEFileIndex,
+  CFFEMod,
+  MRFEVersion,
   FEUnifiedSearchResult,
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
@@ -38,7 +38,7 @@ export type ModRowProps = ModProps | ModpackProps;
 
 export const isCurseForgeData = (
   data: FEUnifiedSearchResult
-): data is { curseforge: FEMod } => {
+): data is { curseforge: CFFEMod } => {
   return "curseforge" in data;
 };
 
@@ -121,13 +121,13 @@ export const getLatestVersion = (prop: ModRowProps) => {
 };
 
 export const sortArrayByGameVersion = (
-  arr: FEFileIndex[] | FEModrinthVersion[]
-): (FEFileIndex | FEModrinthVersion)[] => {
+  arr: CFFEFileIndex[] | MRFEVersion[]
+): (CFFEFileIndex | MRFEVersion)[] => {
   let sortedArr = [...arr];
 
   const isCurseForgeFile = (
-    arr: FEFileIndex | FEModrinthVersion
-  ): arr is FEFileIndex => "gameVersion" in arr;
+    arr: CFFEFileIndex | MRFEVersion
+  ): arr is CFFEFileIndex => "gameVersion" in arr;
 
   sortedArr.sort((a, b) => {
     const aGameVersion = isCurseForgeFile(a) ? a.gameVersion : a.version_number;

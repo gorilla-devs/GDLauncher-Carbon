@@ -15,10 +15,11 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
-  FEModLoaderType,
-  FEModSearchParametersQuery,
-  FEModSearchSortField,
-  FEQueryModLoaderType,
+  CFFEModSearchSortField,
+  CFFEModLoaderType,
+  FEUnifiedSearchParameters,
+  MRFESearchIndex,
+  FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CurseForgeSortFields } from "@/utils/constants";
@@ -82,7 +83,7 @@ const AddMod = (props: ModalProps) => {
     });
   });
 
-  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
@@ -123,7 +124,7 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (FEQueryModLoaderType | "any")[] = [
+  const modloaders: (CFFEModLoaderType | "any")[] = [
     "any",
     "forge",
     "fabric",
@@ -204,6 +205,8 @@ const AddMod = (props: ModalProps) => {
     );
   };
 
+  const isCurseforge = () => query.searchApi === "curseforge";
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 bg-darkSlate-800 p-5">
@@ -215,7 +218,7 @@ const AddMod = (props: ModalProps) => {
               class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
               onInput={(e) => {
                 const target = e.target as HTMLInputElement;
-                setQueryWrapper({ searchFilter: target.value });
+                setQueryWrapper({ searchQuery: target.value });
               }}
             />
             <div class="flex items-center gap-3">
@@ -233,8 +236,15 @@ const AddMod = (props: ModalProps) => {
                   key: field,
                 }))}
                 onChange={(val) => {
+                  const sortIndex = isCurseforge()
+                    ? {
+                        curseForge: val.key as CFFEModSearchSortField,
+                      }
+                    : {
+                        modrinth: val.key as MRFESearchIndex,
+                      };
                   setQueryWrapper({
-                    sortField: val.key as FEModSearchSortField,
+                    sortIndex,
                   });
                 }}
                 value={0}
@@ -250,9 +260,10 @@ const AddMod = (props: ModalProps) => {
                   const mappedValue =
                     val.key === "any"
                       ? null
-                      : [...prevModloaders, val.key as FEModLoaderType];
+                      : [...prevModloaders, val.key as FEUnifiedModLoaderType];
+
                   setQueryWrapper({
-                    modLoaderTypes: mappedValue,
+                    modloaders: mappedValue,
                   });
                 }}
                 rounded

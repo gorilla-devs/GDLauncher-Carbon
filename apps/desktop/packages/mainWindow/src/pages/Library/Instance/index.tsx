@@ -24,7 +24,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import {
   FEModResponse,
-  FEModrinthProject,
+  MRFEProject,
   InstanceDetails,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
@@ -56,7 +56,7 @@ const Instance = () => {
     routeData.instanceDetails.data?.name || ""
   );
   const [modpackDetails, setModpackDetails] = createSignal<
-    FEModResponse | FEModrinthProject | undefined
+    FEModResponse | MRFEProject | undefined
   >(undefined);
 
   const [t] = useTransContext();
@@ -201,7 +201,7 @@ const Instance = () => {
     if (isCurseforge) {
       setModpackDetails(
         rspc.createQuery(() => [
-          "modplatforms.curseforgeGetMod",
+          "modplatforms.curseforge.getMod",
           {
             modId: isCurseforge.project_id as number,
           },
@@ -220,7 +220,7 @@ const Instance = () => {
     if (isModrninth) {
       setModpackDetails(
         rspc.createQuery(() => [
-          "modplatforms.modrinthGetProject",
+          "modplatforms.modrinth.getProject",
           isModrninth.project_id,
         ]).data
       );

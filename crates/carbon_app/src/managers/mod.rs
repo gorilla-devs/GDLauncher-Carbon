@@ -51,7 +51,6 @@ mod app {
     use crate::cache_middleware;
 
     use super::{
-        instance::importer::{legacy_gdlauncher::LegacyGDLauncherImporter, InstanceImporter},
         java::JavaManager,
         metadata::cache::MetaCacheManager,
         metrics::MetricsManager,

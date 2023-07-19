@@ -1,8 +1,8 @@
 import {
-  FEFile,
-  FEMod,
-  FEModrinthProject,
-  FEModrinthVersion,
+  CFFEFile,
+  CFFEMod,
+  MRFEProject,
+  MRFEVersion,
   FETask,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
@@ -15,8 +15,8 @@ import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 
 type Props = {
-  modVersion: FEModrinthVersion | FEFile;
-  project: FEMod | FEModrinthProject | undefined;
+  modVersion: MRFEVersion | CFFEFile;
+  project: CFFEMod | MRFEProject | undefined;
   isCurseforge?: boolean;
 };
 
@@ -74,36 +74,36 @@ const VersionRow = (props: Props) => {
 
   // const getUrl = () => {
   //   if (props.isCurseforge) {
-  //     return (props.modVersion as FEFile).displayName;
+  //     return (props.modVersion as CFFEFile).displayName;
   //   }
-  //   return (props.modVersion as FEModrinthVersion).;
+  //   return (props.modVersion as MRFEVersion).;
   // };
   const getName = () => {
     if (props.isCurseforge) {
-      return (props.modVersion as FEFile).displayName;
+      return (props.modVersion as CFFEFile).displayName;
     }
-    return (props.modVersion as FEModrinthVersion).name;
+    return (props.modVersion as MRFEVersion).name;
   };
 
   const getDate = () => {
     if (props.isCurseforge) {
-      return (props.modVersion as FEFile).fileDate;
+      return (props.modVersion as CFFEFile).fileDate;
     }
-    return (props.modVersion as FEModrinthVersion).date_published;
+    return (props.modVersion as MRFEVersion).date_published;
   };
 
   const getLastGameVersion = () => {
     if (props.isCurseforge) {
-      return (props.modVersion as FEFile).gameVersions[0];
+      return (props.modVersion as CFFEFile).gameVersions[0];
     }
-    return (props.modVersion as FEModrinthVersion).version_number;
+    return (props.modVersion as MRFEVersion).version_number;
   };
 
   const getReleaseType = () => {
     if (props.isCurseforge) {
-      return (props.modVersion as FEFile).releaseType;
+      return (props.modVersion as CFFEFile).releaseType;
     }
-    return (props.modVersion as FEModrinthVersion).version_type;
+    return (props.modVersion as MRFEVersion).version_type;
   };
 
   return (
@@ -137,21 +137,20 @@ const VersionRow = (props: Props) => {
         class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
         onClick={() => {
           const icon = props.isCurseforge
-            ? (props.project as FEMod).logo.url
-            : (props.project as FEModrinthProject).icon_url;
+            ? (props.project as CFFEMod).logo.url
+            : (props.project as MRFEProject).icon_url;
 
           const modpack = props.isCurseforge
             ? {
                 Curseforge: {
-                  file_id: (props.modVersion as FEFile).id,
-                  project_id: (props.modVersion as FEFile).modId,
+                  file_id: (props.modVersion as CFFEFile).id,
+                  project_id: (props.modVersion as CFFEFile).modId,
                 },
               }
             : {
                 Modrinth: {
-                  project_id: (props.modVersion as FEModrinthVersion)
-                    .project_id,
-                  version_id: (props.modVersion as FEModrinthVersion).id,
+                  project_id: (props.modVersion as MRFEVersion).project_id,
+                  version_id: (props.modVersion as MRFEVersion).id,
                 },
               };
 
@@ -163,8 +162,8 @@ const VersionRow = (props: Props) => {
             use_loaded_icon: true,
             notes: "",
             name: props.isCurseforge
-              ? (props.modVersion as FEFile).displayName
-              : (props.project as FEModrinthProject).title,
+              ? (props.modVersion as CFFEFile).displayName
+              : (props.project as MRFEProject).title,
             version: {
               Modpack: modpack,
             },

@@ -5,21 +5,21 @@ import VersionRow from "./VersionRow";
 import { Skeleton } from "@gd/ui";
 import {
   FEModFilesResponse,
-  FEModrinthVersionsResponse,
+  MRFEVersionsResponse,
 } from "@gd/core_module/bindings";
 import { rspc } from "@/utils/rspcClient";
 
 const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [modrinthVersions, setModrnithVersions] =
-    createSignal<FEModrinthVersionsResponse>([]);
+    createSignal<MRFEVersionsResponse>([]);
 
   createEffect(() => {
     if (!routeData.modrinthGetProject?.data) return;
     const versions = routeData.modrinthGetProject.data.versions;
     if (!routeData.isCurseforge && versions) {
       const query = rspc.createQuery(() => [
-        "modplatforms.modrinthGetVersions",
+        "modplatforms.modrinth.getVersions",
         versions,
       ]);
 

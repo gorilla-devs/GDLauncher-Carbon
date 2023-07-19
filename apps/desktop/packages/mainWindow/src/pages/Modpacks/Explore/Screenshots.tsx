@@ -3,7 +3,7 @@ import { useRouteData } from "@solidjs/router";
 import { For, Match, Switch } from "solid-js";
 import fetchData from "../modpack.screenshots";
 import { Skeleton } from "@gd/ui";
-import { FEModAsset } from "@gd/core_module/bindings";
+import { CFFEModAsset } from "@gd/core_module/bindings";
 
 const Screenshots = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -29,7 +29,7 @@ const Screenshots = () => {
                   <img
                     src={
                       routeData.isCurseforge
-                        ? (screenshot as FEModAsset).thumbnailUrl
+                        ? (screenshot as CFFEModAsset).thumbnailUrl
                         : screenshot.url
                     }
                     class="rounded-xl w-72 h-44"

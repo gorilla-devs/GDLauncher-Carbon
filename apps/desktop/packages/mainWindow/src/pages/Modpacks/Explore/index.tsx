@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse, FEModrinthProject } from "@gd/core_module/bindings";
+import { FEModResponse, MRFEProject } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -118,14 +118,14 @@ const Modpack = () => {
   const icon = () =>
     routeData.isCurseforge
       ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
-      : (routeData.modpackDetails?.data as FEModrinthProject).icon_url;
+      : (routeData.modpackDetails?.data as MRFEProject).icon_url;
 
   createEffect(() => {
     if (!routeData.isCurseforge) {
       const versions = routeData.modpackDetails.data?.versions;
       if (versions) {
         const modrinthVersions = rspc.createQuery(() => [
-          "modplatforms.modrinthGetVersions",
+          "modplatforms.modrinth.getVersions",
           versions,
         ]);
         const lastVersion = modrinthVersions.data?.[0];

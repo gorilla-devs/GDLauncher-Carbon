@@ -6,26 +6,28 @@ import fetchData from "@/pages/Modpacks/browser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import {
-  FECategory,
-  FEModrinthCategory,
-  FEQueryModLoaderType,
+  CFFECategory,
+  MRFECategory,
   FESearchAPI,
   FEUnifiedSearchCategoryID,
-  FEInstanceModLoaderType,
   ModpackPlatform,
+  FEUnifiedModLoaderType,
+  CFFEModLoaderType,
+  MRFELoader,
+  MRFELoaderType,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 
-const getIcon = (category: FECategory | FEModrinthCategory) => {
+const getIcon = (category: CFFECategory | MRFECategory) => {
   if ("iconUrl" in category) {
     return category.iconUrl;
   } else return category.icon;
 };
 
-const Icon = (props: { category: FECategory | FEModrinthCategory }) => {
+const Icon = (props: { category: CFFECategory | MRFECategory }) => {
   return (
     <Switch
       fallback={
@@ -46,9 +48,11 @@ const Icon = (props: { category: FECategory | FEModrinthCategory }) => {
 const Sidebar = () => {
   const [currentPlatform, setCurrentPlatform] =
     createSignal<ModpackPlatform>("Curseforge");
-  const [forgeCategories, setForgeCategories] = createSignal<FECategory[]>([]);
+  const [forgeCategories, setForgeCategories] = createSignal<CFFECategory[]>(
+    []
+  );
   const [modrinthCategories, setModrinthCategories] = createSignal<
-    FEModrinthCategory[]
+    MRFECategory[]
   >([]);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -99,17 +103,29 @@ const Sidebar = () => {
       ? forgeCategories()
       : modrinthCategories();
 
-  function getCategoryId(searchCategory: FEUnifiedSearchCategoryID) {
+  const getCategoryId = (searchCategory: FEUnifiedSearchCategoryID) => {
     if ("curseforge" in searchCategory) {
       return searchCategory.curseforge;
     } else if ("modrinth" in searchCategory) {
       return searchCategory.modrinth;
     }
-  }
+  };
+  const getModloaderName = (
+    modloaderName: CFFEModLoaderType | MRFELoaderType
+  ) => {
+    if (typeof modloaderName === "string") return modloaderName;
+    else return modloaderName.other;
+  };
 
   const isCurseforge = () => infiniteQuery.query?.searchApi === "curseforge";
 
-  const modloaders = ["forge", "fabric", "quilt"];
+  const modloaders = isCurseforge()
+    ? routeData.curseForgeModloaders.data
+    : routeData.modrinthModloaders.data;
+
+  createEffect(() => {
+    console.log("MODLOADERS", modloaders);
+  });
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -123,6 +139,7 @@ const Sidebar = () => {
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: [],
+                  modloaders: null,
                 });
               }}
               value={infiniteQuery.query?.searchApi}
@@ -142,34 +159,44 @@ const Sidebar = () => {
         <Collapsable title="Modloader">
           <div class="flex flex-col gap-3">
             <For each={modloaders}>
-              {(modloader) => (
-                <div class="flex items-center gap-2">
-                  <Checkbox
-                    onChange={(checked) => {
-                      const prevModloaders =
-                        infiniteQuery?.query.modloaders || [];
+              {(modloader) => {
+                const modloaderName = () =>
+                  isCurseforge()
+                    ? capitalize(modloader as CFFEModLoaderType)
+                    : (capitalize(
+                        getModloaderName((modloader as MRFELoader).name)
+                      ) as string);
 
-                      const newModloaders = checked
-                        ? [...prevModloaders, modloader as FEQueryModLoaderType]
-                        : prevModloaders.filter(
-                            (categ) =>
-                              categ !== (modloader as FEQueryModLoaderType)
-                          );
+                return (
+                  <div class="flex items-center gap-2">
+                    <Checkbox
+                      onChange={(checked) => {
+                        const prevModloaders =
+                          infiniteQuery?.query.modloaders || [];
 
-                      infiniteQuery.setQuery({
-                        modloaders: newModloaders,
-                      });
-                    }}
-                  />
-                  <img
-                    class="h-4 w-4"
-                    src={getModloaderIcon(
-                      capitalize(modloader) as FEInstanceModLoaderType
-                    )}
-                  />
-                  <p class="m-0">{capitalize(modloader)}</p>
-                </div>
-              )}
+                        const newModloaders = checked
+                          ? [
+                              ...prevModloaders,
+                              modloader as FEUnifiedModLoaderType,
+                            ]
+                          : prevModloaders.filter(
+                              (categ) =>
+                                categ !== (modloader as FEUnifiedModLoaderType)
+                            );
+
+                        infiniteQuery.setQuery({
+                          modloaders: newModloaders,
+                        });
+                      }}
+                    />
+                    <img
+                      class="h-4 w-4"
+                      src={getModloaderIcon(modloaderName())}
+                    />
+                    <p class="m-0">{capitalize(modloaderName())}</p>
+                  </div>
+                );
+              }}
             </For>
           </div>
         </Collapsable>
@@ -181,13 +208,13 @@ const Sidebar = () => {
                   {(category) => {
                     const categoryObj = () =>
                       isCurseforge()
-                        ? { curseforge: (category as FECategory).id }
-                        : { modrinth: (category as FEModrinthCategory).name };
+                        ? { curseforge: (category as CFFECategory).id }
+                        : { modrinth: (category as MRFECategory).name };
 
                     const categoryId = () =>
                       isCurseforge()
-                        ? (category as FECategory).id
-                        : (category as FEModrinthCategory).name;
+                        ? (category as CFFECategory).id
+                        : (category as MRFECategory).name;
 
                     const isCategoryIncluded =
                       infiniteQuery?.query.categories?.some(

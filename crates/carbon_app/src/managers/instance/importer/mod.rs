@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::{
-    domain::{instance::InstanceId, vtask::VisualTaskId},
+    domain::{vtask::VisualTaskId},
     managers::AppInner,
 };
 

@@ -2,7 +2,7 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { FEMod } from "@gd/core_module/bindings";
+import { CFFEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
@@ -11,7 +11,7 @@ import { lastInstanceOpened } from "@/utils/routes";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
-  const modDetails = () => props.data?.mod as FEMod;
+  const modDetails = () => props.data?.mod as CFFEMod;
   const modId = () => modDetails()?.id;
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
@@ -28,7 +28,7 @@ const ModDetails = (props: ModalProps) => {
   createEffect(() => {
     if (modId()) {
       const modpackDescription = rspc.createQuery(() => [
-        "modplatforms.curseforgeGetModDescription",
+        "modplatforms.curseforge.getModDescription",
         { modId: modId() },
       ]);
       if (modpackDescription.data?.data)

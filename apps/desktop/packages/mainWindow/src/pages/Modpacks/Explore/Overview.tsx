@@ -5,7 +5,7 @@ import { Match, Switch } from "solid-js";
 import { Skeleton } from "@gd/ui";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
-import { FEModrinthProject } from "@gd/core_module/bindings";
+import { MRFEProject } from "@gd/core_module/bindings";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -22,7 +22,7 @@ const Overview = () => {
             class="w-full"
             innerHTML={marked.parse(
               sanitizeHtml(
-                (routeData.modpackDetails.data as FEModrinthProject)?.body || ""
+                (routeData.modpackDetails.data as MRFEProject)?.body || ""
               )
             )}
           />

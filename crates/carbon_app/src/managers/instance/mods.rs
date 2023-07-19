@@ -1,20 +1,19 @@
 use std::{
     ffi::{OsStr, OsString},
     io::Cursor,
-    sync::Arc,
     time::Duration,
 };
 
 use anyhow::bail;
 use carbon_net::Downloadable;
-use md5::{Digest, Md5};
+use md5::{Digest};
 use thiserror::Error;
 
 use crate::domain::{instance as domain, modplatforms::modrinth::search::VersionID};
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
-    domain::{modplatforms::curseforge::filters::ModFileParameters, vtask::VisualTaskId},
+    domain::{vtask::VisualTaskId},
     managers::{metadata, vtask::VisualTask, ManagerRef},
 };
 

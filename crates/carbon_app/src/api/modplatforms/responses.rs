@@ -2,16 +2,16 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use super::curseforge;
-use super::curseforge::structs::FEMod;
+use super::curseforge::structs::CFFEMod;
 use super::modrinth;
-use super::modrinth::structs::FEModrinthProjectSearchResult;
+use super::modrinth::structs::MRFEProjectSearchResult;
 use super::FESearchAPI;
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedSearchResult {
-    Curseforge(FEMod),
-    Modrinth(FEModrinthProjectSearchResult),
+    Curseforge(CFFEMod),
+    Modrinth(MRFEProjectSearchResult),
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
@@ -50,8 +50,8 @@ impl From<curseforge::responses::FEModSearchResponse> for FEUnifiedSearchRespons
     }
 }
 
-impl From<modrinth::responses::FEModrinthProjectSearchResponse> for FEUnifiedSearchResponse {
-    fn from(value: modrinth::responses::FEModrinthProjectSearchResponse) -> Self {
+impl From<modrinth::responses::MRFEProjectSearchResponse> for FEUnifiedSearchResponse {
+    fn from(value: modrinth::responses::MRFEProjectSearchResponse) -> Self {
         let result_count = value.hits.len();
         FEUnifiedSearchResponse {
             search_api: FESearchAPI::Modrinth,
