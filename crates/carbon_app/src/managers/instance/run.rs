@@ -86,7 +86,7 @@ impl ManagerRef<'_, InstanceManager> {
             None => self
                 .app
                 .settings_manager()
-                .get()
+                .get_settings()
                 .await
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
@@ -95,7 +95,7 @@ impl ManagerRef<'_, InstanceManager> {
             true => self
                 .app
                 .settings_manager()
-                .get()
+                .get_settings()
                 .await
                 .map(|c| c.java_custom_args)
                 .unwrap_or(String::new()),
@@ -552,7 +552,9 @@ impl ManagerRef<'_, InstanceManager> {
                     t_download_files.complete_download();
                 });
 
-                carbon_net::download_multiple(downloads, progress_watch_tx).await?;
+                let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
+
+                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
 
                 // scan instances again offtask to pick up modpack mods
                 let app2 = app.clone();
