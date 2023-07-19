@@ -23,6 +23,8 @@ import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { useModal } from "@/managers/ModalsManager";
+import { useRouteData } from "@solidjs/router";
+import fetchData from "./browser.data";
 
 const NoMoreModpacks = () => {
   return (
@@ -102,7 +104,7 @@ export default function Browser() {
   const [t] = useTransContext();
   const modalsContext = useModal();
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const infiniteQuery = useInfiniteModpacksQuery();
 
@@ -322,7 +324,10 @@ export default function Browser() {
                               <ModRow
                                 type="Modpack"
                                 data={modpack()}
-                                defaultGroup={defaultGroup.data}
+                                defaultGroup={routeData.defaultGroup.data}
+                                modrinthCategories={
+                                  routeData.modrinthCategories.data
+                                }
                               />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>

@@ -1,8 +1,8 @@
-import { Show, mergeProps } from "solid-js";
+import { Show, mergeProps, JSX } from "solid-js";
 
 type Props = {
   name?: string;
-  img?: string | undefined | null;
+  img?: string | JSX.Element | undefined | null;
   type?: "fixed" | "default";
   size?: "medium" | "small";
   onClose?: (_name: string) => void;
@@ -21,13 +21,14 @@ export const Tag = (props: Props) => {
         "px-2 py-1": props.size === "small",
       }}
     >
-      <Show when={props.img}>
+      <Show when={props.img && typeof props.img === "string"}>
         <img
           class="w-4 h-4"
           src={props.img as string}
           alt={`icon_${props.name}`}
         />
       </Show>
+      <Show when={props.img && typeof props.img !== "string"}>{props.img}</Show>
       <Show when={props.name}>
         <p class="m-0 text-darkSlate-100 whitespace-nowrap">{props.name}</p>
       </Show>

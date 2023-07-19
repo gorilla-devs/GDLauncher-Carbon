@@ -1,3 +1,4 @@
+/* eslint-disable solid/no-innerhtml */
 import {
   FeError,
   InvalidListInstance,
@@ -12,11 +13,14 @@ import {
   CurseforgeModpack,
   ModrinthModpack,
   ModpackPlatform,
+  CFFECategory,
+  MRFECategory,
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "./helpers";
 import { port } from "./rspcClient";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
+import { Show, Switch, Match, createEffect } from "solid-js";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -239,4 +243,30 @@ export const getModpackPlatformIcon = (platform: ModpackPlatform) => {
     default:
       return CurseforgeLogo;
   }
+};
+
+export const getCategoryIcon = (category: CFFECategory | MRFECategory) => {
+  if ("iconUrl" in category) {
+    return category.iconUrl;
+  } else return category.icon;
+};
+
+export const CategoryIcon = (props: {
+  category: CFFECategory | MRFECategory;
+}) => {
+  return (
+    <Switch
+      fallback={
+        <>
+          <Show when={getCategoryIcon(props.category)}>
+            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
+          </Show>
+        </>
+      }
+    >
+      <Match when={"iconUrl" in props.category}>
+        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+      </Match>
+    </Switch>
+  );
 };

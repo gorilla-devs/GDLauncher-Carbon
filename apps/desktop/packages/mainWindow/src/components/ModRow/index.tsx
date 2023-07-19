@@ -226,7 +226,13 @@ const ModRow = (props: ModRowProps) => {
               {getName(props)}
             </h2>
           </Popover>
-          <Categories modProps={props} isRowSmall={isRowSmall} />
+          <Categories
+            modProps={props}
+            isRowSmall={isRowSmall}
+            modrinthCategories={props.modrinthCategories?.filter((category) =>
+              category.project_type.includes(props.type.toLowerCase())
+            )}
+          />
         </div>
         <div class="flex gap-4 items-center">
           <div class="flex gap-2 items-center text-darkSlate-100">

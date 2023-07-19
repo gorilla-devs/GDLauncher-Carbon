@@ -16,6 +16,7 @@ const fetchData = () => {
   const curseForgeModloaders = rspc.createQuery(() => [
     "modplatforms.curseforge.getModloaders",
   ]);
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
   return {
     forgeCategories,
@@ -23,6 +24,7 @@ const fetchData = () => {
     modrinthCategories,
     curseForgeModloaders,
     modrinthModloaders,
+    defaultGroup,
   };
 };
 

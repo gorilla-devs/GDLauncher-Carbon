@@ -1,18 +1,27 @@
 import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/Mods";
 import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tag, Tooltip } from "@gd/ui";
-import { CFFECategory } from "@gd/core_module/bindings";
+import {
+  CFFECategory,
+  MRFECategoriesResponse,
+  MRFECategory,
+} from "@gd/core_module/bindings";
+import { CategoryIcon } from "@/utils/instances";
 
 type Props = {
   modProps: ModRowProps;
   isRowSmall: Accessor<boolean>;
+  modrinthCategories: MRFECategoriesResponse | undefined;
 };
 
 const Categories = (props: Props) => {
+  // const modrinthIcon = () =>
   return (
     <div class="flex gap-2 scrollbar-hide">
       <Switch>
-        <Match when={!props.isRowSmall()}>
+        <Match
+          when={!props.isRowSmall() && getCategories(props.modProps).length < 5}
+        >
           <For each={getCategories(props.modProps)}>
             {(tag) => (
               <Tooltip
@@ -24,14 +33,24 @@ const Categories = (props: Props) => {
               >
                 <Tag
                   img={
-                    isCurseForgeData(props.modProps.data)
-                      ? (tag as CFFECategory).iconUrl
-                      : null
-                  }
-                  name={
-                    !isCurseForgeData(props.modProps.data)
-                      ? (tag as string)
-                      : ""
+                    isCurseForgeData(props.modProps.data) ? (
+                      (tag as CFFECategory).iconUrl
+                    ) : (
+                      <Show
+                        fallback={tag as string}
+                        when={props.modrinthCategories?.find(
+                          (category) => category.name === tag
+                        )}
+                      >
+                        <CategoryIcon
+                          category={
+                            props.modrinthCategories?.find(
+                              (category) => category.name === tag
+                            ) as MRFECategory
+                          }
+                        />
+                      </Show>
+                    )
                   }
                   type="fixed"
                 />
@@ -39,7 +58,9 @@ const Categories = (props: Props) => {
             )}
           </For>
         </Match>
-        <Match when={props.isRowSmall()}>
+        <Match
+          when={props.isRowSmall() || getCategories(props.modProps).length >= 5}
+        >
           <Tooltip
             content={
               isCurseForgeData(props.modProps.data)
@@ -49,15 +70,28 @@ const Categories = (props: Props) => {
           >
             <Tag
               img={
-                isCurseForgeData(props.modProps.data)
-                  ? (getCategories(props.modProps)?.[0] as CFFECategory)
-                      ?.iconUrl
-                  : null
-              }
-              name={
-                !isCurseForgeData(props.modProps.data)
-                  ? (getCategories(props.modProps)?.[0] as string)
-                  : ""
+                isCurseForgeData(props.modProps.data) ? (
+                  (getCategories(props.modProps)?.[0] as CFFECategory)?.iconUrl
+                ) : (
+                  <Show
+                    fallback={getCategories(props.modProps)?.[0] as string}
+                    when={props.modrinthCategories?.find(
+                      (category) =>
+                        category.name ===
+                        (getCategories(props.modProps)?.[0] as string)
+                    )}
+                  >
+                    <CategoryIcon
+                      category={
+                        props.modrinthCategories?.find(
+                          (category) =>
+                            category.name ===
+                            (getCategories(props.modProps)?.[0] as string)
+                        ) as MRFECategory
+                      }
+                    />
+                  </Show>
+                )
               }
               type="fixed"
             />
@@ -80,7 +114,27 @@ const Categories = (props: Props) => {
                     </Match>
                     <Match when={!isCurseForgeData(props.modProps.data)}>
                       <For each={getCategories(props.modProps).slice(1)}>
-                        {(tag) => <Tag name={tag as string} type="fixed" />}
+                        {(tag) => (
+                          <Tag
+                            img={
+                              <Show
+                                when={props.modrinthCategories?.find(
+                                  (category) => category.name === tag
+                                )}
+                              >
+                                <CategoryIcon
+                                  category={
+                                    props.modrinthCategories?.find(
+                                      (category) => category.name === tag
+                                    ) as MRFECategory
+                                  }
+                                />
+                              </Show>
+                            }
+                            name={tag as string}
+                            type="fixed"
+                          />
+                        )}
                       </For>
                     </Match>
                   </Switch>

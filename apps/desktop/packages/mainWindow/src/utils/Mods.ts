@@ -3,6 +3,7 @@ import {
   CFFEMod,
   MRFEVersion,
   FEUnifiedSearchResult,
+  MRFECategoriesResponse,
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModpacksQuery";
@@ -27,11 +28,13 @@ type BaseProps = {
 export type ModProps = BaseProps & {
   type: "Mod";
   mcVersion: string;
+  modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 
 export type ModpackProps = BaseProps & {
   type: "Modpack";
   defaultGroup?: number;
+  modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 
 export type ModRowProps = ModProps | ModpackProps;

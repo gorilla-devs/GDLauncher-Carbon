@@ -20,35 +20,12 @@ import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
-
-const getCategoryIcon = (category: CFFECategory | MRFECategory) => {
-  if ("iconUrl" in category) {
-    return category.iconUrl;
-  } else return category.icon;
-};
+import { CategoryIcon } from "@/utils/instances";
 
 const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
   if (typeof category === "string") {
     return getForgeModloaderIcon(category);
   } else return category.icon;
-};
-
-const CategoryIcon = (props: { category: CFFECategory | MRFECategory }) => {
-  return (
-    <Switch
-      fallback={
-        <>
-          <Show when={getCategoryIcon(props.category)}>
-            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
-          </Show>
-        </>
-      }
-    >
-      <Match when={"iconUrl" in props.category}>
-        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
-      </Match>
-    </Switch>
-  );
 };
 
 const ModloaderIcon = (props: {
