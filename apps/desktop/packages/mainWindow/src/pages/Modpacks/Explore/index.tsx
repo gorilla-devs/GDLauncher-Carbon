@@ -277,6 +277,7 @@ const Modpack = () => {
                       <Button
                         uppercase
                         size="large"
+                        disabled={routeData.modpackDetails.isInitialLoading}
                         onClick={() => handleDownload()}
                       >
                         <Show when={loading()}>
@@ -339,6 +340,7 @@ const Modpack = () => {
                   <Button
                     uppercase
                     size="small"
+                    disabled={routeData.modpackDetails.isInitialLoading}
                     onClick={() => handleDownload()}
                   >
                     <Show when={loading()}>
