@@ -9,8 +9,8 @@ use crate::{
     domain::modplatforms::modrinth::{
         project::Project,
         responses::{
-            CategoriesResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
-            VersionsResponse, LoadersResponse,
+            CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
+            VersionHashesResponse, VersionsResponse,
         },
         search::{
             ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
@@ -352,7 +352,6 @@ mod test {
         tracing::debug!("Categories: {:?}", results);
         assert!(!results.is_empty());
     }
-
 
     #[tokio::test]
     #[traced_test]

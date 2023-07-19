@@ -106,7 +106,7 @@ impl<T> From<Or<T>> for And<T> {
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedModSortIndex {
     CurseForge(curseforge::filters::FEModSearchSortField),
-    Modrinth(modrinth::filters::FEModrinthSearchIndex),
+    Modrinth(modrinth::filters::MRFESearchIndex),
 }
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
@@ -241,10 +241,10 @@ impl TryFrom<FEUnifiedSearchParameters>
     }
 }
 
-impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProjectSearchParameters {
+impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearchParameters {
     type Error = anyhow::Error;
     fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        let mut facets = modrinth::filters::FEModrinthSearchFacetAnd::new();
+        let mut facets = modrinth::filters::MRFESearchFacetAnd::new();
         if let Some(categories) = value.categories {
             for cat_or in categories {
                 let category_or = cat_or
@@ -252,7 +252,7 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProject
                     .filter_map(|cat| match cat {
                         FEUnifiedSearchCategoryID::Curseforge(_) => None,
                         FEUnifiedSearchCategoryID::Modrinth(id) => {
-                            Some(modrinth::filters::FEModrinthSearchFacet::Category(id))
+                            Some(modrinth::filters::MRFESearchFacet::Category(id))
                         }
                     })
                     .collect();
@@ -262,7 +262,7 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProject
         if let Some(versions) = value.game_versions {
             let versions_or = versions
                 .into_iter()
-                .map(modrinth::filters::FEModrinthSearchFacet::Version)
+                .map(modrinth::filters::MRFESearchFacet::Version)
                 .collect();
             facets.push(versions_or);
         }
@@ -270,17 +270,17 @@ impl TryFrom<FEUnifiedSearchParameters> for modrinth::filters::FEModrinthProject
             let modloaders_or = modloaders
                 .into_iter()
                 .map(|modloader| {
-                    modrinth::filters::FEModrinthSearchFacet::Category(modloader.to_string())
+                    modrinth::filters::MRFESearchFacet::Category(modloader.to_string())
                 })
                 .collect();
             facets.push(modloaders_or);
         }
         if let Some(project_type) = value.project_type {
-            facets.push(modrinth::filters::FEModrinthSearchFacetOr(vec![
-                modrinth::filters::FEModrinthSearchFacet::ProjectType(project_type.to_string()),
+            facets.push(modrinth::filters::MRFESearchFacetOr(vec![
+                modrinth::filters::MRFESearchFacet::ProjectType(project_type.to_string()),
             ]));
         }
-        Ok(modrinth::filters::FEModrinthProjectSearchParameters {
+        Ok(modrinth::filters::MRFEProjectSearchParameters {
             query: value.search_query,
             facets: if facets.is_empty() {
                 None

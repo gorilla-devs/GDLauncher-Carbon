@@ -100,60 +100,60 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         // Modrinth
-        query MODRINTH_SEARCH[app, search_params: modrinth::filters::FEModrinthProjectSearchParameters] {
+        query MODRINTH_SEARCH[app, search_params: modrinth::filters::MRFEProjectSearchParameters] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.search(search_params.into()).await?;
 
-            Ok(modrinth::responses::FEModrinthProjectSearchResponse::from(response))
+            Ok(modrinth::responses::MRFEProjectSearchResponse::from(response))
 
         }
         query MODRINTH_GET_LOADERS[app, _args: ()] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_loaders().await?;
 
-            Ok(modrinth::responses::FEModrinthLoadersResponse::from(response))
+            Ok(modrinth::responses::MRFELoadersResponse::from(response))
         }
         query MODRINTH_GET_CATEGORIES[app, args: () ] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_categories().await?;
 
-            Ok(modrinth::responses::FEModrinthCategoriesResponse::from(response))
+            Ok(modrinth::responses::MRFECategoriesResponse::from(response))
         }
-        query MODRINTH_GET_PROJECT[app, project: modrinth::filters::FEModrinthProjectID  ] {
+        query MODRINTH_GET_PROJECT[app, project: modrinth::filters::MRFEProjectID  ] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_project(project.into()).await?;
 
-            Ok(modrinth::structs::FEModrinthProject::from(response))
+            Ok(modrinth::structs::MRFEProject::from(response))
         }
-        query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::FEModrinthProjectIDs] {
+        query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::MRFEProjectIDs] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_projects(projects.into()).await?;
 
-            Ok(modrinth::responses::FEModrinthProjectsResponse::from(response))
+            Ok(modrinth::responses::MRFEProjectsResponse::from(response))
         }
-        query MODRINTH_GET_VERSION[app, version: modrinth::filters::FEModrinthVersionID] {
+        query MODRINTH_GET_VERSION[app, version: modrinth::filters::MRFEVersionID] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_version(version.into()).await?;
 
-            Ok(modrinth::structs::FEModrinthVersion::from(response))
+            Ok(modrinth::structs::MRFEVersion::from(response))
         }
-        query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::FEModrinthVersionIDs] {
+        query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::MRFEVersionIDs] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_versions(versions.into()).await?;
 
-            Ok(modrinth::responses::FEModrinthVersionsResponse::from(response))
+            Ok(modrinth::responses::MRFEVersionsResponse::from(response))
         }
-        query MODRINTH_GET_PROJECT_TEAM[app, project: modrinth::filters::FEModrinthProjectID] {
+        query MODRINTH_GET_PROJECT_TEAM[app, project: modrinth::filters::MRFEProjectID] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_project_team(project.into()).await?;
 
-            Ok(modrinth::responses::FEModrinthTeamResponse::from(response))
+            Ok(modrinth::responses::MRFETeamResponse::from(response))
         }
-        query MODRINTH_GET_TEAM[app, team: modrinth::filters::FEModrinthTeamID] {
+        query MODRINTH_GET_TEAM[app, team: modrinth::filters::MRFETeamID] {
             let modplatforms = &app.modplatforms_manager;
             let response = modplatforms.modrinth.get_team(team.into()).await?;
 
-            Ok(modrinth::responses::FEModrinthTeamResponse::from(response))
+            Ok(modrinth::responses::MRFETeamResponse::from(response))
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
@@ -166,10 +166,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     Ok(responses::FEUnifiedSearchResponse::from(fe_curseforge_response))
                 }
                 FESearchAPI::Modrinth => {
-                    let search_params:  modrinth::filters::FEModrinthProjectSearchParameters = search_params.try_into()?;
+                    let search_params:  modrinth::filters::MRFEProjectSearchParameters = search_params.try_into()?;
                     let modplatforms = &app.modplatforms_manager;
                     let modrinth_response = modplatforms.modrinth.search(search_params.into()).await?;
-                    let fe_modrinth_response = modrinth::responses::FEModrinthProjectSearchResponse::from(modrinth_response);
+                    let fe_modrinth_response = modrinth::responses::MRFEProjectSearchResponse::from(modrinth_response);
                     Ok(responses::FEUnifiedSearchResponse::from(fe_modrinth_response))
                 }
             }
