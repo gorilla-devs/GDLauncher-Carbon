@@ -209,6 +209,7 @@ pub async fn download_file(
 pub async fn download_multiple(
     files: Vec<Downloadable>,
     progress: watch::Sender<Progress>,
+    concurrency: usize,
 ) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build().unwrap();
@@ -216,7 +217,7 @@ pub async fn download_multiple(
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build();
 
-    let downloads = Arc::new(tokio::sync::Semaphore::new(10));
+    let downloads = Arc::new(tokio::sync::Semaphore::new(concurrency));
 
     let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
 
