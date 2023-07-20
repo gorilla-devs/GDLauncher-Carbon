@@ -1,3 +1,4 @@
+use anyhow::bail;
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
 use tracing::trace;
@@ -51,6 +52,17 @@ impl CurseForge {
         &self,
         search_params: ModSearchParameters,
     ) -> anyhow::Result<CurseForgeResponse<Vec<Mod>>> {
+        let more_than_10_categories = search_params
+            .query
+            .category_ids
+            .as_ref()
+            .map(|ids| ids.len() > 10)
+            .unwrap_or(false);
+
+        if more_than_10_categories {
+            bail!("Cannot search for more than 10 categories at once");
+        }
+
         let mut url = self.base_url.join("mods/search")?;
         let query = search_params.query.into_query_parameters()?;
         url.set_query(Some(&query));

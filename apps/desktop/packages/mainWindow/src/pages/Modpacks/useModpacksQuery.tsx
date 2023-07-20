@@ -12,7 +12,7 @@ const useModpacksQuery = (
 ] => {
   const [query, setQuery] = createStore<FEModSearchParameters>({
     query: initialValue || {
-      categoryId: 0,
+      categoryIds: null,
       classId: "modpacks",
       gameId: 432,
       gameVersion: "",

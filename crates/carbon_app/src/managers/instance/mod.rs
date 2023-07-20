@@ -32,6 +32,7 @@ use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder
 use domain::info;
 
 pub mod importer;
+pub mod installer;
 pub mod log;
 mod mods;
 mod run;

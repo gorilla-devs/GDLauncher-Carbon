@@ -133,7 +133,7 @@ model CurseForgeModCache {
   urlslug    String
   summary    String
   authors    String
-  cachedAt   DateTime    @default(now())
+  cachedAt   DateTime
   metadataId String      @unique
   metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 

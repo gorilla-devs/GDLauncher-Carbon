@@ -124,6 +124,7 @@ keys! {
     }
 
     modplatforms {
+        CURSEFORGE_GET_MODLOADERS                   = "curseforge.getModloaders";
         CURSEFORGE_GET_CATEGORIES                   = "curseforgeGetCategories";
         CURSEFORGE_SEARCH                           = "curseforgeSearch";
         CURSEFORGE_GET_MOD                          = "curseforgeGetMod";

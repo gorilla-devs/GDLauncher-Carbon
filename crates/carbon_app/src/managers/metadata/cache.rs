@@ -24,6 +24,7 @@ use crate::db::read_filters::BytesFilter;
 use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
 
+use crate::db::read_filters::StringFilter;
 use crate::domain::instance::InstanceId;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
@@ -40,6 +41,7 @@ use itertools::Itertools;
 pub struct MetaCacheManager {
     waiting_instances: RwLock<HashSet<InstanceId>>,
     scanned_instances: Mutex<HashSet<InstanceId>>,
+    ignored_remote_hashes: RwLock<HashSet<u32>>,
     priority_instance: Mutex<Option<InstanceId>>,
     remote_instance: watch::Sender<Option<InstanceId>>,
     waiting_notify: watch::Sender<()>,
@@ -55,6 +57,7 @@ impl MetaCacheManager {
         Self {
             waiting_instances: RwLock::new(HashSet::new()),
             scanned_instances: Mutex::new(HashSet::new()),
+            ignored_remote_hashes: RwLock::new(HashSet::new()),
             priority_instance: Mutex::new(None),
             remote_instance: remote_tx,
             waiting_notify: local_tx,
@@ -435,7 +438,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                     info!("updating curseforge metadata cache for instance {instance_id}");
 
                     let fut = async {
-                        let mut modlist = app
+                        let modlist = app
                             .prisma_client
                             .mod_file_cache()
                             .find_many(vec![
@@ -461,10 +464,19 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     metadata.murmur_2 as u32,
                                     (metadata.id, metadata.murmur_2 as u32),
                                 )
-                            })
+                            });
+
+                        let mcm = app.meta_cache_manager();
+                        let ignored_hashes = mcm.ignored_remote_hashes.read().await;
+
+                        let mut modlist = modlist
+                            .filter(|(_, (_, murmur2))| !ignored_hashes.contains(murmur2))
                             .collect::<VecDeque<_>>();
 
+                        drop(ignored_hashes);
+
                         let (batch_tx, mut batch_rx) = mpsc::unbounded_channel::<(
+                            Vec<u32>,
                             Vec<(String, u32)>,
                             FingerprintsMatchesResult,
                             Vec<Mod>,
@@ -472,7 +484,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                         let app_db = app.clone();
                         tokio::spawn(async move {
-                            while let Some((batch, fp_response, mods_response)) =
+                            while let Some((fingerprints, batch, fp_response, mods_response)) =
                                 batch_rx.recv().await
                             {
                                 trace!("processing mod batch for instance {instance_id}");
@@ -487,15 +499,29 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     })
                                     .collect::<HashMap<_, _>>();
 
-                                let upserts = batch
+                                let mcm = app_db.meta_cache_manager();
+                                let mut ignored_hashes = mcm.ignored_remote_hashes.write().await;
+                                ignored_hashes.extend(
+                                    fingerprints.iter().filter(|fp| !matches.contains_key(fp)),
+                                );
+                                drop(ignored_hashes);
+
+                                let (deletes, insert_data) = batch
                                     .into_iter()
                                     .filter_map(|(metadata_id, murmur2)| {
                                         let fpmatch = matches.remove(&murmur2);
                                         fpmatch.map(|(fileinfo, modinfo)| {
-                                            app_db.prisma_client.curse_forge_mod_cache().upsert(
-                                                cfdb::UniqueWhereParam::MetadataIdEquals(
-                                                    metadata_id.clone(),
-                                                ),
+                                            (
+                                                app_db
+                                                    .prisma_client
+                                                    .curse_forge_mod_cache()
+                                                    .delete_many(vec![
+                                                        cfdb::WhereParam::MetadataId(
+                                                            StringFilter::Equals(
+                                                                metadata_id.clone(),
+                                                            ),
+                                                        ),
+                                                    ]),
                                                 (
                                                     murmur2 as i32,
                                                     modinfo.id,
@@ -508,20 +534,27 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                         .into_iter()
                                                         .map(|a| a.name)
                                                         .join(", "),
-                                                    metadb::UniqueWhereParam::IdEquals(
-                                                        metadata_id.clone(),
-                                                    ),
+                                                    chrono::Utc::now().into(),
+                                                    metadata_id.clone(),
                                                     Vec::new(),
                                                 ),
-                                                Vec::new(),
                                             )
                                         })
                                     })
-                                    .collect::<Vec<_>>();
+                                    .unzip::<_, _, Vec<_>, Vec<_>>();
 
-                                trace!("saving mod metadata batch");
+                                trace!("saving mod metadata batch of size {}", deletes.len());
                                 // may fail if the user removed a mod
-                                let r = app_db.prisma_client._batch(upserts).await;
+                                let r = app_db
+                                    .prisma_client
+                                    ._batch((
+                                        deletes,
+                                        app_db
+                                            .prisma_client
+                                            .curse_forge_mod_cache()
+                                            .create_many(insert_data),
+                                    ))
+                                    .await;
 
                                 if let Err(e) = r {
                                     tracing::error!({ error = ?e }, "Could not store mod metadata");
@@ -561,7 +594,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 .data;
 
                             batch_tx
-                                .send((metadata, fp_response, mods_response))
+                                .send((fingerprints, metadata, fp_response, mods_response))
                                 .expect(
                                 "batch processor should not drop until the transmitter is dropped",
                             );

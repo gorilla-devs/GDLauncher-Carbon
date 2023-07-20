@@ -94,6 +94,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eab1c04a571841102f5345a8fc0f6bb3d31c315dec879b5c6e42e40ce7ffa34e"
 
 [[package]]
+name = "async-recursion"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e97ce7de6cf12de5d7226c73f5ba9811622f4db3a5b91b55c53e987e5f91cba"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.18",
+]
+
+[[package]]
 name = "async-stream"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -417,6 +428,7 @@ name = "carbon_app"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "async-recursion",
  "async-stream",
  "async-trait",
  "axum",
@@ -449,8 +461,8 @@ dependencies = [
  "sentry",
  "serde",
  "serde_json",
+ "serde_qs",
  "serde_repr",
- "serde_urlencoded",
  "sha2 0.10.6",
  "strum",
  "strum_macros",
@@ -498,6 +510,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "hex",
+ "md-5",
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
@@ -3581,6 +3594,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7f05c1d5476066defcdfacce1f52fc3cae3af1d3089727100c02ae92e5abbe0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "serde_qs"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0431a35568651e363364210c91983c1da5eb29404d9f0928b67d4ebcfa7d330c"
+dependencies = [
+ "percent-encoding",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

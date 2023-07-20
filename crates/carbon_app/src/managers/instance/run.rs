@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;

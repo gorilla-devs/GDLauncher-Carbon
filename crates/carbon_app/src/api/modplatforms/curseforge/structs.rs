@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -944,7 +945,7 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, EnumIter)]
 #[serde(rename_all = "camelCase")]
 pub enum FEModLoaderType {
     Forge,
