@@ -14,6 +14,7 @@ import {
   CFFEModLoaderType,
   MRFELoader,
   MRFELoaderType,
+  MRFEProjectType,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
@@ -125,10 +126,26 @@ const Sidebar = () => {
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
+  const cfModpackModloaders = ["forge", "fabric", "quilt"];
+
+  const curseforgeModpackModloaders = () => {
+    const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
+      cfModpackModloaders.includes(modloader)
+    );
+    return filtered;
+  };
+
+  const modrinthModpackModloaders = () => {
+    const filtered = routeData.modrinthModloaders.data?.filter((modloader) =>
+      modloader.supported_project_types.includes("modpack" as MRFEProjectType)
+    );
+    return filtered;
+  };
+
   const modloaders = () =>
     isCurseforge()
-      ? routeData.curseForgeModloaders.data
-      : routeData.modrinthModloaders.data;
+      ? curseforgeModpackModloaders()
+      : modrinthModpackModloaders();
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>

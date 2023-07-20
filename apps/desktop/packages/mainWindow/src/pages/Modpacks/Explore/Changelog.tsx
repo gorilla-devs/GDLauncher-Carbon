@@ -66,7 +66,7 @@ const Changelog = () => {
   createEffect(() => {
     const modpackId = parseInt(params.id, 10);
 
-    if (routeData.isCurseforge)
+    if (routeData.isCurseforge) {
       if (
         fileId() !== undefined ||
         (lastFile() && (lastFile() as CFFEFile).id !== undefined)
@@ -76,11 +76,13 @@ const Changelog = () => {
           "modplatforms.curseforge.getModFileChangelog",
           {
             modId: modpackId,
-            fileId: (fileId() as number) || (lastFile() as CFFEFile).id,
+            fileId:
+              parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id,
           },
         ]);
         setChangelog(changelogQuery.data?.data);
       }
+    }
   });
 
   createEffect(() => {
