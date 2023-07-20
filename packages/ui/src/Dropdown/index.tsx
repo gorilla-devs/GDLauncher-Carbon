@@ -49,6 +49,7 @@ interface DropDownButtonProps {
   value: string | number;
   error?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   rounded?: boolean;
   label?: string;
   onChange?: (_value: Option) => void;
@@ -241,8 +242,11 @@ const DropDownButton = (props: DropDownButtonProps) => {
     <div class="flex">
       <Button
         disabled={props.disabled}
+        loading={props.disabled}
         class="rounded-r-0 pr-4 pl-4 flex gap-1"
-        onClick={() => props?.onClick?.()}
+        onClick={() => {
+          if (!props.disabled && !props.loading) props?.onClick?.();
+        }}
       >
         <span>{props.children}</span>
       </Button>

@@ -1,14 +1,14 @@
 import {
   FEModSearchParameters,
-  FEModSearchParametersQuery,
+  FEUnifiedSearchParameters,
 } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 
 const useModsQuery = (
-  initialValue?: FEModSearchParametersQuery
+  initialValue?: FEUnifiedSearchParameters
 ): [
   FEModSearchParameters,
-  (_newValue: Partial<FEModSearchParametersQuery>) => void
+  (_newValue: Partial<FEUnifiedSearchParameters>) => void
 ] => {
   const [query, setQuery] = createStore<FEModSearchParameters>({
     query: initialValue || {
@@ -28,7 +28,7 @@ const useModsQuery = (
     },
   });
 
-  const setQueryParams = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryParams = (newValue: Partial<FEUnifiedSearchParameters>) => {
     const indexValue = newValue.index ?? 0;
 
     setQuery("query", (prev) => ({

@@ -16,7 +16,7 @@ import {
 import {
   FEMod,
   FEModSearchParameters,
-  FEModSearchParametersQuery,
+  FEUnifiedSearchParameters,
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
@@ -25,7 +25,7 @@ import { scrollTop } from "@/utils/browser";
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
   query: FEModSearchParameters;
-  setQuery: (_newValue: Partial<FEModSearchParametersQuery>) => void;
+  setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
   resetList: () => void;
@@ -94,7 +94,7 @@ function ModpacksLayout() {
     parentRef()?.scrollTo(0, scrollTop());
   });
 
-  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();

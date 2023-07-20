@@ -92,8 +92,6 @@ export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
-export type FEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: FEModSearchSortOrder | null; sortField: FEModSearchSortField | null; classId: FEClassId | null; modLoaderTypes: FEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
-
 export type FEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
@@ -165,6 +163,8 @@ export type CreateInstanceVersion = { Version: GameVersion } | { Modpack: Modpac
 export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningOfGroup: FEGroupId } | { EndOfGroup: FEGroupId }
 
 export type FEModFilesParametersQuery = { gameVersion?: string | null; modLoaderType?: FEModLoaderType | null; gameVersionTypeId?: number | null; index?: number | null; pageSize?: number | null }
+
+export type FEUnifiedSearchParameters = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: FEModSearchSortOrder | null; sortField: FEModSearchSortField | null; classId: FEClassId | null; modLoaderTypes: FEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
 
 export type FEModAsset = { id: number; modId: number; title: string; description: string; thumbnailUrl: string; url: string }
 
@@ -302,7 +302,7 @@ export type InstanceDetails = { name: string; favorite: boolean; version: string
 
 export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 
-export type FEModSearchParameters = { query: FEModSearchParametersQuery }
+export type FEModSearchParameters = { query: FEUnifiedSearchParameters }
 
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 

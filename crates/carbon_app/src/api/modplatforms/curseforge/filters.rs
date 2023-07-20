@@ -81,7 +81,7 @@ impl From<ModSearchSortOrder> for FEModSearchSortOrder {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEModSearchParameters {
-    pub query: FEModSearchParametersQuery,
+    pub query: FEUnifiedSearchParameters,
 }
 
 impl From<FEModSearchParameters> for ModSearchParameters {
@@ -94,7 +94,7 @@ impl From<FEModSearchParameters> for ModSearchParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModSearchParametersQuery {
+pub struct FEUnifiedSearchParameters {
     pub game_id: i32,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
@@ -110,8 +110,8 @@ pub struct FEModSearchParametersQuery {
     pub page_size: Option<i32>,
 }
 
-impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
-    fn from(params: FEModSearchParametersQuery) -> Self {
+impl From<FEUnifiedSearchParameters> for ModSearchParametersQuery {
+    fn from(params: FEUnifiedSearchParameters) -> Self {
         let mod_loader_types = params
             .mod_loader_types
             .map(|types| types.into_iter().map(|t| t.into()).collect());

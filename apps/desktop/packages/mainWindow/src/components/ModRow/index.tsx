@@ -3,7 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
-import { FEMod, InstanceDetails, Mod } from "@gd/core_module/bindings";
+import { FEMod, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -53,6 +53,25 @@ const ModRow = (props: Props) => {
     CreateQueryResult<Mod[], RSPCError> | undefined
   >(undefined);
   const [isRowSmall, setIsRowSmall] = createSignal(false);
+
+  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+
+  createEffect(() => {
+    if (taskId() !== undefined) {
+      // eslint-disable-next-line solid/reactivity
+      const task = rspc.createQuery(() => [
+        "vtask.getTask",
+        taskId() as number,
+      ]);
+
+      const isDowloaded = () =>
+        (task.data?.download_total || 0) > 0 &&
+        task.data?.download_total === task.data?.downloaded;
+
+      if (isDowloaded()) setLoading(false);
+    }
+  });
+
   const mergedProps = mergeProps({ type: "Modpack" }, props);
   const navigate = useGDNavigate();
   const addNotification = createNotification();
@@ -140,8 +159,8 @@ const ModRow = (props: Props) => {
     onMutate() {
       setLoading(true);
     },
-    onSettled() {
-      setLoading(false);
+    onSuccess(taskId) {
+      setTaskId(taskId);
     },
   });
 
@@ -424,12 +443,13 @@ const ModRow = (props: Props) => {
                         <Match when={!isModInstalled()}>
                           <Dropdown.button
                             menuPlacement="bottom-end"
-                            disabled={loading()}
+                            loading={loading()}
                             options={mappedVersions()}
                             rounded
                             value={mappedVersions()[0]?.key}
                             onClick={() => {
                               if (props.type !== "Mod") return;
+                              setLoading(true);
                               const fileVersion =
                                 props.data.latestFilesIndexes.find(
                                   (file) => file.gameVersion === props.mcVersion
@@ -450,6 +470,8 @@ const ModRow = (props: Props) => {
                                 (file) =>
                                   file.id === parseInt(val.key as string, 10)
                               );
+                              setLoading(true);
+
                               if (file && instanceId()) {
                                 installModMutation.mutate({
                                   file_id: file.id,
@@ -477,7 +499,6 @@ const ModRow = (props: Props) => {
                         </Match>
                         <Match when={isModInstalled()}>
                           <Button
-                            cursor="cursor-default"
                             variant={isModInstalled() ? "green" : "primary"}
                           >
                             <Trans

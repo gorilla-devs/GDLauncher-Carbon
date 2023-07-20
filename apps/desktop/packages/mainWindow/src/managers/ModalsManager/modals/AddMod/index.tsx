@@ -16,7 +16,7 @@ import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
   FEModLoaderType,
-  FEModSearchParametersQuery,
+  FEUnifiedSearchParameters,
   FEModSearchSortField,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
@@ -28,11 +28,11 @@ const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
 
   const [query, setQuery] = useModsQuery({
-    categoryId: null,
+    categoryIds: null,
     classId: "mods",
     gameId: 432,
     gameVersion: "",
-    modLoaderType: null,
+    modLoaderTypes: null,
     sortField: "featured",
     sortOrder: "descending",
     pageSize: 40,
@@ -84,7 +84,7 @@ const AddMod = (props: ModalProps) => {
     });
   });
 
-  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
@@ -250,12 +250,12 @@ const AddMod = (props: ModalProps) => {
                   key: modloader,
                 }))}
                 onChange={(val) => {
-                  const mappedValue = val.key === "Any" ? null : val.key;
+                  const mappedValue =
+                    val.key === "Any" ? null : [val.key as FEModLoaderType];
                   setQueryWrapper({
-                    modLoaderType: mappedValue as FEModLoaderType | null,
+                    modLoaderTypes: mappedValue,
                   });
                 }}
-                value={query.query.modLoaderType}
                 rounded
               />
             </div>
