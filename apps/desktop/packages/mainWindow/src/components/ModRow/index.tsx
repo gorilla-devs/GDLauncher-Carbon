@@ -466,15 +466,16 @@ const ModRow = (props: Props) => {
                               }
                             }}
                             onChange={(val) => {
-                              const file = props.data.latestFiles.find(
+                              const file = props.data.latestFilesIndexes.find(
                                 (file) =>
-                                  file.id === parseInt(val.key as string, 10)
+                                  file.fileId ===
+                                  parseInt(val.key as string, 10)
                               );
                               setLoading(true);
 
                               if (file && instanceId()) {
                                 installModMutation.mutate({
-                                  file_id: file.id,
+                                  file_id: parseInt(val.key as string, 10),
                                   instance_id: parseInt(
                                     instanceId() as string,
                                     10
