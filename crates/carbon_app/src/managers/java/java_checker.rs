@@ -38,8 +38,17 @@ impl JavaChecker for RealJavaChecker {
             );
         }
 
+        // Attempt to canonicalize path
+        let resolved_java_bin_path = match std::fs::canonicalize(java_bin_path) {
+            Ok(canonical_path) => canonical_path,
+            Err(err) => {
+                tracing::warn!("Error resolving canonical java bin path: {}", err);
+                java_bin_path.to_path_buf()
+            }
+        };
+
         // Run java
-        let output = Command::new(java_bin_path)
+        let output = Command::new(&resolved_java_bin_path)
             .current_dir(java_checker_path.parent().expect("This should never fail"))
             .arg(
                 JAVA_CHECK_APP_NAME
@@ -53,7 +62,7 @@ impl JavaChecker for RealJavaChecker {
         let parsed_output = parse_cmd_output_java(&output)?;
 
         Ok(JavaComponent {
-            path: java_bin_path.to_string_lossy().to_string(),
+            path: resolved_java_bin_path.to_string_lossy().to_string(),
             version: parsed_output.version,
             arch: parsed_output.arch,
             vendor: parsed_output.vendor,
