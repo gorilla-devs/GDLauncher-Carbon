@@ -1,4 +1,6 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+};
 
 use super::json::get_json_context;
 use reqwest::{Response, StatusCode, Url};

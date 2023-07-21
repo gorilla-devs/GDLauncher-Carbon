@@ -85,9 +85,8 @@ const ModDetails = (props: ModalProps) => {
                       <div
                         class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                         style={{
-                          "background-image": `url("${
-                            modDetails()?.logo?.thumbnailUrl
-                          }")`,
+                          "background-image": `url("${modDetails()?.logo?.thumbnailUrl
+                            }")`,
                         }}
                       />
                       <div class="flex flex-1 flex-col max-w-185">

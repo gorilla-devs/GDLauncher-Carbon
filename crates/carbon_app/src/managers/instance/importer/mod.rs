@@ -3,7 +3,10 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
-use crate::{domain::vtask::VisualTaskId, managers::AppInner};
+use crate::{
+    domain::{vtask::VisualTaskId},
+    managers::AppInner,
+};
 
 pub mod legacy_gdlauncher;
 
