@@ -46,10 +46,10 @@ const AddMod = (props: ModalProps) => {
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.curseforgeSearch"],
+    queryKey: () => ["modplatforms.curseforge.search"],
     queryFn: (ctx) => {
       setQuery({ index: ctx.pageParam + (query.query.pageSize || 20) + 1 });
-      return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
+      return rspcContext.client.query(["modplatforms.curseforge.search", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;

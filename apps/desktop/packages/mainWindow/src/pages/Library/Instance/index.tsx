@@ -195,7 +195,7 @@ const Instance = () => {
     ) {
       setModpackDetails(
         rspc.createQuery(() => [
-          "modplatforms.curseforgeGetMod",
+          "modplatforms.curseforge.getMod",
           {
             modId: routeData.instanceDetails.data?.modpack?.Curseforge
               .project_id as number,
