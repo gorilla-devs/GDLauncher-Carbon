@@ -1,23 +1,39 @@
 /* eslint-disable solid/no-innerhtml */
 import { useRouteData } from "@solidjs/router";
-import fetchData from "../modpack.overview";
 import { Match, Suspense, Switch } from "solid-js";
 import { Skeleton } from "@gd/ui";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { MRFEProject } from "@gd/core_module/bindings";
+import fetchData from "../modpack.overview";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const Description = () => {
+    const cleanHtml = () =>
+      sanitizeHtml(routeData.modpackDescription?.data?.data || "", {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+          "img",
+          "iframe",
+        ]),
+        allowedAttributes: {
+          a: ["href", "name", "target"],
+          img: ["src", "width", "height"],
+          iframe: ["src", "width", "height", "allowfullscreen"],
+        },
+        allowedIframeHostnames: [
+          "www.youtube.com",
+          "i.imgur.com",
+          "cdn.ko-fi.com",
+        ],
+      });
     return (
       <Suspense fallback={<Skeleton.modpackScreenshotsPage />}>
         <div>
           <Switch fallback={<Skeleton.modpackScreenshotsPage />}>
             <Match when={routeData.isCurseforge}>
-              {/* I don't sanitize the curseforge one otherwise the embed video do are not gonna work */}
-              <div innerHTML={routeData.modpackDescription?.data?.data} />
+              <div innerHTML={cleanHtml()} />
             </Match>
             <Match when={!routeData.isCurseforge}>
               <div
