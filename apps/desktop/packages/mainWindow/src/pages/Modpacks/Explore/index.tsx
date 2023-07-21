@@ -12,7 +12,13 @@ import {
   Tabs,
   createNotification,
 } from "@gd/ui";
-import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useParams,
+  useRouteData,
+} from "@solidjs/router";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
@@ -44,6 +50,22 @@ const Modpack = () => {
       path: `/modpacks/${params.id}/${params.platform}/versions`,
     },
   ];
+
+  const getTabIndexFromPath = (path: string) => {
+    if (path.match(/\/modpacks\/.+\/.+/g)) {
+      if (path.endsWith("/changelog")) {
+        return 1;
+      } else if (path.endsWith("/screenshots")) {
+        return 2;
+      } else if (path.endsWith("/versions")) {
+        return 3;
+      } else {
+        return 0;
+      }
+    }
+
+    return 0;
+  };
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
@@ -139,6 +161,10 @@ const Modpack = () => {
         },
       });
   };
+
+  const location = useLocation();
+
+  const indexTab = () => getTabIndexFromPath(location.pathname);
 
   return (
     <ContentWrapper>
@@ -324,7 +350,7 @@ const Modpack = () => {
                     </Button>
                   </Show>
                 </span>
-                <Tabs>
+                <Tabs index={indexTab()}>
                   <TabList>
                     <For each={instancePages()}>
                       {(page) => (
