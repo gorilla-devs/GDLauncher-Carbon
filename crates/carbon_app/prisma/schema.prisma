@@ -26,7 +26,8 @@ model AppConfiguration {
   isFirstLaunch        Boolean @default(true)
   autoManageJava       Boolean @default(true)
   isLegalAccepted      Boolean @default(false)
-  metricsLevel         Int? // 0 = disabled, 1 = anonymous, 2 = anonymous + sessions, 3 = authenticated + sessions
+  randomUserUUID       String  @default(uuid())
+  metricsEnabled       Boolean @default(false)
 }
 
 model Java {

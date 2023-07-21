@@ -9,7 +9,8 @@ type Props = {
 };
 
 const TermsAndConditions = (props: Props) => {
-  const [accepted, setAccepted] = createSignal(false);
+  const [acceptedTOS, setAcceptedTOS] = createSignal(false);
+  const [acceptedMetrics, setAcceptedMetrics] = createSignal(false);
   const modalsContext = useModal();
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
@@ -32,7 +33,16 @@ const TermsAndConditions = (props: Props) => {
                 <Trans key="login.we_value_privacy_text2" />
               </div>
               <div>
-                <Trans key="login.we_value_privacy_text3" />
+                <Trans key="login.we_value_privacy_text3">
+                  {""}
+                  <span
+                    class="underline text-lightSlate-400 cursor-pointer"
+                    onClick={() => {
+                      window?.openCMPWindow();
+                    }}
+                  />
+                  {""}
+                </Trans>
               </div>
               <div>
                 <Trans key="login.we_value_privacy_text4" />
@@ -41,58 +51,65 @@ const TermsAndConditions = (props: Props) => {
           </div>
         </div>
       </div>
-      <div class="w-full flex flex-col items-center">
+      <div class="w-full flex flex-col items-center p-4">
         <div class="flex justify-between items-center w-full">
-          <div class="flex gap-2">
-            <Checkbox
-              checked={accepted()}
-              onChange={() => {
-                setAccepted((prev) => !prev);
-              }}
-            />
-            <p class="m-0 text-xs text-darkSlate-100 select-none leading-5">
-              <Trans key="login.read_and_accept">
-                I have read and accept
-                <span
-                  class="cursor-pointer underline text-lightSlate-400"
-                  onClick={() => {
-                    modalsContext?.openModal({
-                      name: "termsAndConditions",
-                    });
-                  }}
-                >
-                  Terms
-                </span>
-                and
-                <span
-                  class="underline text-lightSlate-400 cursor-pointer"
-                  onClick={() => {
-                    modalsContext?.openModal({
-                      name: "acceptableUsePolicy",
-                    });
-                  }}
-                >
-                  Privacy Policy
-                </span>
-              </Trans>
-            </p>
+          <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+              <Checkbox
+                checked={acceptedMetrics()}
+                onChange={() => {
+                  setAcceptedMetrics((prev) => !prev);
+                }}
+              />
+              <p class="m-0 text-darkSlate-100 leading-5 text-xs select-none text-left">
+                <Trans key="login.cookies_tracking" />
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <Checkbox
+                checked={acceptedTOS()}
+                onChange={() => {
+                  setAcceptedTOS((prev) => !prev);
+                }}
+              />
+              <p class="m-0 text-darkSlate-100 leading-5 text-xs select-none">
+                <Trans key="login.read_and_accept">
+                  I have read and accept
+                  <span
+                    class="cursor-pointer underline text-lightSlate-400"
+                    onClick={() => {
+                      modalsContext?.openModal({
+                        name: "termsAndConditions",
+                      });
+                    }}
+                  >
+                    Terms
+                  </span>
+                  and
+                  <span
+                    class="underline text-lightSlate-400 cursor-pointer"
+                    onClick={() => {
+                      modalsContext?.openModal({
+                        name: "acceptableUsePolicy",
+                      });
+                    }}
+                  >
+                    Privacy Policy
+                  </span>
+                </Trans>
+              </p>
+            </div>
           </div>
-          <Button
-            type="secondary"
-            size="small"
-            rounded={false}
-            onClick={() => {
-              window?.openCMPWindow();
-            }}
-          >
-            <Trans key="login.manage" />
-          </Button>
           <Button
             variant="primary"
             size="small"
-            disabled={!accepted()}
+            disabled={!acceptedTOS()}
             onClick={() => {
-              settingsMutation.mutate({ isLegalAccepted: true });
+              settingsMutation.mutate({
+                isLegalAccepted: true,
+                metricsEnabled: acceptedMetrics(),
+              });
+
               props.nextStep();
             }}
           >

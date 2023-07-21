@@ -154,14 +154,10 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
-        if let Some(metrics_level) = incoming_settings.metrics_level {
-            if !(0..=3).contains(&metrics_level) {
-                return Err(anyhow::anyhow!("Invalid metrics level"));
-            }
-
+        if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::metrics_level::set(Some(metrics_level))],
+                vec![app_configuration::metrics_enabled::set(metrics_enabled)],
             ));
             something_changed = true;
         }

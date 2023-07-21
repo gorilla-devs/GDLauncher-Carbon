@@ -17,7 +17,7 @@ function Checkbox(props: Props) {
 
   return (
     <div
-      class="flex justify-center items-center h-5 w-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer"
+      class="flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer"
       classList={{
         "bg-primary-500": checked(),
         "bg-darkSlate-500": !checked(),

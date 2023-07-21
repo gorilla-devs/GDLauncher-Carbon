@@ -17,7 +17,8 @@ CREATE TABLE "AppConfiguration" (
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
     "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
-    "metricsLevel" INTEGER
+    "randomUserUUID" TEXT NOT NULL,
+    "metricsEnabled" BOOLEAN NOT NULL DEFAULT false
 );
 
 -- CreateTable
