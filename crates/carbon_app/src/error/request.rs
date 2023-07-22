@@ -1,5 +1,6 @@
 use std::fmt::{self, Display, Formatter};
 
+use super::json::get_json_context;
 use reqwest::{Response, StatusCode, Url};
 use rspc::Type;
 use serde::Serialize;
@@ -32,11 +33,22 @@ pub enum RequestErrorDetails {
     #[error("connection failed")]
     ConnectionFailed,
 
-    #[error("malformed response")]
-    MalformedResponse, // TODO: get body
+    #[error("malformed response: {details}")]
+    MalformedResponse { details: MalformedResponseDetails }, // TODO: get body
 
     #[error("unknown reqwest error: {0}")]
     Unknown(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum MalformedResponseDetails {
+    JsonDecodeError {
+        ctx: String,
+        line: usize,
+        column: usize,
+        source: String,
+    },
+    UnknownDecodeError,
 }
 
 impl Display for RequestContext {
@@ -49,6 +61,28 @@ impl Display for RequestContext {
                 .map(|u| u.to_string())
                 .unwrap_or_else(|| String::from("<no url>"))
         )
+    }
+}
+
+impl Display for MalformedResponseDetails {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::JsonDecodeError {
+                ctx,
+                line,
+                column,
+                source,
+            } => {
+                write!(
+                    f,
+                    "Unable to deserialise json object at {}:{}. Context `{}` Caused by: {}",
+                    line, column, ctx, source
+                )
+            }
+            Self::UnknownDecodeError => {
+                write!(f, "Unknown decode error")
+            }
+        }
     }
 }
 
@@ -68,6 +102,12 @@ impl RequestContext {
             url: Some(response.url().clone()),
         }
     }
+
+    pub fn from_url(url: &Url) -> Self {
+        Self {
+            url: Some(url.clone()),
+        }
+    }
 }
 
 impl RequestErrorDetails {
@@ -82,7 +122,9 @@ impl RequestErrorDetails {
         } else if error.is_connect() {
             Self::ConnectionFailed
         } else if error.is_decode() {
-            Self::MalformedResponse
+            Self::MalformedResponse {
+                details: MalformedResponseDetails::UnknownDecodeError,
+            }
         } else {
             Self::Unknown(format!("{error:#?}"))
         }
@@ -98,6 +140,17 @@ impl RequestErrorDetails {
     pub fn from_error_censored(error: reqwest::Error) -> Self {
         Self::from_error(error.without_url())
     }
+
+    pub fn from_json_decode_error(error: serde_json::Error, body: &str) -> Self {
+        Self::MalformedResponse {
+            details: MalformedResponseDetails::JsonDecodeError {
+                ctx: get_json_context(&error, body, 200),
+                line: error.line(),
+                column: error.column(),
+                source: error.to_string(),
+            },
+        }
+    }
 }
 
 impl RequestError {
@@ -112,6 +165,13 @@ impl RequestError {
         Self {
             context: RequestContext::from_error(&value),
             error: RequestErrorDetails::from_error(value),
+        }
+    }
+
+    pub fn from_json_decode_error(error: serde_json::Error, body: &str, url: &Url) -> Self {
+        Self {
+            context: RequestContext::from_url(url),
+            error: RequestErrorDetails::from_json_decode_error(error, body),
         }
     }
 
@@ -138,7 +198,9 @@ pub enum FERequestErrorType {
 
     Timeout,
     ConnectionFailed,
-    MalformedResponse,
+    MalformedResponse {
+        details: FEMalformedResponseDetails,
+    },
     Unknown(String),
 }
 
@@ -155,9 +217,43 @@ impl From<RequestError> for FERequestError {
                 }
                 RequestErrorDetails::Timeout => FERequestErrorType::Timeout,
                 RequestErrorDetails::ConnectionFailed => FERequestErrorType::ConnectionFailed,
-                RequestErrorDetails::MalformedResponse => FERequestErrorType::MalformedResponse,
+                RequestErrorDetails::MalformedResponse { details } => {
+                    FERequestErrorType::MalformedResponse {
+                        details: details.into(),
+                    }
+                }
                 RequestErrorDetails::Unknown(x) => FERequestErrorType::Unknown(x),
             },
+        }
+    }
+}
+
+#[derive(Type, Serialize)]
+pub enum FEMalformedResponseDetails {
+    JsonDecodeError {
+        ctx: String,
+        line: usize,
+        column: usize,
+        source: String,
+    },
+    UnknownDecodeError,
+}
+
+impl From<MalformedResponseDetails> for FEMalformedResponseDetails {
+    fn from(value: MalformedResponseDetails) -> Self {
+        match value {
+            MalformedResponseDetails::JsonDecodeError {
+                ctx,
+                line,
+                column,
+                source,
+            } => Self::JsonDecodeError {
+                ctx,
+                line,
+                column,
+                source,
+            },
+            MalformedResponseDetails::UnknownDecodeError => Self::UnknownDecodeError,
         }
     }
 }

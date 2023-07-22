@@ -1,16 +1,14 @@
 use anyhow::bail;
 use thiserror::Error;
 
-use crate::{
-    domain::{instance::info::ModLoaderType, vtask::VisualTaskId},
-    managers::ManagerRef,
-};
+use crate::domain::instance::info::ModLoaderType;
+use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use crate::{db::read_filters::IntFilter, domain::instance as domain};
 
 use super::{
-    installer::{CurseforgeModInstaller, IntoInstaller},
+    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
     InstanceId, InstanceManager, InvalidInstanceIdError,
 };
 
@@ -197,9 +195,24 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let install_result = installer.install(self.app, instance_id).await?;
+        let task_id = installer.install(self.app, instance_id).await?;
 
-        Ok(install_result)
+        Ok(task_id)
+    }
+
+    pub async fn install_modrinth_mod(
+        &self,
+        instance_id: InstanceId,
+        project_id: String,
+        version_id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
+            .await?
+            .into_installer();
+
+        let task_id = installer.install(self.app, instance_id).await?;
+
+        Ok(task_id)
     }
 }
 

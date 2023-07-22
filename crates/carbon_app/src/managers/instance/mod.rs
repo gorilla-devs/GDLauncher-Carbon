@@ -505,7 +505,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let groupid = self
                 .app
                 .settings_manager()
-                .get()
+                .get_settings()
                 .await?
                 .default_instance_group;
 

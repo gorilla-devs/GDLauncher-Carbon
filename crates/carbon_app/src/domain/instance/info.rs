@@ -25,17 +25,25 @@ pub enum InstanceIcon {
 #[derive(Debug, Clone)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
+    Modrinth(ModrinthModpack),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ModpackPlatform {
     Curseforge,
+    Modrinth,
 }
 
 #[derive(Debug, Clone)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModrinthModpack {
+    pub project_id: String,
+    pub version_id: String,
 }
 
 #[derive(Debug, Clone)]
@@ -99,6 +107,7 @@ impl Modpack {
     pub fn as_platform(&self) -> ModpackPlatform {
         match self {
             Self::Curseforge(_) => ModpackPlatform::Curseforge,
+            Self::Modrinth(_) => ModpackPlatform::Modrinth,
         }
     }
 }

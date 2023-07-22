@@ -125,14 +125,27 @@ keys! {
 
     modplatforms {
         CURSEFORGE_GET_MODLOADERS                   = "curseforge.getModloaders";
-        CURSEFORGE_GET_CATEGORIES                   = "curseforgeGetCategories";
-        CURSEFORGE_SEARCH                           = "curseforgeSearch";
-        CURSEFORGE_GET_MOD                          = "curseforgeGetMod";
-        CURSEFORGE_GET_MODS                         = "curseforgeGetMods";
-        CURSEFORGE_GET_MOD_DESCRIPTION              = "curseforgeGetModDescription";
-        CURSEFORGE_GET_MOD_FILE                     = "curseforgeGetModFile";
-        CURSEFORGE_GET_MOD_FILES                    = "curseforgeGetModFiles";
-        CURSEFORGE_GET_FILES                        = "curseforgeGetFiles";
-        CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforgeGetModFileChangelog";
+        CURSEFORGE_GET_CATEGORIES                   = "curseforge.getCategories";
+        CURSEFORGE_SEARCH                           = "curseforge.search";
+        CURSEFORGE_GET_MOD                          = "curseforge.getMod";
+        CURSEFORGE_GET_MODS                         = "curseforge.getMods";
+        CURSEFORGE_GET_MOD_DESCRIPTION              = "curseforge.getModDescription";
+        CURSEFORGE_GET_MOD_FILE                     = "curseforge.getModFile";
+        CURSEFORGE_GET_MOD_FILES                    = "curseforge.getModFiles";
+        CURSEFORGE_GET_FILES                        = "curseforge.getFiles";
+        CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforge.getModFileChangelog";
+
+        MODRINTH_GET_LOADERS                        = "modrinth.getLoaders";
+        MODRINTH_GET_CATEGORIES                     = "modrinth.getCategories";
+        MODRINTH_SEARCH                             = "modrinth.search";
+        MODRINTH_GET_PROJECT                        = "modrinth.getProject";
+        MODRINTH_GET_PROJECTS                       = "modrinth.getProjects";
+        MODRINTH_GET_PROJECT_VERSIONS               = "modrinth.getProjectVersions";
+        MODRINTH_GET_VERSION                        = "modrinth.getVersion";
+        MODRINTH_GET_VERSIONS                       = "modrinth.getVersions";
+        MODRINTH_GET_PROJECT_TEAM                   = "modrinth.getProjectTeam";
+        MODRINTH_GET_TEAM                           = "modrinth.getTeam";
+
+        UNIFIED_SEARCH                              = "unifiedSearch";
     }
 }

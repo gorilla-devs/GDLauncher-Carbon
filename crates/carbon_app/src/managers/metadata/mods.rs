@@ -230,7 +230,7 @@ fn fabric_mod_json_schema_version_default() -> u32 {
 #[derive(Deserialize, Clone)]
 #[serde(untagged)]
 enum FabricModJson {
-    Single(FabricModJsonEntry),
+    Single(Box<FabricModJsonEntry>),
     /// not supported by loaders >= 0.4.0
     List(Vec<FabricModJsonEntry>),
 }
@@ -508,11 +508,11 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
 impl From<QuiltModJson> for ModFileMetadata {
     fn from(value: QuiltModJson) -> Self {
         let (name, description, authors) = if let Some(metadata) = value.quilt_loader.metadata {
-            let authors = metadata.contributors.and_then(|contributors| {
+            let authors = metadata.contributors.map(|contributors| {
                 let authors_string = contributors.keys().cloned().collect::<Vec<_>>().join(", ");
-                Some(authors_string)
+                authors_string
             });
-            (metadata.name.clone(), metadata.description.clone(), authors)
+            (metadata.name.clone(), metadata.description, authors)
         } else {
             (None, None, None)
         };

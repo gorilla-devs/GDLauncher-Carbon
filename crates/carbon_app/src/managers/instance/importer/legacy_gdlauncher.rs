@@ -5,16 +5,12 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
 };
-use tracing::info;
 
 use crate::{
     api::{instance::import::FEEntity, keys},
     domain::{
-        instance::{
-            info::{
-                CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
-            },
-            InstanceId,
+        instance::info::{
+            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },

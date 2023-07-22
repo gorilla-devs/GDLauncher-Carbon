@@ -11,7 +11,7 @@ CREATE TABLE "AppConfiguration" (
     "showNews" BOOLEAN NOT NULL DEFAULT true,
     "startupResolution" TEXT NOT NULL DEFAULT '854x480',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
-    "xmx" INTEGER NOT NULL DEFAULT 1024,
+    "xmx" INTEGER NOT NULL,
     "xms" INTEGER NOT NULL DEFAULT 1024,
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
@@ -127,7 +127,7 @@ CREATE TABLE "CurseForgeModCache" (
     "urlslug" TEXT NOT NULL,
     "summary" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
-    "cachedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "cachedAt" DATETIME NOT NULL,
     "metadataId" TEXT NOT NULL,
     CONSTRAINT "CurseForgeModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );

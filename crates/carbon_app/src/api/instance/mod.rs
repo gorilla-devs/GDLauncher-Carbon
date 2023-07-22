@@ -247,13 +247,26 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation INSTALL_MOD[app, imod: InstallMod] {
-            let task = app.instance_manager()
-                .install_curseforge_mod(
-                    imod.instance_id.into(),
-                    imod.project_id,
-                    imod.file_id,
-                )
-                .await?;
+            let task = match imod.mod_source {
+                ModSource::Curseforge(cf_mod) => {
+                    app.instance_manager()
+                        .install_curseforge_mod(
+                            imod.instance_id.into(),
+                            cf_mod.project_id,
+                            cf_mod.file_id,
+                        )
+                        .await?
+                }
+                ModSource::Modrinth(mdr_mod) => {
+                    app.instance_manager()
+                        .install_modrinth_mod(
+                            imod.instance_id.into(),
+                            mdr_mod.project_id,
+                            mdr_mod.version_id,
+                        )
+                        .await?
+                }
+            };
 
             Ok(super::vtask::FETaskId::from(task))
         }
@@ -476,6 +489,7 @@ struct ValidListInstance {
 #[derive(Type, Debug, Serialize)]
 enum ModpackPlatform {
     Curseforge,
+    Modrinth,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -562,10 +576,27 @@ struct InstanceMod {
 }
 
 #[derive(Type, Debug, Deserialize)]
-struct InstallMod {
-    instance_id: FEInstanceId,
+enum ModSource {
+    Curseforge(CurseforgeMod),
+    Modrinth(ModrinthMod),
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct CurseforgeMod {
     project_id: u32,
     file_id: u32,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ModrinthMod {
+    project_id: String,
+    version_id: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct InstallMod {
+    instance_id: FEInstanceId,
+    mod_source: ModSource,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -593,12 +624,19 @@ enum GameVersion {
 #[derive(Type, Debug, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
+    Modrinth(ModrinthModpack),
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 struct CurseforgeModpack {
     project_id: u32,
     file_id: u32,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct ModrinthModpack {
+    pub project_id: String,
+    pub version_id: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -749,6 +787,7 @@ impl From<domain::info::ModpackPlatform> for ModpackPlatform {
     fn from(value: domain::info::ModpackPlatform) -> Self {
         match value {
             domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
+            domain::info::ModpackPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -795,6 +834,7 @@ impl From<Modpack> for domain::info::Modpack {
     fn from(value: Modpack) -> Self {
         match value {
             Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+            Modpack::Modrinth(m) => Self::Modrinth(m.into()),
         }
     }
 }
@@ -808,10 +848,20 @@ impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
     }
 }
 
+impl From<ModrinthModpack> for domain::info::ModrinthModpack {
+    fn from(value: ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
+        }
+    }
+}
+
 impl From<domain::info::Modpack> for Modpack {
     fn from(value: domain::info::Modpack) -> Self {
         match value {
             domain::info::Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+            domain::info::Modpack::Modrinth(m) => Self::Modrinth(m.into()),
         }
     }
 }
@@ -821,6 +871,15 @@ impl From<domain::info::CurseforgeModpack> for CurseforgeModpack {
         Self {
             project_id: value.project_id,
             file_id: value.file_id,
+        }
+    }
+}
+
+impl From<domain::info::ModrinthModpack> for ModrinthModpack {
+    fn from(value: domain::info::ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
         }
     }
 }

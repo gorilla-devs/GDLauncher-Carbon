@@ -13,14 +13,14 @@ const Versions = () => {
       <Switch>
         <Match
           when={
-            (routeData.curseforgeGetModFiles.data as FEModFilesResponse)?.data
+            (routeData.curseforge.getModFiles.data as FEModFilesResponse)?.data
               .length > 0
           }
         >
-          <For each={routeData.curseforgeGetModFiles.data?.data}>
+          <For each={routeData.curseforge.getModFiles.data?.data}>
             {(modFile) => (
               <VersionRow
-                project={routeData.curseforgeGetMod.data!.data}
+                project={routeData.curseforge.getMod.data!.data}
                 modVersion={modFile}
               />
             )}
@@ -28,8 +28,8 @@ const Versions = () => {
         </Match>
         <Match
           when={
-            (routeData.curseforgeGetModFiles.data as FEModFilesResponse)?.data
-              .length === 0 || !routeData.curseforgeGetModFiles.data
+            (routeData.curseforge.getModFiles.data as FEModFilesResponse)?.data
+              .length === 0 || !routeData.curseforge.getModFiles.data
           }
         >
           <Skeleton.modpackVersionList />

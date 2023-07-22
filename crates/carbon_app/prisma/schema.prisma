@@ -20,7 +20,7 @@ model AppConfiguration {
   showNews             Boolean @default(true)
   startupResolution    String  @default("854x480")
   javaCustomArgs       String  @default("")
-  xmx                  Int     @default(1024)
+  xmx                  Int
   xms                  Int     @default(1024)
   defaultInstanceGroup Int?
   isFirstLaunch        Boolean @default(true)

@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::curseforge::{Category, CurseForgeResponse, File, Mod};
 
-use super::structs::{FECategory, FEFile, FEMod, FEPagination};
+use super::structs::{CFFECategory, CFFEFile, CFFEMod, CFFEPagination};
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModSearchResponse {
-    pub data: Vec<FEMod>,
-    pub pagination: Option<FEPagination>,
+    pub data: Vec<CFFEMod>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Vec<Mod>>> for FEModSearchResponse {
@@ -22,8 +22,8 @@ impl From<CurseForgeResponse<Vec<Mod>>> for FEModSearchResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FECategoriesResponse {
-    pub data: Vec<FECategory>,
-    pub pagination: Option<FEPagination>,
+    pub data: Vec<CFFECategory>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Vec<Category>>> for FECategoriesResponse {
@@ -37,8 +37,8 @@ impl From<CurseForgeResponse<Vec<Category>>> for FECategoriesResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModResponse {
-    pub data: FEMod,
-    pub pagination: Option<FEPagination>,
+    pub data: CFFEMod,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Mod>> for FEModResponse {
@@ -52,8 +52,8 @@ impl From<CurseForgeResponse<Mod>> for FEModResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModsResponse {
-    pub data: Vec<FEMod>,
-    pub pagination: Option<FEPagination>,
+    pub data: Vec<CFFEMod>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Vec<Mod>>> for FEModsResponse {
@@ -68,7 +68,7 @@ impl From<CurseForgeResponse<Vec<Mod>>> for FEModsResponse {
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModDescriptionResponse {
     pub data: String,
-    pub pagination: Option<FEPagination>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<String>> for FEModDescriptionResponse {
@@ -82,8 +82,8 @@ impl From<CurseForgeResponse<String>> for FEModDescriptionResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModFileResponse {
-    pub data: FEFile,
-    pub pagination: Option<FEPagination>,
+    pub data: CFFEFile,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<File>> for FEModFileResponse {
@@ -97,8 +97,8 @@ impl From<CurseForgeResponse<File>> for FEModFileResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModFilesResponse {
-    pub data: Vec<FEFile>,
-    pub pagination: Option<FEPagination>,
+    pub data: Vec<CFFEFile>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Vec<File>>> for FEModFilesResponse {
@@ -112,8 +112,8 @@ impl From<CurseForgeResponse<Vec<File>>> for FEModFilesResponse {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEFilesResponse {
-    pub data: Vec<FEFile>,
-    pub pagination: Option<FEPagination>,
+    pub data: Vec<CFFEFile>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<Vec<File>>> for FEFilesResponse {
@@ -128,7 +128,7 @@ impl From<CurseForgeResponse<Vec<File>>> for FEFilesResponse {
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModFileChangelogResponse {
     pub data: String,
-    pub pagination: Option<FEPagination>,
+    pub pagination: Option<CFFEPagination>,
 }
 
 impl From<CurseForgeResponse<String>> for FEModFileChangelogResponse {

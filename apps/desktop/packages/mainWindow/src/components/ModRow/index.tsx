@@ -3,7 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
-import { FEMod, Mod } from "@gd/core_module/bindings";
+import { FEMod, InstanceDetails, ModSource } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -130,8 +130,8 @@ const ModRow = (props: Props) => {
   const latestFilesIndexes = () =>
     props.type === "Mod"
       ? props.data.latestFilesIndexes.filter(
-          (file) => file.gameVersion === props.mcVersion
-        )
+        (file) => file.gameVersion === props.mcVersion
+      )
       : [];
 
   const location = useLocation();
@@ -302,9 +302,8 @@ const ModRow = (props: Props) => {
                         </div>
                       }
                     >
-                      <p class="m-0">{`+${
-                        props.data.authors.slice(3).length
-                      }`}</p>
+                      <p class="m-0">{`+${props.data.authors.slice(3).length
+                        }`}</p>
                     </Tooltip>
                   </Show>
                 </Match>
@@ -456,12 +455,16 @@ const ModRow = (props: Props) => {
                                 );
                               if (fileVersion && instanceId()) {
                                 installModMutation.mutate({
-                                  file_id: fileVersion?.fileId,
+                                  mod_source: {
+                                    Curseforge: {
+                                      file_id: fileVersion?.fileId,
+                                      project_id: props.data.id,
+                                    }
+                                  },
                                   instance_id: parseInt(
                                     instanceId() as string,
                                     10
                                   ),
-                                  project_id: props.data.id,
                                 });
                               }
                             }}
@@ -470,12 +473,17 @@ const ModRow = (props: Props) => {
 
                               if (instanceId()) {
                                 installModMutation.mutate({
-                                  file_id: parseInt(val.key as string, 10),
+                                  mod_source: {
+                                    Curseforge: {
+                                      file_id: file.id,
+                                      project_id: props.data.id,
+                                    }
+                                  },
+
                                   instance_id: parseInt(
                                     instanceId() as string,
                                     10
                                   ),
-                                  project_id: props.data.id,
                                 });
                               }
                             }}
