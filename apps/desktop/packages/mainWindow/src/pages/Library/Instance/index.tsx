@@ -332,8 +332,8 @@ const Instance = () => {
         class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
-          "background-image": routeData.image()
-            ? `url("${routeData.image()}")`
+          "background-image": routeData.image
+            ? `url("${routeData.image}")`
             : `url("${DefaultImg}")`,
           "background-position": "center",
           "background-repeat": "repeat",
@@ -362,8 +362,8 @@ const Instance = () => {
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
-                      "background-image": routeData.image()
-                        ? `url("${routeData.image()}")`
+                      "background-image": routeData.image
+                        ? `url("${routeData.image}")`
                         : `url("${DefaultImg}")`,
                     }}
                   />

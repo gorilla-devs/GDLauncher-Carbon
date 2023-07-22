@@ -1,7 +1,6 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
-  fetchImage,
   isListInstanceValid,
   isProgressKnown,
   isProgressFailed,
@@ -18,7 +17,7 @@ import {
   FETask,
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { rspc } from "@/utils/rspcClient";
+import { port, rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { bytesToMB } from "@/utils/helpers";
 import { RSPCError } from "@rspc/client";
@@ -44,10 +43,7 @@ const InstanceTile = (props: {
     percentage: 0,
     subTasks: undefined,
   });
-  const [imageResource, { refetch }] = createResource(
-    () => props.instance.id,
-    fetchImage
-  );
+
   const navigate = useGDNavigate();
 
   const validInstance = () => getValideInstance(props.instance.status);
@@ -63,20 +59,28 @@ const InstanceTile = (props: {
   const isRunning = () => getRunningState(props.instance.status);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
+  const image = () =>
+    `http://localhost:${port}/instance/instanceIcon?id=${props.instance.id}`;
+
   const [task, setTask] = createSignal<CreateQueryResult<
     FETask | null,
     RSPCError
   > | null>(null);
+  const [img, setImg] = createSignal(image());
 
   createEffect(() => {
-    if (taskId() !== undefined) {
-      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
+    const isImgUpdated = props.instance.icon_revision !== undefined;
+    if (isImgUpdated) {
+      setImg("");
+      setImg(
+        `http://localhost:${port}/instance/instanceIcon?id=${props.instance.id}`
+      );
     }
   });
 
   createEffect(() => {
-    if (props.instance.icon_revision !== undefined) {
-      refetch();
+    if (taskId() !== undefined) {
+      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
     }
   });
 
@@ -138,7 +142,7 @@ const InstanceTile = (props: {
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}
       variant={type()}
-      img={imageResource()}
+      img={img()}
       selected={props.selected}
       isLoading={isLoading()}
       percentage={progress.percentage * 100}
