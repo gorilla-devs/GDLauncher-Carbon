@@ -107,7 +107,7 @@ export type FEFileStatus = "processing" | "changesRequired" | "underReview" | "a
 
 export type InstallMod = { instance_id: FEInstanceId; project_id: number; file_id: number }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; isLegalAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; isLegalAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string; metricsEnabledLastUpdate: string | null }
 
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
 
@@ -199,6 +199,8 @@ export type StandardVersion = { release: string; modloaders: ModLoader[] }
 
 export type FEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; isLegalAccepted?: boolean | null; metricsEnabled?: boolean | null }
+
 export type FEFilesParameters = { body: FEFilesParametersBody }
 
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
@@ -230,8 +232,6 @@ export type FeError = { cause: CauseSegment[]; backtrace: string }
 export type ManifestVersion = { id: string; type: McType }
 
 export type FECategory = { id: number; name: string; slug: string; url: string; iconUrl: string; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
-
-export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type GameLogId = number
 
@@ -309,8 +309,6 @@ export type CreateInstanceVersion = { Version: GameVersion } | { Modpack: Modpac
 
 export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; isLegalAccepted?: boolean | null; metricsEnabled?: boolean | null }
-
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 
 export type Modpack = { Curseforge: CurseforgeModpack }
@@ -318,6 +316,8 @@ export type Modpack = { Curseforge: CurseforgeModpack }
 export type FEModsResponse = { data: FEMod[]; pagination: FEPagination | null }
 
 export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
+
+export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type AccountType = "microsoft" | "offline"
 

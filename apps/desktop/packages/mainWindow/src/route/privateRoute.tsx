@@ -14,9 +14,12 @@ const PrivateRoute = (props: Props) => {
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
-    !routeData.status.data;
+    !routeData.status.data &&
+    routeData.settings.data?.isLegalAccepted &&
+    routeData.settings.data.metricsEnabledLastUpdate;
 
   createEffect(() => {
+    console.log(isAlreadyAuthenticated());
     if (!isAlreadyAuthenticated()) navigate("/");
   });
 

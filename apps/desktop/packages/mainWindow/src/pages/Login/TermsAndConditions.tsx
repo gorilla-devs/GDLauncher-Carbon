@@ -14,7 +14,7 @@ const TermsAndConditions = (props: Props) => {
   const modalsContext = useModal();
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
-
+  // Add renew metrics text
   return (
     <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 h-full">
       <div class="flex flex-col justify-between items-center w-full">

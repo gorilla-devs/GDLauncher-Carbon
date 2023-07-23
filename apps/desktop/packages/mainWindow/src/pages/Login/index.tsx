@@ -26,7 +26,10 @@ export default function Login() {
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
-    routeData?.activeUuid?.data && routeData?.accounts?.data?.length! > 0;
+    routeData?.activeUuid?.data &&
+    routeData.accounts.data?.length! > 0 &&
+    routeData.settings.data?.isLegalAccepted &&
+    routeData.settings.data.metricsEnabledLastUpdate;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
@@ -83,12 +86,12 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full h-screen p-0 bg-img-loginBG.jpg">
+        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.jpg">
           <div
             style={{
               "mix-blend-mode": "hard-light",
             }}
-            class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
+            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
           />
           <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
             <Dropdown
@@ -117,7 +120,7 @@ export default function Login() {
               "overflow-hidden": step() === 2,
             }}
           >
-            <Show when={step() < 1}>
+            <Show when={step() === 0}>
               <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
                 <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">

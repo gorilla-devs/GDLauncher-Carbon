@@ -18,7 +18,8 @@ CREATE TABLE "AppConfiguration" (
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
     "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
     "randomUserUUID" TEXT NOT NULL,
-    "metricsEnabled" BOOLEAN NOT NULL DEFAULT false
+    "metricsEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "metricsEnabledLastUpdate" DATETIME
 );
 
 -- CreateTable

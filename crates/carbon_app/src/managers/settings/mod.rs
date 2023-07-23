@@ -5,6 +5,7 @@ use crate::{
     domain::runtime_path,
 };
 use anyhow::anyhow;
+use chrono::Utc;
 use std::path::PathBuf;
 
 pub(crate) struct SettingsManager {
@@ -157,7 +158,10 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::metrics_enabled::set(metrics_enabled)],
+                vec![
+                    app_configuration::metrics_enabled::set(metrics_enabled),
+                    app_configuration::metrics_enabled_last_update::set(Some(Utc::now().into())),
+                ],
             ));
             something_changed = true;
         }

@@ -9,25 +9,26 @@ generator client {
 }
 
 model AppConfiguration {
-  id                   Int     @id @unique @default(0)
-  theme                String  @default("main")
-  reducedMotion        Boolean @default(false)
-  language             String  @default("english")
-  discordIntegration   Boolean @default(true)
-  releaseChannel       String  @default("stable")
-  activeAccountUuid    String?
-  concurrentDownloads  Int     @default(8)
-  showNews             Boolean @default(true)
-  startupResolution    String  @default("854x480")
-  javaCustomArgs       String  @default("")
-  xmx                  Int
-  xms                  Int     @default(1024)
-  defaultInstanceGroup Int?
-  isFirstLaunch        Boolean @default(true)
-  autoManageJava       Boolean @default(true)
-  isLegalAccepted      Boolean @default(false)
-  randomUserUUID       String  @default(uuid())
-  metricsEnabled       Boolean @default(false)
+  id                       Int       @id @unique @default(0)
+  theme                    String    @default("main")
+  reducedMotion            Boolean   @default(false)
+  language                 String    @default("english")
+  discordIntegration       Boolean   @default(true)
+  releaseChannel           String    @default("stable")
+  activeAccountUuid        String?
+  concurrentDownloads      Int       @default(8)
+  showNews                 Boolean   @default(true)
+  startupResolution        String    @default("854x480")
+  javaCustomArgs           String    @default("")
+  xmx                      Int
+  xms                      Int       @default(1024)
+  defaultInstanceGroup     Int?
+  isFirstLaunch            Boolean   @default(true)
+  autoManageJava           Boolean   @default(true)
+  isLegalAccepted          Boolean   @default(false)
+  randomUserUUID           String    @default(uuid())
+  metricsEnabled           Boolean   @default(false)
+  metricsEnabledLastUpdate DateTime?
 }
 
 model Java {

@@ -45,6 +45,7 @@ struct FESettings {
     is_legal_accepted: bool,
     metrics_enabled: bool,
     random_user_uuid: String,
+    metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
 impl From<crate::db::app_configuration::Data> for FESettings {
@@ -66,6 +67,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             is_legal_accepted: data.is_legal_accepted,
             metrics_enabled: data.metrics_enabled,
             random_user_uuid: data.random_user_uuid,
+            metrics_enabled_last_update: data.metrics_enabled_last_update,
         }
     }
 }
