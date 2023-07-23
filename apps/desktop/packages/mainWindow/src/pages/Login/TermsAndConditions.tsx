@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
@@ -13,8 +13,9 @@ const TermsAndConditions = (props: Props) => {
   const [acceptedMetrics, setAcceptedMetrics] = createSignal(false);
   const modalsContext = useModal();
 
+  const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
-  // Add renew metrics text
+
   return (
     <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 h-full">
       <div class="flex flex-col justify-between items-center w-full">
@@ -22,10 +23,19 @@ const TermsAndConditions = (props: Props) => {
           <div class="flex justify-between">
             <h2 class="m-0">
               <Trans key="login.we_value_privacy_title" />
+              <Show when={activeUuid?.data}>
+                {" - "}
+                <Trans key="login.renew" />
+              </Show>
             </h2>
           </div>
           <div class="overflow-y-scroll max-h-48">
             <div class="flex flex-col m-0 text-darkSlate-100 text-left gap-4 leading-5">
+              <Show when={activeUuid?.data}>
+                <div>
+                  <Trans key="login.we_value_privacy_text_renew" />
+                </div>
+              </Show>
               <div>
                 <Trans key="login.we_value_privacy_text1" />
               </div>
@@ -102,7 +112,7 @@ const TermsAndConditions = (props: Props) => {
           </div>
           <Button
             variant="primary"
-            size="small"
+            size="large"
             disabled={!acceptedTOS()}
             onClick={() => {
               settingsMutation.mutate({
