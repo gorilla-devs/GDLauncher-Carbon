@@ -2,7 +2,7 @@ import { Show, mergeProps, JSX } from "solid-js";
 
 type Props = {
   name?: string;
-  img?: string | JSX.Element | undefined | null;
+  img?: string | JSX.Element | Element | undefined | null;
   type?: "fixed" | "default";
   size?: "medium" | "small";
   onClose?: (_name: string) => void;

@@ -1,11 +1,8 @@
-use std::ffi::OsStr;
 use anyhow::bail;
+use std::ffi::OsStr;
 use thiserror::Error;
 
-
-use crate::{
-    api::keys::instance::*, managers::ManagerRef, domain::vtask::VisualTaskId
-};
+use crate::{api::keys::instance::*, domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},

@@ -203,6 +203,8 @@ export type FEManagedJavaOs = "windows" | "linux" | "macOs"
 
 export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
 
+export type FEImportableInstance = { name: string }
+
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
 export type And<T> = Or<T>[]
@@ -323,11 +325,11 @@ export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: str
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
-export type FEImportableInstance = { name: string }
-
 export type CFFEFilesParametersBody = { fileIds: number[] }
 
 export type UpdateInstance = { instance: FEInstanceId; name?: Set<string> | null; use_loaded_icon?: Set<boolean> | null; notes?: Set<string> | null; version?: Set<string> | null; modloader?: Set<ModLoader | null> | null; global_java_args?: Set<boolean> | null; extra_java_args?: Set<string | null> | null; memory?: Set<MemoryRange | null> | null }
+
+export type FEImportInstance = { entity: FEEntity; index: number }
 
 export type FEEvent = { name: FEEventName; properties: { [key: string]: string } }
 
@@ -367,6 +369,8 @@ export type CFFEModSearchSortOrder = "ascending" | "descending"
 
 export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget }
 
+export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
+
 export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack"
 
 export type MRFELoadersResponse = MRFELoader[]
@@ -380,8 +384,6 @@ export type MRFEModeratorMessage = { message: string; body: string | null }
 export type CFFEMod = { id: number; gameId: number; name: string; slug: string; links: CFFEModLinks; summary: string; status: CFFEModStatus; downloadCount: number; isFeatured: boolean; primaryCategoryId: number; categories: CFFECategory[]; classId: number | null; authors: CFFEModAuthor[]; logo: CFFEModAsset; screenshots: CFFEModAsset[]; mainFileId: number; latestFiles: CFFEFile[]; latestFilesIndexes: CFFEFileIndex[]; dateCreated: string; dateModified: string; dateReleased: string; allowModDistribution: boolean | null; gamePopularityRank: number; isAvailable: boolean; thumbsUpCount: number }
 
 export type MRFEProjectSearchResult = { slug: string; title: string; description: string; categories: string[] | null; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; project_id: string; author: string; display_categories: string[] | null; versions: string[]; follows: number; date_created: string; date_modified: string; latest_version: string | null; license: string; gallery: string[] | null; featured_gallery: string | null }
-
-export type FEImportInstance = { entity: FEEntity; index: number }
 
 export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: boolean; version: CreateInstanceVersion; notes: string }
 
@@ -416,8 +418,6 @@ export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: strin
 export type DuplicateInstance = { instance: FEInstanceId; new_name: string }
 
 export type FEUnifiedSearchResult = { curseforge: CFFEMod } | { modrinth: MRFEProjectSearchResult }
-
-export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
 
 export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 

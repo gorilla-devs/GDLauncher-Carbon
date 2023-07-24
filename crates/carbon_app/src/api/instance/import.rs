@@ -11,8 +11,6 @@ use crate::{
     },
 };
 
-
-
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEEntity {

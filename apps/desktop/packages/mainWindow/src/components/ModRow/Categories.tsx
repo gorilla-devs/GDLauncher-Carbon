@@ -15,7 +15,6 @@ type Props = {
 };
 
 const Categories = (props: Props) => {
-  // const modrinthIcon = () =>
   return (
     <div class="flex gap-2 scrollbar-hide">
       <Switch>
@@ -36,21 +35,23 @@ const Categories = (props: Props) => {
                     isCurseForgeData(props.modProps.data) ? (
                       (tag as CFFECategory).iconUrl
                     ) : (
-                      <Switch fallback={tag as string}>
-                        <Match
-                          when={props.modrinthCategories?.find(
-                            (category) => category.name === tag
-                          )}
-                        >
-                          <CategoryIcon
-                            category={
-                              props.modrinthCategories?.find(
-                                (category) => category.name === tag
-                              ) as MRFECategory
-                            }
-                          />
-                        </Match>
-                      </Switch>
+                      <div>
+                        <Switch fallback={tag as string}>
+                          <Match
+                            when={props.modrinthCategories?.find(
+                              (category) => category.name === tag
+                            )}
+                          >
+                            <CategoryIcon
+                              category={
+                                props.modrinthCategories?.find(
+                                  (category) => category.name === tag
+                                ) as MRFECategory
+                              }
+                            />
+                          </Match>
+                        </Switch>
+                      </div>
                     )
                   }
                   type="fixed"
@@ -74,24 +75,26 @@ const Categories = (props: Props) => {
                 isCurseForgeData(props.modProps.data) ? (
                   (getCategories(props.modProps)?.[0] as CFFECategory)?.iconUrl
                 ) : (
-                  <Show
-                    fallback={getCategories(props.modProps)?.[0] as string}
-                    when={props.modrinthCategories?.find(
-                      (category) =>
-                        category.name ===
-                        (getCategories(props.modProps)?.[0] as string)
-                    )}
-                  >
-                    <CategoryIcon
-                      category={
-                        props.modrinthCategories?.find(
-                          (category) =>
-                            category.name ===
-                            (getCategories(props.modProps)?.[0] as string)
-                        ) as MRFECategory
-                      }
-                    />
-                  </Show>
+                  <div>
+                    <Show
+                      fallback={getCategories(props.modProps)?.[0] as string}
+                      when={props.modrinthCategories?.find(
+                        (category) =>
+                          category.name ===
+                          (getCategories(props.modProps)?.[0] as string)
+                      )}
+                    >
+                      <CategoryIcon
+                        category={
+                          props.modrinthCategories?.find(
+                            (category) =>
+                              category.name ===
+                              (getCategories(props.modProps)?.[0] as string)
+                          ) as MRFECategory
+                        }
+                      />
+                    </Show>
+                  </div>
                 )
               }
               type="fixed"
@@ -118,19 +121,21 @@ const Categories = (props: Props) => {
                         {(tag) => (
                           <Tag
                             img={
-                              <Show
-                                when={props.modrinthCategories?.find(
-                                  (category) => category.name === tag
-                                )}
-                              >
-                                <CategoryIcon
-                                  category={
-                                    props.modrinthCategories?.find(
-                                      (category) => category.name === tag
-                                    ) as MRFECategory
-                                  }
-                                />
-                              </Show>
+                              <div>
+                                <Show
+                                  when={props.modrinthCategories?.find(
+                                    (category) => category.name === tag
+                                  )}
+                                >
+                                  <CategoryIcon
+                                    category={
+                                      props.modrinthCategories?.find(
+                                        (category) => category.name === tag
+                                      ) as MRFECategory
+                                    }
+                                  />
+                                </Show>
+                              </div>
                             }
                             name={tag as string}
                             type="fixed"
