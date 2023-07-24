@@ -51,12 +51,8 @@ mod app {
     use crate::cache_middleware;
 
     use super::{
-        java::JavaManager,
-        metadata::cache::MetaCacheManager,
-        metrics::MetricsManager,
-        modplatforms::ModplatformsManager,
-        system_info::SystemInfoManager,
-        *,
+        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
+        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
     };
 
     pub struct AppInner {

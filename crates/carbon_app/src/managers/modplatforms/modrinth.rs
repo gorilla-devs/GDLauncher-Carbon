@@ -1,5 +1,3 @@
-
-
 use anyhow::Ok;
 use reqwest_middleware::ClientWithMiddleware;
 use tracing::trace;
@@ -127,8 +125,13 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_project_versions(&self, project: ProjectID) -> anyhow::Result<VersionsResponse> {
-        let url = self.base_url.join(&format!("project/{}/version", &*project))?;
+    pub async fn get_project_versions(
+        &self,
+        project: ProjectID,
+    ) -> anyhow::Result<VersionsResponse> {
+        let url = self
+            .base_url
+            .join(&format!("project/{}/version", &*project))?;
 
         trace!("GET {}", url);
 
@@ -405,7 +408,6 @@ mod test {
         assert!(result.title == "Just Enough Items");
         Ok(())
     }
-
 
     #[tokio::test]
     #[traced_test]
