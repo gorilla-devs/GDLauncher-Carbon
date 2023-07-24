@@ -1,7 +1,9 @@
 import {
+  currentInstanceIndex,
   instances,
   loadingInstances,
   selectedInstancesIndexes,
+  setCurrentInstanceIndex,
   setInstances,
   setLoadingInstances,
   setSelectedInstancesIndexes,
@@ -42,11 +44,9 @@ const Import = () => {
     }
   );
 
-  let currentInstanceIndex = 0;
+  let currentIndex = currentInstanceIndex();
   createEffect(() => {
     if (taskId() !== undefined) {
-      console.log("TASK-ID", taskId());
-
       // eslint-disable-next-line solid/reactivity
       const task = rspc.createQuery(() => [
         "vtask.getTask",
@@ -56,23 +56,20 @@ const Import = () => {
       const isFailed = task.data && isProgressFailed(task.data.progress);
       const isDownloaded = task.data === null;
 
-      const currentInstance = selectedEntires()[currentInstanceIndex];
+      const currentInstance = selectedEntires()[currentIndex];
       if (!currentInstance) return;
       const instanceIndex = parseInt(currentInstance[0], 10);
-      console.log("TASK", task.data, task.isFetching, isFailed);
 
       setLoadingInstances(instanceIndex, task.data);
 
       if (isDownloaded || isFailed) {
-        currentInstanceIndex += 1;
+        currentIndex = setCurrentInstanceIndex((prev) => prev + 1);
         setLoadingInstances(instanceIndex, null);
         setImportedInstances((prev) => [...prev, instanceIndex]);
 
-        const nextInstance = selectedEntires()[currentInstanceIndex];
+        const nextInstance = selectedEntires()[currentIndex];
         if (!nextInstance) return;
         const nextInstanceIndex = parseInt(nextInstance[0], 10);
-
-        console.log("NEXT", nextInstanceIndex, currentInstanceIndex);
 
         importInstanceMutation.mutate({
           entity: selectedEntity(),
@@ -223,7 +220,7 @@ const Import = () => {
                               (loadingInstances[i()] as FETask).progress
                             )}
                           >
-                            <div class="w-1/2 relative">
+                            <div class="w-1/2 relative bg-darkSlate-600 rounded-lg overflow-hidden">
                               <div
                                 class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{
