@@ -28,10 +28,11 @@ const Overview = () => {
           "cdn.ko-fi.com",
         ],
       });
+
     return (
-      <Suspense fallback={<Skeleton.modpackScreenshotsPage />}>
+      <Suspense fallback={<Skeleton.modpackOverviewPage />}>
         <div>
-          <Switch fallback={<Skeleton.modpackScreenshotsPage />}>
+          <Switch fallback={<Skeleton.modpackOverviewPage />}>
             <Match when={routeData.isCurseforge}>
               <div innerHTML={cleanHtml()} />
             </Match>
@@ -52,16 +53,14 @@ const Overview = () => {
   };
 
   return (
-    <div>
-      <Switch fallback={<Skeleton.modpackOverviewPage />}>
-        <Match when={!routeData.modpackDescription?.isLoading}>
-          <Description />
-        </Match>
-        <Match when={routeData.modpackDescription?.isLoading}>
-          <Skeleton.modpackOverviewPage />
-        </Match>
-      </Switch>
-    </div>
+    <Switch fallback={<Skeleton.modpackOverviewPage />}>
+      <Match when={!routeData.modpackDescription?.isLoading}>
+        <Description />
+      </Match>
+      <Match when={routeData.modpackDescription?.isLoading}>
+        <Skeleton.modpackOverviewPage />
+      </Match>
+    </Switch>
   );
 };
 
