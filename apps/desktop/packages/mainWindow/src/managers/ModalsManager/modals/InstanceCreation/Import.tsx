@@ -1,94 +1,83 @@
 import {
+  instances,
+  loadingInstances,
+  selectedInstancesIndexes,
+  setInstances,
+  setLoadingInstances,
+  setSelectedInstancesIndexes,
+  setTaskId,
+  taskId,
+} from "@/utils/import";
+import {
   importedInstances,
   isProgressFailed,
+  isProgressKnown,
   setImportedInstances,
 } from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
-import {
-  FEEntity,
-  FEImportableInstance,
-  FETask,
-} from "@gd/core_module/bindings";
+import { FEEntity, FETask } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox, Spinner } from "@gd/ui";
-import { RSPCError } from "@rspc/client";
-import { CreateQueryResult } from "@tanstack/solid-query";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
-import { createStore } from "solid-js/store";
 
 const Import = () => {
   const [selectedEntity, setSelectedEntity] =
     createSignal<FEEntity>("legacyGDLauncher");
   const [isLoading, setIsLoading] = createSignal(false);
-  const [selectedInstancesIds, setSelectedInstancesIds] = createStore<{
-    [id: number]: boolean;
-  }>({});
-  const [loadingInstances, setLoadingInstances] = createStore<{
-    [id: number]: FETask | null | undefined;
-  }>({});
-  const [instances, setInstances] =
-    createSignal<CreateQueryResult<FEImportableInstance[], RSPCError>>();
-  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
-  const [currentInstanceIndex, setCurrentInstanceIndex] = createSignal(0);
 
   const scanImportableInstancesMutation = rspc.createMutation([
     "instance.scanImportableInstances",
   ]);
 
-  const entries = () => Object.entries(selectedInstancesIds);
-  const filteredEntries = () =>
+  const entries = () => Object.entries(selectedInstancesIndexes);
+  const selectedEntires = () =>
     entries().filter(([_i, isSelected]) => isSelected);
 
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
-      onSuccess(taskId, entity) {
-        console.log("ONSUCCESS", taskId, entity.index);
+      onSuccess(taskId) {
         setTaskId(taskId);
       },
     }
   );
 
+  let currentInstanceIndex = 0;
   createEffect(() => {
     if (taskId() !== undefined) {
-      console.log("TASK ID", taskId());
+      console.log("TASK-ID", taskId());
 
+      // eslint-disable-next-line solid/reactivity
       const task = rspc.createQuery(() => [
         "vtask.getTask",
         taskId() as number,
       ]);
 
       const isFailed = task.data && isProgressFailed(task.data.progress);
-      const isDownloaded =
-        task.data &&
-        task.data?.download_total > 0 &&
-        task.data?.downloaded === task.data?.download_total;
+      const isDownloaded = task.data === null;
 
-      const nextInstance = filteredEntries()[currentInstanceIndex()];
-      if (!nextInstance) return;
-      const instanceIndex = parseInt(nextInstance[0], 10);
-      console.log(
-        "TASK",
-        instanceIndex,
-        task.data,
-        (isDownloaded || isFailed) && !task.isLoading,
-        task.data && !task.isInitialLoading
-      );
+      const currentInstance = selectedEntires()[currentInstanceIndex];
+      if (!currentInstance) return;
+      const instanceIndex = parseInt(currentInstance[0], 10);
+      console.log("TASK", task.data, task.isFetching, isFailed);
 
       setLoadingInstances(instanceIndex, task.data);
 
       if (isDownloaded || isFailed) {
-        setLoadingInstances(instanceIndex, undefined);
-
-        console.log("NEXT");
+        currentInstanceIndex += 1;
+        setLoadingInstances(instanceIndex, null);
         setImportedInstances((prev) => [...prev, instanceIndex]);
+
+        const nextInstance = selectedEntires()[currentInstanceIndex];
+        if (!nextInstance) return;
+        const nextInstanceIndex = parseInt(nextInstance[0], 10);
+
+        console.log("NEXT", nextInstanceIndex, currentInstanceIndex);
 
         importInstanceMutation.mutate({
           entity: selectedEntity(),
-          index: instanceIndex,
+          index: nextInstanceIndex,
         });
-
-        setCurrentInstanceIndex((prev) => prev + 1);
       }
     }
   });
@@ -113,7 +102,7 @@ const Import = () => {
 
   const selectAll = (checked: boolean) => {
     instances()?.data?.forEach((_instance, i) => {
-      setSelectedInstancesIds((prev) => ({
+      setSelectedInstancesIndexes((prev) => ({
         ...prev,
         [i]: checked,
       }));
@@ -121,7 +110,7 @@ const Import = () => {
   };
 
   const areAllSelected = () =>
-    Object.values(selectedInstancesIds).filter((instance) => instance)
+    Object.values(selectedInstancesIndexes).filter((instance) => instance)
       .length === instances()?.data?.length;
 
   const isAllImported = () =>
@@ -167,7 +156,7 @@ const Import = () => {
         <div class="w-full bg-darkSlate-800 rounded-xl box-border flex flex-col overflow-hidden h-50">
           <div class="flex justify-between w-full bg-darkSlate-900 px-4 py-2 box-border">
             <Checkbox
-              disabled={isAllImported()}
+              disabled={isAllImported() || importedInstances().length > 0}
               checked={areAllSelected()}
               onChange={(checked) => {
                 selectAll(checked);
@@ -176,10 +165,12 @@ const Import = () => {
             <span
               class="cursor-pointer"
               classList={{
-                "text-darkSlate-600": isAllImported(),
+                "text-darkSlate-600":
+                  isAllImported() || importedInstances().length > 0,
               }}
               onClick={() => {
-                if (!isAllImported()) selectAll(!areAllSelected());
+                if (!isAllImported() || importedInstances().length === 0)
+                  selectAll(!areAllSelected());
               }}
             >
               <Switch>
@@ -201,9 +192,10 @@ const Import = () => {
                       <div class="flex gap-2 w-full">
                         <Checkbox
                           disabled={importedInstances().includes(i())}
-                          checked={selectedInstancesIds[i()]}
+                          checked={selectedInstancesIndexes[i()]}
                           onChange={(checked) => {
-                            setSelectedInstancesIds((prev) => ({
+                            // eslint-disable-next-line solid/reactivity
+                            setSelectedInstancesIndexes((prev) => ({
                               ...prev,
                               [i()]: checked,
                             }));
@@ -221,14 +213,34 @@ const Import = () => {
                       </div>
                       <Show
                         when={
-                          loadingInstances[i()]
-
-                          // loadingInstances[i()] &&
-                          // loadingInstances[i()]?.downloaded <
-                          //   loadingInstances[i()]?.download_total
+                          loadingInstances[i()] !== null &&
+                          loadingInstances[i()] !== undefined
                         }
                       >
-                        <Spinner />
+                        <div class="flex justify-between w-full">
+                          <Show
+                            when={isProgressKnown(
+                              (loadingInstances[i()] as FETask).progress
+                            )}
+                          >
+                            <div class="w-1/2 relative">
+                              <div
+                                class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
+                                style={{
+                                  width: `${
+                                    (
+                                      (loadingInstances[i()] as FETask)
+                                        .progress as {
+                                        Known: number;
+                                      }
+                                    ).Known * 100
+                                  }%`,
+                                }}
+                              />
+                            </div>
+                          </Show>
+                          <Spinner />
+                        </div>
                       </Show>
                     </div>
                   )}
@@ -244,38 +256,40 @@ const Import = () => {
         </div>
       </div>
       <Button
-        disabled={importedInstances().length === instances()?.data?.length}
+        disabled={isAllImported()}
         onClick={() => {
           setIsLoading(true);
-          const indexFirstElement = parseInt(filteredEntries()[0][0], 10);
-          console.log("entries()", entries());
+          const firstSelectedEntry = selectedEntires()[0];
+          const firstSelectedEntryIndex = firstSelectedEntry[0];
+          const parsedIndex = parseInt(firstSelectedEntryIndex, 10);
+
           importInstanceMutation.mutate({
             entity: selectedEntity(),
-            index: indexFirstElement,
+            index: parsedIndex,
           });
         }}
       >
         <Switch>
           <Match
             when={
-              Object.values(selectedInstancesIds).filter((id) => id).length >
-                0 && !isLoading()
+              Object.values(selectedInstancesIndexes).filter((id) => id)
+                .length > 0 && !isLoading()
             }
           >
             <div class="i-ri:folder-open-fill" />
             <Trans
               key="instance.import_instance_amount"
               options={{
-                instances_amount: Object.values(selectedInstancesIds).filter(
-                  (id) => id
-                ).length,
+                instances_amount: Object.values(
+                  selectedInstancesIndexes
+                ).filter((id) => id).length,
               }}
             />
           </Match>
           <Match
             when={
-              Object.values(selectedInstancesIds).filter((id) => id).length ===
-                0 && !isLoading()
+              Object.values(selectedInstancesIndexes).filter((id) => id)
+                .length === 0 && !isLoading()
             }
           >
             <div class="i-ri:folder-open-fill" />
