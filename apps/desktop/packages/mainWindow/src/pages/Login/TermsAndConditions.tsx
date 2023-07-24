@@ -17,9 +17,9 @@ const TermsAndConditions = (props: Props) => {
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   return (
-    <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 h-full">
+    <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 max-w-full h-full box-border">
       <div class="flex flex-col justify-between items-center w-full">
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4 w-full">
           <div class="flex justify-between">
             <h2 class="m-0">
               <Trans key="login.we_value_privacy_title" />
@@ -29,7 +29,7 @@ const TermsAndConditions = (props: Props) => {
               </Show>
             </h2>
           </div>
-          <div class="overflow-y-scroll max-h-48">
+          <div class="overflow-y-scroll max-h-38">
             <div class="flex flex-col m-0 text-darkSlate-100 text-left gap-4 leading-5">
               <Show when={activeUuid?.data}>
                 <div>

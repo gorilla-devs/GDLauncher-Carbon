@@ -111,13 +111,15 @@ export default function Login() {
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
               "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
               "overflow-hidden": step() === 2,
+              "w-140": step() !== 0,
+              "max-w-160": step() === 0,
             }}
           >
             <Show when={step() === 0}>
