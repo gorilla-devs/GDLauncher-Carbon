@@ -10,8 +10,8 @@ import {
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip, createNotification } from "@gd/ui";
+import { rspc } from "@/utils/rspcClient";
+import { Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
@@ -44,59 +44,8 @@ const Tile = (props: Props) => {
     props
   );
   const [t] = useTransContext();
-  const addNotification = createNotification();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
-
-  const deleteInstanceMutation = rspc.createMutation(
-    ["instance.deleteInstance"],
-    {
-      onMutate: async (
-        instanceId
-      ): Promise<
-        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      > => {
-        await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-
-        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
-
-        queryClient.setQueryData(
-          ["account.getActiveUuid", null],
-          (old: UngroupedInstance[] | undefined) => {
-            const filteredAccounts = old?.filter(
-              (account) => account.id !== instanceId
-            );
-
-            if (filteredAccounts) return filteredAccounts;
-          }
-        );
-
-        if (previusInstancesUngrouped) return { previusInstancesUngrouped };
-      },
-      onError: (
-        error,
-        _variables,
-        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      ) => {
-        addNotification(error.message, "error");
-
-        if (context?.previusInstancesUngrouped) {
-          queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
-            context.previusInstancesUngrouped
-          );
-        }
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-      },
-    }
-  );
 
   const launchInstanceMutation = rspc.createMutation([
     "instance.launchInstance",
@@ -129,7 +78,16 @@ const Tile = (props: Props) => {
   };
 
   const handleDelete = () => {
-    deleteInstanceMutation.mutate(props.instance.id);
+    // deleteInstanceMutation.mutate(props.instance.id);
+    modalsContext?.openModal(
+      {
+        name: "confirmInstanceDeletion",
+      },
+      {
+        id: props.instance.id,
+        name: props.instance.name,
+      }
+    );
   };
 
   const handleSettings = () => {
