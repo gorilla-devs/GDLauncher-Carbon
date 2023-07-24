@@ -18,9 +18,7 @@ const Categories = (props: Props) => {
   return (
     <div class="flex gap-2 scrollbar-hide">
       <Switch>
-        <Match
-          when={!props.isRowSmall() && getCategories(props.modProps).length < 5}
-        >
+        <Match when={!props.isRowSmall()}>
           <For each={getCategories(props.modProps)}>
             {(tag) => (
               <Tooltip
@@ -60,9 +58,7 @@ const Categories = (props: Props) => {
             )}
           </For>
         </Match>
-        <Match
-          when={props.isRowSmall() || getCategories(props.modProps).length >= 5}
-        >
+        <Match when={props.isRowSmall()}>
           <Tooltip
             content={
               isCurseForgeData(props.modProps.data)

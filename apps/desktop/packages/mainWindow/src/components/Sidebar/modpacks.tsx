@@ -13,8 +13,6 @@ import {
   FEUnifiedModLoaderType,
   CFFEModLoaderType,
   MRFELoader,
-  MRFELoaderType,
-  MRFEProjectType,
 } from "@gd/core_module/bindings";
 import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
@@ -22,6 +20,7 @@ import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { CategoryIcon } from "@/utils/instances";
+import { useTransContext } from "@gd/i18n";
 
 const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
   if (typeof category === "string") {
@@ -33,22 +32,25 @@ const ModloaderIcon = (props: {
   modloader: CFFEModLoaderType | MRFELoader;
 }) => {
   return (
-    <Switch
-      fallback={
-        <>
-          <Show when={getModloaderIcon(props.modloader)}>
-            <div
-              class="w-4 h-4"
-              innerHTML={getModloaderIcon(props.modloader)}
-            />
-          </Show>
-        </>
-      }
-    >
-      <Match when={typeof props.modloader === "string"}>
-        <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-      </Match>
-    </Switch>
+    // <Switch
+    //   fallback={
+    //     <>
+    //       <Show when={getModloaderIcon(props.modloader)}>
+    //         <div
+    //           class="w-4 h-4"
+    //           innerHTML={getModloaderIcon(props.modloader)}
+    //         />
+    //       </Show>
+    //     </>
+    //   }
+    // >
+    //   <Match when={typeof props.modloader === "string"}>
+    //     <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
+    //   </Match>
+    // </Switch>
+    <Show when={typeof props.modloader === "string"}>
+      <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
+    </Show>
   );
 };
 
@@ -64,6 +66,8 @@ const Sidebar = () => {
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const infiniteQuery = useInfiniteModpacksQuery();
+
+  const [t] = useTransContext();
 
   createEffect(() => {
     if (routeData.forgeCategories.data?.data) {
@@ -117,12 +121,6 @@ const Sidebar = () => {
       return searchCategory.modrinth;
     }
   };
-  const getModloaderName = (
-    modloaderName: CFFEModLoaderType | MRFELoaderType
-  ) => {
-    if (typeof modloaderName === "string") return modloaderName;
-    else return modloaderName.other;
-  };
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
@@ -135,22 +133,23 @@ const Sidebar = () => {
     return filtered;
   };
 
-  const modrinthModpackModloaders = () => {
-    const filtered = routeData.modrinthModloaders.data?.filter((modloader) =>
-      modloader.supported_project_types.includes("modpack" as MRFEProjectType)
-    );
-    return filtered;
-  };
+  // const modrinthModpackModloaders = () => {
+  //   const filtered = routeData.modrinthModloaders.data?.filter((modloader) =>
+  //     modloader.supported_project_types.includes("modpack" as MRFEProjectType)
+  //   );
+  //   return filtered;
+  // };
 
-  const modloaders = () =>
-    isCurseforge()
-      ? curseforgeModpackModloaders()
-      : modrinthModpackModloaders();
+  // const modloaders = () =>
+  //   isCurseforge()
+  //     ? curseforgeModpackModloaders()
+  //     : modrinthModpackModloaders();
+  const modloaders = () => curseforgeModpackModloaders();
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
-        <Collapsable title="Platform">
+        <Collapsable title={t("Platform")} noPadding>
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
@@ -176,16 +175,11 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
-        <Collapsable title="Modloader">
+        <Collapsable title={t("Modloader")} noPadding>
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
-                const modloaderName = () =>
-                  isCurseforge()
-                    ? capitalize(modloader as CFFEModLoaderType)
-                    : (capitalize(
-                        getModloaderName((modloader as MRFELoader).name)
-                      ) as string);
+                const modloaderName = () => capitalize(modloader);
 
                 return (
                   <div class="flex items-center gap-2">
@@ -195,8 +189,7 @@ const Sidebar = () => {
                           infiniteQuery?.query.modloaders || [];
 
                         const filteredModloaders = prevModloaders.filter(
-                          (modloader) =>
-                            getModloaderName(modloader) !== modloaderName()
+                          (modloader) => modloader !== modloaderName()
                         );
 
                         const newModloaders = checked
@@ -222,7 +215,7 @@ const Sidebar = () => {
         </Collapsable>
         <Switch>
           <Match when={categories().length > 0}>
-            <Collapsable title="Categories">
+            <Collapsable title={t("Categories")} noPadding>
               <div class="flex flex-col gap-3">
                 <For each={categories()}>
                   {(category) => {
