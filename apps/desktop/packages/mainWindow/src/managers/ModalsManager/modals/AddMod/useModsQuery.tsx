@@ -13,7 +13,7 @@ const useModsQuery = (
     categories: null,
     gameVersions: null,
     modloaders: null,
-    projectType: "modPack",
+    projectType: "mod",
     sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
     index: 0,

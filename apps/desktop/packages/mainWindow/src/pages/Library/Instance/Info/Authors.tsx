@@ -35,14 +35,14 @@ const Authors = (props: Props) => {
   const getAuthors = () => {
     if (props.isCurseforge && props.modpackDetails) {
       const modpack = props.modpackDetails as FEModResponse;
-      return modpack.data.authors;
+      return modpack.data?.authors;
     } else if (props.isModrinth) return authors();
 
     return [];
   };
 
   return (
-    <Show when={getAuthors().length > 0}>
+    <Show when={getAuthors()?.length > 0}>
       <div class="flex gap-2 items-center h-full">
         <div class="i-ri:user-fill" />
         <For each={getAuthors()}>
