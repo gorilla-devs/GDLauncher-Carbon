@@ -162,11 +162,11 @@ const Sidebar = () => {
                   modloaders: null,
                 });
               }}
-              value={infiniteQuery.query?.searchApi}
+              value={capitalize(infiniteQuery?.query?.searchApi)}
             >
               <For each={ModpackPlatforms}>
                 {(platform) => (
-                  <Radio name="platform" value={platform.toLocaleLowerCase()}>
+                  <Radio name="platform" value={platform}>
                     <div class="flex items-center gap-2">
                       <p class="m-0">{platform}</p>
                     </div>

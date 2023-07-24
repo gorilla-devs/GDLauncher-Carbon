@@ -96,7 +96,7 @@ export const getLogoUrl = (prop: ModRowProps) => {
 export const getWebsiteUrl = (prop: ModRowProps) => {
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.links.websiteUrl;
-  } else `${MODRNITH_WEBSITE_MODPACKS}${prop.data.modrinth.slug}`;
+  } else return `${MODRNITH_WEBSITE_MODPACKS}${prop.data.modrinth.slug}`;
 };
 
 export const getFEMod = (prop: ModRowProps) => {
@@ -111,16 +111,10 @@ export const getProjectId = (prop: ModRowProps) => {
   } else return prop.data.modrinth.project_id;
 };
 
-// export const getVersions = (prop: ModRowProps) => {
-//   if (isCurseForgeData(prop.data)) {
-//     return prop.data.curseforge.latestFilesIndexes;
-//   } else return prop.data.modrinth.versions;
-// };
-
 export const getLatestVersion = (prop: ModRowProps) => {
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.latestFilesIndexes[0].gameVersion;
-  } else return prop.data.modrinth.versions;
+  } else return prop.data.modrinth.versions[0];
 };
 
 export const sortArrayByGameVersion = (
