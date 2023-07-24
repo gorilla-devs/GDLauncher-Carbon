@@ -36,20 +36,21 @@ const Categories = (props: Props) => {
                     isCurseForgeData(props.modProps.data) ? (
                       (tag as CFFECategory).iconUrl
                     ) : (
-                      <Show
-                        fallback={tag as string}
-                        when={props.modrinthCategories?.find(
-                          (category) => category.name === tag
-                        )}
-                      >
-                        <CategoryIcon
-                          category={
-                            props.modrinthCategories?.find(
-                              (category) => category.name === tag
-                            ) as MRFECategory
-                          }
-                        />
-                      </Show>
+                      <Switch fallback={tag as string}>
+                        <Match
+                          when={props.modrinthCategories?.find(
+                            (category) => category.name === tag
+                          )}
+                        >
+                          <CategoryIcon
+                            category={
+                              props.modrinthCategories?.find(
+                                (category) => category.name === tag
+                              ) as MRFECategory
+                            }
+                          />
+                        </Match>
+                      </Switch>
                     )
                   }
                   type="fixed"
