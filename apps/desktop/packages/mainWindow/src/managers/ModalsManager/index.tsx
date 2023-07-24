@@ -64,6 +64,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification",
   },
+  confirmInstanceDeletion: {
+    component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
+    title: "Confirm Instance Deletion",
+  },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true,
