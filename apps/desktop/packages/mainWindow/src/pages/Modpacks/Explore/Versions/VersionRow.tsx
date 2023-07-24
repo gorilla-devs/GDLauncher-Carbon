@@ -3,16 +3,13 @@ import {
   CFFEMod,
   MRFEProject,
   MRFEVersion,
-  FETask,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { Spinner, createNotification } from "@gd/ui";
-import { Match, Switch, createEffect, createSignal } from "solid-js";
-import { RSPCError } from "@rspc/client";
-import { CreateQueryResult } from "@tanstack/solid-query";
+import { Match, Switch, createSignal } from "solid-js";
 
 type Props = {
   modVersion: MRFEVersion | CFFEFile;
@@ -25,36 +22,24 @@ const VersionRow = (props: Props) => {
   const addNotification = createNotification();
 
   const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
-  const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
-  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
-  const [task, setTask] = createSignal<CreateQueryResult<
-    FETask | null,
-    RSPCError
-  > | null>(null);
-
-  createEffect(() => {
-    if (taskId() !== undefined) {
-      // eslint-disable-next-line solid/reactivity
-      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
-    }
-  });
+  const [loading, setLoading] = createSignal(false);
 
   const prepareInstanceMutation = rspc.createMutation(
     ["instance.prepareInstance"],
     {
-      onSuccess(_data, taskId) {
-        setTaskId(taskId);
+      onSuccess(_data) {
+        setLoading(true);
         addNotification("Instance successfully created.");
       },
       onError() {
-        if (taskId()) dismissTaskMutation.mutate(taskId() as number);
+        setLoading(false);
         addNotification("Error while creating the instance.", "error");
       },
       onSettled() {
-        if (taskId()) dismissTaskMutation.mutate(taskId() as number);
+        setLoading(false);
         navigate(`/library`);
       },
     }
@@ -72,15 +57,6 @@ const VersionRow = (props: Props) => {
     }
   );
 
-  const getName = () => {
-    if (props.isCurseforge) {
-      return (props.modVersion as CFFEFile).displayName;
-    }
-    return `${(props.project as MRFEProject).title} ${
-      (props.modVersion as MRFEVersion).name
-    }`;
-  };
-
   const getDate = () => {
     if (props.isCurseforge) {
       return (props.modVersion as CFFEFile).fileDate;
@@ -92,7 +68,14 @@ const VersionRow = (props: Props) => {
     if (props.isCurseforge) {
       return (props.modVersion as CFFEFile).gameVersions[0];
     }
-    return (props.modVersion as MRFEVersion).version_number;
+    return (props.modVersion as MRFEVersion).game_versions[0];
+  };
+
+  const getName = () => {
+    if (props.isCurseforge) {
+      return (props.modVersion as CFFEFile).displayName;
+    }
+    return `${(props.project as MRFEProject).title} ${getLastGameVersion()}`;
   };
 
   const getReleaseType = () => {
@@ -155,6 +138,8 @@ const VersionRow = (props: Props) => {
           if (icon) {
             loadIconMutation.mutate(icon);
           }
+          setLoading(true);
+          console.log("props.modVersion", props.modVersion);
           createInstanceMutation.mutate({
             group: defaultGroup.data || 1,
             use_loaded_icon: true,
@@ -169,7 +154,7 @@ const VersionRow = (props: Props) => {
         }}
       >
         <Switch fallback={<div>Loading...</div>}>
-          <Match when={task()}>
+          <Match when={loading()}>
             <Trans
               key="modpack.version_downloading"
               options={{
@@ -178,7 +163,7 @@ const VersionRow = (props: Props) => {
             />
             <Spinner class="w-5 h-5" />
           </Match>
-          <Match when={!task()}>
+          <Match when={!loading()}>
             <Trans
               key="modpack.version_download"
               options={{
