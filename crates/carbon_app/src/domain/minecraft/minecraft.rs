@@ -6,7 +6,6 @@ use sysinfo::SystemExt;
 
 use crate::domain::{
     java::JavaArch,
-    maven::MavenCoordinates,
     runtime_path::{AssetsPath, LibrariesPath, RuntimePath},
 };
 
@@ -36,13 +35,8 @@ pub fn libraries_into_vec_downloadable(
         if let Some(base_url) = &library.url {
             let checksum = None;
 
-            // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
-            let Ok(maven) = MavenCoordinates::try_from(library.name.to_string(), None) else {
-                continue
-            };
-
-            let maven_path = maven.clone().into_path();
-            let Ok(maven_url) = maven.into_url(base_url) else {
+            let maven_path = library.name.into_path();
+            let Ok(maven_url) = library.name.into_url(base_url) else {
                 continue
             };
 
@@ -204,11 +198,7 @@ pub fn chain_lwjgl_libs_with_base_libs(
                         panic!("Library has no artifact or classifier");
                     }
                 } else if library.url.is_some() {
-                    let Ok(maven) = MavenCoordinates::try_from(library.name.to_string(), None) else {
-                        return None;
-                    };
-
-                    maven.into_path().to_string_lossy().to_string()
+                    library.name.into_path().to_string_lossy().to_string()
                 } else {
                     panic!("Library has no method of retrieval");
                 }

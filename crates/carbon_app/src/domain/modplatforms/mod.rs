@@ -1,4 +1,5 @@
 pub mod curseforge;
+pub mod modrinth;
 
 #[cfg(test)]
 mod test {

@@ -10,8 +10,8 @@ import {
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip, createNotification } from "@gd/ui";
+import { rspc } from "@/utils/rspcClient";
+import { Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
@@ -44,59 +44,8 @@ const Tile = (props: Props) => {
     props
   );
   const [t] = useTransContext();
-  const addNotification = createNotification();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
-
-  const deleteInstanceMutation = rspc.createMutation(
-    ["instance.deleteInstance"],
-    {
-      onMutate: async (
-        instanceId
-      ): Promise<
-        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      > => {
-        await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-
-        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
-
-        queryClient.setQueryData(
-          ["account.getActiveUuid", null],
-          (old: UngroupedInstance[] | undefined) => {
-            const filteredAccounts = old?.filter(
-              (account) => account.id !== instanceId
-            );
-
-            if (filteredAccounts) return filteredAccounts;
-          }
-        );
-
-        if (previusInstancesUngrouped) return { previusInstancesUngrouped };
-      },
-      onError: (
-        error,
-        _variables,
-        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      ) => {
-        addNotification(error.message, "error");
-
-        if (context?.previusInstancesUngrouped) {
-          queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
-            context.previusInstancesUngrouped
-          );
-        }
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-      },
-    }
-  );
 
   const launchInstanceMutation = rspc.createMutation([
     "instance.launchInstance",
@@ -129,7 +78,16 @@ const Tile = (props: Props) => {
   };
 
   const handleDelete = () => {
-    deleteInstanceMutation.mutate(props.instance.id);
+    // deleteInstanceMutation.mutate(props.instance.id);
+    modalsContext?.openModal(
+      {
+        name: "confirmInstanceDeletion",
+      },
+      {
+        id: props.instance.id,
+        name: props.instance.name,
+      }
+    );
   };
 
   const handleSettings = () => {
@@ -221,13 +179,8 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
-          {/* <Tooltip
-            content="TEST"
-            placement="right-start"
-            color="bg-darkSlate-400"
-          > */}
           <div
-            class="flex justify-center flex-col select-none group items-start z-50"
+            class="relative flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -240,107 +193,129 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div
-              class="flex justify-center relative items-center rounded-2xl overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
-              classList={{
-                grayscale: props.isLoading || isInQueue(),
-                "cursor-pointer":
-                  !props.isLoading &&
-                  !isInQueue() &&
-                  !props.isInvalid &&
-                  !props.failError &&
-                  !props.isRunning,
-              }}
-              style={{
-                "background-image": props.img
-                  ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`,
-                "background-size": props.img ? "cover" : "120%",
-              }}
-            >
-              <Show when={props.isInvalid}>
-                <h2 class="text-sm z-20 text-center">
-                  <Trans key="instance.error_invalid" />
-                </h2>
-                <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
-              </Show>
-              <Show when={props.failError}>
-                <h2 class="text-center z-20 text-sm">{props.failError}</h2>
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-                <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
-              </Show>
-
+            <div class="relative rounded-2xl overflow-hidden h-38 w-38">
               <div
-                class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
                 classList={{
-                  "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
-                    !props.isRunning,
-                  "scale-0": !props.isRunning,
-                  "bg-red-500 scale-100": props.isRunning,
-                  "group-hover:scale-100 group-hover:drop-shadow-xl":
+                  grayscale: props.isLoading || isInQueue(),
+                  "cursor-pointer":
                     !props.isLoading &&
                     !isInQueue() &&
                     !props.isInvalid &&
                     !props.failError &&
                     !props.isRunning,
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayClick();
+                style={{
+                  "background-image": props.img
+                    ? `url("${props.img as string}")`
+                    : `url("${DefaultImg}")`,
+                  "background-size": props.img ? "100%" : "120%",
                 }}
               >
-                <div
-                  class="text-white"
-                  classList={{
-                    "i-ri:play-fill": !props.isRunning,
-                    "i-ri:stop-fill text-xl": props.isRunning,
-                  }}
-                />
-              </div>
+                <Show when={props.isInvalid}>
+                  <h2 class="text-sm text-center z-20">
+                    <Trans key="instance.error_invalid" />
+                  </h2>
+                  <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
+                  <div class="absolute z-10 text-2xl text-yellow-500 i-ri:alert-fill top-1 right-1" />
+                </Show>
+                <Show when={props.failError}>
+                  <h2 class="text-center z-20 text-sm">{props.failError}</h2>
+                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                  <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
+                </Show>
 
-              <Show
-                when={
-                  props.isLoading &&
-                  props.percentage !== undefined &&
-                  props.percentage !== null
-                }
-              >
-                <div class="flex flex-col gap-2 z-20">
-                  <h3 class="m-0 text-center">
-                    {Math.round(props.percentage as number)}%
-                  </h3>
-                  <For each={props.subTasks}>
-                    {(subTask) => (
-                      <div class="text-center">
-                        <Trans
-                          key={subTask.name.translation}
-                          options={getTranslationArgs(subTask.name)}
-                        />
-                      </div>
-                    )}
-                  </For>
-                </div>
-              </Show>
-              <Show when={isInQueue()}>
-                <div class="z-12">
-                  <Spinner />
-                </div>
-              </Show>
-              <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
-                  class="absolute left-0 top-0 bottom-0 opacity-10 bg-white"
+                  class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
+                  classList={{
+                    "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
+                      !props.isRunning,
+                    "scale-0": !props.isRunning,
+                    "bg-red-500 scale-100": props.isRunning,
+                    "group-hover:scale-100 group-hover:drop-shadow-xl":
+                      !props.isLoading &&
+                      !isInQueue() &&
+                      !props.isInvalid &&
+                      !props.failError &&
+                      !props.isRunning,
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                >
+                  <div
+                    class="text-white"
+                    classList={{
+                      "i-ri:play-fill": !props.isRunning,
+                      "i-ri:stop-fill text-xl": props.isRunning,
+                    }}
+                  />
+                </div>
+
+                <Show
+                  when={
+                    props.isLoading &&
+                    props.percentage !== undefined &&
+                    props.percentage !== null
+                  }
+                >
+                  <div class="flex flex-col justify-center items-center gap-2 z-20 w-full h-full">
+                    <h3 class="m-0 text-center text-3xl opacity-50">
+                      {Math.round(props.percentage as number)}%
+                    </h3>
+                    <div class="h-10">
+                      <For each={props.subTasks}>
+                        {(subTask) => (
+                          <div
+                            class="text-center"
+                            classList={{
+                              "text-xs":
+                                props.subTasks && props.subTasks?.length > 1,
+                              "text-md": props.subTasks?.length === 1,
+                            }}
+                          >
+                            <Trans
+                              key={subTask.name.translation}
+                              options={getTranslationArgs(subTask.name)}
+                            />
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </Show>
+                <Show when={isInQueue()}>
+                  <div class="z-12 flex flex-col gap-2 items-center">
+                    <Spinner />
+                    <span class="font-bold">
+                      <Trans key="instance.isInQueue" />
+                    </span>
+                  </div>
+                </Show>
+                {/* <Show when={props.isLoading && props.percentage !== undefined}>
+                <div
+                  class="absolute left-0 bottom-0 opacity-10 bg-primary-500 h-4 z-20"
                   style={{
                     width: `${props.percentage}%`,
                   }}
                 />
-              </Show>
-              <Show when={props.isLoading || isInQueue()}>
-                <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+              </Show> */}
+                <Show when={props.isLoading || isInQueue()}>
+                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
+                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                </Show>
+              </div>
+              <Show when={props.isLoading && props.percentage !== undefined}>
+                <div
+                  class="absolute left-0 bottom-0 bg-primary-500 h-2 z-40 rounded-full"
+                  style={{
+                    width: `${props.percentage}%`,
+                  }}
+                />
               </Show>
             </div>
             <h4

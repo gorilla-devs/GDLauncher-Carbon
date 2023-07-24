@@ -11,7 +11,7 @@ CREATE TABLE "AppConfiguration" (
     "showNews" BOOLEAN NOT NULL DEFAULT true,
     "startupResolution" TEXT NOT NULL DEFAULT '854x480',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
-    "xmx" INTEGER NOT NULL DEFAULT 1024,
+    "xmx" INTEGER NOT NULL,
     "xms" INTEGER NOT NULL DEFAULT 1024,
     "defaultInstanceGroup" INTEGER,
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,

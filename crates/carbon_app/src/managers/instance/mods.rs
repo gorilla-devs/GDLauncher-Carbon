@@ -1,26 +1,15 @@
-use std::{
-    ffi::{OsStr, OsString},
-    io::Cursor,
-    sync::Arc,
-    time::Duration,
-};
-
+use std::ffi::OsStr;
 use anyhow::bail;
-use carbon_net::Downloadable;
-use md5::{Digest, Md5};
 use thiserror::Error;
 
-use crate::domain::instance as domain;
+
 use crate::{
-    api::keys::instance::*,
-    api::translation::Translation,
-    domain::{modplatforms::curseforge::filters::ModFileParameters, vtask::VisualTaskId},
-    managers::{metadata, vtask::VisualTask, ManagerRef},
+    api::keys::instance::*, managers::ManagerRef, domain::vtask::VisualTaskId
 };
 
 use super::{
-    installer::{CurseforgeModInstaller, IntoInstaller},
-    Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError, Mod,
+    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
+    Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError,
 };
 
 impl ManagerRef<'_, InstanceManager> {
@@ -140,9 +129,24 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let install_result = installer.install(self.app, &instance_id).await?;
+        let task_id = installer.install(self.app, &instance_id).await?;
 
-        Ok(install_result)
+        Ok(task_id)
+    }
+
+    pub async fn install_modrinth_mod(
+        &self,
+        instance_id: InstanceId,
+        project_id: String,
+        version_id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
+            .await?
+            .into_installer();
+
+        let task_id = installer.install(self.app, &instance_id).await?;
+
+        Ok(task_id)
     }
 }
 

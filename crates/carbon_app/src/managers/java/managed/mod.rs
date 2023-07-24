@@ -158,8 +158,7 @@ impl ManagedService {
 
                     while recv.changed().await.is_ok() {
                         let mut progress_ref = progress_ref.lock().await;
-                        let borrowed_progress = recv.borrow().clone();
-                        *progress_ref = borrowed_progress;
+                        *progress_ref = recv.borrow().clone();
                         app.invalidate(GET_SETUP_MANAGED_JAVA_PROGRESS, None);
                         drop(progress_ref);
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;

@@ -1,16 +1,18 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
+use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
-use crate::managers::minecraft::curseforge::{self, ProgressState};
+use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
+use crate::managers::minecraft::modrinth;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
-use crate::domain::instance::{self as domain, GameLogId, InstanceSettingsUpdate};
+use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
@@ -18,7 +20,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 use anyhow::{anyhow, bail};
 
@@ -86,7 +88,7 @@ impl ManagerRef<'_, InstanceManager> {
             None => self
                 .app
                 .settings_manager()
-                .get()
+                .get_settings()
                 .await
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
@@ -95,7 +97,7 @@ impl ManagerRef<'_, InstanceManager> {
             true => self
                 .app
                 .settings_manager()
-                .get()
+                .get_settings()
                 .await
                 .map(|c| c.java_custom_args)
                 .unwrap_or(String::new()),
@@ -205,59 +207,120 @@ impl ManagerRef<'_, InstanceManager> {
                     t_modpack
                 {
                     if let Some(modpack) = &config.modpack {
-                        let Modpack::Curseforge(modpack) = modpack;
+                        let v: StandardVersion = match modpack {
+                            Modpack::Curseforge(modpack) => {
 
-                        t_request.start_opaque();
-                        let file = app
-                            .modplatforms_manager()
-                            .curseforge
-                            .get_mod_file(ModFileParameters {
-                                file_id: modpack.file_id as i32,
-                                mod_id: modpack.project_id as i32,
-                            })
-                            .await?
-                            .data;
-                        t_request.complete_opaque();
+                                t_request.start_opaque();
+                                let file = app
+                                    .modplatforms_manager()
+                                    .curseforge
+                                    .get_mod_file(ModFileParameters {
+                                        file_id: modpack.file_id as i32,
+                                        mod_id: modpack.project_id as i32,
+                                    })
+                                    .await?
+                                    .data;
+                                t_request.complete_opaque();
 
-                        let (modpack_progress_tx, mut modpack_progress_rx) =
-                            tokio::sync::watch::channel(ProgressState::Idle);
+                                let (modpack_progress_tx, mut modpack_progress_rx) =
+                                    tokio::sync::watch::channel(curseforge::ProgressState::Idle);
 
-                        tokio::spawn(async move {
-                            while modpack_progress_rx.changed().await.is_ok() {
-                                {
-                                    let progress = modpack_progress_rx.borrow();
-                                    match *progress {
-                                        ProgressState::Idle => {}
-                                        ProgressState::DownloadingAddonZip(downloaded, total) => {
-                                            t_download_files
-                                                .update_download(downloaded as u32, total as u32)
+                                tokio::spawn(async move {
+                                    while modpack_progress_rx.changed().await.is_ok() {
+                                        {
+                                            let progress = modpack_progress_rx.borrow();
+                                            match *progress {
+                                                curseforge::ProgressState::Idle => {}
+                                                curseforge::ProgressState::DownloadingAddonZip(downloaded, total) => {
+                                                    t_download_files
+                                                        .update_download(downloaded as u32, total as u32)
+                                                }
+                                                curseforge::ProgressState::ExtractingAddonOverrides(count, total) => {
+                                                    t_extract_files.update_items(count as u32, total as u32)
+                                                }
+                                                curseforge::ProgressState::AcquiringAddonsMetadata(count, total) => {
+                                                    t_addon_metadata
+                                                        .update_items(count as u32, total as u32)
+                                                }
+                                            }
                                         }
-                                        ProgressState::ExtractingAddonOverrides(count, total) => {
-                                            t_extract_files.update_items(count as u32, total as u32)
-                                        }
-                                        ProgressState::AcquiringAddonsMetadata(count, total) => {
-                                            t_addon_metadata
-                                                .update_items(count as u32, total as u32)
-                                        }
+
+                                        tokio::time::sleep(Duration::from_millis(200)).await;
                                     }
-                                }
 
-                                tokio::time::sleep(Duration::from_millis(200)).await;
+                                    t_download_files.complete_download();
+                                });
+
+                                let modpack_info = curseforge::prepare_modpack_from_addon(
+                                    &app,
+                                    &file,
+                                    instance_path.clone(),
+                                    modpack_progress_tx,
+                                )
+                                .await?;
+
+                                downloads.extend(modpack_info.downloadables);
+
+                                modpack_info.manifest.minecraft.try_into()?
                             }
+                            Modpack::Modrinth(modpack) =>  {
+                                t_request.start_opaque();
+                                let file = app
+                                    .modplatforms_manager()
+                                    .modrinth
+                                    .get_version(VersionID(modpack.version_id.clone()))
+                                    .await?
+                                    .files
+                                    .into_iter()
+                                    .reduce(|a, b| {
+                                        if b.primary {
+                                            b
+                                        } else {
+                                            a
+                                        }
+                                    })
+                                    .ok_or_else(|| anyhow!("Modrinth project '{}' version '{}' does not have a file", modpack.project_id, modpack.version_id))?;
+                                t_request.complete_opaque();
 
-                            t_download_files.complete_download();
-                        });
+                                let (modpack_progress_tx, mut modpack_progress_rx) =
+                                    tokio::sync::watch::channel(modrinth::ProgressState::Idle);
 
-                        let modpack_info = curseforge::prepare_modpack_from_addon(
-                            &app,
-                            &file,
-                            instance_path.clone(),
-                            modpack_progress_tx,
-                        )
-                        .await?;
+                                tokio::spawn(async move {
+                                    while modpack_progress_rx.changed().await.is_ok() {
+                                        {
+                                            let progress = modpack_progress_rx.borrow();
+                                            match *progress {
+                                                modrinth::ProgressState::Idle => {}
+                                                modrinth::ProgressState::DownloadingMRPack(downloaded, total) => {
+                                                    t_download_files
+                                                        .update_download(downloaded as u32, total as u32)
+                                                }
+                                                modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
+                                                    t_extract_files.update_items(count as u32, total as u32)
+                                                }
+                                                modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
+                                                    t_addon_metadata
+                                                        .update_items(count as u32, total as u32)
+                                                }
+                                            }
+                                        }
 
-                        downloads.extend(modpack_info.downloadables);
-                        let v: StandardVersion = modpack_info.manifest.minecraft.try_into()?;
+                                        tokio::time::sleep(Duration::from_millis(200)).await;
+                                    }
+
+                                    t_download_files.complete_download();
+                                });
+
+                                let modpack_info = modrinth::prepare_modpack_from_file(&app, &file, instance_path.clone(), modpack_progress_tx).await?;
+
+                                downloads.extend(modpack_info.downloadables);
+
+                                modpack_info.index.dependencies.try_into()?
+
+                            }
+                        };
+
+
 
                         tracing::info!("Modpack version: {:?}", v);
 
@@ -552,7 +615,9 @@ impl ManagerRef<'_, InstanceManager> {
                     t_download_files.complete_download();
                 });
 
-                carbon_net::download_multiple(downloads, progress_watch_tx).await?;
+                let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
+
+                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
 
                 // scan instances again offtask to pick up modpack mods
                 let app2 = app.clone();

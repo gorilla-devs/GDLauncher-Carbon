@@ -2,16 +2,16 @@ import { rspc } from "@/utils/rspcClient";
 
 const fetchData = ({ params }: { params: any }) => {
   const curseforgeGetModFiles = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetModFiles",
+    "modplatforms.curseforge.getModFiles",
     { modId: parseInt(params.id, 10), query: {} },
   ]);
 
   const curseforgeGetMod = rspc.createQuery(() => [
-    "modplatforms.curseforgeGetMod",
+    "modplatforms.curseforge.getMod",
     { modId: parseInt(params.id, 10) },
   ]);
 
-  return { curseforgeGetModFiles, curseforgeGetMod };
+  return { curseforgeGetMod, curseforgeGetModFiles };
 };
 
 export default fetchData;
