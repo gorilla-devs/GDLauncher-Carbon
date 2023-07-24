@@ -198,8 +198,6 @@ export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
-export type FESearchAPI = "curseforge" | "modrinth"
-
 export type FEUnifiedModLoaderType = "forge" | "fabric" | "quilt" | "liteloader" | "cauldron" | "bukkit" | "bungeecord" | "canvas" | "datapack" | "folia" | "iris" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall" | { other: string }
 
 export type FETaskId = number
@@ -242,6 +240,8 @@ export type CFFEFilesParametersBody = { fileIds: number[] }
 export type MRFEGalleryItem = { url: string; featured: boolean; title: string | null; description: string | null; created: string; ordering: number }
 
 export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: string }
+
+export type FESearchAPI = "curseforge" | "modrinth"
 
 export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningOfGroup: FEGroupId } | { EndOfGroup: FEGroupId }
 
