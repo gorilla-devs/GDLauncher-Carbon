@@ -4,6 +4,7 @@ type Props = {
   children: JSX.Element;
   title?: string | JSX.Element;
   size?: "standard" | "small";
+  noPadding?: boolean;
 };
 
 const Collapsable = (props: Props) => {
@@ -14,8 +15,8 @@ const Collapsable = (props: Props) => {
       <div
         class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         classList={{
-          "px-3": props.size !== "small",
-          "px-2": props.size === "small",
+          "px-3": props.size !== "small" && !props.noPadding,
+          "px-2": props.size === "small" && !props.noPadding,
         }}
         onClick={() => {
           setOpened((prev) => !prev);

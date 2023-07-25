@@ -3,7 +3,7 @@ import { port } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useParams, useRouteData } from "@solidjs/router";
 import { For, Match, Switch, createEffect, createResource } from "solid-js";
-import fetchData from "../instance.logs.data";
+import fetchData from "../../instance.logs.data";
 import { getRunningState } from "@/utils/instances";
 
 const fetchLogs = async (logId: number) => {

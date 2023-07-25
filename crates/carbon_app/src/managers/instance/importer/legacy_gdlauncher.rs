@@ -6,14 +6,11 @@ use tokio::{
     sync::Mutex,
 };
 
-
 use crate::{
     api::{instance::import::FEEntity, keys},
     domain::{
-        instance::{
-            info::{
-                CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
-            },
+        instance::info::{
+            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },

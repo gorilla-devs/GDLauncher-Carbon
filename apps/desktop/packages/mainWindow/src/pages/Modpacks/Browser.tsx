@@ -10,16 +10,20 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { FEModSearchSortField } from "@gd/core_module/bindings";
+import {
+  CFFEModSearchSortField,
+  MRFESearchIndex,
+} from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { useInfiniteModpacksQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
-import { SortFields } from "@/utils/constants";
-import { rspc } from "@/utils/rspcClient";
+import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import { setScrollTop } from "@/utils/browser";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { useModal } from "@/managers/ModalsManager";
+import { useRouteData } from "@solidjs/router";
+import fetchData from "./browser.data";
 
 const NoMoreModpacks = () => {
   return (
@@ -40,7 +44,7 @@ const NoMoreModpacks = () => {
 
 const NoModpacksAvailable = () => {
   return (
-    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
+    <div class="flex flex-col justify-center items-center gap-4 bg-darkSlate-700 rounded-xl h-100 mx-5">
       <div class="flex justify-center items-center flex-col text-center">
         <img src={skull} class="w-16 h-16" />
 
@@ -99,7 +103,7 @@ export default function Browser() {
   const [t] = useTransContext();
   const modalsContext = useModal();
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const infiniteQuery = useInfiniteModpacksQuery();
 
@@ -109,7 +113,7 @@ export default function Browser() {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.query.index) {
+    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
       return;
     }
 
@@ -147,6 +151,11 @@ export default function Browser() {
     }
   });
 
+  const isCurseforge = () => infiniteQuery.query.searchApi === "curseforge";
+
+  const sortingFields = () =>
+    isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -160,7 +169,7 @@ export default function Browser() {
             class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
             onInput={(e) => {
               const target = e.target as HTMLInputElement;
-              infiniteQuery?.setQuery({ searchFilter: target.value });
+              infiniteQuery?.setQuery({ searchQuery: target.value });
             }}
           />
           <div class="flex items-center gap-3">
@@ -173,13 +182,21 @@ export default function Browser() {
               />
             </p>
             <Dropdown
-              options={SortFields.map((field) => ({
+              options={sortingFields().map((field) => ({
                 label: t(`instance.sort_by_${field}`),
                 key: field,
               }))}
               onChange={(val) => {
+                const sortIndex = isCurseforge()
+                  ? {
+                      curseForge: val.key as CFFEModSearchSortField,
+                    }
+                  : {
+                      modrinth: val.key as MRFESearchIndex,
+                    };
+
                 infiniteQuery?.setQuery({
-                  sortField: val.key as FEModSearchSortField,
+                  sortIndex: sortIndex,
                 });
               }}
               value={0}
@@ -192,7 +209,9 @@ export default function Browser() {
                 rounded
                 value={mappedMcVersions()[0].key}
                 onChange={(val) => {
-                  infiniteQuery?.setQuery({ gameVersion: val.key as string });
+                  infiniteQuery?.setQuery({
+                    gameVersions: [val.key as string],
+                  });
                 }}
               />
             </Show>
@@ -218,14 +237,11 @@ export default function Browser() {
           <div
             class="cursor-pointer text-2xl"
             classList={{
-              "i-ri:sort-asc":
-                infiniteQuery?.query.query.sortOrder === "ascending",
-              "i-ri:sort-desc":
-                infiniteQuery?.query.query.sortOrder === "descending",
+              "i-ri:sort-asc": infiniteQuery?.query.sortOrder === "ascending",
+              "i-ri:sort-desc": infiniteQuery?.query.sortOrder === "descending",
             }}
             onClick={() => {
-              const isAsc =
-                infiniteQuery?.query.query.sortOrder === "ascending";
+              const isAsc = infiniteQuery?.query.sortOrder === "ascending";
               infiniteQuery?.setQuery({
                 sortOrder: isAsc ? "descending" : "ascending",
               });
@@ -307,7 +323,10 @@ export default function Browser() {
                               <ModRow
                                 type="Modpack"
                                 data={modpack()}
-                                defaultGroup={defaultGroup.data}
+                                defaultGroup={routeData.defaultGroup.data}
+                                modrinthCategories={
+                                  routeData.modrinthCategories.data
+                                }
                               />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>

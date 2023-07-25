@@ -3,7 +3,7 @@ import forgeIcon from "/assets/images/icons/forge.png";
 import fabricIcon from "/assets/images/icons/fabric.png";
 import quiltIcon from "/assets/images/icons/quilt.svg";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
-import { FEModLoaderType } from "@gd/core_module/bindings";
+import { CFFEModLoaderType } from "@gd/core_module/bindings";
 
 const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);
 
@@ -11,7 +11,7 @@ export const toggleSidebar = () => {
   return setIsSidebarOpened(!isSidebarOpened());
 };
 
-const getModloaderIcon = (modloader?: FEModLoaderType) => {
+const getForgeModloaderIcon = (modloader?: CFFEModLoaderType) => {
   switch (modloader?.toLowerCase()) {
     case "forge":
       return forgeIcon;
@@ -24,4 +24,4 @@ const getModloaderIcon = (modloader?: FEModLoaderType) => {
   }
 };
 
-export { isSidebarOpened, getModloaderIcon };
+export { isSidebarOpened, getForgeModloaderIcon };

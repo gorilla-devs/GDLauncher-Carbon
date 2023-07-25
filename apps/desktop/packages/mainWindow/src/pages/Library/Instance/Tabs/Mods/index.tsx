@@ -7,7 +7,7 @@ import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
-import fetchData from "../instance.data";
+import fetchData from "../../instance.data";
 
 const Mods = () => {
   const [t] = useTransContext();

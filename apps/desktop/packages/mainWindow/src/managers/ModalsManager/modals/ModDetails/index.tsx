@@ -2,7 +2,7 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { FEMod } from "@gd/core_module/bindings";
+import { CFFEMod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
@@ -11,7 +11,7 @@ import { lastInstanceOpened } from "@/utils/routes";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
-  const modDetails = () => props.data?.mod as FEMod;
+  const modDetails = () => props.data?.mod as CFFEMod;
   const modId = () => modDetails()?.id;
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
@@ -85,8 +85,9 @@ const ModDetails = (props: ModalProps) => {
                       <div
                         class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                         style={{
-                          "background-image": `url("${modDetails()?.logo?.thumbnailUrl
-                            }")`,
+                          "background-image": `url("${
+                            modDetails()?.logo?.thumbnailUrl
+                          }")`,
                         }}
                       />
                       <div class="flex flex-1 flex-col max-w-185">
@@ -191,7 +192,7 @@ const ModDetails = (props: ModalProps) => {
                             Curseforge: {
                               project_id: modDetails().id,
                               file_id: modDetails().mainFileId,
-                            }
+                            },
                           },
                           instance_id: parseInt(lastInstanceOpened(), 10),
                         });
