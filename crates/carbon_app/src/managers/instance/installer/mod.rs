@@ -1,9 +1,6 @@
 use anyhow::{bail, Context};
 use carbon_net::{Checksum, Downloadable};
-use std::{
-    cell::RefCell, collections::HashSet, ffi::OsString, ops::Deref, path::PathBuf, pin::Pin,
-    sync::Arc, time::Duration,
-};
+use std::{ffi::OsString, ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use crate::{
@@ -11,10 +8,14 @@ use crate::{
     domain::{
         self,
         instance::{self, InstanceId},
-        modplatforms::curseforge::{
-            self,
-            filters::{
-                ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
+        modplatforms::{
+            curseforge::{
+                self,
+                filters::{ModFileParameters, ModFilesParameters, ModFilesParametersQuery},
+            },
+            modrinth::{
+                self,
+                search::{ProjectID, VersionID},
             },
         },
         runtime_path::InstancePath,
@@ -25,7 +26,7 @@ use crate::{
 
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
 
-use futures::future::{BoxFuture, Future};
+use futures::future::Future;
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
@@ -464,6 +465,7 @@ impl Installer {
     }
 }
 
+// curseforge
 pub struct CurseforgeModInstaller {
     file: crate::domain::modplatforms::curseforge::File,
     download_url: String,
@@ -723,6 +725,292 @@ impl ResourceInstaller for CurseforgeModInstaller {
 }
 
 impl IntoInstaller for CurseforgeModInstaller {
+    fn into_installer(self) -> Installer {
+        Installer::new(Box::new(self) as BoxedResourceInstaller)
+    }
+}
+
+// modrinth
+pub struct ModrinthModInstaller {
+    version: crate::domain::modplatforms::modrinth::version::Version,
+    file: crate::domain::modplatforms::modrinth::version::VersionFile,
+    download_url: String,
+    applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
+}
+
+impl ModrinthModInstaller {
+    pub async fn create(
+        app: &Arc<AppInner>,
+        project_id: String,
+        version_id: String,
+    ) -> anyhow::Result<Self> {
+        let version = app
+            .modplatforms_manager()
+            .modrinth
+            .get_version(VersionID(version_id.clone()))
+            .await?;
+
+        let file = version
+            .files
+            .iter()
+            .reduce(|a, b| if b.primary { b } else { a })
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Modrinth project '{}' version '{}' does not have a file",
+                    &project_id,
+                    &version_id
+                )
+            })?;
+
+        let download_url = file.url.clone();
+
+        Ok(Self {
+            version,
+            file,
+            download_url,
+            applied_data: Arc::new(Mutex::new(None)),
+        })
+    }
+
+    pub fn from_version(
+        version: crate::domain::modplatforms::modrinth::version::Version,
+    ) -> anyhow::Result<Self> {
+        let file = version
+            .files
+            .iter()
+            .reduce(|a, b| if b.primary { b } else { a })
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Modrinth project '{}' version '{}' does not have a file",
+                    &version.project_id,
+                    &version.id
+                )
+            })?;
+
+        let download_url = file.url.clone();
+
+        Ok(Self {
+            version,
+            file,
+            download_url,
+            applied_data: Arc::new(Mutex::new(None)),
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl ResourceInstaller for ModrinthModInstaller {
+    fn id(&self) -> String {
+        format!("modrinth:{}:{}", &self.version.project_id, &self.version.id)
+    }
+
+    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
+        let install_path = instance_path.get_mods_path().join(&self.file.filename);
+
+        let checksum = Checksum::Sha1(self.file.hashes.sha1.clone());
+
+        Some(Downloadable::new(&self.download_url, install_path).with_checksum(Some(checksum)))
+    }
+
+    fn dependencies(
+        &self,
+        app: &Arc<AppInner>,
+        instance_data: &InstanceData,
+    ) -> DependencyIterator {
+        let game_version = instance_data
+            .config
+            .game_configuration
+            .version
+            .clone()
+            .and_then(|ver| match ver {
+                instance::info::GameVersion::Standard(version) => {
+                    Some((version.release, version.modloaders))
+                }
+                _ => None,
+            });
+
+        let mut installers: Vec<ResourceInstallerGetter> = Vec::new();
+        for dep in &self.version.dependencies {
+            let app_clone = Arc::clone(app);
+            let version_id = dep.version_id.clone();
+            let project_id = dep.project_id.clone();
+            let game_version = game_version.clone();
+
+            if let modrinth::version::DependencyType::Required = dep.dependency_type {
+                if let Some(version_id) = version_id {
+                    installers.push(Box::new(move || {
+                        Box::pin(async move {
+                            app_clone
+                                .modplatforms_manager()
+                                .modrinth
+                                .get_version(VersionID(version_id))
+                                .await
+                                .and_then(|version| {
+                                    // let app_clone = Arc::clone(&self.app);
+                                    ModrinthModInstaller::from_version(version).map(|installer| {
+                                        Box::new(installer) as BoxedResourceInstaller
+                                    })
+                                })
+                        })
+                    }));
+                } else if let Some(project_id) = project_id {
+                    installers.push(Box::new(move || {
+                        Box::pin(async move {
+                            app_clone
+                                .modplatforms_manager()
+                                .modrinth
+                                .get_project_versions(ProjectID(project_id))
+                                .await
+                                .and_then(|versions| {
+                                    if let Some((release, modloaders)) = game_version {
+                                        let modloader_strings: Vec<String> = modloaders
+                                            .iter()
+                                            .filter_map(|modloader| match modloader.type_ {
+                                                domain::instance::info::ModLoaderType::Forge => {
+                                                    Some("forge".to_string())
+                                                }
+                                                domain::instance::info::ModLoaderType::Fabric => {
+                                                    Some("fabric".to_string())
+                                                }
+                                                domain::instance::info::ModLoaderType::Quilt => {
+                                                    Some("quilt".to_string())
+                                                }
+                                                domain::instance::info::ModLoaderType::Unknown => {
+                                                    None
+                                                }
+                                            })
+                                            .collect();
+                                        if let Some(version) = versions.iter().find(|&version| {
+                                            let has_release =
+                                                version.game_versions.contains(&release);
+                                            let has_one_of_our_modloaders =
+                                                version.loaders.iter().any(|loader| {
+                                                    modloader_strings
+                                                        .contains(&loader.to_lowercase())
+                                                });
+                                            has_release && has_one_of_our_modloaders
+                                        }) {
+                                            Ok(version.clone())
+                                        } else {
+                                            versions
+                                                .first()
+                                                .cloned()
+                                                .ok_or_else(|| anyhow::anyhow!("no versions found"))
+                                        }
+                                    } else {
+                                        versions
+                                            .first()
+                                            .cloned()
+                                            .ok_or_else(|| anyhow::anyhow!("no versions found"))
+                                    }
+                                })
+                                .and_then(|version| {
+                                    ModrinthModInstaller::from_version(version).map(|installer| {
+                                        Box::new(installer) as BoxedResourceInstaller
+                                    })
+                                })
+                        })
+                    }));
+                }
+            }
+        }
+        DependencyIterator::new(installers.into_iter())
+    }
+
+    fn is_already_installed(&self, instance_data: &InstanceData) -> bool {
+        // TODO: check with fingerprint once local meta cache is done
+        let filename = &self.file.filename;
+        instance_data
+            .mods
+            .iter()
+            .any(|m| &m.filename.to_string_lossy() == filename)
+    }
+
+    fn display_name(&self) -> String {
+        self.version.name.clone()
+    }
+
+    async fn perform_install(
+        &self,
+        instance_data: &mut InstanceData,
+        downloadable: Option<Downloadable>,
+    ) -> anyhow::Result<()> {
+        let Some(downloadable) = downloadable else {
+            return Err(anyhow::anyhow!("Perform install called before file was downloaded."))
+        };
+
+        tracing::info!(
+            "Installing {} from {}",
+            self.version.name,
+            downloadable.path.to_string_lossy()
+        );
+
+        let file_data = tokio::fs::read(&downloadable.path).await.with_context(|| {
+            format!(
+                "failed to read file: `{}`",
+                &downloadable.path.to_string_lossy()
+            )
+        })?;
+
+        let id = {
+            use sha1::{Digest, Sha1};
+            let sha1hash = Sha1::new_with_prefix(&file_data).finalize();
+            hex::encode(sha1hash)
+        };
+
+        let metadata = tokio::task::spawn_blocking(|| {
+            metadata::mods::parse_metadata(std::io::Cursor::new(file_data))
+        })
+        .await??
+        .ok_or_else(|| anyhow::anyhow!("downloaded modrinth mod did not have any metadata"))?;
+
+        let mod_data = Mod {
+            id,
+            filename: OsString::from(&self.file.filename),
+            enabled: true,
+            modloaders: metadata
+                .modloaders
+                .clone()
+                .unwrap_or_else(|| vec![instance::info::ModLoaderType::Forge]),
+            metadata,
+        };
+
+        instance_data.mods.push(mod_data.clone());
+        *self.applied_data.lock().await = Some((mod_data, downloadable));
+        Ok(())
+    }
+
+    async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
+        let mut lock = self.applied_data.lock().await;
+        if let Some((applied_mod_data, downloadable)) = &*lock {
+            instance_data
+                .mods
+                .retain(|mod_data| mod_data.id != applied_mod_data.id);
+
+            match tokio::fs::try_exists(&downloadable.path).await {
+                Ok(true) => {
+                    tokio::fs::remove_file(&downloadable.path).await?;
+                }
+                Ok(false) => {
+                    // not downloaded yet
+                    // NOOP
+                }
+                Err(_) => {
+                    // no confirmation of path, not downloaded yet
+                    // NOOP
+                }
+            }
+        }
+
+        *lock = None;
+
+        Ok(())
+    }
+}
+
+impl IntoInstaller for ModrinthModInstaller {
     fn into_installer(self) -> Installer {
         Installer::new(Box::new(self) as BoxedResourceInstaller)
     }

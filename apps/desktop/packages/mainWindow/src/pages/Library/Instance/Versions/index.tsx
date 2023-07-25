@@ -48,7 +48,7 @@ const Versions = () => {
 
   if (routeData.instanceDetails.data?.modpack?.Curseforge.project_id) {
     const instanceDetails = rspc.createQuery(() => [
-      "modplatforms.curseforgeGetMod",
+      "modplatforms.curseforge.getMod",
       {
         modId: modId(),
       },

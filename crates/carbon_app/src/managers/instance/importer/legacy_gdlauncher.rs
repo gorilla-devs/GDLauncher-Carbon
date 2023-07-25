@@ -5,7 +5,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
 };
-use tracing::info;
+
 
 use crate::{
     api::{instance::import::FEEntity, keys},
@@ -14,7 +14,6 @@ use crate::{
             info::{
                 CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
             },
-            InstanceId,
         },
         vtask::VisualTaskId,
     },

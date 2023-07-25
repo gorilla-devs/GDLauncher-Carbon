@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     db::read_filters::StringFilter,
-    error::request::{RequestContext, RequestError, RequestErrorDetails},
+    error::request::{MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails},
     once_send::OnceSend,
 };
 
@@ -271,7 +271,9 @@ impl ManagerRef<'_, DownloadManager> {
                                 Err(()) => {
                                     bail!(RequestError {
                                         context: RequestContext::from_response(&response),
-                                        error: RequestErrorDetails::MalformedResponse,
+                                        error: RequestErrorDetails::MalformedResponse {
+                                            details: MalformedResponseDetails::UnknownDecodeError
+                                        },
                                     });
                                 }
                             }
