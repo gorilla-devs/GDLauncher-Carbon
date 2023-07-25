@@ -14,7 +14,11 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, vtask::VisualTask, AppInner},
+    managers::{
+        instance::InstanceVersionSource,
+        vtask::{Subtask, VisualTask},
+        AppInner,
+    },
 };
 
 use super::InstanceImporter;
@@ -181,10 +185,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         let instance_full_path = instance.full_path.clone();
         let instance_background = instance.config.background.clone();
         let app_clone = Arc::clone(&app);
-        let callback_task = move |task: VisualTask| {
+        let callback_task = move |subtask: Subtask| {
             Box::pin(async move {
-                let subtask = task.subtask(Translation::FinalizingImport).await;
-                subtask.set_weight(1.0);
                 subtask.start_opaque();
 
                 let walked_dir = walkdir::WalkDir::new(&instance_full_path)

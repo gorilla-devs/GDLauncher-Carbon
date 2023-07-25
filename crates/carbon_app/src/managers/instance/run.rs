@@ -6,6 +6,7 @@ use crate::domain::vtask::VisualTaskId;
 use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
+use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -51,8 +52,7 @@ impl PersistenceManager {
     }
 }
 type InstanceCallback = Box<
-    dyn FnOnce(VisualTask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>
-        + Send,
+    dyn FnOnce(Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
 
 impl ManagerRef<'_, InstanceManager> {
@@ -201,6 +201,12 @@ impl ManagerRef<'_, InstanceManager> {
                             .await,
                     ),
                     false => None,
+                };
+
+                let t_finalize_import = if callback_task.is_some() {
+                    Some(task.subtask(Translation::FinalizingImport).await)
+                } else {
+                    None
                 };
 
                 task.edit(|data| data.state = TaskState::KnownProgress)
@@ -675,8 +681,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let _ = tokio::fs::remove_file(first_run_path).await;
 
-                let task_clone = task.clone();
-
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
@@ -694,7 +698,7 @@ impl ManagerRef<'_, InstanceManager> {
                     )),
                     None => {
                         if let Some(callback_task) = callback_task {
-                            callback_task(task_clone).await?;
+                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
                         }
 
                         let _ = app
