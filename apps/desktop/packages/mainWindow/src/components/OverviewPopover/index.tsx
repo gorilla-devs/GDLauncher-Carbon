@@ -12,13 +12,52 @@ import {
   isCurseForgeData,
 } from "@/utils/Mods";
 import { formatDownloadCount } from "@/utils/helpers";
-import { CFFECategory } from "@gd/core_module/bindings";
+import { CategoryIcon } from "@/utils/instances";
+import {
+  CFFECategory,
+  CFFEModAuthor,
+  MRFECategoriesResponse,
+  MRFECategory,
+  MRFEProjectSearchResult,
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Tag } from "@gd/ui";
 import { formatDistanceToNowStrict } from "date-fns";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 
-const OverviewPopover = (props: { data: ModRowProps }) => {
+const Authors = (props: { data: ModRowProps }) => {
+  return (
+    <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
+      <Switch>
+        <Match when={isCurseForgeData(props.data.data)}>
+          <For each={getAuthors(props.data)}>
+            {(author, i) => (
+              <>
+                <p class="m-0 text-sm">{(author as CFFEModAuthor)?.name}</p>
+                <Show when={i() !== getAuthors(props.data).length - 1}>
+                  <span class="text-lightSlate-100">{"•"}</span>
+                </Show>
+              </>
+            )}
+          </For>
+        </Match>
+        <Match when={!isCurseForgeData(props.data.data)}>
+          <p class="m-0 text-sm">
+            {
+              (props.data.data as { modrinth: MRFEProjectSearchResult })
+                .modrinth.author
+            }
+          </p>
+        </Match>
+      </Switch>
+    </div>
+  );
+};
+
+const OverviewPopover = (props: {
+  data: ModRowProps;
+  modrinthCategories: MRFECategoriesResponse | undefined;
+}) => {
   return (
     <div class="relative flex flex-col overflow-hidden w-70 pb-4">
       <Show when={getWebsiteUrl(props.data)}>
@@ -52,12 +91,29 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             {(tag) => (
               <Tag
                 img={
-                  isCurseForgeData(props.data.data)
-                    ? (tag as CFFECategory).iconUrl
-                    : null
+                  isCurseForgeData(props.data.data) ? (
+                    (tag as CFFECategory).iconUrl
+                  ) : (
+                    <div>
+                      <Switch fallback={tag as string}>
+                        <Match
+                          when={props.modrinthCategories?.find(
+                            (category) => category.name === tag
+                          )}
+                        >
+                          <CategoryIcon
+                            category={
+                              props.modrinthCategories?.find(
+                                (category) => category.name === tag
+                              ) as MRFECategory
+                            }
+                          />
+                        </Match>
+                      </Switch>
+                    </div>
+                  )
                 }
                 type="fixed"
-                size="small"
               />
             )}
           </For>
@@ -70,18 +126,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
                 <Trans key="modpack.authors" />
               </p>
             </span>
-            <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
-              <For each={getAuthors(props.data)}>
-                {(author, i) => (
-                  <>
-                    <p class="m-0 text-sm">{author?.name}</p>
-                    <Show when={i() !== getAuthors(props.data).length - 1}>
-                      <span class="text-lightSlate-100">{"•"}</span>
-                    </Show>
-                  </>
-                )}
-              </For>
-            </div>
+            <Authors data={props.data} />
           </div>
           <div class="flex gap-2 items-center text-darkSlate-100">
             <div class="text-lightSlate-100 i-ri:time-fill" />

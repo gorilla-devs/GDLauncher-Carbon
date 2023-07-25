@@ -7,6 +7,7 @@ import {
   MRFECategory,
 } from "@gd/core_module/bindings";
 import { CategoryIcon } from "@/utils/instances";
+import { capitalize } from "@/utils/helpers";
 
 type Props = {
   modProps: ModRowProps;
@@ -63,7 +64,7 @@ const Categories = (props: Props) => {
             content={
               isCurseForgeData(props.modProps.data)
                 ? (getCategories(props.modProps)?.[0] as CFFECategory)?.name
-                : (getCategories(props.modProps)?.[0] as string)
+                : capitalize(getCategories(props.modProps)?.[0] as string)
             }
           >
             <Tag
@@ -133,7 +134,7 @@ const Categories = (props: Props) => {
                                 </Show>
                               </div>
                             }
-                            name={tag as string}
+                            name={capitalize(tag as string)}
                             type="fixed"
                           />
                         )}
