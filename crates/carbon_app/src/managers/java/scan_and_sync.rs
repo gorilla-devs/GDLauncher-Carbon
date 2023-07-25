@@ -83,7 +83,7 @@ where
         trace!("Analyzing local java: {:?}", local_java);
 
         // Attempt to canonicalize path
-        let resolved_java_path = match std::fs::canonicalize(local_java) {
+        let resolved_java_path = match tokio::fs::canonicalize(local_java).await {
             Ok(canonical_path) => canonical_path,
             Err(err) => {
                 tracing::warn!("Error resolving canonical java path: {}", err);
