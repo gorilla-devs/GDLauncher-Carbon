@@ -312,7 +312,7 @@ const Tile = (props: Props) => {
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
-                  class="absolute left-0 bottom-0 z-40 rounded-full bg-primary-500 h-2"
+                  class="absolute left-0 bottom-0 z-40 rounded-full bg-primary-500 h-1"
                   style={{
                     width: `${props.percentage}%`,
                   }}

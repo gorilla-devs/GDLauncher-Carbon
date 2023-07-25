@@ -88,6 +88,7 @@ const News = (props: CarouselProps) => {
     resetInterval();
     setIsMoving(true);
     slidesRef.style.transition = `transform 450ms ease-in-out`;
+    if (currentImageIndex() > props.slides.length) return;
     if (direction === "right") {
       setCurrentImageIndex((prev) => prev + 1);
     } else {
