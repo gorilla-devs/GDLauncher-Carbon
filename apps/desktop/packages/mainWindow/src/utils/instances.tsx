@@ -254,3 +254,6 @@ export const CategoryIcon = (props: {
     </Switch>
   );
 };
+export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
+};

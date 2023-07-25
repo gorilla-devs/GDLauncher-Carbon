@@ -19,7 +19,7 @@ import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
-import { CategoryIcon } from "@/utils/instances";
+import { CategoryIcon, PlatformIcon } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 
 const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
@@ -167,6 +167,7 @@ const Sidebar = () => {
                 {(platform) => (
                   <Radio name="platform" value={platform}>
                     <div class="flex items-center gap-2">
+                      <PlatformIcon platform={platform} />
                       <p class="m-0">{platform}</p>
                     </div>
                   </Radio>
@@ -260,7 +261,7 @@ const Sidebar = () => {
                         />
                         <div class="flex items-center gap-2 max-w-32">
                           <CategoryIcon category={category} />
-                          <p class="m-0">{category.name}</p>
+                          <p class="m-0">{capitalize(category.name)}</p>
                         </div>
                       </div>
                     );
