@@ -26,7 +26,7 @@ const Categories = (props: Props) => {
                 content={
                   isCurseForgeData(props.modProps.data)
                     ? (tag as CFFECategory).name
-                    : (tag as string)
+                    : capitalize(tag as string)
                 }
               >
                 <Tag
@@ -35,7 +35,7 @@ const Categories = (props: Props) => {
                       (tag as CFFECategory).iconUrl
                     ) : (
                       <div>
-                        <Switch fallback={tag as string}>
+                        <Switch fallback={capitalize(tag as string)}>
                           <Match
                             when={props.modrinthCategories?.find(
                               (category) => category.name === tag
