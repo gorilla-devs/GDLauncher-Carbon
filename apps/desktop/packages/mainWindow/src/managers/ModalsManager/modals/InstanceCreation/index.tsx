@@ -27,6 +27,13 @@ type Instancetype = {
   img: string | undefined;
 };
 
+// eslint-disable-next-line no-unused-vars
+enum Modloaders {
+  _Quilt = "quilt",
+  _Forge = "forge",
+  _Fabric = "fabric",
+}
+
 const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext();
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
@@ -94,8 +101,12 @@ const InstanceCreation = (props: ModalProps) => {
 
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
 
+  const isFabric = () => loader() === Modloaders._Fabric;
+  const isForge = () => loader() === Modloaders._Forge;
+  const isQuilt = () => loader() === Modloaders._Quilt;
+
   createEffect(() => {
-    if (forgeVersionsQuery.data && loader() === "forge") {
+    if (forgeVersionsQuery.data && isForge()) {
       const versions = forgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
@@ -107,7 +118,7 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    if (fabricVersionsQuery.data && loader() === "fabric") {
+    if (fabricVersionsQuery.data && isFabric()) {
       const supported =
         fabricVersionsQuery?.data?.gameVersions.find(
           (v) =>
@@ -128,7 +139,7 @@ const InstanceCreation = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    if (quiltVersionsQuery.data && loader() === "quilt") {
+    if (quiltVersionsQuery.data && isQuilt()) {
       const supported =
         quiltVersionsQuery?.data?.gameVersions.find(
           (v) =>
@@ -167,9 +178,9 @@ const InstanceCreation = (props: ModalProps) => {
       return { ...item, hasModloader: quiltHashmap.has(item.id) };
     });
 
-    if (loader() === "forge") setMappedMcVersions(forgeMappedVersions);
-    else if (loader() === "fabric") setMappedMcVersions(fabricMappedVersions);
-    else if (loader() === "quilt") setMappedMcVersions(quiltMappedVersions);
+    if (isForge()) setMappedMcVersions(forgeMappedVersions);
+    else if (isFabric()) setMappedMcVersions(fabricMappedVersions);
+    else if (isQuilt()) setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
   });
 
@@ -306,18 +317,18 @@ const InstanceCreation = (props: ModalProps) => {
       setError("");
 
       let versions: FEModdedManifestLoaderVersion[];
-      if (loader() == "forge") {
+      if (isForge()) {
         const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
         versions =
           forgeVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === (mcVersion() || mcVers?.id)
           )?.loaders || [];
-      } else if (loader() == "fabric") {
+      } else if (isFabric()) {
         versions =
           fabricVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === DUMMY_META_VERSION
           )?.loaders || [];
-      } else if (loader() == "quilt") {
+      } else if (isQuilt()) {
         versions =
           quiltVersionsQuery?.data?.gameVersions.find(
             (v) => v.id === DUMMY_META_VERSION
@@ -547,14 +558,14 @@ const InstanceCreation = (props: ModalProps) => {
 
                     if (!loader) {
                       setLoaderVersions([]);
-                    } else if (loader() === "forge") {
+                    } else if (isForge()) {
                       const versions =
                         forgeVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
                         )?.loaders;
 
                       setLoaderVersions(versions || []);
-                    } else if (loader() === "fabric") {
+                    } else if (isFabric()) {
                       const supported =
                         fabricVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
@@ -568,7 +579,7 @@ const InstanceCreation = (props: ModalProps) => {
                           : [];
 
                       setLoaderVersions(versions || []);
-                    } else if (loader() === "quilt") {
+                    } else if (isQuilt()) {
                       const supported =
                         quiltVersionsQuery?.data?.gameVersions.find(
                           (v) => v.id === l.key
