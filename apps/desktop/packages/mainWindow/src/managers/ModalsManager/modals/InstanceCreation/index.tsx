@@ -398,6 +398,10 @@ const InstanceCreation = (props: ModalProps) => {
   createEffect(() => {
     if (instanceData()?.modloader === "forge") {
       forgeVersionsQuery.refetch();
+    } else if (instanceData()?.modloader === "fabric") {
+      fabricVersionsQuery.refetch();
+    } else if (instanceData()?.modloader === "quilt") {
+      quiltVersionsQuery.refetch();
     }
   });
 
