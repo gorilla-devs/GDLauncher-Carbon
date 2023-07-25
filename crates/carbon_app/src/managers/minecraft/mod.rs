@@ -22,6 +22,7 @@ pub mod curseforge;
 pub mod fabric;
 pub mod forge;
 pub mod minecraft;
+pub mod modrinth;
 pub mod quilt;
 
 pub(crate) struct MinecraftManager {

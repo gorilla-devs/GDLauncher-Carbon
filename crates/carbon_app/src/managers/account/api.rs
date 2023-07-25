@@ -11,7 +11,9 @@ use serde_json::json;
 use thiserror::Error;
 use tracing::info;
 
-use crate::error::request::{censor_error, RequestContext, RequestError, RequestErrorDetails};
+use crate::error::request::{
+    censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
+};
 
 #[derive(Debug, Clone)]
 pub struct DeviceCode {
@@ -278,7 +280,9 @@ impl XboxAuth {
                         .ok_or_else(|| {
                             anyhow!(RequestError {
                                 context: RequestContext::none(),
-                                error: RequestErrorDetails::MalformedResponse,
+                                error: RequestErrorDetails::MalformedResponse {
+                                    details: MalformedResponseDetails::UnknownDecodeError
+                                },
                             })
                         })?
                         .uhs

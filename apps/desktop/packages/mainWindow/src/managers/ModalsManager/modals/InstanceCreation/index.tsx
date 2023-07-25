@@ -57,7 +57,7 @@ const InstanceCreation = (props: ModalProps) => {
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
-  const forgeHasmap = new ReactiveMap();
+  const forgeHashmap = new ReactiveMap();
   const fabricHashmap = new ReactiveMap();
   const quiltHashmap = new ReactiveMap();
 
@@ -69,7 +69,7 @@ const InstanceCreation = (props: ModalProps) => {
     enabled: false,
     onSuccess(data) {
       data.gameVersions.forEach((version) => {
-        forgeHasmap.set(version.id, version.loaders);
+        forgeHashmap.set(version.id, version.loaders);
       });
     },
   });
@@ -157,11 +157,19 @@ const InstanceCreation = (props: ModalProps) => {
         (item.type === "old_alpha" && oldAlphaVersionFilter())
     );
 
-    const mappedVersions = filteredData.map((item) => {
-      return { ...item, hasModloader: forgeHasmap.has(item.id) };
+    const forgeMappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: forgeHashmap.has(item.id) };
+    });
+    const fabricMappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: fabricHashmap.has(item.id) };
+    });
+    const quiltMappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: quiltHashmap.has(item.id) };
     });
 
-    if (loader()) setMappedMcVersions(mappedVersions);
+    if (loader() === "forge") setMappedMcVersions(forgeMappedVersions);
+    else if (loader() === "fabric") setMappedMcVersions(fabricMappedVersions);
+    else if (loader() === "quilt") setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
   });
 

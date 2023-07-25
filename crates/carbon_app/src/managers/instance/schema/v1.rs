@@ -35,12 +35,19 @@ impl Default for InstanceIcon {
 #[serde(tag = "platform")]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
+    Modrinth(ModrinthModpack),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ModrinthModpack {
+    pub project_id: String,
+    pub version_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -149,6 +156,7 @@ impl From<Modpack> for info::Modpack {
     fn from(value: Modpack) -> Self {
         match value {
             Modpack::Curseforge(cf) => Self::Curseforge(cf.into()),
+            Modpack::Modrinth(mdr) => Self::Modrinth(mdr.into()),
         }
     }
 }
@@ -157,6 +165,7 @@ impl From<info::Modpack> for Modpack {
     fn from(value: info::Modpack) -> Self {
         match value {
             info::Modpack::Curseforge(cf) => Self::Curseforge(cf.into()),
+            info::Modpack::Modrinth(mdr) => Self::Modrinth(mdr.into()),
         }
     }
 }
@@ -175,6 +184,24 @@ impl From<info::CurseforgeModpack> for CurseforgeModpack {
         Self {
             project_id: value.project_id,
             file_id: value.file_id,
+        }
+    }
+}
+
+impl From<ModrinthModpack> for info::ModrinthModpack {
+    fn from(value: ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
+        }
+    }
+}
+
+impl From<info::ModrinthModpack> for ModrinthModpack {
+    fn from(value: info::ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
         }
     }
 }

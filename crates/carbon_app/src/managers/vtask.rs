@@ -111,7 +111,7 @@ impl ManagerRef<'_, VisualTaskManager> {
 
     #[cfg(test)]
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
-        use tracing::{error, info};
+        use tracing::info;
 
         let tasklist = self.tasks.read().await;
         let Some(task) = tasklist.get(&task_id) else {
