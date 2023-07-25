@@ -30,4 +30,5 @@ pub enum Translation {
         instance_name: String,
     },
     InstanceTaskInstallModDownloadFile,
+    FinalizingImport,
 }

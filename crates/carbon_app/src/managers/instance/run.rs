@@ -51,7 +51,7 @@ impl PersistenceManager {
     }
 }
 type InstanceCallback = Box<
-    dyn FnOnce(VisualTaskId) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>
+    dyn FnOnce(VisualTask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>>
         + Send,
 >;
 
@@ -675,6 +675,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let _ = tokio::fs::remove_file(first_run_path).await;
 
+                let task_clone = task.clone();
+
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
@@ -692,7 +694,7 @@ impl ManagerRef<'_, InstanceManager> {
                     )),
                     None => {
                         if let Some(callback_task) = callback_task {
-                            callback_task(id).await?;
+                            callback_task(task_clone).await?;
                         }
 
                         let _ = app

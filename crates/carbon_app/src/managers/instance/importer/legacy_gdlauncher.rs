@@ -7,14 +7,14 @@ use tokio::{
 };
 
 use crate::{
-    api::{instance::import::FEEntity, keys},
+    api::{instance::import::FEEntity, keys, translation::Translation},
     domain::{
         instance::info::{
             CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{instance::InstanceVersionSource, vtask::VisualTask, AppInner},
 };
 
 use super::InstanceImporter;
@@ -181,8 +181,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         let instance_full_path = instance.full_path.clone();
         let instance_background = instance.config.background.clone();
         let app_clone = Arc::clone(&app);
-        let callback_task = move |task_id: VisualTaskId| {
+        let callback_task = move |task: VisualTask| {
             Box::pin(async move {
+                let subtask = task.subtask(Translation::FinalizingImport).await;
+                subtask.set_weight(1.0);
+                subtask.start_opaque();
+
                 let walked_dir = walkdir::WalkDir::new(&instance_full_path)
                     .into_iter()
                     .filter_map(|entry| {
@@ -206,7 +210,11 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                                 Some(entry)
                             }
                         }
-                    });
+                    })
+                    .collect::<Vec<_>>();
+
+                let count = walked_dir.len() as u32;
+                subtask.update_items(0, count);
 
                 let instances_path = app_clone
                     .settings_manager()
@@ -225,7 +233,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                         .shortpath,
                 );
 
-                for entry in walked_dir {
+                for (i, entry) in walked_dir.into_iter().enumerate() {
                     let is_dir = entry.file_type().is_dir();
                     let path = entry.path();
                     let relative_path = path.strip_prefix(&instance_full_path).unwrap();
@@ -247,7 +255,11 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                         let mut file = tokio::fs::File::create(destination).await?;
                         file.write_all(&buffer).await?;
                     }
+                    subtask.update_items(i as u32, count);
                 }
+
+                // Ensure task is completed just in case
+                subtask.update_items(count, count);
 
                 Ok::<(), anyhow::Error>(())
             }) as _ // Required to cast trait object to concrete object
