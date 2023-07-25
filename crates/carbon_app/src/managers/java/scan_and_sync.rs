@@ -81,13 +81,23 @@ where
 
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
+
+        // Attempt to canonicalize path
+        let resolved_java_path = match std::fs::canonicalize(local_java) {
+            Ok(canonical_path) => canonical_path,
+            Err(err) => {
+                tracing::warn!("Error resolving canonical java path: {}", err);
+                local_java.to_path_buf()
+            }
+        };
+
         // Verify whether the java is valid
         let java_bin_info = java_checker
-            .get_bin_info(local_java, JavaComponentType::Local)
+            .get_bin_info(&resolved_java_path, JavaComponentType::Local)
             .await;
 
         let db_entry =
-            get_java_component_from_db(db, local_java.to_string_lossy().to_string()).await?;
+            get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string()).await?;
 
         if let Some(db_entry) = &db_entry {
             if JavaComponentType::try_from(&*db_entry.r#type)? != JavaComponentType::Local {
@@ -117,7 +127,7 @@ where
                     let Some(java) = profile.java.as_ref() else { return false; };
                     let Some(java) = java.as_ref() else { return false; };
                     let java_path = java.path.clone();
-                    java_path == local_java.display().to_string()
+                    java_path == resolved_java_path.display().to_string()
                 });
 
                 // If it is in the db, update it to invalid
@@ -125,13 +135,13 @@ where
                     if is_java_used_in_profile && !auto_manage_java {
                         update_java_component_in_db_to_invalid(
                             db,
-                            local_java.display().to_string(),
+                            resolved_java_path.display().to_string(),
                         )
                         .await?;
                     } else {
                         db.java()
                             .delete(crate::db::java::UniqueWhereParam::PathEquals(
-                                local_java.display().to_string(),
+                                resolved_java_path.display().to_string(),
                             ))
                             .exec()
                             .await?;
