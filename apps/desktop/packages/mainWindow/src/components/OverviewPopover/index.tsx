@@ -95,7 +95,7 @@ const OverviewPopover = (props: {
                     (tag as CFFECategory).iconUrl
                   ) : (
                     <div>
-                      <Switch fallback={tag as string}>
+                      <Switch>
                         <Match
                           when={props.modrinthCategories?.find(
                             (category) => category.name === tag

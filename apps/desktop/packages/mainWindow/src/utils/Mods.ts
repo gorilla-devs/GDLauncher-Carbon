@@ -52,9 +52,15 @@ export const getName = (prop: ModRowProps) => {
 };
 
 export const getCategories = (prop: ModRowProps) => {
+  const modloader = ["forge", "fabric", "quilt"];
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.categories;
-  } else return prop.data.modrinth.categories || [];
+  } else
+    return (
+      prop.data.modrinth.categories?.filter(
+        (category) => !modloader.includes(category)
+      ) || []
+    );
 };
 
 export const getDataCreation = (prop: ModRowProps) => {
