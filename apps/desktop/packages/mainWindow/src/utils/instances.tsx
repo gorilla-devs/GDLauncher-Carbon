@@ -19,6 +19,7 @@ import {
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import { Show, Switch, Match } from "solid-js";
+import { port } from "./rspcClient";
 
 export const isListInstanceValid = (
   status: ListInstanceStatus
@@ -201,6 +202,17 @@ export const getModrinthData = (modpack: Modpack) => {
   if ("Modrinth" in modpack) return modpack.Modrinth;
 };
 
+export const fetchImage = async (id: number) => {
+  const imageUrl = `http://localhost:${port}/instance/instanceIcon?id=${id}`;
+  const image = await fetch(imageUrl);
+
+  const imageNotPresent = image.status === 204;
+
+  if (!imageNotPresent) {
+    return imageUrl;
+  } else return "";
+};
+
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
   error?: InvalidListInstance;
 }
@@ -254,6 +266,7 @@ export const CategoryIcon = (props: {
     </Switch>
   );
 };
+
 export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
   return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
 };
