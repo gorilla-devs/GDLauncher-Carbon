@@ -4,7 +4,7 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button, Input, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
-import fetchData from "../instance.data";
+import fetchData from "../../instance.data";
 import { Show } from "solid-js";
 
 const Settings = () => {

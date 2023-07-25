@@ -220,7 +220,7 @@ const Import = () => {
                               (loadingInstances[i()] as FETask).progress
                             )}
                           >
-                            <div class="w-1/2 relative bg-darkSlate-600 rounded-lg overflow-hidden">
+                            <div class="w-1/2 relative rounded-lg overflow-hidden bg-darkSlate-600">
                               <div
                                 class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{

@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse } from "@gd/core_module/bindings";
+import { FEModResponse, MRFEProject } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -12,11 +12,18 @@ import {
   Tabs,
   createNotification,
 } from "@gd/ui";
-import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useParams,
+  useRouteData,
+} from "@solidjs/router";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
+import Authors from "@/pages/Library/Instance/Info/Authors";
 
 const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
@@ -28,21 +35,37 @@ const Modpack = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/modpacks/${params.id}`,
+      path: `/modpacks/${params.id}/${params.platform}`,
     },
     {
       label: "Changelog",
-      path: `/modpacks/${params.id}/changelog`,
+      path: `/modpacks/${params.id}/${params.platform}/changelog`,
     },
     {
       label: "Screenshots",
-      path: `/modpacks/${params.id}/screenshots`,
+      path: `/modpacks/${params.id}/${params.platform}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/modpacks/${params.id}/versions`,
+      path: `/modpacks/${params.id}/${params.platform}/versions`,
     },
   ];
+
+  const getTabIndexFromPath = (path: string) => {
+    if (path.match(/\/modpacks\/.+\/.+/g)) {
+      if (path.endsWith("/changelog")) {
+        return 1;
+      } else if (path.endsWith("/screenshots")) {
+        return 2;
+      } else if (path.endsWith("/versions")) {
+        return 3;
+      } else {
+        return 0;
+      }
+    }
+
+    return 0;
+  };
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
@@ -83,6 +106,66 @@ const Modpack = () => {
     }
   );
 
+  const modpack = () => {
+    const versions = routeData.modrinthProjectVersions?.data;
+    if (!routeData.modpackDetails.data || !versions) return;
+    const versionId = versions[versions.length - 1];
+
+    const modrinth =
+      !routeData.isCurseforge && versionId
+        ? {
+            Modrinth: {
+              project_id: routeData.modpackDetails.data?.id,
+              version_id: versionId.id,
+            },
+          }
+        : undefined;
+
+    return routeData.isCurseforge
+      ? {
+          Curseforge: {
+            file_id: routeData.modpackDetails.data?.data.mainFileId,
+            project_id: routeData.modpackDetails.data?.data.id,
+          },
+        }
+      : modrinth;
+  };
+
+  const instanceName = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data.name
+      : routeData.modpackDetails.data?.title;
+
+  const icon = () =>
+    routeData.isCurseforge
+      ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
+      : (routeData.modpackDetails?.data as MRFEProject).icon_url;
+
+  const handleDownload = () => {
+    setLoading(true);
+    const instanceIcon = icon();
+
+    if (instanceIcon) loadIconMutation.mutate(instanceIcon);
+
+    const name = instanceName();
+    const modpackObj = modpack();
+
+    if (name && modpackObj)
+      createInstanceMutation.mutate({
+        group: defaultGroup.data || 1,
+        use_loaded_icon: true,
+        notes: "",
+        name: name,
+        version: {
+          Modpack: modpackObj,
+        },
+      });
+  };
+
+  const location = useLocation();
+
+  const indexTab = () => getTabIndexFromPath(location.pathname);
+
   return (
     <ContentWrapper>
       <div
@@ -97,18 +180,19 @@ const Modpack = () => {
       >
         <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
           <div class="relative h-full">
-            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 from-30% z-20" />
+            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 z-20 from-30%" />
             <div
-              class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat z-10"
+              class="h-full absolute left-0 right-0 top-0 z-10 bg-cover bg-center bg-fixed bg-no-repeat"
               style={{
                 "background-image": `url("${
-                  (routeData.modpackDetails?.data as FEModResponse)?.data.logo
-                    .url
+                  routeData.isCurseforge
+                    ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                    : routeData.modpackDetails.data?.icon_url
                 }")`,
                 "background-position": "right-5rem",
               }}
             />
-            <div class="top-5 sticky left-5 w-fit z-20">
+            <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
                 onClick={() => navigate("/modpacks")}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -129,8 +213,9 @@ const Modpack = () => {
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                   style={{
                     "background-image": `url("${
-                      (routeData.modpackDetails?.data as FEModResponse)?.data
-                        .logo.thumbnailUrl
+                      routeData.isCurseforge
+                        ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                        : routeData.modpackDetails.data?.icon_url
                     }")`,
                   }}
                 />
@@ -139,10 +224,9 @@ const Modpack = () => {
                     <Switch>
                       <Match when={!isFetching()}>
                         <h1 class="m-0 h-9">
-                          {
-                            (routeData.modpackDetails?.data as FEModResponse)
-                              ?.data.name
-                          }
+                          {routeData.isCurseforge
+                            ? routeData.modpackDetails.data?.data.name
+                            : routeData.modpackDetails.data?.title}
                         </h1>
                       </Match>
                       <Match when={isFetching()}>
@@ -154,35 +238,39 @@ const Modpack = () => {
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
                     <div class="flex flex-col lg:flex-row text-darkSlate-50 items-start gap-1 lg:items-center lg:gap-0">
-                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 lg:pr-2">
                         <Switch>
                           <Match when={!isFetching()}>
-                            {
-                              routeData.modpackDetails.data?.data
-                                .latestFilesIndexes[0].gameVersion
-                            }
+                            {routeData.isCurseforge
+                              ? routeData.modpackDetails.data?.data
+                                  .latestFilesIndexes[0].gameVersion
+                              : routeData.modpackDetails.data?.game_versions[0]}
                           </Match>
                           <Match when={isFetching()}>
                             <Skeleton />
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                         <div class="i-ri:time-fill" />
 
                         <Switch>
                           <Match when={!isFetching()}>
                             <Show
                               when={
-                                routeData.modpackDetails.data?.data.dateCreated
+                                routeData.isCurseforge
+                                  ? routeData.modpackDetails.data?.data
+                                      .dateCreated
+                                  : routeData.modpackDetails.data?.published
                               }
                             >
                               {format(
                                 new Date(
-                                  (
-                                    routeData.modpackDetails
-                                      .data as FEModResponse
-                                  ).data.dateCreated
+                                  routeData.isCurseforge
+                                    ? (routeData.modpackDetails.data?.data
+                                        .dateCreated as string)
+                                    : (routeData.modpackDetails.data
+                                        ?.published as string)
                                 ).getTime(),
                                 "P"
                               )}
@@ -193,18 +281,15 @@ const Modpack = () => {
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 lg:px-4 flex gap-2 items-center">
-                        <div class="i-ri:user-fill" />
+                      <div class="p-0 lg:px-2 flex gap-2 items-center">
                         <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                           <Switch>
                             <Match when={!isFetching()}>
-                              <For
-                                each={
-                                  routeData.modpackDetails.data?.data.authors
-                                }
-                              >
-                                {(author) => <p class="m-0">{author.name}</p>}
-                              </For>
+                              <Authors
+                                isCurseforge={routeData.isCurseforge}
+                                isModrinth={routeData.isModrinth}
+                                modpackDetails={routeData.modpackDetails.data}
+                              />
                             </Match>
                             <Match when={isFetching()}>
                               <Skeleton />
@@ -217,26 +302,8 @@ const Modpack = () => {
                       <Button
                         uppercase
                         size="large"
-                        onClick={() => {
-                          const modpack = routeData.modpackDetails
-                            ?.data as FEModResponse;
-
-                          loadIconMutation.mutate(modpack.data.logo.url);
-                          createInstanceMutation.mutate({
-                            group: defaultGroup.data || 1,
-                            use_loaded_icon: true,
-                            notes: "",
-                            name: modpack.data.name,
-                            version: {
-                              Modpack: {
-                                Curseforge: {
-                                  file_id: modpack.data.mainFileId,
-                                  project_id: modpack.data.id,
-                                },
-                              },
-                            },
-                          });
-                        }}
+                        disabled={routeData.modpackDetails.isInitialLoading}
+                        onClick={() => handleDownload()}
                       >
                         <Show when={loading()}>
                           <Spinner />
@@ -264,7 +331,7 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex items-center justify-between mb-4 px-4 z-10 bg-darkSlate-800"
+                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
               >
                 <span class="mr-4">
                   <Show when={isSticky()}>
@@ -283,7 +350,7 @@ const Modpack = () => {
                     </Button>
                   </Show>
                 </span>
-                <Tabs>
+                <Tabs index={indexTab()}>
                   <TabList>
                     <For each={instancePages()}>
                       {(page) => (
@@ -298,26 +365,8 @@ const Modpack = () => {
                   <Button
                     uppercase
                     size="small"
-                    onClick={() => {
-                      const modpack = routeData.modpackDetails
-                        ?.data as FEModResponse;
-
-                      loadIconMutation.mutate(modpack.data.logo.url);
-                      createInstanceMutation.mutate({
-                        group: defaultGroup.data || 1,
-                        use_loaded_icon: true,
-                        notes: "",
-                        name: modpack.data.name,
-                        version: {
-                          Modpack: {
-                            Curseforge: {
-                              file_id: modpack.data.mainFileId,
-                              project_id: modpack.data.id,
-                            },
-                          },
-                        },
-                      });
-                    }}
+                    disabled={routeData.modpackDetails.isInitialLoading}
+                    onClick={() => handleDownload()}
                   >
                     <Show when={loading()}>
                       <Spinner />
