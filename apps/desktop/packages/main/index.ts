@@ -206,7 +206,13 @@ app.whenReady().then(() => {
   createWindow();
 });
 
-app.on("window-all-closed", () => {
+app.on("window-all-closed", async () => {
+  try {
+    let _coreModule = await coreModule;
+    _coreModule.kill();
+  } catch {
+    // No op
+  }
   win = null;
   app.quit();
 });

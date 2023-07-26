@@ -34,7 +34,10 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: process.env.GENERIC_PUBLISH_URL.replace("${arch}", arch),
+        url: (process.env.GENERIC_PUBLISH_URL || "https://example.com").replace(
+          "${arch}",
+          arch
+        ),
       };
 
 module.exports = {
@@ -51,7 +54,7 @@ module.exports = {
   extraResources: [
     {
       from: "binaries/${arch}",
-      to: `.`,
+      to: `binaries`,
     },
   ],
   npmRebuild: false,
@@ -74,7 +77,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip", "dmg"],
+    target: ["dir", "zip"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.bundles.plist",
