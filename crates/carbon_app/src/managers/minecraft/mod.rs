@@ -276,6 +276,7 @@ mod tests {
                 client_path,
                 game_version,
                 libraries_path,
+                None
             )
             .await
             .unwrap();
