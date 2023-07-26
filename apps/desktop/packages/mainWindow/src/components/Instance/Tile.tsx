@@ -340,14 +340,12 @@ const Tile = (props: Props) => {
                         )}
                       />
                     </Show>
-                    <Show when={props.modloader}>
-                      <img
-                        class="w-4 h-4"
-                        src={getForgeModloaderIcon(
-                          props.modloader as CFFEModLoaderType
-                        )}
-                      />
-                    </Show>
+                    <img
+                      class="w-4 h-4"
+                      src={getForgeModloaderIcon(
+                        props.modloader as CFFEModLoaderType
+                      )}
+                    />
                     <p class="m-0">{props.modloader || "Vanilla"}</p>
                   </span>
                   <p class="m-0">{props.version}</p>
