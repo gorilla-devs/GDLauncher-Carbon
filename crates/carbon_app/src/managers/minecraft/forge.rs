@@ -5,17 +5,17 @@ use std::{
 };
 
 use anyhow::bail;
-use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry};
+use daedalus::{
+    modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
+    GradleSpecifier,
+};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::process::Command;
 use tracing::info;
 
 use crate::{
-    domain::{
-        maven::MavenCoordinates,
-        runtime_path::{InstancePath, LibrariesPath},
-    },
+    domain::runtime_path::{InstancePath, LibrariesPath},
     managers::java::utils::PATH_SEPARATOR,
 };
 
@@ -62,7 +62,7 @@ fn get_class_paths_jar(libraries_path: &Path, libraries: &[String]) -> anyhow::R
     let cps = libraries
         .iter()
         .map(|library| {
-            let library_path = MavenCoordinates::try_from(library.to_owned(), None)?.into_path();
+            let library_path = library.parse::<GradleSpecifier>()?.into_path();
             let library_path = libraries_path.join(library_path);
             if !library_path.exists() {
                 bail!("Library {} does not exist", library);
@@ -119,11 +119,9 @@ fn get_processor_arguments<T: AsRef<str>>(
                 new_arguments.push(if entry.client.starts_with('[') {
                     libraries_path
                         .join(
-                            MavenCoordinates::try_from(
-                                entry.client[1..entry.client.len() - 1].to_string(),
-                                None,
-                            )?
-                            .into_path(),
+                            entry.client[1..entry.client.len() - 1]
+                                .parse::<GradleSpecifier>()?
+                                .into_path(),
                         )
                         .to_string_lossy()
                         .to_string()
@@ -134,7 +132,7 @@ fn get_processor_arguments<T: AsRef<str>>(
         } else if argument.as_ref().starts_with('[') {
             new_arguments.push(
                 libraries_path
-                    .join(MavenCoordinates::try_from(trimmed_arg.to_string(), None)?.into_path())
+                    .join(trimmed_arg.parse::<GradleSpecifier>()?.into_path())
                     .to_string_lossy()
                     .to_string(),
             )
@@ -159,7 +157,10 @@ macro_rules! augment_data {
     }
 }
 
-pub async fn execute_processors(
+type ProgressCallback<'a> = Box<dyn Fn(u32, u32) + Send + Sync + 'a>;
+
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+pub async fn execute_processors<'callback> (
     processors: &Vec<Processor>,
     data: &HashMap<String, SidedDataEntry>,
     java_binary: PathBuf,
@@ -167,6 +168,7 @@ pub async fn execute_processors(
     client_path: PathBuf,
     game_version: String,
     libraries_path: LibrariesPath,
+    progress_callback: Option<ProgressCallback<'callback>>
 ) -> anyhow::Result<()> {
     let mut data = data.clone();
     augment_data! {
@@ -187,8 +189,13 @@ pub async fn execute_processors(
             client => libraries_path.to_path().to_string_lossy(),
             server => "";
     }
+    let total_processors = processors.len();
+    let mut cur_progress  = 0;
 
     for processor in processors {
+        if let Some(progress_callback) = &progress_callback {
+            progress_callback(cur_progress, total_processors as u32);
+        }
         if let Some(sides) = &processor.sides {
             if !sides.contains(&"client".to_string()) {
                 continue;
@@ -201,7 +208,7 @@ pub async fn execute_processors(
         let classpath = get_class_paths_jar(&libraries_path.to_path(), &classpath)?;
         let main_class_path = libraries_path
             .to_path()
-            .join(MavenCoordinates::try_from(processor.jar.clone(), None)?.into_path());
+            .join(processor.jar.parse::<GradleSpecifier>()?.into_path());
         let main_class = get_processor_main_class(main_class_path.to_string_lossy().to_string())
             .await?
             .ok_or_else(|| {
@@ -229,6 +236,13 @@ pub async fn execute_processors(
                 child.status.code().unwrap_or(-1)
             );
         }
+
+        cur_progress += 1;
     }
+
+    if let Some(progress_callback) = &progress_callback {
+        progress_callback(cur_progress, total_processors as u32);
+    }
+
     Ok(())
 }

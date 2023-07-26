@@ -11,7 +11,7 @@ import {
   createSignal,
 } from "solid-js";
 import {
-  getModloaderIcon,
+  getForgeModloaderIcon,
   isSidebarOpened,
   toggleSidebar,
 } from "@/utils/sidebar";
@@ -23,7 +23,7 @@ import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
-import { ModLoaderType } from "@gd/core_module/bindings";
+import { CFFEModLoaderType } from "@gd/core_module/bindings";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -76,15 +76,12 @@ const Sidebar = () => {
   const mapIconToKey = (key: string) => {
     return (
       <Switch>
-        <Match when={isSidebarOpened() && key === "vanilla"}>
-          {t("vanilla")}
-        </Match>
-        <Match when={isSidebarOpened() && key === "Forge"}>{t("forge")}</Match>
-        <Match when={!isSidebarOpened() && key === "vanilla"}>
-          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
-        </Match>
-        <Match when={!isSidebarOpened() && key === "Forge"}>
-          <img class="w-6 h-6" src={getModloaderIcon(key as ModLoaderType)} />
+        <Match when={isSidebarOpened()}>{t(key)}</Match>
+        <Match when={!isSidebarOpened()}>
+          <img
+            class="w-6 h-6"
+            src={getForgeModloaderIcon(key as CFFEModLoaderType)}
+          />
         </Match>
       </Switch>
     );
@@ -110,7 +107,7 @@ const Sidebar = () => {
           >
             <Input
               ref={inputRef}
-              placeholder={t("general.search") || ""}
+              placeholder={t("general.search") as string}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}

@@ -64,6 +64,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification",
   },
+  confirmInstanceDeletion: {
+    component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
+    title: "Confirm Instance Deletion",
+  },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true,
@@ -197,7 +201,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     </div>
                   </div>
                   <div
-                    class="h-screen w-screen absolute text-white transition-all duration-100 ease-in-out backdrop-blur-sm grid place-items-center z-99 origin-center"
+                    class="h-screen w-screen absolute duration-100 ease-in-out text-white transition-all backdrop-blur-sm grid place-items-center z-99 origin-center"
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();

@@ -22,6 +22,7 @@ pub mod curseforge;
 pub mod fabric;
 pub mod forge;
 pub mod minecraft;
+pub mod modrinth;
 pub mod quilt;
 
 pub(crate) struct MinecraftManager {
@@ -240,7 +241,7 @@ mod tests {
             .await
             .unwrap();
 
-        carbon_net::download_multiple(vanilla_files, progress.0)
+        carbon_net::download_multiple(vanilla_files, progress.0, 10)
             .await
             .unwrap();
 
@@ -275,6 +276,7 @@ mod tests {
                 client_path,
                 game_version,
                 libraries_path,
+                None
             )
             .await
             .unwrap();

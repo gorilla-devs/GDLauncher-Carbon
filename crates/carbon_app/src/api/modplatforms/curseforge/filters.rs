@@ -8,11 +8,11 @@ use crate::domain::modplatforms::curseforge::filters::{
     ModsParameters, ModsParametersBody,
 };
 
-use super::structs::{FEClassId, FEModLoaderType};
+use super::structs::{CFFEClassId, CFFEModLoaderType};
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEModSearchSortField {
+pub enum CFFEModSearchSortField {
     Featured,
     Popularity,
     LastUpdated,
@@ -23,69 +23,69 @@ pub enum FEModSearchSortField {
     GameVersion,
 }
 
-impl From<FEModSearchSortField> for ModSearchSortField {
-    fn from(field: FEModSearchSortField) -> Self {
+impl From<CFFEModSearchSortField> for ModSearchSortField {
+    fn from(field: CFFEModSearchSortField) -> Self {
         match field {
-            FEModSearchSortField::Featured => ModSearchSortField::Featured,
-            FEModSearchSortField::Popularity => ModSearchSortField::Popularity,
-            FEModSearchSortField::LastUpdated => ModSearchSortField::LastUpdated,
-            FEModSearchSortField::Name => ModSearchSortField::Name,
-            FEModSearchSortField::Author => ModSearchSortField::Author,
-            FEModSearchSortField::TotalDownloads => ModSearchSortField::TotalDownloads,
-            FEModSearchSortField::Category => ModSearchSortField::Category,
-            FEModSearchSortField::GameVersion => ModSearchSortField::GameVersion,
+            CFFEModSearchSortField::Featured => ModSearchSortField::Featured,
+            CFFEModSearchSortField::Popularity => ModSearchSortField::Popularity,
+            CFFEModSearchSortField::LastUpdated => ModSearchSortField::LastUpdated,
+            CFFEModSearchSortField::Name => ModSearchSortField::Name,
+            CFFEModSearchSortField::Author => ModSearchSortField::Author,
+            CFFEModSearchSortField::TotalDownloads => ModSearchSortField::TotalDownloads,
+            CFFEModSearchSortField::Category => ModSearchSortField::Category,
+            CFFEModSearchSortField::GameVersion => ModSearchSortField::GameVersion,
         }
     }
 }
 
-impl From<ModSearchSortField> for FEModSearchSortField {
+impl From<ModSearchSortField> for CFFEModSearchSortField {
     fn from(field: ModSearchSortField) -> Self {
         match field {
-            ModSearchSortField::Featured => FEModSearchSortField::Featured,
-            ModSearchSortField::Popularity => FEModSearchSortField::Popularity,
-            ModSearchSortField::LastUpdated => FEModSearchSortField::LastUpdated,
-            ModSearchSortField::Name => FEModSearchSortField::Name,
-            ModSearchSortField::Author => FEModSearchSortField::Author,
-            ModSearchSortField::TotalDownloads => FEModSearchSortField::TotalDownloads,
-            ModSearchSortField::Category => FEModSearchSortField::Category,
-            ModSearchSortField::GameVersion => FEModSearchSortField::GameVersion,
+            ModSearchSortField::Featured => CFFEModSearchSortField::Featured,
+            ModSearchSortField::Popularity => CFFEModSearchSortField::Popularity,
+            ModSearchSortField::LastUpdated => CFFEModSearchSortField::LastUpdated,
+            ModSearchSortField::Name => CFFEModSearchSortField::Name,
+            ModSearchSortField::Author => CFFEModSearchSortField::Author,
+            ModSearchSortField::TotalDownloads => CFFEModSearchSortField::TotalDownloads,
+            ModSearchSortField::Category => CFFEModSearchSortField::Category,
+            ModSearchSortField::GameVersion => CFFEModSearchSortField::GameVersion,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEModSearchSortOrder {
+pub enum CFFEModSearchSortOrder {
     Ascending,
     Descending,
 }
 
-impl From<FEModSearchSortOrder> for ModSearchSortOrder {
-    fn from(order: FEModSearchSortOrder) -> Self {
+impl From<CFFEModSearchSortOrder> for ModSearchSortOrder {
+    fn from(order: CFFEModSearchSortOrder) -> Self {
         match order {
-            FEModSearchSortOrder::Ascending => ModSearchSortOrder::Ascending,
-            FEModSearchSortOrder::Descending => ModSearchSortOrder::Descending,
+            CFFEModSearchSortOrder::Ascending => ModSearchSortOrder::Ascending,
+            CFFEModSearchSortOrder::Descending => ModSearchSortOrder::Descending,
         }
     }
 }
 
-impl From<ModSearchSortOrder> for FEModSearchSortOrder {
+impl From<ModSearchSortOrder> for CFFEModSearchSortOrder {
     fn from(order: ModSearchSortOrder) -> Self {
         match order {
-            ModSearchSortOrder::Ascending => FEModSearchSortOrder::Ascending,
-            ModSearchSortOrder::Descending => FEModSearchSortOrder::Descending,
+            ModSearchSortOrder::Ascending => CFFEModSearchSortOrder::Ascending,
+            ModSearchSortOrder::Descending => CFFEModSearchSortOrder::Descending,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModSearchParameters {
-    pub query: FEModSearchParametersQuery,
+pub struct CFFEModSearchParameters {
+    pub query: CFFEModSearchParametersQuery,
 }
 
-impl From<FEModSearchParameters> for ModSearchParameters {
-    fn from(params: FEModSearchParameters) -> Self {
+impl From<CFFEModSearchParameters> for ModSearchParameters {
+    fn from(params: CFFEModSearchParameters) -> Self {
         Self {
             query: params.query.into(),
         }
@@ -94,15 +94,15 @@ impl From<FEModSearchParameters> for ModSearchParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModSearchParametersQuery {
+pub struct CFFEModSearchParametersQuery {
     pub game_id: i32,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
-    pub category_id: Option<i32>,
-    pub sort_order: Option<FEModSearchSortOrder>,
-    pub sort_field: Option<FEModSearchSortField>,
-    pub class_id: Option<FEClassId>,
-    pub mod_loader_type: Option<FEModLoaderType>,
+    pub category_ids: Option<Vec<i32>>,
+    pub sort_order: Option<CFFEModSearchSortOrder>,
+    pub sort_field: Option<CFFEModSearchSortField>,
+    pub class_id: Option<CFFEClassId>,
+    pub mod_loader_types: Option<Vec<CFFEModLoaderType>>,
     pub game_version_type_id: Option<i32>,
     pub author_id: Option<i32>,
     pub slug: Option<String>,
@@ -110,17 +110,21 @@ pub struct FEModSearchParametersQuery {
     pub page_size: Option<i32>,
 }
 
-impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
-    fn from(params: FEModSearchParametersQuery) -> Self {
+impl From<CFFEModSearchParametersQuery> for ModSearchParametersQuery {
+    fn from(params: CFFEModSearchParametersQuery) -> Self {
+        let mod_loader_types = params
+            .mod_loader_types
+            .map(|types| types.into_iter().map(|t| t.into()).collect());
+
         Self {
             game_id: params.game_id,
             search_filter: params.search_filter,
             game_version: params.game_version,
-            category_id: params.category_id,
+            category_ids: params.category_ids,
             sort_order: params.sort_order.map(Into::into),
             sort_field: params.sort_field.map(Into::into),
             class_id: params.class_id.map(Into::into),
-            mod_loader_type: params.mod_loader_type.map(Into::into),
+            mod_loader_types,
             game_version_type_id: params.game_version_type_id,
             author_id: params.author_id,
             slug: params.slug,
@@ -132,13 +136,13 @@ impl From<FEModSearchParametersQuery> for ModSearchParametersQuery {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFilesParameters {
+pub struct CFFEModFilesParameters {
     pub mod_id: i32,
-    pub query: FEModFilesParametersQuery,
+    pub query: CFFEModFilesParametersQuery,
 }
 
-impl From<FEModFilesParameters> for ModFilesParameters {
-    fn from(params: FEModFilesParameters) -> Self {
+impl From<CFFEModFilesParameters> for ModFilesParameters {
+    fn from(params: CFFEModFilesParameters) -> Self {
         Self {
             mod_id: params.mod_id,
             query: params.query.into(),
@@ -148,11 +152,11 @@ impl From<FEModFilesParameters> for ModFilesParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFilesParametersQuery {
+pub struct CFFEModFilesParametersQuery {
     #[specta(optional)]
     pub game_version: Option<String>,
     #[specta(optional)]
-    pub mod_loader_type: Option<FEModLoaderType>,
+    pub mod_loader_type: Option<CFFEModLoaderType>,
     #[specta(optional)]
     pub game_version_type_id: Option<i32>,
     #[specta(optional)]
@@ -161,8 +165,8 @@ pub struct FEModFilesParametersQuery {
     pub page_size: Option<i32>,
 }
 
-impl From<FEModFilesParametersQuery> for ModFilesParametersQuery {
-    fn from(params: FEModFilesParametersQuery) -> Self {
+impl From<CFFEModFilesParametersQuery> for ModFilesParametersQuery {
+    fn from(params: CFFEModFilesParametersQuery) -> Self {
         Self {
             game_version: params.game_version,
             mod_loader_type: params.mod_loader_type.map(Into::into),
@@ -175,13 +179,13 @@ impl From<FEModFilesParametersQuery> for ModFilesParametersQuery {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFileParameters {
+pub struct CFFEModFileParameters {
     pub mod_id: i32,
     pub file_id: i32,
 }
 
-impl From<FEModFileParameters> for ModFileParameters {
-    fn from(params: FEModFileParameters) -> Self {
+impl From<CFFEModFileParameters> for ModFileParameters {
+    fn from(params: CFFEModFileParameters) -> Self {
         Self {
             mod_id: params.mod_id,
             file_id: params.file_id,
@@ -191,12 +195,12 @@ impl From<FEModFileParameters> for ModFileParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModDescriptionParameters {
+pub struct CFFEModDescriptionParameters {
     pub mod_id: i32,
 }
 
-impl From<FEModDescriptionParameters> for ModDescriptionParameters {
-    fn from(params: FEModDescriptionParameters) -> Self {
+impl From<CFFEModDescriptionParameters> for ModDescriptionParameters {
+    fn from(params: CFFEModDescriptionParameters) -> Self {
         Self {
             mod_id: params.mod_id,
         }
@@ -205,12 +209,12 @@ impl From<FEModDescriptionParameters> for ModDescriptionParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModParameters {
+pub struct CFFEModParameters {
     pub mod_id: i32,
 }
 
-impl From<FEModParameters> for ModParameters {
-    fn from(params: FEModParameters) -> Self {
+impl From<CFFEModParameters> for ModParameters {
+    fn from(params: CFFEModParameters) -> Self {
         Self {
             mod_id: params.mod_id,
         }
@@ -219,12 +223,12 @@ impl From<FEModParameters> for ModParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModsParameters {
-    pub body: FEModsParametersBody,
+pub struct CFFEModsParameters {
+    pub body: CFFEModsParametersBody,
 }
 
-impl From<FEModsParameters> for ModsParameters {
-    fn from(params: FEModsParameters) -> Self {
+impl From<CFFEModsParameters> for ModsParameters {
+    fn from(params: CFFEModsParameters) -> Self {
         Self {
             body: params.body.into(),
         }
@@ -233,12 +237,12 @@ impl From<FEModsParameters> for ModsParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModsParametersBody {
+pub struct CFFEModsParametersBody {
     pub mod_ids: Vec<i32>,
 }
 
-impl From<FEModsParametersBody> for ModsParametersBody {
-    fn from(params: FEModsParametersBody) -> Self {
+impl From<CFFEModsParametersBody> for ModsParametersBody {
+    fn from(params: CFFEModsParametersBody) -> Self {
         Self {
             mod_ids: params.mod_ids,
         }
@@ -247,12 +251,12 @@ impl From<FEModsParametersBody> for ModsParametersBody {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFilesParameters {
-    pub body: FEFilesParametersBody,
+pub struct CFFEFilesParameters {
+    pub body: CFFEFilesParametersBody,
 }
 
-impl From<FEFilesParameters> for FilesParameters {
-    fn from(params: FEFilesParameters) -> Self {
+impl From<CFFEFilesParameters> for FilesParameters {
+    fn from(params: CFFEFilesParameters) -> Self {
         Self {
             body: params.body.into(),
         }
@@ -261,12 +265,12 @@ impl From<FEFilesParameters> for FilesParameters {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFilesParametersBody {
+pub struct CFFEFilesParametersBody {
     pub file_ids: Vec<i32>,
 }
 
-impl From<FEFilesParametersBody> for FilesParametersBody {
-    fn from(params: FEFilesParametersBody) -> Self {
+impl From<CFFEFilesParametersBody> for FilesParametersBody {
+    fn from(params: CFFEFilesParametersBody) -> Self {
         Self {
             file_ids: params.file_ids,
         }
@@ -275,13 +279,13 @@ impl From<FEFilesParametersBody> for FilesParametersBody {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFileChangelogParameters {
+pub struct CFFEModFileChangelogParameters {
     pub mod_id: i32,
     pub file_id: i32,
 }
 
-impl From<FEModFileChangelogParameters> for ModFileChangelogParameters {
-    fn from(params: FEModFileChangelogParameters) -> Self {
+impl From<CFFEModFileChangelogParameters> for ModFileChangelogParameters {
+    fn from(params: CFFEModFileChangelogParameters) -> Self {
         Self {
             mod_id: params.mod_id,
             file_id: params.file_id,

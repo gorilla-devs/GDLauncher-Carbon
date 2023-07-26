@@ -13,7 +13,7 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import fetchData from "../instance.logs.data";
+import fetchData from "../../instance.logs.data";
 import { getRunningState } from "@/utils/instances";
 import { Button, Tooltip } from "@gd/ui";
 

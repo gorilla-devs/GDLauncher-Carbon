@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::db::{self, PrismaClient};
+use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
 
@@ -57,11 +58,27 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
     Ok(db_client)
 }
 
+async fn find_appropriate_default_xmx() -> i32 {
+    let mut memory = System::new();
+    memory.refresh_memory();
+
+    match memory.total_memory() / 1024 / 1024 {
+        0..=4096 => 1024,
+        4097..=6144 => 2048,
+        6145..=8192 => 3072,
+        _ => 4096,
+    }
+}
+
 async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
-        db_client.app_configuration().create(vec![]).exec().await?;
+        db_client
+            .app_configuration()
+            .create(find_appropriate_default_xmx().await, vec![])
+            .exec()
+            .await?;
     }
 
     JavaManager::ensure_profiles_in_db(db_client)

@@ -1,84 +1,130 @@
 /* eslint-disable solid/no-innerhtml */
 import { useParams, useRouteData } from "@solidjs/router";
-import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  Match,
+  Show,
+  Suspense,
+  Switch,
+  createEffect,
+  createSignal,
+} from "solid-js";
 import { Dropdown, Skeleton } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import fetchData from "../modpack.overview";
-import { FEFileIndex, FEModResponse } from "@gd/core_module/bindings";
-
-const sortArrayByGameVersion = (arr: FEFileIndex[]) => {
-  let sortedArr = [...arr];
-
-  sortedArr.sort((a, b) => {
-    let aVersion = a.gameVersion.split(".").map(Number);
-    let bVersion = b.gameVersion.split(".").map(Number);
-
-    for (let i = 0; i < aVersion.length; i++) {
-      if (aVersion[i] > bVersion[i]) {
-        return -1;
-      }
-      if (aVersion[i] < bVersion[i]) {
-        return 1;
-      }
-    }
-
-    return 0;
-  });
-
-  return sortedArr;
-};
+import {
+  CFFEFile,
+  CFFEFileIndex,
+  FEModResponse,
+} from "@gd/core_module/bindings";
+import { sortArrayByGameVersion } from "@/utils/Mods";
 
 const Changelog = () => {
   const params = useParams();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const lastFile = () =>
+    routeData.isCurseforge &&
     routeData.modpackDetails?.data?.data.latestFiles[
       routeData.modpackDetails?.data?.data.latestFiles.length - 1
     ];
-  const [fileId, setFileId] = createSignal<number | undefined>(undefined);
+
+  const [options, setOptions] = createSignal<{ key: string; label: string }[]>(
+    []
+  );
+  const [fileId, setFileId] = createSignal<number | string | undefined>(
+    undefined
+  );
   const [changeLog, setChangelog] = createSignal<string | undefined>(undefined);
 
   createEffect(() => {
-    const modpackId = parseInt(params.id, 10);
-    if (fileId() !== undefined || lastFile()?.id !== undefined) {
-      // eslint-disable-next-line solid/reactivity
-      const changelogQuery = rspc.createQuery(() => [
-        "modplatforms.curseforgeGetModFileChangelog",
-        {
-          modId: modpackId,
-          fileId: (fileId() as number) || (lastFile()?.id as number),
-        },
-      ]);
-      setChangelog(changelogQuery.data?.data);
+    if (!routeData.modpackDetails.data) return;
+    if (!routeData.isCurseforge) {
+      if (routeData.modrinthProjectVersions.data) {
+        setFileId(routeData.modrinthProjectVersions.data[0].id);
+
+        setOptions(
+          routeData.modrinthProjectVersions.data.map((file) => ({
+            key: file.id,
+            label: file.version_number,
+          }))
+        );
+      }
+    } else {
+      const sortedVersions = sortArrayByGameVersion(
+        (routeData.modpackDetails.data as FEModResponse)?.data
+          .latestFilesIndexes
+      );
+      setOptions(
+        (sortedVersions as CFFEFileIndex[]).map((file) => ({
+          key: file.fileId.toString(),
+          label: file.filename,
+        }))
+      );
     }
   });
 
-  const sortedFilesByMcVersion = () =>
-    sortArrayByGameVersion(
-      (routeData.modpackDetails.data as FEModResponse).data.latestFilesIndexes
-    );
+  createEffect(() => {
+    const modpackId = parseInt(params.id, 10);
+
+    if (routeData.isCurseforge) {
+      if (
+        fileId() !== undefined ||
+        (lastFile() && (lastFile() as CFFEFile).id !== undefined)
+      ) {
+        // eslint-disable-next-line solid/reactivity
+        const changelogQuery = rspc.createQuery(() => [
+          "modplatforms.curseforge.getModFileChangelog",
+          {
+            modId: modpackId,
+            fileId:
+              parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id,
+          },
+        ]);
+        setChangelog(changelogQuery.data?.data);
+      }
+    }
+  });
+
+  createEffect(() => {
+    if (!routeData.isCurseforge) {
+      if (fileId() !== undefined) {
+        // eslint-disable-next-line solid/reactivity
+        const changelogQuery = rspc.createQuery(() => [
+          "modplatforms.modrinth.getVersion",
+          fileId() as string,
+        ]);
+
+        if (changelogQuery.data?.changelog) {
+          setChangelog(changelogQuery.data.changelog);
+        }
+      }
+    }
+  });
 
   return (
-    <div>
-      <Show when={routeData.modpackDetails.data}>
-        <Dropdown
-          options={sortedFilesByMcVersion().map((file) => ({
-            key: file.fileId,
-            label: file.filename,
-          }))}
-          value={fileId() || lastFile()?.id}
-          onChange={(fileId) => {
-            setFileId(fileId.key as number);
-          }}
-        />
-      </Show>
-      <Switch fallback={<Skeleton.modpackChangelogPage />}>
-        <Match when={changeLog()}>
-          <div innerHTML={changeLog()} />
-        </Match>
-      </Switch>
-    </div>
+    <Suspense fallback={<Skeleton.modpackChangelogPage />}>
+      <div>
+        <Show
+          when={routeData.modpackDetails.data}
+          fallback={<div>Loading...</div>}
+        >
+          <Dropdown
+            options={options()}
+            onChange={(fileId) => {
+              setFileId(fileId.key);
+            }}
+          />
+        </Show>
+        <Switch fallback={<Skeleton.modpackChangelogPage />}>
+          <Match when={changeLog() && routeData.isCurseforge}>
+            <div innerHTML={changeLog()} />
+          </Match>
+          <Match when={changeLog() && !routeData.isCurseforge}>
+            <pre>{changeLog()}</pre>
+          </Match>
+        </Switch>
+      </div>
+    </Suspense>
   );
 };
 

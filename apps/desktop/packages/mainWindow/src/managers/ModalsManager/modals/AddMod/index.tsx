@@ -15,12 +15,14 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
-  FEModLoaderType,
-  FEModSearchParametersQuery,
-  FEModSearchSortField,
+  CFFEModSearchSortField,
+  CFFEModLoaderType,
+  FEUnifiedSearchParameters,
+  MRFESearchIndex,
+  FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { SortFields } from "@/utils/constants";
+import { CurseForgeSortFields } from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 
@@ -28,33 +30,30 @@ const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
 
   const [query, setQuery] = useModsQuery({
-    categoryId: null,
-    classId: "mods",
-    gameId: 432,
-    gameVersion: "",
-    modLoaderType: null,
-    sortField: "featured",
+    searchQuery: "",
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    projectType: "mod",
+    sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
-    pageSize: 40,
-    slug: "",
-    searchFilter: "",
-    gameVersionTypeId: null,
-    authorId: null,
     index: 0,
+    pageSize: 40,
+    searchApi: "curseforge",
   });
 
   const rspcContext = rspc.useContext();
 
   const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.curseforgeSearch"],
+    queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      setQuery({ index: ctx.pageParam + (query.query.pageSize || 20) + 1 });
-      return rspcContext.client.query(["modplatforms.curseforgeSearch", query]);
+      setQuery({ index: ctx.pageParam + (query.pageSize || 20) + 1 });
+      return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
-      const pageSize = query.query.pageSize || 20;
+      const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
     },
@@ -84,7 +83,7 @@ const AddMod = (props: ModalProps) => {
     });
   });
 
-  const setQueryWrapper = (newValue: Partial<FEModSearchParametersQuery>) => {
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
@@ -98,7 +97,7 @@ const AddMod = (props: ModalProps) => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
-    if (!lastItem() || lastItem().index === query.query.index) {
+    if (!lastItem() || lastItem().index === query.index) {
       return;
     }
 
@@ -125,11 +124,9 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (FEModLoaderType | "Any")[] = [
-    "Any",
+  const modloaders: (CFFEModLoaderType | "any")[] = [
+    "any",
     "forge",
-    "cauldron",
-    "liteLoader",
     "fabric",
     "quilt",
   ];
@@ -208,6 +205,8 @@ const AddMod = (props: ModalProps) => {
     );
   };
 
+  const isCurseforge = () => query.searchApi === "curseforge";
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 bg-darkSlate-800 p-5">
@@ -219,7 +218,7 @@ const AddMod = (props: ModalProps) => {
               class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
               onInput={(e) => {
                 const target = e.target as HTMLInputElement;
-                setQueryWrapper({ searchFilter: target.value });
+                setQueryWrapper({ searchQuery: target.value });
               }}
             />
             <div class="flex items-center gap-3">
@@ -232,13 +231,20 @@ const AddMod = (props: ModalProps) => {
                 />
               </p>
               <Dropdown
-                options={SortFields.map((field) => ({
+                options={CurseForgeSortFields.map((field) => ({
                   label: t(`instance.sort_by_${field}`),
                   key: field,
                 }))}
                 onChange={(val) => {
+                  const sortIndex = isCurseforge()
+                    ? {
+                        curseForge: val.key as CFFEModSearchSortField,
+                      }
+                    : {
+                        modrinth: val.key as MRFESearchIndex,
+                      };
                   setQueryWrapper({
-                    sortField: val.key as FEModSearchSortField,
+                    sortIndex,
                   });
                 }}
                 value={0}
@@ -250,23 +256,27 @@ const AddMod = (props: ModalProps) => {
                   key: modloader,
                 }))}
                 onChange={(val) => {
-                  const mappedValue = val.key === "Any" ? null : val.key;
+                  const prevModloaders = query.modloaders || [];
+                  const mappedValue =
+                    val.key === "any"
+                      ? null
+                      : [...prevModloaders, val.key as FEUnifiedModLoaderType];
+
                   setQueryWrapper({
-                    modLoaderType: mappedValue as FEModLoaderType | null,
+                    modloaders: mappedValue,
                   });
                 }}
-                value={query.query.modLoaderType}
                 rounded
               />
             </div>
             <div
               class="cursor-pointer text-2xl"
               classList={{
-                "i-ri:sort-asc": query.query.sortOrder === "ascending",
-                "i-ri:sort-desc": query.query.sortOrder === "descending",
+                "i-ri:sort-asc": query.sortOrder === "ascending",
+                "i-ri:sort-desc": query.sortOrder === "descending",
               }}
               onClick={() => {
-                const isAsc = query.query.sortOrder === "ascending";
+                const isAsc = query.sortOrder === "ascending";
                 setQueryWrapper({
                   sortOrder: isAsc ? "descending" : "ascending",
                 });

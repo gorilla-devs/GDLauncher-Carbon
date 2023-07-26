@@ -15,6 +15,7 @@ use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+use crate::api::instance::import::FEEntity;
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
@@ -22,10 +23,12 @@ use crate::managers::{App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
-use super::vtask::TaskId;
+use super::vtask::FETaskId;
 
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
+
+pub mod import;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -65,7 +68,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             app.instance_manager()
                 .create_group(name)
                 .await
-                .map(GroupId::from)
+                .map(FEGroupId::from)
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
@@ -78,7 +81,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.notes,
                 )
                 .await
-                .map(InstanceId::from)
+                .map(FEInstanceId::from)
         }
 
         mutation LOAD_ICON_URL[app, url: String] {
@@ -87,13 +90,13 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        mutation DELETE_GROUP[app, id: GroupId] {
+        mutation DELETE_GROUP[app, id: FEGroupId] {
             app.instance_manager()
                 .delete_group(id.into())
                 .await
         }
 
-        mutation DELETE_INSTANCE[app, id: InstanceId] {
+        mutation DELETE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .delete_instance(id.into())
                 .await
@@ -131,7 +134,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     details.new_name,
                 )
                 .await
-                .map(InstanceId::from)
+                .map(FEInstanceId::from)
         }
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
@@ -149,20 +152,22 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: InstanceId] {
+        query INSTANCE_DETAILS[app, id: FEInstanceId] {
             app.instance_manager()
                 .instance_details(id.into())
                 .await
                 .map(InstanceDetails::from)
         }
 
-        mutation PREPARE_INSTANCE[app, id: InstanceId] {
+        mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .prepare_game(id.into(), None)
-                .await
+                .await?;
+
+            Ok(())
         }
 
-        mutation LAUNCH_INSTANCE[app, id: InstanceId] {
+        mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
             let account = app.account_manager()
                 .get_active_account()
                 .await?;
@@ -173,10 +178,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
             app.instance_manager()
                 .prepare_game(id.into(), Some(account))
-                .await
+                .await?;
+
+            Ok(())
         }
 
-        mutation KILL_INSTANCE[app, id: InstanceId] {
+        mutation KILL_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .kill_instance(id.into())
                 .await
@@ -227,15 +234,28 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation INSTALL_MOD[app, imod: InstallMod] {
-            let task = app.instance_manager()
-                .install_curseforge_mod(
-                    imod.instance_id.into(),
-                    imod.project_id,
-                    imod.file_id,
-                )
-                .await?;
+            let task = match imod.mod_source {
+                ModSource::Curseforge(cf_mod) => {
+                    app.instance_manager()
+                        .install_curseforge_mod(
+                            imod.instance_id.into(),
+                            cf_mod.project_id,
+                            cf_mod.file_id,
+                        )
+                        .await?
+                }
+                ModSource::Modrinth(mdr_mod) => {
+                    app.instance_manager()
+                        .install_modrinth_mod(
+                            imod.instance_id.into(),
+                            mdr_mod.project_id,
+                            mdr_mod.version_id,
+                        )
+                        .await?
+                }
+            };
 
-            Ok(super::vtask::TaskId::from(task))
+            Ok(super::vtask::FETaskId::from(task))
         }
 
         mutation OPEN_INSTANCE_FOLDER[app, folder: OpenInstanceFolder] {
@@ -244,6 +264,25 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 folder.folder.into(),
             )
             .await
+        }
+
+        query GET_IMPORTABLE_ENTITIES[_, args: ()] {
+            Ok(manager::importer::Entity::get_available()
+                .into_iter()
+                .map(FEEntity::from)
+                .collect::<Vec<_>>())
+        }
+
+        mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
+            import::scan_importable_instances(app, entity).await
+        }
+
+        query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
+            import::get_importable_instances(app, entity).await
+        }
+
+        mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
+            import::import_instance(app, args).await
         }
     }
 }
@@ -368,45 +407,45 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         )
 }
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct GroupId(i32);
+pub struct FEGroupId(i32);
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct InstanceId(i32);
+pub struct FEInstanceId(i32);
 
-impl From<domain::GroupId> for GroupId {
+impl From<domain::GroupId> for FEGroupId {
     fn from(value: domain::GroupId) -> Self {
         Self(*value)
     }
 }
 
-impl From<domain::InstanceId> for InstanceId {
+impl From<domain::InstanceId> for FEInstanceId {
     fn from(value: domain::InstanceId) -> Self {
         Self(*value)
     }
 }
 
-impl From<GroupId> for domain::GroupId {
-    fn from(value: GroupId) -> Self {
+impl From<FEGroupId> for domain::GroupId {
+    fn from(value: FEGroupId) -> Self {
         Self(value.0)
     }
 }
 
-impl From<InstanceId> for domain::InstanceId {
-    fn from(value: InstanceId) -> Self {
+impl From<FEInstanceId> for domain::InstanceId {
+    fn from(value: FEInstanceId) -> Self {
         Self(value.0)
     }
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListGroup {
-    id: GroupId,
+    id: FEGroupId,
     name: String,
     instances: Vec<ListInstance>,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListInstance {
-    id: InstanceId,
+    id: FEInstanceId,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -429,7 +468,7 @@ enum ListInstanceStatus {
 #[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
-    modloader: Option<ModLoaderType>,
+    modloader: Option<CFFEModLoaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
 }
@@ -437,6 +476,7 @@ struct ValidListInstance {
 #[derive(Type, Debug, Serialize)]
 enum ModpackPlatform {
     Curseforge,
+    Modrinth,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -463,7 +503,7 @@ enum ConfigurationParseErrorType {
 
 #[derive(Type, Debug, Deserialize)]
 struct CreateInstance {
-    group: GroupId,
+    group: FEGroupId,
     name: String,
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
@@ -472,7 +512,7 @@ struct CreateInstance {
 
 #[derive(Type, Debug, Deserialize)]
 struct UpdateInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     #[specta(optional)]
     name: Option<Set<String>>,
     #[specta(optional)]
@@ -493,13 +533,13 @@ struct UpdateInstance {
 
 #[derive(Type, Debug, Deserialize)]
 struct DuplicateInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     new_name: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
 struct SetFavorite {
-    instance: InstanceId,
+    instance: FEInstanceId,
     favorite: bool,
 }
 
@@ -518,15 +558,32 @@ impl<T> Set<T> {
 
 #[derive(Type, Debug, Deserialize)]
 struct InstanceMod {
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     mod_id: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
-struct InstallMod {
-    instance_id: InstanceId,
+enum ModSource {
+    Curseforge(CurseforgeMod),
+    Modrinth(ModrinthMod),
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct CurseforgeMod {
     project_id: u32,
     file_id: u32,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ModrinthMod {
+    project_id: String,
+    version_id: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct InstallMod {
+    instance_id: FEInstanceId,
+    mod_source: ModSource,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -535,7 +592,7 @@ struct GameLogId(i32);
 #[derive(Type, Debug, Serialize)]
 struct GameLogEntry {
     id: GameLogId,
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     active: bool,
 }
 
@@ -554,12 +611,19 @@ enum GameVersion {
 #[derive(Type, Debug, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
+    Modrinth(ModrinthModpack),
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 struct CurseforgeModpack {
     project_id: u32,
     file_id: u32,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct ModrinthModpack {
+    pub project_id: String,
+    pub version_id: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -570,21 +634,21 @@ struct StandardVersion {
 
 #[derive(Type, Debug, Deserialize)]
 struct MoveGroup {
-    group: GroupId,
-    before: Option<GroupId>,
+    group: FEGroupId,
+    before: Option<FEGroupId>,
 }
 
 #[derive(Type, Debug, Deserialize)]
 struct MoveInstance {
-    instance: InstanceId,
+    instance: FEInstanceId,
     target: MoveInstanceTarget,
 }
 
 #[derive(Type, Debug, Deserialize)]
 enum MoveInstanceTarget {
-    BeforeInstance(InstanceId),
-    BeginningOfGroup(GroupId),
-    EndOfGroup(GroupId),
+    BeforeInstance(FEInstanceId),
+    BeginningOfGroup(FEGroupId),
+    EndOfGroup(FEGroupId),
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -613,7 +677,7 @@ pub struct MemoryRange {
 
 #[derive(Type, Debug, Deserialize)]
 struct OpenInstanceFolder {
-    instance_id: InstanceId,
+    instance_id: FEInstanceId,
     folder: InstanceFolder,
 }
 
@@ -634,12 +698,13 @@ enum InstanceFolder {
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
-    type_: ModLoaderType,
+    type_: CFFEModLoaderType,
     version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-enum ModLoaderType {
+#[serde(rename_all = "camelCase")]
+enum CFFEModLoaderType {
     Forge,
     Fabric,
     Quilt,
@@ -649,9 +714,9 @@ enum ModLoaderType {
 #[derive(Type, Debug, Serialize)]
 enum LaunchState {
     Inactive {
-        failed_task: Option<TaskId>,
+        failed_task: Option<FETaskId>,
     },
-    Preparing(TaskId),
+    Preparing(FETaskId),
     Running {
         start_time: DateTime<Utc>,
         log_id: i32,
@@ -663,7 +728,7 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
-    modloaders: Vec<ModLoaderType>,
+    modloaders: Vec<CFFEModLoaderType>,
     metadata: ModFileMetadata,
 }
 
@@ -674,7 +739,7 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Option<Vec<ModLoaderType>>,
+    modloaders: Option<Vec<CFFEModLoaderType>>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -702,6 +767,7 @@ impl From<domain::info::ModpackPlatform> for ModpackPlatform {
     fn from(value: domain::info::ModpackPlatform) -> Self {
         match value {
             domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
+            domain::info::ModpackPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -715,7 +781,7 @@ impl From<domain::info::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::info::ModLoaderType> for ModLoaderType {
+impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         use domain::info::ModLoaderType as domain;
 
@@ -749,6 +815,7 @@ impl From<Modpack> for domain::info::Modpack {
     fn from(value: Modpack) -> Self {
         match value {
             Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+            Modpack::Modrinth(m) => Self::Modrinth(m.into()),
         }
     }
 }
@@ -762,10 +829,20 @@ impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
     }
 }
 
+impl From<ModrinthModpack> for domain::info::ModrinthModpack {
+    fn from(value: ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
+        }
+    }
+}
+
 impl From<domain::info::Modpack> for Modpack {
     fn from(value: domain::info::Modpack) -> Self {
         match value {
             domain::info::Modpack::Curseforge(m) => Self::Curseforge(m.into()),
+            domain::info::Modpack::Modrinth(m) => Self::Modrinth(m.into()),
         }
     }
 }
@@ -775,6 +852,15 @@ impl From<domain::info::CurseforgeModpack> for CurseforgeModpack {
         Self {
             project_id: value.project_id,
             file_id: value.file_id,
+        }
+    }
+}
+
+impl From<domain::info::ModrinthModpack> for ModrinthModpack {
+    fn from(value: domain::info::ModrinthModpack) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
         }
     }
 }
@@ -797,13 +883,13 @@ impl From<ModLoader> for domain::info::ModLoader {
     }
 }
 
-impl From<ModLoaderType> for domain::info::ModLoaderType {
-    fn from(value: ModLoaderType) -> Self {
+impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
+    fn from(value: CFFEModLoaderType) -> Self {
         match value {
-            ModLoaderType::Forge => Self::Forge,
-            ModLoaderType::Fabric => Self::Fabric,
-            ModLoaderType::Quilt => Self::Quilt,
-            ModLoaderType::Unknown => Self::Unknown,
+            CFFEModLoaderType::Forge => Self::Forge,
+            CFFEModLoaderType::Fabric => Self::Fabric,
+            CFFEModLoaderType::Quilt => Self::Quilt,
+            CFFEModLoaderType::Unknown => Self::Unknown,
         }
     }
 }
@@ -924,7 +1010,7 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             authors: value.authors,
             modloaders: value
                 .modloaders
-                .and_then(|v| Some(v.into_iter().map(Into::into).collect())),
+                .map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }

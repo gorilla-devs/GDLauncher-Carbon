@@ -21,7 +21,13 @@ impl SettingsManager {
 
 impl ManagerRef<'_, SettingsManager> {
     pub async fn get_settings(self) -> anyhow::Result<crate::db::app_configuration::Data> {
-        self.get().await
+        self.app
+            .prisma_client
+            .app_configuration()
+            .find_unique(app_configuration::id::equals(0))
+            .exec()
+            .await?
+            .ok_or(anyhow!("Can't find this key"))
     }
 
     #[tracing::instrument(skip(self))]
@@ -177,15 +183,5 @@ impl ManagerRef<'_, SettingsManager> {
             .await?;
 
         Ok(())
-    }
-
-    pub async fn get(self) -> anyhow::Result<app_configuration::Data> {
-        self.app
-            .prisma_client
-            .app_configuration()
-            .find_unique(app_configuration::id::equals(0))
-            .exec()
-            .await?
-            .ok_or(anyhow!("Can't find this key"))
     }
 }
