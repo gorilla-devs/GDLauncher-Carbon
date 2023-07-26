@@ -6,6 +6,7 @@ import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
 import initAnalytics from "@/utils/analytics";
+import { checkForUpdates } from "./utils/updater";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -23,6 +24,8 @@ const App = (props: Props) => {
 
   const isFirstRun = rspc.createQuery(() => ["settings.getSettings"], {
     onSuccess(data) {
+      checkForUpdates(data.releaseChannel);
+
       if (data.metricsLevel !== 0 && data.metricsLevel !== null) {
         initAnalytics(data.metricsLevel);
       }

@@ -11,11 +11,12 @@ use serde::{Deserialize, Serialize};
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
-            let response = app.settings_manager()
-                    .get_settings()
-                    .await?;
+            let response: FESettings = app.settings_manager()
+                .get_settings()
+                .await?
+                .try_into()?;
 
-            Ok(Into::<FESettings>::into(response))
+            Ok(response)
         }
 
         mutation SET_SETTINGS[app, new_settings: FESettingsUpdate] {
@@ -26,6 +27,38 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     }
 }
 
+#[derive(Type, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum FEReleaseChannel {
+    Stable,
+    Alpha,
+    Beta,
+}
+
+impl TryFrom<String> for FEReleaseChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value.to_lowercase() {
+            "stable" => Ok(Self::Stable),
+            "alpha" => Ok(Self::Alpha),
+            "beta" => Ok(Self::Beta),
+            _ => Err(anyhow::anyhow!("Invalid release channel")),
+        }
+    }
+}
+
+impl From<FEReleaseChannel> for String {
+    fn from(value: FEReleaseChannel) -> Self {
+        match value {
+            FEReleaseChannel::Stable => "stable",
+            FEReleaseChannel::Alpha => "alpha",
+            FEReleaseChannel::Beta => "beta",
+        }
+        .to_string()
+    }
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FESettings {
@@ -33,7 +66,7 @@ struct FESettings {
     language: String,
     reduced_motion: bool,
     discord_integration: bool,
-    release_channel: String,
+    release_channel: FEReleaseChannel,
     concurrent_downloads: i32,
     show_news: bool,
     xmx: i32,
@@ -46,14 +79,16 @@ struct FESettings {
     metrics_level: Option<i32>,
 }
 
-impl From<crate::db::app_configuration::Data> for FESettings {
-    fn from(data: crate::db::app_configuration::Data) -> Self {
-        Self {
+impl TryFrom<crate::db::app_configuration::Data> for FESettings {
+    type Error = anyhow::Error;
+
+    fn try_from(data: crate::db::app_configuration::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
             theme: data.theme,
             language: data.language,
             reduced_motion: data.reduced_motion,
             discord_integration: data.discord_integration,
-            release_channel: data.release_channel,
+            release_channel: data.release_channel.try_into()?,
             concurrent_downloads: data.concurrent_downloads,
             show_news: data.show_news,
             xmx: data.xmx,
@@ -64,7 +99,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             auto_manage_java: data.auto_manage_java,
             is_legal_accepted: data.is_legal_accepted,
             metrics_level: data.metrics_level,
-        }
+        })
     }
 }
 
@@ -81,7 +116,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub discord_integration: Option<bool>,
     #[specta(optional)]
-    pub release_channel: Option<String>,
+    pub release_channel: Option<FEReleaseChannel>,
     #[specta(optional)]
     pub concurrent_downloads: Option<i32>,
     #[specta(optional)]

@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use crate::db::{self, PrismaClient};
+use crate::{
+    app_version::APP_VERSION,
+    db::{self, PrismaClient},
+};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
@@ -74,9 +77,20 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
+        let release_channel = match APP_VERSION {
+            v if v.contains("alpha") => "alpha",
+            v if v.contains("beta") => "beta",
+            _ => "stable",
+        }
+        .to_string();
+
         db_client
             .app_configuration()
-            .create(find_appropriate_default_xmx().await, vec![])
+            .create(
+                release_channel,
+                find_appropriate_default_xmx().await,
+                vec![],
+            )
             .exec()
             .await?;
     }

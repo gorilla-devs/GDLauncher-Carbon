@@ -14,7 +14,7 @@ model AppConfiguration {
   reducedMotion        Boolean @default(false)
   language             String  @default("english")
   discordIntegration   Boolean @default(true)
-  releaseChannel       String  @default("stable")
+  releaseChannel       String
   activeAccountUuid    String?
   concurrentDownloads  Int     @default(8)
   showNews             Boolean @default(true)

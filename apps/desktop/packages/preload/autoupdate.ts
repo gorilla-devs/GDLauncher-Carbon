@@ -1,7 +1,10 @@
+import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("checkForUpdates", async () =>
-  ipcRenderer.invoke("checkForUpdates")
+contextBridge.exposeInMainWorld(
+  "checkForUpdates",
+  async (releaseChannel: string) =>
+    ipcRenderer.invoke("checkForUpdates", releaseChannel)
 );
 
 contextBridge.exposeInMainWorld("installUpdate", async () =>
@@ -14,6 +17,6 @@ contextBridge.exposeInMainWorld("updateAvailable", async (cb: any) =>
 
 contextBridge.exposeInMainWorld(
   "releaseChannel",
-  async (releaseChannel: string) =>
+  async (releaseChannel: FEReleaseChannel) =>
     ipcRenderer.send("releaseChannel", releaseChannel)
 );

@@ -239,5 +239,7 @@
 
   "app_update.new_update_available_text": "A new version of GDLauncher is available! This edition of the app is not able to update automatically.",
   "app_update.click_button_below": "Please download the new version by clicking on the button below",
-  "app_update.download_new_version": "Download New Version"
+  "app_update.download_new_version": "Download New Version",
+  "app_update.current_version": "Current Version",
+  "app_update.available_version": "Available Version"
 }

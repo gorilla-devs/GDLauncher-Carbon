@@ -10,7 +10,7 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import updateAvailable, { checkForUpdates } from "@/utils/updater";
+import updateAvailable from "@/utils/updater";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 
@@ -41,7 +41,6 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
-  checkForUpdates();
 
   createEffect(() => {
     const mappedAccounts = routeData.accounts.data?.map((account) => {

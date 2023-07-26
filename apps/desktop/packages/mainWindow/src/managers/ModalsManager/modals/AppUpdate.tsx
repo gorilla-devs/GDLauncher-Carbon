@@ -14,17 +14,25 @@ const AppUpdate = (props: ModalProps) => {
         <p>
           <Trans key="app_update.click_button_below" />
         </p>
-        <div class="mt-4 flex justify-between items-center">
-          <div class="flex flex-col gap-2">
-            <div class="text-left font-bold">Current Version</div>
+        <hr class="w-full border-darkSlate-50" />
+        <div class="mt-4 flex justify-between items-center relative divide-y divide-yellow-500/50">
+          <div class="flex flex-col gap-4">
+            <div class="text-left font-bold">
+              <Trans key="app_update.current_version" />
+            </div>
             <div class="text-left">{__APP_VERSION__}</div>
           </div>
-          <div class="i-ri:arrow-right-double-line" />
-          <div class="flex flex-col gap-2">
-            <div class="text-left font-bold">Available Version</div>
-            <div class="text-left">{updateAvailable()?.updateInfo.version}</div>
+          <div class="i-ri:arrow-right-double-fill text-2xl" />
+          <div class="flex flex-col gap-4">
+            <div class="text-left font-bold">
+              <Trans key="app_update.available_version" />
+            </div>
+            <div class="text-left">
+              {updateAvailable()?.updateInfo?.version || __APP_VERSION__}
+            </div>
           </div>
         </div>
+        <hr class="w-full mt-8 border-darkSlate-50" />
         <div class="flex items-center justify-center flex-1 mt-20 mb-4">
           <Button
             icon={

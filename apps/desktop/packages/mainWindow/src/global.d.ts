@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 
+import type { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BoundsSize } from "./utils/adhelper";
 import type { UpdateCheckResult } from "electron-updater";
 
@@ -14,7 +15,9 @@ declare global {
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
-    checkForUpdates: () => Promise<UpdateCheckResult | null>;
+    checkForUpdates: (
+      releaseChannel: FEReleaseChannel
+    ) => Promise<UpdateCheckResult | null>;
     installUpdate: () => void;
     releaseChannel: (releaseChannel: string) => void;
     openExternalLink: (link: string) => void;

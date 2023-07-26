@@ -1,19 +1,20 @@
-import { BrowserWindow, app, ipcMain } from "electron";
+import { FEReleaseChannel } from "@gd/core_module/bindings";
+import { BrowserWindow, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 
 export default function initAutoUpdater(win: BrowserWindow) {
-  const isUnstable =
-    app.getVersion().includes("alpha") || app.getVersion().includes("beta");
-
   autoUpdater.autoDownload = false;
-  autoUpdater.allowDowngrade = isUnstable;
-  autoUpdater.allowPrerelease = true;
+  autoUpdater.allowDowngrade = true;
 
-  ipcMain.handle("checkForUpdates", async () => {
-    console.log("Checking for updates");
-    return autoUpdater.checkForUpdates();
-    // return true;
-  });
+  ipcMain.handle(
+    "checkForUpdates",
+    async (_, selectedChannel: FEReleaseChannel) => {
+      autoUpdater.channel = selectedChannel;
+      autoUpdater.allowPrerelease = selectedChannel !== "stable";
+      console.log("Checking for updates", selectedChannel);
+      return autoUpdater.checkForUpdates();
+    }
+  );
 
   ipcMain.handle("installUpdate", async () => {
     // autoUpdater.quitAndInstall(true, false);

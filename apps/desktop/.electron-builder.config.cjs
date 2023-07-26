@@ -42,6 +42,7 @@ let publish =
 module.exports = {
   productName: "GDLauncher",
   appId: "org.gorilladevs.GDLauncher",
+  generateUpdatesFilesForAllChannels: true,
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
   publish,
   asar: true,
