@@ -138,7 +138,7 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
-    let Some(mapping_class) = classifiers.get(&natives_name.clone()) else {
+    let Some(mapping_class) = classifiers.get(&natives_name.replace("${arch}", ARCH_WIDTH)) else {
         return None;
     };
 
@@ -193,7 +193,11 @@ pub fn chain_lwjgl_libs_with_base_libs(
                             return None;
                         };
 
-                        classifiers.get(native_name).unwrap().path.clone()
+                        classifiers
+                            .get(&native_name.replace("${arch}", ARCH_WIDTH))
+                            .unwrap()
+                            .path
+                            .clone()
                     } else {
                         panic!("Library has no artifact or classifier");
                     }
