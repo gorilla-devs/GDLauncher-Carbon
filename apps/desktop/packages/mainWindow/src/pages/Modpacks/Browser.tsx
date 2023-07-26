@@ -215,9 +215,6 @@ export default function Browser() {
                 }}
               />
             </Show>
-            <Show when={mappedMcVersions().length === 0}>
-              <Skeleton.select />
-            </Show>
           </div>
           <Button
             type="outline"
