@@ -17,10 +17,10 @@ import { join, resolve } from "path";
 import os from "os";
 import "./cli";
 import coreModule from "./CoreModuleLoaded";
-// import autoUpdater from "./autoUpdater";
 import "./preloadListeners";
 import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
+import initAutoUpdater from "./autoUpdater";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
@@ -67,6 +67,8 @@ async function createWindow() {
       sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
     },
   });
+
+  initAutoUpdater(win);
 
   screen.addListener(
     "display-metrics-changed",

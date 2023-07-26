@@ -34,10 +34,9 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: (process.env.GENERIC_PUBLISH_URL || "https://example.com").replace(
-          "${arch}",
-          arch
-        ),
+        url: (
+          process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn"
+        ).replace("${arch}", arch),
       };
 
 module.exports = {
@@ -73,17 +72,17 @@ module.exports = {
   nsis: {
     oneClick: false,
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    allowToChangeInstallationDirectory: false,
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
-    target: ["dir", "zip"],
+    target: ["dir", "zip", "appImage"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
   },
   afterAllArtifactBuild: (buildResult) => {

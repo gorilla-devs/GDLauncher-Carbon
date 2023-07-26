@@ -2,14 +2,15 @@ import { BrowserWindow, app, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 
 export default function initAutoUpdater(win: BrowserWindow) {
-  let allowUnstableReleases = false;
+  const isUnstable =
+    app.getVersion().includes("alpha") || app.getVersion().includes("beta");
 
   autoUpdater.autoDownload = false;
-  autoUpdater.allowDowngrade =
-    !allowUnstableReleases && app.getVersion().includes("beta");
-  autoUpdater.allowPrerelease = allowUnstableReleases;
+  autoUpdater.allowDowngrade = isUnstable;
+  autoUpdater.allowPrerelease = true;
 
   ipcMain.handle("checkUpdate", async () => {
+    console.log("Checking for updates");
     autoUpdater.checkForUpdates();
   });
 
@@ -17,7 +18,13 @@ export default function initAutoUpdater(win: BrowserWindow) {
     // autoUpdater.quitAndInstall(true, false);
   });
 
-  autoUpdater.on("update-available", () => {
+  autoUpdater.on("update-available", (updateInfo) => {
+    console.log("Update available", updateInfo);
+    // autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("update-not-available", (updateInfo) => {
+    console.log("Update not available", updateInfo);
     // autoUpdater.downloadUpdate();
   });
 
@@ -25,9 +32,9 @@ export default function initAutoUpdater(win: BrowserWindow) {
     win?.webContents.send("updateAvailable");
   });
 
-  ipcMain.on("releaseChannel", async (_, releaseChannel) => {
-    if (releaseChannel === "beta" || releaseChannel === "alpha") {
-      allowUnstableReleases = true;
-    }
-  });
+  // ipcMain.on("releaseChannel", async (_, releaseChannel) => {
+  //   if (releaseChannel === "beta" || releaseChannel === "alpha") {
+  //     allowUnstableReleases = true;
+  //   }
+  // });
 }
