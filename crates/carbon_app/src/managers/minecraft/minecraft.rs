@@ -13,6 +13,7 @@ use crate::{
         },
     },
 };
+use anyhow::Context;
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
@@ -554,7 +555,15 @@ pub async fn extract_natives(
 
         info!("Extracting natives from {}", path.display());
 
-        carbon_compression::decompress(path, dest).await?;
+        carbon_compression::decompress(&path, dest)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to decompress natives from `{}` to `{}`",
+                    path.to_string_lossy(),
+                    dest.to_string_lossy()
+                )
+            })?;
 
         Ok(())
     }
@@ -574,7 +583,13 @@ pub async fn extract_natives(
             Some(natives) => {
                 if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
                     extract_single_library_natives(runtime_path, library, &dest, native_name)
-                        .await?;
+                        .await
+                        .with_context(|| {
+                            format!(
+                                "Failed to extract native `{}` for library `{}`",
+                                &native_name, &library.name
+                            )
+                        })?;
                 }
             }
             None => continue,
