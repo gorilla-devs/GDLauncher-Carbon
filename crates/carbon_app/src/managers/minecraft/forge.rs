@@ -160,7 +160,7 @@ macro_rules! augment_data {
 type ProgressCallback<'a> = Box<dyn Fn(u32, u32) + Send + Sync + 'a>;
 
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
-pub async fn execute_processors<'callback> (
+pub async fn execute_processors<'callback>(
     processors: &Vec<Processor>,
     data: &HashMap<String, SidedDataEntry>,
     java_binary: PathBuf,
@@ -168,7 +168,7 @@ pub async fn execute_processors<'callback> (
     client_path: PathBuf,
     game_version: String,
     libraries_path: LibrariesPath,
-    progress_callback: Option<ProgressCallback<'callback>>
+    progress_callback: Option<ProgressCallback<'callback>>,
 ) -> anyhow::Result<()> {
     let mut data = data.clone();
     augment_data! {
@@ -190,7 +190,7 @@ pub async fn execute_processors<'callback> (
             server => "";
     }
     let total_processors = processors.len();
-    let mut cur_progress  = 0;
+    let mut cur_progress = 0;
 
     for processor in processors {
         if let Some(progress_callback) = &progress_callback {

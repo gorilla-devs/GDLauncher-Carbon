@@ -97,7 +97,8 @@ where
             .await;
 
         let db_entry =
-            get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string()).await?;
+            get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string())
+                .await?;
 
         if let Some(db_entry) = &db_entry {
             if JavaComponentType::try_from(&*db_entry.r#type)? != JavaComponentType::Local {
