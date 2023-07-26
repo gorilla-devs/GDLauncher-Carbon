@@ -1,26 +1,27 @@
 /* eslint-disable i18next/no-literal-string */
-import { getModloaderIcon } from "@/utils/sidebar";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
-  ModLoaderType,
+  CFFEModLoaderType,
   FESubtask,
   Translation,
   UngroupedInstance,
+  ModpackPlatform,
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip, createNotification } from "@gd/ui";
+import { rspc } from "@/utils/rspcClient";
+import { Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
-import { getValideInstance } from "@/utils/instances";
+import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
-  modloader: ModLoaderType | null | undefined;
+  modloader: CFFEModLoaderType | null | undefined;
   instance: UngroupedInstance | ListInstance;
   selected?: boolean;
   isLoading?: boolean;
@@ -44,59 +45,8 @@ const Tile = (props: Props) => {
     props
   );
   const [t] = useTransContext();
-  const addNotification = createNotification();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
-
-  const deleteInstanceMutation = rspc.createMutation(
-    ["instance.deleteInstance"],
-    {
-      onMutate: async (
-        instanceId
-      ): Promise<
-        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      > => {
-        await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-
-        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
-
-        queryClient.setQueryData(
-          ["account.getActiveUuid", null],
-          (old: UngroupedInstance[] | undefined) => {
-            const filteredAccounts = old?.filter(
-              (account) => account.id !== instanceId
-            );
-
-            if (filteredAccounts) return filteredAccounts;
-          }
-        );
-
-        if (previusInstancesUngrouped) return { previusInstancesUngrouped };
-      },
-      onError: (
-        error,
-        _variables,
-        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      ) => {
-        addNotification(error.message, "error");
-
-        if (context?.previusInstancesUngrouped) {
-          queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
-            context.previusInstancesUngrouped
-          );
-        }
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
-        });
-      },
-    }
-  );
 
   const launchInstanceMutation = rspc.createMutation([
     "instance.launchInstance",
@@ -129,7 +79,16 @@ const Tile = (props: Props) => {
   };
 
   const handleDelete = () => {
-    deleteInstanceMutation.mutate(props.instance.id);
+    // deleteInstanceMutation.mutate(props.instance.id);
+    modalsContext?.openModal(
+      {
+        name: "confirmInstanceDeletion",
+      },
+      {
+        id: props.instance.id,
+        name: props.instance.name,
+      }
+    );
   };
 
   const handleSettings = () => {
@@ -237,7 +196,7 @@ const Tile = (props: Props) => {
           >
             <div class="relative rounded-2xl overflow-hidden h-38 w-38">
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden bg-cover bg-center h-38 w-38 max-w-38"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
                 classList={{
                   grayscale: props.isLoading || isInQueue(),
                   "cursor-pointer":
@@ -260,7 +219,7 @@ const Tile = (props: Props) => {
                   </h2>
                   <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                  <div class="absolute z-10 text-2xl text-yellow-500 i-ri:alert-fill top-1 right-1" />
+                  <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
                 <Show when={props.failError}>
                   <h2 class="text-center z-20 text-sm">{props.failError}</h2>
@@ -330,7 +289,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={isInQueue()}>
-                  <div class="z-12 flex flex-col gap-2 items-center">
+                  <div class="flex flex-col gap-2 items-center z-12">
                     <Spinner />
                     <span class="font-bold">
                       <Trans key="instance.isInQueue" />
@@ -353,7 +312,7 @@ const Tile = (props: Props) => {
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
-                  class="absolute left-0 bottom-0 bg-primary-500 h-2 z-40 rounded-full"
+                  class="absolute left-0 bottom-0 z-40 rounded-full bg-primary-500 h-1"
                   style={{
                     width: `${props.percentage}%`,
                   }}
@@ -373,10 +332,20 @@ const Tile = (props: Props) => {
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-2">
-                    <Show when={!props.isInvalid && !props.failError}>
+                    <Show when={validInstance()?.modpack_platform}>
                       <img
                         class="w-4 h-4"
-                        src={getModloaderIcon(props.modloader as ModLoaderType)}
+                        src={getModpackPlatformIcon(
+                          validInstance()?.modpack_platform as ModpackPlatform
+                        )}
+                      />
+                    </Show>
+                    <Show when={props.modloader}>
+                      <img
+                        class="w-4 h-4"
+                        src={getForgeModloaderIcon(
+                          props.modloader as CFFEModLoaderType
+                        )}
                       />
                     </Show>
                     <p class="m-0">{props.modloader || "Vanilla"}</p>
@@ -419,7 +388,7 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
-            <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition hover:bg-primary-500" />
+            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-primary-500" />
 
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
@@ -488,10 +457,20 @@ const Tile = (props: Props) => {
               </h4>
               <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">
-                  <Show when={!props.isInvalid && !props.failError}>
+                  <Show when={validInstance()?.modpack_platform}>
                     <img
                       class="w-4 h-4"
-                      src={getModloaderIcon(props.modloader as ModLoaderType)}
+                      src={getModpackPlatformIcon(
+                        validInstance()?.modpack_platform as ModpackPlatform
+                      )}
+                    />
+                  </Show>
+                  <Show when={props.modloader}>
+                    <img
+                      class="w-4 h-4"
+                      src={getForgeModloaderIcon(
+                        props.modloader as CFFEModLoaderType
+                      )}
                     />
                   </Show>
                   <Show when={props.modloader}>

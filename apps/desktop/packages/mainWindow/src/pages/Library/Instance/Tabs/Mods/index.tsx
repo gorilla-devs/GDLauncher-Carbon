@@ -1,110 +1,26 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
-import ModRow from "./Mod";
+import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
 import { useParams, useRouteData } from "@solidjs/router";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
-import fetchData from "../instance.data";
-import { Mod } from "@gd/core_module/bindings";
+import fetchData from "../../instance.data";
 
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
   const modalsContext = useModal();
-  const [selectMods, setSelectedMods] = createStore<{
+  const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
-  const [filter, setFilter] = createSignal("");
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
-  const disableModMutation = rspc.createMutation(["instance.disableMod"], {
-    async onMutate(
-      changes
-    ): Promise<{ previousMods: Mod[] | undefined } | undefined> {
-      await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceMods"],
-      });
-
-      const previousMods: Mod[] | undefined = queryClient.getQueryData([
-        "instance.getInstanceMods",
-      ]);
-
-      queryClient.setQueryData(
-        ["instance.getInstanceMods"],
-        (instances: Mod[] | undefined) => {
-          if (!instances) return;
-          const index = instances?.findIndex(
-            (instance) => instance.id === changes.mod_id
-          );
-          instances[index].enabled = false;
-
-          return instances;
-        }
-      );
-
-      return { previousMods };
-    },
-    onError: (
-      _err,
-      _newMods,
-      context: { previousMods: Mod[] | undefined } | undefined
-    ) => {
-      if (context)
-        queryClient.setQueryData(
-          ["instance.getInstanceMods"],
-          context.previousMods
-        );
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["instance.getInstanceMods"] });
-    },
-  });
-  const enableModMutation = rspc.createMutation(["instance.enableMod"], {
-    async onMutate(
-      changes
-    ): Promise<{ previousMods: Mod[] | undefined } | undefined> {
-      await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceMods"],
-      });
-
-      const previousMods: Mod[] | undefined = queryClient.getQueryData([
-        "instance.getInstanceMods",
-      ]);
-
-      queryClient.setQueryData(
-        ["instance.getInstanceMods"],
-        (instances: Mod[] | undefined) => {
-          if (!instances) return;
-          const index = instances?.findIndex(
-            (instance) => instance.id === changes.mod_id
-          );
-          instances[index].enabled = true;
-
-          return instances;
-        }
-      );
-
-      return { previousMods };
-    },
-    onError: (
-      _err,
-      _newMods,
-      context: { previousMods: Mod[] | undefined } | undefined
-    ) => {
-      if (context)
-        queryClient.setQueryData(
-          ["instance.getInstanceMods"],
-          context.previousMods
-        );
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["instance.getInstanceMods"] });
-    },
-  });
+  const disableModMutation = rspc.createMutation(["instance.disableMod"]);
+  const enableModMutation = rspc.createMutation(["instance.enableMod"]);
 
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
@@ -146,32 +62,15 @@ const Mods = () => {
     );
   };
 
-  const instanceMods = () => routeData.instanceMods.data || [];
-
-  const mods = () =>
-    filter()
-      ? instanceMods().filter((item) =>
-          item.filename.toLowerCase().includes(filter().toLowerCase())
-        )
-      : instanceMods();
-
-  const selectedMods = () =>
-    Object.entries(selectMods).filter(([_id, selected]) => selected);
-
-  const areSelectedModsEnabled = () =>
-    mods()
-      .filter((mod) => selectMods[mod.id])
-      .every((mod) => mod.enabled);
-
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
-            onInput={(e) => setFilter(e.target.value)}
-            placeholder={t("general.type_here") as string}
+            placeholder="Type Here"
             icon={<div class="i-ri:search-line" />}
             class="w-full rounded-full text-darkSlate-50"
+            inputClass=""
           />
           <div class="flex gap-3 items-center">
             <p class="text-darkSlate-50">
@@ -214,7 +113,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 onChange={(checked) => {
-                  routeData.instanceMods.data?.forEach((mod) => {
+                  routeData.instanceDetails.data?.mods.forEach((mod) => {
                     if (checked) {
                       setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
                     } else
@@ -250,7 +149,7 @@ const Mods = () => {
             <div
               class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
               onClick={() => {
-                Object.keys(selectMods).forEach((mod) => {
+                Object.keys(selectedMods).forEach((mod) => {
                   deleteModMutation.mutate({
                     instance_id: parseInt(params.id, 10),
                     mod_id: mod,
@@ -266,29 +165,24 @@ const Mods = () => {
                 }}
               />
             </div>
-            <Show
-              when={Object.values(selectMods).filter((val) => val).length > 0}
-            >
+            <Show when={Object.keys(selectedMods).length > 0}>
               <div
                 class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
                 onClick={() => {
-                  console.log("MODS", mods());
+                  const areSelectedEnabled =
+                    routeData.instanceDetails.data?.mods
+                      .filter((mod) => selectedMods[mod.id])
+                      .every((mod) => mod.enabled);
 
-                  mods()
-                    .filter((mod) => selectMods[mod.id])
+                  routeData.instanceDetails.data?.mods
+                    .filter((mod) => selectedMods[mod.id])
                     .forEach((mod) => {
-                      console.log(
-                        "ROW",
-                        mod.enabled,
-                        areSelectedModsEnabled(),
-                        mod.id
-                      );
-                      if (areSelectedModsEnabled() && mod.enabled) {
+                      if (areSelectedEnabled) {
                         disableModMutation.mutate({
                           instance_id: parseInt(params.id, 10),
                           mod_id: mod.id,
                         });
-                      } else if (!areSelectedModsEnabled() && !mod.enabled) {
+                      } else {
                         enableModMutation.mutate({
                           instance_id: parseInt(params.id, 10),
                           mod_id: mod.id,
@@ -298,7 +192,9 @@ const Mods = () => {
                 }}
               >
                 <Show
-                  when={areSelectedModsEnabled()}
+                  when={routeData.instanceDetails.data?.mods
+                    .filter((mod) => selectedMods[mod.id])
+                    .every((mod) => mod.enabled)}
                   fallback={
                     <Trans
                       key="instance.enable_all_selected_mod"
@@ -319,7 +215,7 @@ const Mods = () => {
             </Show>
           </div>
           <div class="flex gap-1">
-            <span>{selectedMods().length || mods().length}</span>
+            <span>{routeData.instanceDetails.data?.mods.length}</span>
 
             <Trans
               key="instance.mods"
@@ -333,16 +229,18 @@ const Mods = () => {
       <div class="h-full overflow-y-hidden">
         <Show
           when={
-            mods() && mods().length > 0 && !routeData.instanceDetails.isLoading
+            routeData.instanceDetails.data?.mods &&
+            routeData.instanceDetails.data?.mods.length > 0 &&
+            !routeData.instanceDetails.isLoading
           }
           fallback={<NoMods />}
         >
-          <For each={mods()}>
+          <For each={routeData.instanceDetails.data?.mods}>
             {(props) => (
-              <ModRow
+              <Mod
                 mod={props}
                 setSelectedMods={setSelectedMods}
-                selectMods={selectMods}
+                selectedMods={selectedMods}
               />
             )}
           </For>

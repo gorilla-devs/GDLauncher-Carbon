@@ -1,10 +1,10 @@
 import { Trans } from "@gd/i18n";
 import { Show } from "solid-js";
 import { format } from "date-fns";
-import { FEFile } from "@gd/core_module/bindings";
+import { CFFEFile } from "@gd/core_module/bindings";
 
 type Props = {
-  version: FEFile;
+  version: CFFEFile;
   mainFileId: number;
 };
 

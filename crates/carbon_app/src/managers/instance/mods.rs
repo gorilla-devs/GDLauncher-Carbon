@@ -1,11 +1,16 @@
 use anyhow::bail;
+use std::ffi::OsStr;
 use thiserror::Error;
 
+<<<<<<< HEAD
 use crate::domain::instance::info::ModLoaderType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use crate::{db::read_filters::IntFilter, domain::instance as domain};
+=======
+use crate::{api::keys::instance::*, domain::vtask::VisualTaskId, managers::ManagerRef};
+>>>>>>> develop
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},

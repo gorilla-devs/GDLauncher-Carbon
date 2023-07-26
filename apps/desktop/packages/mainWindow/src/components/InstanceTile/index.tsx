@@ -15,7 +15,7 @@ import {
   ListInstance,
   UngroupedInstance,
   FESubtask,
-  Task,
+  FETask,
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
@@ -64,7 +64,7 @@ const InstanceTile = (props: {
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
   const [task, setTask] = createSignal<CreateQueryResult<
-    Task | null,
+    FETask | null,
     RSPCError
   > | null>(null);
 
@@ -83,8 +83,8 @@ const InstanceTile = (props: {
   createEffect(() => {
     setFailError("");
     if (task() !== null && task()?.data) {
-      const data = (task() as CreateQueryResult<Task | null, RSPCError>)
-        .data as Task;
+      const data = (task() as CreateQueryResult<FETask | null, RSPCError>)
+        .data as FETask;
       setProgress("totalDownload", data.download_total);
       setProgress("downloaded", data.downloaded);
       if (isProgressKnown(data.progress)) {

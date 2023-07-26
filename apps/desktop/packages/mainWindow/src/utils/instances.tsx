@@ -1,3 +1,4 @@
+/* eslint-disable solid/no-innerhtml */
 import {
   FeError,
   InvalidListInstance,
@@ -5,11 +6,19 @@ import {
   ListInstanceStatus,
   Progress,
   FESubtask,
-  TaskId,
+  FETaskId,
   UngroupedInstance,
   ValidListInstance,
+  Modpack,
+  CurseforgeModpack,
+  ModrinthModpack,
+  ModpackPlatform,
+  CFFECategory,
+  MRFECategory,
 } from "@gd/core_module/bindings";
-import { blobToBase64 } from "./helpers";
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
+import { Show, Switch, Match } from "solid-js";
 import { port } from "./rspcClient";
 
 export const isListInstanceValid = (
@@ -44,7 +53,10 @@ export const isListInstanceInvalid = (
 
 export const getLaunchState = (
   launchState: LaunchState
-): { Preparing: TaskId } | { Running: { start_time: string } } | undefined => {
+):
+  | { Preparing: FETaskId }
+  | { Running: { start_time: string } }
+  | undefined => {
   if (typeof launchState === "object" && "Preparing" in launchState) {
     return { Preparing: launchState.Preparing };
   } else if (typeof launchState === "object" && "Running" in launchState) {
@@ -148,7 +160,7 @@ export const getRunningState = (status: ListInstanceStatus | LaunchState) => {
 
 export const isInstancePreparing = (
   launchState: LaunchState
-): launchState is { Preparing: TaskId } => {
+): launchState is { Preparing: FETaskId } => {
   return typeof launchState === "object" && "Preparing" in launchState;
 };
 
@@ -170,6 +182,37 @@ export const isProgressFailed = (
   return (progress as { Failed: FeError }).Failed !== undefined;
 };
 
+export const isModpackCurseforge = (
+  modpack: Modpack
+): modpack is { Curseforge: CurseforgeModpack } => {
+  return "Curseforge" in modpack;
+};
+
+export const getCurseForgeData = (modpack: Modpack) => {
+  if ("Curseforge" in modpack) return modpack.Curseforge;
+};
+
+export const isModpackModrinth = (
+  modpack: Modpack
+): modpack is { Modrinth: ModrinthModpack } => {
+  return "Modrinth" in modpack;
+};
+
+export const getModrinthData = (modpack: Modpack) => {
+  if ("Modrinth" in modpack) return modpack.Modrinth;
+};
+
+export const fetchImage = async (id: number) => {
+  const imageUrl = `http://localhost:${port}/instance/instanceIcon?id=${id}`;
+  const image = await fetch(imageUrl);
+
+  const imageNotPresent = image.status === 204;
+
+  if (!imageNotPresent) {
+    return imageUrl;
+  } else return "";
+};
+
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
   error?: InvalidListInstance;
 }
@@ -181,22 +224,49 @@ export interface ValidInstanceType
   img: string;
 }
 
-export const fetchImage = async (id: number) => {
-  const image = await fetch(
-    `http://localhost:${port}/instance/instanceIcon?id=${id}`
-  );
-
-  const imageNotPresent = image.status === 204;
-
-  if (!imageNotPresent) {
-    const blob = await image.blob();
-    const b64 = (await blobToBase64(blob)) as string;
-    return `data:image/png;base64, ${b64.substring(b64.indexOf(",") + 1)}`;
-  } else return "";
-};
-
 export type Instance = InvalidInstanceType | ValidInstanceType;
 
 export interface InstancesStore {
   [modloader: string]: UngroupedInstance[];
 }
+
+export const getModpackPlatformIcon = (platform: ModpackPlatform) => {
+  switch (platform) {
+    case "Curseforge":
+      return CurseforgeLogo;
+    case "Modrinth":
+      return ModrinthLogo;
+    default:
+      return CurseforgeLogo;
+  }
+};
+
+export const getCategoryIcon = (category: CFFECategory | MRFECategory) => {
+  if ("iconUrl" in category) {
+    return category.iconUrl;
+  } else return category.icon;
+};
+
+export const CategoryIcon = (props: {
+  category: CFFECategory | MRFECategory;
+}) => {
+  return (
+    <Switch
+      fallback={
+        <>
+          <Show when={getCategoryIcon(props.category)}>
+            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
+          </Show>
+        </>
+      }
+    >
+      <Match when={"iconUrl" in props.category}>
+        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+      </Match>
+    </Switch>
+  );
+};
+
+export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
+};
