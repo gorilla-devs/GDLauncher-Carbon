@@ -1,16 +1,11 @@
 use anyhow::bail;
-use std::ffi::OsStr;
 use thiserror::Error;
 
-<<<<<<< HEAD
 use crate::domain::instance::info::ModLoaderType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use crate::{db::read_filters::IntFilter, domain::instance as domain};
-=======
-use crate::{api::keys::instance::*, domain::vtask::VisualTaskId, managers::ManagerRef};
->>>>>>> develop
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
@@ -227,12 +222,10 @@ pub struct InvalidModIdError(InstanceId, String);
 
 #[cfg(test)]
 mod test {
+    use crate::managers::instance::InstanceVersionSource;
     use std::collections::HashSet;
 
-    use crate::{
-        api::keys::instance::INSTANCE_MODS, domain::instance::info,
-        managers::instance::InstanceVersionSouce,
-    };
+    use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
     #[tokio::test]
     async fn test_mod_metadata() -> anyhow::Result<()> {
@@ -245,10 +238,12 @@ mod test {
                 group,
                 String::from("test"),
                 false,
-                InstanceVersionSouce::Version(info::GameVersion::Standard(info::StandardVersion {
-                    release: String::from("1.16.5"),
-                    modloaders: HashSet::new(),
-                })),
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.16.5"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
                 String::new(),
             )
             .await?;

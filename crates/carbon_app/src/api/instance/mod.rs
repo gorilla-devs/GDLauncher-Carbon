@@ -739,13 +739,8 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
-<<<<<<< HEAD
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
-=======
-    modloaders: Vec<CFFEModLoaderType>,
-    metadata: ModFileMetadata,
->>>>>>> develop
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -755,8 +750,7 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-<<<<<<< HEAD
-    modloaders: Vec<FEInstanceModLoaderType>,
+    modloaders: Vec<CFFEModLoaderType>,
 }
 
 #[derive(Type, Serialize, Debug)]
@@ -767,9 +761,6 @@ struct CurseForgeModMetadata {
     pub urlslug: String,
     pub summary: String,
     pub authors: String,
-=======
-    modloaders: Option<Vec<CFFEModLoaderType>>,
->>>>>>> develop
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -914,16 +905,9 @@ impl From<ModLoader> for domain::info::ModLoader {
 impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
     fn from(value: CFFEModLoaderType) -> Self {
         match value {
-<<<<<<< HEAD
-            FEInstanceModLoaderType::Forge => Self::Forge,
-            FEInstanceModLoaderType::Fabric => Self::Fabric,
-            FEInstanceModLoaderType::Quilt => Self::Quilt,
-=======
             CFFEModLoaderType::Forge => Self::Forge,
             CFFEModLoaderType::Fabric => Self::Fabric,
             CFFEModLoaderType::Quilt => Self::Quilt,
-            CFFEModLoaderType::Unknown => Self::Unknown,
->>>>>>> develop
         }
     }
 }

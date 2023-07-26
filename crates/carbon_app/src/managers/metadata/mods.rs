@@ -665,7 +665,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -688,7 +688,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -717,7 +717,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -742,7 +742,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -767,7 +767,7 @@ authors = "TestAuthor1, TestAuthor2"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -790,7 +790,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -849,7 +849,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("This is an example description!")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Fabric]),
+            modloaders: vec![ModLoaderType::Fabric],
         });
 
         let returned = parsemeta("fabric.mod.json", modjson)?;
@@ -910,7 +910,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("A short description of your mod.")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Quilt]),
+            modloaders: vec![ModLoaderType::Quilt],
         });
 
         let returned = parsemeta("quilt.mod.json", modjson)?;
