@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("checkUpdate", async () =>
-  ipcRenderer.invoke("checkUpdate")
+contextBridge.exposeInMainWorld("checkForUpdates", async () =>
+  ipcRenderer.invoke("checkForUpdates")
 );
 
 contextBridge.exposeInMainWorld("installUpdate", async () =>

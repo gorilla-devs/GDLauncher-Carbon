@@ -1,5 +1,5 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, onMount } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing, Button } from "@gd/ui";
@@ -10,7 +10,7 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import { checkForUpdates } from "@/utils/updaterhelper";
+import updateAvailable, { checkForUpdates } from "@/utils/updater";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 
@@ -41,6 +41,7 @@ const AppNavbar = () => {
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
+  checkForUpdates();
 
   createEffect(() => {
     const mappedAccounts = routeData.accounts.data?.map((account) => {
@@ -61,10 +62,6 @@ const AppNavbar = () => {
     if (mappedAccounts) {
       setAccounts(mappedAccounts);
     }
-  });
-
-  onMount(() => {
-    checkForUpdates();
   });
 
   return (
@@ -148,12 +145,16 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </div>
-                  {/* <div
-                    class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
-                    onClick={() =>
-                      modalsContext?.openModal({ name: "notification" })
-                    }
-                  /> */}
+                  <Show when={updateAvailable()}>
+                    <Tab ignored>
+                      <div
+                        class="text-2xl cursor-pointer text-green-600 i-ri:download-2-fill"
+                        onClick={() =>
+                          modalsContext?.openModal({ name: "appUpdate" })
+                        }
+                      />
+                    </Tab>
+                  </Show>
                 </div>
               </TabList>
             </Tabs>

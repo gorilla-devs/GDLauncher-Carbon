@@ -9,23 +9,14 @@ export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.allowDowngrade = isUnstable;
   autoUpdater.allowPrerelease = true;
 
-  ipcMain.handle("checkUpdate", async () => {
+  ipcMain.handle("checkForUpdates", async () => {
     console.log("Checking for updates");
-    autoUpdater.checkForUpdates();
+    return autoUpdater.checkForUpdates();
+    // return true;
   });
 
   ipcMain.handle("installUpdate", async () => {
     // autoUpdater.quitAndInstall(true, false);
-  });
-
-  autoUpdater.on("update-available", (updateInfo) => {
-    console.log("Update available", updateInfo);
-    // autoUpdater.downloadUpdate();
-  });
-
-  autoUpdater.on("update-not-available", (updateInfo) => {
-    console.log("Update not available", updateInfo);
-    // autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on("update-downloaded", () => {

@@ -235,5 +235,9 @@
   "tracking.setting_anonymous_with_session_recordings": "Anonymous with Sessions Recordings",
   "tracking.setting_anonymous_with_session_recordings_text": "This sends the same amount of data as Anonymous, but also includes session recordings, which are brief recordings of the app usage.",
   "tracking.settings_authenticated_with_session_recordings": "Authenticated with Sessions Recordings",
-  "tracking.settings_authenticated_with_session_recordings_text": "Same as Anonymous with Session Recordings but we bind events and recordings to your Microsoft account. This is useful if you want to work with the developers to fix a specific bug you're having."
+  "tracking.settings_authenticated_with_session_recordings_text": "Same as Anonymous with Session Recordings but we bind events and recordings to your Microsoft account. This is useful if you want to work with the developers to fix a specific bug you're having.",
+
+  "app_update.new_update_available_text": "A new version of GDLauncher is available! This edition of the app is not able to update automatically.",
+  "app_update.click_button_below": "Please download the new version by clicking on the button below",
+  "app_update.download_new_version": "Download New Version"
 }
