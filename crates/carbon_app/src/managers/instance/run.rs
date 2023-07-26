@@ -659,6 +659,9 @@ impl ManagerRef<'_, InstanceManager> {
                             client_path,
                             game_version,
                             libraries_path,
+                            Some(Box::new(|current, total| {
+                                t_forge_processors.update_items(current, total);
+                            })),
                         )
                         .await?;
                     }
