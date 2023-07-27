@@ -22,7 +22,7 @@ export const getAuthors = (prop: ModRowProps | FEUnifiedSearchResult) => {
 };
 
 const Authors = (props: Props) => {
-  const isModRow = () => "data" in props;
+  const isModRow = () => "data" in props.modProps;
   const modProps = () =>
     isModRow()
       ? (props.modProps as ModRowProps).data
@@ -61,7 +61,7 @@ const Authors = (props: Props) => {
                       <For
                         each={(
                           getAuthors(props.modProps) as CFFEModAuthor[]
-                        ).slice(3)}
+                        ).slice(2)}
                       >
                         {(author) => <p class="m-0">{author?.name}</p>}
                       </For>
@@ -69,7 +69,8 @@ const Authors = (props: Props) => {
                   }
                 >
                   <p class="m-0">{`+${
-                    getAuthors(props.modProps).slice(3).length
+                    (getAuthors(props.modProps) as CFFEModAuthor[]).slice(2)
+                      .length
                   }`}</p>
                 </Tooltip>
               </Show>

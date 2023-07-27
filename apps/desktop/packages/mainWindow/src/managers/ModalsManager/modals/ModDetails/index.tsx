@@ -2,82 +2,167 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { FEUnifiedSearchResult } from "@gd/core_module/bindings";
+import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
-import { lastInstanceOpened } from "@/utils/routes";
+import { getInstanceIdFromPath } from "@/utils/routes";
 import {
   getDataCreation,
   getFileId,
   getLatestVersion,
   getLogoUrl,
   getName,
+  getProjectId,
   isCurseForgeData,
 } from "@/utils/Mods";
 import Authors from "@/components/ModRow/Authors";
+import { marked } from "marked";
+import sanitizeHtml from "sanitize-html";
+import { CreateQueryResult } from "@tanstack/solid-query";
+import { RSPCError } from "@rspc/client";
+import { useLocation } from "@solidjs/router";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
+  const [mods, setMods] = createSignal<
+    CreateQueryResult<Mod[], RSPCError> | undefined
+  >(undefined);
   const modDetails = () => props.data?.mod as FEUnifiedSearchResult;
-  const modId = () => getFileId(modDetails());
+  const fileId = () => getFileId(modDetails());
+  const projectId = () => getProjectId(modDetails());
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
+  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+
+  const location = useLocation();
+  const instanceId = () => getInstanceIdFromPath(location.pathname);
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onMutate() {
       setLoading(true);
     },
-    onSettled() {
-      setLoading(false);
+    onSuccess(taskId) {
+      setTaskId(taskId);
     },
   });
 
   createEffect(() => {
-    if (modId() && isCurseForgeData(modDetails())) {
+    if (taskId() !== undefined) {
+      // eslint-disable-next-line solid/reactivity
+      const task = rspc.createQuery(() => [
+        "vtask.getTask",
+        taskId() as number,
+      ]);
+
+      const isDowloaded = () =>
+        (task.data?.download_total || 0) > 0 &&
+        task.data?.download_total === task.data?.downloaded;
+
+      if (isDowloaded()) setLoading(false);
+    }
+  });
+
+  createEffect(() => {
+    if (projectId() && isCurseForgeData(modDetails())) {
       const modpackDescription = rspc.createQuery(() => [
         "modplatforms.curseforge.getModDescription",
-        { modId: modId() as number },
+        { modId: projectId() as number },
       ]);
       if (modpackDescription.data?.data)
         setModpackDescription(modpackDescription.data?.data);
     }
   });
 
-  // createEffect(() => {
-  //   console.log("modDetails", modDetails());
-  //   if (modId() && !isCurseForgeData(modDetails())) {
-  //     const modpackDescription = rspc.createQuery(() => [
-  //       "modplatforms.modrinth.getVersion",
-  //       modId() as string,
-  //     ]);
-  //     console.log("TEST", modId(), modpackDescription.data?.changelog);
-  //     if (modpackDescription.data?.changelog)
-  //       setModpackDescription(modpackDescription.data.changelog);
-  //   }
-  // });
+  createEffect(() => {
+    if (projectId() && !isCurseForgeData(modDetails())) {
+      const modpackDescription = rspc.createQuery(() => [
+        "modplatforms.modrinth.getProject",
+        projectId() as string,
+      ]);
+      if (modpackDescription.data?.body)
+        setModpackDescription(
+          marked.parse(sanitizeHtml(modpackDescription.data?.body || ""))
+        );
+    }
+  });
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
 
-  const instanceCreationObj = (
-    fileId?: number | string,
-    projectId?: number | string
-  ) => {
-    return isCurseForgeData(props.data)
+  const modSourceObj = () => {
+    return isCurseForgeData(modDetails())
       ? {
           Curseforge: {
-            file_id: (fileId as number) || props.data.curseforge.mainFileId,
-            project_id: (projectId as number) || props.data.curseforge.id,
+            file_id: fileId() as number,
+            project_id: projectId() as number,
           },
         }
       : {
           Modrinth: {
-            project_id: projectId?.toString() || props.data.modrinth.project_id,
-            version_id: fileId?.toString() as string,
+            project_id: projectId() as string,
+            version_id: fileId() as string,
           },
         };
+  };
+
+  createEffect(() => {
+    if (instanceId() !== undefined) {
+      setMods(
+        rspc.createQuery(() => [
+          "instance.getInstanceMods",
+          parseInt(instanceId() as string, 10),
+        ])
+      );
+    }
+  });
+
+  const DownloadBtn = (propss: { size: "large" | "small" }) => {
+    const isModInstalled = () =>
+      mods()?.data?.find(
+        (mod) => mod.curseforge?.project_id === projectId()
+      ) !== undefined;
+
+    return (
+      <Switch>
+        <Match when={!isModInstalled()}>
+          <Button
+            disabled={loading()}
+            uppercase
+            type="glow"
+            size={propss.size}
+            onClick={() => {
+              const fileId = getFileId(modDetails());
+
+              if (fileId && instanceId()) {
+                installModMutation.mutate({
+                  mod_source: modSourceObj(),
+                  instance_id: parseInt(instanceId() as string, 10),
+                });
+              }
+            }}
+          >
+            <Show when={loading()}>
+              <Spinner />
+            </Show>
+            <Show when={!loading()}>
+              <Trans key="mod.download" />
+            </Show>
+          </Button>
+        </Match>
+        <Match when={isModInstalled()}>
+          <Button uppercase type="glow" size={propss.size} variant="green">
+            <Trans
+              key="mod.downloaded"
+              options={{
+                defaultValue: "Downloaded",
+              }}
+            />
+          </Button>
+        </Match>
+      </Switch>
+    );
   };
 
   return (
@@ -160,33 +245,7 @@ const ModDetails = (props: ModalProps) => {
                             </div>
                           </div>
                           <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                            <Button
-                              disabled={loading()}
-                              uppercase
-                              type="glow"
-                              size="large"
-                              onClick={() => {
-                                installModMutation.mutate({
-                                  mod_source: instanceCreationObj(),
-                                  instance_id: parseInt(
-                                    lastInstanceOpened(),
-                                    10
-                                  ),
-                                });
-                              }}
-                            >
-                              <Show when={loading()}>
-                                <Spinner />
-                              </Show>
-                              <Show when={!loading()}>
-                                <Trans
-                                  key="mod.download"
-                                  options={{
-                                    defaultValue: "Download",
-                                  }}
-                                />
-                              </Show>
-                            </Button>
+                            <DownloadBtn size="large" />
                           </div>
                         </div>
                       </div>
@@ -214,30 +273,7 @@ const ModDetails = (props: ModalProps) => {
                     </Button>
                   </Show>
                   <Show when={isSticky()}>
-                    <Button
-                      disabled={loading()}
-                      uppercase
-                      type="glow"
-                      size="small"
-                      onClick={() => {
-                        installModMutation.mutate({
-                          mod_source: instanceCreationObj(),
-                          instance_id: parseInt(lastInstanceOpened(), 10),
-                        });
-                      }}
-                    >
-                      <Show when={loading()}>
-                        <Spinner />
-                      </Show>
-                      <Show when={!loading()}>
-                        <Trans
-                          key="mod.download"
-                          options={{
-                            defaultValue: "Download",
-                          }}
-                        />
-                      </Show>
-                    </Button>
+                    <DownloadBtn size="small" />
                   </Show>
                 </div>
               </Show>

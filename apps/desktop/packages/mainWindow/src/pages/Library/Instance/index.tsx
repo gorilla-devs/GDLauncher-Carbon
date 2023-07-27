@@ -352,7 +352,7 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60 bg-cover bg-center"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out bg-cover bg-center transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
           "background-image": imageUrl()

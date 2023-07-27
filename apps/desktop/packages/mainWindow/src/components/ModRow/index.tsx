@@ -181,10 +181,6 @@ const ModRow = (props: ModRowProps) => {
       (mod) => mod.curseforge?.project_id === getProjectId(props)
     ) !== undefined;
 
-  createEffect(() => {
-    console.log("MOD", mods(), getProjectId(props));
-  });
-
   let containrRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
 

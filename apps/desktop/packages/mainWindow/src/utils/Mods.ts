@@ -148,22 +148,22 @@ export const getFEMod = (prop: ModRowProps) => {
   }
 };
 
-export const getProjectId = (prop: ModRowProps) => {
-  // const isModRow = "data" in prop;
-  // if (isModRow) {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.id;
-  } else return prop.data.modrinth.project_id;
-  // } else {
-  // if (isCurseForgeData(prop.)) {
-  //   return prop.data.curseforge.id;
-  // } else return prop.data.modrinth.project_id;
-  // }
+export const getProjectId = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.id;
+    } else return prop.data.modrinth.project_id;
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.id;
+    } else return prop.modrinth.project_id;
+  }
 };
 
 export const getFileId = (prop: FEUnifiedSearchResult) => {
   if (isCurseForgeData(prop)) {
-    return prop.curseforge.id;
+    return prop.curseforge.mainFileId;
   } else return prop.modrinth.latest_version;
 };
 

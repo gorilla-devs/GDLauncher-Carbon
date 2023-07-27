@@ -297,7 +297,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={validInstance()?.modpack_platform}>
-                  <div class="absolute top-2 right-2 p-2 flex justify-center items-center bg-darkSlate-900 border-1 border-solid border-darkSlate-600 rounded-lg">
+                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg top-2 right-2 p-2 border-solid border-darkSlate-600">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
@@ -333,7 +333,7 @@ const Tile = (props: Props) => {
             <Switch>
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
-                  <span class="flex gap-2">
+                  <span class="flex gap-1">
                     <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
