@@ -53,18 +53,35 @@ pub async fn load_index(
     Ok(serde_json::from_slice(&asset_index_bytes)?)
 }
 
+pub enum AssetsDir {
+    Index(PathBuf),
+    Virtual(PathBuf),
+    InstanceMapped(PathBuf),
+}
+
+impl AssetsDir {
+
+    pub fn to_path_buf(&self) -> PathBuf {
+        match self {
+            Self::Index(buf) => buf.clone(),
+            Self::Virtual(buf) => buf.clone(),
+            Self::InstanceMapped(buf) => buf.clone(),
+        }
+    }
+}
+
 pub async fn get_assets_dir(
     index_id: &str,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<AssetsDir> {
     let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
     if assets_index.map_virtual {
-        Ok(assets_path.get_virtual_path().join(index_id))
+        Ok(AssetsDir::Virtual(assets_path.get_virtual_path().join(index_id)))
     } else if assets_index.map_to_resources {
-        Ok(resources_dir)
+        Ok(AssetsDir::InstanceMapped(resources_dir))
     } else {
-        Ok(assets_path.to_path())
+        Ok(AssetsDir::Index(assets_path.to_path()))
     }
 }
 
