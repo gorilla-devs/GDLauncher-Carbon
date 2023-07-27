@@ -299,6 +299,15 @@ pub async fn generate_startup_command(
         .get_libraries()
         .get_mc_client(version.inherits_from.as_ref().unwrap_or(&version.id));
 
+    let assets_dir = super::assets::get_assets_dir(
+        &version.assets,
+        runtime_path.get_assets(),
+        instance_path.get_resources_path(),
+    )
+    .await?;
+
+    let instance_mapped_assets = matches!(&assets_dir, super::assets::AssetsDir::InstanceMapped(_));
+
     let replacer_args = ReplacerArgs {
         player_name: full_account.username,
         player_token: player_token.clone(),
@@ -307,8 +316,8 @@ pub async fn generate_startup_command(
             .as_ref()
             .unwrap_or(&version.id)
             .clone(),
-        game_directory: instance_path,
-        game_assets: runtime_path.get_assets().to_path(),
+        game_directory: instance_path.clone(),
+        game_assets: assets_dir.to_path_buf(),
         library_directory: runtime_path.get_libraries().to_path(),
         natives_path: runtime_path.get_natives().get_versioned(&version.id),
         assets_root: runtime_path.get_assets().to_path(),
@@ -370,7 +379,18 @@ pub async fn generate_startup_command(
     let substitute_arguments = |command: &mut Vec<String>, arguments: &Vec<Argument>| {
         for arg in arguments {
             match arg {
-                Argument::Normal(arg) => command.push(substitute_argument(arg)),
+                Argument::Normal(arg) => {
+                    // fix for pre legacy 1.5.x and older minecraft
+                    // drop --assetsDir arg, they are found automatically inside the instance
+                    // resources folder
+                    if instance_mapped_assets
+                        && (arg.starts_with("--assetsDir") || arg.starts_with("${game_assets}"))
+                    {
+                        continue;
+                    }
+
+                    command.push(substitute_argument(arg))
+                }
                 Argument::Ruled { rules, value } => {
                     let is_allowed = rules
                         .iter()
