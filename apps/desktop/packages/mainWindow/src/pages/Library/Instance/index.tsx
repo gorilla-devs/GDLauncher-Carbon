@@ -319,6 +319,7 @@ const Instance = () => {
 
   return (
     <main
+      id="main-container-instance-details"
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();

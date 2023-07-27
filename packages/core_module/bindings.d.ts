@@ -289,7 +289,7 @@ export type FEUnifiedModSortIndex = { curseForge: CFFEModSearchSortField } | { m
 
 export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
 
-export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
+export type MRFEUserRole = "developer" | "moderator" | "admin"
 
 export type CFFEFileDependency = { modId: number; relationType: CFFEFileRelationType }
 
@@ -319,7 +319,7 @@ export type ManifestVersion = { id: string; type: McType }
 
 export type MRFEProjectSearchParameters = { query: string | null; facets: MRFESearchFacetAnd | null; index: MRFESearchIndex | null; offset: number | null; limit: number | null; filters: string | null }
 
-export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: number | null }
+export type GameLogId = number
 
 export type FEPageview = { path: string }
 

@@ -138,7 +138,7 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
-    let Some(mapping_class) = classifiers.get(&natives_name.clone()) else {
+    let Some(mapping_class) = classifiers.get(&natives_name.replace("${arch}", ARCH_WIDTH)) else {
         return None;
     };
 
@@ -193,7 +193,11 @@ pub fn chain_lwjgl_libs_with_base_libs(
                             return None;
                         };
 
-                        classifiers.get(native_name).unwrap().path.clone()
+                        classifiers
+                            .get(&native_name.replace("${arch}", ARCH_WIDTH))
+                            .unwrap()
+                            .path
+                            .clone()
                     } else {
                         panic!("Library has no artifact or classifier");
                     }
@@ -219,13 +223,11 @@ pub fn assets_index_into_vec_downloadable(
 ) -> Vec<carbon_net::Downloadable> {
     let mut files: Vec<carbon_net::Downloadable> = vec![];
 
-    for (key, object) in assets_index.objects.iter() {
-        // TODO: handle directories for different versions (virtual legacy)
+    for (_, object) in assets_index.objects.iter() {
         let asset_path = assets_path
             .get_objects_path()
             .join(&object.hash[0..2])
             .join(&object.hash);
-        let _virtual_asset_path = assets_path.get_legacy_path().join(key);
 
         files.push(
             carbon_net::Downloadable::new(
@@ -239,18 +241,6 @@ pub fn assets_index_into_vec_downloadable(
             .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
             .with_size(object.size as u64),
         );
-        // files.push(
-        //     carbon_net::Downloadable::new(
-        //         format!(
-        //             "https://resources.download.minecraft.net/{}/{}",
-        //             &object.hash[0..2],
-        //             &object.hash
-        //         ),
-        //         virtual_asset_path,
-        //     )
-        //     .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
-        //     .with_size(object.size as u64),
-        // );
     }
 
     files
