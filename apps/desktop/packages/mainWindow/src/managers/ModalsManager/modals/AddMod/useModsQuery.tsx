@@ -8,7 +8,6 @@ const useModsQuery = (
   (_newValue: Partial<FEUnifiedSearchParameters>) => void
 ] => {
   const [query, setQuery] = createStore<FEUnifiedSearchParameters>({
-    ...initialValue,
     searchQuery: "",
     categories: null,
     gameVersions: null,
@@ -19,6 +18,7 @@ const useModsQuery = (
     index: 0,
     pageSize: 20,
     searchApi: "curseforge",
+    ...initialValue,
   });
 
   const setQueryParams = (newValue: Partial<FEUnifiedSearchParameters>) => {

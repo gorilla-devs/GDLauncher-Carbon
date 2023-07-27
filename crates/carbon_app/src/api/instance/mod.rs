@@ -304,6 +304,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     #[derive(Deserialize)]
     struct InstanceIconQuery {
         id: i32,
+        rev: Option<i32>,
     }
 
     #[derive(Deserialize)]

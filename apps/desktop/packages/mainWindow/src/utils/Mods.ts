@@ -45,10 +45,17 @@ export const isCurseForgeData = (
   return "curseforge" in data;
 };
 
-export const getName = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.name;
-  } else return prop.data.modrinth.title;
+export const getName = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.name;
+    } else return prop.data.modrinth.title;
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.name;
+    } else return prop.modrinth.title;
+  }
 };
 
 export const getCategories = (prop: ModRowProps) => {
@@ -63,16 +70,32 @@ export const getCategories = (prop: ModRowProps) => {
     );
 };
 
-export const getDataCreation = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.dateCreated;
-  } else return prop.data.modrinth.date_created;
+export const getDataCreation = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.dateCreated;
+    } else return prop.data.modrinth.date_created;
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.dateCreated;
+    } else return prop.modrinth.date_created;
+  }
 };
 
-export const getDateModification = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.dateModified;
-  } else return prop.data.modrinth.date_modified;
+export const getDateModification = (
+  prop: ModRowProps | FEUnifiedSearchResult
+) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.dateModified;
+    } else return prop.data.modrinth.date_modified;
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.dateModified;
+    } else return prop.modrinth.date_modified;
+  }
 };
 
 export const getDownloads = (prop: ModRowProps) => {
@@ -81,10 +104,17 @@ export const getDownloads = (prop: ModRowProps) => {
   } else return prop.data.modrinth.downloads;
 };
 
-export const getAuthors = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.authors;
-  } else return [];
+export const getAuthors = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.authors;
+    } else return [];
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.authors;
+    } else return [];
+  }
 };
 
 export const getSummary = (prop: ModRowProps) => {
@@ -93,10 +123,17 @@ export const getSummary = (prop: ModRowProps) => {
   } else return prop.data.modrinth.description;
 };
 
-export const getLogoUrl = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.logo.thumbnailUrl;
-  } else return prop.data.modrinth.icon_url;
+export const getLogoUrl = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.logo.thumbnailUrl;
+    } else return prop.data.modrinth.icon_url;
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.logo.thumbnailUrl;
+    } else return prop.modrinth.icon_url;
+  }
 };
 
 export const getWebsiteUrl = (prop: ModRowProps) => {
@@ -112,15 +149,35 @@ export const getFEMod = (prop: ModRowProps) => {
 };
 
 export const getProjectId = (prop: ModRowProps) => {
+  // const isModRow = "data" in prop;
+  // if (isModRow) {
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.id;
   } else return prop.data.modrinth.project_id;
+  // } else {
+  // if (isCurseForgeData(prop.)) {
+  //   return prop.data.curseforge.id;
+  // } else return prop.data.modrinth.project_id;
+  // }
 };
 
-export const getLatestVersion = (prop: ModRowProps) => {
-  if (isCurseForgeData(prop.data)) {
-    return prop.data.curseforge.latestFilesIndexes[0].gameVersion;
-  } else return prop.data.modrinth.versions[0];
+export const getFileId = (prop: FEUnifiedSearchResult) => {
+  if (isCurseForgeData(prop)) {
+    return prop.curseforge.id;
+  } else return prop.modrinth.latest_version;
+};
+
+export const getLatestVersion = (prop: ModRowProps | FEUnifiedSearchResult) => {
+  const isModRow = "data" in prop;
+  if (isModRow) {
+    if (isCurseForgeData(prop.data)) {
+      return prop.data.curseforge.latestFilesIndexes[0].gameVersion;
+    } else return prop.data.modrinth.versions[0];
+  } else {
+    if (isCurseForgeData(prop)) {
+      return prop.curseforge.latestFilesIndexes[0].gameVersion;
+    } else return prop.modrinth.versions[0];
+  }
 };
 
 export const sortArrayByGameVersion = (

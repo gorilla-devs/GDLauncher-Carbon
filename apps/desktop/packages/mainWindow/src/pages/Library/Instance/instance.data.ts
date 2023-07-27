@@ -11,9 +11,7 @@ const fetchData = ({ params }) => {
     parseInt(params.id, 10),
   ]);
 
-  const image = `http://localhost:${port}/instance/instanceIcon?id=${params.id}`;
-
-  return { image, instanceDetails };
+  return { instanceDetails, instanceMods };
 };
 
 export default fetchData;

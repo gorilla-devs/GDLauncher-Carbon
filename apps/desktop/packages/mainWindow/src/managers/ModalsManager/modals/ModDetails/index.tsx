@@ -2,17 +2,26 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { CFFEMod } from "@gd/core_module/bindings";
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { lastInstanceOpened } from "@/utils/routes";
+import {
+  getDataCreation,
+  getFileId,
+  getLatestVersion,
+  getLogoUrl,
+  getName,
+  isCurseForgeData,
+} from "@/utils/Mods";
+import Authors from "@/components/ModRow/Authors";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
-  const modDetails = () => props.data?.mod as CFFEMod;
-  const modId = () => modDetails()?.id;
+  const modDetails = () => props.data?.mod as FEUnifiedSearchResult;
+  const modId = () => getFileId(modDetails());
   const modalsContext = useModal();
   const [modpackDescription, setModpackDescription] = createSignal("");
 
@@ -26,18 +35,50 @@ const ModDetails = (props: ModalProps) => {
   });
 
   createEffect(() => {
-    if (modId()) {
+    if (modId() && isCurseForgeData(modDetails())) {
       const modpackDescription = rspc.createQuery(() => [
         "modplatforms.curseforge.getModDescription",
-        { modId: modId() },
+        { modId: modId() as number },
       ]);
       if (modpackDescription.data?.data)
         setModpackDescription(modpackDescription.data?.data);
     }
   });
 
+  // createEffect(() => {
+  //   console.log("modDetails", modDetails());
+  //   if (modId() && !isCurseForgeData(modDetails())) {
+  //     const modpackDescription = rspc.createQuery(() => [
+  //       "modplatforms.modrinth.getVersion",
+  //       modId() as string,
+  //     ]);
+  //     console.log("TEST", modId(), modpackDescription.data?.changelog);
+  //     if (modpackDescription.data?.changelog)
+  //       setModpackDescription(modpackDescription.data.changelog);
+  //   }
+  // });
+
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
+
+  const instanceCreationObj = (
+    fileId?: number | string,
+    projectId?: number | string
+  ) => {
+    return isCurseForgeData(props.data)
+      ? {
+          Curseforge: {
+            file_id: (fileId as number) || props.data.curseforge.mainFileId,
+            project_id: (projectId as number) || props.data.curseforge.id,
+          },
+        }
+      : {
+          Modrinth: {
+            project_id: projectId?.toString() || props.data.modrinth.project_id,
+            version_id: fileId?.toString() as string,
+          },
+        };
+  };
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
@@ -59,7 +100,7 @@ const ModDetails = (props: ModalProps) => {
                   <div
                     class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
                     style={{
-                      "background-image": `url("${modDetails()?.logo?.url}")`,
+                      "background-image": `url("${getLogoUrl(modDetails())}")`,
                       "background-position": "right-5rem",
                     }}
                   />
@@ -85,29 +126,28 @@ const ModDetails = (props: ModalProps) => {
                       <div
                         class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                         style={{
-                          "background-image": `url("${
-                            modDetails()?.logo?.thumbnailUrl
-                          }")`,
+                          "background-image": `url("${getLogoUrl(
+                            modDetails()
+                          )}")`,
                         }}
                       />
                       <div class="flex flex-1 flex-col max-w-185">
                         <div class="flex gap-4 items-center cursor-pointer">
-                          <h1 class="m-0 h-9">{modDetails()?.name}</h1>
+                          <h1 class="m-0 h-9">{getName(modDetails())}</h1>
                         </div>
                         <div class="flex flex-col lg:flex-row justify-between cursor-default">
                           <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
                             <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
-                              {
-                                modDetails()?.latestFilesIndexes?.[0]
-                                  ?.gameVersion
-                              }
+                              {getLatestVersion(modDetails())}
                             </div>
-                            <Show when={modDetails()?.dateCreated}>
+                            <Show when={getDataCreation(modDetails())}>
                               <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
                                 <div class="i-ri:time-fill" />
 
                                 {format(
-                                  new Date(modDetails()?.dateCreated).getTime(),
+                                  new Date(
+                                    getDataCreation(modDetails())
+                                  ).getTime(),
                                   "P"
                                 )}
                               </div>
@@ -115,9 +155,7 @@ const ModDetails = (props: ModalProps) => {
                             <div class="p-0 lg:px-4 flex gap-2 items-center">
                               <div class="i-ri:user-fill" />
                               <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
-                                <For each={modDetails()?.authors}>
-                                  {(author) => <p class="m-0">{author.name}</p>}
-                                </For>
+                                <Authors modProps={modDetails()} />
                               </div>
                             </div>
                           </div>
@@ -129,12 +167,7 @@ const ModDetails = (props: ModalProps) => {
                               size="large"
                               onClick={() => {
                                 installModMutation.mutate({
-                                  mod_source: {
-                                    Curseforge: {
-                                      project_id: modDetails().id,
-                                      file_id: modDetails().mainFileId,
-                                    },
-                                  },
+                                  mod_source: instanceCreationObj(),
                                   instance_id: parseInt(
                                     lastInstanceOpened(),
                                     10
@@ -188,12 +221,7 @@ const ModDetails = (props: ModalProps) => {
                       size="small"
                       onClick={() => {
                         installModMutation.mutate({
-                          mod_source: {
-                            Curseforge: {
-                              project_id: modDetails().id,
-                              file_id: modDetails().mainFileId,
-                            },
-                          },
+                          mod_source: instanceCreationObj(),
                           instance_id: parseInt(lastInstanceOpened(), 10),
                         });
                       }}

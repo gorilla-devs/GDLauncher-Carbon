@@ -15,7 +15,6 @@ import { createInfiniteQuery } from "@tanstack/solid-query";
 import { rspc } from "@/utils/rspcClient";
 import useModsQuery from "./useModsQuery";
 import {
-  FEModSearchSortField,
   CFFEModSearchSortField,
   CFFEModLoaderType,
   FEUnifiedSearchParameters,
@@ -27,10 +26,18 @@ import { CurseForgeSortFields } from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 
+type DataType = {
+  mcVersion: string;
+  isCurseforge: boolean;
+};
+
 const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
 
+  const data = () => props.data as DataType;
+
   const [query, setQuery] = useModsQuery({
+    searchApi: data().isCurseforge ? "curseforge" : "modrinth",
     searchQuery: "",
     categories: null,
     gameVersions: null,
@@ -39,8 +46,7 @@ const AddMod = (props: ModalProps) => {
     sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
     index: 0,
-    pageSize: 40,
-    searchApi: "curseforge",
+    pageSize: 20,
   });
 
   const rspcContext = rspc.useContext();
@@ -332,7 +338,7 @@ const AddMod = (props: ModalProps) => {
                               <ModRow
                                 type="Mod"
                                 data={mod()}
-                                mcVersion={props.data as string}
+                                mcVersion={data().mcVersion}
                               />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
