@@ -24,6 +24,7 @@ pub enum Translation {
     InstanceTaskLaunchInstallJava,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskLaunchExtractNatives,
+    InstanceTaskReconstructAssets,
     InstanceTaskLaunchRunForgeProcessors,
     InstanceTaskInstallMod {
         mod_name: String,

@@ -223,13 +223,11 @@ pub fn assets_index_into_vec_downloadable(
 ) -> Vec<carbon_net::Downloadable> {
     let mut files: Vec<carbon_net::Downloadable> = vec![];
 
-    for (key, object) in assets_index.objects.iter() {
-        // TODO: handle directories for different versions (virtual legacy)
+    for (_, object) in assets_index.objects.iter() {
         let asset_path = assets_path
             .get_objects_path()
             .join(&object.hash[0..2])
             .join(&object.hash);
-        let _virtual_asset_path = assets_path.get_legacy_path().join(key);
 
         files.push(
             carbon_net::Downloadable::new(
@@ -243,18 +241,6 @@ pub fn assets_index_into_vec_downloadable(
             .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
             .with_size(object.size as u64),
         );
-        // files.push(
-        //     carbon_net::Downloadable::new(
-        //         format!(
-        //             "https://resources.download.minecraft.net/{}/{}",
-        //             &object.hash[0..2],
-        //             &object.hash
-        //         ),
-        //         virtual_asset_path,
-        //     )
-        //     .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
-        //     .with_size(object.size as u64),
-        // );
     }
 
     files

@@ -139,7 +139,6 @@ const VersionRow = (props: Props) => {
             loadIconMutation.mutate(icon);
           }
           setLoading(true);
-          console.log("props.modVersion", props.modVersion);
           createInstanceMutation.mutate({
             group: defaultGroup.data || 1,
             use_loaded_icon: true,

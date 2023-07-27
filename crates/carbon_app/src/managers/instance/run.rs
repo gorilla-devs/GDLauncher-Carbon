@@ -195,6 +195,10 @@ impl ManagerRef<'_, InstanceManager> {
                     .subtask(Translation::InstanceTaskLaunchExtractNatives)
                     .await;
 
+                let t_reconstruct_assets = task
+                    .subtask(Translation::InstanceTaskReconstructAssets)
+                    .await;
+
                 let t_forge_processors = match is_first_run {
                     true => Some(
                         task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)
@@ -647,6 +651,14 @@ impl ManagerRef<'_, InstanceManager> {
                 )
                 .await?;
                 t_extract_natives.complete_opaque();
+
+                t_reconstruct_assets.start_opaque();
+                managers::minecraft::assets::reconstruct_assets(
+                    &version_info.assets,
+                    runtime_path.get_assets(),
+                    instance_path.get_resources_path(),
+                ).await?;
+                t_reconstruct_assets.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
                 let game_version = version_info.id.to_string();
