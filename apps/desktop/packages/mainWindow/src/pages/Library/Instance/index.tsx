@@ -329,6 +329,17 @@ const Instance = () => {
     }
   });
 
+  createEffect(() => {
+    if (
+      routeData.instancesUngrouped.data &&
+      !routeData.instancesUngrouped.data?.find(
+        (instance) => instance.id === parseInt(params.id, 10)
+      )
+    ) {
+      navigate("/library");
+    }
+  });
+
   return (
     <main
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
@@ -341,14 +352,12 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60 bg-cover bg-center"
         style={{
           transition: "height 0.2s",
           "background-image": imageUrl()
             ? `url("${imageUrl()}")`
             : `url("${DefaultImg}")`,
-          "background-position": "center",
-          "background-repeat": "repeat",
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
