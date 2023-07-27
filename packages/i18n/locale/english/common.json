@@ -226,6 +226,8 @@
   "modloader_quilt": "Quilt",
   "modloader_forge": "Forge",
   "modloader_fabric": "Fabric",
+  "logs.copy": "Copy logs",
+  "logs.scroll_top": "Scroll to top",
   "introduction": "Introduction",
   "handle_java": "Handle java",
   "import_instances": "Import instances",
