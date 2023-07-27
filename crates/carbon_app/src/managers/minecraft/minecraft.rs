@@ -307,8 +307,12 @@ pub async fn generate_startup_command(
             .as_ref()
             .unwrap_or(&version.id)
             .clone(),
-        game_directory: instance_path,
-        game_assets: runtime_path.get_assets().to_path(),
+        game_directory: instance_path.clone(),
+        game_assets: super::assets::get_assets_dir(
+            &version.assets,
+            runtime_path.get_assets(),
+            instance_path.get_resources_path(),
+        ).await?,
         library_directory: runtime_path.get_libraries().to_path(),
         natives_path: runtime_path.get_natives().get_versioned(&version.id),
         assets_root: runtime_path.get_assets().to_path(),

@@ -202,6 +202,7 @@
   "InstanceTaskLaunchRequestVersions": "Requesting versions",
   "InstanceTaskLaunchDownloadFiles": "Downloading files",
   "InstanceTaskLaunchExtractNatives": "Extracting natives",
+  "InstanceTaskReconstructAssets": "Reconstructing assets",
   "InstanceTaskInstallMod": "Installing mod {{mod_name}} for {{instance_name}}",
   "InstanceTaskLaunchRunForgeProcessors": "Setting up forge",
   "InstanceTaskLaunchInstallJava": "Installing java",

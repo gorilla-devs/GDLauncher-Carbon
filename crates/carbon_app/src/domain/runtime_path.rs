@@ -46,8 +46,8 @@ impl AssetsPath {
         self.0.join("indexes")
     }
 
-    pub fn get_legacy_path(&self) -> PathBuf {
-        self.0.join("virtual").join("legacy")
+    pub fn get_virtual_path(&self) -> PathBuf {
+        self.0.join("virtual")
     }
 
     pub fn get_objects_path(&self) -> PathBuf {
@@ -111,6 +111,10 @@ impl InstancePath {
 
     pub fn get_data_path(&self) -> PathBuf {
         self.0.join("instance")
+    }
+
+    pub fn get_resources_path(&self) -> PathBuf {
+        self.get_data_path().join("resources")
     }
 
     pub fn get_mods_path(&self) -> PathBuf {
