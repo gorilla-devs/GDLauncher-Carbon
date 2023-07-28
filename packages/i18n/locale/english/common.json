@@ -242,7 +242,19 @@
 
   "app_update.new_update_available_text": "A new version of GDLauncher is available! This edition of the app is not able to update automatically.",
   "app_update.click_button_below": "Please download the new version by clicking on the button below",
+  "app_update.join_our_discord": "Please join our discord to access the link to the new version",
   "app_update.download_new_version": "Download New Version",
+  "app_update.discord_link": "Discord Link",
   "app_update.current_version": "Current Version",
-  "app_update.available_version": "Available Version"
+  "app_update.available_version": "Available Version",
+  "app_update.current_release_channel": "Current Release Channel",
+
+  "adbanner.snapshot_title": "GDLauncher Snapshot Release",
+  "adbanner.snapshot_text": "This is a GDLauncher snapshot release.\nThis means that it is highly unstable and contains potentially disruptive bugs. It also does not have auto updates.",
+
+  "adbanner.beta_title": "GDLauncher Beta Release",
+  "adbanner.beta_text": "This is a GDLauncher beta release.\nThis means that it might contain some bugs but it should be mostly stable.",
+
+  "adbanner.alpha_title": "GDLauncher Alpha Release",
+  "adbanner.alpha_text": "This is a GDLauncher alpha release.\nThis means that it is unstable and contains many bugs."
 }

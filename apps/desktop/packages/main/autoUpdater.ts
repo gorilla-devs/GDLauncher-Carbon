@@ -9,6 +9,9 @@ export default function initAutoUpdater(win: BrowserWindow) {
   ipcMain.handle(
     "checkForUpdates",
     async (_, selectedChannel: FEReleaseChannel) => {
+      if (__APP_VERSION__.includes("snapshot")) {
+        return new Promise((r) => r(false));
+      }
       autoUpdater.channel = selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
       console.log("Checking for updates", selectedChannel);
