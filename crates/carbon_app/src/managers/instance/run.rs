@@ -333,11 +333,11 @@ impl ManagerRef<'_, InstanceManager> {
                         version = Some(v.clone());
 
                         let path = app
-                        .settings_manager()
-                        .runtime_path
-                        .get_instances()
-                        .to_path()
-                        .join(instance_shortpath);
+                            .settings_manager()
+                            .runtime_path
+                            .get_instances()
+                            .to_path()
+                            .join(instance_shortpath);
 
                         config.game_configuration.version =
                             Some(GameVersion::Standard(StandardVersion {
@@ -351,23 +351,15 @@ impl ManagerRef<'_, InstanceManager> {
                                 },
                             }));
 
-                            config.game_configuration.version =
-                            Some(GameVersion::Standard(StandardVersion {
-                                release: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        release,
-                                        ..
-                                    })) => release.clone(),
-                                    _ => bail!("custom versions are not yet supported"),
-                                },
-                                modloaders: match v.modloaders.iter().next().cloned() {
-                                    Some(modloader) => std::collections::HashSet::from([modloader]),
-                                    None => std::collections::HashSet::new(),
-                                },
-                            }));
-
                         let json = make_instance_config(config.clone())?;
                         tokio::fs::write(path.join("instance.json"), json).await?;
+
+                        instance_manager.instances.write().await
+                            .get_mut(&instance_id)
+                            .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
+                            .data_mut()?
+                            .config = config;
+
                         is_initial_modpack_launch = true;
                     }
                 }
