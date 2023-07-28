@@ -342,13 +342,7 @@ impl ManagerRef<'_, InstanceManager> {
                         config.game_configuration.version =
                             Some(GameVersion::Standard(StandardVersion {
                                 release: v.release.clone(),
-                                modloaders: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        modloaders,
-                                        ..
-                                    })) => modloaders.clone(),
-                                    _ => std::collections::HashSet::new(),
-                                },
+                                modloaders: v.modloaders.clone(),
                             }));
 
                         let json = make_instance_config(config.clone())?;

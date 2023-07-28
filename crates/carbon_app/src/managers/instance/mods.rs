@@ -28,7 +28,11 @@ impl ManagerRef<'_, InstanceManager> {
             .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
                 *instance_id,
             ))])
-            .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
+            .with(
+                fcdb::metadata::fetch()
+                    .with(metadb::curseforge::fetch())
+                    .with(metadb::modrinth::fetch()),
+            )
             .exec()
             .await?
             .into_iter()
@@ -36,26 +40,21 @@ impl ManagerRef<'_, InstanceManager> {
                 id: m.id,
                 filename: m.filename,
                 enabled: m.enabled,
-                metadata: m
-                    .metadata
-                    .as_ref()
-                    .map(|m| match m.modid.clone() {
-                        Some(modid) => Some(domain::ModFileMetadata {
-                            modid,
-                            name: m.name.clone(),
-                            version: m.version.clone(),
-                            description: m.description.clone(),
-                            authors: m.authors.clone(),
-                            modloaders: m
-                                .modloaders
-                                .split(",")
-                                // ignore unknown modloaders
-                                .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                                .collect::<Vec<_>>(),
-                        }),
-                        _ => None,
+                metadata: m.metadata.as_ref().and_then(|m| {
+                    m.modid.clone().map(|modid| domain::ModFileMetadata {
+                        modid,
+                        name: m.name.clone(),
+                        version: m.version.clone(),
+                        description: m.description.clone(),
+                        authors: m.authors.clone(),
+                        modloaders: m
+                            .modloaders
+                            .split(',')
+                            // ignore unknown modloaders
+                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                            .collect::<Vec<_>>(),
                     })
-                    .flatten(),
+                }),
                 curseforge: m
                     .metadata
                     .clone()
@@ -107,14 +106,14 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or_else(|| InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&shortpath)
+            .get_instance_path(shortpath)
             .get_mods_path();
 
         let enabled_path = disabled_path.join(&m.filename);
@@ -168,14 +167,14 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or_else(|| InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&shortpath)
+            .get_instance_path(shortpath)
             .get_mods_path();
 
         let enabled_path = disabled_path.join(&m.filename);
