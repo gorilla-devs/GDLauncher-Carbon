@@ -950,7 +950,7 @@ pub struct MRFEGalleryItem {
     pub created: String,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: u32,
+    pub ordering: Option<i32>,
 }
 
 impl From<GalleryItem> for MRFEGalleryItem {
