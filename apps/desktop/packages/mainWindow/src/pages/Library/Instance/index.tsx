@@ -148,7 +148,7 @@ const Instance = () => {
       path: `/library/${params.id}`,
     },
 
-    ...(routeData.instanceDetails.data?.modloaders[0]?.type_
+    ...(routeData.instanceDetails.data?.modloaders.length! > 0
       ? [
           {
             label: "Mods",
