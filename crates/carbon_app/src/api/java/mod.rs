@@ -112,6 +112,7 @@ async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::R
             args.vendor.into(),
             args.id,
             app.clone(),
+            None,
         )
         .await
 }
