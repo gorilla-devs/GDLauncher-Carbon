@@ -1,10 +1,11 @@
-use std::sync::Arc;
+use std::{sync::Arc, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::{domain::vtask::VisualTaskId, managers::AppInner};
 
+pub mod archive_importer;
 pub mod legacy_gdlauncher;
 
 #[derive(Debug, Serialize, Deserialize, EnumIter)]
@@ -45,3 +46,10 @@ pub trait InstanceImporter {
 pub struct Importer {
     pub legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter,
 }
+
+
+#[async_trait::async_trait]
+pub trait InstanceArchiveImporter {
+    async fn import(&self, app: Arc<AppInner>, path: PathBuf) -> anyhow::Result<VisualTaskId>;
+}
+
