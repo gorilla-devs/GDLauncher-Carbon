@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicI32, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -166,7 +166,8 @@ pub struct VisualTask {
     data: Arc<RwLock<TaskData>>,
     notify_rx: watch::Receiver<NotifyState>,
     notify_tx: Arc<watch::Sender<NotifyState>>,
-    subtasks: Arc<RwLock<Vec<watch::Receiver<SubtaskData>>>>,
+    // TODO: this should probably be replaced with a channel of some kind, instead of a sync mutex
+    subtasks: Arc<Mutex<Vec<watch::Receiver<SubtaskData>>>>,
     owner: bool,
 }
 
@@ -203,23 +204,28 @@ impl VisualTask {
             data: Arc::new(RwLock::new(TaskData {
                 name,
                 state: TaskState::Indeterminate,
+                checked_progress: 0.0,
             })),
             notify_rx,
             notify_tx: Arc::new(notify_tx),
-            subtasks: Arc::new(RwLock::new(Vec::new())),
+            subtasks: Arc::new(Mutex::new(Vec::new())),
             owner: true,
         }
     }
 
-    pub async fn subtask(&self, name: Translation) -> Subtask {
+    pub fn subtask(&self, name: Translation) -> Subtask {
         let (watch_tx, watch_rx) = watch::channel(SubtaskData {
             name,
             weight: 1.0,
             started: false,
             progress: Progress::Opaque(false),
+            checked_progress: Mutex::new(0.0),
         });
 
-        self.subtasks.write().await.push(watch_rx);
+        self.subtasks
+            .lock()
+            .expect("this mutex can never witness a panic")
+            .push(watch_rx);
 
         Subtask {
             notify: self.notify_tx.clone(),
@@ -243,28 +249,68 @@ impl VisualTask {
         let _ = self.notify_tx.send(NotifyState::Update);
     }
 
-    // Get the current task progress as a float from 0.0 to 1.0
+    /// Get the current task progress as a float from 0.0 to 1.0.
+    /// Finalizes checked progress in the main progress bar.
     pub async fn progress_float(&self) -> f32 {
-        let subtasks = self.subtasks.read().await;
+        // The math here is wrong, disabled due to time constraints.
+        /*let additional_progress = {
+            let subtasks = self.subtasks.lock().expect("this mutex can never witness a panic");
+
+            let remaining_weight = subtasks
+                .iter()
+                .map(|subtask| {
+                    let subtask = subtask.borrow();
+                    // as this is the only function that interacts with this value, it should never have to pause
+                    let progress = subtask.checked_progress.lock().expect("this mutex can never witness a panic");
+
+                    subtask.weight * (1.0 - *progress)
+                })
+                .sum::<f32>();
+
+            let additional_progress = subtasks
+                .iter()
+                .map(|subtask| {
+                    let subtask = subtask.borrow();
+                    let mut checked_progress = subtask.checked_progress.lock().expect("this mutex can never witness a panic");
+                    let progress = subtask.progress.as_float();
+                    let new_progress = progress - *checked_progress;
+                    let weight = subtask.weight * (1.0 - *checked_progress);
+
+                    *checked_progress = progress;
+                    new_progress * (subtask.weight * remaining_weight)
+                })
+                .sum::<f32>();
+
+            additional_progress
+        };
+
+        let mut data = self.data.write().await;
+        data.checked_progress += additional_progress;
+        data.checked_progress*/
+
+        let subtasks = self
+            .subtasks
+            .lock()
+            .expect("this mutex can never witness a panic");
         let total_weight = subtasks
             .iter()
-            .map(|task| task.borrow().weight)
+            .map(|subtask| subtask.borrow().weight)
             .sum::<f32>();
 
         subtasks
             .iter()
-            .map(|task| {
-                let task = task.borrow();
-                let mul = task.weight / total_weight;
-                task.progress.as_float() * mul
+            .map(|subtask| {
+                let subtask = subtask.borrow();
+                let mul = subtask.weight / total_weight;
+                subtask.progress.as_float() * mul
             })
             .sum()
     }
 
     pub async fn downloaded_bytes(&self) -> (u32, u32) {
         self.subtasks
-            .read()
-            .await
+            .lock()
+            .expect("this mutex can never witness a panic")
             .iter()
             .map(|task| match task.borrow().progress {
                 Progress::Download {
@@ -294,8 +340,8 @@ impl VisualTask {
             download_total,
             active_subtasks: self
                 .subtasks
-                .read()
-                .await
+                .lock()
+                .expect("this mutex can never witness a panic")
                 .iter()
                 .map(|t| t.borrow())
                 .filter(|t| t.started)
@@ -329,11 +375,13 @@ impl Subtask {
         });
     }
 
-    pub fn update_download(&self, downloaded: u32, total: u32) {
+    // complete_on_match is an explicit parameter instead of a following call to make sure
+    // a conscious decision is made on a case by case basis.
+    pub fn update_download(&self, downloaded: u32, total: u32, complete_on_match: bool) {
         self.update_progress(Progress::Download {
             downloaded,
             total,
-            complete: false,
+            complete: complete_on_match && downloaded >= total,
         });
     }
 
@@ -364,6 +412,18 @@ impl Subtask {
         });
     }
 
+    pub fn complete_items(&self) {
+        self.update(|data| {
+            data.progress = match data.progress {
+                Progress::Item { total, .. } => Progress::Item {
+                    current: total,
+                    total,
+                },
+                _ => Progress::Opaque(true),
+            }
+        });
+    }
+
     pub fn set_weight(&self, weight: f32) {
         self.update(|data| data.weight = weight);
     }
@@ -372,6 +432,7 @@ impl Subtask {
 pub struct TaskData {
     pub name: Translation,
     pub state: TaskState,
+    checked_progress: f32,
 }
 
 #[derive(Clone)]
@@ -398,6 +459,8 @@ pub struct SubtaskData {
     /// Started tasks show in the task list if they are not also complete.
     pub started: bool,
     pub progress: Progress,
+    /// Progress that has been checked into the main progress bar
+    checked_progress: Mutex<f32>,
 }
 
 #[derive(Copy, Clone)]
@@ -468,7 +531,7 @@ mod test {
         let task = VisualTask::new(Translation::Test);
         let id = app.task_manager().spawn_task(&task).await;
 
-        let subtask = task.subtask(Translation::Test).await;
+        let subtask = task.subtask(Translation::Test);
 
         subtask.start_opaque();
 

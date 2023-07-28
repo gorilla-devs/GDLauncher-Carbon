@@ -15,11 +15,44 @@ use crate::managers::App;
 // Extract overrides
 
 #[derive(Debug, Copy, Clone)]
-pub enum ProgressState {
-    Idle,
-    DownloadingAddonZip(u64, u64),
-    ExtractingAddonOverrides(u64, u64),
-    AcquiringAddonsMetadata(u64, u64),
+pub struct ProgressState {
+    pub download_addon_zip: UpdateValue<(u64, u64)>,
+    pub extract_addon_overrides: UpdateValue<(u64, u64)>,
+    pub acquire_addon_metadata: UpdateValue<(u64, u64)>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct UpdateValue<T: Copy + Clone + Eq>(pub T);
+
+impl<T: Copy + Clone + Eq> UpdateValue<T> {
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    pub fn set(&mut self, value: T) {
+        self.0 = value;
+    }
+
+    pub fn get(&self) -> &T {
+        &self.0
+    }
+
+    pub fn update_from(&mut self, from: &Self, update_callback: impl FnOnce(T)) {
+        if self.0 != from.0 {
+            self.0 = from.0;
+            update_callback(self.0);
+        }
+    }
+}
+
+impl ProgressState {
+    pub fn new() -> Self {
+        Self {
+            download_addon_zip: UpdateValue::new((0, 0)),
+            extract_addon_overrides: UpdateValue::new((0, 0)),
+            acquire_addon_metadata: UpdateValue::new((0, 0)),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -58,10 +91,12 @@ pub async fn prepare_modpack_from_addon(
 
     let progress_percentage_sender = tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
-            progress_percentage_sender.send(ProgressState::DownloadingAddonZip(
-                download_progress_recv.borrow().current_size,
-                download_progress_recv.borrow().total_size,
-            ))?;
+            let p = download_progress_recv.borrow();
+            progress_percentage_sender.send_modify(|progress| {
+                progress
+                    .download_addon_zip
+                    .set((p.current_size, p.total_size))
+            });
         }
 
         Ok::<_, anyhow::Error>(progress_percentage_sender)
@@ -130,10 +165,12 @@ pub async fn prepare_modpack_from_zip(
                     instance_path.join(mod_file.file_name),
                 )
                 .with_size(mod_file.file_length as u64);
-                progress_percentage_sender_clone.send(ProgressState::AcquiringAddonsMetadata(
-                    atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-                    files_len,
-                ))?;
+                progress_percentage_sender_clone.send_modify(|progress| {
+                    progress.acquire_addon_metadata.set((
+                        atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1,
+                        files_len,
+                    ));
+                });
 
                 Ok::<Downloadable, anyhow::Error>(downloadable)
             });
@@ -179,10 +216,11 @@ pub async fn prepare_modpack_from_zip(
                 std::io::copy(&mut file, &mut outfile)?;
             }
 
-            progress_percentage_sender.send(ProgressState::ExtractingAddonOverrides(
-                i as u64,
-                total_archive_files,
-            ))?;
+            progress_percentage_sender.send_modify(|progress| {
+                progress
+                    .extract_addon_overrides
+                    .set((i as u64 + 1, total_archive_files));
+            });
         }
 
         Ok::<(), anyhow::Error>(())

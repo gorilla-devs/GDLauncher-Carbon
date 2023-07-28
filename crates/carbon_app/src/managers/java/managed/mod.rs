@@ -5,7 +5,10 @@ use std::{
     sync::Arc,
 };
 use strum::IntoEnumIterator;
-use tokio::sync::{watch::Sender, Mutex};
+use tokio::sync::{
+    watch::{self, Sender},
+    Mutex,
+};
 
 use crate::{
     api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
@@ -131,6 +134,7 @@ impl ManagedService {
         vendor: JavaVendor,
         id: String,
         app: crate::App,
+        progress_sender: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<String> {
         let java_id = match vendor {
             JavaVendor::Azul => {
@@ -159,6 +163,9 @@ impl ManagedService {
                     while recv.changed().await.is_ok() {
                         let mut progress_ref = progress_ref.lock().await;
                         *progress_ref = recv.borrow().clone();
+                        if let Some(progress_sender) = &progress_sender {
+                            let _ = progress_sender.send(recv.borrow().clone());
+                        }
                         app.invalidate(GET_SETUP_MANAGED_JAVA_PROGRESS, None);
                         drop(progress_ref);
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;

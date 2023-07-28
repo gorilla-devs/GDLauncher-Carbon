@@ -1,8 +1,13 @@
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
+use tokio::sync::watch;
 use tracing::{debug, error, trace};
 
-use self::{discovery::Discovery, java_checker::JavaChecker, managed::ManagedService};
+use self::{
+    discovery::Discovery,
+    java_checker::JavaChecker,
+    managed::{ManagedService, Step},
+};
 
 use super::ManagerRef;
 use crate::{
@@ -292,6 +297,7 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
         update_target_profile: bool,
+        progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
         use crate::db::java::UniqueWhereParam;
 
@@ -325,6 +331,7 @@ impl ManagerRef<'_, JavaManager> {
                     .id
                     .clone(),
                 self.app.clone(),
+                progress,
             )
             .await?;
 
@@ -405,6 +412,7 @@ mod test {
                     .id
                     .clone(),
                 app.app.clone(),
+                None,
             )
             .await
             .unwrap();
