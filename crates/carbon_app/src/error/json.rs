@@ -83,7 +83,6 @@ pub fn read_json_context_back(ctx: &str, max_len: usize, string_can_end: bool) -
 pub fn read_json_context_forward(ctx: &str, max_len: usize, string_can_end: bool) -> String {
     let mut ctx: String = ctx.to_owned();
 
-
     let mut token_contexts: Vec<char> = vec![];
     let mut in_str = false;
     let mut found_close = false;
@@ -160,7 +159,6 @@ pub fn read_json_context_forward(ctx: &str, max_len: usize, string_can_end: bool
 }
 
 pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> String {
-
     if body.is_empty() {
         return body.to_owned();
     }
@@ -186,7 +184,6 @@ pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> 
     let obj_before = read_json_context_back(&ctx_before, max_len, string_can_end);
     let obj_after = read_json_context_forward(&ctx_after, max_len, string_can_end);
 
-
     obj_before + obj_after.as_str()
 }
 
@@ -199,4 +196,3 @@ fn json_matching_brace(c: char) -> char {
         other => other,
     }
 }
-

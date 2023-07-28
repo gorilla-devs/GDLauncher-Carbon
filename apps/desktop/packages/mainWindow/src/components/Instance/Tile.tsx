@@ -342,7 +342,7 @@ const Tile = (props: Props) => {
                         )}
                       />
                     </Show>
-                    <p class="m-0">{props.modloader || "Vanilla"}</p>
+                    <p class="m-0">{props.modloader}</p>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>

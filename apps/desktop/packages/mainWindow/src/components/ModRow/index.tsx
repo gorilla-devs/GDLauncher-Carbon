@@ -178,8 +178,14 @@ const ModRow = (props: ModRowProps) => {
 
   const isModInstalled = () =>
     mods()?.data?.find(
-      (mod) => mod.curseforge?.project_id === getProjectId(props)
+      (mod) =>
+        (mod.curseforge?.project_id || mod.modrinth?.project_id) ===
+        getProjectId(props)
     ) !== undefined;
+
+  createEffect(() => {
+    console.log("MODS", mods(), getProjectId(props));
+  });
 
   let containrRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;

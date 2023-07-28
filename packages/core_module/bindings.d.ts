@@ -158,6 +158,8 @@ export type MemoryRange = { min_mb: number; max_mb: number }
 
 export type FEModDescriptionResponse = { data: string; pagination: CFFEPagination | null }
 
+export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: CFFEModLoaderType[] }
+
 export type FEEventName = "AppClosed"
 
 export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
@@ -217,8 +219,6 @@ export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileNa
 export type FEImportableInstance = { name: string }
 
 export type And<T> = Or<T>[]
-
-export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; urlslug: string; summary: string; authors: string }
 
 export type FEModFileChangelogResponse = { data: string; pagination: CFFEPagination | null }
 
@@ -332,6 +332,8 @@ export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: str
 
 export type CFFEFilesParametersBody = { fileIds: number[] }
 
+export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; urlslug: string; summary: string; authors: string }
+
 export type FEImportInstance = { entity: FEEntity; index: number }
 
 export type FEEvent = { name: FEEventName; properties: { [key: string]: string } }
@@ -368,6 +370,8 @@ export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationPars
 
 export type FESystemJavaProfileName = "legacy" | "alpha" | "beta" | "gamma" | "minecraftJavaExe"
 
+export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; filename: string; urlslug: string; description: string; authors: string; sha512: string; sha1: string }
+
 export type CFFEModSearchSortOrder = "ascending" | "descending"
 
 export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
@@ -380,7 +384,7 @@ export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack"
 
 export type MRFELoadersResponse = MRFELoader[]
 
-export type Mod = { id: string; filename: string; enabled: boolean; metadata: ModFileMetadata | null; curseforge: CurseForgeModMetadata | null }
+export type Mod = { id: string; filename: string; enabled: boolean; metadata: ModFileMetadata | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null }
 
 export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string; created: string; role: MRFEUserRole; badges: number }
 
@@ -431,8 +435,6 @@ export type FEUnifiedSearchResult = { curseforge: CFFEMod } | { modrinth: MRFEPr
 export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
-
-export type ModFileMetadata = { modid: string; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: CFFEModLoaderType[] }
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 

@@ -371,9 +371,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                 meta.as_ref()
                                                     .map(|meta| &meta.modloaders)
                                                     .map(|vec| {
-                                                        vec.iter()
-                                                            .map(|m| m.to_string())
-                                                            .join(",")
+                                                        vec.iter().map(|m| m.to_string()).join(",")
                                                     })
                                                     .unwrap_or(String::new()),
                                                 match meta {
@@ -413,9 +411,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 .into_iter()
                                 .map(|id| app.prisma_client.mod_file_cache().delete(id))
                                 .collect::<Vec<_>>(),
-                            app.prisma_client.mod_metadata().create_many(
-                                new_meta_entries.into_iter().flatten().collect(),
-                            ),
+                            app.prisma_client
+                                .mod_metadata()
+                                .create_many(new_meta_entries.into_iter().flatten().collect()),
                             app.prisma_client
                                 .mod_file_cache()
                                 .create_many(new_fc_entries),

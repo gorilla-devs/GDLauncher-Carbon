@@ -185,7 +185,7 @@ impl RequestError {
 
 #[async_trait::async_trait]
 pub trait GoodJsonRequestError {
-    async fn json_with_context< T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError>;
+    async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError>;
 }
 
 #[async_trait::async_trait]
