@@ -23,7 +23,7 @@ export const checkForUpdates = async (releaseChannel: FEReleaseChannel) => {
       } else {
         setUpdateAvailable(null);
       }
-    }, 60 * 15 * 1000);
+    }, 60 * 30 * 1000);
   }
 };
 

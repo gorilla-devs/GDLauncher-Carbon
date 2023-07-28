@@ -8,7 +8,7 @@ type Props = {
   height?: number;
 };
 
-const RiveAppWapper = (props: Props) => {
+const RiveAppWrapper = (props: Props) => {
   let canvas: HTMLCanvasElement | undefined;
 
   const [riveRef, setRiveRef] = createSignal<Rive | undefined>();
@@ -54,4 +54,4 @@ const RiveAppWapper = (props: Props) => {
   );
 };
 
-export default RiveAppWapper;
+export default RiveAppWrapper;
