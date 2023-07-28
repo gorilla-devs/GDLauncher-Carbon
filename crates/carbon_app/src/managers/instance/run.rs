@@ -183,8 +183,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .subtask(Translation::InstanceTaskLaunchExtractNatives);
 
                 let t_reconstruct_assets = task
-                    .subtask(Translation::InstanceTaskReconstructAssets)
-                    .await;
+                    .subtask(Translation::InstanceTaskReconstructAssets);
 
                 let t_forge_processors = match is_first_run {
                     true => Some(
