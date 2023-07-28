@@ -632,7 +632,7 @@ pub struct CFFEMod {
     pub categories: Vec<CFFECategory>,
     pub class_id: Option<i32>, // TODO: Add all options to enum and use it
     pub authors: Vec<CFFEModAuthor>,
-    pub logo: CFFEModAsset,
+    pub logo: Option<CFFEModAsset>,
     pub screenshots: Vec<CFFEModAsset>,
     pub main_file_id: i32,
     pub latest_files: Vec<CFFEFile>,
@@ -670,7 +670,7 @@ impl From<crate::domain::modplatforms::curseforge::Mod> for CFFEMod {
                 .into_iter()
                 .map(|a| a.into())
                 .collect(),
-            logo: minecraft_mod.logo.into(),
+            logo: minecraft_mod.logo.map(Into::into),
             screenshots: minecraft_mod
                 .screenshots
                 .into_iter()
