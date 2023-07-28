@@ -71,6 +71,7 @@ pub struct Mod {
     pub enabled: bool,
     pub metadata: Option<ModFileMetadata>,
     pub curseforge: Option<CurseForgeModMetadata>,
+    pub modrinth: Option<ModrinthModMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +92,19 @@ pub struct CurseForgeModMetadata {
     pub urlslug: String,
     pub summary: String,
     pub authors: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModrinthModMetadata {
+    pub project_id: String,
+    pub version_id: String,
+    pub title: String,
+    pub filename: String,
+    pub urlslug: String,
+    pub description: String,
+    pub authors: String,
+    pub sha512: String,
+    pub sha1: String,
 }
 
 #[derive(Debug, Copy, Clone)]

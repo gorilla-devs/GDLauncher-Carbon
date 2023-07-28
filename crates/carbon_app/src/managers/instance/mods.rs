@@ -58,8 +58,8 @@ impl ManagerRef<'_, InstanceManager> {
                     .flatten(),
                 curseforge: m
                     .metadata
-                    .map(|m| m.curseforge)
-                    .flatten()
+                    .clone()
+                    .and_then(|m| m.curseforge)
                     .flatten()
                     .map(|m| domain::CurseForgeModMetadata {
                         project_id: m.project_id as u32,
@@ -69,6 +69,19 @@ impl ManagerRef<'_, InstanceManager> {
                         summary: m.summary,
                         authors: m.authors,
                     }),
+                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
+                    domain::ModrinthModMetadata {
+                        project_id: m.project_id,
+                        version_id: m.version_id,
+                        title: m.title,
+                        filename: m.filename,
+                        urlslug: m.urlslug,
+                        description: m.description,
+                        authors: m.authors,
+                        sha512: m.sha_512,
+                        sha1: m.sha_1,
+                    }
+                }),
             });
 
         Ok(mods.collect::<Vec<_>>())

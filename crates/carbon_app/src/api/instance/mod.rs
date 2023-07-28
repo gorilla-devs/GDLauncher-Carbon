@@ -742,6 +742,7 @@ struct Mod {
     enabled: bool,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
+    modrinth: Option<ModrinthModMetadata>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -762,6 +763,19 @@ struct CurseForgeModMetadata {
     pub urlslug: String,
     pub summary: String,
     pub authors: String,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ModrinthModMetadata {
+    pub project_id: String,
+    pub version_id: String,
+    pub title: String,
+    pub filename: String,
+    pub urlslug: String,
+    pub description: String,
+    pub authors: String,
+    pub sha512: String,
+    pub sha1: String,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -1015,6 +1029,7 @@ impl From<domain::Mod> for Mod {
             enabled: value.enabled,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
+            modrinth: value.modrinth.map(Into::into),
         }
     }
 }
@@ -1041,6 +1056,22 @@ impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
             urlslug: value.urlslug,
             summary: value.summary,
             authors: value.authors,
+        }
+    }
+}
+
+impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
+    fn from(value: domain::ModrinthModMetadata) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
+            title: value.title,
+            filename: value.filename,
+            urlslug: value.urlslug,
+            description: value.description,
+            authors: value.authors,
+            sha512: value.sha512,
+            sha1: value.sha1,
         }
     }
 }
