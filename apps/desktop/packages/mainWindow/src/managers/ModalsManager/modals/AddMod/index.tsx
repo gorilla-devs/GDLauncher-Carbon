@@ -214,6 +214,10 @@ const AddMod = (props: ModalProps) => {
 
   const isCurseforge = () => query.searchApi === "curseforge";
 
+  const modrinthCategories = rspc.createQuery(() => [
+    "modplatforms.modrinth.getCategories",
+  ]);
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 bg-darkSlate-800 p-5">
@@ -339,6 +343,7 @@ const AddMod = (props: ModalProps) => {
                                 type="Mod"
                                 data={mod()}
                                 mcVersion={data().mcVersion}
+                                modrinthCategories={modrinthCategories.data}
                               />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
