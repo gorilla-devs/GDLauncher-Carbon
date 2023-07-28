@@ -41,6 +41,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
 
 type InstancePage = {
   label: string;
@@ -463,10 +464,21 @@ const Instance = () => {
                     >
                       <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
                         <div class="m-0 flex gap-2 items-center h-full">
-                          <span>
-                            {routeData.instanceDetails.data?.modloaders[0]
-                              ?.type_ || "Vanilla"}
-                          </span>
+                          <For
+                            each={routeData.instanceDetails.data?.modloaders}
+                          >
+                            {(modloader) => (
+                              <>
+                                <Show when={modloader.type_}>
+                                  <img
+                                    class="w-4 h-4"
+                                    src={getForgeModloaderIcon(modloader.type_)}
+                                  />
+                                </Show>
+                                <span>{modloader.type_}</span>
+                              </>
+                            )}
+                          </For>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
                         <Show
