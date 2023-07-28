@@ -8,15 +8,22 @@ export const [updateAvailable, setUpdateAvailable] =
 let lastChannel: FEReleaseChannel | null = null;
 
 export const checkForUpdates = async (releaseChannel: FEReleaseChannel) => {
-  if (!lastChannel || lastChannel !== releaseChannel) {
-    lastChannel = releaseChannel;
-    const isUpdateAvailable = await window.checkForUpdates(releaseChannel);
+  let interval = null;
 
-    if (isUpdateAvailable) {
-      setUpdateAvailable(isUpdateAvailable);
-    } else {
-      setUpdateAvailable(null);
+  if (!lastChannel || lastChannel !== releaseChannel) {
+    if (interval) {
+      clearInterval(interval);
     }
+    interval = setInterval(async () => {
+      lastChannel = releaseChannel;
+      const isUpdateAvailable = await window.checkForUpdates(releaseChannel);
+
+      if (isUpdateAvailable) {
+        setUpdateAvailable(isUpdateAvailable);
+      } else {
+        setUpdateAvailable(null);
+      }
+    }, 60 * 15 * 1000);
   }
 };
 
