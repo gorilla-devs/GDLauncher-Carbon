@@ -132,6 +132,23 @@ CREATE TABLE "CurseForgeModCache" (
     CONSTRAINT "CurseForgeModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- CreateTable
+CREATE TABLE "ModrinthModCache" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "sha512" TEXT NOT NULL,
+    "sha1" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "versionId" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "urlslug" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "authors" TEXT NOT NULL,
+    "cachedAt" DATETIME NOT NULL,
+    "metadataId" TEXT NOT NULL,
+    CONSTRAINT "ModrinthModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "AppConfiguration_id_key" ON "AppConfiguration"("id");
 
@@ -161,3 +178,9 @@ CREATE UNIQUE INDEX "CurseForgeModCache_metadataId_key" ON "CurseForgeModCache"(
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CurseForgeModCache_projectId_fileId_key" ON "CurseForgeModCache"("projectId", "fileId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModrinthModCache_metadataId_key" ON "ModrinthModCache"("metadataId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ModrinthModCache_projectId_versionId_key" ON "ModrinthModCache"("projectId", "versionId");
