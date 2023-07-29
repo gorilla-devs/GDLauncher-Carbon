@@ -489,7 +489,7 @@ const Instance = () => {
                         >
                           <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:time-fill" />
-                            <span>
+                            <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
                                 (
                                   routeData.instanceDetails
