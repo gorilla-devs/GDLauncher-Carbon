@@ -121,7 +121,10 @@ const ModDetails = (props: ModalProps) => {
   const DownloadBtn = (propss: { size: "large" | "small" }) => {
     const isModInstalled = () =>
       mods()?.data?.find(
-        (mod) => mod.curseforge?.project_id === projectId()
+        (mod) =>
+          (isCurseForgeData(modDetails())
+            ? mod.curseforge?.project_id
+            : mod.modrinth?.project_id) === projectId()
       ) !== undefined;
 
     return (

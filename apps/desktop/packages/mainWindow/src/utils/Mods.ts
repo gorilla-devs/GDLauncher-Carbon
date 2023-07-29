@@ -60,6 +60,7 @@ export const getName = (prop: ModRowProps | FEUnifiedSearchResult) => {
 
 export const getCategories = (prop: ModRowProps) => {
   const modloader = ["forge", "fabric", "quilt"];
+
   if (isCurseForgeData(prop.data)) {
     return prop.data.curseforge.categories;
   } else

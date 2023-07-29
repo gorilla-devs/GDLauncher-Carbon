@@ -131,12 +131,7 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (CFFEModLoaderType | "any")[] = [
-    "any",
-    "forge",
-    "fabric",
-    "quilt",
-  ];
+  const modloaders: CFFEModLoaderType[] = ["forge", "fabric", "quilt"];
 
   const NoMoreMods = () => {
     return (
