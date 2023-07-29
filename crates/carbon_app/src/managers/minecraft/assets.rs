@@ -60,7 +60,6 @@ pub enum AssetsDir {
 }
 
 impl AssetsDir {
-
     pub fn to_path_buf(&self) -> PathBuf {
         match self {
             Self::Index(buf) => buf.clone(),
@@ -77,7 +76,9 @@ pub async fn get_assets_dir(
 ) -> anyhow::Result<AssetsDir> {
     let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
     if assets_index.map_virtual {
-        Ok(AssetsDir::Virtual(assets_path.get_virtual_path().join(index_id)))
+        Ok(AssetsDir::Virtual(
+            assets_path.get_virtual_path().join(index_id),
+        ))
     } else if assets_index.map_to_resources {
         Ok(AssetsDir::InstanceMapped(resources_dir))
     } else {

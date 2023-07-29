@@ -200,7 +200,7 @@ impl ManagerRef<'_, InstanceManager> {
                 };
 
                 let t_finalize_import = if callback_task.is_some() {
-                    Some(task.subtask(Translation::FinalizingImport).await)
+                    Some(task.subtask(Translation::FinalizingImport))
                 } else {
                     None
                 };
