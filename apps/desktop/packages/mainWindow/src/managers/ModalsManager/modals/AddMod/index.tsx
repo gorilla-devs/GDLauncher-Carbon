@@ -22,7 +22,7 @@ import {
   FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { CurseForgeSortFields } from "@/utils/constants";
+import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 
@@ -213,6 +213,9 @@ const AddMod = (props: ModalProps) => {
     "modplatforms.modrinth.getCategories",
   ]);
 
+  const sortingFields = () =>
+    isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
       <div class="h-130 w-190 bg-darkSlate-800 p-5">
@@ -237,7 +240,7 @@ const AddMod = (props: ModalProps) => {
                 />
               </p>
               <Dropdown
-                options={CurseForgeSortFields.map((field) => ({
+                options={sortingFields().map((field) => ({
                   label: t(`instance.sort_by_${field}`),
                   key: field,
                 }))}
