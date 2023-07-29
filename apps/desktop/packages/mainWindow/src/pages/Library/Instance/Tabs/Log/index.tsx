@@ -136,23 +136,24 @@ const Logs = () => {
     }
   };
 
+  const container = document.getElementById("main-container-instance-details");
   // Scroll event listener
   onMount(() => {
-    const container = document.getElementById(
-      "main-container-instance-details"
-    );
     if (container) {
       container.addEventListener("scroll", checkScrollTop);
-      return () => {
-        container.removeEventListener("scroll", checkScrollTop);
-      };
+    }
+  });
+
+  onCleanup(() => {
+    if (container) {
+      container.removeEventListener("scroll", checkScrollTop);
     }
   });
 
   return (
     <div>
       <Show when={showButton()}>
-        <div class="fixed bottom-4 right-[490px] rounded-full">
+        <div class="rounded-full fixed bottom-4 right-[490px]">
           <Button typeof="secondary" onClick={scrollTop}>
             <Trans key="logs.scroll_top" />
           </Button>

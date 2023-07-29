@@ -4,7 +4,7 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { Button } from "@gd/ui";
 import Import from "../InstanceCreation/Import";
 import { rspc } from "@/utils/rspcClient";
-import { Match, Switch, createEffect } from "solid-js";
+import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 type Props = {
   prevStep: () => void;
@@ -12,6 +12,7 @@ type Props = {
 
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
+  const [isLoading, setIsLoading] = createSignal(false);
 
   const legacyGDLauncherEntity = "legacyGDLauncher";
 
@@ -91,7 +92,7 @@ const ThirdStep = (props: Props) => {
       <Switch>
         <Match when={instances.data && instances.data?.length > 0}>
           <div class="mt-20 h-full max-w-full">
-            <Import />
+            <Import setIsLoading={setIsLoading} />
           </div>
         </Match>
         <Match when={instances.data && instances.data?.length === 0}>
@@ -100,6 +101,7 @@ const ThirdStep = (props: Props) => {
       </Switch>
       <div class="flex justify-between w-full">
         <Button
+          disabled={isLoading()}
           type="secondary"
           size="large"
           onClick={() => {
@@ -109,6 +111,7 @@ const ThirdStep = (props: Props) => {
           <Trans key="onboarding.prev" />
         </Button>
         <Button
+          disabled={isLoading()}
           onClick={() => {
             modalsContext?.closeModal();
           }}

@@ -410,7 +410,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         <span class="flex flex-col justify-between gap-4">
           <div class="flex gap-4 w-full">
             <div
-              class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl w-20 h-20"
+              class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover rounded-xl h-20 w-20"
               style={{
                 "background-image": `url("${bgPreview()}")`,
               }}

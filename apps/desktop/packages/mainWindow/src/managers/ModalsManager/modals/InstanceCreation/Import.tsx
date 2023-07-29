@@ -20,9 +20,21 @@ import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FETask } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Checkbox, Spinner } from "@gd/ui";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Setter,
+  Show,
+  Switch,
+  createEffect,
+  createSignal,
+} from "solid-js";
 
-const Import = () => {
+type Props = {
+  setIsLoading?: Setter<boolean>;
+};
+
+const Import = (props: Props) => {
   const [selectedEntity, setSelectedEntity] =
     createSignal<FEEntity>("legacyGDLauncher");
   const [isLoading, setIsLoading] = createSignal(false);
@@ -114,7 +126,10 @@ const Import = () => {
     importedInstances().length === instances()?.data?.length;
 
   createEffect(() => {
-    if (isAllImported()) setIsLoading(false);
+    if (isAllImported()) {
+      setIsLoading(false);
+      props?.setIsLoading?.(false);
+    }
   });
 
   return (
@@ -153,7 +168,12 @@ const Import = () => {
         <div class="w-full bg-darkSlate-800 rounded-xl box-border flex flex-col overflow-hidden h-50">
           <div class="flex justify-between w-full bg-darkSlate-900 px-4 py-2 box-border">
             <Checkbox
-              disabled={isAllImported() || importedInstances().length > 0}
+              disabled={
+                isAllImported() ||
+                importedInstances().length > 0 ||
+                Object.values(loadingInstances).filter((loading) => loading)
+                  .length > 0
+              }
               checked={areAllSelected()}
               onChange={(checked) => {
                 selectAll(checked);
@@ -163,10 +183,17 @@ const Import = () => {
               class="cursor-pointer"
               classList={{
                 "text-darkSlate-600":
-                  isAllImported() || importedInstances().length > 0,
+                  isAllImported() ||
+                  importedInstances().length > 0 ||
+                  Object.values(loadingInstances).filter((loading) => loading)
+                    .length > 0,
               }}
               onClick={() => {
-                if (!isAllImported() || importedInstances().length === 0)
+                if (
+                  (!isAllImported() || importedInstances().length === 0) &&
+                  Object.values(loadingInstances).filter((loading) => loading)
+                    .length === 0
+                )
                   selectAll(!areAllSelected());
               }}
             >
@@ -188,7 +215,10 @@ const Import = () => {
                     <div class="flex justify-between">
                       <div class="flex gap-2 w-full">
                         <Checkbox
-                          disabled={importedInstances().includes(i())}
+                          disabled={
+                            importedInstances().includes(i()) ||
+                            !!loadingInstances[i()]
+                          }
                           checked={selectedInstancesIndexes[i()]}
                           onChange={(checked) => {
                             // eslint-disable-next-line solid/reactivity
@@ -256,6 +286,7 @@ const Import = () => {
         disabled={isAllImported()}
         onClick={() => {
           setIsLoading(true);
+          props?.setIsLoading?.(true);
           const firstSelectedEntry = selectedEntires()[0];
           const firstSelectedEntryIndex = firstSelectedEntry[0];
           const parsedIndex = parseInt(firstSelectedEntryIndex, 10);
