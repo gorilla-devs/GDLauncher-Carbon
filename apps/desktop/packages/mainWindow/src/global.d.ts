@@ -3,7 +3,7 @@
 
 import type { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BoundsSize } from "./utils/adhelper";
-import type { UpdateCheckResult } from "electron-updater";
+import type { ProgressInfo, UpdateCheckResult } from "electron-updater";
 
 declare global {
   interface Window {
@@ -18,8 +18,11 @@ declare global {
     checkForUpdates: (
       releaseChannel: FEReleaseChannel
     ) => Promise<UpdateCheckResult | null>;
+    onDownloadProgress: (
+      cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
+    ) => void;
     installUpdate: () => void;
-    releaseChannel: (releaseChannel: string) => void;
+    downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
     openCMPWindow: () => void;

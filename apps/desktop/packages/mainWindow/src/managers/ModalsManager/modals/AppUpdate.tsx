@@ -1,8 +1,8 @@
-import { Button } from "@gd/ui";
+import { Button, Progressbar } from "@gd/ui";
 import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
 import { Trans } from "@gd/i18n";
-import updateAvailable from "@/utils/updater";
+import updateAvailable, { updateProgress } from "@/utils/updater";
 import { rspc } from "@/utils/rspcClient";
 
 const AppUpdate = (props: ModalProps) => {
@@ -67,6 +67,7 @@ const AppUpdate = (props: ModalProps) => {
           </div>
         </div>
         <hr class="w-full border-darkSlate-50 mt-8" />
+        <Progressbar percentage={updateProgress()} />
         <div class="flex items-center justify-center flex-1 mt-20 mb-4">
           <Button
             icon={
@@ -75,7 +76,8 @@ const AppUpdate = (props: ModalProps) => {
             iconRight
             onClick={() => {
               // window.openExternalLink("https://gdlauncher.com/en/download");
-              window.openExternalLink("https://discord.gdlauncher.com");
+              // window.openExternalLink("https://discord.gdlauncher.com");
+              window.downloadUpdate();
             }}
           >
             {/* <Trans key="app_update.download_new_version" /> */}

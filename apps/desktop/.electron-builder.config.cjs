@@ -66,7 +66,7 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip", "nsis"],
+    target: appChannel === "snapshot" ? ["zip"] : ["nsis"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     verifyUpdateCodeSignature: false,
   },
@@ -77,13 +77,13 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip", "dmg"],
+    target: appChannel === "snapshot" ? ["zip"] : ["dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
-    target: ["dir", "zip", "appImage"],
+    target: appChannel === "snapshot" ? ["zip"] : ["appImage"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
   },
   afterAllArtifactBuild: (buildResult) => {

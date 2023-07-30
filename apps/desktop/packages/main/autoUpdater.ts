@@ -19,8 +19,18 @@ export default function initAutoUpdater(win: BrowserWindow) {
     }
   );
 
+  ipcMain.handle("downloadUpdate", async () => {
+    console.log("Downloading update");
+    autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    console.log("Download progress", progress);
+    win.webContents.send("downloadProgress", progress);
+  });
+
   ipcMain.handle("installUpdate", async () => {
-    // autoUpdater.quitAndInstall(true, false);
+    autoUpdater.quitAndInstall(true, true);
   });
 
   autoUpdater.on("update-downloaded", () => {
