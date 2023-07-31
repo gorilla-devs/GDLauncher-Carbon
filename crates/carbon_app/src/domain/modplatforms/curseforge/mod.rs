@@ -356,6 +356,7 @@ pub enum ModLoaderType {
     LiteLoader = 3,
     Fabric = 4,
     Quilt = 5,
+    NeoForge = 6,
 }
 
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
