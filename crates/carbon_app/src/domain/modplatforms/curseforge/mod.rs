@@ -252,11 +252,40 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,
     Modpacks = 4471,
+    Other(u16),
+}
+
+
+impl<'de> Deserialize<'de> for ClassId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u16::deserialize(deserializer)?;
+        match n {
+            6 => Ok(Self::Mods),
+            4471 => Ok(Self::Modpacks),
+            other => Ok(Self::Other(other)),
+        }
+    }
+}
+
+impl Serialize for ClassId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        serializer.serialize_u16(match self {
+            Self::Mods => 6,
+            Self::Modpacks => 4471,
+            Self::Other(other) => *other,
+
+        } )
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -348,7 +377,7 @@ pub enum GameVersionTypeStatus {
     Deleted = 2,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug)]
 #[repr(u8)]
 pub enum ModLoaderType {
     Forge = 1,
@@ -357,7 +386,44 @@ pub enum ModLoaderType {
     Fabric = 4,
     Quilt = 5,
     NeoForge = 6,
+    Other(u8),
 }
+
+impl<'de> Deserialize<'de> for ModLoaderType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u8::deserialize(deserializer)?;
+        match n {
+            1 => Ok(Self::Forge),
+            2 => Ok(Self::Cauldron),
+            3 => Ok(Self::LiteLoader),
+            4 => Ok(Self::Fabric),
+            5 => Ok(Self::Quilt),
+            6 => Ok(Self::NeoForge),
+            other => Ok(Self::Other(other)),
+        }
+    }
+}
+
+impl Serialize for ModLoaderType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        serializer.serialize_u8(match self {
+            Self::Forge => 1,
+            Self::Cauldron => 2,
+            Self::LiteLoader => 3,
+            Self::Fabric => 4,
+            Self::Quilt => 5,
+            Self::NeoForge => 6,
+            Self::Other(other) => *other,
+
+        } )
+    }
+}
+
 
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
