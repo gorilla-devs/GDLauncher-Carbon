@@ -20,11 +20,18 @@ import {
   FEUnifiedSearchParameters,
   MRFESearchIndex,
   FEUnifiedModLoaderType,
+  FESearchAPI,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
+import {
+  CurseForgeSortFields,
+  ModpackPlatforms,
+  ModrinthSortFields,
+} from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
+import { PlatformIcon } from "@/utils/instances";
+import { capitalize } from "@/utils/helpers";
 
 type DataType = {
   mcVersion: string;
@@ -273,6 +280,26 @@ const AddMod = (props: ModalProps) => {
 
                   setQueryWrapper({
                     modloaders: mappedValue,
+                  });
+                }}
+                rounded
+              />
+              <Dropdown
+                options={ModpackPlatforms.map((platform) => ({
+                  label: (
+                    <div class="flex items-center gap-2">
+                      <PlatformIcon platform={platform} />
+                      <p class="m-0">{platform}</p>
+                    </div>
+                  ),
+                  key: platform,
+                }))}
+                value={capitalize(query.searchApi)}
+                onChange={(val) => {
+                  setQueryWrapper({
+                    searchApi: (val.key as string).toLowerCase() as FESearchAPI,
+                    categories: [],
+                    modloaders: null,
                   });
                 }}
                 rounded
