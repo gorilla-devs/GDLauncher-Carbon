@@ -299,9 +299,9 @@ struct _Loader {
     loader_version: Option<String>,
     mc_version: String,
     #[serde(rename = "fileID")]
-    file_id: Option<u32>,
+    file_id: Option<i32>,
     #[serde(rename = "projectID")]
-    project_id: Option<u32>,
+    project_id: Option<i32>,
     source: Option<String>,
     source_name: Option<String>,
 }
