@@ -7,9 +7,11 @@ use crate::managers::java::managed::Step;
 use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
+use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::pin::Pin;
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -17,6 +19,7 @@ use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
+use futures::Future;
 use std::time::Duration;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
@@ -49,12 +52,16 @@ impl PersistenceManager {
         }
     }
 }
+type InstanceCallback = Box<
+    dyn FnOnce(Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
+>;
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn prepare_game(
         self,
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
+        callback_task: Option<InstanceCallback>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -192,7 +199,14 @@ impl ManagerRef<'_, InstanceManager> {
                     false => None,
                 };
 
-                task.edit(|data| data.state = TaskState::KnownProgress).await;
+                let t_finalize_import = if callback_task.is_some() {
+                    Some(task.subtask(Translation::FinalizingImport))
+                } else {
+                    None
+                };
+
+                task.edit(|data| data.state = TaskState::KnownProgress)
+                    .await;
 
                 wait_task.complete_opaque();
 
@@ -729,6 +743,10 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                     )),
                     None => {
+                        if let Some(callback_task) = callback_task {
+                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
+                        }
+
                         let _ = app
                             .instance_manager()
                             .change_launch_state(
@@ -1019,7 +1037,7 @@ mod test {
         };
 
         app.instance_manager()
-            .prepare_game(instance_id, Some(account))
+            .prepare_game(instance_id, Some(account), None)
             .await?;
 
         let task = match app.instance_manager().get_launch_state(instance_id).await? {
