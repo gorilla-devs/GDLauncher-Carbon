@@ -14,7 +14,7 @@ const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
   const [isLoading, setIsLoading] = createSignal(false);
 
-  const legacyGDLauncherEntity = "legacyGDLauncher";
+  const legacyGDLauncherEntity = "legacygdlauncher";
 
   const instances = rspc.createQuery(() => [
     "instance.getImportableInstances",

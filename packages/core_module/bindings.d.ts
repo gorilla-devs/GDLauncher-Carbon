@@ -367,7 +367,7 @@ export type CFFEModSearchSortOrder = "ascending" | "descending"
 
 export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget }
 
-export type FEEntity = "legacyGDLauncher" | "mrpack" | "modrinth" | "curseForgeZip" | "curseForge" | "atlauncher" | "technic" | "ftb" | "multiMC" | "prismLauncher"
+export type FEEntity = "legacygdlauncher" | "mrpack" | "modrinth" | "curseforgezip" | "curseforge" | "atlauncher" | "technic" | "ftb" | "multimc" | "prismlauncher"
 
 export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack"
 

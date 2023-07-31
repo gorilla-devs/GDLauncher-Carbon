@@ -18,7 +18,7 @@ import {
 } from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FETask } from "@gd/core_module/bindings";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Checkbox, Spinner } from "@gd/ui";
 import {
   For,
@@ -36,8 +36,10 @@ type Props = {
 
 const Import = (props: Props) => {
   const [selectedEntity, setSelectedEntity] =
-    createSignal<FEEntity>("legacyGDLauncher");
+    createSignal<FEEntity>("legacygdlauncher");
   const [isLoading, setIsLoading] = createSignal(false);
+
+  const [t] = useTransContext();
 
   const scanImportableInstancesMutation = rspc.createMutation([
     "instance.scanImportableInstances",
@@ -103,7 +105,7 @@ const Import = (props: Props) => {
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
 
-  const currentlySupportedEnties = ["legacyGDLauncher"];
+  const currentlySupportedEnties = ["legacygdlauncher"];
 
   createEffect(() => {
     scanImportableInstancesMutation.mutate(selectedEntity());
@@ -140,7 +142,7 @@ const Import = (props: Props) => {
             <For each={entities.data}>
               {(entity) => (
                 <div
-                  class="relative flex justify-center px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer min-w-30"
+                  class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
                   classList={{
                     "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
                       !currentlySupportedEnties.includes(entity) ||
@@ -154,12 +156,12 @@ const Import = (props: Props) => {
                       setSelectedEntity(entity);
                   }}
                 >
-                  <Show when={entity !== "legacyGDLauncher"}>
+                  <Show when={entity !== "legacygdlauncher"}>
                     <span class="absolute rounded-full text-white text-xs -top-2 -right-4 bg-green-500 px-1">
                       <Trans key="instances.import_entity_coming_soon" />
                     </span>
                   </Show>
-                  {entity}
+                  {t(`entity.${entity}`)}
                 </div>
               )}
             </For>
