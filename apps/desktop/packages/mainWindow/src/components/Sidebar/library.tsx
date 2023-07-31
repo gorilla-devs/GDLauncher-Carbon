@@ -89,7 +89,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full box-border transition-all pt-5 pb-5 flex flex-col">
+      <div class="h-full w-full box-border transition-all flex flex-col pt-5 pb-5">
         <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}
@@ -101,7 +101,7 @@ const Sidebar = () => {
                   inputRef?.focus();
                 }}
               >
-                <div class="duration-100 ease-in-out i-ri:search-line transition text-darkSlate-500 group-hover:text-darkSlate-50" />
+                <div class="duration-100 ease-in-out transition i-ri:search-line text-darkSlate-500 group-hover:text-darkSlate-50" />
               </div>
             }
           >
@@ -119,7 +119,7 @@ const Sidebar = () => {
           <Skeleton.sidebarInstances />
         </Show>
         <div
-          class="overflow-y-auto h-full box-border"
+          class="h-full box-border overflow-y-auto"
           classList={{
             "scrollbar-hide": !isSidebarOpened(),
           }}
