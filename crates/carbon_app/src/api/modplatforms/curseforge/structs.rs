@@ -4,6 +4,8 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
+use crate::domain::modplatforms::curseforge as mpcf;
+
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFeaturedModsResponse {
@@ -12,12 +14,8 @@ pub struct CFFEFeaturedModsResponse {
     pub recently_updated: Vec<CFFEMod>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FeaturedModsResponse>
-    for CFFEFeaturedModsResponse
-{
-    fn from(
-        featured_mods_response: crate::domain::modplatforms::curseforge::FeaturedModsResponse,
-    ) -> Self {
+impl From<mpcf::FeaturedModsResponse> for CFFEFeaturedModsResponse {
+    fn from(featured_mods_response: mpcf::FeaturedModsResponse) -> Self {
         Self {
             featured: featured_mods_response
                 .featured
@@ -68,8 +66,8 @@ pub struct CFFEFile {
     pub modules: Vec<CFFEFileModule>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::File> for CFFEFile {
-    fn from(file: crate::domain::modplatforms::curseforge::File) -> Self {
+impl From<mpcf::File> for CFFEFile {
+    fn from(file: mpcf::File) -> Self {
         Self {
             id: file.id,
             game_id: file.game_id,
@@ -119,8 +117,8 @@ pub struct CFFEFileDependency {
     pub relation_type: CFFEFileRelationType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileDependency> for CFFEFileDependency {
-    fn from(dependency: crate::domain::modplatforms::curseforge::FileDependency) -> Self {
+impl From<mpcf::FileDependency> for CFFEFileDependency {
+    fn from(dependency: mpcf::FileDependency) -> Self {
         Self {
             mod_id: dependency.mod_id,
             relation_type: dependency.relation_type.into(),
@@ -135,8 +133,8 @@ pub struct CFFEFileHash {
     pub algo: CFFEHashAlgo,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileHash> for CFFEFileHash {
-    fn from(hash: crate::domain::modplatforms::curseforge::FileHash) -> Self {
+impl From<mpcf::FileHash> for CFFEFileHash {
+    fn from(hash: mpcf::FileHash) -> Self {
         Self {
             value: hash.value,
             algo: hash.algo.into(),
@@ -152,18 +150,12 @@ pub enum CFFEFileReleaseType {
     Alpha,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for CFFEFileReleaseType {
-    fn from(release_type: crate::domain::modplatforms::curseforge::FileReleaseType) -> Self {
+impl From<mpcf::FileReleaseType> for CFFEFileReleaseType {
+    fn from(release_type: mpcf::FileReleaseType) -> Self {
         match release_type {
-            crate::domain::modplatforms::curseforge::FileReleaseType::Stable => {
-                CFFEFileReleaseType::Stable
-            }
-            crate::domain::modplatforms::curseforge::FileReleaseType::Beta => {
-                CFFEFileReleaseType::Beta
-            }
-            crate::domain::modplatforms::curseforge::FileReleaseType::Alpha => {
-                CFFEFileReleaseType::Alpha
-            }
+            mpcf::FileReleaseType::Stable => CFFEFileReleaseType::Stable,
+            mpcf::FileReleaseType::Beta => CFFEFileReleaseType::Beta,
+            mpcf::FileReleaseType::Alpha => CFFEFileReleaseType::Alpha,
         }
     }
 }
@@ -188,48 +180,24 @@ pub enum CFFEFileStatus {
     FailedPublishing,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileStatus> for CFFEFileStatus {
-    fn from(file_status: crate::domain::modplatforms::curseforge::FileStatus) -> Self {
+impl From<mpcf::FileStatus> for CFFEFileStatus {
+    fn from(file_status: mpcf::FileStatus) -> Self {
         match file_status {
-            crate::domain::modplatforms::curseforge::FileStatus::Processing => {
-                CFFEFileStatus::Processing
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::ChangesRequired => {
-                CFFEFileStatus::ChangesRequired
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::UnderReview => {
-                CFFEFileStatus::UnderReview
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Approved => {
-                CFFEFileStatus::Approved
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Rejected => {
-                CFFEFileStatus::Rejected
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::MalwareDetected => {
-                CFFEFileStatus::MalwareDetected
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Deleted => CFFEFileStatus::Deleted,
-            crate::domain::modplatforms::curseforge::FileStatus::Archived => {
-                CFFEFileStatus::Archived
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Testing => CFFEFileStatus::Testing,
-            crate::domain::modplatforms::curseforge::FileStatus::Released => {
-                CFFEFileStatus::Released
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::ReadyForReview => {
-                CFFEFileStatus::ReadyForReview
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Deprecated => {
-                CFFEFileStatus::Deprecated
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Baking => CFFEFileStatus::Baking,
-            crate::domain::modplatforms::curseforge::FileStatus::AwaitingPublishing => {
-                CFFEFileStatus::AwaitingPublishing
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::FailedPublishing => {
-                CFFEFileStatus::FailedPublishing
-            }
+            mpcf::FileStatus::Processing => CFFEFileStatus::Processing,
+            mpcf::FileStatus::ChangesRequired => CFFEFileStatus::ChangesRequired,
+            mpcf::FileStatus::UnderReview => CFFEFileStatus::UnderReview,
+            mpcf::FileStatus::Approved => CFFEFileStatus::Approved,
+            mpcf::FileStatus::Rejected => CFFEFileStatus::Rejected,
+            mpcf::FileStatus::MalwareDetected => CFFEFileStatus::MalwareDetected,
+            mpcf::FileStatus::Deleted => CFFEFileStatus::Deleted,
+            mpcf::FileStatus::Archived => CFFEFileStatus::Archived,
+            mpcf::FileStatus::Testing => CFFEFileStatus::Testing,
+            mpcf::FileStatus::Released => CFFEFileStatus::Released,
+            mpcf::FileStatus::ReadyForReview => CFFEFileStatus::ReadyForReview,
+            mpcf::FileStatus::Deprecated => CFFEFileStatus::Deprecated,
+            mpcf::FileStatus::Baking => CFFEFileStatus::Baking,
+            mpcf::FileStatus::AwaitingPublishing => CFFEFileStatus::AwaitingPublishing,
+            mpcf::FileStatus::FailedPublishing => CFFEFileStatus::FailedPublishing,
         }
     }
 }
@@ -245,27 +213,15 @@ pub enum CFFEFileRelationType {
     Include,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileRelationType> for CFFEFileRelationType {
-    fn from(relation_type: crate::domain::modplatforms::curseforge::FileRelationType) -> Self {
+impl From<mpcf::FileRelationType> for CFFEFileRelationType {
+    fn from(relation_type: mpcf::FileRelationType) -> Self {
         match relation_type {
-            crate::domain::modplatforms::curseforge::FileRelationType::EmbeddedLibrary => {
-                CFFEFileRelationType::EmbeddedLibrary
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::OptionalDependency => {
-                CFFEFileRelationType::OptionalDependency
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::RequiredDependency => {
-                CFFEFileRelationType::RequiredDependency
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Tool => {
-                CFFEFileRelationType::Tool
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Incompatible => {
-                CFFEFileRelationType::Incompatible
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Include => {
-                CFFEFileRelationType::Include
-            }
+            mpcf::FileRelationType::EmbeddedLibrary => CFFEFileRelationType::EmbeddedLibrary,
+            mpcf::FileRelationType::OptionalDependency => CFFEFileRelationType::OptionalDependency,
+            mpcf::FileRelationType::RequiredDependency => CFFEFileRelationType::RequiredDependency,
+            mpcf::FileRelationType::Tool => CFFEFileRelationType::Tool,
+            mpcf::FileRelationType::Incompatible => CFFEFileRelationType::Incompatible,
+            mpcf::FileRelationType::Include => CFFEFileRelationType::Include,
         }
     }
 }
@@ -277,11 +233,11 @@ pub enum CFFEHashAlgo {
     Md5,
 }
 
-impl From<crate::domain::modplatforms::curseforge::HashAlgo> for CFFEHashAlgo {
-    fn from(hash_algo: crate::domain::modplatforms::curseforge::HashAlgo) -> Self {
+impl From<mpcf::HashAlgo> for CFFEHashAlgo {
+    fn from(hash_algo: mpcf::HashAlgo) -> Self {
         match hash_algo {
-            crate::domain::modplatforms::curseforge::HashAlgo::Sha1 => CFFEHashAlgo::Sha1,
-            crate::domain::modplatforms::curseforge::HashAlgo::Md5 => CFFEHashAlgo::Md5,
+            mpcf::HashAlgo::Sha1 => CFFEHashAlgo::Sha1,
+            mpcf::HashAlgo::Md5 => CFFEHashAlgo::Md5,
         }
     }
 }
@@ -293,8 +249,8 @@ pub struct CFFEFileModule {
     pub fingerprint: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileModule> for CFFEFileModule {
-    fn from(file_module: crate::domain::modplatforms::curseforge::FileModule) -> Self {
+impl From<mpcf::FileModule> for CFFEFileModule {
+    fn from(file_module: mpcf::FileModule) -> Self {
         CFFEFileModule {
             name: file_module.name,
             fingerprint: file_module.fingerprint.to_string(),
@@ -311,10 +267,8 @@ pub struct CFFEFingerprintFuzzyMatch {
     pub fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatch>
-    for CFFEFingerprintFuzzyMatch
-{
-    fn from(fuzzy_match: crate::domain::modplatforms::curseforge::FingerprintFuzzyMatch) -> Self {
+impl From<mpcf::FingerprintFuzzyMatch> for CFFEFingerprintFuzzyMatch {
+    fn from(fuzzy_match: mpcf::FingerprintFuzzyMatch) -> Self {
         CFFEFingerprintFuzzyMatch {
             id: fuzzy_match.id,
             file: fuzzy_match.file.into(),
@@ -338,12 +292,8 @@ pub struct CFFEFingerprintFuzzyMatchResult {
     pub fuzzy_matches: Vec<CFFEFingerprintFuzzyMatch>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatchResult>
-    for CFFEFingerprintFuzzyMatchResult
-{
-    fn from(
-        fuzzy_match_result: crate::domain::modplatforms::curseforge::FingerprintFuzzyMatchResult,
-    ) -> Self {
+impl From<mpcf::FingerprintFuzzyMatchResult> for CFFEFingerprintFuzzyMatchResult {
+    fn from(fuzzy_match_result: mpcf::FingerprintFuzzyMatchResult) -> Self {
         CFFEFingerprintFuzzyMatchResult {
             fuzzy_matches: fuzzy_match_result
                 .fuzzy_matches
@@ -362,8 +312,8 @@ pub struct CFFEFingerprintMatch {
     pub latest_files: Vec<CFFEFile>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintMatch> for CFFEFingerprintMatch {
-    fn from(match_: crate::domain::modplatforms::curseforge::FingerprintMatch) -> Self {
+impl From<mpcf::FingerprintMatch> for CFFEFingerprintMatch {
+    fn from(match_: mpcf::FingerprintMatch) -> Self {
         CFFEFingerprintMatch {
             id: match_.id,
             file: match_.file.into(),
@@ -384,12 +334,8 @@ pub struct CFFEFingerprintsMatchesResult {
     pub unmatched_fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintsMatchesResult>
-    for CFFEFingerprintsMatchesResult
-{
-    fn from(
-        matches_result: crate::domain::modplatforms::curseforge::FingerprintsMatchesResult,
-    ) -> Self {
+impl From<mpcf::FingerprintsMatchesResult> for CFFEFingerprintsMatchesResult {
+    fn from(matches_result: mpcf::FingerprintsMatchesResult) -> Self {
         CFFEFingerprintsMatchesResult {
             is_cache_built: matches_result.is_cache_built,
             exact_matches: matches_result
@@ -433,10 +379,8 @@ pub struct CFFEFolderFingerprint {
     pub fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FolderFingerprint> for CFFEFolderFingerprint {
-    fn from(
-        folder_fingerprint: crate::domain::modplatforms::curseforge::FolderFingerprint,
-    ) -> Self {
+impl From<mpcf::FolderFingerprint> for CFFEFolderFingerprint {
+    fn from(folder_fingerprint: mpcf::FolderFingerprint) -> Self {
         CFFEFolderFingerprint {
             foldername: folder_fingerprint.foldername,
             fingerprints: folder_fingerprint
@@ -460,8 +404,8 @@ pub struct CFFEGame {
     pub api_status: CFFECoreApiStatus,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Game> for CFFEGame {
-    fn from(game: crate::domain::modplatforms::curseforge::Game) -> Self {
+impl From<mpcf::Game> for CFFEGame {
+    fn from(game: mpcf::Game) -> Self {
         CFFEGame {
             id: game.id,
             name: game.name,
@@ -489,12 +433,8 @@ pub struct CFFEMinecraftGameVersion {
     pub game_version_type_status: CFFEGameVersionTypeStatus,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftGameVersion>
-    for CFFEMinecraftGameVersion
-{
-    fn from(
-        minecraft_game_version: crate::domain::modplatforms::curseforge::MinecraftGameVersion,
-    ) -> Self {
+impl From<mpcf::MinecraftGameVersion> for CFFEMinecraftGameVersion {
+    fn from(minecraft_game_version: mpcf::MinecraftGameVersion) -> Self {
         CFFEMinecraftGameVersion {
             id: minecraft_game_version.id,
             game_version_id: minecraft_game_version.game_version_id,
@@ -521,12 +461,8 @@ pub struct CFFEMinecraftModLoaderIndex {
     pub mod_loader_type: CFFEModLoaderType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderIndex>
-    for CFFEMinecraftModLoaderIndex
-{
-    fn from(
-        minecraft_mod_loader_index: crate::domain::modplatforms::curseforge::MinecraftModLoaderIndex,
-    ) -> Self {
+impl From<mpcf::MinecraftModLoaderIndex> for CFFEMinecraftModLoaderIndex {
+    fn from(minecraft_mod_loader_index: mpcf::MinecraftModLoaderIndex) -> Self {
         CFFEMinecraftModLoaderIndex {
             name: minecraft_mod_loader_index.name,
             game_version: minecraft_mod_loader_index.game_version,
@@ -570,12 +506,8 @@ pub struct CFFEMinecraftModLoaderVersion {
     pub install_profile_json: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderVersion>
-    for CFFEMinecraftModLoaderVersion
-{
-    fn from(
-        minecraft_mod_loader_version: crate::domain::modplatforms::curseforge::MinecraftModLoaderVersion,
-    ) -> Self {
+impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
+    fn from(minecraft_mod_loader_version: mpcf::MinecraftModLoaderVersion) -> Self {
         CFFEMinecraftModLoaderVersion {
             id: minecraft_mod_loader_version.id,
             game_version_id: minecraft_mod_loader_version.game_version_id,
@@ -645,8 +577,8 @@ pub struct CFFEMod {
     pub thumbs_up_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Mod> for CFFEMod {
-    fn from(minecraft_mod: crate::domain::modplatforms::curseforge::Mod) -> Self {
+impl From<mpcf::Mod> for CFFEMod {
+    fn from(minecraft_mod: mpcf::Mod) -> Self {
         CFFEMod {
             id: minecraft_mod.id,
             game_id: minecraft_mod.game_id,
@@ -704,20 +636,20 @@ pub enum CFFEClassId {
     Modpacks,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ClassId> for CFFEClassId {
-    fn from(class_id: crate::domain::modplatforms::curseforge::ClassId) -> Self {
+impl From<mpcf::ClassId> for CFFEClassId {
+    fn from(class_id: mpcf::ClassId) -> Self {
         match class_id {
-            crate::domain::modplatforms::curseforge::ClassId::Mods => CFFEClassId::Mods,
-            crate::domain::modplatforms::curseforge::ClassId::Modpacks => CFFEClassId::Modpacks,
+            mpcf::ClassId::Mods => CFFEClassId::Mods,
+            mpcf::ClassId::Modpacks => CFFEClassId::Modpacks,
         }
     }
 }
 
-impl From<CFFEClassId> for crate::domain::modplatforms::curseforge::ClassId {
+impl From<CFFEClassId> for mpcf::ClassId {
     fn from(class_id: CFFEClassId) -> Self {
         match class_id {
-            CFFEClassId::Mods => crate::domain::modplatforms::curseforge::ClassId::Mods,
-            CFFEClassId::Modpacks => crate::domain::modplatforms::curseforge::ClassId::Modpacks,
+            CFFEClassId::Mods => mpcf::ClassId::Mods,
+            CFFEClassId::Modpacks => mpcf::ClassId::Modpacks,
         }
     }
 }
@@ -733,10 +665,8 @@ pub struct CFFEModDependencies {
     pub dependency_type: CFFEDependencyType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModDependencies> for CFFEModDependencies {
-    fn from(
-        minecraft_mod_dependencies: crate::domain::modplatforms::curseforge::ModDependencies,
-    ) -> Self {
+impl From<mpcf::ModDependencies> for CFFEModDependencies {
+    fn from(minecraft_mod_dependencies: mpcf::ModDependencies) -> Self {
         CFFEModDependencies {
             id: minecraft_mod_dependencies.id,
             mod_id: minecraft_mod_dependencies.mod_id,
@@ -755,10 +685,8 @@ pub struct CFFEModFileModule {
     pub fingerprint: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileModule> for CFFEModFileModule {
-    fn from(
-        minecraft_mod_file_module: crate::domain::modplatforms::curseforge::ModFileModule,
-    ) -> Self {
+impl From<mpcf::ModFileModule> for CFFEModFileModule {
+    fn from(minecraft_mod_file_module: mpcf::ModFileModule) -> Self {
         CFFEModFileModule {
             folder_name: minecraft_mod_file_module.folder_name,
             fingerprint: minecraft_mod_file_module.fingerprint.to_string(),
@@ -777,8 +705,8 @@ pub struct CFFEModFileStat {
     pub update_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileStat> for CFFEModFileStat {
-    fn from(minecraft_mod_file_stat: crate::domain::modplatforms::curseforge::ModFileStat) -> Self {
+impl From<mpcf::ModFileStat> for CFFEModFileStat {
+    fn from(minecraft_mod_file_stat: mpcf::ModFileStat) -> Self {
         CFFEModFileStat {
             mod_id: minecraft_mod_file_stat.mod_id,
             file_id: minecraft_mod_file_stat.file_id,
@@ -800,10 +728,8 @@ pub struct CFFEModFileVersion {
     pub game_version: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileVersion> for CFFEModFileVersion {
-    fn from(
-        minecraft_mod_file_version: crate::domain::modplatforms::curseforge::ModFileVersion,
-    ) -> Self {
+impl From<mpcf::ModFileVersion> for CFFEModFileVersion {
+    fn from(minecraft_mod_file_version: mpcf::ModFileVersion) -> Self {
         CFFEModFileVersion {
             id: minecraft_mod_file_version.id,
             mod_id: minecraft_mod_file_version.mod_id,
@@ -824,12 +750,8 @@ pub struct CFFESortableGameVersion {
     pub game_version_type_id: Option<i32>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::SortableGameVersion>
-    for CFFESortableGameVersion
-{
-    fn from(
-        minecraft_sortable_game_version: crate::domain::modplatforms::curseforge::SortableGameVersion,
-    ) -> Self {
+impl From<mpcf::SortableGameVersion> for CFFESortableGameVersion {
+    fn from(minecraft_sortable_game_version: mpcf::SortableGameVersion) -> Self {
         CFFESortableGameVersion {
             game_version_name: minecraft_sortable_game_version.game_version_name,
             game_version_padded: minecraft_sortable_game_version.game_version_padded,
@@ -847,8 +769,8 @@ pub struct CFFEGameAssets {
     pub logo: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameAssets> for CFFEGameAssets {
-    fn from(minecraft_game_assets: crate::domain::modplatforms::curseforge::GameAssets) -> Self {
+impl From<mpcf::GameAssets> for CFFEGameAssets {
+    fn from(minecraft_game_assets: mpcf::GameAssets) -> Self {
         CFFEGameAssets {
             game: minecraft_game_assets.game,
             logo: minecraft_game_assets.logo,
@@ -867,21 +789,15 @@ pub enum CFFECoreStatus {
     Live,
 }
 
-impl From<crate::domain::modplatforms::curseforge::CoreStatus> for CFFECoreStatus {
-    fn from(minecraft_core_status: crate::domain::modplatforms::curseforge::CoreStatus) -> Self {
+impl From<mpcf::CoreStatus> for CFFECoreStatus {
+    fn from(minecraft_core_status: mpcf::CoreStatus) -> Self {
         match minecraft_core_status {
-            crate::domain::modplatforms::curseforge::CoreStatus::Draft => CFFECoreStatus::Draft,
-            crate::domain::modplatforms::curseforge::CoreStatus::Test => CFFECoreStatus::Test,
-            crate::domain::modplatforms::curseforge::CoreStatus::PendingReview => {
-                CFFECoreStatus::PendingReview
-            }
-            crate::domain::modplatforms::curseforge::CoreStatus::Rejected => {
-                CFFECoreStatus::Rejected
-            }
-            crate::domain::modplatforms::curseforge::CoreStatus::Approved => {
-                CFFECoreStatus::Approved
-            }
-            crate::domain::modplatforms::curseforge::CoreStatus::Live => CFFECoreStatus::Live,
+            mpcf::CoreStatus::Draft => CFFECoreStatus::Draft,
+            mpcf::CoreStatus::Test => CFFECoreStatus::Test,
+            mpcf::CoreStatus::PendingReview => CFFECoreStatus::PendingReview,
+            mpcf::CoreStatus::Rejected => CFFECoreStatus::Rejected,
+            mpcf::CoreStatus::Approved => CFFECoreStatus::Approved,
+            mpcf::CoreStatus::Live => CFFECoreStatus::Live,
         }
     }
 }
@@ -893,17 +809,11 @@ pub enum CFFECoreApiStatus {
     Public,
 }
 
-impl From<crate::domain::modplatforms::curseforge::CoreApiStatus> for CFFECoreApiStatus {
-    fn from(
-        minecraft_core_api_status: crate::domain::modplatforms::curseforge::CoreApiStatus,
-    ) -> Self {
+impl From<mpcf::CoreApiStatus> for CFFECoreApiStatus {
+    fn from(minecraft_core_api_status: mpcf::CoreApiStatus) -> Self {
         match minecraft_core_api_status {
-            crate::domain::modplatforms::curseforge::CoreApiStatus::Private => {
-                CFFECoreApiStatus::Private
-            }
-            crate::domain::modplatforms::curseforge::CoreApiStatus::Public => {
-                CFFECoreApiStatus::Public
-            }
+            mpcf::CoreApiStatus::Private => CFFECoreApiStatus::Private,
+            mpcf::CoreApiStatus::Public => CFFECoreApiStatus::Public,
         }
     }
 }
@@ -916,20 +826,12 @@ pub enum CFFEGameVersionStatus {
     New,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameVersionStatus> for CFFEGameVersionStatus {
-    fn from(
-        minecraft_game_version_status: crate::domain::modplatforms::curseforge::GameVersionStatus,
-    ) -> Self {
+impl From<mpcf::GameVersionStatus> for CFFEGameVersionStatus {
+    fn from(minecraft_game_version_status: mpcf::GameVersionStatus) -> Self {
         match minecraft_game_version_status {
-            crate::domain::modplatforms::curseforge::GameVersionStatus::Approved => {
-                CFFEGameVersionStatus::Approved
-            }
-            crate::domain::modplatforms::curseforge::GameVersionStatus::Deleted => {
-                CFFEGameVersionStatus::Deleted
-            }
-            crate::domain::modplatforms::curseforge::GameVersionStatus::New => {
-                CFFEGameVersionStatus::New
-            }
+            mpcf::GameVersionStatus::Approved => CFFEGameVersionStatus::Approved,
+            mpcf::GameVersionStatus::Deleted => CFFEGameVersionStatus::Deleted,
+            mpcf::GameVersionStatus::New => CFFEGameVersionStatus::New,
         }
     }
 }
@@ -941,19 +843,11 @@ pub enum CFFEGameVersionTypeStatus {
     Deleted,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
-    for CFFEGameVersionTypeStatus
-{
-    fn from(
-        minecraft_game_version_type_status: crate::domain::modplatforms::curseforge::GameVersionTypeStatus,
-    ) -> Self {
+impl From<mpcf::GameVersionTypeStatus> for CFFEGameVersionTypeStatus {
+    fn from(minecraft_game_version_type_status: mpcf::GameVersionTypeStatus) -> Self {
         match minecraft_game_version_type_status {
-            crate::domain::modplatforms::curseforge::GameVersionTypeStatus::Normal => {
-                CFFEGameVersionTypeStatus::Normal
-            }
-            crate::domain::modplatforms::curseforge::GameVersionTypeStatus::Deleted => {
-                CFFEGameVersionTypeStatus::Deleted
-            }
+            mpcf::GameVersionTypeStatus::Normal => CFFEGameVersionTypeStatus::Normal,
+            mpcf::GameVersionTypeStatus::Deleted => CFFEGameVersionTypeStatus::Deleted,
         }
     }
 }
@@ -962,56 +856,36 @@ impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
 #[serde(rename_all = "camelCase")]
 pub enum CFFEModLoaderType {
     Forge,
+    NeoForge,
     Cauldron,
     LiteLoader,
     Fabric,
     Quilt,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModLoaderType> for CFFEModLoaderType {
-    fn from(
-        minecraft_mod_loader_type: crate::domain::modplatforms::curseforge::ModLoaderType,
-    ) -> Self {
+use mpcf::ModLoaderType as CFModLoaderType;
+impl From<CFModLoaderType> for CFFEModLoaderType {
+    fn from(minecraft_mod_loader_type: CFModLoaderType) -> Self {
         match minecraft_mod_loader_type {
-            crate::domain::modplatforms::curseforge::ModLoaderType::Forge => {
-                CFFEModLoaderType::Forge
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron => {
-                CFFEModLoaderType::Cauldron
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::LiteLoader => {
-                CFFEModLoaderType::LiteLoader
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::Fabric => {
-                CFFEModLoaderType::Fabric
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::Quilt => {
-                CFFEModLoaderType::Quilt
-            }
+            CFModLoaderType::Forge => CFFEModLoaderType::Forge,
+            CFModLoaderType::NeoForge => CFFEModLoaderType::NeoForge,
+            CFModLoaderType::Cauldron => CFFEModLoaderType::Cauldron,
+            CFModLoaderType::LiteLoader => CFFEModLoaderType::LiteLoader,
+            CFModLoaderType::Fabric => CFFEModLoaderType::Fabric,
+            CFModLoaderType::Quilt => CFFEModLoaderType::Quilt,
         }
     }
 }
 
-impl From<CFFEModLoaderType> for crate::domain::modplatforms::curseforge::ModLoaderType {
-    fn from(
-        minecraft_mod_loader_type: CFFEModLoaderType,
-    ) -> crate::domain::modplatforms::curseforge::ModLoaderType {
+impl From<CFFEModLoaderType> for CFModLoaderType {
+    fn from(minecraft_mod_loader_type: CFFEModLoaderType) -> CFModLoaderType {
         match minecraft_mod_loader_type {
-            CFFEModLoaderType::Forge => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Forge
-            }
-            CFFEModLoaderType::Cauldron => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron
-            }
-            CFFEModLoaderType::LiteLoader => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::LiteLoader
-            }
-            CFFEModLoaderType::Fabric => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Fabric
-            }
-            CFFEModLoaderType::Quilt => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Quilt
-            }
+            CFFEModLoaderType::Forge => CFModLoaderType::Forge,
+            CFFEModLoaderType::NeoForge => CFModLoaderType::NeoForge,
+            CFFEModLoaderType::Cauldron => CFModLoaderType::Cauldron,
+            CFFEModLoaderType::LiteLoader => CFModLoaderType::LiteLoader,
+            CFFEModLoaderType::Fabric => CFModLoaderType::Fabric,
+            CFFEModLoaderType::Quilt => CFModLoaderType::Quilt,
         }
     }
 }
@@ -1023,21 +897,15 @@ pub enum CFFEModLoaderInstallMethod {
     ForgeJarInstall,
     ForgeInstallerV2,
 }
-
-impl From<crate::domain::modplatforms::curseforge::ModLoaderInstallMethod>
-    for CFFEModLoaderInstallMethod
-{
-    fn from(
-        minecraft_mod_loader_install_method: crate::domain::modplatforms::curseforge::ModLoaderInstallMethod,
-    ) -> Self {
+use mpcf::ModLoaderInstallMethod as CFModLoaderInstallMethod;
+impl From<CFModLoaderInstallMethod> for CFFEModLoaderInstallMethod {
+    fn from(minecraft_mod_loader_install_method: CFModLoaderInstallMethod) -> Self {
         match minecraft_mod_loader_install_method {
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeInstaller => {
-                CFFEModLoaderInstallMethod::ForgeInstaller
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeJarInstall => {
+            CFModLoaderInstallMethod::ForgeInstaller => CFFEModLoaderInstallMethod::ForgeInstaller,
+            CFModLoaderInstallMethod::ForgeJarInstall => {
                 CFFEModLoaderInstallMethod::ForgeJarInstall
             }
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeInstallerV2 => {
+            CFModLoaderInstallMethod::ForgeInstallerV2 => {
                 CFFEModLoaderInstallMethod::ForgeInstallerV2
             }
         }
@@ -1053,8 +921,8 @@ pub struct CFFEModLinks {
     pub source_url: Option<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModLinks> for CFFEModLinks {
-    fn from(minecraft_mod_links: crate::domain::modplatforms::curseforge::ModLinks) -> Self {
+impl From<mpcf::ModLinks> for CFFEModLinks {
+    fn from(minecraft_mod_links: mpcf::ModLinks) -> Self {
         CFFEModLinks {
             website_url: minecraft_mod_links.website_url,
             wiki_url: minecraft_mod_links.wiki_url,
@@ -1079,29 +947,20 @@ pub enum CFFEModStatus {
     UnderReview,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModStatus> for CFFEModStatus {
-    fn from(minecraft_mod_status: crate::domain::modplatforms::curseforge::ModStatus) -> Self {
+use mpcf::ModStatus as CFModStatus;
+impl From<CFModStatus> for CFFEModStatus {
+    fn from(minecraft_mod_status: CFModStatus) -> Self {
         match minecraft_mod_status {
-            crate::domain::modplatforms::curseforge::ModStatus::New => CFFEModStatus::New,
-            crate::domain::modplatforms::curseforge::ModStatus::ChangesRequired => {
-                CFFEModStatus::ChangesRequired
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::UnderSoftReview => {
-                CFFEModStatus::UnderSoftReview
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::Approved => CFFEModStatus::Approved,
-            crate::domain::modplatforms::curseforge::ModStatus::Rejected => CFFEModStatus::Rejected,
-            crate::domain::modplatforms::curseforge::ModStatus::ChangesMade => {
-                CFFEModStatus::ChangesMade
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::Inactive => CFFEModStatus::Inactive,
-            crate::domain::modplatforms::curseforge::ModStatus::Abandoned => {
-                CFFEModStatus::Abandoned
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::Deleted => CFFEModStatus::Deleted,
-            crate::domain::modplatforms::curseforge::ModStatus::UnderReview => {
-                CFFEModStatus::UnderReview
-            }
+            CFModStatus::New => CFFEModStatus::New,
+            CFModStatus::ChangesRequired => CFFEModStatus::ChangesRequired,
+            CFModStatus::UnderSoftReview => CFFEModStatus::UnderSoftReview,
+            CFModStatus::Approved => CFFEModStatus::Approved,
+            CFModStatus::Rejected => CFFEModStatus::Rejected,
+            CFModStatus::ChangesMade => CFFEModStatus::ChangesMade,
+            CFModStatus::Inactive => CFFEModStatus::Inactive,
+            CFModStatus::Abandoned => CFFEModStatus::Abandoned,
+            CFModStatus::Deleted => CFFEModStatus::Deleted,
+            CFModStatus::UnderReview => CFFEModStatus::UnderReview,
         }
     }
 }
@@ -1121,8 +980,8 @@ pub struct CFFECategory {
     pub display_index: Option<i32>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Category> for CFFECategory {
-    fn from(minecraft_category: crate::domain::modplatforms::curseforge::Category) -> Self {
+impl From<mpcf::Category> for CFFECategory {
+    fn from(minecraft_category: mpcf::Category) -> Self {
         CFFECategory {
             id: minecraft_category.id,
             name: minecraft_category.name,
@@ -1146,8 +1005,8 @@ pub struct CFFEModAuthor {
     pub url: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModAuthor> for CFFEModAuthor {
-    fn from(minecraft_mod_author: crate::domain::modplatforms::curseforge::ModAuthor) -> Self {
+impl From<mpcf::ModAuthor> for CFFEModAuthor {
+    fn from(minecraft_mod_author: mpcf::ModAuthor) -> Self {
         CFFEModAuthor {
             id: minecraft_mod_author.id,
             name: minecraft_mod_author.name,
@@ -1167,8 +1026,8 @@ pub struct CFFEModAsset {
     pub url: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModAsset> for CFFEModAsset {
-    fn from(minecraft_mod_asset: crate::domain::modplatforms::curseforge::ModAsset) -> Self {
+impl From<mpcf::ModAsset> for CFFEModAsset {
+    fn from(minecraft_mod_asset: mpcf::ModAsset) -> Self {
         CFFEModAsset {
             id: minecraft_mod_asset.id,
             mod_id: minecraft_mod_asset.mod_id,
@@ -1191,8 +1050,8 @@ pub struct CFFEFileIndex {
     pub mod_loader: Option<CFFEModLoaderType>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileIndex> for CFFEFileIndex {
-    fn from(minecraft_file_index: crate::domain::modplatforms::curseforge::FileIndex) -> Self {
+impl From<mpcf::FileIndex> for CFFEFileIndex {
+    fn from(minecraft_file_index: mpcf::FileIndex) -> Self {
         CFFEFileIndex {
             game_version: minecraft_file_index.game_version,
             file_id: minecraft_file_index.file_id,
@@ -1217,29 +1076,15 @@ pub enum CFFEDependencyType {
     Include,
 }
 
-impl From<crate::domain::modplatforms::curseforge::DependencyType> for CFFEDependencyType {
-    fn from(
-        minecraft_dependency_type: crate::domain::modplatforms::curseforge::DependencyType,
-    ) -> Self {
+impl From<mpcf::DependencyType> for CFFEDependencyType {
+    fn from(minecraft_dependency_type: mpcf::DependencyType) -> Self {
         match minecraft_dependency_type {
-            crate::domain::modplatforms::curseforge::DependencyType::EmbeddedLibrary => {
-                CFFEDependencyType::EmbeddedLibrary
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::OptionalDependency => {
-                CFFEDependencyType::OptionalDependency
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::RequiredDependency => {
-                CFFEDependencyType::RequiredDependency
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::Tool => {
-                CFFEDependencyType::Tool
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::Incompatible => {
-                CFFEDependencyType::Incompatible
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::Include => {
-                CFFEDependencyType::Include
-            }
+            mpcf::DependencyType::EmbeddedLibrary => CFFEDependencyType::EmbeddedLibrary,
+            mpcf::DependencyType::OptionalDependency => CFFEDependencyType::OptionalDependency,
+            mpcf::DependencyType::RequiredDependency => CFFEDependencyType::RequiredDependency,
+            mpcf::DependencyType::Tool => CFFEDependencyType::Tool,
+            mpcf::DependencyType::Incompatible => CFFEDependencyType::Incompatible,
+            mpcf::DependencyType::Include => CFFEDependencyType::Include,
         }
     }
 }
@@ -1253,8 +1098,8 @@ pub struct CFFEPagination {
     pub total_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Pagination> for CFFEPagination {
-    fn from(minecraft_pagination: crate::domain::modplatforms::curseforge::Pagination) -> Self {
+impl From<mpcf::Pagination> for CFFEPagination {
+    fn from(minecraft_pagination: mpcf::Pagination) -> Self {
         CFFEPagination {
             index: minecraft_pagination.index,
             page_size: minecraft_pagination.page_size,

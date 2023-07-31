@@ -124,6 +124,7 @@ pub enum FEUnifiedModSortIndex {
 pub enum FEUnifiedModLoaderType {
     // all
     Forge,
+    NeoForge,
     Fabric,
     Quilt,
     Liteloader,
@@ -153,23 +154,16 @@ pub enum FEUnifiedModLoaderType {
     Other(String),
 }
 
-// impl Display for FEUnifiedModLoaderType {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         let out = match self {
-//             FEUnifiedModLoaderType::Forge => "forge",
-//             FEUnifiedModLoaderType::Fabric => "fabric",
-//             FEUnifiedModLoaderType::Quilt => "quilt",
-//         };
-//         write!(f, "{}", out)
-//     }
-// }
-
 impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType {
     type Error = anyhow::Error;
 
     fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
         match value {
             FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
+
+            FEUnifiedModLoaderType::NeoForge => {
+                Ok(curseforge::structs::CFFEModLoaderType::NeoForge)
+            }
             FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),
             FEUnifiedModLoaderType::Liteloader => {
@@ -192,6 +186,7 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
     fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
         match value {
             FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
+            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::NeoForge),
             FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
             FEUnifiedModLoaderType::Liteloader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
