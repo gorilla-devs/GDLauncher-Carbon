@@ -25,6 +25,7 @@ model AppConfiguration {
   defaultInstanceGroup Int?
   isFirstLaunch        Boolean @default(true)
   autoManageJava       Boolean @default(true)
+  preferredModChannel  Int     @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
   isLegalAccepted      Boolean @default(false)
   metricsLevel         Int? // 0 = disabled, 1 = anonymous, 2 = anonymous + sessions, 3 = authenticated + sessions
 }
