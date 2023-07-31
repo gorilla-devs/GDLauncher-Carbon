@@ -21,7 +21,8 @@ pub enum Translation {
     InstanceTaskLaunchDownloadModpackFiles,
     InstanceTaskLaunchExtractModpackFiles,
     InstanceTaskLaunchDownloadAddonMetadata,
-    InstanceTaskLaunchInstallJava,
+    InstanceTaskLaunchDownloadJava,
+    InstanceTaskLaunchExtractJava,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskLaunchExtractNatives,
     InstanceTaskReconstructAssets,
@@ -31,4 +32,5 @@ pub enum Translation {
         instance_name: String,
     },
     InstanceTaskInstallModDownloadFile,
+    FinalizingImport,
 }

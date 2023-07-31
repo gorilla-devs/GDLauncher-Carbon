@@ -128,11 +128,11 @@ export const getLogoUrl = (prop: ModRowProps | FEUnifiedSearchResult) => {
   const isModRow = "data" in prop;
   if (isModRow) {
     if (isCurseForgeData(prop.data)) {
-      return prop.data.curseforge.logo.thumbnailUrl;
+      return prop.data.curseforge.logo?.thumbnailUrl;
     } else return prop.data.modrinth.icon_url;
   } else {
     if (isCurseForgeData(prop)) {
-      return prop.curseforge.logo.thumbnailUrl;
+      return prop.curseforge.logo?.thumbnailUrl;
     } else return prop.modrinth.icon_url;
   }
 };

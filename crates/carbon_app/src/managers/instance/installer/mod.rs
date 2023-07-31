@@ -401,7 +401,6 @@ impl Installer {
         let t_download_file = {
             let lock = parent_task.lock().await;
             lock.subtask(Translation::InstanceTaskInstallModDownloadFile)
-                .await
         };
 
         let instance_path = instance_path.clone();
@@ -432,6 +431,7 @@ impl Installer {
                                         t_download_file.update_download(
                                             progress.current_size as u32,
                                             progress.total_size as u32,
+                                            false,
                                         );
                                     }
 

@@ -174,7 +174,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
-                .prepare_game(id.into(), None)
+                .prepare_game(id.into(), None, None)
                 .await?;
 
             Ok(())
@@ -190,7 +190,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             };
 
             app.instance_manager()
-                .prepare_game(id.into(), Some(account))
+                .prepare_game(id.into(), Some(account), None)
                 .await?;
 
             Ok(())

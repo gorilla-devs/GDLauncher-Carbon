@@ -7,6 +7,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
@@ -1056,7 +1057,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let app = self.app.clone();
             tokio::spawn(async move {
                 app.instance_manager()
-                    .prepare_game(InstanceId(*update.instance_id), None)
+                    .prepare_game(InstanceId(*update.instance_id), None, None)
                     .await?;
 
                 Ok(()) as anyhow::Result<()>
