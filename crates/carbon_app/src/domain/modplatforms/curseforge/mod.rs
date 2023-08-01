@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
+use super::ModChannel;
+
 pub mod filters;
 pub mod manifest;
 
@@ -57,7 +59,7 @@ pub struct FileHash {
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -526,4 +528,14 @@ pub struct Pagination {
 pub struct CurseForgeResponse<T> {
     pub data: T,
     pub pagination: Option<Pagination>,
+}
+
+impl From<FileReleaseType> for ModChannel {
+    fn from(value: FileReleaseType) -> Self {
+        match value {
+            FileReleaseType::Alpha => ModChannel::Alpha,
+            FileReleaseType::Beta => ModChannel::Beta,
+            FileReleaseType::Stable => ModChannel::Stable,
+        }
+    }
 }
