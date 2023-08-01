@@ -17,6 +17,7 @@ use crate::{
                 self,
                 search::{ProjectID, VersionID},
             },
+            ModChannel,
         },
         runtime_path::InstancePath,
         vtask::VisualTaskId,
@@ -70,8 +71,12 @@ pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
-    fn dependencies(&self, app: &Arc<AppInner>, instance_data: &InstanceData)
-        -> DependencyIterator;
+    fn dependencies(
+        &self,
+        app: &Arc<AppInner>,
+        instance_data: &InstanceData,
+        preferred_channel: ModChannel,
+    ) -> DependencyIterator;
     fn is_already_installed(&self, instance_data: &InstanceData) -> bool;
     fn display_name(&self) -> String;
     async fn perform_install(
@@ -99,8 +104,9 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
         &self,
         app: &Arc<AppInner>,
         instance_data: &InstanceData,
+        preferred_channel: ModChannel,
     ) -> DependencyIterator {
-        (**self).dependencies(app, instance_data)
+        (**self).dependencies(app, instance_data, preferred_channel)
     }
 
     #[inline]
@@ -315,7 +321,7 @@ impl Installer {
                     .expect("instance should still be valid");
                 let instance_data = instance.data().expect("instance should still be valid");
 
-                lock.dependencies(app, instance_data)
+                lock.dependencies(app, instance_data, ModChannel::Stable)
             };
 
             let mut processed_deps = Vec::new();
@@ -379,7 +385,6 @@ impl Installer {
         let t_download_file = {
             let lock = parent_task.lock().await;
             lock.subtask(Translation::InstanceTaskInstallModDownloadFile)
-                .await
         };
 
         let instance_id = *instance_id;
@@ -411,6 +416,7 @@ impl Installer {
                                         t_download_file.update_download(
                                             progress.current_size as u32,
                                             progress.total_size as u32,
+                                            false,
                                         );
                                     }
 
@@ -545,6 +551,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
         &self,
         app: &Arc<AppInner>,
         instance_data: &InstanceData,
+        preferred_channel: ModChannel,
     ) -> DependencyIterator {
         let game_version = instance_data
             .config
@@ -600,14 +607,37 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                             domain::instance::info::ModLoaderType::Unknown => None,
                                         })
                                         .collect();
-                                    if let Some(file) = res.data.iter().find(|&file| {
-                                        let has_release = file.game_versions.contains(&release);
-                                        let has_one_of_our_modloaders =
-                                            file.game_versions.iter().any(|ver| {
-                                                modloader_strings.contains(&ver.to_lowercase())
-                                            });
-                                        has_release && has_one_of_our_modloaders
-                                    }) {
+
+                                    let mut matching_versions = res
+                                        .data
+                                        .iter()
+                                        .filter(|&file| {
+                                            let has_release = file.game_versions.contains(&release);
+                                            let has_one_of_our_modloaders =
+                                                file.game_versions.iter().any(|ver| {
+                                                    modloader_strings.contains(&ver.to_lowercase())
+                                                });
+                                            has_release && has_one_of_our_modloaders
+                                        })
+                                        .peekable();
+
+                                    let mut matched_version = matching_versions.peek().map(|f| *f);
+                                    let mut matched_channel = ModChannel::Alpha;
+
+                                    for version in matching_versions {
+                                        let channel = ModChannel::from(version.release_type);
+
+                                        if channel > matched_channel {
+                                            matched_version = Some(version);
+                                            matched_channel = channel;
+                                        }
+
+                                        if channel >= preferred_channel {
+                                            break;
+                                        }
+                                    }
+
+                                    if let Some(file) = matched_version {
                                         Ok(file.clone())
                                     } else {
                                         res.data
@@ -818,6 +848,7 @@ impl ResourceInstaller for ModrinthModInstaller {
         &self,
         app: &Arc<AppInner>,
         instance_data: &InstanceData,
+        preferred_channel: ModChannel,
     ) -> DependencyIterator {
         let game_version = instance_data
             .config
@@ -882,16 +913,39 @@ impl ResourceInstaller for ModrinthModInstaller {
                                                 }
                                             })
                                             .collect();
-                                        if let Some(version) = versions.iter().find(|&version| {
-                                            let has_release =
-                                                version.game_versions.contains(&release);
-                                            let has_one_of_our_modloaders =
-                                                version.loaders.iter().any(|loader| {
-                                                    modloader_strings
-                                                        .contains(&loader.to_lowercase())
-                                                });
-                                            has_release && has_one_of_our_modloaders
-                                        }) {
+
+                                        let mut matching_versions = versions
+                                            .iter()
+                                            .filter(|&version| {
+                                                let has_release =
+                                                    version.game_versions.contains(&release);
+                                                let has_one_of_our_modloaders =
+                                                    version.loaders.iter().any(|loader| {
+                                                        modloader_strings
+                                                            .contains(&loader.to_lowercase())
+                                                    });
+                                                has_release && has_one_of_our_modloaders
+                                            })
+                                            .peekable();
+
+                                        let mut matched_version =
+                                            matching_versions.peek().map(|f| *f);
+                                        let mut matched_channel = ModChannel::Alpha;
+
+                                        for version in matching_versions {
+                                            let channel = ModChannel::from(version.version_type);
+
+                                            if channel > matched_channel {
+                                                matched_version = Some(version);
+                                                matched_channel = channel;
+                                            }
+
+                                            if channel >= preferred_channel {
+                                                break;
+                                            }
+                                        }
+
+                                        if let Some(version) = matched_version {
                                             Ok(version.clone())
                                         } else {
                                             versions

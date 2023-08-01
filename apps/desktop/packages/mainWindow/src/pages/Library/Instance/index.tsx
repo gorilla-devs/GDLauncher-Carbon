@@ -24,16 +24,21 @@ import { queryClient, rspc } from "@/utils/rspcClient";
 import fetchData from "./instance.data";
 import {
   FEModResponse,
+  MRFEProject,
   InstanceDetails,
   UngroupedInstance,
 } from "@gd/core_module/bindings";
-import { getPreparingState, getRunningState } from "@/utils/instances";
+import {
+  getCurseForgeData,
+  getModrinthData,
+  getPreparingState,
+  getRunningState,
+} from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { CreateQueryResult } from "@tanstack/solid-query";
-import { RSPCError } from "@rspc/client";
 import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
+import Authors from "./Info/Authors";
 
 type InstancePage = {
   label: string;
@@ -50,6 +55,10 @@ const Instance = () => {
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
   );
+  const [modpackDetails, setModpackDetails] = createSignal<
+    FEModResponse | MRFEProject | undefined
+  >(undefined);
+
   const [t] = useTransContext();
   const modalsContext = useModal();
 
@@ -183,24 +192,37 @@ const Instance = () => {
     routeData.instanceDetails.data?.state &&
     getPreparingState(routeData.instanceDetails.data?.state);
 
-  const [modpackDetails, setModpackDetails] = createSignal<CreateQueryResult<
-    FEModResponse,
-    RSPCError
-  > | null>(null);
+  const curseforgeData = () =>
+    routeData.instanceDetails.data?.modpack &&
+    getCurseForgeData(routeData.instanceDetails.data.modpack);
 
   createEffect(() => {
-    if (
-      routeData.instanceDetails.data?.modpack?.Curseforge.project_id !==
-      undefined
-    ) {
+    const isCurseforge = curseforgeData();
+    if (isCurseforge) {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.curseforge.getMod",
           {
-            modId: routeData.instanceDetails.data?.modpack?.Curseforge
-              .project_id as number,
+            modId: isCurseforge.project_id as number,
           },
-        ])
+        ]).data
+      );
+    }
+  });
+
+  const modrinthData = () =>
+    routeData.instanceDetails.data?.modpack &&
+    getModrinthData(routeData.instanceDetails.data.modpack);
+
+  createEffect(() => {
+    const isModrninth = modrinthData();
+
+    if (isModrninth) {
+      setModpackDetails(
+        rspc.createQuery(() => [
+          "modplatforms.modrinth.getProject",
+          isModrninth.project_id,
+        ]).data
       );
     }
   });
@@ -297,6 +319,7 @@ const Instance = () => {
 
   return (
     <main
+      id="main-container-instance-details"
       class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();
@@ -310,8 +333,8 @@ const Instance = () => {
         class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
-          "background-image": routeData.image()
-            ? `url("${routeData.image()}")`
+          "background-image": routeData.image
+            ? `url("${routeData.image}")`
             : `url("${DefaultImg}")`,
           "background-position": "center",
           "background-repeat": "repeat",
@@ -340,8 +363,8 @@ const Instance = () => {
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
-                      "background-image": routeData.image()
-                        ? `url("${routeData.image()}")`
+                      "background-image": routeData.image
+                        ? `url("${routeData.image}")`
                         : `url("${DefaultImg}")`,
                     }}
                   />
@@ -443,19 +466,11 @@ const Instance = () => {
                             </span>
                           </div>
                         </Show>
-                        <Show
-                          when={
-                            (modpackDetails()?.data?.data.authors || [])
-                              .length > 0
-                          }
-                        >
-                          <div class="flex gap-2 items-center h-full">
-                            <div class="i-ri:user-fill" />
-                            <For each={modpackDetails()?.data?.data.authors}>
-                              {(author) => <p class="m-0">{author.name}</p>}
-                            </For>
-                          </div>
-                        </Show>
+                        <Authors
+                          modpackDetails={modpackDetails()}
+                          isCurseforge={!!curseforgeData()}
+                          isModrinth={!!modrinthData()}
+                        />
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
                         <ContextMenu menuItems={menuItems()} trigger="click">

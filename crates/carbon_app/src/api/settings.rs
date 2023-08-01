@@ -15,7 +15,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     .get_settings()
                     .await?;
 
-            Ok(Into::<FESettings>::into(response))
+            TryInto::<FESettings>::try_into(response)
         }
 
         mutation SET_SETTINGS[app, new_settings: FESettingsUpdate] {
@@ -42,15 +42,60 @@ struct FESettings {
     startup_resolution: String,
     java_custom_args: String,
     auto_manage_java: bool,
+    preferred_mod_channel: ModChannel,
     is_legal_accepted: bool,
     metrics_enabled: bool,
     random_user_uuid: String,
     metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
-impl From<crate::db::app_configuration::Data> for FESettings {
-    fn from(data: crate::db::app_configuration::Data) -> Self {
-        Self {
+// in the public interface due to `FESettings` also being in the public interface.
+#[derive(Debug, Type, Serialize, Deserialize)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
+
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Beta),
+            2 => Ok(Self::Stable),
+            _ => Err(anyhow::anyhow!(
+                "Invalid mod channel id {value} not in range 0..=2"
+            )),
+        }
+    }
+}
+
+impl From<ModChannel> for crate::domain::modplatforms::ModChannel {
+    fn from(value: ModChannel) -> Self {
+        use crate::domain::modplatforms::ModChannel as Domain;
+
+        match value {
+            ModChannel::Alpha => Domain::Alpha,
+            ModChannel::Beta => Domain::Beta,
+            ModChannel::Stable => Domain::Stable,
+        }
+    }
+}
+
+impl Default for ModChannel {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl TryFrom<crate::db::app_configuration::Data> for FESettings {
+    type Error = anyhow::Error;
+
+    fn try_from(data: crate::db::app_configuration::Data) -> Result<Self, Self::Error> {
+        Ok(Self {
             theme: data.theme,
             language: data.language,
             reduced_motion: data.reduced_motion,
@@ -64,6 +109,7 @@ impl From<crate::db::app_configuration::Data> for FESettings {
             startup_resolution: data.startup_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
+            preferred_mod_channel: data.preferred_mod_channel.try_into()?,
             is_legal_accepted: data.is_legal_accepted,
             metrics_enabled: data.metrics_enabled,
             random_user_uuid: data.random_user_uuid,
@@ -102,6 +148,8 @@ pub struct FESettingsUpdate {
     pub java_custom_args: Option<String>,
     #[specta(optional)]
     pub auto_manage_java: Option<bool>,
+    #[specta(optional)]
+    pub preferred_mod_channel: Option<ModChannel>,
     #[specta(optional)]
     pub is_legal_accepted: Option<bool>,
     #[specta(optional)]

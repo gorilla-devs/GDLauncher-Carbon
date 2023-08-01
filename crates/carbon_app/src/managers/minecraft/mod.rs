@@ -17,7 +17,7 @@ use self::minecraft::get_lwjgl_meta;
 
 use super::ManagerRef;
 
-mod assets;
+pub mod assets;
 pub mod curseforge;
 pub mod fabric;
 pub mod forge;
@@ -276,6 +276,7 @@ mod tests {
                 client_path,
                 game_version,
                 libraries_path,
+                None,
             )
             .await
             .unwrap();

@@ -6,18 +6,19 @@ use tokio::{
     sync::Mutex,
 };
 
-
 use crate::{
-    api::{instance::import::FEEntity, keys},
+    api::{instance::import::FEEntity, keys, translation::Translation},
     domain::{
-        instance::{
-            info::{
-                CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
-            },
+        instance::info::{
+            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{
+        instance::InstanceVersionSource,
+        vtask::{Subtask, VisualTask},
+        AppInner,
+    },
 };
 
 use super::InstanceImporter;
@@ -181,75 +182,95 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             )
             .await?;
 
-        let (_, task_id) = app
-            .instance_manager()
-            .prepare_game(created_instance_id, None)
-            .await?;
+        let instance_full_path = instance.full_path.clone();
+        let instance_background = instance.config.background.clone();
+        let app_clone = Arc::clone(&app);
+        let callback_task = move |subtask: Subtask| {
+            Box::pin(async move {
+                subtask.start_opaque();
 
-        let walked_dir = walkdir::WalkDir::new(&instance.full_path)
-            .into_iter()
-            .filter_map(|entry| {
-                let Ok(entry) = entry else {
-                    return None;
-                };
+                let walked_dir = walkdir::WalkDir::new(&instance_full_path)
+                    .into_iter()
+                    .filter_map(|entry| {
+                        let Ok(entry) = entry else {
+                            return None;
+                        };
 
-                let Some(file_name) = entry.file_name().to_str() else {
-                    return None;
-                };
+                        let Some(file_name) = entry.file_name().to_str() else {
+                            return None;
+                        };
 
-                match file_name {
-                    "config.json" => None,
-                    _ => {
-                        if let Some(ref background) = instance.config.background {
-                            if file_name == background {
-                                return None;
+                        match file_name {
+                            "config.json" => None,
+                            _ => {
+                                if let Some(ref background) = instance_background {
+                                    if file_name == background {
+                                        return None;
+                                    }
+                                }
+
+                                Some(entry)
                             }
                         }
+                    })
+                    .collect::<Vec<_>>();
 
-                        Some(entry)
+                let count = walked_dir.len() as u32;
+                subtask.update_items(0, count);
+
+                let instances_path = app_clone
+                    .settings_manager()
+                    .runtime_path
+                    .get_instances()
+                    .to_path();
+
+                let instance_path = instances_path.join(
+                    &app_clone
+                        .instance_manager()
+                        .instances
+                        .read()
+                        .await
+                        .get(&created_instance_id)
+                        .unwrap()
+                        .shortpath,
+                );
+
+                for (i, entry) in walked_dir.into_iter().enumerate() {
+                    let is_dir = entry.file_type().is_dir();
+                    let path = entry.path();
+                    let relative_path = path.strip_prefix(&instance_full_path).unwrap();
+
+                    let destination = instance_path.join(relative_path);
+
+                    if destination.exists() {
+                        // TODO: Check checksum
+                        continue;
                     }
+
+                    if is_dir {
+                        create_dir_all(destination).await?;
+                    } else {
+                        let mut file = tokio::fs::File::open(path).await?;
+                        let mut buffer = Vec::new();
+                        file.read_to_end(&mut buffer).await?;
+
+                        let mut file = tokio::fs::File::create(destination).await?;
+                        file.write_all(&buffer).await?;
+                    }
+                    subtask.update_items(i as u32, count);
                 }
-            });
 
-        let instances_path = app
-            .settings_manager()
-            .runtime_path
-            .get_instances()
-            .to_path();
+                // Ensure task is completed just in case
+                subtask.update_items(count, count);
 
-        let instance_path = instances_path.join(
-            &app.instance_manager()
-                .instances
-                .read()
-                .await
-                .get(&created_instance_id)
-                .unwrap()
-                .shortpath,
-        );
+                Ok::<(), anyhow::Error>(())
+            }) as _ // Required to cast trait object to concrete object
+        };
 
-        for entry in walked_dir {
-            let is_dir = entry.file_type().is_dir();
-            let path = entry.path();
-            let relative_path = path.strip_prefix(&instance.full_path).unwrap();
-
-            let destination = instance_path.join(relative_path);
-
-            if destination.exists() {
-                // TODO: Check checksum
-                continue;
-            }
-
-            if is_dir {
-                create_dir_all(destination).await?;
-            } else {
-                let mut file = tokio::fs::File::open(path).await?;
-                let mut buffer = Vec::new();
-                file.read_to_end(&mut buffer).await?;
-
-                let mut file = tokio::fs::File::create(destination).await?;
-                file.write_all(&buffer).await?;
-            }
-        }
+        let (_, task_id) = app
+            .instance_manager()
+            .prepare_game(created_instance_id, None, Some(Box::new(callback_task)))
+            .await?;
 
         Ok(task_id)
     }

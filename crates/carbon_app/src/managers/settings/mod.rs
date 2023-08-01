@@ -147,6 +147,15 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
+        if let Some(preferred_mod_channel) = incoming_settings.preferred_mod_channel {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::preferred_mod_channel::set(
+                    preferred_mod_channel as i32,
+                )],
+            ));
+        }
+
         if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),

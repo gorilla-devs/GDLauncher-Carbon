@@ -1,41 +1,48 @@
 import { useRouteData } from "@solidjs/router";
 import fetchData from "../../modpack.versions";
-import { For, Match, Switch } from "solid-js";
+import { For, Match, Suspense, Switch } from "solid-js";
 import VersionRow from "./VersionRow";
 import { Skeleton } from "@gd/ui";
-import { FEModFilesResponse } from "@gd/core_module/bindings";
 
 const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
+  const versions = () =>
+    (routeData.isCurseforge
+      ? routeData.curseforgeGetModFiles.data?.data
+      : routeData.modrinthProjectVersions.data) || [];
+
   return (
-    <div class="flex flex-col">
-      <Switch>
-        <Match
-          when={
-            (routeData.curseforge.getModFiles.data as FEModFilesResponse)?.data
-              .length > 0
-          }
-        >
-          <For each={routeData.curseforge.getModFiles.data?.data}>
-            {(modFile) => (
-              <VersionRow
-                project={routeData.curseforge.getMod.data!.data}
-                modVersion={modFile}
-              />
-            )}
-          </For>
-        </Match>
-        <Match
-          when={
-            (routeData.curseforge.getModFiles.data as FEModFilesResponse)?.data
-              .length === 0 || !routeData.curseforge.getModFiles.data
-          }
-        >
-          <Skeleton.modpackVersionList />
-        </Match>
-      </Switch>
-    </div>
+    <Suspense fallback={<Skeleton.modpackVersionList />}>
+      <div class="flex flex-col">
+        <Switch fallback={<Skeleton.modpackVersionList />}>
+          <Match when={versions()?.length > 0}>
+            <For each={versions()}>
+              {(modFile) => (
+                <VersionRow
+                  project={
+                    routeData.curseforgeGetMod?.data?.data ||
+                    routeData.modrinthGetProject?.data
+                  }
+                  modVersion={modFile}
+                  isCurseforge={routeData.isCurseforge}
+                />
+              )}
+            </For>
+          </Match>
+          <Match
+            when={
+              versions()?.length === 0 ||
+              !routeData.isCurseforge ||
+              !(routeData.modrinthGetProject as any)?.isLoading ||
+              !(routeData.curseforgeGetModFiles as any)?.isLoading
+            }
+          >
+            <Skeleton.modpackVersionList />
+          </Match>
+        </Switch>
+      </div>
+    </Suspense>
   );
 };
 
