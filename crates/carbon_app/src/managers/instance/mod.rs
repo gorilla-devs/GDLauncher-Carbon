@@ -802,7 +802,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instances()
             .to_path();
 
-        // cant conflict with anything if it dosen't exist
+        // cant conflict with anything if it doesn't exist
         if !instance_path.exists() {
             instance_path.push(&sanitized_name);
             return Ok((sanitized_name, instance_path));
