@@ -1,9 +1,12 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
+use crate::managers::AppInner;
 use carbon_net::Downloadable;
+use daedalus::minecraft::VersionInfo;
 
 use crate::domain::instance::info::CurseforgeModpack;
 use crate::domain::instance::info::ModrinthModpack;
 
+use crate::domain::java::JavaComponent;
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
@@ -14,13 +17,12 @@ use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
 use crate::managers::vtask::Subtask;
-use crate::managers::AppInner;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
 
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info};
@@ -189,22 +191,17 @@ impl ManagerRef<'_, InstanceManager> {
                     false => None,
                 };
 
-                let t_request_version_info = task
-                    .subtask(Translation::InstanceTaskLaunchRequestVersions);
+                let t_request_version_info =
+                    task.subtask(Translation::InstanceTaskLaunchRequestVersions);
 
-                let t_download_files = task
-                    .subtask(Translation::InstanceTaskLaunchDownloadFiles);
+                let t_download_files = task.subtask(Translation::InstanceTaskLaunchDownloadFiles);
                 t_download_files.set_weight(20.0);
-                let t_extract_natives = task
-                    .subtask(Translation::InstanceTaskLaunchExtractNatives);
+                let t_extract_natives = task.subtask(Translation::InstanceTaskLaunchExtractNatives);
 
-                let t_reconstruct_assets = task
-                    .subtask(Translation::InstanceTaskReconstructAssets);
+                let t_reconstruct_assets = task.subtask(Translation::InstanceTaskReconstructAssets);
 
                 let t_forge_processors = match is_first_run {
-                    true => Some(
-                        task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors),
-                    ),
+                    true => Some(task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)),
                     false => None,
                 };
 
@@ -228,14 +225,32 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Some(modpack) = &config.modpack {
                         let v: StandardVersion = match modpack {
                             Modpack::Curseforge(modpack) => {
-                                self.prepare_curseforge(app, instance_path, modpack, &mut downloads, t_request, t_extract_files, t_download_files, t_addon_metadata).await?
+                                prepare_curseforge(
+                                    Arc::clone(&app),
+                                    instance_path.clone(),
+                                    modpack,
+                                    &mut downloads,
+                                    t_request,
+                                    t_extract_files,
+                                    t_download_files,
+                                    t_addon_metadata,
+                                )
+                                .await?
                             }
-                            Modpack::Modrinth(modpack) =>  {
-                                self.prepare_modrinth(app, instance_path, modpack, &mut downloads, t_request, t_extract_files, t_download_files, t_addon_metadata).await?
+                            Modpack::Modrinth(modpack) => {
+                                prepare_modrinth(
+                                    Arc::clone(&app),
+                                    instance_path.clone(),
+                                    modpack,
+                                    &mut downloads,
+                                    t_request,
+                                    t_extract_files,
+                                    t_download_files,
+                                    t_addon_metadata,
+                                )
+                                .await?
                             }
                         };
-
-
 
                         tracing::info!("Modpack version: {:?}", v);
 
@@ -257,7 +272,10 @@ impl ManagerRef<'_, InstanceManager> {
                         let json = make_instance_config(config.clone())?;
                         tokio::fs::write(path.join("instance.json"), json).await?;
 
-                        instance_manager.instances.write().await
+                        instance_manager
+                            .instances
+                            .write()
+                            .await
                             .get_mut(&instance_id)
                             .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
                             .data_mut()?
@@ -297,234 +315,49 @@ impl ManagerRef<'_, InstanceManager> {
                 t_request_version_info.update_items(2, 3);
 
                 let java = {
-                    let required_java = SystemJavaProfileName::from(
-                        daedalus::minecraft::MinecraftJavaProfile::try_from(
-                            &version_info
-                                .java_version
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    anyhow::anyhow!("instance java version unsupported")
-                                })?
-                                .component as &str,
-                        )?,
-                    );
-
-                    match app.java_manager().get_usable_java(required_java).await? {
-                        Some(path) => path,
-                        None => {
-                            let t_download_java = task
-                                .subtask(Translation::InstanceTaskLaunchDownloadJava);
-
-                            let t_extract_java = task
-                                .subtask(Translation::InstanceTaskLaunchExtractJava);
-                            t_download_java.set_weight(0.0);
-                            t_extract_java.set_weight(0.0);
-
-                            let (progress_watch_tx, mut progress_watch_rx) = watch::channel(Step::Idle);
-
-                            // dropped when the sender is dropped
-                            tokio::spawn(async move {
-                                let mut started = false;
-                                let mut dl_completed = false;
-
-                                while progress_watch_rx.changed().await.is_ok() {
-                                    let step = progress_watch_rx.borrow();
-
-                                    if !started && !matches!(*step, Step::Idle) {
-                                        t_download_java.set_weight(10.0);
-                                        t_extract_java.set_weight(3.0);
-                                        started = true;
-                                    }
-
-                                    match *step {
-                                        Step::Downloading(downloaded, total) => t_download_java.update_download(downloaded as u32, total as u32, true),
-                                        Step::Extracting(count, total) => {
-                                            if !dl_completed {
-                                                t_download_java.complete_download();
-                                                dl_completed = true;
-                                            }
-
-                                            t_extract_java.update_items(count as u32, total as u32);
-                                        }
-
-                                        Step::Done => {
-                                            t_download_java.complete_download();
-                                            t_extract_java.complete_items();
-                                        }
-
-                                        Step::Idle => {}
-                                    }
-
-                                    // this is already debounced in setup_managed
-                                }
-                            });
-
-                            let path = app
-                                .java_manager()
-                                .require_java_install(required_java, true, Some(progress_watch_tx))
-                                .await?;
-
-                            match path {
-                                Some(path) => path,
-                                None => return Ok(None),
-                            }
-                        }
+                    match prepare_java(Arc::clone(&app), &version_info, &task).await? {
+                        Some(java) => java,
+                        None => return Ok(None),
                     }
                 };
 
                 for modloader in version.modloaders.iter() {
-                    match modloader {
+                    version_info = match modloader {
                         ModLoader {
                             type_: ModLoaderType::Forge,
                             version: forge_version,
                         } => {
-                            let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
-
-                            let forge_version =
-                                match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => forge_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let forge_manifest_version = forge_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == version.release)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find forge versions for {}", version.release)
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| v.id == format!("{}-{}", version.release, forge_version))
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find forge version {}-{} for minecraft version {}",
-                                        version.release,
-                                        forge_version,
-                                        version.release,
-                                    )
-                                })?;
-
-                            let forge_version = crate::managers::minecraft::forge::get_version(
-                                &app.reqwest_client,
-                                forge_manifest_version,
+                            prepare_forge_modloader(
+                                Arc::clone(&app),
+                                &version,
+                                forge_version,
+                                version_info,
                             )
-                            .await?;
-
-                            version_info =
-                                daedalus::modded::merge_partial_version(forge_version, version_info);
+                            .await?
                         }
                         ModLoader {
                             type_: ModLoaderType::Fabric,
                             version: fabric_version,
                         } => {
-                            let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
-
-                            let fabric_version =
-                                match fabric_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => fabric_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
-
-                            let supported = fabric_manifest
-                                    .game_versions
-                                    .iter()
-                                    .any(|v| v.id == version.release);
-
-                            if !supported {
-                                return Err(anyhow!("Fabric does not support version {}", version.release));
-                            }
-
-                            let fabric_manifest_version = fabric_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == dummy_string)
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find fabric metadata template using {}",
-                                        dummy_string
-                                    )
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| v.id == fabric_version)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find fabric version {}", fabric_version)
-                                })?;
-
-                            let fabric_version = crate::managers::minecraft::fabric::replace_template(
-                                &crate::managers::minecraft::fabric::get_version(
-                                    &app.reqwest_client,
-                                    fabric_manifest_version,
-                                )
-                                .await?,
-                                &version.release,
-                                &dummy_string,
-                            );
-
-                            version_info =
-                                daedalus::modded::merge_partial_version(fabric_version, version_info);
+                            prepare_fabric_modloader(
+                                Arc::clone(&app),
+                                &version,
+                                &fabric_version,
+                                version_info,
+                            )
+                            .await?
                         }
                         ModLoader {
                             type_: ModLoaderType::Quilt,
                             version: quilt_version,
                         } => {
-                            let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
-
-                            let quilt_version =
-                                match quilt_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => quilt_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
-
-                            let supported = quilt_manifest
-                                    .game_versions
-                                    .iter()
-                                    .any(|v| v.id == version.release);
-
-                            if !supported {
-                                return Err(anyhow!("Quilt does not support version {}", version.release));
-                            }
-
-                            let quilt_manifest_version = quilt_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == dummy_string)
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find quilt metadata template using {}",
-                                        dummy_string
-                                    )
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| v.id == quilt_version)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find quilt version {}", quilt_version)
-                                })?;
-
-                            let quilt_version = crate::managers::minecraft::quilt::replace_template(
-                                &crate::managers::minecraft::quilt::get_version(
-                                    &app.reqwest_client,
-                                    quilt_manifest_version,
-                                )
-                                .await?,
-                                &version.release,
-                                &dummy_string,
-                            );
-
-                            version_info =
-                                daedalus::modded::merge_partial_version(quilt_version, version_info);
+                            prepare_quilt_modloader(
+                                Arc::clone(&app),
+                                &version,
+                                quilt_version,
+                                version_info,
+                            )
+                            .await?
                         }
                     }
                 }
@@ -558,9 +391,14 @@ impl ManagerRef<'_, InstanceManager> {
                     t_download_files.complete_download();
                 });
 
-                let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
+                let concurrency = app
+                    .settings_manager()
+                    .get_settings()
+                    .await?
+                    .concurrent_downloads;
 
-                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
+                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize)
+                    .await?;
 
                 // update mod metadata after mods are downloaded
                 if is_initial_modpack_launch {
@@ -588,7 +426,8 @@ impl ManagerRef<'_, InstanceManager> {
                     &version_info.assets,
                     runtime_path.get_assets(),
                     instance_path.get_resources_path(),
-                ).await?;
+                )
+                .await?;
                 t_reconstruct_assets.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
@@ -644,7 +483,11 @@ impl ManagerRef<'_, InstanceManager> {
                     )),
                     None => {
                         if let Some(callback_task) = callback_task {
-                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
+                            callback_task(
+                                t_finalize_import
+                                    .expect("If callback_task is Some, subtask will also be Some"),
+                            )
+                            .await?;
                         }
 
                         let _ = app
@@ -700,7 +543,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
 
                     let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
-                        panic!("stdout and stderr are not availible even though the child process was created with both enabled");
+                        panic!("stdout and stderr are not available even though the child process was created with both enabled");
                     };
 
                     let read_logs = async {
@@ -852,147 +695,384 @@ impl ManagerRef<'_, InstanceManager> {
 
         Ok(())
     }
+}
 
-    pub async fn prepare_curseforge(
-        &self,
-        app: Arc<AppInner>,
-        instance_path: InstancePath,
-        modpack: &CurseforgeModpack,
-        downloads: &mut Vec<Downloadable>,
-        t_request: Subtask,
-        t_extract_files: Subtask,
-        t_download_files: Subtask,
-        t_addon_metadata: Subtask,
-    ) -> anyhow::Result<StandardVersion> {
-        t_request.start_opaque();
-        let file = app
-            .modplatforms_manager()
-            .curseforge
-            .get_mod_file(ModFileParameters {
-                file_id: modpack.file_id as i32,
-                mod_id: modpack.project_id as i32,
-            })
-            .await?
-            .data;
-        t_request.complete_opaque();
+pub async fn prepare_curseforge(
+    app: Arc<AppInner>,
+    instance_path: InstancePath,
+    modpack: &CurseforgeModpack,
+    downloads: &mut Vec<Downloadable>,
+    t_request: Subtask,
+    t_extract_files: Subtask,
+    t_download_files: Subtask,
+    t_addon_metadata: Subtask,
+) -> anyhow::Result<StandardVersion> {
+    t_request.start_opaque();
+    let file = app
+        .modplatforms_manager()
+        .curseforge
+        .get_mod_file(ModFileParameters {
+            file_id: modpack.file_id as i32,
+            mod_id: modpack.project_id as i32,
+        })
+        .await?
+        .data;
+    t_request.complete_opaque();
 
-        let (modpack_progress_tx, mut modpack_progress_rx) =
-            tokio::sync::watch::channel(curseforge::ProgressState::new());
+    let (modpack_progress_tx, mut modpack_progress_rx) =
+        tokio::sync::watch::channel(curseforge::ProgressState::new());
 
-        tokio::spawn(async move {
-            let mut tracker = curseforge::ProgressState::new();
+    tokio::spawn(async move {
+        let mut tracker = curseforge::ProgressState::new();
 
-            while modpack_progress_rx.changed().await.is_ok() {
-                {
-                    let progress = modpack_progress_rx.borrow();
+        while modpack_progress_rx.changed().await.is_ok() {
+            {
+                let progress = modpack_progress_rx.borrow();
 
-                    tracker.download_addon_zip.update_from(
-                        &progress.download_addon_zip,
-                        |(downloaded, total)| {
-                            t_download_files.update_download(downloaded as u32, total as u32, true);
-                        },
-                    );
+                tracker.download_addon_zip.update_from(
+                    &progress.download_addon_zip,
+                    |(downloaded, total)| {
+                        t_download_files.update_download(downloaded as u32, total as u32, true);
+                    },
+                );
 
-                    tracker.extract_addon_overrides.update_from(
-                        &progress.extract_addon_overrides,
-                        |(completed, total)| {
-                            t_extract_files.update_items(completed as u32, total as u32);
-                        },
-                    );
+                tracker.extract_addon_overrides.update_from(
+                    &progress.extract_addon_overrides,
+                    |(completed, total)| {
+                        t_extract_files.update_items(completed as u32, total as u32);
+                    },
+                );
 
-                    tracker.acquire_addon_metadata.update_from(
-                        &progress.acquire_addon_metadata,
-                        |(completed, total)| {
-                            t_addon_metadata.update_items(completed as u32, total as u32);
-                        },
-                    );
-                }
-
-                tokio::time::sleep(Duration::from_millis(200)).await;
+                tracker.acquire_addon_metadata.update_from(
+                    &progress.acquire_addon_metadata,
+                    |(completed, total)| {
+                        t_addon_metadata.update_items(completed as u32, total as u32);
+                    },
+                );
             }
-        });
 
-        let modpack_info = curseforge::prepare_modpack_from_addon(
-            &app,
-            &file,
-            instance_path.clone(),
-            modpack_progress_tx,
-        )
-        .await?;
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+    });
 
-        downloads.extend(modpack_info.downloadables);
+    let modpack_info = curseforge::prepare_modpack_from_addon(
+        &app,
+        &file,
+        instance_path.clone(),
+        modpack_progress_tx,
+    )
+    .await?;
 
-        modpack_info.manifest.minecraft.try_into()
-    }
+    downloads.extend(modpack_info.downloadables);
 
-    pub async fn prepare_modrinth(
-        &self,
-        app: Arc<AppInner>,
-        instance_path: InstancePath,
-        modpack: &ModrinthModpack,
-        downloads: &mut Vec<Downloadable>,
-        t_request: Subtask,
-        t_extract_files: Subtask,
-        t_download_files: Subtask,
-        t_addon_metadata: Subtask,
-    ) -> anyhow::Result<StandardVersion> {
-        t_request.start_opaque();
-        let file = app
-            .modplatforms_manager()
-            .modrinth
-            .get_version(VersionID(modpack.version_id.clone()))
-            .await?
-            .files
-            .into_iter()
-            .reduce(|a, b| if b.primary { b } else { a })
-            .ok_or_else(|| {
-                anyhow!(
-                    "Modrinth project '{}' version '{}' does not have a file",
-                    modpack.project_id,
-                    modpack.version_id
-                )
-            })?;
-        t_request.complete_opaque();
+    modpack_info.manifest.minecraft.try_into()
+}
 
-        let (modpack_progress_tx, mut modpack_progress_rx) =
-            tokio::sync::watch::channel(modrinth::ProgressState::Idle);
+pub async fn prepare_modrinth(
+    app: Arc<AppInner>,
+    instance_path: InstancePath,
+    modpack: &ModrinthModpack,
+    downloads: &mut Vec<Downloadable>,
+    t_request: Subtask,
+    t_extract_files: Subtask,
+    t_download_files: Subtask,
+    t_addon_metadata: Subtask,
+) -> anyhow::Result<StandardVersion> {
+    t_request.start_opaque();
+    let file = app
+        .modplatforms_manager()
+        .modrinth
+        .get_version(VersionID(modpack.version_id.clone()))
+        .await?
+        .files
+        .into_iter()
+        .reduce(|a, b| if b.primary { b } else { a })
+        .ok_or_else(|| {
+            anyhow!(
+                "Modrinth project '{}' version '{}' does not have a file",
+                modpack.project_id,
+                modpack.version_id
+            )
+        })?;
+    t_request.complete_opaque();
 
-        tokio::spawn(async move {
-            while modpack_progress_rx.changed().await.is_ok() {
-                {
-                    let progress = modpack_progress_rx.borrow();
-                    match *progress {
-                        modrinth::ProgressState::Idle => {}
-                        modrinth::ProgressState::DownloadingMRPack(downloaded, total) => {
-                            t_download_files.update_download(downloaded as u32, total as u32, true)
-                        }
-                        modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
-                            t_extract_files.update_items(count as u32, total as u32)
-                        }
-                        modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
-                            t_addon_metadata.update_items(count as u32, total as u32)
-                        }
+    let (modpack_progress_tx, mut modpack_progress_rx) =
+        tokio::sync::watch::channel(modrinth::ProgressState::Idle);
+
+    tokio::spawn(async move {
+        while modpack_progress_rx.changed().await.is_ok() {
+            {
+                let progress = modpack_progress_rx.borrow();
+                match *progress {
+                    modrinth::ProgressState::Idle => {}
+                    modrinth::ProgressState::DownloadingMRPack(downloaded, total) => {
+                        t_download_files.update_download(downloaded as u32, total as u32, true)
+                    }
+                    modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
+                        t_extract_files.update_items(count as u32, total as u32)
+                    }
+                    modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
+                        t_addon_metadata.update_items(count as u32, total as u32)
                     }
                 }
-
-                tokio::time::sleep(Duration::from_millis(200)).await;
             }
 
-            t_download_files.complete_download();
-        });
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
 
-        let modpack_info = modrinth::prepare_modpack_from_file(
-            &app,
-            &file,
-            instance_path.clone(),
-            modpack_progress_tx,
-        )
-        .await?;
+        t_download_files.complete_download();
+    });
 
-        downloads.extend(modpack_info.downloadables);
+    let modpack_info = modrinth::prepare_modpack_from_file(
+        &app,
+        &file,
+        instance_path.clone(),
+        modpack_progress_tx,
+    )
+    .await?;
 
-        modpack_info.index.dependencies.try_into()
+    downloads.extend(modpack_info.downloadables);
+
+    modpack_info.index.dependencies.try_into()
+}
+
+pub async fn prepare_java(
+    app: Arc<AppInner>,
+    version_info: &VersionInfo,
+    task: &VisualTask,
+) -> anyhow::Result<Option<JavaComponent>> {
+    let required_java =
+        SystemJavaProfileName::from(daedalus::minecraft::MinecraftJavaProfile::try_from(
+            &version_info
+                .java_version
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("instance java version unsupported"))?
+                .component as &str,
+        )?);
+
+    match app.java_manager().get_usable_java(required_java).await? {
+        Some(path) => Ok(Some(path)),
+        None => {
+            let t_download_java = task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+
+            let t_extract_java = task.subtask(Translation::InstanceTaskLaunchExtractJava);
+            t_download_java.set_weight(0.0);
+            t_extract_java.set_weight(0.0);
+
+            let (progress_watch_tx, mut progress_watch_rx) = watch::channel(Step::Idle);
+
+            // dropped when the sender is dropped
+            tokio::spawn(async move {
+                let mut started = false;
+                let mut dl_completed = false;
+
+                while progress_watch_rx.changed().await.is_ok() {
+                    let step = progress_watch_rx.borrow();
+
+                    if !started && !matches!(*step, Step::Idle) {
+                        t_download_java.set_weight(10.0);
+                        t_extract_java.set_weight(3.0);
+                        started = true;
+                    }
+
+                    match *step {
+                        Step::Downloading(downloaded, total) => {
+                            t_download_java.update_download(downloaded as u32, total as u32, true)
+                        }
+                        Step::Extracting(count, total) => {
+                            if !dl_completed {
+                                t_download_java.complete_download();
+                                dl_completed = true;
+                            }
+
+                            t_extract_java.update_items(count as u32, total as u32);
+                        }
+
+                        Step::Done => {
+                            t_download_java.complete_download();
+                            t_extract_java.complete_items();
+                        }
+
+                        Step::Idle => {}
+                    }
+
+                    // this is already debounced in setup_managed
+                }
+            });
+
+            let path = app
+                .java_manager()
+                .require_java_install(required_java, true, Some(progress_watch_tx))
+                .await?;
+
+            match path {
+                Some(path) => Ok(Some(path)),
+                None => Ok(None),
+            }
+        }
     }
+}
+
+pub async fn prepare_forge_modloader(
+    app: Arc<AppInner>,
+    version: &StandardVersion,
+    forge_version: &str,
+    version_info: VersionInfo,
+) -> anyhow::Result<VersionInfo> {
+    let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+
+    let forge_version = match forge_version.strip_prefix(&format!("{}-", version.release)) {
+        None => forge_version,
+        Some(sub) => sub,
+    };
+
+    let forge_manifest_version = forge_manifest
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == version.release)
+        .ok_or_else(|| anyhow!("Could not find forge versions for {}", version.release))?
+        .loaders
+        .into_iter()
+        .find(|v| v.id == format!("{}-{}", version.release, forge_version))
+        .ok_or_else(|| {
+            anyhow!(
+                "Could not find forge version {}-{} for minecraft version {}",
+                version.release,
+                forge_version,
+                version.release,
+            )
+        })?;
+
+    let forge_version =
+        crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest_version)
+            .await?;
+
+    Ok(daedalus::modded::merge_partial_version(
+        forge_version,
+        version_info,
+    ))
+}
+
+pub async fn prepare_fabric_modloader(
+    app: Arc<AppInner>,
+    version: &StandardVersion,
+    fabric_version: &str,
+    version_info: VersionInfo,
+) -> anyhow::Result<VersionInfo> {
+    let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
+
+    let fabric_version = match fabric_version.strip_prefix(&format!("{}-", version.release)) {
+        None => fabric_version,
+        Some(sub) => sub,
+    };
+
+    let dummy_string = daedalus::BRANDING
+        .get_or_init(daedalus::Branding::default)
+        .dummy_replace_string
+        .clone();
+
+    let supported = fabric_manifest
+        .game_versions
+        .iter()
+        .any(|v| v.id == version.release);
+
+    if !supported {
+        return Err(anyhow!(
+            "Fabric does not support version {}",
+            version.release
+        ));
+    }
+
+    let fabric_manifest_version = fabric_manifest
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == dummy_string)
+        .ok_or_else(|| {
+            anyhow!(
+                "Could not find fabric metadata template using {}",
+                dummy_string
+            )
+        })?
+        .loaders
+        .into_iter()
+        .find(|v| v.id == fabric_version)
+        .ok_or_else(|| anyhow!("Could not find fabric version {}", fabric_version))?;
+
+    let fabric_version = crate::managers::minecraft::fabric::replace_template(
+        &crate::managers::minecraft::fabric::get_version(
+            &app.reqwest_client,
+            fabric_manifest_version,
+        )
+        .await?,
+        &version.release,
+        &dummy_string,
+    );
+
+    Ok(daedalus::modded::merge_partial_version(
+        fabric_version,
+        version_info,
+    ))
+}
+
+pub async fn prepare_quilt_modloader(
+    app: Arc<AppInner>,
+    version: &StandardVersion,
+    quilt_version: &str,
+    version_info: VersionInfo,
+) -> anyhow::Result<VersionInfo> {
+    let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
+
+    let quilt_version = match quilt_version.strip_prefix(&format!("{}-", version.release)) {
+        None => quilt_version,
+        Some(sub) => sub,
+    };
+
+    let dummy_string = daedalus::BRANDING
+        .get_or_init(daedalus::Branding::default)
+        .dummy_replace_string
+        .clone();
+
+    let supported = quilt_manifest
+        .game_versions
+        .iter()
+        .any(|v| v.id == version.release);
+
+    if !supported {
+        return Err(anyhow!(
+            "Quilt does not support version {}",
+            version.release
+        ));
+    }
+
+    let quilt_manifest_version = quilt_manifest
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == dummy_string)
+        .ok_or_else(|| {
+            anyhow!(
+                "Could not find quilt metadata template using {}",
+                dummy_string
+            )
+        })?
+        .loaders
+        .into_iter()
+        .find(|v| v.id == quilt_version)
+        .ok_or_else(|| anyhow!("Could not find quilt version {}", quilt_version))?;
+
+    let quilt_version = crate::managers::minecraft::quilt::replace_template(
+        &crate::managers::minecraft::quilt::get_version(
+            &app.reqwest_client,
+            quilt_manifest_version,
+        )
+        .await?,
+        &version.release,
+        &dummy_string,
+    );
+
+    Ok(daedalus::modded::merge_partial_version(
+        quilt_version,
+        version_info,
+    ))
 }
 
 pub enum LaunchState {
