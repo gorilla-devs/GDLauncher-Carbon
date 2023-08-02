@@ -8,6 +8,8 @@ import { rspc } from "@/utils/rspcClient";
 import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
 import fetchData from "../../instance.data";
+import { Mod as Modtype } from "@gd/core_module/bindings";
+import { getModrinthData } from "@/utils/instances";
 
 const Mods = () => {
   const [t] = useTransContext();
@@ -25,6 +27,10 @@ const Mods = () => {
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
   ]);
+
+  const isModrinth = () =>
+    routeData.instanceDetails.data?.modpack &&
+    getModrinthData(routeData.instanceDetails.data.modpack);
 
   const NoMods = () => {
     return (
@@ -46,7 +52,10 @@ const Mods = () => {
             onClick={() => {
               modalsContext?.openModal(
                 { name: "addMod" },
-                routeData.instanceDetails.data?.version
+                {
+                  mcVersion: routeData.instanceDetails.data?.version,
+                  isCurseforge: !isModrinth(),
+                }
               );
             }}
           >
@@ -96,7 +105,10 @@ const Mods = () => {
             onClick={() => {
               modalsContext?.openModal(
                 { name: "addMod" },
-                routeData.instanceDetails.data?.version
+                {
+                  mcVersion: routeData.instanceDetails.data?.version,
+                  isCurseforge: !isModrinth(),
+                }
               );
             }}
           >
@@ -113,7 +125,7 @@ const Mods = () => {
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox
                 onChange={(checked) => {
-                  routeData.instanceDetails.data?.mods.forEach((mod) => {
+                  routeData.instanceMods.data?.forEach((mod) => {
                     if (checked) {
                       setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
                     } else
@@ -169,13 +181,12 @@ const Mods = () => {
               <div
                 class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out"
                 onClick={() => {
-                  const areSelectedEnabled =
-                    routeData.instanceDetails.data?.mods
-                      .filter((mod) => selectedMods[mod.id])
-                      .every((mod) => mod.enabled);
+                  const areSelectedEnabled = routeData.instanceMods.data
+                    ?.filter((mod) => selectedMods[mod.id])
+                    .every((mod) => mod.enabled);
 
-                  routeData.instanceDetails.data?.mods
-                    .filter((mod) => selectedMods[mod.id])
+                  routeData.instanceMods.data
+                    ?.filter((mod) => selectedMods[mod.id])
                     .forEach((mod) => {
                       if (areSelectedEnabled) {
                         disableModMutation.mutate({
@@ -192,8 +203,8 @@ const Mods = () => {
                 }}
               >
                 <Show
-                  when={routeData.instanceDetails.data?.mods
-                    .filter((mod) => selectedMods[mod.id])
+                  when={routeData.instanceMods.data
+                    ?.filter((mod) => selectedMods[mod.id])
                     .every((mod) => mod.enabled)}
                   fallback={
                     <Trans
@@ -215,7 +226,7 @@ const Mods = () => {
             </Show>
           </div>
           <div class="flex gap-1">
-            <span>{routeData.instanceDetails.data?.mods.length}</span>
+            <span>{routeData.instanceMods.data?.length}</span>
 
             <Trans
               key="instance.mods"
@@ -229,18 +240,18 @@ const Mods = () => {
       <div class="h-full overflow-y-hidden">
         <Show
           when={
-            routeData.instanceDetails.data?.mods &&
-            routeData.instanceDetails.data?.mods.length > 0 &&
+            routeData.instanceMods.data &&
+            routeData.instanceMods.data?.length > 0 &&
             !routeData.instanceDetails.isLoading
           }
           fallback={<NoMods />}
         >
-          <For each={routeData.instanceDetails.data?.mods}>
+          <For each={routeData.instanceMods.data as Modtype[]}>
             {(props) => (
               <Mod
                 mod={props}
                 setSelectedMods={setSelectedMods}
-                selectedMods={selectedMods}
+                selectMods={selectedMods}
               />
             )}
           </For>

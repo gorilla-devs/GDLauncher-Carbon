@@ -138,7 +138,7 @@ const Modpack = () => {
 
   const icon = () =>
     routeData.isCurseforge
-      ? (routeData.modpackDetails?.data as FEModResponse).data.logo.url
+      ? (routeData.modpackDetails?.data as FEModResponse).data.logo?.url
       : (routeData.modpackDetails?.data as MRFEProject).icon_url;
 
   const handleDownload = () => {
@@ -186,7 +186,7 @@ const Modpack = () => {
               style={{
                 "background-image": `url("${
                   routeData.isCurseforge
-                    ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                    ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
                     : routeData.modpackDetails.data?.icon_url
                 }")`,
                 "background-position": "right-5rem",
@@ -214,7 +214,7 @@ const Modpack = () => {
                   style={{
                     "background-image": `url("${
                       routeData.isCurseforge
-                        ? routeData.modpackDetails.data?.data.logo.thumbnailUrl
+                        ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
                         : routeData.modpackDetails.data?.icon_url
                     }")`,
                   }}

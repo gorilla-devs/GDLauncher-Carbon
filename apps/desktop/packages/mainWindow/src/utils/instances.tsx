@@ -271,6 +271,18 @@ export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
   return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
 };
 
+export const getModpackPlatform = (modpack: Modpack) => {
+  if ((modpack as { Curseforge: CurseforgeModpack }).Curseforge !== undefined) {
+    return "Curseforge";
+  } else if (
+    (modpack as { Modrinth: ModrinthModpack }).Modrinth !== undefined
+  ) {
+    return "Modrinth";
+  } else {
+    return "Unknown";
+  }
+};
+
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(
   []
 );

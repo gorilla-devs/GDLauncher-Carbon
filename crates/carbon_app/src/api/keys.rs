@@ -83,6 +83,7 @@ keys! {
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
+        INSTANCE_MODS                               = "getInstanceMods";
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";

@@ -1,6 +1,6 @@
-use anyhow::{bail, Context};
+use anyhow::bail;
 use carbon_net::{Checksum, Downloadable};
-use std::{ffi::OsString, ops::Deref, pin::Pin, sync::Arc, time::Duration};
+use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
         runtime_path::InstancePath,
         vtask::VisualTaskId,
     },
-    managers::{instance::Mod, metadata, vtask::VisualTask, AppInner},
+    managers::{instance::Mod, vtask::VisualTask, AppInner},
 };
 
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
@@ -77,11 +77,16 @@ pub trait ResourceInstaller: Sync {
         instance_data: &InstanceData,
         preferred_channel: ModChannel,
     ) -> DependencyIterator;
-    fn is_already_installed(&self, instance_data: &InstanceData) -> bool;
-    fn display_name(&self) -> String;
-    async fn perform_install(
+    async fn is_already_installed(
         &self,
-        instance_data: &mut InstanceData,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<bool>;
+    fn display_name(&self) -> String;
+    async fn finalize_install(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
         downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()>;
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()>;
@@ -110,8 +115,12 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    fn is_already_installed(&self, instance_data: &InstanceData) -> bool {
-        (**self).is_already_installed(instance_data)
+    async fn is_already_installed(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<bool> {
+        (**self).is_already_installed(app, instance_id).await
     }
     #[inline]
     fn display_name(&self) -> String {
@@ -119,12 +128,15 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    async fn perform_install(
+    async fn finalize_install(
         &self,
-        instance_data: &mut InstanceData,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
         downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()> {
-        (**self).perform_install(instance_data, downloadable).await
+        (**self)
+            .finalize_install(app, instance_id, downloadable)
+            .await
     }
 
     #[inline]
@@ -243,14 +255,14 @@ impl Installer {
     pub async fn install(
         &self,
         app: &Arc<AppInner>,
-        instance_id: &InstanceId,
+        instance_id: InstanceId,
     ) -> anyhow::Result<VisualTaskId> {
         let (task, task_id, instance_path) = async {
             let instance_manager = app.instance_manager();
             let instances = instance_manager.instances.write().await;
             let instance = instances
-                .get(instance_id)
-                .ok_or(InvalidInstanceIdError(*instance_id))?;
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
 
             let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &instance else {
                 bail!("install called with invalid instance");
@@ -259,7 +271,7 @@ impl Installer {
             let task = {
                 let lock = self.inner.lock().await;
 
-                if lock.is_already_installed(data) {
+                if lock.is_already_installed(app, instance_id).await? {
                     bail!("resource is already installed");
                 }
 
@@ -293,7 +305,7 @@ impl Installer {
     async fn install_inner(
         &self,
         app: &Arc<AppInner>,
-        instance_id: &InstanceId,
+        instance_id: InstanceId,
         instance_path: &InstancePath,
         parent_task: &Arc<Mutex<VisualTask>>,
         visited_ids: &Arc<Mutex<Vec<String>>>,
@@ -317,7 +329,7 @@ impl Installer {
                 let instance_manager = app.instance_manager();
                 let instances = instance_manager.instances.read().await;
                 let instance = instances
-                    .get(instance_id)
+                    .get(&instance_id)
                     .expect("instance should still be valid");
                 let instance_data = instance.data().expect("instance should still be valid");
 
@@ -367,12 +379,22 @@ impl Installer {
             (dep_error, processed_deps)
         };
 
+        if self
+            .inner
+            .lock()
+            .await
+            .is_already_installed(app, instance_id)
+            .await?
+        {
+            return Ok(());
+        }
+
         {
             let mut lock = self.rollback_context.lock().await;
             *lock = Some(InstallerRollbackContext {
                 inner: Arc::clone(&self.inner),
                 processed_deps: Arc::new(Mutex::new(processed_deps)),
-                instance_id: *instance_id,
+                instance_id,
                 app: Arc::clone(app),
             })
         }
@@ -387,7 +409,6 @@ impl Installer {
             lock.subtask(Translation::InstanceTaskInstallModDownloadFile)
         };
 
-        let instance_id = *instance_id;
         let instance_path = instance_path.clone();
         let inner = Arc::clone(&self.inner);
         let app_clone = Arc::clone(app);
@@ -437,10 +458,11 @@ impl Installer {
                                 .get_mut(&instance_id)
                                 .expect("instance should still be valid");
 
-                            let data = instance.data_mut().expect("instance should still be valid");
+                            let _ = instance.data_mut().expect("instance should still be valid");
                             let lock = inner.lock().await;
 
-                            lock.perform_install(data, downloadable).await
+                            lock.finalize_install(&app_clone, instance_id, downloadable)
+                                .await
                         }?;
 
                         app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
@@ -594,17 +616,16 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                 if let Some((release, modloaders)) = game_version {
                                     let modloader_strings: Vec<String> = modloaders
                                         .iter()
-                                        .filter_map(|modloader| match modloader.type_ {
+                                        .map(|modloader| match modloader.type_ {
                                             domain::instance::info::ModLoaderType::Forge => {
-                                                Some("forge".to_string())
+                                                "forge".to_string()
                                             }
                                             domain::instance::info::ModLoaderType::Fabric => {
-                                                Some("fabric".to_string())
+                                                "fabric".to_string()
                                             }
                                             domain::instance::info::ModLoaderType::Quilt => {
-                                                Some("quilt".to_string())
+                                                "quilt".to_string()
                                             }
-                                            domain::instance::info::ModLoaderType::Unknown => None,
                                         })
                                         .collect();
 
@@ -664,75 +685,47 @@ impl ResourceInstaller for CurseforgeModInstaller {
         DependencyIterator::new(installers.into_iter())
     }
 
-    fn is_already_installed(&self, instance_data: &InstanceData) -> bool {
-        // TODO: check with fingerprint once local meta cache is done
-        let file_name = &self.file.file_name;
-        instance_data
-            .mods
-            .iter()
-            .any(|m| &m.filename.to_string_lossy() == file_name)
+    async fn is_already_installed(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<bool> {
+        use crate::db::mod_file_cache as fcdb;
+
+        // TODO: check with fingerprint?
+        let is_installed = app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
+                *instance_id,
+                self.file.file_name.clone(),
+            ))
+            .exec()
+            .await?
+            .is_some();
+
+        Ok(is_installed)
     }
 
     fn display_name(&self) -> String {
         self.file.display_name.clone()
     }
 
-    async fn perform_install(
+    async fn finalize_install(
         &self,
-        instance_data: &mut InstanceData,
-        downloadable: Option<Downloadable>,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+        _downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()> {
-        let Some(downloadable) = downloadable else {
-            return Err(anyhow::anyhow!("Perform install called before file was downloaded."))
-        };
-
-        tracing::info!(
-            "Installing {} from {}",
-            self.file.display_name,
-            downloadable.path.to_string_lossy()
-        );
-
-        let file_data = tokio::fs::read(&downloadable.path).await.with_context(|| {
-            format!(
-                "failed to read file: `{}`",
-                &downloadable.path.to_string_lossy()
-            )
-        })?;
-
-        use md5::Digest;
-        let md5hash = md5::Md5::new_with_prefix(&file_data).finalize();
-
-        let metadata = tokio::task::spawn_blocking(|| {
-            metadata::mods::parse_metadata(std::io::Cursor::new(file_data))
-        })
-        .await??
-        .ok_or_else(|| anyhow::anyhow!("downloaded curseforge mod did not have any metadata"))?;
-
-        let id = hex::encode(md5hash);
-
-        let mod_data = Mod {
-            id,
-            filename: OsString::from(&self.file.file_name),
-            enabled: true,
-            modloaders: metadata
-                .modloaders
-                .clone()
-                .unwrap_or_else(|| vec![instance::info::ModLoaderType::Forge]),
-            metadata,
-        };
-
-        instance_data.mods.push(mod_data.clone());
-        *self.applied_data.lock().await = Some((mod_data, downloadable));
+        app.meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
         Ok(())
     }
 
-    async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
+    async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
         let mut lock = self.applied_data.lock().await;
-        if let Some((applied_mod_data, downloadable)) = &*lock {
-            instance_data
-                .mods
-                .retain(|mod_data| mod_data.id != applied_mod_data.id);
-
+        if let Some((_, downloadable)) = &*lock {
             match tokio::fs::try_exists(&downloadable.path).await {
                 Ok(true) => {
                     tokio::fs::remove_file(&downloadable.path).await?;
@@ -898,18 +891,15 @@ impl ResourceInstaller for ModrinthModInstaller {
                                     if let Some((release, modloaders)) = game_version {
                                         let modloader_strings: Vec<String> = modloaders
                                             .iter()
-                                            .filter_map(|modloader| match modloader.type_ {
+                                            .map(|modloader| match modloader.type_ {
                                                 domain::instance::info::ModLoaderType::Forge => {
-                                                    Some("forge".to_string())
+                                                    "forge".to_string()
                                                 }
                                                 domain::instance::info::ModLoaderType::Fabric => {
-                                                    Some("fabric".to_string())
+                                                    "fabric".to_string()
                                                 }
                                                 domain::instance::info::ModLoaderType::Quilt => {
-                                                    Some("quilt".to_string())
-                                                }
-                                                domain::instance::info::ModLoaderType::Unknown => {
-                                                    None
+                                                    "quilt".to_string()
                                                 }
                                             })
                                             .collect();
@@ -973,76 +963,47 @@ impl ResourceInstaller for ModrinthModInstaller {
         DependencyIterator::new(installers.into_iter())
     }
 
-    fn is_already_installed(&self, instance_data: &InstanceData) -> bool {
-        // TODO: check with fingerprint once local meta cache is done
-        let filename = &self.file.filename;
-        instance_data
-            .mods
-            .iter()
-            .any(|m| &m.filename.to_string_lossy() == filename)
+    async fn is_already_installed(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<bool> {
+        use crate::db::mod_file_cache as fcdb;
+
+        // TODO: check with fingerprint?
+        let is_installed = app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
+                *instance_id,
+                self.file.filename.clone(),
+            ))
+            .exec()
+            .await?
+            .is_some();
+
+        Ok(is_installed)
     }
 
     fn display_name(&self) -> String {
         self.version.name.clone()
     }
 
-    async fn perform_install(
+    async fn finalize_install(
         &self,
-        instance_data: &mut InstanceData,
-        downloadable: Option<Downloadable>,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+        _downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()> {
-        let Some(downloadable) = downloadable else {
-            return Err(anyhow::anyhow!("Perform install called before file was downloaded."))
-        };
-
-        tracing::info!(
-            "Installing {} from {}",
-            self.version.name,
-            downloadable.path.to_string_lossy()
-        );
-
-        let file_data = tokio::fs::read(&downloadable.path).await.with_context(|| {
-            format!(
-                "failed to read file: `{}`",
-                &downloadable.path.to_string_lossy()
-            )
-        })?;
-
-        let id = {
-            use sha1::{Digest, Sha1};
-            let sha1hash = Sha1::new_with_prefix(&file_data).finalize();
-            hex::encode(sha1hash)
-        };
-
-        let metadata = tokio::task::spawn_blocking(|| {
-            metadata::mods::parse_metadata(std::io::Cursor::new(file_data))
-        })
-        .await??
-        .ok_or_else(|| anyhow::anyhow!("downloaded modrinth mod did not have any metadata"))?;
-
-        let mod_data = Mod {
-            id,
-            filename: OsString::from(&self.file.filename),
-            enabled: true,
-            modloaders: metadata
-                .modloaders
-                .clone()
-                .unwrap_or_else(|| vec![instance::info::ModLoaderType::Forge]),
-            metadata,
-        };
-
-        instance_data.mods.push(mod_data.clone());
-        *self.applied_data.lock().await = Some((mod_data, downloadable));
+        app.meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
         Ok(())
     }
 
-    async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
+    async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
         let mut lock = self.applied_data.lock().await;
-        if let Some((applied_mod_data, downloadable)) = &*lock {
-            instance_data
-                .mods
-                .retain(|mod_data| mod_data.id != applied_mod_data.id);
-
+        if let Some((_applied_mod_data, downloadable)) = &*lock {
             match tokio::fs::try_exists(&downloadable.path).await {
                 Ok(true) => {
                     tokio::fs::remove_file(&downloadable.path).await?;
