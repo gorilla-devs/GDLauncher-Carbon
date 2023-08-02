@@ -118,7 +118,7 @@ const VersionRow = (props: Props) => {
         class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
         onClick={() => {
           const icon = props.isCurseforge
-            ? (props.project as CFFEMod).logo.url
+            ? (props.project as CFFEMod).logo?.url
             : (props.project as MRFEProject).icon_url;
 
           const modpack = props.isCurseforge

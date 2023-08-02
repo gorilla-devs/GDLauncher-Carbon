@@ -91,7 +91,6 @@ pub enum ModLoaderType {
     Forge,
     Fabric,
     Quilt,
-    Unknown,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -294,7 +293,6 @@ impl From<ModLoaderType> for info::ModLoaderType {
             Schema::Forge => Self::Forge,
             Schema::Fabric => Self::Fabric,
             Schema::Quilt => Self::Quilt,
-            Schema::Unknown => Self::Unknown,
         }
     }
 }
@@ -307,7 +305,6 @@ impl From<info::ModLoaderType> for ModLoaderType {
             Info::Forge => Self::Forge,
             Info::Fabric => Self::Fabric,
             Info::Quilt => Self::Quilt,
-            Info::Unknown => Self::Unknown,
         }
     }
 }

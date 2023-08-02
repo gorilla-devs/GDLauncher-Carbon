@@ -54,6 +54,7 @@ pub struct Project {
     pub game_versions: Vec<String>,
     /// A list of all of the loaders supported by the project
     pub loaders: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     /// A list of images that have been uploaded to the project's gallery
     pub gallery: Vec<GalleryItem>,
 }
@@ -94,7 +95,7 @@ pub struct GalleryItem {
     pub created: UtcDateTime,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: u32,
+    pub ordering: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

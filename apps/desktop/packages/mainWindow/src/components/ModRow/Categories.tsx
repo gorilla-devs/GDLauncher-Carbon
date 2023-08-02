@@ -21,42 +21,40 @@ const Categories = (props: Props) => {
       <Switch>
         <Match when={!props.isRowSmall()}>
           <For each={getCategories(props.modProps)}>
-            {(tag) => (
-              <Tooltip
-                content={
-                  isCurseForgeData(props.modProps.data)
-                    ? (tag as CFFECategory).name
-                    : capitalize(tag as string)
-                }
-              >
-                <Tag
-                  img={
-                    isCurseForgeData(props.modProps.data) ? (
-                      (tag as CFFECategory).iconUrl
-                    ) : (
-                      <div>
-                        <Switch fallback={capitalize(tag as string)}>
-                          <Match
-                            when={props.modrinthCategories?.find(
-                              (category) => category.name === tag
-                            )}
-                          >
-                            <CategoryIcon
-                              category={
-                                props.modrinthCategories?.find(
-                                  (category) => category.name === tag
-                                ) as MRFECategory
-                              }
-                            />
-                          </Match>
-                        </Switch>
-                      </div>
-                    )
+            {(tag) => {
+              const modrinthCategory = () =>
+                props.modrinthCategories?.find(
+                  (category) => category.name === tag
+                );
+              return (
+                <Tooltip
+                  content={
+                    isCurseForgeData(props.modProps.data)
+                      ? (tag as CFFECategory).name
+                      : capitalize(tag as string)
                   }
-                  type="fixed"
-                />
-              </Tooltip>
-            )}
+                >
+                  <Tag
+                    img={
+                      isCurseForgeData(props.modProps.data) ? (
+                        (tag as CFFECategory).iconUrl
+                      ) : (
+                        <div>
+                          <Switch fallback={capitalize(tag as string)}>
+                            <Match when={modrinthCategory()}>
+                              <CategoryIcon
+                                category={modrinthCategory() as MRFECategory}
+                              />
+                            </Match>
+                          </Switch>
+                        </div>
+                      )
+                    }
+                    type="fixed"
+                  />
+                </Tooltip>
+              );
+            }}
           </For>
         </Match>
         <Match when={props.isRowSmall()}>

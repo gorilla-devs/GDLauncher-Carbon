@@ -12,7 +12,7 @@ type Props = {
   setSelectedMods: SetStoreFunction<{
     [id: string]: boolean;
   }>;
-  selectedMods: {
+  selectMods: {
     [id: string]: boolean;
   };
 };
@@ -32,7 +32,7 @@ const Mod = (props: Props) => {
       <div class="flex gap-4 justify-between items-center w-full">
         <div class="flex gap-4 justify-between items-center">
           <Checkbox
-            checked={props.selectedMods[props.mod.id]}
+            checked={props.selectMods[props.mod.id]}
             onChange={(e) => {
               props.setSelectedMods(props.mod.id, e);
             }}
@@ -40,9 +40,11 @@ const Mod = (props: Props) => {
           <div class="flex items-center gap-2">
             <div class="h-10 w-10 rounded-xl bg-green-500" />
             <div class="flex flex-col">
-              {props.mod.metadata.name}
+              {props.mod.curseforge?.name ||
+                props.mod.metadata?.name ||
+                props.mod.filename}
               <div class="flex gap-2">
-                <For each={props.mod.modloaders}>
+                <For each={props.mod.metadata?.modloaders}>
                   {(modloader, _) => (
                     <span class="flex gap-2 justify-center items-center">
                       <Show when={modloader}>
@@ -60,7 +62,10 @@ const Mod = (props: Props) => {
                   )}
                 </For>
                 <p class="m-0 text-darkSlate-500 text-sm">
-                  {`${props.mod.metadata.version}`}
+                  {`${props.mod.metadata?.modloaders[0]} ${
+                    props.mod.curseforge?.project_id ||
+                    props.mod.metadata?.version
+                  }`}
                 </p>
               </div>
             </div>

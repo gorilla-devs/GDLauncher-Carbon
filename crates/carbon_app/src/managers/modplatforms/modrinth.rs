@@ -11,12 +11,12 @@ use crate::{
             VersionHashesResponse, VersionsResponse,
         },
         search::{
-            ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
+            ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID, TeamIDs,
             VersionHashesQuery, VersionID, VersionIDs,
         },
         version::Version,
     },
-    error::request::RequestError,
+    error::request::GoodJsonRequestError,
 };
 
 pub struct Modrinth {
@@ -41,18 +41,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let categories = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let categories = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(categories)
     }
 
@@ -62,18 +57,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let categories = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let categories = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(categories)
     }
 
@@ -88,18 +78,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let search_results = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let search_results = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(search_results)
     }
 
@@ -109,18 +94,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let proj = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let proj = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(proj)
     }
 
@@ -135,18 +115,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let proj = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let proj = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(proj)
     }
 
@@ -158,18 +133,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let projects = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let projects: ProjectsResponse = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(projects)
     }
 
@@ -179,18 +149,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let ver = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let ver: Version = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(ver)
     }
 
@@ -202,18 +167,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let versions = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let versions: VersionsResponse = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(versions)
     }
 
@@ -228,19 +188,14 @@ impl Modrinth {
 
         trace!("POST {url} - {body:?}");
 
-        let body = self
+        let versions = self
             .client
             .post(url.as_str())
             .json(&hashes_query)
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let versions: VersionHashesResponse = serde_json::from_str(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?;
+            .json_with_context()
+            .await?;
         Ok(versions)
     }
 
@@ -250,22 +205,38 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let team = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let team = serde_json::from_str::<TeamResponse>(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?
+            .json_with_context::<TeamResponse>()
+            .await?
             .into_iter()
             .filter(|member| member.accepted)
             .collect::<TeamResponse>();
         Ok(team)
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_teams(&self, team_ids: TeamIDs) -> anyhow::Result<Vec<TeamResponse>> {
+        let mut url = self.base_url.join("teams")?;
+        let query = team_ids.into_query_parameters()?;
+        url.set_query(Some(&query));
+
+        trace!("GET {}", url);
+
+        let teams = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json_with_context::<Vec<TeamResponse>>()
+            .await?
+            .into_iter()
+            .map(|team| team.into_iter().filter(|member| member.accepted).collect())
+            .collect::<Vec<TeamResponse>>();
+        Ok(teams)
     }
 
     #[tracing::instrument(skip(self))]
@@ -276,18 +247,13 @@ impl Modrinth {
 
         trace!("GET {}", url);
 
-        let body = self
+        let team = self
             .client
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()
-            .map_err(RequestError::from_error)?
-            .text()
-            .await
-            .map_err(RequestError::from_error)?;
-        let team = serde_json::from_str::<TeamResponse>(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?
+            .json_with_context::<TeamResponse>()
+            .await?
             .into_iter()
             .filter(|member| member.accepted)
             .collect::<TeamResponse>();
@@ -454,6 +420,25 @@ mod test {
 
         let results = modrinth.get_team(TeamID("SfcwZ8an".to_string())).await?;
         tracing::debug!("Team: {:?}", results);
+        assert!(!results.is_empty());
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn test_get_teams() -> anyhow::Result<()> {
+        use super::*;
+
+        let client = reqwest::Client::builder().build()?;
+        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let modrinth = Modrinth::new(client);
+
+        let results = modrinth
+            .get_teams(TeamIDs {
+                ids: vec!["SfcwZ8an".to_string(), "BZoBsPo6".to_string()],
+            })
+            .await?;
+        tracing::debug!("Teams: {:?}", results);
         assert!(!results.is_empty());
         Ok(())
     }
