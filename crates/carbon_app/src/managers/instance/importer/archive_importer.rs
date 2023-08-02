@@ -1,10 +1,7 @@
-use super::InstanceArchiveImporter;
 use crate::{
     api::{instance::import::FEEntity, keys},
     domain::{
-        instance::info::{
-            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
-        },
+        instance::info::{CurseforgeModpack, Modpack},
         modplatforms::curseforge::{
             self,
             filters::{ModsParameters, ModsParametersBody},
@@ -13,20 +10,32 @@ use crate::{
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
-use tokio::{
-    fs::create_dir_all,
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::Mutex,
-    task::spawn_blocking,
-};
+use anyhow::anyhow;
+use std::{path::PathBuf, sync::Arc};
+use tokio::{sync::Mutex, task::spawn_blocking};
+
+use super::InstanceImporter;
+
+#[derive(Debug)]
+pub struct CurseForgeManifestWrapper {
+    full_path: PathBuf,
+    manifest: curseforge::manifest::Manifest,
+}
 
 #[derive(Debug, Default)]
-pub struct CurseforgeInstanceArchiveImporter {}
+pub struct CurseForgeZipImporter {
+    scan_result: Mutex<Option<CurseForgeManifestWrapper>>,
+}
 
 #[async_trait::async_trait]
-impl InstanceArchiveImporter for CurseforgeInstanceArchiveImporter {
-    async fn import(&self, app: Arc<AppInner>, path: PathBuf) -> anyhow::Result<VisualTaskId> {
+impl InstanceImporter for CurseForgeZipImporter {
+    type Config = CurseForgeManifestWrapper;
+
+    async fn scan(&mut self, app: Arc<AppInner>, path: Option<PathBuf>) -> anyhow::Result<()> {
+        let Some(path) = path else {
+            return Err(anyhow!("No scan path provided. Scan path required for CurseForge Zip Importer"));
+        };
+
         let file_path_clone = path.clone();
 
         // make sure this is a valid modpack
@@ -42,7 +51,50 @@ impl InstanceArchiveImporter for CurseforgeInstanceArchiveImporter {
         })
         .await??;
 
-        let mut content = tokio::fs::read(path).await?;
+        if manifest.manifest_type != "minecraftModpack" {
+            return Err(anyhow::anyhow!(format!(
+                "Invalid manifest type `{}`",
+                &manifest.manifest_type
+            )));
+        }
+
+        let mut lock = self.scan_result.lock().await;
+        *lock = Some(CurseForgeManifestWrapper {
+            full_path: path,
+            manifest,
+        });
+        app.invalidate(
+            keys::instance::GET_IMPORTABLE_INSTANCES,
+            Some(serde_json::to_value(FEEntity::CurseForgeZip(
+                path.to_string_lossy().to_string(),
+            ))?),
+        );
+
+        Ok(())
+    }
+
+    async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
+        let instances = self.scan_result.lock().await.map_or_else(
+            || vec![],
+            |instance| {
+                vec![super::ImportableInstance {
+                    name: instance.manifest.name.clone(),
+                }]
+            },
+        );
+        Ok(instances)
+    }
+
+    async fn import(
+        &self,
+        app: Arc<AppInner>,
+        _index: u32,
+        name: &str,
+    ) -> anyhow::Result<VisualTaskId> {
+        let lock = self.scan_result.lock().await;
+        let instance = lock.ok_or(anyhow!("No importable instance available"))?;
+
+        let mut content = tokio::fs::read(instance.full_path).await?;
         let murmur2 = tokio::task::spawn_blocking(move || {
             murmurhash32::murmurhash2({
                 // curseforge's weird api
@@ -57,50 +109,59 @@ impl InstanceArchiveImporter for CurseforgeInstanceArchiveImporter {
             .get_fingerprints(&vec![murmur2])
             .await?
             .data;
-        // let mods_response = app
-        //     .modplatforms_manager()
-        //     .curseforge
-        //     .get_mods(ModsParameters {
-        //         body: ModsParametersBody {
-        //             mod_ids: fp_response
-        //                 .exact_matches
-        //                 .iter()
-        //                 .map(|m| m.file.mod_id)
-        //                 .collect::<Vec<_>>(),
-        //         },
-        //     })
-        //     .await?
-        //     .data;
+        let mods_response = app
+            .modplatforms_manager()
+            .curseforge
+            .get_mods(ModsParameters {
+                body: ModsParametersBody {
+                    mod_ids: fp_response
+                        .exact_matches
+                        .iter()
+                        .map(|m| m.file.mod_id)
+                        .collect::<Vec<_>>(),
+                },
+            })
+            .await?
+            .data;
         let mut matches = fp_response
             .exact_fingerprints
             .into_iter()
             .zip(fp_response.exact_matches.into_iter())
-            // .zip(mods_response.into_iter())
-            // .map(|((fingerprint, fp_match), proj)| (fingerprint, fp_match, proj))
+            .zip(mods_response.into_iter())
+            .map(|((fingerprint, fp_match), proj)| (fingerprint, fp_match, proj))
             .collect::<Vec<_>>();
-        let modpack = matches
+        let (modpack, icon) = matches
             .first()
-            .map(|(_, fp_match)| {
-                Modpack::CurseforgeLocal(
-                    CurseforgeModpack {
-                        project_id: fp_match.file.mod_id,
-                        file_id: fp_match.file.id,
-                    },
-                    path.clone(),
+            .map(|(_, fp_match, proj)| {
+                (
+                    Modpack::CurseforgeLocal(
+                        CurseforgeModpack {
+                            project_id: fp_match.file.mod_id,
+                            file_id: fp_match.file.id,
+                        },
+                        instance.full_path.clone(),
+                    ),
+                    Some(proj.logo.url),
                 )
             })
-            .unwrap_or_else(|| Modpack::CurseforgeUnmanaged(path.clone()));
+            .unwrap_or_else(|| {
+                (
+                    Modpack::CurseforgeUnmanaged(instance.full_path.clone()),
+                    None,
+                )
+            });
+
+        if let Some(icon_url) = icon {
+            app.instance_manager().download_icon(icon_url).await?;
+        }
 
         let install_source = InstanceVersionSource::Modpack(modpack);
 
-        // TODO: set instance name and icon properly
-        let icon : Option<()> = None;
-        let instance_name = "".to_string();
         let created_instance_id = app
             .instance_manager()
             .create_instance(
                 app.instance_manager().get_default_group().await?,
-                instance_name,
+                name.to_string(),
                 icon.is_some(),
                 install_source,
                 "".to_string(),
@@ -109,10 +170,9 @@ impl InstanceArchiveImporter for CurseforgeInstanceArchiveImporter {
 
         let (_, task_id) = app
             .instance_manager()
-            .prepare_game(created_instance_id, None)
+            .prepare_game(created_instance_id, None, None)
             .await?;
 
         Ok(task_id)
-
     }
 }

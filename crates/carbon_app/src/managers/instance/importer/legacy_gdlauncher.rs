@@ -7,7 +7,7 @@ use tokio::{
 };
 
 use crate::{
-    api::{instance::import::FEEntity, keys, translation::Translation},
+    api::{instance::import::FEEntity, keys},
     domain::{
         instance::info::{
             CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
@@ -16,7 +16,7 @@ use crate::{
     },
     managers::{
         instance::InstanceVersionSource,
-        vtask::{Subtask, VisualTask},
+        vtask::Subtask,
         AppInner,
     },
 };
@@ -32,7 +32,7 @@ pub struct LegacyGDLauncherImporter {
 impl InstanceImporter for LegacyGDLauncherImporter {
     type Config = LegacyGDLauncherConfigWrapper;
 
-    async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()> {
+    async fn scan(&mut self, app: Arc<AppInner>, _path: Option<PathBuf>) -> anyhow::Result<()> {
         let mut old_gdl_base_path = directories::BaseDirs::new()
             .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
             .data_dir()
@@ -111,7 +111,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(instances)
     }
 
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn import(&self, app: Arc<AppInner>, index: u32, name: &str) -> anyhow::Result<VisualTaskId> {
         let lock = self.results.lock().await;
         let instance = lock
             .get(index as usize)
@@ -175,7 +175,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .instance_manager()
             .create_instance(
                 app.instance_manager().get_default_group().await?,
-                instance.name.clone(),
+                name.to_string(),
                 instance.config.background.is_some(),
                 instance_version_source,
                 "".to_string(),

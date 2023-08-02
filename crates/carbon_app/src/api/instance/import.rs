@@ -15,9 +15,9 @@ use crate::{
 #[serde(rename_all = "lowercase")]
 pub enum FEEntity {
     LegacyGDLauncher,
-    MRPack,
+    MRPack(String),
     Modrinth,
-    CurseForgeZip,
+    CurseForgeZip(String),
     CurseForge,
     ATLauncher,
     Technic,
@@ -30,9 +30,9 @@ impl From<FEEntity> for importer::Entity {
     fn from(entity: FEEntity) -> Self {
         match entity {
             FEEntity::LegacyGDLauncher => Self::LegacyGDLauncher,
-            FEEntity::MRPack => Self::MRPack,
+            FEEntity::MRPack(path) => Self::MRPack(path.into()),
             FEEntity::Modrinth => Self::Modrinth,
-            FEEntity::CurseForgeZip => Self::CurseForgeZip,
+            FEEntity::CurseForgeZip(path) => Self::CurseForgeZip(path.into()),
             FEEntity::CurseForge => Self::CurseForge,
             FEEntity::ATLauncher => Self::ATLauncher,
             FEEntity::Technic => Self::Technic,
@@ -47,9 +47,9 @@ impl From<importer::Entity> for FEEntity {
     fn from(entity: importer::Entity) -> Self {
         match entity {
             importer::Entity::LegacyGDLauncher => Self::LegacyGDLauncher,
-            importer::Entity::MRPack => Self::MRPack,
+            importer::Entity::MRPack(path) => Self::MRPack(path.into_string_lossy()),
             importer::Entity::Modrinth => Self::Modrinth,
-            importer::Entity::CurseForgeZip => Self::CurseForgeZip,
+            importer::Entity::CurseForgeZip(path) => Self::CurseForgeZip(path.into_string_lossy()),
             importer::Entity::CurseForge => Self::CurseForge,
             importer::Entity::ATLauncher => Self::ATLauncher,
             importer::Entity::Technic => Self::Technic,
@@ -79,6 +79,7 @@ impl From<importer::ImportableInstance> for FEImportableInstance {
 pub struct FEImportInstance {
     pub entity: FEEntity,
     pub index: u32,
+    pub name: String,
 }
 
 pub async fn scan_importable_instances(app: Arc<AppInner>, entity: FEEntity) -> anyhow::Result<()> {
@@ -86,7 +87,7 @@ pub async fn scan_importable_instances(app: Arc<AppInner>, entity: FEEntity) -> 
     let mut locker = locker.importer.lock().await;
 
     match entity {
-        FEEntity::LegacyGDLauncher => locker.legacy_gdlauncher.scan(app.clone()).await,
+        FEEntity::LegacyGDLauncher => locker.legacy_gdlauncher.scan(app.clone(), None).await,
         _ => anyhow::bail!("Unsupported entity"),
     }
 }
@@ -118,7 +119,7 @@ pub async fn import_instance(
     match args.entity {
         FEEntity::LegacyGDLauncher => locker
             .legacy_gdlauncher
-            .import(app.clone(), args.index)
+            .import(app.clone(), args.index, &args.name)
             .await
             .map(|task_id| task_id.into()),
         _ => anyhow::bail!("Unsupported entity"),
