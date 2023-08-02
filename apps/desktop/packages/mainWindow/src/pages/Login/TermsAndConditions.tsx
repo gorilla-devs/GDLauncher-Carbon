@@ -100,7 +100,7 @@ const TermsAndConditions = (props: Props) => {
                     class="underline text-lightSlate-400 cursor-pointer"
                     onClick={() => {
                       modalsContext?.openModal({
-                        name: "acceptableUsePolicy",
+                        name: "privacyStatement",
                       });
                     }}
                   >

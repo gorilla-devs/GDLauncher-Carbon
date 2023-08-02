@@ -96,7 +96,8 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
                 .update(
                     db::app_configuration::id::equals(0),
                     vec![
-                        app_configuration::is_legal_accepted::set(false),
+                        app_configuration::terms_and_privacy_accepted::set(false),
+                        app_configuration::terms_and_privacy_accepted_checksum::set(None),
                         app_configuration::metrics_enabled::set(false),
                         app_configuration::metrics_enabled_last_update::set(None),
                     ],

@@ -1,3 +1,5 @@
+use self::terms_and_privacy::TermsAndPrivacy;
+
 use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
@@ -8,14 +10,18 @@ use anyhow::anyhow;
 use chrono::Utc;
 use std::path::PathBuf;
 
+mod terms_and_privacy;
+
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
+    pub terms_and_privacy: TermsAndPrivacy,
 }
 
 impl SettingsManager {
     pub fn new(runtime_path: PathBuf) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
+            terms_and_privacy: TermsAndPrivacy::new(),
         }
     }
 }
@@ -156,10 +162,12 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
+        if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::is_legal_accepted::set(is_legal_accepted)],
+                vec![app_configuration::terms_and_privacy_accepted::set(
+                    terms_and_privacy_accepted,
+                )],
             ));
             something_changed = true;
         }

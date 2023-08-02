@@ -1,6 +1,8 @@
 use crate::{
     api::{
-        keys::settings::{GET_SETTINGS, SET_SETTINGS},
+        keys::settings::{
+            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+        },
         router::router,
     },
     managers::App,
@@ -23,6 +25,20 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .set_settings(new_settings)
                 .await
         }
+
+        query GET_TERMS_OF_SERVICE_BODY[app, _args: ()] {
+            app.settings_manager()
+                .terms_and_privacy
+                .fetch_terms_of_service_body()
+                .await
+        }
+
+        query GET_PRIVACY_STATEMENT_BODY[app, _args: ()] {
+            app.settings_manager()
+                .terms_and_privacy
+                .fetch_privacy_statement_body()
+                .await
+        }
     }
 }
 
@@ -43,10 +59,9 @@ struct FESettings {
     java_custom_args: String,
     auto_manage_java: bool,
     preferred_mod_channel: ModChannel,
-    is_legal_accepted: bool,
+    terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
     random_user_uuid: String,
-    metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
 // in the public interface due to `FESettings` also being in the public interface.
@@ -110,11 +125,10 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             preferred_mod_channel: data.preferred_mod_channel.try_into()?,
-            is_legal_accepted: data.is_legal_accepted,
+            terms_and_privacy_accepted: data.terms_and_privacy_accepted,
             metrics_enabled: data.metrics_enabled,
             random_user_uuid: data.random_user_uuid,
-            metrics_enabled_last_update: data.metrics_enabled_last_update,
-        }
+        })
     }
 }
 
@@ -151,7 +165,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub preferred_mod_channel: Option<ModChannel>,
     #[specta(optional)]
-    pub is_legal_accepted: Option<bool>,
+    pub terms_and_privacy_accepted: Option<bool>,
     #[specta(optional)]
     pub metrics_enabled: Option<bool>,
 }

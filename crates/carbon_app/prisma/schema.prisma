@@ -9,27 +9,29 @@ generator client {
 }
 
 model AppConfiguration {
-  id                   Int     @id @unique @default(0)
-  theme                String  @default("main")
-  reducedMotion        Boolean @default(false)
-  language             String  @default("english")
-  discordIntegration   Boolean @default(true)
-  releaseChannel       String  @default("stable")
-  activeAccountUuid    String?
-  concurrentDownloads  Int     @default(8)
-  showNews             Boolean @default(true)
-  startupResolution    String  @default("854x480")
-  javaCustomArgs       String  @default("")
-  xmx                  Int
-  xms                  Int     @default(1024)
-  defaultInstanceGroup Int?
-  isFirstLaunch        Boolean @default(true)
-  autoManageJava       Boolean @default(true)
-  preferredModChannel  Int     @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
-  isLegalAccepted      Boolean @default(false)
-  metricsEnabled           Boolean   @default(false)
-  metricsEnabledLastUpdate DateTime?
-  randomUserUUID           String    @default(uuid())
+  id                              Int       @id @unique @default(0)
+  theme                           String    @default("main")
+  reducedMotion                   Boolean   @default(false)
+  language                        String    @default("english")
+  discordIntegration              Boolean   @default(true)
+  releaseChannel                  String    @default("stable")
+  activeAccountUuid               String?
+  concurrentDownloads             Int       @default(8)
+  showNews                        Boolean   @default(true)
+  startupResolution               String    @default("854x480")
+  javaCustomArgs                  String    @default("")
+  xmx                             Int
+  xms                             Int       @default(1024)
+  defaultInstanceGroup            Int?
+  isFirstLaunch                   Boolean   @default(true)
+  autoManageJava                  Boolean   @default(true)
+  preferredModChannel             Int       @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
+  // Legal / metrics
+  randomUserUUID                  String    @default(uuid())
+  termsAndPrivacyAccepted         Boolean   @default(false)
+  termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
+  metricsEnabled                  Boolean   @default(false)
+  metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
 }
 
 model Java {

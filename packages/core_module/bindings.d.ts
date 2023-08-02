@@ -48,7 +48,9 @@ export type Procedures = {
         { key: "modplatforms.modrinth.getVersions", input: MRFEVersionIDs, result: MRFEVersionsResponse } | 
         { key: "modplatforms.modrinth.search", input: MRFEProjectSearchParameters, result: MRFEProjectSearchResponse } | 
         { key: "modplatforms.unifiedSearch", input: FEUnifiedSearchParameters, result: FEUnifiedSearchResponse } | 
+        { key: "settings.getPrivacyStatementBody", input: never, result: string } | 
         { key: "settings.getSettings", input: never, result: FESettings } | 
+        { key: "settings.getTermsOfServiceBody", input: never, result: string } | 
         { key: "systeminfo.getTotalRAM", input: never, result: string } | 
         { key: "systeminfo.getUsedRAM", input: never, result: string } | 
         { key: "vtask.getTask", input: FETaskId, result: FETask | null } | 
@@ -127,6 +129,8 @@ export type MRFEGalleryItem = { url: string; featured: boolean; title: string | 
 
 export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
 
+export type ModChannel = "Alpha" | "Beta" | "Stable"
+
 export type MemoryRange = { min_mb: number; max_mb: number }
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
@@ -152,8 +156,6 @@ export type CurseforgeMod = { project_id: number; file_id: number }
 export type FEModDescriptionResponse = { data: string; pagination: CFFEPagination | null }
 
 export type FEEventName = "AppClosed"
-
-export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
@@ -303,9 +305,13 @@ export type MRFEDependency = { version_id: string | null; project_id: string | n
 
 export type MRFEProject = { slug: string; title: string; description: string; categories: string[]; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; body: string; additional_categories: string[]; issues_url: string | null; source_url: string | null; wiki_url: string | null; discord_url: string | null; donation_urls: MRFEDonationLink[]; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; id: string; team: string; moderator_message: MRFEModeratorMessage | null; published: string; updated: string; approved: string | null; followers: number; status: MRFEProjectStatus; license: MRFELicense; versions: string[]; game_versions: string[]; loaders: string[]; gallery: MRFEGalleryItem[] }
 
+export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
+
 export type Set<T> = { Set: T }
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource }
+
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
 
 export type CFFEModParameters = { modId: number }
 
@@ -345,8 +351,6 @@ export type Modpack = { Curseforge: CurseforgeModpack } | { Modrinth: ModrinthMo
 
 export type Progress = "Indeterminate" | { Known: number } | { Failed: FeError }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; isLegalAccepted: boolean; metricsLevel: number | null }
-
 export type CFFEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
 export type CFFEModFilesParametersQuery = { gameVersion?: string | null; modLoaderType?: CFFEModLoaderType | null; gameVersionTypeId?: number | null; index?: number | null; pageSize?: number | null }
@@ -361,8 +365,6 @@ export type CFFEFileIndex = { gameVersion: string; fileId: number; filename: str
 
 export type ListInstance = { id: FEInstanceId; name: string; favorite: boolean; status: ListInstanceStatus; icon_revision: number }
 
-export type ModChannel = "Alpha" | "Beta" | "Stable"
-
 export type CFFEModSearchSortOrder = "ascending" | "descending"
 
 export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget }
@@ -376,6 +378,8 @@ export type MRFELoadersResponse = MRFELoader[]
 export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningOfGroup: FEGroupId } | { EndOfGroup: FEGroupId }
 
 export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string; created: string; role: MRFEUserRole; badges: number }
+
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
 
 export type MRFEModeratorMessage = { message: string; body: string | null }
 
@@ -428,8 +432,6 @@ export type LaunchState = { Inactive: { failed_task: FETaskId | null } } | { Pre
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
 export type CFFEClassId = "mods" | "modpacks"
-
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; isLegalAccepted?: boolean | null; metricsLevel?: number | null }
 
 export type FEUnifiedModLoaderType = "forge" | "fabric" | "quilt" | "liteloader" | "cauldron" | "bukkit" | "bungeecord" | "canvas" | "datapack" | "folia" | "iris" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall" | { other: string }
 
