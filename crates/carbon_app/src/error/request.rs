@@ -144,7 +144,7 @@ impl RequestErrorDetails {
     pub fn from_json_decode_error(error: serde_json::Error, body: &str) -> Self {
         Self::MalformedResponse {
             details: MalformedResponseDetails::JsonDecodeError {
-                ctx: get_json_context(&error, body, 200),
+                ctx: get_json_context(&error, body, 400),
                 line: error.line(),
                 column: error.column(),
                 source: error.to_string(),
@@ -180,6 +180,26 @@ impl RequestError {
             context: RequestContext::from_error(&value),
             error: RequestErrorDetails::from_error_censored(value),
         }
+    }
+}
+
+#[async_trait::async_trait]
+pub trait GoodJsonRequestError {
+    async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError>;
+}
+
+#[async_trait::async_trait]
+impl GoodJsonRequestError for reqwest::Response {
+    async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError> {
+        let url = self.url().clone();
+        let body = self
+            .error_for_status()
+            .map_err(RequestError::from_error)?
+            .text()
+            .await
+            .map_err(RequestError::from_error)?;
+        Ok(serde_json::from_str::<T>(&body)
+            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?)
     }
 }
 

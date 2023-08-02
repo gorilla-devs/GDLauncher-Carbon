@@ -2,6 +2,7 @@
 
 use std::{collections::HashSet, path::PathBuf};
 
+use anyhow::bail;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
@@ -78,7 +79,30 @@ pub enum ModLoaderType {
     Forge,
     Fabric,
     Quilt,
-    Unknown,
+}
+
+impl ToString for ModLoaderType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Forge => "forge",
+            Self::Fabric => "fabric",
+            Self::Quilt => "quilt",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<&str> for ModLoaderType {
+    type Error = anyhow::Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "forge" => Ok(Self::Forge),
+            "fabric" => Ok(Self::Fabric),
+            "quilt" => Ok(Self::Quilt),
+            _ => bail!("unknown modloader type {s}"),
+        }
+    }
 }
 
 impl Modpack {

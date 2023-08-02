@@ -42,6 +42,7 @@ pub enum LoaderType {
     Fabric,
     Folia,
     Forge,
+    NeoForge,
     Iris,
     Liteloader,
     Minecraft,

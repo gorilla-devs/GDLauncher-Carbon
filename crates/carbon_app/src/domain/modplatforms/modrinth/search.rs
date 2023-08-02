@@ -293,6 +293,16 @@ pub struct ProjectSearchResponse {
     pub total_hits: u32,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct VersionID(pub String);
+
+impl Deref for VersionID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct VersionIDs {
@@ -349,26 +359,6 @@ impl Deref for ProjectID {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct VersionID(pub String);
-
-impl Deref for VersionID {
-    type Target = String;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct TeamID(pub String);
-
-impl Deref for TeamID {
-    type Target = String;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectIDs {
@@ -403,6 +393,53 @@ impl FromIterator<String> for ProjectIDs {
             c.push(i);
         }
         ProjectIDs { ids: c }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TeamID(pub String);
+
+impl Deref for TeamID {
+    type Target = String;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[into_query_parameters]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct TeamIDs {
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json"
+    )]
+    pub ids: Vec<String>,
+}
+
+impl Deref for TeamIDs {
+    type Target = Vec<String>;
+    fn deref(&self) -> &Self::Target {
+        &self.ids
+    }
+}
+
+impl IntoIterator for TeamIDs {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.ids.into_iter()
+    }
+}
+
+impl FromIterator<String> for TeamIDs {
+    fn from_iter<T: IntoIterator<Item = String>>(iter: T) -> Self {
+        let iter = iter.into_iter();
+        let (size_lower, _) = iter.size_hint();
+        let mut c = Vec::with_capacity(size_lower);
+        for i in iter {
+            c.push(i);
+        }
+        TeamIDs { ids: c }
     }
 }
 

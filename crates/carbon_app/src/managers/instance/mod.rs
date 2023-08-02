@@ -2,10 +2,8 @@ use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
-use std::io::Cursor;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
-use super::metadata::mods as mod_meta;
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
@@ -16,7 +14,6 @@ use chrono::Utc;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 
-use md5::{Digest, Md5};
 use prisma_client_rust::Direction;
 use rspc::Type;
 use serde::Serialize;
@@ -139,6 +136,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
 
             instances.insert(instance_id, instance);
+
+            self.app
+                .meta_cache_manager()
+                .queue_local_caching(instance_id, false)
+                .await;
         }
 
         self.app.invalidate(GET_GROUPS, None);
@@ -181,70 +183,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
-                let mods_path = path.join("instance/mods");
-                let mut mod_futures = Vec::new();
-
-                if mods_path.is_dir() {
-                    let mut reader = tokio::fs::read_dir(mods_path).await?;
-
-                    while let Some(entry) = reader.next_entry().await? {
-                        mod_futures.push(async move {
-                            let mut path = entry.path();
-                            let is_jar = path.extension() == Some(OsStr::new("jar"));
-                            let is_jar_disabled = path.extension() == Some(OsStr::new("disabled"));
-
-                            if (is_jar || is_jar_disabled) && entry.file_type().await?.is_file() {
-                                let mut md5 = Md5::new();
-                                let file = tokio::fs::read(&path).await?;
-                                md5.update(&file);
-                                let md5hash = md5.finalize();
-
-                                let mod_ = tokio::task::spawn_blocking(|| {
-                                    mod_meta::parse_metadata(Cursor::new(file))
-                                })
-                                    .await??
-                                    .map(|metadata| {
-                                        let id = hex::encode(md5hash);
-
-                                        let mut filename = path.file_name()
-                                            .expect("this path cannot end in .. since we have used it as a file");
-
-                                        if is_jar_disabled {
-                                            // remove the .disabled extension
-                                            path = path.with_extension("");
-                                            filename = path.file_name()
-                                                .expect("this path cannot end in .. or the above expect would've failed");
-                                        }
-
-                                        Mod {
-                                            id,
-                                            filename: filename.to_owned(),
-                                            enabled: !is_jar_disabled,
-                                            modloaders: metadata.modloaders.clone().unwrap_or_else(|| vec![info::ModLoaderType::Unknown]),
-                                            metadata,
-                                        }
-                                    });
-
-                                Ok(mod_)
-                            } else {
-                                Ok::<_, anyhow::Error>(None)
-                            }
-                        });
-                    }
-                };
-
-                let mods = futures::future::join_all(mod_futures)
-                    .await
-                    .into_iter()
-                    .map(|r| r.unwrap_or(None))
-                    .filter_map(|x| x)
-                    .collect::<Vec<_>>();
-
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    mods,
                     icon_revision: 0,
                 };
 
@@ -707,6 +649,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .exec()
             .await?;
 
+        self.app.meta_cache_manager().gc_mod_metadata().await;
+
         Ok(())
     }
 
@@ -958,7 +902,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    mods: Vec::new(),
                     icon_revision: 0,
                 }),
             },
@@ -1177,7 +1120,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             })?
             .group_id;
 
-        let data = instance.data()?;
         let mut new_info = instance.data()?.config.clone();
         let (new_shortpath, new_path) = self.next_folder(&instance.shortpath).await?;
         new_info.name = name;
@@ -1221,8 +1163,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             )
             .await?;
 
-        let mods = data.mods.clone();
-
         instances.insert(
             id,
             Instance {
@@ -1231,7 +1171,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    mods,
                     icon_revision: 0,
                 }),
             },
@@ -1239,6 +1178,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app
+            .meta_cache_manager()
+            .queue_local_caching(id, false)
+            .await;
 
         Ok(id)
     }
@@ -1387,17 +1330,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
-            mods: instance
-                .mods
-                .iter()
-                .map(|m| domain::Mod {
-                    id: m.id.clone(),
-                    filename: m.filename.to_string_lossy().to_string(),
-                    enabled: m.enabled,
-                    modloaders: m.modloaders.clone(),
-                    metadata: m.metadata.clone(),
-                })
-                .collect(),
             icon_revision: 0,
         })
     }
@@ -1617,7 +1549,6 @@ pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
-    mods: Vec<Mod>,
     icon_revision: u32,
 }
 

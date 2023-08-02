@@ -25,6 +25,7 @@ model AppConfiguration {
   defaultInstanceGroup Int?
   isFirstLaunch        Boolean @default(true)
   autoManageJava       Boolean @default(true)
+  preferredModChannel  Int     @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
   isLegalAccepted      Boolean @default(false)
   metricsLevel         Int? // 0 = disabled, 1 = anonymous, 2 = anonymous + sessions, 3 = authenticated + sessions
 }
@@ -87,6 +88,7 @@ model Instance {
   index     Int
   group     InstanceGroup @relation(fields: [groupId], references: [id])
   groupId   Int
+  mods      ModFileCache[]
 }
 
 model InstanceGroup {
@@ -97,33 +99,64 @@ model InstanceGroup {
 }
 
 model ModFileCache {
-  instance_id Int
-  path        String
+  id          String      @id @default(uuid())
+  instanceId  Int
+  instance    Instance    @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  filename    String
   filesize    Int
-  md5         Bytes
-  metadata    ModMetadata @relation(fields: [md5], references: [md5])
+  enabled     Boolean
+  metadataId  String
+  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Restrict)
 
-  @@unique([instance_id, path])
+  @@unique([instanceId, filename])
 }
 
 model ModMetadata {
-  md5         Bytes               @id
-  murmur2     Int
-  name        String?
-  modid       String?
-  version     String?
-  description String?
-  authors     String?
-  curseforge  CurseForgeModCache? @relation(fields: [murmur2], references: [murmur2])
-  cachedFiles ModFileCache[]
+  id           String              @id
+  murmur2      Int
+  sha512       Bytes
+  name         String?
+  modid        String?
+  version      String?
+  description  String?
+  authors      String?
+  modloaders   String
+  curseforge   CurseForgeModCache?
+  modrinth     ModrinthModCache?
+  cachedFiles  ModFileCache[]
 }
 
 model CurseForgeModCache {
-  murmur2    Int           @id
-  project_id Int
-  file_id    Int
+  id         String      @id @default(uuid())
+  murmur2    Int
+  projectId  Int
+  fileId     Int
   name       String
   urlslug    String
   summary    String
-  metadata   ModMetadata[]
+  authors    String
+  cachedAt   DateTime
+  metadataId String      @unique
+  metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fileId])
+}
+
+model ModrinthModCache {
+  id          String      @id @default(uuid())
+  sha512      String
+  sha1        String
+  filename    String
+  projectId   String
+  versionId   String
+  title       String
+  urlslug     String
+  description String
+  authors     String
+  cachedAt    DateTime
+  metadataId  String      @unique
+  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+
+
+  @@unique([projectId, versionId])
 }

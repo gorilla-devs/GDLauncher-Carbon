@@ -1,4 +1,4 @@
-import { port, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 
 //@ts-ignore
 const fetchData = ({ params }) => {
@@ -7,9 +7,16 @@ const fetchData = ({ params }) => {
     parseInt(params.id, 10),
   ]);
 
-  const image = `http://localhost:${port}/instance/instanceIcon?id=${params.id}`;
+  const instancesUngrouped = rspc.createQuery(() => [
+    "instance.getInstancesUngrouped",
+  ]);
 
-  return { image, instanceDetails };
+  const instanceMods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
+    parseInt(params.id, 10),
+  ]);
+
+  return { instanceDetails, instanceMods, instancesUngrouped };
 };
 
 export default fetchData;

@@ -159,6 +159,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(InstanceDetails::from)
         }
 
+        query INSTANCE_MODS[app, id: FEInstanceId] {
+            app.meta_cache_manager()
+                .focus_instance(id.into())
+                .await;
+
+            Ok(app.instance_manager()
+                .list_mods(id.into())
+                .await?
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<Mod>>())
+        }
+
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
                 .prepare_game(id.into(), None, None)
@@ -291,6 +304,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     #[derive(Deserialize)]
     struct InstanceIconQuery {
         id: i32,
+        rev: Option<i32>,
     }
 
     #[derive(Deserialize)]
@@ -406,10 +420,10 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
 }
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
 
-#[derive(Type, Debug, Serialize, Deserialize)]
+#[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEInstanceId(i32);
 
 impl From<domain::GroupId> for FEGroupId {
@@ -665,7 +679,6 @@ struct InstanceDetails {
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
-    mods: Vec<Mod>,
     icon_revision: u32,
 }
 
@@ -708,7 +721,6 @@ enum CFFEModLoaderType {
     Forge,
     Fabric,
     Quilt,
-    Unknown,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -728,8 +740,9 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
-    modloaders: Vec<CFFEModLoaderType>,
-    metadata: ModFileMetadata,
+    metadata: Option<ModFileMetadata>,
+    curseforge: Option<CurseForgeModMetadata>,
+    modrinth: Option<ModrinthModMetadata>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -739,7 +752,30 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Option<Vec<CFFEModLoaderType>>,
+    modloaders: Vec<CFFEModLoaderType>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct CurseForgeModMetadata {
+    pub project_id: u32,
+    pub file_id: u32,
+    pub name: String,
+    pub urlslug: String,
+    pub summary: String,
+    pub authors: String,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ModrinthModMetadata {
+    pub project_id: String,
+    pub version_id: String,
+    pub title: String,
+    pub filename: String,
+    pub urlslug: String,
+    pub description: String,
+    pub authors: String,
+    pub sha512: String,
+    pub sha1: String,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -757,7 +793,6 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             notes: value.notes,
             state: value.state.into(),
-            mods: value.mods.into_iter().map(Into::into).collect(),
             icon_revision: value.icon_revision,
         }
     }
@@ -789,7 +824,6 @@ impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
             domain::Quilt => Self::Quilt,
-            domain::Unknown => Self::Unknown,
         }
     }
 }
@@ -889,7 +923,6 @@ impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
             CFFEModLoaderType::Forge => Self::Forge,
             CFFEModLoaderType::Fabric => Self::Fabric,
             CFFEModLoaderType::Quilt => Self::Quilt,
-            CFFEModLoaderType::Unknown => Self::Unknown,
         }
     }
 }
@@ -994,8 +1027,9 @@ impl From<domain::Mod> for Mod {
             id: value.id,
             filename: value.filename,
             enabled: value.enabled,
-            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
-            metadata: value.metadata.into(),
+            metadata: value.metadata.map(Into::into),
+            curseforge: value.curseforge.map(Into::into),
+            modrinth: value.modrinth.map(Into::into),
         }
     }
 }
@@ -1008,9 +1042,36 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors,
-            modloaders: value
-                .modloaders
-                .map(|v| v.into_iter().map(Into::into).collect()),
+            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
+    fn from(value: domain::CurseForgeModMetadata) -> Self {
+        Self {
+            project_id: value.project_id,
+            file_id: value.file_id,
+            name: value.name,
+            urlslug: value.urlslug,
+            summary: value.summary,
+            authors: value.authors,
+        }
+    }
+}
+
+impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
+    fn from(value: domain::ModrinthModMetadata) -> Self {
+        Self {
+            project_id: value.project_id,
+            version_id: value.version_id,
+            title: value.title,
+            filename: value.filename,
+            urlslug: value.urlslug,
+            description: value.description,
+            authors: value.authors,
+            sha512: value.sha512,
+            sha1: value.sha1,
         }
     }
 }

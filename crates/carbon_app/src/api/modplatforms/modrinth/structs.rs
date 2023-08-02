@@ -278,6 +278,7 @@ pub enum MRFELoaderType {
     Fabric,
     Folia,
     Forge,
+    NeoForge,
     Iris,
     Liteloader,
     Minecraft,
@@ -306,6 +307,7 @@ impl From<LoaderType> for MRFELoaderType {
             LoaderType::Fabric => MRFELoaderType::Fabric,
             LoaderType::Folia => MRFELoaderType::Folia,
             LoaderType::Forge => MRFELoaderType::Forge,
+            LoaderType::NeoForge => MRFELoaderType::NeoForge,
             LoaderType::Iris => MRFELoaderType::Iris,
             LoaderType::Liteloader => MRFELoaderType::Liteloader,
             LoaderType::Minecraft => MRFELoaderType::Minecraft,
@@ -335,6 +337,7 @@ impl From<MRFELoaderType> for LoaderType {
             MRFELoaderType::Fabric => LoaderType::Fabric,
             MRFELoaderType::Folia => LoaderType::Folia,
             MRFELoaderType::Forge => LoaderType::Forge,
+            MRFELoaderType::NeoForge => LoaderType::NeoForge,
             MRFELoaderType::Iris => LoaderType::Iris,
             MRFELoaderType::Liteloader => LoaderType::Liteloader,
             MRFELoaderType::Minecraft => LoaderType::Minecraft,
@@ -950,7 +953,7 @@ pub struct MRFEGalleryItem {
     pub created: String,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: u32,
+    pub ordering: Option<i32>,
 }
 
 impl From<GalleryItem> for MRFEGalleryItem {
