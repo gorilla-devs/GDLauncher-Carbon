@@ -71,8 +71,12 @@ pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
-    fn dependencies(&self, app: &Arc<AppInner>, instance_data: &InstanceData, preferred_channel: ModChannel)
-        -> DependencyIterator;
+    fn dependencies(
+        &self,
+        app: &Arc<AppInner>,
+        instance_data: &InstanceData,
+        preferred_channel: ModChannel,
+    ) -> DependencyIterator;
     async fn is_already_installed(
         &self,
         app: &Arc<AppInner>,

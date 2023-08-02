@@ -204,7 +204,6 @@ impl std::ops::Deref for TestEnv {
 async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = temp_dir.into_path();
-    logger::setup_logger(temp_path.as_path()).await;
     info!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 

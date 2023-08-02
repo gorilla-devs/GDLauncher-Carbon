@@ -262,7 +262,6 @@ pub enum ClassId {
     Other(u16),
 }
 
-
 impl<'de> Deserialize<'de> for ClassId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -279,14 +278,14 @@ impl<'de> Deserialize<'de> for ClassId {
 
 impl Serialize for ClassId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_u16(match self {
             Self::Mods => 6,
             Self::Modpacks => 4471,
             Self::Other(other) => *other,
-
-        } )
+        })
     }
 }
 
@@ -411,8 +410,9 @@ impl<'de> Deserialize<'de> for ModLoaderType {
 
 impl Serialize for ModLoaderType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_u8(match self {
             Self::Forge => 1,
             Self::Cauldron => 2,
@@ -421,11 +421,9 @@ impl Serialize for ModLoaderType {
             Self::Quilt => 5,
             Self::NeoForge => 6,
             Self::Other(other) => *other,
-
-        } )
+        })
     }
 }
-
 
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
