@@ -116,7 +116,7 @@ const TermsAndConditions = (props: Props) => {
             disabled={!acceptedTOS()}
             onClick={() => {
               settingsMutation.mutate({
-                isLegalAccepted: true,
+                termsAndPrivacyAccepted: true,
                 metricsEnabled: acceptedMetrics(),
               });
 
