@@ -637,14 +637,14 @@ mod test {
         let mut zip = ZipWriter::new(Cursor::new(&mut vec));
         let options = FileOptions::default().compression_method(CompressionMethod::Stored);
         zip.start_file(path, options)?;
-        zip.write(content.as_bytes())?;
+        zip.write_all(content.as_bytes())?;
         zip.finish()?;
         drop(zip);
 
         // read meta zip
         let meta = parse_metadata(Cursor::new(&vec));
 
-        Ok(meta?)
+        meta
     }
 
     #[test]

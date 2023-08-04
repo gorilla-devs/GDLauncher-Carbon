@@ -1,6 +1,6 @@
 //! Schema for instance jsons
 
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
 
 use anyhow::bail;
 use chrono::{DateTime, Utc};
@@ -25,8 +25,6 @@ pub enum InstanceIcon {
 #[derive(Debug, Clone)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
-    CurseforgeLocal(CurseforgeModpack, PathBuf),
-    CurseforgeUnmanaged(PathBuf),
     Modrinth(ModrinthModpack),
 }
 
@@ -37,9 +35,19 @@ pub enum ModpackPlatform {
 }
 
 #[derive(Debug, Clone)]
-pub struct CurseforgeModpack {
-    pub project_id: i32,
-    pub file_id: i32,
+pub enum CurseforgeModpack {
+    RemoteManaged {
+        project_id: i32,
+        file_id: i32,
+    },
+    LocalManaged {
+        project_id: i32,
+        file_id: i32,
+        archive_path: String,
+    },
+    Unmanaged {
+        archive_path: String,
+    }
 }
 
 #[derive(Debug, Clone)]

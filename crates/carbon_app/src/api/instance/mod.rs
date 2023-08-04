@@ -629,9 +629,19 @@ enum Modpack {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct CurseforgeModpack {
-    project_id: u32,
-    file_id: u32,
+enum CurseforgeModpack {
+    RemoteManaged {
+        project_id: i32,
+        file_id: i32,
+    },
+    LocalManaged {
+        project_id: i32,
+        file_id: i32,
+        archive_path: String,
+    },
+    Unmanaged {
+        archive_path: String,
+    },
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -856,9 +866,24 @@ impl From<Modpack> for domain::info::Modpack {
 
 impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
     fn from(value: CurseforgeModpack) -> Self {
-        Self {
-            project_id: value.project_id,
-            file_id: value.file_id,
+        match value {
+            CurseforgeModpack::RemoteManaged {
+                project_id,
+                file_id,
+            } => Self::RemoteManaged {
+                project_id,
+                file_id,
+            },
+            CurseforgeModpack::LocalManaged {
+                project_id,
+                file_id,
+                archive_path,
+            } => Self::LocalManaged {
+                project_id,
+                file_id,
+                archive_path,
+            },
+            CurseforgeModpack::Unmanaged { archive_path } => Self::Unmanaged { archive_path },
         }
     }
 }
@@ -883,9 +908,26 @@ impl From<domain::info::Modpack> for Modpack {
 
 impl From<domain::info::CurseforgeModpack> for CurseforgeModpack {
     fn from(value: domain::info::CurseforgeModpack) -> Self {
-        Self {
-            project_id: value.project_id,
-            file_id: value.file_id,
+        match value {
+            domain::info::CurseforgeModpack::RemoteManaged {
+                project_id,
+                file_id,
+            } => Self::RemoteManaged {
+                project_id,
+                file_id,
+            },
+            domain::info::CurseforgeModpack::LocalManaged {
+                project_id,
+                file_id,
+                archive_path,
+            } => Self::LocalManaged {
+                project_id,
+                file_id,
+                archive_path,
+            },
+            domain::info::CurseforgeModpack::Unmanaged { archive_path } => {
+                Self::Unmanaged { archive_path }
+            }
         }
     }
 }

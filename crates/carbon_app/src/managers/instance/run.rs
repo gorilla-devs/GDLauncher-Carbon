@@ -95,7 +95,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         }
 
-        let mut config = data.config.clone();
+        let config = data.config.clone();
 
         let (xms_memory, xmx_memory) = match config.game_configuration.memory {
             Some(memory) => memory,
@@ -132,7 +132,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instances()
             .get_instance_path(&instance.shortpath);
 
-        let mut version = match config.game_configuration.version {
+        let version = match config.game_configuration.version {
             Some(GameVersion::Standard(ref v)) => Some(v.clone()),
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
             None if config.modpack.as_ref().is_some() => None,
@@ -162,36 +162,38 @@ impl ManagerRef<'_, InstanceManager> {
 
         let app = self.app.clone();
         let instance_shortpath = instance.shortpath.clone();
+        let info = PrepareInstanceInfo {
+            task_id: id,
+            instance_id,
+            runtime_path,
+            instance_path,
+            instance_shortpath,
+            version,
+            config,
+        };
         let installation_task = tokio::spawn(async move {
-            if let Some((java, version_info, lwjgl_group)) = prepare_game_installation_task(
-                app,
+            if let Ok((java, version_info, lwjgl_group)) = prepare_game_installation_task(
+                Arc::clone(&app),
                 &task,
                 wait_task,
-                instance_id,
-                runtime_path,
-                instance_path,
-                instance_shortpath,
-                config,
-                version,
+                info.clone(),
                 callback_task,
             )
             .await
-            .ok()
             {
                 prepare_game_launch_task(
-                    app,
+                    Arc::clone(&app),
                     task,
-                    id,
+                    info,
                     launch_account,
-                    instance_id,
-                    runtime_path,
-                    instance_path,
                     version_info,
-                    lwjgl_group,
-                    java,
-                    xms_memory,
-                    xmx_memory,
-                    extra_java_args,
+                    LaunchJavaInfo {
+                        java,
+                        lwjgl_group,
+                        xms_memory,
+                        xmx_memory,
+                        extra_java_args,
+                    },
                 )
                 .await;
             }
@@ -248,20 +250,26 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
-pub async fn prepare_game_installation_task(
-    app: Arc<AppInner>,
-    task: &VisualTask,
-    wait_task: Subtask,
+#[derive(Clone)]
+struct PrepareInstanceInfo {
+    task_id: VisualTaskId,
     instance_id: InstanceId,
     runtime_path: RuntimePath,
     instance_path: InstancePath,
     instance_shortpath: String,
-    config: Instance,
     version: Option<StandardVersion>,
+    config: Instance,
+}
+
+async fn prepare_game_installation_task(
+    app: Arc<AppInner>,
+    task: &VisualTask,
+    wait_task: Subtask,
+    info: PrepareInstanceInfo,
     callback_task: Option<InstanceCallback>,
 ) -> anyhow::Result<(JavaComponent, VersionInfo, LibraryGroup)> {
-    let mut config = config;
-    let mut version = version;
+    let mut config = info.config;
+    let mut version = info.version;
     let instance_manager = app.instance_manager();
     let task = task;
     let _lock = instance_manager
@@ -271,7 +279,7 @@ pub async fn prepare_game_installation_task(
         .await
         .expect("the ensure lock semaphore should never be closed");
 
-    let first_run_path = instance_path.get_root().join(".first_run_incomplete");
+    let first_run_path = info.instance_path.get_root().join(".first_run_incomplete");
     let is_first_run = first_run_path.is_file();
 
     let t_modpack = match is_first_run {
@@ -312,31 +320,31 @@ pub async fn prepare_game_installation_task(
 
     let mut is_initial_modpack_launch = false;
     if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) = t_modpack {
+        let subtasks = PrepareModpackSubtasks {
+            t_request,
+            t_extract_files,
+            t_download_files,
+            t_addon_metadata,
+        };
         if let Some(modpack) = &config.modpack {
             let v: StandardVersion = match modpack {
                 Modpack::Curseforge(modpack) => {
                     prepare_curseforge(
                         Arc::clone(&app),
-                        instance_path.clone(),
+                        info.instance_path.clone(),
                         modpack,
                         &mut downloads,
-                        t_request,
-                        t_extract_files,
-                        t_download_files,
-                        t_addon_metadata,
+                        subtasks,
                     )
                     .await?
                 }
                 Modpack::Modrinth(modpack) => {
                     prepare_modrinth(
                         Arc::clone(&app),
-                        instance_path.clone(),
+                        info.instance_path.clone(),
                         modpack,
                         &mut downloads,
-                        t_request,
-                        t_extract_files,
-                        t_download_files,
-                        t_addon_metadata,
+                        subtasks,
                     )
                     .await?
                 }
@@ -351,7 +359,7 @@ pub async fn prepare_game_installation_task(
                 .runtime_path
                 .get_instances()
                 .to_path()
-                .join(instance_shortpath);
+                .join(info.instance_shortpath);
 
             config.game_configuration.version = Some(GameVersion::Standard(StandardVersion {
                 release: v.release.clone(),
@@ -365,7 +373,7 @@ pub async fn prepare_game_installation_task(
                 .instances
                 .write()
                 .await
-                .get_mut(&instance_id)
+                .get_mut(&info.instance_id)
                 .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
                 .data_mut()?
                 .config = config;
@@ -404,7 +412,7 @@ pub async fn prepare_game_installation_task(
     t_request_version_info.update_items(2, 3);
 
     let java = {
-        match prepare_java(Arc::clone(&app), &version_info, &task).await? {
+        match prepare_java(Arc::clone(&app), &version_info, task).await? {
             Some(java) => java,
             None => return Err(anyhow!("No Java runtime available")),
         }
@@ -416,21 +424,21 @@ pub async fn prepare_game_installation_task(
                 type_: ModLoaderType::Forge,
                 version: forge_version,
             } => {
-                prepare_forge_modloader(Arc::clone(&app), &version, &forge_version, version_info)
+                prepare_forge_modloader(Arc::clone(&app), &version, forge_version, version_info)
                     .await?
             }
             ModLoader {
                 type_: ModLoaderType::Fabric,
                 version: fabric_version,
             } => {
-                prepare_fabric_modloader(Arc::clone(&app), &version, &fabric_version, version_info)
+                prepare_fabric_modloader(Arc::clone(&app), &version, fabric_version, version_info)
                     .await?
             }
             ModLoader {
                 type_: ModLoaderType::Quilt,
                 version: quilt_version,
             } => {
-                prepare_quilt_modloader(Arc::clone(&app), &version, &quilt_version, version_info)
+                prepare_quilt_modloader(Arc::clone(&app), &version, quilt_version, version_info)
                     .await?
             }
         }
@@ -478,7 +486,7 @@ pub async fn prepare_game_installation_task(
         tracing::info!("queueing metadata caching for running instance");
 
         app.meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_local_caching(info.instance_id, true)
             .await;
 
         tracing::trace!("queued metadata caching");
@@ -486,7 +494,7 @@ pub async fn prepare_game_installation_task(
 
     t_extract_natives.start_opaque();
     managers::minecraft::minecraft::extract_natives(
-        &runtime_path,
+        &info.runtime_path,
         &version_info,
         &lwjgl_group,
         &java.arch,
@@ -497,15 +505,15 @@ pub async fn prepare_game_installation_task(
     t_reconstruct_assets.start_opaque();
     managers::minecraft::assets::reconstruct_assets(
         &version_info.assets,
-        runtime_path.get_assets(),
-        instance_path.get_resources_path(),
+        info.runtime_path.get_assets(),
+        info.instance_path.get_resources_path(),
     )
     .await?;
     t_reconstruct_assets.complete_opaque();
 
-    let libraries_path = runtime_path.get_libraries();
+    let libraries_path = info.runtime_path.get_libraries();
     let game_version = version_info.id.to_string();
-    let client_path = runtime_path.get_libraries().get_mc_client(
+    let client_path = info.runtime_path.get_libraries().get_mc_client(
         version_info
             .inherits_from
             .as_ref()
@@ -523,7 +531,7 @@ pub async fn prepare_game_installation_task(
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
                 PathBuf::from(&java.path),
-                instance_path.clone(),
+                info.instance_path.clone(),
                 client_path,
                 game_version,
                 libraries_path,
@@ -549,41 +557,45 @@ pub async fn prepare_game_installation_task(
     Ok((java, version_info, lwjgl_group))
 }
 
-pub async fn prepare_game_launch_task(
-    app: Arc<AppInner>,
-    task: VisualTask,
-    task_id: VisualTaskId,
-    launch_account: Option<FullAccount>,
-    instance_id: InstanceId,
-    runtime_path: RuntimePath,
-    instance_path: InstancePath,
-    version_info: VersionInfo,
+struct LaunchJavaInfo {
     lwjgl_group: LibraryGroup,
     java: JavaComponent,
     xms_memory: u16,
     xmx_memory: u16,
     extra_java_args: String,
+}
+
+async fn prepare_game_launch_task(
+    app: Arc<AppInner>,
+    task: VisualTask,
+    info: PrepareInstanceInfo,
+    launch_account: Option<FullAccount>,
+    version_info: VersionInfo,
+    java_info: LaunchJavaInfo,
 ) {
     let try_result: anyhow::Result<_> = (|| async {
         match launch_account {
             Some(account) => Ok(Some(
                 managers::minecraft::minecraft::launch_minecraft(
-                    java,
+                    java_info.java,
                     account,
-                    xmx_memory,
-                    xms_memory,
-                    &extra_java_args,
-                    &runtime_path,
+                    java_info.xmx_memory,
+                    java_info.xms_memory,
+                    &java_info.extra_java_args,
+                    &info.runtime_path,
                     version_info,
-                    &lwjgl_group,
-                    instance_path,
+                    &java_info.lwjgl_group,
+                    info.instance_path,
                 )
                 .await?,
             )),
             None => {
                 let _ = app
                     .instance_manager()
-                    .change_launch_state(instance_id, LaunchState::Inactive { failed_task: None })
+                    .change_launch_state(
+                        info.instance_id,
+                        LaunchState::Inactive { failed_task: None },
+                    )
                     .await;
 
                 Ok(None)
@@ -598,9 +610,9 @@ pub async fn prepare_game_launch_task(
             let _ = app
                 .instance_manager()
                 .change_launch_state(
-                    instance_id,
+                    info.instance_id,
                     LaunchState::Inactive {
-                        failed_task: Some(task_id),
+                        failed_task: Some(info.task_id),
                     },
                 )
                 .await;
@@ -616,11 +628,11 @@ pub async fn prepare_game_launch_task(
 
             let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
-            let (log_id, log) = app.instance_manager().create_log(instance_id).await;
+            let (log_id, log) = app.instance_manager().create_log(info.instance_id).await;
             let _ = app
                 .instance_manager()
                 .change_launch_state(
-                    instance_id,
+                    info.instance_id,
                     LaunchState::Running(RunningInstance {
                         process_id: child.id().expect(
                             "child process id is not present even though child process was started",
@@ -650,7 +662,7 @@ pub async fn prepare_game_launch_task(
                                     tracing::trace!("stdout: {}", utf8);
                                 }
                                 log.send_if_modified(|log| {
-                                    log.push(EntryType::StdOut, &*utf8);
+                                    log.push(EntryType::StdOut, &utf8);
                                     false
                                 });
 
@@ -661,7 +673,7 @@ pub async fn prepare_game_launch_task(
                                             Ok(count) if count > 0 => {
                                                 let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
                                                 log.send_if_modified(|log| {
-                                                    log.push(EntryType::StdOut, &*utf8);
+                                                    log.push(EntryType::StdOut, &utf8);
                                                     false
                                                 });
                                             },
@@ -682,7 +694,7 @@ pub async fn prepare_game_launch_task(
                                     tracing::trace!("stderr: {}", utf8);
                                 }
                                 log.send_if_modified(|log| {
-                                    log.push(EntryType::StdErr, &*utf8);
+                                    log.push(EntryType::StdErr, &utf8);
                                     false
                                 });
 
@@ -693,7 +705,7 @@ pub async fn prepare_game_launch_task(
                                             Ok(count) if count > 0 => {
                                                 let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
                                                 log.send_if_modified(|log| {
-                                                    log.push(EntryType::StdErr, &*utf8);
+                                                    log.push(EntryType::StdErr, &utf8);
                                                     false
                                                 });
                                             },
@@ -727,33 +739,57 @@ pub async fn prepare_game_launch_task(
 
             let _ = app
                 .instance_manager()
-                .change_launch_state(instance_id, LaunchState::Inactive { failed_task: None })
+                .change_launch_state(
+                    info.instance_id,
+                    LaunchState::Inactive { failed_task: None },
+                )
                 .await;
         }
     }
 }
 
-pub async fn prepare_curseforge(
-    app: Arc<AppInner>,
-    instance_path: InstancePath,
-    modpack: &CurseforgeModpack,
-    downloads: &mut Vec<Downloadable>,
+enum CurseforgeInstallSource {
+    Remote { project_id: i32, file_id: i32 },
+    Local { archive_path: String },
+}
+
+struct PrepareModpackSubtasks {
     t_request: Subtask,
     t_extract_files: Subtask,
     t_download_files: Subtask,
     t_addon_metadata: Subtask,
+}
+
+async fn prepare_curseforge(
+    app: Arc<AppInner>,
+    instance_path: InstancePath,
+    modpack: &CurseforgeModpack,
+    downloads: &mut Vec<Downloadable>,
+    subtasks: PrepareModpackSubtasks,
 ) -> anyhow::Result<StandardVersion> {
-    t_request.start_opaque();
-    let file = app
-        .modplatforms_manager()
-        .curseforge
-        .get_mod_file(ModFileParameters {
-            file_id: modpack.file_id as i32,
-            mod_id: modpack.project_id as i32,
-        })
-        .await?
-        .data;
-    t_request.complete_opaque();
+    let t_request = subtasks.t_request;
+    let t_extract_files = subtasks.t_extract_files;
+    let t_download_files = subtasks.t_download_files;
+    let t_addon_metadata = subtasks.t_addon_metadata;
+    let install_source = match modpack {
+        CurseforgeModpack::RemoteManaged {
+            project_id,
+            file_id,
+        } => CurseforgeInstallSource::Remote {
+            project_id: *project_id,
+            file_id: *file_id,
+        },
+        CurseforgeModpack::LocalManaged {
+            project_id: _,
+            file_id: _,
+            archive_path,
+        } => CurseforgeInstallSource::Local {
+            archive_path: archive_path.clone(),
+        },
+        CurseforgeModpack::Unmanaged { archive_path } => CurseforgeInstallSource::Local {
+            archive_path: archive_path.clone(),
+        },
+    };
 
     let (modpack_progress_tx, mut modpack_progress_rx) =
         tokio::sync::watch::channel(curseforge::ProgressState::new());
@@ -791,29 +827,63 @@ pub async fn prepare_curseforge(
         }
     });
 
-    let modpack_info = curseforge::prepare_modpack_from_addon(
-        &app,
-        &file,
-        instance_path.clone(),
-        modpack_progress_tx,
-    )
-    .await?;
+    let modpack_info = match install_source {
+        CurseforgeInstallSource::Remote {
+            project_id,
+            file_id,
+        } => {
+            t_request.start_opaque();
+            let file = app
+                .modplatforms_manager()
+                .curseforge
+                .get_mod_file(ModFileParameters {
+                    file_id,
+                    mod_id: project_id,
+                })
+                .await?
+                .data;
+            t_request.complete_opaque();
+
+            curseforge::prepare_modpack_from_addon(
+                &app,
+                &file,
+                instance_path.clone(),
+                modpack_progress_tx,
+            )
+            .await?
+        }
+        CurseforgeInstallSource::Local { archive_path } => {
+            let file_size = std::fs::metadata(&archive_path)?.len();
+            // show pack as already downloaded
+            modpack_progress_tx
+                .send_modify(|progress| progress.download_addon_zip.set((file_size, file_size)));
+
+            curseforge::prepare_modpack_from_zip(
+                &app,
+                archive_path.into(),
+                instance_path.clone(),
+                modpack_progress_tx,
+            )
+            .await?
+        }
+    };
 
     downloads.extend(modpack_info.downloadables);
 
     modpack_info.manifest.minecraft.try_into()
 }
 
-pub async fn prepare_modrinth(
+async fn prepare_modrinth(
     app: Arc<AppInner>,
     instance_path: InstancePath,
     modpack: &ModrinthModpack,
     downloads: &mut Vec<Downloadable>,
-    t_request: Subtask,
-    t_extract_files: Subtask,
-    t_download_files: Subtask,
-    t_addon_metadata: Subtask,
+    subtasks: PrepareModpackSubtasks,
 ) -> anyhow::Result<StandardVersion> {
+    let t_request = subtasks.t_request;
+    let t_extract_files = subtasks.t_extract_files;
+    let t_download_files = subtasks.t_download_files;
+    let t_addon_metadata = subtasks.t_addon_metadata;
     t_request.start_opaque();
     let file = app
         .modplatforms_manager()
@@ -1142,7 +1212,7 @@ impl From<&LaunchState> for domain::LaunchState {
     fn from(value: &LaunchState) -> Self {
         match value {
             LaunchState::Inactive { failed_task } => Self::Inactive {
-                failed_task: failed_task.clone(),
+                failed_task: *failed_task,
             },
             LaunchState::Preparing(t) => Self::Preparing(*t),
             LaunchState::Running(RunningInstance {

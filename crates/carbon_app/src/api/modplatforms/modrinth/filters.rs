@@ -193,6 +193,12 @@ impl From<MRFESearchFacetOr> for SearchFacetOr {
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct MRFESearchFacetAnd(pub Vec<MRFESearchFacetOr>);
 
+impl Default for MRFESearchFacetAnd {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MRFESearchFacetAnd {
     pub fn new() -> Self {
         MRFESearchFacetAnd(Vec::new())

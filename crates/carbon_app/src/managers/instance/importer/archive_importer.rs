@@ -60,7 +60,7 @@ impl InstanceImporter for CurseForgeZipImporter {
 
         let mut lock = self.scan_result.lock().await;
         *lock = Some(CurseForgeManifestWrapper {
-            full_path: path,
+            full_path: path.clone(),
             manifest,
         });
         app.invalidate(
@@ -74,8 +74,8 @@ impl InstanceImporter for CurseForgeZipImporter {
     }
 
     async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
-        let instances = self.scan_result.lock().await.map_or_else(
-            || vec![],
+        let instances = self.scan_result.lock().await.as_ref().map_or_else(
+            Vec::new,
             |instance| {
                 vec![super::ImportableInstance {
                     name: instance.manifest.name.clone(),
@@ -92,9 +92,9 @@ impl InstanceImporter for CurseForgeZipImporter {
         name: &str,
     ) -> anyhow::Result<VisualTaskId> {
         let lock = self.scan_result.lock().await;
-        let instance = lock.ok_or(anyhow!("No importable instance available"))?;
+        let instance = lock.as_ref().ok_or(anyhow!("No importable instance available"))?;
 
-        let mut content = tokio::fs::read(instance.full_path).await?;
+        let mut content = tokio::fs::read(&instance.full_path).await?;
         let murmur2 = tokio::task::spawn_blocking(move || {
             murmurhash32::murmurhash2({
                 // curseforge's weird api
@@ -106,7 +106,7 @@ impl InstanceImporter for CurseForgeZipImporter {
         let fp_response = app
             .modplatforms_manager()
             .curseforge
-            .get_fingerprints(&vec![murmur2])
+            .get_fingerprints(&[murmur2])
             .await?
             .data;
         let mods_response = app
@@ -123,7 +123,7 @@ impl InstanceImporter for CurseForgeZipImporter {
             })
             .await?
             .data;
-        let mut matches = fp_response
+        let matches = fp_response
             .exact_fingerprints
             .into_iter()
             .zip(fp_response.exact_matches.into_iter())
@@ -134,25 +134,25 @@ impl InstanceImporter for CurseForgeZipImporter {
             .first()
             .map(|(_, fp_match, proj)| {
                 (
-                    Modpack::CurseforgeLocal(
-                        CurseforgeModpack {
-                            project_id: fp_match.file.mod_id,
-                            file_id: fp_match.file.id,
-                        },
-                        instance.full_path.clone(),
-                    ),
-                    Some(proj.logo.url),
+                    Modpack::Curseforge(CurseforgeModpack::LocalManaged {
+                        project_id: fp_match.file.mod_id,
+                        file_id: fp_match.file.id,
+                        archive_path: instance.full_path.to_string_lossy().to_string(),
+                    }),
+                    proj.logo.as_ref().map(|logo| logo.url.clone()),
                 )
             })
             .unwrap_or_else(|| {
                 (
-                    Modpack::CurseforgeUnmanaged(instance.full_path.clone()),
+                    Modpack::Curseforge(CurseforgeModpack::Unmanaged {
+                        archive_path: instance.full_path.to_string_lossy().to_string(),
+                    }),
                     None,
                 )
             });
 
-        if let Some(icon_url) = icon {
-            app.instance_manager().download_icon(icon_url).await?;
+        if let Some(icon_url) = &icon {
+            app.instance_manager().download_icon(icon_url.clone()).await?;
         }
 
         let install_source = InstanceVersionSource::Modpack(modpack);

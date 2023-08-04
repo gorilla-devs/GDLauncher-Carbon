@@ -2,7 +2,7 @@ use std::{sync::Arc, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
-use url::Url;
+
 
 use crate::{domain::vtask::VisualTaskId, managers::AppInner};
 
@@ -12,9 +12,9 @@ pub mod legacy_gdlauncher;
 #[derive(Debug, Serialize, Deserialize, EnumIter)]
 pub enum Entity {
     LegacyGDLauncher,
-    MRPack(PathBuf),
+    MRPack(String),
     Modrinth,
-    CurseForgeZip(PathBuf),
+    CurseForgeZip(String),
     CurseForge,
     ATLauncher,
     Technic,

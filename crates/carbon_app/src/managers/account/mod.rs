@@ -104,7 +104,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .find_first(vec![Uuid(StringFilter::Equals(uuid))])
             .exec()
             .await?
-            .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
+            .ok_or_else(|| anyhow!("currently active account could not be read from database"))?;
 
         Ok(Some(account.try_into()?))
     }
@@ -295,7 +295,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 let account_manager = app.account_manager();
                 let mut refreshing = account_manager.currently_refreshing.write().await;
                 // this should never happen
-                let enrollment = refreshing.get(&self.account.uuid).expect("account refresh invalidator recieved an invalidation without an active enrollemt");
+                let enrollment = refreshing.get(&self.account.uuid).expect("account refresh invalidator received an invalidation without an active enrollment");
                 let status = enrollment.status.read().await;
 
                 match &*status {
@@ -320,16 +320,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             type_: FullAccountType::Microsoft {
                                 access_token: access_token.clone(),
                                 refresh_token: None,
-                                token_expires: token_expires.clone(),
+                                token_expires: *token_expires,
                                 skin_id: skin_id.clone(),
                             },
-                            last_used: self.account.last_used.clone(),
+                            last_used: self.account.last_used,
                         }).await.expect("db error, this can't be handled in the account invalidator right now");
                     }
                     _ => {}
                 }
 
-                ()
             }
         }
 

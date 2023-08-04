@@ -76,7 +76,7 @@ pub struct LoggingConfigsPath(PathBuf);
 
 impl LoggingConfigsPath {
     pub fn get_client_path(&self, id: &str) -> PathBuf {
-        self.0.clone().join(&id)
+        self.0.clone().join(id)
     }
 }
 

@@ -7,7 +7,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
-use crate::domain::vtask::VisualTaskId;
+
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
@@ -44,7 +44,7 @@ pub struct InstanceManager {
     pub importer: Mutex<importer::Importer>,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
-    // seperate lock to prevent a deadlock with the index lock
+    // separate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
@@ -203,7 +203,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         JsonErrorType::Eof => ConfigurationParseErrorType::Eof,
                         JsonErrorType::Io => unreachable!(),
                     },
-                    line: e.line() as u32, // will panic with more lines but that dosen't really seem like a problem
+                    line: e.line() as u32, // will panic with more lines but that doesn't really seem like a problem
                     message: e.to_string(),
                     config_text,
                 });
@@ -242,12 +242,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     .instances
                     .expect("instance groups were requested with group list yet are not present")
                     .into_iter()
-                    .filter_map(
-                        |instance| match active_instances.get(&InstanceId(instance.id)) {
-                            Some(data) => Some((instance, &data.type_)),
-                            None => None,
-                        },
-                    )
+                    .filter_map(|instance| {
+                        active_instances
+                            .get(&InstanceId(instance.id))
+                            .map(|data| (instance, &data.type_))
+                    })
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
                         name: instance.name,
@@ -267,12 +266,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         None => None,
                                     },
                                     modloader: match &status.config.game_configuration.version {
-                                        Some(GameVersion::Standard(version)) => {
-                                            match version.modloaders.iter().next() {
-                                                Some(modloader) => Some(modloader.type_),
-                                                None => None,
-                                            }
-                                        }
+                                        Some(GameVersion::Standard(version)) => version
+                                            .modloaders
+                                            .iter()
+                                            .next()
+                                            .map(|modloader| modloader.type_),
                                         Some(GameVersion::Custom(_)) => None,
                                         None => None,
                                     },
@@ -343,7 +341,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         };
 
-        let (reamining_query, target_idx) = match (start_idx, target_idx) {
+        let (remaining_query, target_idx) = match (start_idx, target_idx) {
             (start, target) if start < target => (
                 self.app.prisma_client.instance_group().update_many(
                     vec![
@@ -370,7 +368,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app
             .prisma_client
             ._batch((
-                reamining_query,
+                remaining_query,
                 self.app.prisma_client.instance_group().update(
                     UniqueWhereParam::IdEquals(*group),
                     vec![SetParam::SetGroupIndex(target_idx)],
@@ -712,7 +710,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // trim whitespace (including windows does not end with ' ' requirement)
         let name = name.trim();
-        // max 28 character name. this gives us 3 digets for numbers to use as discriminators
+        // max 28 character name. this gives us 3 digits for numbers to use as discriminators
         let name = &name[0..usize::min(name.len(), 28)];
 
         // sanitize any illegal filenames
@@ -798,8 +796,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn download_icon(self, url: String) -> anyhow::Result<()> {
         let extension = url
             .rsplit_once('/')
-            .map(|(_, name)| name.rsplit_once('.'))
-            .flatten()
+            .and_then(|(_, name)| name.rsplit_once('.'))
             .map(|(_, ext)| ext)
             .unwrap_or("png");
 
@@ -1204,17 +1201,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get_instance_path(&instance.shortpath);
 
         let path = match folder {
-            InstanceFolder::Root => path.get_root().to_path_buf(),
-            InstanceFolder::Data => path.get_data_path().to_path_buf(),
-            InstanceFolder::Mods => path.get_mods_path().to_path_buf(),
-            InstanceFolder::Configs => path.get_config_path().to_path_buf(),
-            InstanceFolder::Screenshots => path.get_screenshots_path().to_path_buf(),
-            InstanceFolder::Saves => path.get_saves_path().to_path_buf(),
-            InstanceFolder::Logs => path.get_logs_path().to_path_buf(),
-            InstanceFolder::CrashReports => path.get_crash_reports_path().to_path_buf(),
-            InstanceFolder::ResourcePacks => path.get_resourcepacks_path().to_path_buf(),
-            InstanceFolder::TexturePacks => path.get_texturepacks_path().to_path_buf(),
-            InstanceFolder::ShaderPacks => path.get_shaderpacks_path().to_path_buf(),
+            InstanceFolder::Root => path.get_root(),
+            InstanceFolder::Data => path.get_data_path(),
+            InstanceFolder::Mods => path.get_mods_path(),
+            InstanceFolder::Configs => path.get_config_path(),
+            InstanceFolder::Screenshots => path.get_screenshots_path(),
+            InstanceFolder::Saves => path.get_saves_path(),
+            InstanceFolder::Logs => path.get_logs_path(),
+            InstanceFolder::CrashReports => path.get_crash_reports_path(),
+            InstanceFolder::ResourcePacks => path.get_resourcepacks_path(),
+            InstanceFolder::TexturePacks => path.get_texturepacks_path(),
+            InstanceFolder::ShaderPacks => path.get_shaderpacks_path(),
         };
 
         if !path.is_dir() {
@@ -1725,14 +1722,14 @@ mod test {
         };
 
         let mut group0_instances = [
-            mk_instance("g0i0", group0.clone()).await?,
-            mk_instance("g0i1", group0.clone()).await?,
-            mk_instance("g0i2", group0.clone()).await?,
+            mk_instance("g0i0", group0).await?,
+            mk_instance("g0i1", group0).await?,
+            mk_instance("g0i2", group0).await?,
         ];
 
         let group1_instances = [
-            mk_instance("g1i0", group1.clone()).await?,
-            mk_instance("g1i1", group1.clone()).await?,
+            mk_instance("g1i0", group1).await?,
+            mk_instance("g1i1", group1).await?,
         ];
 
         // move 1 to 1 (do nothing)

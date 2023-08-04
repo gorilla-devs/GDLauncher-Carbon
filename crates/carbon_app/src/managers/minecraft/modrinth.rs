@@ -119,7 +119,7 @@ pub async fn prepare_modpack_from_file(
     // generate uuid
     let uuid = uuid::Uuid::new_v4();
     let file_path = temp_dir.to_path().join(format!("{}.mrpack", uuid));
-    let file_downloadable = Downloadable::new(&mrpack_file.url.to_string(), file_path.clone())
+    let file_downloadable = Downloadable::new(mrpack_file.url.to_string(), file_path.clone())
         .with_size(mrpack_file.size as u64);
 
     tokio::fs::create_dir_all(
@@ -175,9 +175,8 @@ pub async fn prepare_modpack_from_mrpack(
         .files
         .iter()
         .filter(|&file| {
-            file.env.as_ref().map_or(true, |env| match env.client {
-                ModrinthEnvironmentSupport::Required => true,
-                _ => false,
+            file.env.as_ref().map_or(true, |env| {
+                matches!(env.client, ModrinthEnvironmentSupport::Required)
             })
         })
         .cloned()
@@ -187,9 +186,8 @@ pub async fn prepare_modpack_from_mrpack(
         .files
         .iter()
         .filter(|&file| {
-            file.env.as_ref().map_or(false, |env| match env.client {
-                ModrinthEnvironmentSupport::Optional => true,
-                _ => false,
+            file.env.as_ref().map_or(false, |env| {
+                matches!(env.client, ModrinthEnvironmentSupport::Optional)
             })
         })
         .cloned()
@@ -250,14 +248,14 @@ pub async fn prepare_modpack_from_mrpack(
         let total_archive_files = archive.len() as u64;
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
-            if !(file.name().starts_with(&overrides_folder_name)) {
+            if !(file.name().starts_with(overrides_folder_name)) {
                 continue;
             }
 
             let out_path = match file.enclosed_name() {
                 Some(path) => secure_path_join(
                     Path::new(&data_path),
-                    path.strip_prefix(&overrides_folder_name).expect(
+                    path.strip_prefix(overrides_folder_name).expect(
                         "valid path as we skipped paths that did not start with this prefix",
                     ),
                 )?,

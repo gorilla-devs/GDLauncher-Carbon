@@ -160,7 +160,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                         return Err(anyhow::anyhow!("Missing file id"));
                 };
 
-                let curseforge_modpack = CurseforgeModpack {
+                let curseforge_modpack = CurseforgeModpack::RemoteManaged {
                     project_id,
                     file_id,
                 };
@@ -314,13 +314,13 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         let mut importer = super::LegacyGDLauncherImporter::default();
-        importer.scan(app.app.clone()).await.unwrap();
+        importer.scan(app.app.clone(), None).await.unwrap();
 
         let instances = importer.get_available().await.unwrap();
 
-        for (index, _) in instances.iter().enumerate() {
+        for (index, instance) in instances.iter().enumerate() {
             importer
-                .import(app.app.clone(), index as u32)
+                .import(app.app.clone(), index as u32, &instance.name)
                 .await
                 .unwrap();
         }

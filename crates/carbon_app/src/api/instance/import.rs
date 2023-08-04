@@ -30,9 +30,9 @@ impl From<FEEntity> for importer::Entity {
     fn from(entity: FEEntity) -> Self {
         match entity {
             FEEntity::LegacyGDLauncher => Self::LegacyGDLauncher,
-            FEEntity::MRPack(path) => Self::MRPack(path.into()),
+            FEEntity::MRPack(path) => Self::MRPack(path),
             FEEntity::Modrinth => Self::Modrinth,
-            FEEntity::CurseForgeZip(path) => Self::CurseForgeZip(path.into()),
+            FEEntity::CurseForgeZip(path) => Self::CurseForgeZip(path),
             FEEntity::CurseForge => Self::CurseForge,
             FEEntity::ATLauncher => Self::ATLauncher,
             FEEntity::Technic => Self::Technic,
@@ -47,9 +47,9 @@ impl From<importer::Entity> for FEEntity {
     fn from(entity: importer::Entity) -> Self {
         match entity {
             importer::Entity::LegacyGDLauncher => Self::LegacyGDLauncher,
-            importer::Entity::MRPack(path) => Self::MRPack(path.into_string_lossy()),
+            importer::Entity::MRPack(path) => Self::MRPack(path),
             importer::Entity::Modrinth => Self::Modrinth,
-            importer::Entity::CurseForgeZip(path) => Self::CurseForgeZip(path.into_string_lossy()),
+            importer::Entity::CurseForgeZip(path) => Self::CurseForgeZip(path),
             importer::Entity::CurseForge => Self::CurseForge,
             importer::Entity::ATLauncher => Self::ATLauncher,
             importer::Entity::Technic => Self::Technic,
