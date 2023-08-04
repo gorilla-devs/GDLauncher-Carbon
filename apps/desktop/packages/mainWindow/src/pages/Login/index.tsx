@@ -28,8 +28,7 @@ export default function Login() {
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
-    routeData.settings.data?.isLegalAccepted &&
-    routeData.settings.data.metricsEnabledLastUpdate;
+    routeData.settings.data?.termsAndPrivacyAccepted;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
@@ -77,7 +76,7 @@ export default function Login() {
   });
 
   createEffect(() => {
-    if (routeData.settings.data?.isLegalAccepted) setStep(1);
+    if (routeData.settings.data?.termsAndPrivacyAccepted) setStep(1);
   });
 
   return (

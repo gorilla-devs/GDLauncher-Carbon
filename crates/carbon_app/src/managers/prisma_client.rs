@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use crate::db::{self, app_configuration, PrismaClient};
+use openssl::{aes, rand::rand_bytes};
+use sha2::{Digest, Sha512};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
@@ -74,9 +76,13 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
+
+        let mut buf = [0; 256];
+        rand_bytes(&mut buf).unwrap();
+
         db_client
             .app_configuration()
-            .create(find_appropriate_default_xmx().await, vec![])
+            .create(find_appropriate_default_xmx().await, Vec::from(buf), vec![])
             .exec()
             .await?;
     }

@@ -5,7 +5,7 @@ import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
-import initAnalytics, { init } from "@/utils/analytics";
+import initAnalytics from "@/utils/analytics";
 
 type Props = {
   createInvalidateQuery: () => void;

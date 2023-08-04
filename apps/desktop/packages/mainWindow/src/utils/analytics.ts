@@ -61,8 +61,16 @@ function initAnalytics() {
   }
 }
 
+function shouldTrack() {
+  return posthog.has_opted_in_capturing();
+}
+
 export function trackEvent(event: string, properties?: Record<string, any>) {
-  if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
+  if (
+    import.meta.env.VITE_POSTHOG_KEY &&
+    import.meta.env.VITE_METRICS_URL &&
+    shouldTrack()
+  ) {
     posthog.capture(event, {
       ...(properties || {}),
     });
@@ -70,7 +78,11 @@ export function trackEvent(event: string, properties?: Record<string, any>) {
 }
 
 export function trackPageView() {
-  if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
+  if (
+    import.meta.env.VITE_POSTHOG_KEY &&
+    import.meta.env.VITE_METRICS_URL &&
+    shouldTrack()
+  ) {
     posthog.capture("$pageview");
   }
 }

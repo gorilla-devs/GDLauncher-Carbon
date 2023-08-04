@@ -15,8 +15,7 @@ const PrivateRoute = (props: Props) => {
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
     !routeData.status.data &&
-    routeData.settings.data?.isLegalAccepted &&
-    routeData.settings.data.metricsEnabledLastUpdate;
+    routeData.settings.data?.termsAndPrivacyAccepted;
 
   createEffect(() => {
     console.log(isAlreadyAuthenticated());
