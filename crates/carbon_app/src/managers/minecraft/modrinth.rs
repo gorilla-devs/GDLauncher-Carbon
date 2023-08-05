@@ -12,86 +12,9 @@ use crate::domain::modplatforms::modrinth::version::{
     ModpackIndex, ModrinthEnvironmentSupport, VersionFile,
 };
 
-use thiserror::Error;
+use super::secure_path_join;
 
-#[derive(Error, Debug)]
-pub enum PathTraversalError {
-    #[error("Path `{0}` has a root component and joining it will cause a path traversal")]
-    PathHasRoot(PathBuf),
-    #[error("Path `{0}` climbs above it's root and joining it will cause a path traversal")]
-    PathClimbsAboveRoot(PathBuf),
-}
 
-/// 1. Reduce multiple slashes to a single slash.
-/// 2. Eliminate `.` path name elements (the current directory).
-/// 3. Eliminate `..` path name elements (the parent directory) and the non-`.` non-`..`,
-/// element that precedes them.
-/// 4. Eliminate `..` elements that begin a rooted path, that is, replace `/..` by `/` at the
-/// beginning of a path.
-/// 5. Leave intact `..` elements that begin a non-rooted path.
-///
-/// If the result of this process is an empty string, return the relative path `"."`, representing the
-/// current directory.
-pub fn path_clean<P: AsRef<Path>>(path: P) -> PathBuf {
-    let mut out = Vec::new();
-    for comp in path.as_ref().components() {
-        match comp {
-            Component::CurDir => (),
-            Component::ParentDir => match out.last() {
-                Some(Component::RootDir) => (),
-                Some(Component::Normal(_)) => {
-                    out.pop();
-                }
-                _ => out.push(comp),
-            },
-            comp => out.push(comp),
-        }
-    }
-
-    if out.is_empty() {
-        PathBuf::from(".")
-    } else {
-        out.iter().collect()
-    }
-}
-
-/// lexically checks that the join operation does not climb above the root
-/// the returned bath is guaranteed to be under the provided root baring the influence of symbolic
-/// links. This should be later checked by calling `canonicalize` after we are sure the parent
-/// directories exist.
-///
-pub fn secure_path_join<P1: AsRef<Path>, P2: AsRef<Path>>(
-    root: P1,
-    unsafe_path: P2,
-) -> Result<PathBuf, PathTraversalError> {
-    let unsafe_path = unsafe_path.as_ref();
-    if unsafe_path.has_root() {
-        return Err(PathTraversalError::PathHasRoot(unsafe_path.to_path_buf()));
-    } else if unsafe_path.starts_with("..") {
-        return Err(PathTraversalError::PathClimbsAboveRoot(
-            unsafe_path.to_path_buf(),
-        ));
-    }
-    let clean_root = path_clean(root);
-
-    // clean path first to prevent traversing above
-    let clean_path = path_clean(unsafe_path);
-
-    // join two clean paths
-    let result_path = clean_root.join(clean_path);
-
-    // reclean to resolve remaining indirection
-    let clean_result = path_clean(result_path);
-
-    // double check to make sure we haven't climbed out
-    if !clean_result.starts_with(clean_root) {
-        Err(PathTraversalError::PathClimbsAboveRoot(
-            unsafe_path.to_path_buf(),
-        ))
-    } else {
-        Ok(clean_result)
-    }
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum ProgressState {

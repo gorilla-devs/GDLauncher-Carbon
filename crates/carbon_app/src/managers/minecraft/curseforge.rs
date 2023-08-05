@@ -9,6 +9,8 @@ use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
 use crate::domain::runtime_path::InstancePath;
 use crate::managers::App;
 
+use super::secure_path_join;
+
 // Download ZIP
 // Extract manifest - Parse manifest
 // Download mods
@@ -158,11 +160,13 @@ pub async fn prepare_modpack_from_zip(
                     .await?;
 
                 let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
+                let target_path = secure_path_join(&instance_path, mod_file.file_name)?;
+
                 let downloadable = Downloadable::new(
                     mod_file
                         .download_url
                         .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
-                    instance_path.join(mod_file.file_name),
+                    target_path,
                 )
                 .with_size(mod_file.file_length as u64);
                 progress_percentage_sender_clone.send_modify(|progress| {
@@ -197,23 +201,27 @@ pub async fn prepare_modpack_from_zip(
                 continue;
             }
 
-            let outpath = match file.enclosed_name() {
-                Some(path) => Path::new(&override_full_path)
-                    .join(path.strip_prefix(&override_folder_name).unwrap()),
+            let out_path = match file.enclosed_name() {
+                Some(path) => secure_path_join(
+                    Path::new(&override_full_path),
+                    path.strip_prefix(&override_folder_name).expect(
+                        "valid path as we skipped paths that did not start with this prefix",
+                    ),
+                )?,
                 None => continue,
             };
 
             if (*file.name()).ends_with('/') {
                 continue;
             } else {
-                if let Some(p) = outpath.parent() {
+                if let Some(p) = out_path.parent() {
                     if !p.exists() {
                         std::fs::create_dir_all(p)?;
                     }
                 }
 
-                let mut outfile = std::fs::File::create(&outpath)?;
-                std::io::copy(&mut file, &mut outfile)?;
+                let mut out_file = std::fs::File::create(&out_path)?;
+                std::io::copy(&mut file, &mut out_file)?;
             }
 
             progress_percentage_sender.send_modify(|progress| {
