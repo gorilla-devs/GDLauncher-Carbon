@@ -61,9 +61,8 @@ pub enum ModrinthEnvironmentSupport {
 #[serde(rename_all = "kebab-case")]
 pub struct ModrinthPackDependencies {
     pub minecraft: Option<String>,
-    pub forge: Option<String>,
-    pub fabric_loader: Option<String>,
-    pub quilt_loader: Option<String>,
+    #[serde(flatten)]
+    pub loaders: HashMap<String, String>,
 }
 
 impl TryFrom<ModrinthPackDependencies> for StandardVersion {
@@ -74,24 +73,14 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
             .minecraft
             .ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
         let mut modloaders = HashSet::new();
-        if let Some(forge_version) = value.forge {
+        for (key, version) in value.loaders.into_iter() {
+            let modloader_name = key.strip_suffix("_loader").unwrap_or(&key);
             modloaders.insert(ModLoader {
-                type_: ModLoaderType::Forge,
-                version: format!("{}-{}", &minecraft_version, forge_version),
+                type_: modloader_name.parse()?,
+                version: format!("{}-{}", &minecraft_version, version),
             });
         }
-        if let Some(fabric_version) = value.fabric_loader {
-            modloaders.insert(ModLoader {
-                type_: ModLoaderType::Fabric,
-                version: format!("{}-{}", &minecraft_version, fabric_version),
-            });
-        }
-        if let Some(quilt_version) = value.quilt_loader {
-            modloaders.insert(ModLoader {
-                type_: ModLoaderType::Quilt,
-                version: format!("{}-{}", &minecraft_version, quilt_version),
-            });
-        }
+
         Ok(StandardVersion {
             release: minecraft_version,
             modloaders,

@@ -1,6 +1,6 @@
 //! Schema for instance jsons
 
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 use anyhow::bail;
 use chrono::{DateTime, Utc};
@@ -110,6 +110,14 @@ impl TryFrom<&str> for ModLoaderType {
             "quilt" => Ok(Self::Quilt),
             _ => bail!("unknown modloader type {s}"),
         }
+    }
+}
+
+impl FromStr for ModLoaderType {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.try_into()
     }
 }
 
