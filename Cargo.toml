@@ -88,4 +88,5 @@ url = "2.3.1"
 serde_repr = "0.1"
 sysinfo = "0.29.0"
 serde_qs = "0.12"
-
+markdown = "1.0.0-alpha.11"
+ring = "0.16.20"

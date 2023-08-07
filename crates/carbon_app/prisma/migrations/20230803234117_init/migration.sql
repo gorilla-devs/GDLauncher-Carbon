@@ -17,8 +17,12 @@ CREATE TABLE "AppConfiguration" (
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
     "preferredModChannel" INTEGER NOT NULL DEFAULT 2,
-    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
-    "metricsLevel" INTEGER
+    "randomUserUuid" TEXT NOT NULL,
+    "secret" BLOB NOT NULL,
+    "termsAndPrivacyAccepted" BOOLEAN NOT NULL DEFAULT false,
+    "termsAndPrivacyAcceptedChecksum" TEXT,
+    "metricsEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "metricsEnabledLastUpdate" DATETIME
 );
 
 -- CreateTable

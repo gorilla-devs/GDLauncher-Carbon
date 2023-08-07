@@ -21,15 +21,10 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"], {
-    onSuccess(data) {
-      if (data.metricsLevel !== 0 && data.metricsLevel !== null) {
-        initAnalytics(data.metricsLevel);
-      }
-    },
-  });
+  initAnalytics();
 
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
 
   createEffect(() => {
     if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {
