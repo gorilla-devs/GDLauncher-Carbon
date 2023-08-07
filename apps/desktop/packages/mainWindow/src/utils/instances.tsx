@@ -18,7 +18,7 @@ import {
 } from "@gd/core_module/bindings";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
-import { Show, Switch, Match } from "solid-js";
+import { Show, Switch, Match, createSignal } from "solid-js";
 import { port } from "./rspcClient";
 
 export const isListInstanceValid = (
@@ -253,11 +253,11 @@ export const CategoryIcon = (props: {
   return (
     <Switch
       fallback={
-        <>
+        <div>
           <Show when={getCategoryIcon(props.category)}>
             <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
           </Show>
-        </>
+        </div>
       }
     >
       <Match when={"iconUrl" in props.category}>
@@ -270,3 +270,19 @@ export const CategoryIcon = (props: {
 export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
   return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
 };
+
+export const getModpackPlatform = (modpack: Modpack) => {
+  if ((modpack as { Curseforge: CurseforgeModpack }).Curseforge !== undefined) {
+    return "Curseforge";
+  } else if (
+    (modpack as { Modrinth: ModrinthModpack }).Modrinth !== undefined
+  ) {
+    return "Modrinth";
+  } else {
+    return "Unknown";
+  }
+};
+
+export const [importedInstances, setImportedInstances] = createSignal<number[]>(
+  []
+);

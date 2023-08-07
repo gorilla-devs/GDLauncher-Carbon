@@ -296,14 +296,16 @@ const Tile = (props: Props) => {
                     </span>
                   </div>
                 </Show>
-                {/* <Show when={props.isLoading && props.percentage !== undefined}>
-                <div
-                  class="absolute left-0 bottom-0 opacity-10 bg-primary-500 h-4 z-20"
-                  style={{
-                    width: `${props.percentage}%`,
-                  }}
-                />
-              </Show> */}
+                <Show when={validInstance()?.modpack_platform}>
+                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg top-2 right-2 p-2 border-solid border-darkSlate-600">
+                    <img
+                      class="w-4 h-4"
+                      src={getModpackPlatformIcon(
+                        validInstance()?.modpack_platform as ModpackPlatform
+                      )}
+                    />
+                  </div>
+                </Show>
                 <Show when={props.isLoading || isInQueue()}>
                   <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
@@ -331,22 +333,16 @@ const Tile = (props: Props) => {
             <Switch>
               <Match when={!props.isLoading}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
-                  <span class="flex gap-2">
-                    <Show when={validInstance()?.modpack_platform}>
+                  <span class="flex gap-1">
+                    <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
-                        src={getModpackPlatformIcon(
-                          validInstance()?.modpack_platform as ModpackPlatform
+                        src={getForgeModloaderIcon(
+                          props.modloader as CFFEModLoaderType
                         )}
                       />
                     </Show>
-                    <img
-                      class="w-4 h-4"
-                      src={getForgeModloaderIcon(
-                        props.modloader as CFFEModLoaderType
-                      )}
-                    />
-                    <p class="m-0">{props.modloader || "Vanilla"}</p>
+                    <p class="m-0">{props.modloader}</p>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>

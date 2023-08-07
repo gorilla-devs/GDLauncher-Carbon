@@ -15,6 +15,7 @@ import {
   Show,
   Switch,
   createEffect,
+  createResource,
   createSignal,
   onCleanup,
   onMount,
@@ -29,6 +30,7 @@ import {
   UngroupedInstance,
 } from "@gd/core_module/bindings";
 import {
+  fetchImage,
   getCurseForgeData,
   getModrinthData,
   getPreparingState,
@@ -39,6 +41,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
+import { getForgeModloaderIcon } from "@/utils/sidebar";
 
 type InstancePage = {
   label: string;
@@ -58,6 +61,10 @@ const Instance = () => {
   const [modpackDetails, setModpackDetails] = createSignal<
     FEModResponse | MRFEProject | undefined
   >(undefined);
+  const [imageUrl, { refetch }] = createResource(
+    () => parseInt(params.id, 10),
+    fetchImage
+  );
 
   const [t] = useTransContext();
   const modalsContext = useModal();
@@ -141,7 +148,7 @@ const Instance = () => {
       path: `/library/${params.id}`,
     },
 
-    ...(routeData.instanceDetails.data?.modloaders[0]?.type_
+    ...(routeData.instanceDetails.data?.modloaders.length! > 0
       ? [
           {
             label: "Mods",
@@ -317,6 +324,23 @@ const Instance = () => {
     },
   ];
 
+  createEffect(() => {
+    if (routeData.instanceDetails.data?.icon_revision !== undefined) {
+      refetch();
+    }
+  });
+
+  createEffect(() => {
+    if (
+      routeData.instancesUngrouped.data &&
+      !routeData.instancesUngrouped.data?.find(
+        (instance) => instance.id === parseInt(params.id, 10)
+      )
+    ) {
+      navigate("/library");
+    }
+  });
+
   return (
     <main
       id="main-container-instance-details"
@@ -330,14 +354,12 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out transition-100 min-h-60"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out bg-cover bg-center transition-100 min-h-60"
         style={{
           transition: "height 0.2s",
-          "background-image": routeData.image
-            ? `url("${routeData.image}")`
+          "background-image": imageUrl()
+            ? `url("${imageUrl()}")`
             : `url("${DefaultImg}")`,
-          "background-position": "center",
-          "background-repeat": "repeat",
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
@@ -363,8 +385,8 @@ const Instance = () => {
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
-                      "background-image": routeData.image
-                        ? `url("${routeData.image}")`
+                      "background-image": imageUrl()
+                        ? `url("${imageUrl()}")`
                         : `url("${DefaultImg}")`,
                     }}
                   />
@@ -442,10 +464,21 @@ const Instance = () => {
                     >
                       <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
                         <div class="m-0 flex gap-2 items-center h-full">
-                          <span>
-                            {routeData.instanceDetails.data?.modloaders[0]
-                              ?.type_ || "Vanilla"}
-                          </span>
+                          <For
+                            each={routeData.instanceDetails.data?.modloaders}
+                          >
+                            {(modloader) => (
+                              <>
+                                <Show when={modloader.type_}>
+                                  <img
+                                    class="w-4 h-4"
+                                    src={getForgeModloaderIcon(modloader.type_)}
+                                  />
+                                </Show>
+                                <span>{modloader.type_}</span>
+                              </>
+                            )}
+                          </For>
                           <span>{routeData.instanceDetails.data?.version}</span>
                         </div>
                         <Show
@@ -456,7 +489,7 @@ const Instance = () => {
                         >
                           <div class="flex gap-2 items-center h-full">
                             <div class="i-ri:time-fill" />
-                            <span>
+                            <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
                                 (
                                   routeData.instanceDetails

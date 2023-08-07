@@ -7,9 +7,15 @@ use crate::managers::java::managed::Step;
 use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
+use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::pin::Pin;
+
+use std::time::Duration;
+use tokio::{io::AsyncReadExt, sync::mpsc};
+use tracing::{debug, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -17,11 +23,9 @@ use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
-use std::time::Duration;
+use futures::Future;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
-use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info};
 
 use anyhow::{anyhow, bail};
 
@@ -49,12 +53,16 @@ impl PersistenceManager {
         }
     }
 }
+type InstanceCallback = Box<
+    dyn FnOnce(Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
+>;
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn prepare_game(
         self,
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
+        callback_task: Option<InstanceCallback>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -192,12 +200,20 @@ impl ManagerRef<'_, InstanceManager> {
                     false => None,
                 };
 
-                task.edit(|data| data.state = TaskState::KnownProgress).await;
+                let t_finalize_import = if callback_task.is_some() {
+                    Some(task.subtask(Translation::FinalizingImport))
+                } else {
+                    None
+                };
+
+                task.edit(|data| data.state = TaskState::KnownProgress)
+                    .await;
 
                 wait_task.complete_opaque();
 
                 let mut downloads = Vec::new();
 
+                let mut is_initial_modpack_launch = false;
                 if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
                 {
@@ -319,41 +335,28 @@ impl ManagerRef<'_, InstanceManager> {
                         version = Some(v.clone());
 
                         let path = app
-                        .settings_manager()
-                        .runtime_path
-                        .get_instances()
-                        .to_path()
-                        .join(instance_shortpath);
+                            .settings_manager()
+                            .runtime_path
+                            .get_instances()
+                            .to_path()
+                            .join(instance_shortpath);
 
                         config.game_configuration.version =
                             Some(GameVersion::Standard(StandardVersion {
                                 release: v.release.clone(),
-                                modloaders: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        modloaders,
-                                        ..
-                                    })) => modloaders.clone(),
-                                    _ => std::collections::HashSet::new(),
-                                },
-                            }));
-
-                            config.game_configuration.version =
-                            Some(GameVersion::Standard(StandardVersion {
-                                release: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        release,
-                                        ..
-                                    })) => release.clone(),
-                                    _ => bail!("custom versions are not yet supported"),
-                                },
-                                modloaders: match v.modloaders.iter().next().cloned() {
-                                    Some(modloader) => std::collections::HashSet::from([modloader]),
-                                    None => std::collections::HashSet::new(),
-                                },
+                                modloaders: v.modloaders.clone(),
                             }));
 
                         let json = make_instance_config(config.clone())?;
                         tokio::fs::write(path.join("instance.json"), json).await?;
+
+                        instance_manager.instances.write().await
+                            .get_mut(&instance_id)
+                            .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
+                            .data_mut()?
+                            .config = config;
+
+                        is_initial_modpack_launch = true;
                     }
                 }
 
@@ -616,7 +619,6 @@ impl ManagerRef<'_, InstanceManager> {
                             version_info =
                                 daedalus::modded::merge_partial_version(quilt_version, version_info);
                         }
-                        _ => {}
                     }
                 }
 
@@ -653,11 +655,16 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
 
-                // scan instances again offtask to pick up modpack mods
-                let app2 = app.clone();
-                tokio::spawn(async move {
-                    let _ = app2.instance_manager().scan_instances().await;
-                });
+                // update mod metadata after mods are downloaded
+                if is_initial_modpack_launch {
+                    tracing::info!("queueing metadata caching for running instance");
+
+                    app.meta_cache_manager()
+                        .queue_local_caching(instance_id, true)
+                        .await;
+
+                    tracing::trace!("queued metadata caching");
+                }
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(
@@ -729,6 +736,10 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                     )),
                     None => {
+                        if let Some(callback_task) = callback_task {
+                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
+                        }
+
                         let _ = app
                             .instance_manager()
                             .change_launch_state(
@@ -1019,7 +1030,7 @@ mod test {
         };
 
         app.instance_manager()
-            .prepare_game(instance_id, Some(account))
+            .prepare_game(instance_id, Some(account), None)
             .await?;
 
         let task = match app.instance_manager().get_launch_state(instance_id).await? {

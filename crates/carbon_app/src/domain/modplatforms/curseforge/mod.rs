@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
+use super::ModChannel;
+
 pub mod filters;
 pub mod manifest;
 
@@ -57,7 +59,7 @@ pub struct FileHash {
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -138,11 +140,11 @@ pub struct FingerprintMatch {
 pub struct FingerprintsMatchesResult {
     pub is_cache_built: bool,
     pub exact_matches: Vec<FingerprintMatch>,
-    pub exact_fingerprints: Vec<u64>,
+    pub exact_fingerprints: Vec<u32>,
     pub partial_matches: Vec<FingerprintMatch>,
     pub partial_match_fingerprints: HashMap<String, Vec<u64>>,
-    pub installed_fingerprints: Vec<u64>,
-    pub unmatched_fingerprints: Vec<u64>,
+    pub installed_fingerprints: Vec<u32>,
+    pub unmatched_fingerprints: Option<Vec<u32>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -238,7 +240,7 @@ pub struct Mod {
     pub categories: Vec<Category>,
     pub class_id: Option<i32>, // TODO: Add all options to enum and use it
     pub authors: Vec<ModAuthor>,
-    pub logo: ModAsset,
+    pub logo: Option<ModAsset>,
     pub screenshots: Vec<ModAsset>,
     pub main_file_id: i32,
     pub latest_files: Vec<File>,
@@ -252,11 +254,39 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,
     Modpacks = 4471,
+    Other(u16),
+}
+
+impl<'de> Deserialize<'de> for ClassId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u16::deserialize(deserializer)?;
+        match n {
+            6 => Ok(Self::Mods),
+            4471 => Ok(Self::Modpacks),
+            other => Ok(Self::Other(other)),
+        }
+    }
+}
+
+impl Serialize for ClassId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u16(match self {
+            Self::Mods => 6,
+            Self::Modpacks => 4471,
+            Self::Other(other) => *other,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -348,7 +378,7 @@ pub enum GameVersionTypeStatus {
     Deleted = 2,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug)]
 #[repr(u8)]
 pub enum ModLoaderType {
     Forge = 1,
@@ -356,6 +386,43 @@ pub enum ModLoaderType {
     LiteLoader = 3,
     Fabric = 4,
     Quilt = 5,
+    NeoForge = 6,
+    Other(u8),
+}
+
+impl<'de> Deserialize<'de> for ModLoaderType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u8::deserialize(deserializer)?;
+        match n {
+            1 => Ok(Self::Forge),
+            2 => Ok(Self::Cauldron),
+            3 => Ok(Self::LiteLoader),
+            4 => Ok(Self::Fabric),
+            5 => Ok(Self::Quilt),
+            6 => Ok(Self::NeoForge),
+            other => Ok(Self::Other(other)),
+        }
+    }
+}
+
+impl Serialize for ModLoaderType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(match self {
+            Self::Forge => 1,
+            Self::Cauldron => 2,
+            Self::LiteLoader => 3,
+            Self::Fabric => 4,
+            Self::Quilt => 5,
+            Self::NeoForge => 6,
+            Self::Other(other) => *other,
+        })
+    }
 }
 
 #[derive(Debug, Serialize_repr, Deserialize_repr)]
@@ -459,4 +526,14 @@ pub struct Pagination {
 pub struct CurseForgeResponse<T> {
     pub data: T,
     pub pagination: Option<Pagination>,
+}
+
+impl From<FileReleaseType> for ModChannel {
+    fn from(value: FileReleaseType) -> Self {
+        match value {
+            FileReleaseType::Alpha => ModChannel::Alpha,
+            FileReleaseType::Beta => ModChannel::Beta,
+            FileReleaseType::Stable => ModChannel::Stable,
+        }
+    }
 }

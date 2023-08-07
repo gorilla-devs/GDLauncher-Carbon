@@ -5,7 +5,10 @@
 use super::*;
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
+use crate::domain::{
+    instance::info::{ModLoader, ModLoaderType, StandardVersion},
+    modplatforms::ModChannel,
+};
 
 use anyhow::anyhow;
 
@@ -179,7 +182,7 @@ pub enum HashAlgorithm {
     SHA1,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, Copy, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VersionType {
     Alpha,
@@ -221,4 +224,14 @@ pub enum RequestedVersionStatus {
 pub enum AdditionalFileType {
     RequiredResourcePack,
     OptionalResourcePack,
+}
+
+impl From<VersionType> for ModChannel {
+    fn from(value: VersionType) -> Self {
+        match value {
+            VersionType::Alpha => ModChannel::Alpha,
+            VersionType::Beta => ModChannel::Beta,
+            VersionType::Release => ModChannel::Stable,
+        }
+    }
 }

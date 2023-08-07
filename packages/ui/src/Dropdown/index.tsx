@@ -49,6 +49,7 @@ interface DropDownButtonProps {
   value: string | number;
   error?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   rounded?: boolean;
   label?: string;
   onChange?: (_value: Option) => void;
@@ -145,9 +146,9 @@ const Dropdown = (props: Props) => {
             "bg-darkSlate-700": !props.bgColorClass,
             "rounded-md": !props.btnDropdown && !props.rounded,
             "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300":
-              props.btnDropdown,
+              props.btnDropdown && !props.disabled,
             "group px-4": !props.btnDropdown,
-            "bg-primary-500 duration-100": props.btnDropdown,
+            "bg-primary-500 duration-100": props.btnDropdown && !props.disabled,
             "hover:bg-primary-300": props.btnDropdown && !props.disabled,
           }}
         >
@@ -241,8 +242,11 @@ const DropDownButton = (props: DropDownButtonProps) => {
     <div class="flex">
       <Button
         disabled={props.disabled}
+        loading={props.loading}
         class="rounded-r-0 pr-4 pl-4 flex gap-1"
-        onClick={() => props?.onClick?.()}
+        onClick={() => {
+          if (!props.disabled && !props.loading) props?.onClick?.();
+        }}
       >
         <span>{props.children}</span>
       </Button>

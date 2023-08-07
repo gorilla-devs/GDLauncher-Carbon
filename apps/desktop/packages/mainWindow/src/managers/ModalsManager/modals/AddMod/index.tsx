@@ -20,16 +20,31 @@ import {
   FEUnifiedSearchParameters,
   MRFESearchIndex,
   FEUnifiedModLoaderType,
+  FESearchAPI,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { CurseForgeSortFields } from "@/utils/constants";
+import {
+  CurseForgeSortFields,
+  ModpackPlatforms,
+  ModrinthSortFields,
+} from "@/utils/constants";
 import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
+import { PlatformIcon } from "@/utils/instances";
+import { capitalize } from "@/utils/helpers";
+
+type DataType = {
+  mcVersion: string;
+  isCurseforge: boolean;
+};
 
 const AddMod = (props: ModalProps) => {
   const [t] = useTransContext();
 
+  const data = () => props.data as DataType;
+
   const [query, setQuery] = useModsQuery({
+    searchApi: data().isCurseforge ? "curseforge" : "modrinth",
     searchQuery: "",
     categories: null,
     gameVersions: null,
@@ -38,8 +53,7 @@ const AddMod = (props: ModalProps) => {
     sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
     index: 0,
-    pageSize: 40,
-    searchApi: "curseforge",
+    pageSize: 20,
   });
 
   const rspcContext = rspc.useContext();
@@ -124,12 +138,7 @@ const AddMod = (props: ModalProps) => {
     if (mods().length > 0 && !infiniteQuery.isInitialLoading) resetList();
   });
 
-  const modloaders: (CFFEModLoaderType | "any")[] = [
-    "any",
-    "forge",
-    "fabric",
-    "quilt",
-  ];
+  const modloaders: CFFEModLoaderType[] = ["forge", "fabric", "quilt"];
 
   const NoMoreMods = () => {
     return (
@@ -207,10 +216,17 @@ const AddMod = (props: ModalProps) => {
 
   const isCurseforge = () => query.searchApi === "curseforge";
 
+  const modrinthCategories = rspc.createQuery(() => [
+    "modplatforms.modrinth.getCategories",
+  ]);
+
+  const sortingFields = () =>
+    isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} noPadding>
-      <div class="h-130 w-190 bg-darkSlate-800 p-5">
-        <div class="flex flex-col bg-darkSlate-800 top-0 left-0 right-0 z-10 sticky">
+      <div class="bg-darkSlate-800 p-5 h-130 w-190">
+        <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
           <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
             <Input
               placeholder="Type Here"
@@ -231,7 +247,7 @@ const AddMod = (props: ModalProps) => {
                 />
               </p>
               <Dropdown
-                options={CurseForgeSortFields.map((field) => ({
+                options={sortingFields().map((field) => ({
                   label: t(`instance.sort_by_${field}`),
                   key: field,
                 }))}
@@ -264,6 +280,26 @@ const AddMod = (props: ModalProps) => {
 
                   setQueryWrapper({
                     modloaders: mappedValue,
+                  });
+                }}
+                rounded
+              />
+              <Dropdown
+                options={ModpackPlatforms.map((platform) => ({
+                  label: (
+                    <div class="flex items-center gap-2">
+                      <PlatformIcon platform={platform} />
+                      <p class="m-0">{platform}</p>
+                    </div>
+                  ),
+                  key: platform,
+                }))}
+                value={capitalize(query.searchApi)}
+                onChange={(val) => {
+                  setQueryWrapper({
+                    searchApi: (val.key as string).toLowerCase() as FESearchAPI,
+                    categories: [],
+                    modloaders: null,
                   });
                 }}
                 rounded
@@ -303,7 +339,7 @@ const AddMod = (props: ModalProps) => {
                   {(virtualItem) => {
                     const isLoaderRow = () =>
                       virtualItem.index > mods().length - 1;
-                    const modpack = () => mods()[virtualItem.index];
+                    const mod = () => mods()[virtualItem.index];
 
                     const hasNextPage = () => infiniteQuery?.hasNextPage;
 
@@ -327,11 +363,12 @@ const AddMod = (props: ModalProps) => {
                               </div>
                             }
                           >
-                            <Match when={!isLoaderRow() && modpack()}>
+                            <Match when={!isLoaderRow() && mod()}>
                               <ModRow
                                 type="Mod"
-                                data={modpack()}
-                                mcVersion={props.data as string}
+                                data={mod()}
+                                mcVersion={data().mcVersion}
+                                modrinthCategories={modrinthCategories.data}
                               />
                             </Match>
                             <Match when={isLoaderRow() && !hasNextPage()}>
