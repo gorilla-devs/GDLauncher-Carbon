@@ -24,8 +24,6 @@ function initAnalytics() {
   ) {
     let settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-    window.addEventListener("hashchange", trackPageView);
-
     createEffect(() => {
       if (!settings.data) return;
 
@@ -82,6 +80,8 @@ function initAnalytics() {
     });
   }
 }
+
+window.addEventListener("hashchange", trackPageView);
 
 export function trackEvent(event: string, properties?: Record<string, any>) {
   if (
