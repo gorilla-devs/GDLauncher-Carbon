@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::db::{self, PrismaClient};
+use crate::db::{self, app_configuration, PrismaClient};
+use ring::rand::{SecureRandom, SystemRandom};
+use sha2::{Digest, Sha512};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
@@ -74,11 +76,44 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
+
+        let mut buf = [0; 256];
+
+        let sr = ring::rand::SystemRandom::new();
+        sr.fill(&mut buf).unwrap();
+        println!("Buffer: {:?}", buf);
+
         db_client
             .app_configuration()
-            .create(find_appropriate_default_xmx().await, vec![])
+            .create(find_appropriate_default_xmx().await, Vec::from(buf), vec![])
             .exec()
             .await?;
+    }
+
+    let metrics_enabled_last_update = db_client
+        .app_configuration()
+        .find_unique(db::app_configuration::id::equals(0))
+        .exec()
+        .await?
+        .expect("It's unreasonable to expect that the app configuration doesn't exist")
+        .metrics_enabled_last_update;
+
+    if let Some(metrics_enabled_last_update) = metrics_enabled_last_update {
+        if metrics_enabled_last_update < chrono::Utc::now() - chrono::Duration::days(365) {
+            db_client
+                .app_configuration()
+                .update(
+                    db::app_configuration::id::equals(0),
+                    vec![
+                        app_configuration::terms_and_privacy_accepted::set(false),
+                        app_configuration::terms_and_privacy_accepted_checksum::set(None),
+                        app_configuration::metrics_enabled::set(false),
+                        app_configuration::metrics_enabled_last_update::set(None),
+                    ],
+                )
+                .exec()
+                .await?;
+        }
     }
 
     JavaManager::ensure_profiles_in_db(db_client)

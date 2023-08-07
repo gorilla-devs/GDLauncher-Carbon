@@ -5,8 +5,8 @@ import { ModalProps } from "..";
 import ModalLayout from "../ModalLayout";
 import { Suspense } from "solid-js";
 
-const TermsAndConditions = (props: ModalProps) => {
-  const body = rspc.createQuery(() => ["settings.getTermsOfServiceBody"]);
+const PrivacyStatement = (props: ModalProps) => {
+  const body = rspc.createQuery(() => ["settings.getPrivacyStatementBody"]);
 
   const sanitizedHtml = () => {
     if (!body.data) return undefined;
@@ -24,4 +24,4 @@ const TermsAndConditions = (props: ModalProps) => {
   );
 };
 
-export default TermsAndConditions;
+export default PrivacyStatement;
