@@ -1,7 +1,7 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { ModalProps } from "@/managers/ModalsManager";
 import ModalLayout from "@/managers/ModalsManager/ModalLayout";
-import { Skeleton, Spinner, Input, Dropdown } from "@gd/ui";
+import { Skeleton, Input, Dropdown } from "@gd/ui";
 import {
   For,
   Match,
@@ -28,10 +28,13 @@ import {
   ModpackPlatforms,
   ModrinthSortFields,
 } from "@/utils/constants";
-import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { PlatformIcon } from "@/utils/instances";
 import { capitalize } from "@/utils/helpers";
+import ErrorFetchingMods from "./ErrorFetchingMods";
+import FetchingMods from "./FetchingMods";
+import NoModsAvailable from "./NoModsAvailable";
+import NoMoreMods from "./NoMoreMods";
 
 type DataType = {
   mcVersion: string;
@@ -139,80 +142,6 @@ const AddMod = (props: ModalProps) => {
   });
 
   const modloaders: CFFEModLoaderType[] = ["forge", "fabric", "quilt"];
-
-  const NoMoreMods = () => {
-    return (
-      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
-        <div class="flex justify-center items-center flex-col text-center">
-          <p class="text-darkSlate-50 max-w-100">
-            <Trans
-              key="mods.fetching_no_more_mods"
-              options={{
-                defaultValue: "No more mods to load",
-              }}
-            />
-          </p>
-        </div>
-      </div>
-    );
-  };
-
-  const NoModsAvailable = () => {
-    return (
-      <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-100">
-        <div class="flex justify-center items-center flex-col text-center">
-          <img src={skull} class="w-16 h-16" />
-
-          <p class="text-darkSlate-50 max-w-100">
-            <Trans
-              key="mods.fetching_no_mods_available"
-              options={{
-                defaultValue: "there is no mod available",
-              }}
-            />
-          </p>
-        </div>
-      </div>
-    );
-  };
-
-  const FetchingMods = () => {
-    return (
-      <div class="flex flex-col justify-center items-center gap-4 p-5 rounded-xl h-56">
-        <div class="flex justify-center items-center flex-col text-center">
-          <p class="text-darkSlate-50 max-w-100">
-            <Trans
-              key="mods.fetching_mods_text"
-              options={{
-                defaultValue: "Loading mods",
-              }}
-            />
-          </p>
-          <Spinner />
-        </div>
-      </div>
-    );
-  };
-
-  const ErrorFetchingMods = (props: { error: RSPCError | null }) => {
-    const parsedError = () =>
-      props.error?.message && JSON.parse(props.error?.message);
-    return (
-      <div class="w-full flex h-full justify-center items-center min-h-90">
-        <div class="flex justify-center items-center flex-col text-center">
-          <p class="text-darkSlate-50 max-w-100">
-            <Trans
-              key="mods.fetching_mods_error"
-              options={{
-                defaultValue: "There was an error while fetching mods",
-              }}
-            />
-            {parsedError().cause[0].display}
-          </p>
-        </div>
-      </div>
-    );
-  };
 
   const isCurseforge = () => query.searchApi === "curseforge";
 
@@ -356,13 +285,7 @@ const AddMod = (props: ModalProps) => {
                         }}
                       >
                         <div>
-                          <Switch
-                            fallback={
-                              <div>
-                                <FetchingMods />
-                              </div>
-                            }
-                          >
+                          <Switch fallback={<FetchingMods />}>
                             <Match when={!isLoaderRow() && mod()}>
                               <ModRow
                                 type="Mod"

@@ -160,7 +160,7 @@ export default function Browser() {
     <div class="box-border h-full w-full relative">
       <div
         ref={(el) => (containrRef = el)}
-        class="flex flex-col bg-darkSlate-800 pt-5 z-10 px-5"
+        class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
@@ -262,7 +262,7 @@ export default function Browser() {
         </div>
       </div>
       <div
-        class="flex flex-col pb-5 gap-2 left-0 right-0 absolute bottom-0 overflow-y-hidden"
+        class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
         style={{
           top: `${headerHeight()}px`,
         }}
@@ -275,7 +275,7 @@ export default function Browser() {
             }
           >
             <div
-              class="h-full overflow-y-auto rounded-xl overflow-x-hidden pr-2 ml-5"
+              class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
               ref={(el) => {
                 infiniteQuery.setParentRef(el);
               }}

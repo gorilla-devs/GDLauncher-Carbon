@@ -275,7 +275,7 @@ const ModRow = (props: ModRowProps) => {
           />
         </div>
         <div class="flex gap-4 items-center">
-          <div class="flex gap-2 items-center text-darkSlate-100">
+          <div class="flex items-center gap-2 text-darkSlate-100">
             <i class="text-darkSlate-100 i-ri:time-fill" />
             <div class="whitespace-nowrap text-sm">
               {formatDistanceToNowStrict(
@@ -350,10 +350,10 @@ const ModRow = (props: ModRowProps) => {
   return (
     <div
       ref={(el) => (containrRef = el)}
-      class="relative flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-36"
+      class="flex flex-col gap-4 overflow-hidden relative p-5 bg-darkSlate-700 rounded-2xl box-border h-36"
     >
-      <div class="absolute top-0 right-0 bottom-0 left-0 z-10 bg-gradient-to-r from-darkSlate-700 from-50%" />
-      <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-t from-darkSlate-700 z-10" />
+      <div class="absolute z-10 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
+      <div class="absolute inset-0 from-darkSlate-700 z-10 bg-gradient-to-t" />
       <Show when={getLogoUrl(props)}>
         <img
           class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
@@ -365,7 +365,7 @@ const ModRow = (props: ModRowProps) => {
           <div class="flex flex-col gap-2 w-full z-10 bg-repeat-none">
             <Title />
             <div class="flex justify-between w-full">
-              <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-w-full max-h-15">
+              <p class="text-sm overflow-hidden text-ellipsis m-0 text-darkSlate-50 max-w-full max-h-15">
                 <Switch>
                   <Match when={isRowSmall()}>
                     {truncateText(getSummary(props), 60)}
@@ -378,7 +378,7 @@ const ModRow = (props: ModRowProps) => {
               <div class="flex w-full justify-end items-end">
                 <Switch>
                   <Match when={mergedProps.type === "Modpack"}>
-                    <div class="flex gap-3 items-center">
+                    <div class="flex items-center gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
                         type="outline"
