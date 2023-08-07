@@ -6,9 +6,25 @@ export let init = false;
 
 let startupEventSent = false;
 
+let backlog: Array<[string, any]> = [];
+
+function clearBacklog() {
+  backlog.forEach(([eventName, properties]) => {
+    posthog.capture(eventName, properties);
+  });
+
+  backlog = [];
+}
+
 function initAnalytics() {
-  if (import.meta.env.VITE_POSTHOG_KEY && import.meta.env.VITE_METRICS_URL) {
+  if (
+    import.meta.env.VITE_POSTHOG_KEY &&
+    import.meta.env.VITE_METRICS_URL &&
+    !init
+  ) {
     let settings = rspc.createQuery(() => ["settings.getSettings"]);
+
+    window.addEventListener("hashchange", trackPageView);
 
     createEffect(() => {
       if (!settings.data) return;
@@ -19,14 +35,13 @@ function initAnalytics() {
         disable_session_recording: true,
         autocapture: false,
         persistence: "memory",
-        // debug: import.meta.env.DEV,
-        debug: true,
+        debug: import.meta.env.DEV,
         opt_out_capturing_by_default: !settings.data.metricsEnabled,
         bootstrap: {
           distinctID: settings.data.randomUserUuid,
         },
         loaded: async () => {
-          let os = await window.getCurrentOS();
+          const os = await window.getCurrentOS();
 
           posthog.register({
             $set: {
@@ -34,9 +49,12 @@ function initAnalytics() {
               os: os.platform,
               arch: os.arch,
             },
+            $pathname: window.location.hash,
+            $current_url: window.location.hash,
           });
 
           if (!startupEventSent && settings.data?.metricsEnabled) {
+            clearBacklog();
             startupEventSent = true;
             trackEvent("app_started");
           }
@@ -47,33 +65,44 @@ function initAnalytics() {
     createEffect(() => {
       if (!settings.data) return;
 
-      if (settings.data?.metricsEnabled) {
+      if (settings.data?.metricsEnabled && !posthog.has_opted_in_capturing()) {
         posthog.opt_in_capturing();
 
         if (!startupEventSent) {
+          clearBacklog();
           startupEventSent = true;
           trackEvent("app_started");
         }
-      } else {
+      } else if (
+        !settings.data?.metricsEnabled &&
+        posthog.has_opted_in_capturing()
+      ) {
         posthog.opt_out_capturing();
       }
     });
   }
 }
 
-function shouldTrack() {
-  return posthog.has_opted_in_capturing();
-}
-
 export function trackEvent(event: string, properties?: Record<string, any>) {
   if (
     import.meta.env.VITE_POSTHOG_KEY &&
     import.meta.env.VITE_METRICS_URL &&
-    shouldTrack()
+    posthog.has_opted_in_capturing()
   ) {
-    posthog.capture(event, {
-      ...(properties || {}),
-    });
+    if (!startupEventSent) {
+      backlog.push([
+        event,
+        {
+          ...(properties || {}),
+          $pathname: window.location.hash,
+          $current_url: window.location.hash,
+        },
+      ]);
+    } else {
+      posthog.capture(event, {
+        ...(properties || {}),
+      });
+    }
   }
 }
 
@@ -81,12 +110,20 @@ export function trackPageView() {
   if (
     import.meta.env.VITE_POSTHOG_KEY &&
     import.meta.env.VITE_METRICS_URL &&
-    shouldTrack()
+    posthog.has_opted_in_capturing()
   ) {
-    posthog.capture("$pageview");
+    if (!startupEventSent) {
+      backlog.push([
+        "$pageview",
+        {
+          $pathname: window.location.hash,
+          $current_url: window.location.hash,
+        },
+      ]);
+    } else {
+      posthog.capture("$pageview");
+    }
   }
 }
-
-window.addEventListener("hashchange", trackPageView);
 
 export default initAnalytics;

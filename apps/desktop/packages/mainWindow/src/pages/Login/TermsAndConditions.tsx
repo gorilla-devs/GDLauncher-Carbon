@@ -1,6 +1,6 @@
 import { Show, createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
-import { Button, Checkbox } from "@gd/ui";
+import { Button, Checkbox, createNotification } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
 import { rspc } from "@/utils/rspcClient";
 
@@ -11,7 +11,9 @@ type Props = {
 const TermsAndConditions = (props: Props) => {
   const [acceptedTOS, setAcceptedTOS] = createSignal(false);
   const [acceptedMetrics, setAcceptedMetrics] = createSignal(false);
+  const [loadingButton, setLoadingButton] = createSignal(false);
   const modalsContext = useModal();
+  const addNotification = createNotification();
 
   const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
@@ -43,16 +45,7 @@ const TermsAndConditions = (props: Props) => {
                 <Trans key="login.we_value_privacy_text2" />
               </div>
               <div>
-                <Trans key="login.we_value_privacy_text3">
-                  {""}
-                  <span
-                    class="underline text-lightSlate-400 cursor-pointer"
-                    onClick={() => {
-                      window?.openCMPWindow();
-                    }}
-                  />
-                  {""}
-                </Trans>
+                <Trans key="login.we_value_privacy_text3" />
               </div>
               <div>
                 <Trans key="login.we_value_privacy_text4" />
@@ -110,21 +103,41 @@ const TermsAndConditions = (props: Props) => {
               </p>
             </div>
           </div>
-          <Button
-            variant="primary"
-            size="large"
-            disabled={!acceptedTOS()}
-            onClick={() => {
-              settingsMutation.mutate({
-                termsAndPrivacyAccepted: true,
-                metricsEnabled: acceptedMetrics(),
-              });
+          <div class="flex flex-col gap-4">
+            <div
+              class="text-xs underline text-lightSlate-400 cursor-pointer"
+              onClick={() => {
+                window?.openCMPWindow();
+              }}
+            >
+              <Trans key="login.manage_cpm" />
+            </div>
+            <Button
+              variant="primary"
+              size="large"
+              disabled={!acceptedTOS()}
+              loading={loadingButton()}
+              onClick={async () => {
+                setLoadingButton(true);
+                try {
+                  const res = await settingsMutation.mutateAsync({
+                    termsAndPrivacyAccepted: true,
+                    metricsEnabled: acceptedMetrics(),
+                  });
 
-              props.nextStep();
-            }}
-          >
-            <Trans key="login.next" />
-          </Button>
+                  console.log(res);
+
+                  props.nextStep();
+                } catch {
+                  addNotification("Error during consent saving", "error");
+                }
+
+                setLoadingButton(false);
+              }}
+            >
+              <Trans key="login.next" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

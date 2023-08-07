@@ -40,6 +40,15 @@ impl ManagerRef<'_, SettingsManager> {
     #[tracing::instrument(skip(self))]
     pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
         let db = &self.app.prisma_client;
+
+        let crate::db::app_configuration::Data {
+            secret,
+            random_user_uuid,
+            ..
+        } = self.get_settings().await?;
+
+        let random_user_uuid = uuid::Uuid::parse_str(&random_user_uuid)?;
+
         let mut queries = vec![];
 
         let mut something_changed = false;
@@ -169,6 +178,16 @@ impl ManagerRef<'_, SettingsManager> {
                     terms_and_privacy_accepted,
                 )],
             ));
+
+            self.terms_and_privacy
+                .record_consent(
+                    terms_and_privacy::ConsentType::TermsAndPrivacy,
+                    terms_and_privacy_accepted,
+                    &random_user_uuid,
+                    &secret,
+                )
+                .await?;
+
             something_changed = true;
         }
 
@@ -180,6 +199,16 @@ impl ManagerRef<'_, SettingsManager> {
                     app_configuration::metrics_enabled_last_update::set(Some(Utc::now().into())),
                 ],
             ));
+
+            self.terms_and_privacy
+                .record_consent(
+                    terms_and_privacy::ConsentType::Metrics,
+                    metrics_enabled,
+                    &random_user_uuid,
+                    &secret,
+                )
+                .await?;
+
             something_changed = true;
         }
 

@@ -67,7 +67,7 @@ walkdir = { workspace = true }
 async-recursion = "1.0.4"
 serde-enum-str = "0.3.2"
 markdown = { workspace = true }
-openssl = { workspace = true }
+ring = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

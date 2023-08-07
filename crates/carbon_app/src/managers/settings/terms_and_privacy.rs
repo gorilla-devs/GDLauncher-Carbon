@@ -4,11 +4,19 @@ use chrono::{DateTime, Utc};
 use markdown::{CompileOptions, Options};
 use serde::Serialize;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
 use crate::managers::GDL_API_BASE;
 
 const BASE_GH_API_REPO_URL: &str = "https://api.github.com/repos/gorilla-devs/ToS-Privacy";
 const BASE_GH_REPO_URL: &str = "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy";
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConsentType {
+    Metrics,
+    TermsAndPrivacy,
+}
 
 pub struct TermsAndPrivacy {
     latest_sha: Arc<Mutex<Option<String>>>,
@@ -26,35 +34,53 @@ impl TermsAndPrivacy {
         }
     }
 
-    pub async fn record_consent(
+    pub async fn record_consent<'a>(
         &self,
-        consented_to_metrics: bool,
-        user_id: String,
-        secret: String,
+        consent_type: ConsentType,
+        consented: bool,
+        user_id: &'a Uuid,
+        secret: &'a Vec<u8>,
     ) -> anyhow::Result<()> {
-        #[derive(Debug, Serialize)]
-        pub struct Body {
-            pub user_id: String,
-            pub secret: String,
-            pub consented_to_metrics: bool,
-            pub consented_checksum: String,
-        }
+        let mut lock = self.latest_sha.lock().await;
+        let latest_sha = match lock.as_ref() {
+            Some(sha) => sha.to_owned(),
+            None => {
+                let sha = self.update_latest_commit_sha().await?;
+                *lock = Some(sha.clone());
+                sha
+            }
+        };
 
-        let sha = self.latest_sha.as_ref().lock().await;
+        #[derive(Debug, Serialize)]
+        pub struct Body<'b> {
+            pub user_id: &'b Uuid,
+            pub secret: &'b Vec<u8>,
+            pub consent_type: ConsentType,
+            pub consented: bool,
+            pub document_hash: String,
+        }
 
         let consent_url = format!("{}/v1/record_consent", GDL_API_BASE);
         let body = Body {
-            consented_to_metrics,
-            consented_checksum: sha.as_ref().ok_or(anyhow::anyhow!("No sha"))?.to_string(),
+            document_hash: latest_sha,
             secret,
             user_id,
+            consent_type,
+            consented,
         };
 
-        self.reqwest_client
+        let res = self
+            .reqwest_client
             .post(&consent_url)
             .json(&body)
             .send()
             .await?;
+
+        if !res.status().is_success() {
+            tracing::error!("Failed to record consent: {:?}", res);
+
+            anyhow::bail!("Failed to record consent");
+        }
 
         Ok(())
     }

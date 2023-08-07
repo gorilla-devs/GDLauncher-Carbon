@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::db::{self, app_configuration, PrismaClient};
-use openssl::{aes, rand::rand_bytes};
+use ring::rand::{SecureRandom, SystemRandom};
 use sha2::{Digest, Sha512};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
@@ -78,7 +78,10 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
         trace!("No app configuration found. Creating default one");
 
         let mut buf = [0; 256];
-        rand_bytes(&mut buf).unwrap();
+
+        let sr = ring::rand::SystemRandom::new();
+        sr.fill(&mut buf).unwrap();
+        println!("Buffer: {:?}", buf);
 
         db_client
             .app_configuration()
