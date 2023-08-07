@@ -35,6 +35,8 @@ use domain::info;
 pub mod importer;
 pub mod installer;
 pub mod log;
+mod modloaders;
+mod modpacks;
 mod mods;
 mod run;
 mod schema;
