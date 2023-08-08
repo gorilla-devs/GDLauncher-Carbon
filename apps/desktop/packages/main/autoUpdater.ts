@@ -12,7 +12,8 @@ export default function initAutoUpdater(win: BrowserWindow) {
       if (__APP_VERSION__.includes("snapshot")) {
         return new Promise((r) => r(false));
       }
-      autoUpdater.channel = selectedChannel;
+      autoUpdater.channel =
+        selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
       console.log("Checking for updates", selectedChannel);
       return autoUpdater.checkForUpdates();

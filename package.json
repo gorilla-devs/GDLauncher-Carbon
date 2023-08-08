@@ -25,7 +25,7 @@
     "------divider-prod------": "------divider------",
     "build:linux-x64-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64-prod && turbo run build -- --x64 --linux -- --production",
     "build:win-x64-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --production",
-    "build:mac-universal-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && cargo build -p carbon_app --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --x64 --universal -- --production",
+    "build:mac-universal-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && cargo build -p carbon_app --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --universal --mac -- --production",
     "------divider-utils------": "------divider------",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
     "test": "turbo run test && cargo test",

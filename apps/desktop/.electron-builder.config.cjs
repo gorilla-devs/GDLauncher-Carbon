@@ -1,5 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config({
+  path: "../../.env",
+});
 
 let arch = process.argv[4].replace(/-/g, "");
 let os = process.argv[5].replace(/-/g, "");
@@ -34,7 +39,10 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn",
+        url:
+          (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn") +
+          "/" +
+          process.env.PUBLISH_URL_FOLDER,
       };
 
 module.exports = {
