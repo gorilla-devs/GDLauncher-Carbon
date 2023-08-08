@@ -34,9 +34,7 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: (
-          process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn"
-        ).replace("${arch}", arch),
+        url: process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn",
       };
 
 module.exports = {
