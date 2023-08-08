@@ -1,5 +1,5 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Skeleton, Spinner } from "@gd/ui";
+import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
   For,
   Match,
@@ -15,97 +15,28 @@ import {
   MRFESearchIndex,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteModpacksQuery } from ".";
+import { useInfiniteModsQuery } from ".";
 import { mappedMcVersions } from "@/utils/mcVersion";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import { setScrollTop } from "@/utils/browser";
-import skull from "/assets/images/icons/skull.png";
 import ModRow from "@/components/ModRow";
 import { useModal } from "@/managers/ModalsManager";
 import { useRouteData } from "@solidjs/router";
-import fetchData from "./browser.data";
+import fetchData from "./modpacksBrowser.data";
+import ErrorFetchingMods from "@/managers/ModalsManager/modals/AddMod/ErrorFetchingMods";
+import {
+  FetchingModpacks,
+  NoModpacksAvailable,
+  NoMoreModpacks,
+} from "./ModpacksStatus";
 
-const NoMoreModpacks = () => {
-  return (
-    <div class="flex flex-col justify-center items-center gap-4 p-5 bg-darkSlate-700 rounded-xl h-56">
-      <div class="flex justify-center items-center flex-col text-center">
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.fetching_no_more_modpacks"
-            options={{
-              defaultValue: "No more modpacks to load",
-            }}
-          />
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const NoModpacksAvailable = () => {
-  return (
-    <div class="flex flex-col justify-center items-center gap-4 bg-darkSlate-700 rounded-xl h-100 mx-5">
-      <div class="flex justify-center items-center flex-col text-center">
-        <img src={skull} class="w-16 h-16" />
-
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.fetching_no_modpacks_available"
-            options={{
-              defaultValue: "No modpacks available",
-            }}
-          />
-        </p>
-      </div>
-    </div>
-  );
-};
-
-const FetchingModpacks = () => {
-  return (
-    <div class="flex flex-col justify-center items-center gap-4 p-5 rounded-xl h-56">
-      <div class="flex justify-center items-center flex-col text-center">
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.fetching_modpacks_text"
-            options={{
-              defaultValue: "Loading modpacks",
-            }}
-          />
-        </p>
-        <Spinner />
-      </div>
-    </div>
-  );
-};
-
-const ErrorFetchingModpacks = (props: { error: RSPCError | null }) => {
-  const parsedError = () =>
-    props.error?.message && JSON.parse(props.error?.message);
-  return (
-    <div class="w-full flex h-full justify-center items-center min-h-90">
-      <div class="flex justify-center items-center flex-col text-center">
-        <p class="text-darkSlate-50 max-w-100">
-          <Trans
-            key="instance.fetching_modpacks_error"
-            options={{
-              defaultValue: "There was an error while fetching modpacks",
-            }}
-          />
-          {parsedError().cause[0].display}
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export default function Browser() {
+const ModpackBrowser = () => {
   const [t] = useTransContext();
   const modalsContext = useModal();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const infiniteQuery = useInfiniteModpacksQuery();
+  const infiniteQuery = useInfiniteModsQuery();
 
   const modpacks = () => infiniteQuery.allRows();
 
@@ -312,13 +243,7 @@ export default function Browser() {
                         }}
                       >
                         <div>
-                          <Switch
-                            fallback={
-                              <div>
-                                <FetchingModpacks />
-                              </div>
-                            }
-                          >
+                          <Switch fallback={<FetchingModpacks />}>
                             <Match when={!isLoaderRow() && modpack()}>
                               <ModRow
                                 type="Modpack"
@@ -362,7 +287,7 @@ export default function Browser() {
             <NoModpacksAvailable />
           </Match>
           <Match when={infiniteQuery?.infiniteQuery.isError}>
-            <ErrorFetchingModpacks
+            <ErrorFetchingMods
               error={infiniteQuery?.infiniteQuery.error as RSPCError | null}
             />
           </Match>
@@ -370,4 +295,6 @@ export default function Browser() {
       </div>
     </div>
   );
-}
+};
+
+export default ModpackBrowser;

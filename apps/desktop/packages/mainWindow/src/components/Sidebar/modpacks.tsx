@@ -1,7 +1,7 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
-import fetchData from "@/pages/Modpacks/browser.data";
+import fetchData from "@/pages/Modpacks/modpacksBrowser.data";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import {
@@ -14,7 +14,7 @@ import {
   CFFEModLoaderType,
   MRFELoader,
 } from "@gd/core_module/bindings";
-import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
+import { useInfiniteModsQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
@@ -65,7 +65,7 @@ const Sidebar = () => {
   >([]);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const infiniteQuery = useInfiniteModpacksQuery();
+  const infiniteQuery = useInfiniteModsQuery();
 
   const [t] = useTransContext();
 

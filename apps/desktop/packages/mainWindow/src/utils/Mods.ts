@@ -6,7 +6,7 @@ import {
   MRFECategoriesResponse,
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
-import useModpacksQuery from "@/pages/Modpacks/useModpacksQuery";
+import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
 
 export const [query, setQuery] = useModpacksQuery({
   searchQuery: "",
