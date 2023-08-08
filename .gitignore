@@ -93,3 +93,4 @@ crates/carbon_app/src/db.rs
 /crates/carbon_app/prisma/dev.db
 /crates/carbon_app/prisma/dev.db-journal
 /crates/iridium
+.vscode

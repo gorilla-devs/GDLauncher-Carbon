@@ -16,15 +16,15 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
     impl Middleware for AddHeaderMiddleware {
         async fn handle(
             &self,
-            mut req: Request,
+            req: Request,
             _extensions: &mut task_local_extensions::Extensions,
             next: Next<'_>,
         ) -> reqwest_middleware::Result<Response> {
             // Add the header to the request.
-            req.headers_mut().insert(
-                "authentication",
-                std::env::var("API_AUTH").unwrap().parse().unwrap(),
-            );
+            // req.headers_mut().insert(
+            //     "authentication",
+            //     std::env::var("API_AUTH").unwrap().parse().unwrap(),
+            // );
 
             // Continue with the modified request.
             next.run(req, _extensions).await

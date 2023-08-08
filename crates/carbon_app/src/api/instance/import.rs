@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum FEEntity {
     LegacyGDLauncher,
     MRPack,

@@ -45,12 +45,10 @@ const Overview = () => {
           </For>
         </Show>
 
-        <Show when={routeData.instanceDetails.data?.mods}>
+        <Show when={routeData.instanceMods.data}>
           <Card
             title={t("instance.overview_card_mods_title")}
-            text={
-              (routeData.instanceDetails.data as InstanceDetails)?.mods.length
-            }
+            text={routeData.instanceMods.data?.length || 0}
             icon="cart"
           />
         </Show>

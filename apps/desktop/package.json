@@ -68,5 +68,6 @@
   "env": {
     "//": "Used in build scripts",
     "PORT": 3344
-  }
+  },
+  "version": "1.9.0-alpha.1690755218"
 }

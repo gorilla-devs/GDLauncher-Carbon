@@ -28,9 +28,9 @@ type Hash = {
 };
 
 const defaultModals: Hash = {
-  privacyPolicy: {
-    component: lazy(() => import("./modals/Privacypolicy")),
-    title: "Privacy Policy",
+  privacyStatement: {
+    component: lazy(() => import("./modals/PrivacyStatement")),
+    title: "Privacy Statement",
   },
   termsAndConditions: {
     component: lazy(() => import("./modals/TermsAndConditions")),
@@ -51,10 +51,6 @@ const defaultModals: Hash = {
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: "Java Setup",
-  },
-  acceptableUsePolicy: {
-    component: lazy(() => import("./modals/AcceptableUsePolicy")),
-    title: "Acceptable Use Policy",
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),

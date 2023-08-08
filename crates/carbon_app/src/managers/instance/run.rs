@@ -3,12 +3,19 @@ use crate::domain::java::SystemJavaProfileName;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::java::managed::Step;
 use crate::managers::minecraft::curseforge;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
+use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
+use std::pin::Pin;
+
+use std::time::Duration;
+use tokio::{io::AsyncReadExt, sync::mpsc};
+use tracing::{debug, info};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -16,11 +23,9 @@ use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
-use std::time::Duration;
-use tokio::sync::Semaphore;
+use futures::Future;
+use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
-use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info};
 
 use anyhow::{anyhow, bail};
 
@@ -48,12 +53,16 @@ impl PersistenceManager {
         }
     }
 }
+type InstanceCallback = Box<
+    dyn FnOnce(Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
+>;
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn prepare_game(
         self,
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
+        callback_task: Option<InstanceCallback>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -134,7 +143,7 @@ impl ManagerRef<'_, InstanceManager> {
             },
         });
 
-        let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting).await;
+        let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting);
         wait_task.set_weight(0.0);
 
         let id = self.app.task_manager().spawn_task(&task).await;
@@ -164,40 +173,37 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let t_modpack = match is_first_run {
                     true => Some((
-                        task.subtask(Translation::InstanceTaskLaunchRequestModpack)
-                            .await,
-                        task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles)
-                            .await,
-                        task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles)
-                            .await,
-                        task.subtask(Translation::InstanceTaskLaunchDownloadAddonMetadata)
-                            .await,
+                        task.subtask(Translation::InstanceTaskLaunchRequestModpack),
+                        task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
+                        task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
+                        task.subtask(Translation::InstanceTaskLaunchDownloadAddonMetadata),
                     )),
                     false => None,
                 };
 
                 let t_request_version_info = task
-                    .subtask(Translation::InstanceTaskLaunchRequestVersions)
-                    .await;
+                    .subtask(Translation::InstanceTaskLaunchRequestVersions);
 
                 let t_download_files = task
-                    .subtask(Translation::InstanceTaskLaunchDownloadFiles)
-                    .await;
+                    .subtask(Translation::InstanceTaskLaunchDownloadFiles);
                 t_download_files.set_weight(20.0);
                 let t_extract_natives = task
-                    .subtask(Translation::InstanceTaskLaunchExtractNatives)
-                    .await;
+                    .subtask(Translation::InstanceTaskLaunchExtractNatives);
 
                 let t_reconstruct_assets = task
-                    .subtask(Translation::InstanceTaskReconstructAssets)
-                    .await;
+                    .subtask(Translation::InstanceTaskReconstructAssets);
 
                 let t_forge_processors = match is_first_run {
                     true => Some(
-                        task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)
-                            .await,
+                        task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors),
                     ),
                     false => None,
+                };
+
+                let t_finalize_import = if callback_task.is_some() {
+                    Some(task.subtask(Translation::FinalizingImport))
+                } else {
+                    None
                 };
 
                 task.edit(|data| data.state = TaskState::KnownProgress)
@@ -207,13 +213,13 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut downloads = Vec::new();
 
+                let mut is_initial_modpack_launch = false;
                 if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
                 {
                     if let Some(modpack) = &config.modpack {
                         let v: StandardVersion = match modpack {
                             Modpack::Curseforge(modpack) => {
-
                                 t_request.start_opaque();
                                 let file = app
                                     .modplatforms_manager()
@@ -227,32 +233,30 @@ impl ManagerRef<'_, InstanceManager> {
                                 t_request.complete_opaque();
 
                                 let (modpack_progress_tx, mut modpack_progress_rx) =
-                                    tokio::sync::watch::channel(curseforge::ProgressState::Idle);
+                                    tokio::sync::watch::channel(curseforge::ProgressState::new());
 
                                 tokio::spawn(async move {
+                                    let mut tracker = curseforge::ProgressState::new();
+
                                     while modpack_progress_rx.changed().await.is_ok() {
                                         {
                                             let progress = modpack_progress_rx.borrow();
-                                            match *progress {
-                                                curseforge::ProgressState::Idle => {}
-                                                curseforge::ProgressState::DownloadingAddonZip(downloaded, total) => {
-                                                    t_download_files
-                                                        .update_download(downloaded as u32, total as u32)
-                                                }
-                                                curseforge::ProgressState::ExtractingAddonOverrides(count, total) => {
-                                                    t_extract_files.update_items(count as u32, total as u32)
-                                                }
-                                                curseforge::ProgressState::AcquiringAddonsMetadata(count, total) => {
-                                                    t_addon_metadata
-                                                        .update_items(count as u32, total as u32)
-                                                }
-                                            }
+
+                                            tracker.download_addon_zip.update_from(&progress.download_addon_zip, |(downloaded, total)| {
+                                                t_download_files.update_download(downloaded as u32, total as u32, true);
+                                            });
+
+                                            tracker.extract_addon_overrides.update_from(&progress.extract_addon_overrides, |(completed, total)| {
+                                                t_extract_files.update_items(completed as u32, total as u32);
+                                            });
+
+                                            tracker.acquire_addon_metadata.update_from(&progress.acquire_addon_metadata, |(completed, total)| {
+                                                t_addon_metadata.update_items(completed as u32, total as u32);
+                                            });
                                         }
 
                                         tokio::time::sleep(Duration::from_millis(200)).await;
                                     }
-
-                                    t_download_files.complete_download();
                                 });
 
                                 let modpack_info = curseforge::prepare_modpack_from_addon(
@@ -297,7 +301,7 @@ impl ManagerRef<'_, InstanceManager> {
                                                 modrinth::ProgressState::Idle => {}
                                                 modrinth::ProgressState::DownloadingMRPack(downloaded, total) => {
                                                     t_download_files
-                                                        .update_download(downloaded as u32, total as u32)
+                                                        .update_download(downloaded as u32, total as u32, true)
                                                 }
                                                 modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
                                                     t_extract_files.update_items(count as u32, total as u32)
@@ -331,41 +335,28 @@ impl ManagerRef<'_, InstanceManager> {
                         version = Some(v.clone());
 
                         let path = app
-                        .settings_manager()
-                        .runtime_path
-                        .get_instances()
-                        .to_path()
-                        .join(instance_shortpath);
+                            .settings_manager()
+                            .runtime_path
+                            .get_instances()
+                            .to_path()
+                            .join(instance_shortpath);
 
                         config.game_configuration.version =
                             Some(GameVersion::Standard(StandardVersion {
                                 release: v.release.clone(),
-                                modloaders: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        modloaders,
-                                        ..
-                                    })) => modloaders.clone(),
-                                    _ => std::collections::HashSet::new(),
-                                },
-                            }));
-
-                            config.game_configuration.version =
-                            Some(GameVersion::Standard(StandardVersion {
-                                release: match &config.game_configuration.version {
-                                    Some(GameVersion::Standard(StandardVersion {
-                                        release,
-                                        ..
-                                    })) => release.clone(),
-                                    _ => bail!("custom versions are not yet supported"),
-                                },
-                                modloaders: match v.modloaders.iter().next().cloned() {
-                                    Some(modloader) => std::collections::HashSet::from([modloader]),
-                                    None => std::collections::HashSet::new(),
-                                },
+                                modloaders: v.modloaders.clone(),
                             }));
 
                         let json = make_instance_config(config.clone())?;
                         tokio::fs::write(path.join("instance.json"), json).await?;
+
+                        instance_manager.instances.write().await
+                            .get_mut(&instance_id)
+                            .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
+                            .data_mut()?
+                            .config = config;
+
+                        is_initial_modpack_launch = true;
                     }
                 }
 
@@ -414,16 +405,57 @@ impl ManagerRef<'_, InstanceManager> {
                     match app.java_manager().get_usable_java(required_java).await? {
                         Some(path) => path,
                         None => {
-                            let t_install_java = task
-                                .subtask(Translation::InstanceTaskLaunchInstallJava)
-                                .await;
-                            t_install_java.set_weight(0.0);
-                            t_install_java.start_opaque();
+                            let t_download_java = task
+                                .subtask(Translation::InstanceTaskLaunchDownloadJava);
+
+                            let t_extract_java = task
+                                .subtask(Translation::InstanceTaskLaunchExtractJava);
+                            t_download_java.set_weight(0.0);
+                            t_extract_java.set_weight(0.0);
+
+                            let (progress_watch_tx, mut progress_watch_rx) = watch::channel(Step::Idle);
+
+                            // dropped when the sender is dropped
+                            tokio::spawn(async move {
+                                let mut started = false;
+                                let mut dl_completed = false;
+
+                                while progress_watch_rx.changed().await.is_ok() {
+                                    let step = progress_watch_rx.borrow();
+
+                                    if !started && !matches!(*step, Step::Idle) {
+                                        t_download_java.set_weight(10.0);
+                                        t_extract_java.set_weight(3.0);
+                                        started = true;
+                                    }
+
+                                    match *step {
+                                        Step::Downloading(downloaded, total) => t_download_java.update_download(downloaded as u32, total as u32, true),
+                                        Step::Extracting(count, total) => {
+                                            if !dl_completed {
+                                                t_download_java.complete_download();
+                                                dl_completed = true;
+                                            }
+
+                                            t_extract_java.update_items(count as u32, total as u32);
+                                        }
+
+                                        Step::Done => {
+                                            t_download_java.complete_download();
+                                            t_extract_java.complete_items();
+                                        }
+
+                                        Step::Idle => {}
+                                    }
+
+                                    // this is already debounced in setup_managed
+                                }
+                            });
+
                             let path = app
                                 .java_manager()
-                                .require_java_install(required_java, true)
+                                .require_java_install(required_java, true, Some(progress_watch_tx))
                                 .await?;
-                            t_install_java.complete_opaque();
 
                             match path {
                                 Some(path) => path,
@@ -587,7 +619,6 @@ impl ManagerRef<'_, InstanceManager> {
                             version_info =
                                 daedalus::modded::merge_partial_version(quilt_version, version_info);
                         }
-                        _ => {}
                     }
                 }
 
@@ -610,6 +641,7 @@ impl ManagerRef<'_, InstanceManager> {
                             t_download_files.update_download(
                                 progress.current_size as u32,
                                 progress.total_size as u32,
+                                false,
                             );
                         }
 
@@ -623,11 +655,16 @@ impl ManagerRef<'_, InstanceManager> {
 
                 carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
 
-                // scan instances again offtask to pick up modpack mods
-                let app2 = app.clone();
-                tokio::spawn(async move {
-                    let _ = app2.instance_manager().scan_instances().await;
-                });
+                // update mod metadata after mods are downloaded
+                if is_initial_modpack_launch {
+                    tracing::info!("queueing metadata caching for running instance");
+
+                    app.meta_cache_manager()
+                        .queue_local_caching(instance_id, true)
+                        .await;
+
+                    tracing::trace!("queued metadata caching");
+                }
 
                 t_extract_natives.start_opaque();
                 managers::minecraft::minecraft::extract_natives(
@@ -699,6 +736,10 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                     )),
                     None => {
+                        if let Some(callback_task) = callback_task {
+                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
+                        }
+
                         let _ = app
                             .instance_manager()
                             .change_launch_state(
@@ -989,7 +1030,7 @@ mod test {
         };
 
         app.instance_manager()
-            .prepare_game(instance_id, Some(account))
+            .prepare_game(instance_id, Some(account), None)
             .await?;
 
         let task = match app.instance_manager().get_launch_state(instance_id).await? {

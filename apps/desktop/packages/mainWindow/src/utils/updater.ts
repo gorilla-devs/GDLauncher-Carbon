@@ -1,6 +1,7 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { UpdateCheckResult } from "electron-updater";
-import { createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
+import { rspc } from "./rspcClient";
 
 export const [updateAvailable, setUpdateAvailable] =
   createSignal<UpdateCheckResult | null>(null);
@@ -13,29 +14,40 @@ window.onDownloadProgress((_, progress) => {
   setUpdateProgress(progress.percent);
 });
 
-export const checkForUpdates = async (releaseChannel: FEReleaseChannel) => {
-  let interval = null;
+type IntervalType = ReturnType<typeof setInterval>;
 
-  const check = async () => {
-    lastChannel = releaseChannel;
-    const isUpdateAvailable = await window.checkForUpdates(releaseChannel);
+export const checkForUpdates = async () => {
+  let interval: null | IntervalType = null;
 
-    if (isUpdateAvailable) {
-      setUpdateAvailable(isUpdateAvailable);
-    } else {
-      setUpdateAvailable(null);
-    }
-  };
+  let settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  if (!lastChannel || lastChannel !== releaseChannel) {
-    if (interval) {
-      clearInterval(interval);
-    }
-    check();
-    interval = setInterval(() => {
+  createEffect(() => {
+    if (!settings.data) return;
+
+    if (!lastChannel || settings.data.releaseChannel !== lastChannel) {
+      lastChannel = settings.data!.releaseChannel;
+
+      const check = async () => {
+        const isUpdateAvailable = await window.checkForUpdates(lastChannel!);
+
+        if (isUpdateAvailable) {
+          setUpdateAvailable(isUpdateAvailable);
+        } else {
+          setUpdateAvailable(null);
+        }
+      };
+
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+
       check();
-    }, 60 * 30 * 1000);
-  }
+      interval = setInterval(() => {
+        check();
+      }, 60 * 30 * 1000);
+    }
+  });
 };
 
 export default updateAvailable;

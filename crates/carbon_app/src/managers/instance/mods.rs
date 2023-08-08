@@ -1,48 +1,125 @@
 use anyhow::bail;
-use std::ffi::OsStr;
 use thiserror::Error;
 
-use crate::{api::keys::instance::*, domain::vtask::VisualTaskId, managers::ManagerRef};
+use crate::domain::instance::info::ModLoaderType;
+use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
+
+use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use crate::{db::read_filters::IntFilter, domain::instance as domain};
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
-    Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError,
+    InstanceId, InstanceManager, InvalidInstanceIdError,
 };
 
 impl ManagerRef<'_, InstanceManager> {
+    pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
+        {
+            let instances = self.instances.read().await;
+            if instances.get(&instance_id).is_none() {
+                bail!(InvalidInstanceIdError(instance_id));
+            }
+        }
+
+        let mods = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
+                *instance_id,
+            ))])
+            .with(
+                fcdb::metadata::fetch()
+                    .with(metadb::curseforge::fetch())
+                    .with(metadb::modrinth::fetch()),
+            )
+            .exec()
+            .await?
+            .into_iter()
+            .map(|m| domain::Mod {
+                id: m.id,
+                filename: m.filename,
+                enabled: m.enabled,
+                metadata: m.metadata.as_ref().and_then(|m| {
+                    m.modid.clone().map(|modid| domain::ModFileMetadata {
+                        modid,
+                        name: m.name.clone(),
+                        version: m.version.clone(),
+                        description: m.description.clone(),
+                        authors: m.authors.clone(),
+                        modloaders: m
+                            .modloaders
+                            .split(',')
+                            // ignore unknown modloaders
+                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                            .collect::<Vec<_>>(),
+                    })
+                }),
+                curseforge: m
+                    .metadata
+                    .clone()
+                    .and_then(|m| m.curseforge)
+                    .flatten()
+                    .map(|m| domain::CurseForgeModMetadata {
+                        project_id: m.project_id as u32,
+                        file_id: m.file_id as u32,
+                        name: m.name,
+                        urlslug: m.urlslug,
+                        summary: m.summary,
+                        authors: m.authors,
+                    }),
+                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
+                    domain::ModrinthModMetadata {
+                        project_id: m.project_id,
+                        version_id: m.version_id,
+                        title: m.title,
+                        filename: m.filename,
+                        urlslug: m.urlslug,
+                        description: m.description,
+                        authors: m.authors,
+                        sha512: m.sha_512,
+                        sha1: m.sha_1,
+                    }
+                }),
+            });
+
+        Ok(mods.collect::<Vec<_>>())
+    }
+
     pub async fn enable_mod(
         self,
         instance_id: InstanceId,
         id: String,
         enabled: bool,
     ) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
-        let mut instance = instances
-            .get_mut(&instance_id)
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &mut instance else {
-            bail!("enable_mod called on invalid instance");
-        };
+        let shortpath = &instance.shortpath;
 
-        let m = data
-            .mods
-            .iter_mut()
-            .find(|m| m.id == id)
-            .ok_or_else(|| InvalidModIdError(instance_id, id.clone()))?;
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .exec()
+            .await?
+            .ok_or(InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&shortpath)
+            .get_instance_path(shortpath)
             .get_mods_path();
 
         let enabled_path = disabled_path.join(&m.filename);
 
         let mut disabled = m.filename.clone();
-        disabled.push(OsStr::new(".disabled"));
+        disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
         if enabled {
@@ -67,41 +144,43 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::rename(enabled_path, disabled_path).await?;
         }
 
-        m.enabled = !m.enabled;
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            .meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
+
         Ok(())
     }
 
     pub async fn delete_mod(self, instance_id: InstanceId, id: String) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
-        let mut instance = instances
-            .get_mut(&instance_id)
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &mut instance else {
-            bail!("enable_mod called on invalid instance");
-        };
+        let shortpath = &instance.shortpath;
 
-        let (i, m) = data
-            .mods
-            .iter_mut()
-            .enumerate()
-            .find(|(_, m)| m.id == id)
-            .ok_or_else(|| InvalidModIdError(instance_id, id.clone()))?;
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .exec()
+            .await?
+            .ok_or(InvalidModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&shortpath)
+            .get_instance_path(shortpath)
             .get_mods_path();
 
         let enabled_path = disabled_path.join(&m.filename);
 
         let mut disabled = m.filename.clone();
-        disabled.push(OsStr::new(".disabled"));
+        disabled.push_str(".disabled");
         disabled_path.push(disabled);
 
         if enabled_path.is_file() {
@@ -110,9 +189,11 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::remove_file(disabled_path).await?;
         }
 
-        data.mods.remove(i);
         self.app
-            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+            .meta_cache_manager()
+            .queue_local_caching(instance_id, true)
+            .await;
+
         Ok(())
     }
 
@@ -126,7 +207,7 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, &instance_id).await?;
+        let task_id = installer.install(self.app, instance_id).await?;
 
         Ok(task_id)
     }
@@ -141,7 +222,7 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, &instance_id).await?;
+        let task_id = installer.install(self.app, instance_id).await?;
 
         Ok(task_id)
     }
@@ -150,3 +231,57 @@ impl ManagerRef<'_, InstanceManager> {
 #[derive(Error, Debug)]
 #[error("invalid mod id '{1}' given for instance '{0}'")]
 pub struct InvalidModIdError(InstanceId, String);
+
+#[cfg(test)]
+mod test {
+    use crate::managers::instance::InstanceVersionSource;
+    use std::collections::HashSet;
+
+    use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
+
+    #[tokio::test]
+    async fn test_mod_metadata() -> anyhow::Result<()> {
+        dbg!();
+        let app = crate::setup_managers_for_test().await;
+        let group = app.instance_manager().get_default_group().await?;
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                String::from("test"),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.16.5"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        app.meta_cache_manager()
+            .prioritize_instance(instance_id)
+            .await;
+
+        app.instance_manager()
+            .install_curseforge_mod(instance_id, 331723, 4022327)
+            .await?;
+
+        // first invalidation will happen when the mod is scanned locally
+        app.wait_for_invalidation(INSTANCE_MODS).await?;
+
+        let mods = app.instance_manager().list_mods(instance_id).await?;
+        dbg!(&mods);
+        assert_ne!(mods.get(0), None);
+
+        // second invalidation will happen when the curseforge metadata is fetched
+        app.wait_for_invalidation(INSTANCE_MODS).await?;
+
+        let mods = app.instance_manager().list_mods(instance_id).await?;
+        dbg!(&mods);
+        assert_ne!(mods[0].curseforge, None);
+
+        Ok(())
+    }
+}

@@ -439,7 +439,7 @@ impl From<McModInfo> for ModFileMetadata {
             version: value.version,
             description: value.description,
             authors: value.authors.map(|list| list.join(", ")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         }
     }
 }
@@ -452,7 +452,7 @@ impl From<ModsTomlEntry> for ModFileMetadata {
             version: Some(value.version),
             description: value.description,
             authors: value.authors,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         }
     }
 }
@@ -486,7 +486,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                 version: Some(info.version),
                 description: info.description,
                 authors: info.authors.and_then(flatten_authors),
-                modloaders: Some(vec![ModLoaderType::Fabric]),
+                modloaders: vec![ModLoaderType::Fabric],
             }),
             FabricModJson::List(list) => {
                 let info = list
@@ -498,7 +498,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                     version: Some(info.version.clone()),
                     description: info.description.clone(),
                     authors: info.authors.clone().and_then(flatten_authors),
-                    modloaders: Some(vec![ModLoaderType::Fabric]),
+                    modloaders: vec![ModLoaderType::Fabric],
                 })
             }
         }
@@ -522,14 +522,14 @@ impl From<QuiltModJson> for ModFileMetadata {
             version: Some(value.quilt_loader.version),
             description,
             authors,
-            modloaders: Some(vec![ModLoaderType::Quilt]),
+            modloaders: vec![ModLoaderType::Quilt],
         }
     }
 }
 
 fn merge_mod_metadata(
     metadata: Option<ModFileMetadata>,
-    other: ModFileMetadata,
+    mut other: ModFileMetadata,
 ) -> Option<ModFileMetadata> {
     match metadata {
         Some(metadata) => Some(ModFileMetadata {
@@ -538,14 +538,10 @@ fn merge_mod_metadata(
             version: metadata.version.or(other.version),
             description: metadata.description.or(other.description),
             authors: metadata.authors.or(other.authors),
-            modloaders: match (metadata.modloaders, other.modloaders) {
-                (Some(mut a), Some(mut b)) => {
-                    a.append(&mut b);
-                    Some(a)
-                }
-                (Some(a), None) => Some(a),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
+            modloaders: {
+                let mut modloaders = metadata.modloaders;
+                modloaders.append(&mut other.modloaders);
+                modloaders
             },
         }),
         None => Some(other),
@@ -669,7 +665,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -692,7 +688,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -721,7 +717,7 @@ mod test {
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -746,7 +742,7 @@ mod test {
             version: None,
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
@@ -771,7 +767,7 @@ authors = "TestAuthor1, TestAuthor2"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -794,7 +790,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: None,
             authors: None,
-            modloaders: Some(vec![ModLoaderType::Forge]),
+            modloaders: vec![ModLoaderType::Forge],
         });
 
         let returned = parsemeta("META-INF/mods.toml", modstoml)?;
@@ -853,7 +849,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("This is an example description!")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Fabric]),
+            modloaders: vec![ModLoaderType::Fabric],
         });
 
         let returned = parsemeta("fabric.mod.json", modjson)?;
@@ -914,7 +910,7 @@ displayName = "TestMod"
             version: Some(String::from("1.0.0")),
             description: Some(String::from("A short description of your mod.")),
             authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            modloaders: Some(vec![ModLoaderType::Quilt]),
+            modloaders: vec![ModLoaderType::Quilt],
         });
 
         let returned = parsemeta("quilt.mod.json", modjson)?;
