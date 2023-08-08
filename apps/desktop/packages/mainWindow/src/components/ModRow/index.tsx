@@ -140,7 +140,7 @@ const ModRow = (props: ModRowProps) => {
       );
     } else {
       return (modrinthVersions()?.data || []).filter((version) =>
-        version.game_versions.includes((props as ModProps).mcVersion)
+        version.game_versions.includes((props as ModProps).mcVersion || "")
       );
     }
   };

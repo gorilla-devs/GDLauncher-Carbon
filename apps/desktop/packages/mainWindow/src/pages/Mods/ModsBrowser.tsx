@@ -11,30 +11,31 @@ import {
   onMount,
 } from "solid-js";
 import {
+  CFFEModLoaderType,
   CFFEModSearchSortField,
+  FESearchAPI,
+  FEUnifiedModLoaderType,
   MRFESearchIndex,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { useInfiniteModsQuery } from ".";
-import { mappedMcVersions } from "@/utils/mcVersion";
-import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
-import { setScrollTop } from "@/utils/browser";
+import {
+  CurseForgeSortFields,
+  ModpackPlatforms,
+  ModrinthSortFields,
+} from "@/utils/constants";
 import ModRow from "@/components/ModRow";
-import { useModal } from "@/managers/ModalsManager";
-import { useRouteData } from "@solidjs/router";
 import fetchData from "./modsBrowser.data";
 import ErrorFetchingMods from "@/managers/ModalsManager/modals/AddMod/ErrorFetchingMods";
-import {
-  FetchingModpacks,
-  NoModpacksAvailable,
-  NoMoreModpacks,
-} from "./ModsStatus";
+import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
+import NoModsAvailable from "@/managers/ModalsManager/modals/AddMod/NoModsAvailable";
+import { PlatformIcon } from "@/utils/instances";
+import { capitalize } from "@/utils/helpers";
+import { FetchingModpacks } from "./ModsStatus";
+import { NoMoreModpacks } from "../Modpacks/ModpacksStatus";
+import { useRouteData } from "@solidjs/router";
 
 const ModpackBrowser = () => {
   const [t] = useTransContext();
-  const modalsContext = useModal();
-
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const infiniteQuery = useInfiniteModsQuery();
 
@@ -42,7 +43,10 @@ const ModpackBrowser = () => {
 
   const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
+
   createEffect(() => {
     if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
       return;
@@ -87,209 +91,222 @@ const ModpackBrowser = () => {
   const sortingFields = () =>
     isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
+  const modloaders: CFFEModLoaderType[] = ["forge", "fabric", "quilt"];
+
+  const mods = () =>
+    infiniteQuery?.infiniteQuery.data
+      ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
+      : [];
+
   return (
     <div class="box-border h-full w-full relative">
       <div
         ref={(el) => (containrRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
-        <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
-          <Input
-            placeholder="Type Here"
-            icon={<div class="i-ri:search-line" />}
-            class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
-            onInput={(e) => {
-              const target = e.target as HTMLInputElement;
-              infiniteQuery?.setQuery({ searchQuery: target.value });
-            }}
-          />
-          <div class="flex items-center gap-3">
-            <p class="text-darkSlate-50">
-              <Trans
-                key="instance.sort_by"
-                options={{
-                  defaultValue: "Sort by:",
-                }}
-              />
-            </p>
-            <Dropdown
-              options={sortingFields().map((field) => ({
-                label: t(`instance.sort_by_${field}`),
-                key: field,
-              }))}
-              onChange={(val) => {
-                const sortIndex = isCurseforge()
-                  ? {
-                      curseForge: val.key as CFFEModSearchSortField,
-                    }
-                  : {
-                      modrinth: val.key as MRFESearchIndex,
-                    };
-
-                infiniteQuery?.setQuery({
-                  sortIndex: sortIndex,
-                });
-              }}
-              value={0}
-              rounded
-            />
-            <Show when={mappedMcVersions().length > 0}>
-              <Dropdown
-                options={mappedMcVersions()}
-                icon={<div class="i-ri:price-tag-3-fill" />}
-                rounded
-                value={mappedMcVersions()[0].key}
-                onChange={(val) => {
-                  infiniteQuery?.setQuery({
-                    gameVersions: [val.key as string],
-                  });
-                }}
-              />
-            </Show>
-            <Show when={mappedMcVersions().length === 0}>
-              <Skeleton.select />
-            </Show>
-          </div>
-          <Button
-            type="outline"
-            onClick={() => {
-              modalsContext?.openModal({
-                name: "instanceCreation",
-              });
-            }}
-          >
-            <Trans
-              key="sidebar.plus_add_instance"
-              options={{
-                defaultValue: "+ Add Instance",
-              }}
-            />
-          </Button>
-          <div
-            class="cursor-pointer text-2xl"
-            classList={{
-              "i-ri:sort-asc": infiniteQuery?.query.sortOrder === "ascending",
-              "i-ri:sort-desc": infiniteQuery?.query.sortOrder === "descending",
-            }}
-            onClick={() => {
-              const isAsc = infiniteQuery?.query.sortOrder === "ascending";
-              infiniteQuery?.setQuery({
-                sortOrder: isAsc ? "descending" : "ascending",
-              });
-            }}
-          />
-          {/* <Button
-            type="outline"
-            size="medium"
-            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
-          >
-            <Trans
-              key="instance.import"
-              options={{
-                defaultValue: "Import",
-              }}
-            />
-          </Button> */}
-        </div>
-      </div>
-      <div
-        class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
-        style={{
-          top: `${headerHeight()}px`,
-        }}
-      >
         <Switch>
-          <Match
-            when={
-              modpacks().length > 0 &&
-              !infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
-            <div
-              class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
-              ref={(el) => {
-                infiniteQuery.setParentRef(el);
-              }}
-              onScroll={(e) => {
-                setScrollTop(e.target.scrollTop);
-              }}
-            >
-              <div
-                style={{
-                  height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
-                  width: "100%",
-                  position: "relative",
-                }}
-              >
-                <For each={allVirtualRows()}>
-                  {(virtualItem) => {
-                    const isLoaderRow = () =>
-                      virtualItem.index > modpacks().length - 1;
-                    const modpack = () => modpacks()[virtualItem.index];
-
-                    const hasNextPage = () =>
-                      infiniteQuery?.infiniteQuery.hasNextPage;
-
-                    return (
-                      <div
-                        data-index={virtualItem.index}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: "100%",
-                          height: `${virtualItem.size}px`,
-                          transform: `translateY(${virtualItem.start}px)`,
-                        }}
-                      >
-                        <div>
-                          <Switch fallback={<FetchingModpacks />}>
-                            <Match when={!isLoaderRow() && modpack()}>
-                              <ModRow
-                                type="Modpack"
-                                data={modpack()}
-                                defaultGroup={routeData.defaultGroup.data}
-                                modrinthCategories={
-                                  routeData.modrinthCategories.data
-                                }
-                              />
-                            </Match>
-                            <Match when={isLoaderRow() && !hasNextPage()}>
-                              <NoMoreModpacks />
-                            </Match>
-                          </Switch>
-                        </div>
-                      </div>
-                    );
+          <Match when={infiniteQuery.infiniteQuery.isFetching}>Loading</Match>
+          <Match when={!infiniteQuery.infiniteQuery.isFetching}>
+            <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
+              <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
+                <Input
+                  placeholder="Type Here"
+                  icon={<div class="i-ri:search-line" />}
+                  class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
+                  onInput={(e) => {
+                    const target = e.target as HTMLInputElement;
+                    infiniteQuery.setQuery({ searchQuery: target.value });
                   }}
-                </For>
+                />
+                <div class="flex items-center gap-3">
+                  <p class="text-darkSlate-50">
+                    <Trans
+                      key="instance.sort_by"
+                      options={{
+                        defaultValue: "Sort by:",
+                      }}
+                    />
+                  </p>
+                  <Dropdown
+                    options={sortingFields().map((field) => ({
+                      label: t(`instance.sort_by_${field}`),
+                      key: field,
+                    }))}
+                    onChange={(val) => {
+                      const sortIndex = isCurseforge()
+                        ? {
+                            curseForge: val.key as CFFEModSearchSortField,
+                          }
+                        : {
+                            modrinth: val.key as MRFESearchIndex,
+                          };
+                      infiniteQuery.setQuery({
+                        sortIndex,
+                      });
+                    }}
+                    value={0}
+                    rounded
+                  />
+                  <Dropdown
+                    options={modloaders.map((modloader) => ({
+                      label: t(`modloader_${modloader}`),
+                      key: modloader,
+                    }))}
+                    onChange={(val) => {
+                      const prevModloaders =
+                        infiniteQuery.query.modloaders || [];
+                      const mappedValue =
+                        val.key === "any"
+                          ? null
+                          : [
+                              ...prevModloaders,
+                              val.key as FEUnifiedModLoaderType,
+                            ];
+
+                      infiniteQuery.setQuery({
+                        modloaders: mappedValue,
+                      });
+                    }}
+                    rounded
+                  />
+                  <Dropdown
+                    options={ModpackPlatforms.map((platform) => ({
+                      label: (
+                        <div class="flex items-center gap-2">
+                          <PlatformIcon platform={platform} />
+                          <p class="m-0">{platform}</p>
+                        </div>
+                      ),
+                      key: platform,
+                    }))}
+                    value={capitalize(infiniteQuery.query.searchApi)}
+                    onChange={(val) => {
+                      infiniteQuery.setQuery({
+                        searchApi: (
+                          val.key as string
+                        ).toLowerCase() as FESearchAPI,
+                        categories: [],
+                        modloaders: null,
+                      });
+                    }}
+                    rounded
+                  />
+                </div>
+                <div
+                  class="cursor-pointer text-2xl"
+                  classList={{
+                    "i-ri:sort-asc":
+                      infiniteQuery.query.sortOrder === "ascending",
+                    "i-ri:sort-desc":
+                      infiniteQuery.query.sortOrder === "descending",
+                  }}
+                  onClick={() => {
+                    const isAsc = infiniteQuery.query.sortOrder === "ascending";
+                    infiniteQuery.setQuery({
+                      sortOrder: isAsc ? "descending" : "ascending",
+                    });
+                  }}
+                />
               </div>
             </div>
-          </Match>
-          <Match
-            when={
-              modpacks().length === 0 &&
-              infiniteQuery?.infiniteQuery.isLoading &&
-              infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
-            <div class="m-x-5">
-              <Skeleton.modpacksList />
+            <div
+              class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
+              style={{
+                top: `${headerHeight()}px`,
+              }}
+            >
+              <Switch>
+                <Match
+                  when={
+                    mods().length > 0 &&
+                    !infiniteQuery?.infiniteQuery.isInitialLoading
+                  }
+                >
+                  <div
+                    class="w-full h-full scrollbar-hide overflow-auto"
+                    ref={(el) => {
+                      infiniteQuery.setParentRef(el);
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
+                        width: "100%",
+                        position: "relative",
+                      }}
+                    >
+                      <For each={allVirtualRows()}>
+                        {(virtualItem) => {
+                          const isLoaderRow = () =>
+                            virtualItem.index > mods().length - 1;
+                          const mod = () => mods()[virtualItem.index];
+
+                          const hasNextPage = () =>
+                            infiniteQuery.infiniteQuery.hasNextPage;
+
+                          return (
+                            <div
+                              data-index={virtualItem.index}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: `${virtualItem.size}px`,
+                                transform: `translateY(${virtualItem.start}px)`,
+                              }}
+                            >
+                              <div>
+                                <Switch fallback={<FetchingModpacks />}>
+                                  <Match when={!isLoaderRow() && mod()}>
+                                    <ModRow
+                                      type="Mod"
+                                      data={mod()}
+                                      // mcVersion={data().mcVersion}
+                                      modrinthCategories={
+                                        routeData.modrinthCategories.data
+                                      }
+                                    />
+                                  </Match>
+                                  <Match when={isLoaderRow() && !hasNextPage()}>
+                                    <NoMoreModpacks />
+                                  </Match>
+                                </Switch>
+                              </div>
+                            </div>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </div>
+                </Match>
+                <Match
+                  when={
+                    mods().length === 0 &&
+                    !infiniteQuery?.infiniteQuery.isLoading &&
+                    !infiniteQuery?.infiniteQuery?.isInitialLoading
+                  }
+                >
+                  <NoModsAvailable />
+                </Match>
+                <Match
+                  when={
+                    mods().length === 0 &&
+                    infiniteQuery?.infiniteQuery?.isLoading &&
+                    infiniteQuery?.infiniteQuery?.isInitialLoading
+                  }
+                >
+                  <Skeleton.modpacksList />
+                </Match>
+                <Match when={infiniteQuery?.infiniteQuery?.isError}>
+                  <ErrorFetchingMods
+                    error={
+                      infiniteQuery?.infiniteQuery?.error as RSPCError | null
+                    }
+                  />
+                </Match>
+              </Switch>
             </div>
-          </Match>
-          <Match
-            when={
-              modpacks().length === 0 &&
-              !infiniteQuery?.infiniteQuery.isLoading &&
-              !infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
-            <NoModpacksAvailable />
-          </Match>
-          <Match when={infiniteQuery?.infiniteQuery.isError}>
-            <ErrorFetchingMods
-              error={infiniteQuery?.infiniteQuery.error as RSPCError | null}
-            />
           </Match>
         </Switch>
       </div>

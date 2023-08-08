@@ -7,8 +7,9 @@ import {
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
+import useModsQuery from "@/managers/ModalsManager/modals/AddMod/useModsQuery";
 
-export const [query, setQuery] = useModpacksQuery({
+export const [modpacksQuery, setModpacksQuery] = useModpacksQuery({
   searchQuery: "",
   categories: null,
   gameVersions: null,
@@ -21,13 +22,33 @@ export const [query, setQuery] = useModpacksQuery({
   searchApi: "curseforge",
 });
 
+// type DataType = {
+//   mcVersion: string;
+//   isCurseforge: boolean;
+// };
+// const data = () => props.data as DataType;
+
+export const [modsQuery, setModsQuery] = useModsQuery({
+  // searchApi: data().isCurseforge ? "curseforge" : "modrinth",
+  searchApi: "curseforge",
+  searchQuery: "",
+  categories: null,
+  gameVersions: null,
+  modloaders: null,
+  projectType: "mod",
+  sortIndex: { curseForge: "featured" },
+  sortOrder: "descending",
+  index: 0,
+  pageSize: 20,
+});
+
 type BaseProps = {
   data: FEUnifiedSearchResult;
 };
 
 export type ModProps = BaseProps & {
   type: "Mod";
-  mcVersion: string;
+  mcVersion?: string;
   modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 

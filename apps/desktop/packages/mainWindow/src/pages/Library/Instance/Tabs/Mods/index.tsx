@@ -5,16 +5,16 @@ import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
 import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
-import { getModrinthData } from "@/utils/instances";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
-  const modalsContext = useModal();
+  const navigate = useGDNavigate();
+
   const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
@@ -27,10 +27,6 @@ const Mods = () => {
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
   ]);
-
-  const isModrinth = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack);
 
   const NoMods = () => {
     return (
@@ -50,21 +46,10 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal(
-                { name: "addMod" },
-                {
-                  mcVersion: routeData.instanceDetails.data?.version,
-                  isCurseforge: !isModrinth(),
-                }
-              );
+              navigate("/mods");
             }}
           >
-            <Trans
-              key="instance.add_mod"
-              options={{
-                defaultValue: "+ Add Mod",
-              }}
-            />
+            <Trans key="instance.add_mod" />
           </Button>
         </div>
       </div>
@@ -103,21 +88,10 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal(
-                { name: "addMod" },
-                {
-                  mcVersion: routeData.instanceDetails.data?.version,
-                  isCurseforge: !isModrinth(),
-                }
-              );
+              navigate("/mods");
             }}
           >
-            <Trans
-              key="instance.add_mod"
-              options={{
-                defaultValue: "+ Add Mod",
-              }}
-            />
+            <Trans key="instance.add_mod" />
           </Button>
         </div>
         <div class="flex justify-between text-darkSlate-50 z-10 mb-6">

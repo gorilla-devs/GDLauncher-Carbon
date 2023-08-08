@@ -4,7 +4,8 @@ import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
-import BrowserData from "@/pages/Modpacks/modpacksBrowser.data";
+import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
+import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
@@ -88,24 +89,22 @@ export const routes: RouteDefinition[] = [
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
-        data: BrowserData,
+        data: ModpackBrowserData,
         children: [
           {
             path: "/",
             component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser")),
-            data: BrowserData,
           },
         ],
       },
       {
         path: "/mods",
-        component: lazy(() => import("@/pages/Modpacks")),
-        data: BrowserData,
+        component: lazy(() => import("@/pages/Mods")),
+        data: ModsBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser")),
-            data: BrowserData,
+            component: lazy(() => import("@/pages/Mods/ModsBrowser")),
           },
         ],
       },

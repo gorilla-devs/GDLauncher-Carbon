@@ -14,13 +14,13 @@ import {
   CFFEModLoaderType,
   MRFELoader,
 } from "@gd/core_module/bindings";
-import { useInfiniteModsQuery } from "@/pages/Modpacks";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { CategoryIcon, PlatformIcon } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
+import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 
 const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
   if (typeof category === "string") {
