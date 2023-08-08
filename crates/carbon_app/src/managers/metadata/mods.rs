@@ -644,7 +644,7 @@ mod test {
         // read meta zip
         let meta = parse_metadata(Cursor::new(&vec));
 
-        Ok(meta?)
+        meta
     }
 
     #[test]

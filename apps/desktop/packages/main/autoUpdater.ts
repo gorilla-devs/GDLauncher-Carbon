@@ -34,12 +34,6 @@ export default function initAutoUpdater(win: BrowserWindow) {
   });
 
   autoUpdater.on("update-downloaded", () => {
-    win?.webContents.send("updateAvailable");
+    win?.webContents.send("updateDownloaded");
   });
-
-  // ipcMain.on("releaseChannel", async (_, releaseChannel) => {
-  //   if (releaseChannel === "beta" || releaseChannel === "alpha") {
-  //     allowUnstableReleases = true;
-  //   }
-  // });
 }

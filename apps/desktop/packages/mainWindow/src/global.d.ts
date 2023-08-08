@@ -21,6 +21,7 @@ declare global {
     onDownloadProgress: (
       cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
     ) => void;
+    updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void;
     installUpdate: () => void;
     downloadUpdate: () => void;
     openExternalLink: (link: string) => void;

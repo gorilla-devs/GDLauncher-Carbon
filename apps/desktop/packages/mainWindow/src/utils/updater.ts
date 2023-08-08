@@ -7,11 +7,16 @@ export const [updateAvailable, setUpdateAvailable] =
   createSignal<UpdateCheckResult | null>(null);
 
 export const [updateProgress, setUpdateProgress] = createSignal(0);
+export const [updateDownloaded, setUpdateDownloaded] = createSignal(false);
 
 let lastChannel: FEReleaseChannel | null = null;
 
 window.onDownloadProgress((_, progress) => {
   setUpdateProgress(progress.percent);
+});
+
+window.updateDownloaded((_) => {
+  setUpdateDownloaded(true);
 });
 
 type IntervalType = ReturnType<typeof setInterval>;

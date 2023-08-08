@@ -21,3 +21,9 @@ contextBridge.exposeInMainWorld(
   async (cb: (_ev: IpcRendererEvent, _progressInfo: ProgressInfo) => void) =>
     ipcRenderer.on("downloadProgress", cb)
 );
+
+contextBridge.exposeInMainWorld(
+  "updateDownloaded",
+  async (cb: (_ev: IpcRendererEvent) => void) =>
+    ipcRenderer.on("updateDownloaded", cb)
+);
