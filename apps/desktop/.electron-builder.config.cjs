@@ -83,7 +83,7 @@ module.exports = {
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: appChannel === "snapshot" ? ["zip"] : ["dmg"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.bundles.plist",
