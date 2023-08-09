@@ -65,7 +65,7 @@ const Group = (props: GroupProps) => {
         // @ts-ignore
         const input = item.querySelector(".cursor-pointer input");
 
-        return (input.checked = props.value === input.value);
+        return (input.checked = props.value == input.value);
       });
     });
     return <>{c()}</>;

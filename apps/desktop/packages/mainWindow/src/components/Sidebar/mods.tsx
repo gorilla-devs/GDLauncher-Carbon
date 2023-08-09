@@ -2,7 +2,7 @@
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Mods/modsBrowser.data";
-import { useRouteData } from "@solidjs/router";
+import { useRouteData, useSearchParams } from "@solidjs/router";
 import {
   For,
   Match,
@@ -144,6 +144,11 @@ const Sidebar = () => {
 
   const modloaders = () => curseforgeModpackModloaders();
 
+  const [searchParams] = useSearchParams();
+
+  const instanceId = () =>
+    parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
+
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -153,7 +158,7 @@ const Sidebar = () => {
               onChange={(val) => {
                 infiniteQuery.setInstanceId(val as number);
               }}
-              value={3}
+              value={instanceId()}
             >
               <For each={routeData.instancesUngrouped.data || []}>
                 {(instance) => {

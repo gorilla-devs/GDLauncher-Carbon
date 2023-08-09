@@ -73,7 +73,7 @@ Skeleton.modpack = Modpack;
 
 Skeleton.modpacksList = () => {
   return (
-    <div class="flex flex-col gap-2 w-full">
+    <div class="flex flex-col gap-2 w-full px-4 box-border">
       <Modpack />
       <Modpack />
       <Modpack />

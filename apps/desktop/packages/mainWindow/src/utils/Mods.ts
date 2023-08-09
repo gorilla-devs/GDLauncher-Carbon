@@ -8,7 +8,7 @@ import {
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
-import useModsQuery from "@/managers/ModalsManager/modals/AddMod/useModsQuery";
+import useModsQuery from "@/pages/Mods/useModsQuery";
 
 export const [modpacksQuery, setModpacksQuery] = useModpacksQuery({
   searchQuery: "",
@@ -23,14 +23,7 @@ export const [modpacksQuery, setModpacksQuery] = useModpacksQuery({
   searchApi: "curseforge",
 });
 
-// type DataType = {
-//   mcVersion: string;
-//   isCurseforge: boolean;
-// };
-// const data = () => props.data as DataType;
-
 export const [modsQuery, setModsQuery] = useModsQuery({
-  // searchApi: data().isCurseforge ? "curseforge" : "modrinth",
   searchApi: "curseforge",
   searchQuery: "",
   categories: null,
