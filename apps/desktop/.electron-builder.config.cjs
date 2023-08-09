@@ -72,7 +72,7 @@ module.exports = {
     },
   ],
   win: {
-    target: appChannel === "snapshot" ? ["zip"] : ["nsis"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "nsis"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     verifyUpdateCodeSignature: false,
   },
@@ -89,7 +89,7 @@ module.exports = {
     extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
-    target: appChannel === "snapshot" ? ["zip"] : ["appImage"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "appImage"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
   },
   afterAllArtifactBuild: (buildResult) => {
