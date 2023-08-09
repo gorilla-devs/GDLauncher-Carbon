@@ -10,13 +10,22 @@ export default function initAutoUpdater(win: BrowserWindow) {
     "checkForUpdates",
     async (_, selectedChannel: FEReleaseChannel) => {
       if (__APP_VERSION__.includes("snapshot")) {
-        return new Promise((r) => r(false));
+        return null;
       }
       autoUpdater.channel =
         selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
       console.log("Checking for updates", selectedChannel);
-      return autoUpdater.checkForUpdates();
+      try {
+        const latest = await autoUpdater.checkForUpdates();
+        if (!latest || latest.updateInfo.version === __APP_VERSION__) {
+          return null;
+        }
+
+        return latest;
+      } catch {
+        return null;
+      }
     }
   );
 
