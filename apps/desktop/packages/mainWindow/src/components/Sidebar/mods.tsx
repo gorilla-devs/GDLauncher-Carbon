@@ -162,41 +162,43 @@ const Sidebar = () => {
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
-        <Collapsable title={t("Instances")} noPadding>
-          <div class="flex flex-col gap-3">
-            <Radio.group
-              onChange={(val) => {
-                infiniteQuery.setInstanceId(val as number);
-              }}
-              value={instanceId()}
-            >
-              <For each={filteredInstances() || []}>
-                {(instance) => {
-                  const [imageResource] = createResource(
-                    () => instance.id,
-                    fetchImage
-                  );
-                  return (
-                    <Radio name="instance" value={instance.id}>
-                      <div class="flex items-center justify-between gap-2">
-                        <div
-                          class="w-6 h-6 bg-center bg-cover"
-                          style={{
-                            "background-image": imageResource()
-                              ? `url("${imageResource()}")`
-                              : `url("${DefaultImg}")`,
-                          }}
-                        />
-                        <p class="m-0">{instance.name}</p>
-                      </div>
-                    </Radio>
-                  );
+        <Show when={filteredInstances()}>
+          <Collapsable title={t("general.instances")} noPadding>
+            <div class="flex flex-col gap-3">
+              <Radio.group
+                onChange={(val) => {
+                  infiniteQuery.setInstanceId(val as number);
                 }}
-              </For>
-            </Radio.group>
-          </div>
-        </Collapsable>
-        <Collapsable title={t("Platform")} noPadding>
+                value={instanceId()}
+              >
+                <For each={filteredInstances() || []}>
+                  {(instance) => {
+                    const [imageResource] = createResource(
+                      () => instance.id,
+                      fetchImage
+                    );
+                    return (
+                      <Radio name="instance" value={instance.id}>
+                        <div class="flex items-center justify-between gap-2">
+                          <div
+                            class="w-6 h-6 bg-center bg-cover"
+                            style={{
+                              "background-image": imageResource()
+                                ? `url("${imageResource()}")`
+                                : `url("${DefaultImg}")`,
+                            }}
+                          />
+                          <p class="m-0">{instance.name}</p>
+                        </div>
+                      </Radio>
+                    );
+                  }}
+                </For>
+              </Radio.group>
+            </div>
+          </Collapsable>
+        </Show>
+        <Collapsable title={t("general.platform")} noPadding>
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
@@ -223,7 +225,7 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
-        <Collapsable title={t("Modloader")} noPadding>
+        <Collapsable title={t("general.modloaders")} noPadding>
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
@@ -263,7 +265,7 @@ const Sidebar = () => {
         </Collapsable>
         <Switch>
           <Match when={categories().length > 0}>
-            <Collapsable title={t("Categories")} noPadding>
+            <Collapsable title={t("general.categories")} noPadding>
               <div class="flex flex-col gap-3">
                 <For each={categories()}>
                   {(category) => {

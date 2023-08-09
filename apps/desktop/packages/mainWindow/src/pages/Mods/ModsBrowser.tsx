@@ -12,7 +12,6 @@ import {
   onMount,
 } from "solid-js";
 import {
-  CFFEModLoaderType,
   CFFEModSearchSortField,
   FESearchAPI,
   FEUnifiedModLoaderType,
@@ -135,8 +134,6 @@ const ModsBrowser = () => {
   const sortingFields = () =>
     isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
-  const modloaders: CFFEModLoaderType[] = ["forge", "fabric", "quilt"];
-
   const mods = () =>
     infiniteQuery?.infiniteQuery.data
       ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
@@ -187,16 +184,35 @@ const ModsBrowser = () => {
           >
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
               <Show when={instanceDetails()}>
-                <div class="border-1 border-solid h-10 mb-4 rounded-lg p-2 box-border flex items-center border-green-500">
-                  <div
-                    class="w-6 h-6 bg-center bg-cover mr-4"
-                    style={{
-                      "background-image": imageResource()
-                        ? `url("${imageResource()}")`
-                        : `url("${DefaultImg}")`,
+                <div
+                  class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden p-2 box-border flex items-center justify-between border-darkSlate-500 relative"
+                  style={{
+                    "background-image": imageResource()
+                      ? `url("${imageResource()}")`
+                      : `url("${DefaultImg}")`,
+                  }}
+                >
+                  <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
+                  <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
+                  <div class="flex gap-4 z-10 items-center">
+                    <div
+                      class="w-6 h-6 bg-center bg-cover"
+                      style={{
+                        "background-image": imageResource()
+                          ? `url("${imageResource()}")`
+                          : `url("${DefaultImg}")`,
+                      }}
+                    />
+                    <h2 class="m-0">{instanceDetails()?.name}</h2>
+                  </div>
+                  <i
+                    class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
+                    onClick={() => {
+                      infiniteQuery.setInstanceId(undefined);
+                      setinstanceDetails(undefined);
+                      setInstanceMods(undefined);
                     }}
                   />
-                  <h2 class="m-0">{instanceDetails()?.name}</h2>
                 </div>
               </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
@@ -211,12 +227,7 @@ const ModsBrowser = () => {
                 />
                 <div class="flex items-center gap-3">
                   <p class="text-darkSlate-50">
-                    <Trans
-                      key="instance.sort_by"
-                      options={{
-                        defaultValue: "Sort by:",
-                      }}
-                    />
+                    <Trans key="instance.sort_by" />
                   </p>
                   <Dropdown
                     options={sortingFields().map((field) => ({
@@ -231,18 +242,34 @@ const ModsBrowser = () => {
                         : {
                             modrinth: val.key as MRFESearchIndex,
                           };
+
+                      console.log("PPP", sortIndex);
                       infiniteQuery.setQuery({
                         sortIndex,
                       });
                     }}
-                    value={0}
+                    value={
+                      isCurseforge()
+                        ? (
+                            infiniteQuery.query.sortIndex as {
+                              curseForge: CFFEModSearchSortField;
+                            }
+                          ).curseForge
+                        : (
+                            infiniteQuery.query.sortIndex as {
+                              modrinth: MRFESearchIndex;
+                            }
+                          ).modrinth
+                    }
                     rounded
                   />
                   <Dropdown
-                    options={modloaders.map((modloader) => ({
-                      label: t(`modloader_${modloader}`),
-                      key: modloader,
-                    }))}
+                    options={(routeData.curseForgeModloaders.data || []).map(
+                      (modloader) => ({
+                        label: t(`modloader_${modloader}`),
+                        key: modloader,
+                      })
+                    )}
                     onChange={(val) => {
                       const prevModloaders =
                         infiniteQuery.query.modloaders || [];

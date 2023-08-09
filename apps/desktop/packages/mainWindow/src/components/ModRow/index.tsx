@@ -112,7 +112,9 @@ const ModRow = (props: ModRowProps) => {
     navigate(
       `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
         props
-      )}/${isCurseForgeData(props.data) ? "curseforge" : "modrinth"}`
+      )}/${
+        isCurseForgeData(props.data) ? "curseforge" : "modrinth"
+      }?instanceId=${instanceId()}`
     );
   };
 
@@ -354,12 +356,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans
-                          key="instance.explore_modpack"
-                          options={{
-                            defaultValue: "Explore",
-                          }}
-                        />
+                        <Trans key="instance.explore_modpack" />
                       </Button>
                       <Show when={loading()}>
                         <Button>
@@ -369,7 +366,7 @@ const ModRow = (props: ModRowProps) => {
                       <Show when={!loading()}>
                         <Button
                           size={isRowSmall() ? "small" : "medium"}
-                          disabled={loading() || !instanceId()}
+                          disabled={loading()}
                           rounded
                           onClick={() => {
                             if (props.type !== "Modpack") return;
@@ -400,12 +397,7 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans
-                              key="instance.download_latest"
-                              options={{
-                                defaultValue: "Download Latest",
-                              }}
-                            />
+                            <Trans key="instance.download_latest" />
                           </Show>
                         </Button>
                       </Show>
@@ -418,12 +410,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans
-                          key="instance.explore_modpack"
-                          options={{
-                            defaultValue: "Explore",
-                          }}
-                        />
+                        <Trans key="instance.explore_modpack" />
                       </Button>
                       <Switch>
                         <Match when={!isModInstalled()}>
@@ -486,12 +473,7 @@ const ModRow = (props: ModRowProps) => {
                           <Button
                             variant={isModInstalled() ? "green" : "primary"}
                           >
-                            <Trans
-                              key="mod.downloaded"
-                              options={{
-                                defaultValue: "Downloaded",
-                              }}
-                            />
+                            <Trans key="mod.downloaded" />
                           </Button>
                         </Match>
                       </Switch>

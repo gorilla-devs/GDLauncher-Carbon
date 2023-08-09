@@ -149,7 +149,7 @@ const Sidebar = () => {
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
-        <Collapsable title={t("Platform")} noPadding>
+        <Collapsable title={t("general.platform")} noPadding>
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
@@ -176,7 +176,7 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
-        <Collapsable title={t("Modloader")} noPadding>
+        <Collapsable title={t("general.modloaders")} noPadding>
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
@@ -216,7 +216,7 @@ const Sidebar = () => {
         </Collapsable>
         <Switch>
           <Match when={categories().length > 0}>
-            <Collapsable title={t("Categories")} noPadding>
+            <Collapsable title={t("general.categories")} noPadding>
               <div class="flex flex-col gap-3">
                 <For each={categories()}>
                   {(category) => {

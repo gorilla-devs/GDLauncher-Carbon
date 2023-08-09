@@ -1,6 +1,10 @@
 {
   "general.type_here": "Type Here",
   "general.search": "Search",
+  "general.instances": "Instances",
+  "general.platform": "Platform",
+  "general.modloaders": "Modloader",
+  "general.categories": "Categories",
   "languages.italian": "Italiano",
   "languages.english": "English",
   "languages.german": "german",

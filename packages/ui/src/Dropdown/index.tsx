@@ -125,7 +125,7 @@ const Dropdown = (props: Props) => {
         id={props.id}
       >
         <button
-          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border cursor-pointer ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
+          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -143,13 +143,15 @@ const Dropdown = (props: Props) => {
               !props.disabled && !props.error && !props.textColorClass,
             "text-darkSlate-500": !!props.error && !props.textColorClass,
             "rounded-full": props.rounded,
-            "bg-darkSlate-700": !props.bgColorClass,
+            "bg-darkSlate-700": !props.bgColorClass && !props.disabled,
             "rounded-md": !props.btnDropdown && !props.rounded,
             "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300":
               props.btnDropdown && !props.disabled,
             "group px-4": !props.btnDropdown,
             "bg-primary-500 duration-100": props.btnDropdown && !props.disabled,
             "hover:bg-primary-300": props.btnDropdown && !props.disabled,
+            "cursor-pointer": !props.disabled,
+            "cursor-not-allowed bg-darkSlate-800": props.disabled,
           }}
         >
           <Show when={!props.btnDropdown}>
@@ -178,9 +180,9 @@ const Dropdown = (props: Props) => {
                 !props.btnDropdown &&
                 !props.textColorClass,
               "text-white":
-                !!props.error || (props.btnDropdown && !props.textColorClass),
-              "text-darkSlate-500": props.disabled && !props.btnDropdown,
-              "text-primary-200": props.disabled && props.btnDropdown,
+                !!props.error ||
+                (props.btnDropdown && !props.textColorClass && !props.disabled),
+              "text-darkSlate-500": props.disabled,
             }}
           />
         </button>
@@ -207,7 +209,7 @@ const Dropdown = (props: Props) => {
               <For each={props.options}>
                 {(option) => (
                   <li
-                    class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-600 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full box-border"
+                    class="first:rounded-t last:rounded-b hover:bg-darkSlate-600 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full box-border"
                     classList={{
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-500": selectedValue().key === option.key,
