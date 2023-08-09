@@ -6,7 +6,7 @@ import SettingsData from "./settings.general.data";
 import { useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
-import { FESettings } from "@gd/core_module/bindings";
+import { FEReleaseChannel, FESettings } from "@gd/core_module/bindings";
 import Row from "./components/Row";
 import RightHandSide from "./components/RightHandSide";
 import PageTitle from "./components/PageTitle";
@@ -63,7 +63,7 @@ const General = () => {
           </Title>
           <RightHandSide>
             <Dropdown
-              value={settings.releaseChannel || "stable"}
+              value={settings.releaseChannel}
               options={[
                 { label: t("settings.release_channel_stable"), key: "stable" },
                 { label: t("settings.release_channel_beta"), key: "beta" },
@@ -71,7 +71,7 @@ const General = () => {
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
-                  releaseChannel: channel.key as string,
+                  releaseChannel: channel.key as FEReleaseChannel,
                 });
               }}
             />

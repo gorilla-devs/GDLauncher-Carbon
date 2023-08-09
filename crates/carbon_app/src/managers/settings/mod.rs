@@ -89,7 +89,9 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(release_channel) = incoming_settings.release_channel {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::release_channel::set(release_channel)],
+                vec![app_configuration::release_channel::set(
+                    release_channel.into(),
+                )],
             ));
             something_changed = true;
         }

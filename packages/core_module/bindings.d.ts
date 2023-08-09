@@ -119,8 +119,6 @@ export type ModpackPlatform = "Curseforge" | "Modrinth"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
-export type ModChannel = "Alpha" | "Beta" | "Stable"
-
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
 export type ManifestVersion = { id: string; type: McType }
@@ -294,7 +292,11 @@ export type MRFELoaderType = "bukkit" | "bungeecord" | "canvas" | "datapack" | "
 
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
+
 export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourcePack"
+
+export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
 export type CFFEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
 
@@ -313,8 +315,6 @@ export type MRFEDonationLink = { id: string; platform: string; url: string }
 export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type CFFEFile = { id: number; gameId: number; modId: number; isAvailable: boolean; displayName: string; fileName: string; releaseType: CFFEFileReleaseType; fileStatus: CFFEFileStatus; hashes: CFFEFileHash[]; fileDate: string; fileLength: number; downloadCount: number; downloadUrl: string | null; gameVersions: string[]; sortableGameVersions: CFFESortableGameVersion[]; dependencies: CFFEFileDependency[]; exposeAsAlternative: boolean | null; parentProjectFileId: number | null; alternateFileId: number | null; isServerPack: boolean | null; serverPackFileId: number | null; isEarlyAccessContent: boolean | null; earlyAccessEndDate: string | null; fileFingerprint: string; modules: CFFEFileModule[] }
-
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
@@ -351,6 +351,8 @@ export type FEUnifiedSearchParameters = { searchQuery: string | null; categories
 export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded"
 
 export type Progress = "Indeterminate" | { Known: number } | { Failed: FeError }
+
+export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type MRFEProject = { slug: string; title: string; description: string; categories: string[]; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; body: string; additional_categories: string[]; issues_url: string | null; source_url: string | null; wiki_url: string | null; discord_url: string | null; donation_urls: MRFEDonationLink[]; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; id: string; team: string; moderator_message: MRFEModeratorMessage | null; published: string; updated: string; approved: string | null; followers: number; status: MRFEProjectStatus; license: MRFELicense; versions: string[]; game_versions: string[]; loaders: string[]; gallery: MRFEGalleryItem[] }
 
@@ -394,8 +396,6 @@ export type Mod = { id: string; filename: string; enabled: boolean; metadata: Mo
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource }
 
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
-
 export type FEJavaComponentType = "local" | "managed" | "custom"
 
 export type MRFEProjectSearchResult = { slug: string; title: string; description: string; categories: string[] | null; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; project_id: string; author: string; display_categories: string[] | null; versions: string[]; follows: number; date_created: string; date_modified: string; latest_version: string | null; license: string; gallery: string[] | null; featured_gallery: string | null }
@@ -425,6 +425,8 @@ export type MRFEVersionID = string
 export type ListInstanceStatus = { Valid: ValidListInstance } | { Invalid: InvalidListInstance }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
+
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
 
 export type FEModFileResponse = { data: CFFEFile; pagination: CFFEPagination | null }
 

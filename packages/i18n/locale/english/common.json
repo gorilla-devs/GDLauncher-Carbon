@@ -249,7 +249,6 @@
   "tracking.setting_anonymous_with_session_recordings": "Anonymous with Sessions Recordings",
   "tracking.setting_anonymous_with_session_recordings_text": "This sends the same amount of data as Anonymous, but also includes session recordings, which are brief recordings of the app usage.",
   "tracking.settings_authenticated_with_session_recordings": "Authenticated with Sessions Recordings",
-  "tracking.settings_authenticated_with_session_recordings_text": "Same as Anonymous with Session Recordings but we bind events and recordings to your Microsoft account. This is useful if you want to work with the developers to fix a specific bug you're having.",
   "entity.legacygdlauncher": "GDLauncher legacy",
   "entity.mrpack": "MRpack",
   "entity.modrinth": "Modrinth",
@@ -259,5 +258,22 @@
   "entity.multimc": "Multimc",
   "entity.technic": "Technic",
   "entity.atlauncher": "ATlauncher",
-  "entity.prismlauncher": "Prismlauncher"
+  "entity.prismlauncher": "Prismlauncher",
+  "app_update.new_update_available_text": "A new version of GDLauncher is available!",
+  "app_update.join_our_discord": "MacOS builds are not digitally signed yet. This means that it is not able to auto update. Please join our discord to access the link to the new version",
+  "app_update.discord_link": "Discord Link",
+  "app_update.download": "Download",
+  "app_update.apply_and_restart": "Apply And Restart",
+  "app_update.current_version": "Current Version",
+  "app_update.available_version": "Available Version",
+  "app_update.current_release_channel": "Current Release Channel",
+
+  "adbanner.snapshot_title": "GDLauncher Snapshot Release",
+  "adbanner.snapshot_text": "This is a GDLauncher snapshot release.\nThis means that it is highly unstable and contains potentially disruptive bugs. It also does not have auto updates.",
+
+  "adbanner.beta_title": "GDLauncher Beta Release",
+  "adbanner.beta_text": "This is a GDLauncher beta release.\nThis means that it might contain some bugs but it should be mostly stable.",
+
+  "adbanner.alpha_title": "GDLauncher Alpha Release",
+  "adbanner.alpha_text": "This is a GDLauncher alpha release.\nThis means that it is unstable and contains many bugs."
 }

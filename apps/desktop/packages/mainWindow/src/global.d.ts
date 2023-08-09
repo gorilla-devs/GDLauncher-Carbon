@@ -1,7 +1,9 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 
+import type { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BoundsSize } from "./utils/adhelper";
+import type { ProgressInfo, UpdateCheckResult } from "electron-updater";
 
 declare global {
   interface Window {
@@ -13,12 +15,15 @@ declare global {
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
-    checkUpdate: () => void;
-    installUpdate: () => void;
-    updateAvailable: (
-      cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
+    checkForUpdates: (
+      releaseChannel: FEReleaseChannel
+    ) => Promise<UpdateCheckResult | null>;
+    onDownloadProgress: (
+      cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
     ) => void;
-    releaseChannel: (releaseChannel: string) => void;
+    updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void;
+    installUpdate: () => void;
+    downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
     copyToClipboard: (text: string) => void;
     openCMPWindow: () => void;
