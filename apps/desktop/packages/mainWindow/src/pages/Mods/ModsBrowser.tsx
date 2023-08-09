@@ -1,11 +1,12 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
+import { Dropdown, Input, Skeleton } from "@gd/ui";
 import {
   For,
   Match,
   Show,
   Switch,
   createEffect,
+  createResource,
   createSignal,
   onCleanup,
   onMount,
@@ -15,7 +16,9 @@ import {
   CFFEModSearchSortField,
   FESearchAPI,
   FEUnifiedModLoaderType,
+  InstanceDetails,
   MRFESearchIndex,
+  Mod,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import {
@@ -28,24 +31,62 @@ import fetchData from "./modsBrowser.data";
 import ErrorFetchingMods from "@/managers/ModalsManager/modals/AddMod/ErrorFetchingMods";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
 import NoModsAvailable from "@/managers/ModalsManager/modals/AddMod/NoModsAvailable";
-import { PlatformIcon } from "@/utils/instances";
+import { PlatformIcon, fetchImage } from "@/utils/instances";
 import { capitalize } from "@/utils/helpers";
 import { FetchingModpacks } from "./ModsStatus";
 import { NoMoreModpacks } from "../Modpacks/ModpacksStatus";
-import { useRouteData } from "@solidjs/router";
+import { useRouteData, useSearchParams } from "@solidjs/router";
+import { rspc } from "@/utils/rspcClient";
 
-const ModpackBrowser = () => {
+const ModsBrowser = () => {
   const [t] = useTransContext();
+
+  const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
+  const [instanceDetail, setInstanceDetails] = createSignal<
+    InstanceDetails | undefined
+  >(undefined);
 
   const infiniteQuery = useInfiniteModsQuery();
 
-  const modpacks = () => infiniteQuery.allRows();
+  const rows = () => infiniteQuery.allRows();
 
   const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
+
+  const [searchParams] = useSearchParams();
+
+  const instanceId = () =>
+    parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
+
+  createEffect(() => {
+    if (instanceId() !== undefined) {
+      const mods = rspc.createQuery(() => [
+        "instance.getInstanceMods",
+        instanceId() as number,
+      ]);
+
+      if (mods.data) setInstanceMods(mods.data);
+    }
+  });
+
+  createEffect(() => {
+    if (instanceId() !== undefined) {
+      const instanceDetails = rspc.createQuery(() => [
+        "instance.getInstanceDetails",
+        instanceId() as number,
+      ]);
+
+      if (instanceDetails.data) setInstanceDetails(instanceDetails.data);
+    }
+  });
+
+  onCleanup(() => {
+    setInstanceMods([]);
+    setInstanceDetails(undefined);
+  });
 
   createEffect(() => {
     if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
@@ -57,7 +98,7 @@ const ModpackBrowser = () => {
       : lastItem().index;
 
     if (
-      lastItemIndex >= modpacks().length - 1 &&
+      lastItemIndex >= rows().length - 1 &&
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
@@ -98,6 +139,8 @@ const ModpackBrowser = () => {
       ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
 
+  const [imageResource] = createResource(instanceId(), fetchImage);
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -105,9 +148,22 @@ const ModpackBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match when={infiniteQuery.infiniteQuery.isFetching}>Loading</Match>
+          <Match
+            when={
+              infiniteQuery.infiniteQuery.isFetching &&
+              infiniteQuery.infiniteQuery.isInitialLoading
+            }
+          >
+            <Skeleton.explorer />
+          </Match>
           <Match when={!infiniteQuery.infiniteQuery.isFetching}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
+              <Show when={instanceDetail()}>
+                <div class="border-1 border-solid border-green-500 h-10 mb-4 rounded-lg p-2 box-border flex items-center">
+                  <img src={imageResource()} class="h-full mr-4" />
+                  <h2 class="m-0">{instanceDetail()?.name}</h2>
+                </div>
+              </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
                 <Input
                   placeholder="Type Here"
@@ -223,7 +279,7 @@ const ModpackBrowser = () => {
                   }
                 >
                   <div
-                    class="w-full h-full scrollbar-hide overflow-auto"
+                    class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
                     ref={(el) => {
                       infiniteQuery.setParentRef(el);
                     }}
@@ -262,6 +318,7 @@ const ModpackBrowser = () => {
                                     <ModRow
                                       type="Mod"
                                       data={mod()}
+                                      installedMods={instanceMods()}
                                       // mcVersion={data().mcVersion}
                                       modrinthCategories={
                                         routeData.modrinthCategories.data
@@ -314,4 +371,4 @@ const ModpackBrowser = () => {
   );
 };
 
-export default ModpackBrowser;
+export default ModsBrowser;

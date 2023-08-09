@@ -10,8 +10,8 @@ function withAdsLayout() {
 
   const location = useLocation();
 
-  const modpackPathRegex = /modpacks\/(\w+)(\/.*)?/;
-  const isModpackDetails = () => modpackPathRegex.test(location.pathname);
+  const modpackPathRegex = /(modpacks|mods)\/(\w+)(\/.*)?/;
+  const isDetailPage = () => modpackPathRegex.test(location.pathname);
 
   createEffect(() => {
     if (routeData.minecraftVersions.data)
@@ -26,14 +26,14 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "grid-cols-[auto_2fr_440px]": !isModpackDetails(),
-              "grid-cols-[2fr_440px]": isModpackDetails(),
+              "grid-cols-[auto_2fr_440px]": !isDetailPage(),
+              "grid-cols-[2fr_440px]": isDetailPage(),
             }}
           >
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex justify-start flex-col gap-4 px-5 pt-5 bg-darkSlate-800 w-100 flex-initial"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start w-100 flex-initial"
             >
               <AdsBanner />
             </div>

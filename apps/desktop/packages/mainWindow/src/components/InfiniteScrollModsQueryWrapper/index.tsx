@@ -3,9 +3,9 @@ import {
   createInfiniteQuery,
 } from "@tanstack/solid-query";
 import {
+  Accessor,
   Setter,
   createContext,
-  createEffect,
   createSignal,
   mergeProps,
   onMount,
@@ -29,6 +29,8 @@ type InfiniteQueryType = {
   setParentRef: Setter<HTMLDivElement | undefined>;
   resetList: () => void;
   allRows: () => FEUnifiedSearchResult[];
+  setInstanceId: Setter<number | undefined>;
+  instanceId: Accessor<number | undefined>;
 };
 
 type Props = {
@@ -44,12 +46,11 @@ export const useInfiniteModsQuery = () => {
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
+  const [instanceId, setInstanceId] = createSignal<undefined | number>(
+    undefined
+  );
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
-
-  createEffect(() => {
-    console.log("AAAA", mergedProps.type, props.type);
-  });
 
   const query = () =>
     mergedProps.type === "modPack" ? modpacksQuery : modsQuery;
@@ -116,6 +117,8 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     setParentRef,
     resetList,
     allRows,
+    setInstanceId,
+    instanceId,
   };
 
   return (

@@ -109,6 +109,33 @@ export const routes: RouteDefinition[] = [
         ],
       },
       {
+        path: "/mods/:id/:platform",
+        component: lazy(() => import("@/pages/Modpacks/Explore")),
+        data: ModpackData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+          },
+          {
+            path: "/versions",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
+            data: ModpackVersionsData,
+          },
+          {
+            path: "/changelog",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+          },
+          {
+            path: "/screenshots",
+            component: lazy(
+              () => import("@/pages/Modpacks/Explore/Screenshots")
+            ),
+            data: ModpackScreenshotsData,
+          },
+        ],
+      },
+      {
         path: "/modpacks/:id/:platform",
         component: lazy(() => import("@/pages/Modpacks/Explore")),
         data: ModpackData,

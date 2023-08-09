@@ -94,8 +94,10 @@ const ModpackBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match when={infiniteQuery.infiniteQuery.isFetching}>Loading</Match>
-          <Match when={!infiniteQuery.infiniteQuery.isFetching}>
+          <Match when={infiniteQuery.infiniteQuery.isLoading}>
+            <Skeleton.explorer />
+          </Match>
+          <Match when={!infiniteQuery.infiniteQuery.isLoading}>
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
               <Input
                 placeholder="Type Here"
@@ -196,107 +198,110 @@ const ModpackBrowser = () => {
             />
           </Button> */}
             </div>
-          </Match>
-        </Switch>
-      </div>
-      <div
-        class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
-        style={{
-          top: `${headerHeight()}px`,
-        }}
-      >
-        <Switch>
-          <Match
-            when={
-              modpacks().length > 0 &&
-              !infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
+
             <div
-              class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
-              ref={(el) => {
-                infiniteQuery.setParentRef(el);
-              }}
-              onScroll={(e) => {
-                setScrollTop(e.target.scrollTop);
+              class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
+              style={{
+                top: `${headerHeight()}px`,
               }}
             >
-              <div
-                style={{
-                  height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
-                  width: "100%",
-                  position: "relative",
-                }}
-              >
-                <For each={allVirtualRows()}>
-                  {(virtualItem) => {
-                    const isLoaderRow = () =>
-                      virtualItem.index > modpacks().length - 1;
-                    const modpack = () => modpacks()[virtualItem.index];
+              <Switch>
+                <Match
+                  when={
+                    modpacks().length > 0 &&
+                    !infiniteQuery?.infiniteQuery.isInitialLoading
+                  }
+                >
+                  <div
+                    class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
+                    ref={(el) => {
+                      infiniteQuery.setParentRef(el);
+                    }}
+                    onScroll={(e) => {
+                      setScrollTop(e.target.scrollTop);
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
+                        width: "100%",
+                        position: "relative",
+                      }}
+                    >
+                      <For each={allVirtualRows()}>
+                        {(virtualItem) => {
+                          const isLoaderRow = () =>
+                            virtualItem.index > modpacks().length - 1;
+                          const modpack = () => modpacks()[virtualItem.index];
 
-                    const hasNextPage = () =>
-                      infiniteQuery?.infiniteQuery.hasNextPage;
+                          const hasNextPage = () =>
+                            infiniteQuery?.infiniteQuery.hasNextPage;
 
-                    return (
-                      <div
-                        data-index={virtualItem.index}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: "100%",
-                          height: `${virtualItem.size}px`,
-                          transform: `translateY(${virtualItem.start}px)`,
+                          return (
+                            <div
+                              data-index={virtualItem.index}
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: `${virtualItem.size}px`,
+                                transform: `translateY(${virtualItem.start}px)`,
+                              }}
+                            >
+                              <div>
+                                <Switch fallback={<FetchingModpacks />}>
+                                  <Match when={!isLoaderRow() && modpack()}>
+                                    <ModRow
+                                      type="Modpack"
+                                      data={modpack()}
+                                      defaultGroup={routeData.defaultGroup.data}
+                                      modrinthCategories={
+                                        routeData.modrinthCategories.data
+                                      }
+                                    />
+                                  </Match>
+                                  <Match when={isLoaderRow() && !hasNextPage()}>
+                                    <NoMoreModpacks />
+                                  </Match>
+                                </Switch>
+                              </div>
+                            </div>
+                          );
                         }}
-                      >
-                        <div>
-                          <Switch fallback={<FetchingModpacks />}>
-                            <Match when={!isLoaderRow() && modpack()}>
-                              <ModRow
-                                type="Modpack"
-                                data={modpack()}
-                                defaultGroup={routeData.defaultGroup.data}
-                                modrinthCategories={
-                                  routeData.modrinthCategories.data
-                                }
-                              />
-                            </Match>
-                            <Match when={isLoaderRow() && !hasNextPage()}>
-                              <NoMoreModpacks />
-                            </Match>
-                          </Switch>
-                        </div>
-                      </div>
-                    );
-                  }}
-                </For>
-              </div>
+                      </For>
+                    </div>
+                  </div>
+                </Match>
+                <Match
+                  when={
+                    modpacks().length === 0 &&
+                    infiniteQuery?.infiniteQuery.isLoading &&
+                    infiniteQuery?.infiniteQuery.isInitialLoading
+                  }
+                >
+                  <div class="m-x-5">
+                    <Skeleton.modpacksList />
+                  </div>
+                </Match>
+                <Match
+                  when={
+                    modpacks().length === 0 &&
+                    !infiniteQuery?.infiniteQuery.isLoading &&
+                    !infiniteQuery?.infiniteQuery.isInitialLoading
+                  }
+                >
+                  <NoModpacksAvailable />
+                </Match>
+                <Match when={infiniteQuery?.infiniteQuery.isError}>
+                  <ErrorFetchingMods
+                    error={
+                      infiniteQuery?.infiniteQuery.error as RSPCError | null
+                    }
+                  />
+                </Match>
+              </Switch>
             </div>
-          </Match>
-          <Match
-            when={
-              modpacks().length === 0 &&
-              infiniteQuery?.infiniteQuery.isLoading &&
-              infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
-            <div class="m-x-5">
-              <Skeleton.modpacksList />
-            </div>
-          </Match>
-          <Match
-            when={
-              modpacks().length === 0 &&
-              !infiniteQuery?.infiniteQuery.isLoading &&
-              !infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
-            <NoModpacksAvailable />
-          </Match>
-          <Match when={infiniteQuery?.infiniteQuery.isError}>
-            <ErrorFetchingMods
-              error={infiniteQuery?.infiniteQuery.error as RSPCError | null}
-            />
           </Match>
         </Switch>
       </div>

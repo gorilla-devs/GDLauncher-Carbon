@@ -128,6 +128,7 @@ Skeleton.modpackScreenshotsPage = () => {
     </div>
   );
 };
+
 Skeleton.modpackChangelogPage = () => {
   return (
     <div class="flex flex-col gap-2 w-full">
@@ -168,6 +169,25 @@ Skeleton.modpackSidebarCategories = () => {
 
 Skeleton.select = () => {
   return <div class="w-31	h-12 rounded-full bg-darkSlate-500" />;
+};
+
+Skeleton.explorer = () => {
+  return (
+    <div class="flex flex-col gap-4">
+      <div class="flex gap-4">
+        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
+        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
+        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+      </div>
+    </div>
+  );
 };
 
 export { Skeleton };

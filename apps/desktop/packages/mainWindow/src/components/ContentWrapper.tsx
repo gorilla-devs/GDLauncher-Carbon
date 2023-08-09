@@ -1,6 +1,5 @@
 import { NAVBAR_ROUTES } from "@/constants";
 import { useLocation } from "@solidjs/router";
-
 interface Props {
   children: any;
 }

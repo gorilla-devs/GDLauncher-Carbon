@@ -46,7 +46,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              navigate("/mods");
+              navigate(`/mods?instanceId=${params.id}`);
             }}
           >
             <Trans key="instance.add_mod" />
@@ -88,7 +88,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              navigate("/mods");
+              navigate(`/mods?instanceId=${params.id}`);
             }}
           >
             <Trans key="instance.add_mod" />

@@ -4,6 +4,7 @@ import {
   MRFEVersion,
   FEUnifiedSearchResult,
   MRFECategoriesResponse,
+  Mod,
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
@@ -49,6 +50,7 @@ type BaseProps = {
 export type ModProps = BaseProps & {
   type: "Mod";
   mcVersion?: string;
+  installedMods: Mod[];
   modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 

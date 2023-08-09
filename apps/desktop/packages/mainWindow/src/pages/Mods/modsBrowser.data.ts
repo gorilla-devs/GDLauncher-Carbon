@@ -18,6 +18,10 @@ const fetchData = () => {
   ]);
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
+  const instancesUngrouped = rspc.createQuery(() => [
+    "instance.getInstancesUngrouped",
+  ]);
+
   return {
     forgeCategories,
     minecraftVersions,
@@ -25,6 +29,7 @@ const fetchData = () => {
     curseForgeModloaders,
     modrinthModloaders,
     defaultGroup,
+    instancesUngrouped,
   };
 };
 

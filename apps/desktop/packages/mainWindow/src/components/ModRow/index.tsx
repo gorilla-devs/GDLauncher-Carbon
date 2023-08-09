@@ -42,9 +42,6 @@ import Authors from "./Authors";
 
 const ModRow = (props: ModRowProps) => {
   const [loading, setLoading] = createSignal(false);
-  const [mods, setMods] = createSignal<
-    CreateQueryResult<Mod[], RSPCError> | undefined
-  >(undefined);
   const [modrinthVersions, setModVersions] = createSignal<
     CreateQueryResult<MRFEVersionsResponse, RSPCError> | undefined
   >(undefined);
@@ -117,20 +114,11 @@ const ModRow = (props: ModRowProps) => {
   );
 
   const handleExplore = () => {
-    if (mergedProps.type === "Modpack") {
-      navigate(
-        `/modpacks/${getProjectId(props)}/${
-          isCurseForgeData(props.data) ? "curseforge" : "modrinth"
-        }`
-      );
-    } else {
-      modalsContext?.openModal(
-        {
-          name: "modDetails",
-        },
-        { mod: props.data }
-      );
-    }
+    navigate(
+      `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
+        props
+      )}/${isCurseForgeData(props.data) ? "curseforge" : "modrinth"}`
+    );
   };
 
   const getCurrentMcVersionObj = () => {
@@ -151,17 +139,6 @@ const ModRow = (props: ModRowProps) => {
   const location = useLocation();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
-
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      setMods(
-        rspc.createQuery(() => [
-          "instance.getInstanceMods",
-          parseInt(instanceId() as string, 10),
-        ])
-      );
-    }
-  });
 
   const mappedVersions = () =>
     latestFilesIndexes().map((version) => {
@@ -188,7 +165,7 @@ const ModRow = (props: ModRowProps) => {
   });
 
   const isModInstalled = () =>
-    mods()?.data?.find(
+    (props as ModProps)?.installedMods?.find(
       (mod) =>
         (isCurseForgeData(props.data)
           ? mod.curseforge?.project_id
@@ -446,14 +423,7 @@ const ModRow = (props: ModRowProps) => {
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
                         type="outline"
-                        onClick={() =>
-                          modalsContext?.openModal(
-                            {
-                              name: "modDetails",
-                            },
-                            { mod: props.data }
-                          )
-                        }
+                        onClick={() => handleExplore()}
                       >
                         <Trans
                           key="instance.explore_modpack"
