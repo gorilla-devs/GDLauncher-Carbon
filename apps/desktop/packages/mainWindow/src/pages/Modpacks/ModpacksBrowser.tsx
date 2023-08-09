@@ -93,11 +93,6 @@ const ModpackBrowser = () => {
         ref={(el) => (containrRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
-        {/* <Switch>
-          <Match when={infiniteQuery.infiniteQuery.isLoading}>
-            <Skeleton.explorer />
-          </Match> */}
-        {/* <Match when={!infiniteQuery.infiniteQuery.isLoading}> */}
         <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
           <Input
             placeholder="Type Here"
@@ -296,8 +291,6 @@ const ModpackBrowser = () => {
             </Match>
           </Switch>
         </div>
-        {/* </Match> */}
-        {/* </Switch> */}
       </div>
     </div>
   );

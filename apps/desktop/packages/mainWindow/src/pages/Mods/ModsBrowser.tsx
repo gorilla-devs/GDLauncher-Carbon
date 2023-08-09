@@ -38,6 +38,7 @@ import {
 } from "../Modpacks/ModpacksStatus";
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
+import DefaultImg from "/assets/images/default-instance-img.png";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -140,7 +141,30 @@ const ModsBrowser = () => {
       ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
 
-  const [imageResource] = createResource(instanceId(), fetchImage);
+  const [imageResource] = createResource(instanceId, fetchImage);
+
+  const instanceModloaders = () =>
+    instanceDetail()?.modloaders.map((modloader) => modloader.type_);
+  const instancePlatform = () =>
+    Object.keys(instanceDetail()?.modpack || {})[0]?.toLocaleLowerCase();
+
+  createEffect(() => {
+    console.log("infiniteQuery.query.searchApi", infiniteQuery.query.searchApi);
+  });
+
+  createEffect(() => {
+    const modloaders = instanceModloaders();
+    const platform = instancePlatform();
+
+    if (modloaders && platform) {
+      infiniteQuery.setQuery({
+        modloaders: modloaders,
+        searchApi: platform as FESearchAPI,
+      });
+    }
+  });
+
+  const defaultModloader = () => infiniteQuery.query.modloaders?.[0] as string;
 
   return (
     <div class="box-border h-full w-full relative">
@@ -148,20 +172,17 @@ const ModsBrowser = () => {
         ref={(el) => (containrRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
-        {/* <Switch>
-          <Match
-            when={
-              infiniteQuery.infiniteQuery.isLoading &&
-              infiniteQuery.infiniteQuery.isInitialLoading
-            }
-          >
-            <Skeleton.explorer />
-          </Match> */}
-        {/* <Match when={!infiniteQuery.infiniteQuery.isFetching}> */}
         <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
           <Show when={instanceDetail()}>
-            <div class="border-1 border-solid border-green-500 h-10 mb-4 rounded-lg p-2 box-border flex items-center">
-              <img src={imageResource()} class="h-full mr-4" />
+            <div class="border-1 border-solid h-10 mb-4 rounded-lg p-2 box-border flex items-center border-green-500">
+              <div
+                class="w-6 h-6 bg-center bg-cover mr-4"
+                style={{
+                  "background-image": imageResource()
+                    ? `url("${imageResource()}")`
+                    : `url("${DefaultImg}")`,
+                }}
+              />
               <h2 class="m-0">{instanceDetail()?.name}</h2>
             </div>
           </Show>
@@ -220,6 +241,7 @@ const ModsBrowser = () => {
                     modloaders: mappedValue,
                   });
                 }}
+                value={defaultModloader()}
                 rounded
               />
               <Dropdown
@@ -313,7 +335,7 @@ const ModsBrowser = () => {
                                   type="Mod"
                                   data={mod()}
                                   installedMods={instanceMods()}
-                                  // mcVersion={data().mcVersion}
+                                  mcVersion={instanceDetail()?.version || ""}
                                   modrinthCategories={
                                     routeData.modrinthCategories.data
                                   }
@@ -356,8 +378,6 @@ const ModsBrowser = () => {
             </Match>
           </Switch>
         </div>
-        {/* </Match> */}
-        {/* </Switch> */}
       </div>
     </div>
   );

@@ -65,7 +65,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center bg-darkSlate-800 px-5 text-white h-15">
+      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img

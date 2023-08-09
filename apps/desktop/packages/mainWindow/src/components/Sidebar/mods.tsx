@@ -26,7 +26,12 @@ import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
-import { CategoryIcon, PlatformIcon, fetchImage } from "@/utils/instances";
+import {
+  CategoryIcon,
+  PlatformIcon,
+  fetchImage,
+  getValideInstance,
+} from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import DefaultImg from "/assets/images/default-instance-img.png";
@@ -149,6 +154,11 @@ const Sidebar = () => {
   const instanceId = () =>
     parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
 
+  const filteredInstances = () =>
+    routeData.instancesUngrouped.data?.filter(
+      (instance) => getValideInstance(instance.status)?.modloader
+    );
+
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -160,7 +170,7 @@ const Sidebar = () => {
               }}
               value={instanceId()}
             >
-              <For each={routeData.instancesUngrouped.data || []}>
+              <For each={filteredInstances() || []}>
                 {(instance) => {
                   const [imageResource] = createResource(
                     () => instance.id,

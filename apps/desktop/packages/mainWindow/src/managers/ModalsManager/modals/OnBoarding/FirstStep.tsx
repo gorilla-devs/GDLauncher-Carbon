@@ -25,7 +25,7 @@ const FirstStep = (props: Props) => {
             }}
           />
         </h1>
-        <pre class="text-darkSlate-100 leading-6 text-left max-w-140 whitespace-pre-line">
+        <pre class="text-darkSlate-100 text-left leading-6 max-w-140 whitespace-pre-line">
           <Trans
             key="onboarding.welcome_gdlauncher_text"
             options={{

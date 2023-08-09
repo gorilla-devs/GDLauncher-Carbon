@@ -6,6 +6,7 @@ import {
   Accessor,
   Setter,
   createContext,
+  createEffect,
   createSignal,
   mergeProps,
   onMount,
@@ -19,7 +20,12 @@ import {
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
 import { scrollTop } from "@/utils/browser";
-import { modpacksQuery, modsQuery, setModpacksQuery } from "@/utils/Mods";
+import {
+  modpacksQuery,
+  modsQuery,
+  setModpacksQuery,
+  setModsQuery,
+} from "@/utils/Mods";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -54,11 +60,15 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
   const query = () =>
     mergedProps.type === "modPack" ? modpacksQuery : modsQuery;
+  const getQueryFunction = () =>
+    mergedProps.type === "modPack" ? setModpacksQuery : setModsQuery;
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      setModpacksQuery({
+      const setQuery = getQueryFunction();
+
+      setQuery({
         index: ctx.pageParam + (query().pageSize || 20) + 1,
       });
       return rspcContext.client.query(["modplatforms.unifiedSearch", query()]);
@@ -95,7 +105,9 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   });
 
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
-    setModpacksQuery(newValue);
+    const setQuery = getQueryFunction();
+
+    setQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
     rowVirtualizer.scrollToIndex(0);
@@ -106,6 +118,12 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     infiniteQuery.refetch();
     rowVirtualizer.scrollToIndex(0);
   };
+
+  createEffect(() => {
+    const pageChanged = mergedProps.type === query().projectType;
+
+    if (pageChanged) resetList();
+  });
 
   const context = {
     infiniteQuery,

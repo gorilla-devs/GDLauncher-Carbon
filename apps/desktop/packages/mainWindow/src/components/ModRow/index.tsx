@@ -1,4 +1,3 @@
-import { useModal } from "@/managers/ModalsManager";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { getInstanceIdFromPath } from "@/utils/routes";
@@ -7,7 +6,6 @@ import {
   CFFEFileIndex,
   MRFEVersion,
   MRFEVersionsResponse,
-  Mod,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Popover, Spinner, createNotification } from "@gd/ui";
@@ -74,7 +72,6 @@ const ModRow = (props: ModRowProps) => {
   const mergedProps = mergeProps({ type: "Modpack" }, props);
   const navigate = useGDNavigate();
   const addNotification = createNotification();
-  const modalsContext = useModal();
 
   const prepareInstanceMutation = rspc.createMutation(
     ["instance.prepareInstance"],

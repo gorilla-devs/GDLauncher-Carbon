@@ -181,7 +181,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="relative flex justify-center flex-col select-none items-start group z-50"
+            class="relative flex justify-center flex-col select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
