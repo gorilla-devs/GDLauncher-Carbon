@@ -24,6 +24,7 @@
   "login.cookies_tracking": "Enable anonymous metrics to improve the user experience and provide experimental features",
   "login.next": "Next",
   "login.prev": "Prev",
+  "login.manage": "Manage",
   "login.we_value_privacy_title": "We Value Your Privacy",
   "login.renew": "Renew Confirmation",
   "login.we_value_privacy_text_renew": "In order to be compliant with GDPR, CCPA and other data privacy laws, we are required to ask for the renewal of your confirmation, either periodically or whenever they are updated.",
