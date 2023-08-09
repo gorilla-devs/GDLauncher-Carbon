@@ -1,18 +1,25 @@
 use crate::{
     api::{instance::import::FEEntity, keys},
     domain::{
-        instance::info::{CurseforgeModpack, Modpack},
-        modplatforms::curseforge::{
-            self,
-            filters::{ModsParameters, ModsParametersBody},
+        instance::info::{CurseforgeModpack, Modpack, ModrinthModpack},
+        modplatforms::{
+            curseforge::{
+                self,
+                filters::{ModsParameters, ModsParametersBody},
+            },
+            modrinth::{self, search::ProjectID},
         },
         vtask::VisualTaskId,
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
+
 use anyhow::anyhow;
+use sha2::{digest::Digest, Sha512};
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::spawn_blocking};
+
+use crate::domain::modplatforms::modrinth::{search::VersionHashesQuery, version::HashAlgorithm};
 
 use super::InstanceImporter;
 
@@ -25,6 +32,17 @@ pub struct CurseForgeManifestWrapper {
 #[derive(Debug, Default)]
 pub struct CurseForgeZipImporter {
     scan_result: Mutex<Option<CurseForgeManifestWrapper>>,
+}
+
+#[derive(Debug)]
+pub struct MrpackIndexWrapper {
+    full_path: PathBuf,
+    index: modrinth::version::ModpackIndex,
+}
+
+#[derive(Debug, Default)]
+pub struct MrpackImporter {
+    scan_result: Mutex<Option<MrpackIndexWrapper>>,
 }
 
 #[async_trait::async_trait]
@@ -74,14 +92,16 @@ impl InstanceImporter for CurseForgeZipImporter {
     }
 
     async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
-        let instances = self.scan_result.lock().await.as_ref().map_or_else(
-            Vec::new,
-            |instance| {
+        let instances = self
+            .scan_result
+            .lock()
+            .await
+            .as_ref()
+            .map_or_else(Vec::new, |instance| {
                 vec![super::ImportableInstance {
                     name: instance.manifest.name.clone(),
                 }]
-            },
-        );
+            });
         Ok(instances)
     }
 
@@ -92,7 +112,9 @@ impl InstanceImporter for CurseForgeZipImporter {
         name: &str,
     ) -> anyhow::Result<VisualTaskId> {
         let lock = self.scan_result.lock().await;
-        let instance = lock.as_ref().ok_or(anyhow!("No importable instance available"))?;
+        let instance = lock
+            .as_ref()
+            .ok_or(anyhow!("No importable instance available"))?;
 
         let mut content = tokio::fs::read(&instance.full_path).await?;
         let murmur2 = tokio::task::spawn_blocking(move || {
@@ -152,7 +174,9 @@ impl InstanceImporter for CurseForgeZipImporter {
             });
 
         if let Some(icon_url) = &icon {
-            app.instance_manager().download_icon(icon_url.clone()).await?;
+            app.instance_manager()
+                .download_icon(icon_url.clone())
+                .await?;
         }
 
         let install_source = InstanceVersionSource::Modpack(modpack);
@@ -175,4 +199,136 @@ impl InstanceImporter for CurseForgeZipImporter {
 
         Ok(task_id)
     }
+}
+
+#[async_trait::async_trait]
+impl InstanceImporter for MrpackImporter {
+    type Config = MrpackIndexWrapper;
+
+    async fn scan(&mut self, app: Arc<AppInner>, path: Option<PathBuf>) -> anyhow::Result<()> {
+        let Some(path) = path else {
+            return Err(anyhow!("No scan path provided. Scan path required for CurseForge Zip Importer"));
+        };
+
+        let file_path_clone = path.clone();
+
+        // make sure this is a valid modpack
+        let index = spawn_blocking(move || {
+            let file = std::fs::File::open(file_path_clone)?;
+            let mut archive = zip::ZipArchive::new(file)?;
+            let index: modrinth::version::ModpackIndex = {
+                let file = archive.by_name("modrinth.index.json")?;
+                serde_json::from_reader(file)?
+            };
+
+            Ok::<_, anyhow::Error>(index)
+        })
+        .await??;
+
+        let mut lock = self.scan_result.lock().await;
+        *lock = Some(MrpackIndexWrapper {
+            full_path: path.clone(),
+            index,
+        });
+        app.invalidate(
+            keys::instance::GET_IMPORTABLE_INSTANCES,
+            Some(serde_json::to_value(FEEntity::MRPack(
+                path.to_string_lossy().to_string(),
+            ))?),
+        );
+
+        Ok(())
+    }
+
+    async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
+        let instances = self
+            .scan_result
+            .lock()
+            .await
+            .as_ref()
+            .map_or_else(Vec::new, |instance| {
+                vec![super::ImportableInstance {
+                    name: instance.index.name,
+                }]
+            });
+        Ok(instances)
+    }
+
+    async fn import(
+        &self,
+        app: Arc<AppInner>,
+        index: u32,
+        name: &str,
+    ) -> anyhow::Result<VisualTaskId> {
+        let lock = self.scan_result.lock.await;
+        let instance = lock
+            .as_ref()
+            .ok_or(anyhow!("No importable instance available"))?;
+        let mut content = tokio::fs::read(&instance.full_path).await?;
+        let sha512 = tokio::task::spawn_blocking(move || {
+            hex::encode(<[u8; 64] as From<_>>::from(
+                Sha512::new_with_prefix(&content).finalize(),
+            ))
+        })
+        .await?;
+
+        let version_response = app
+            .modplatforms_manager()
+            .modrinth
+            .get_versions_from_hash(&VersionHashesQuery {
+                hashes: vec![sha512.clone()],
+                algorithm: HashAlgorithm::SHA512,
+            })
+            .await?;
+
+        let (modpack, icon) = match version_response.get(&sha512) {
+            Some(version) => {
+                let project = app
+                    .modplatforms_manager()
+                    .modrinth
+                    .get_project(ProjectID(version.project_id.clone()))
+                    .await?;
+                (
+                    Modpack::Modrinth(ModrinthModpack::LocalManaged {
+                        project_id: project.id.clone(),
+                        version_id: version.id.clone(),
+                        mrpack_path: instance.full_path.to_string_lossy().to_string(),
+                    }),
+                    Some(project.icon_url),
+                )
+            }
+            None => (
+                Modpack::Modrinth(ModrinthModpack::Unmanaged {
+                    mrpack_path: instance.full_path.to_string_lossy().to_string(),
+                }),
+                None,
+            ),
+        };
+
+        if let Some(icon_url) = &icon {
+            app.instance_manager()
+                .download_icon(icon_url.clone())
+                .await?;
+        }
+
+        let install_source = InstanceVersionSource::Modpack(modpack);
+
+        let created_instance_id = app
+            .instance_manager()
+            .create_instance(
+                app.instance_manager().get_default_group().await?,
+                name.to_string(),
+                icon.is_some(),
+                install_source,
+                "".to_string(),
+            )
+            .await?;
+
+        let (_, task_id) = app
+            .instance_manager()
+            .prepare_game(created_instance_id, None, None)
+            .await?;
+        Ok(task_id)
+    }
+
 }

@@ -51,9 +51,20 @@ pub enum CurseforgeModpack {
 }
 
 #[derive(Debug, Clone)]
-pub struct ModrinthModpack {
-    pub project_id: String,
-    pub version_id: String,
+pub enum ModrinthModpack {
+    RemoteManaged {
+        project_id: String,
+        version_id: String,
+    },
+    LocalManaged {
+        project_id: String,
+        version_id: String,
+        mrpack_path: String,
+    },
+    Unmanaged {
+        mrpack_path: String,
+    }
+
 }
 
 #[derive(Debug, Clone)]

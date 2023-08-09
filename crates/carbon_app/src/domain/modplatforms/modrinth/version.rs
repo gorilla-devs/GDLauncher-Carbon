@@ -6,7 +6,7 @@ use super::*;
 use std::collections::{HashMap, HashSet};
 
 use crate::domain::{
-    instance::info::{ModLoader, ModLoaderType, StandardVersion},
+    instance::info::{ModLoader, StandardVersion},
     modplatforms::ModChannel,
 };
 
