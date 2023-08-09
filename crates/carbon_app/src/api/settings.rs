@@ -1,6 +1,8 @@
 use crate::{
     api::{
-        keys::settings::{GET_SETTINGS, SET_SETTINGS},
+        keys::settings::{
+            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+        },
         router::router,
     },
     managers::App,
@@ -12,8 +14,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()
-                    .get_settings()
-                    .await?;
+                .get_settings()
+                .await?;
 
             TryInto::<FESettings>::try_into(response)
         }
@@ -23,6 +25,52 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .set_settings(new_settings)
                 .await
         }
+
+        query GET_TERMS_OF_SERVICE_BODY[app, _args: ()] {
+            app.settings_manager()
+                .terms_and_privacy
+                .fetch_terms_of_service_body()
+                .await
+        }
+
+        query GET_PRIVACY_STATEMENT_BODY[app, _args: ()] {
+            app.settings_manager()
+                .terms_and_privacy
+                .fetch_privacy_statement_body()
+                .await
+        }
+    }
+}
+
+#[derive(Type, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum FEReleaseChannel {
+    Stable,
+    Alpha,
+    Beta,
+}
+
+impl TryFrom<String> for FEReleaseChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value.to_lowercase() {
+            "stable" => Ok(Self::Stable),
+            "alpha" => Ok(Self::Alpha),
+            "beta" => Ok(Self::Beta),
+            _ => Err(anyhow::anyhow!("Invalid release channel")),
+        }
+    }
+}
+
+impl From<FEReleaseChannel> for String {
+    fn from(value: FEReleaseChannel) -> Self {
+        match value {
+            FEReleaseChannel::Stable => "stable",
+            FEReleaseChannel::Alpha => "alpha",
+            FEReleaseChannel::Beta => "beta",
+        }
+        .to_string()
     }
 }
 
@@ -33,7 +81,7 @@ struct FESettings {
     language: String,
     reduced_motion: bool,
     discord_integration: bool,
-    release_channel: String,
+    release_channel: FEReleaseChannel,
     concurrent_downloads: i32,
     show_news: bool,
     xmx: i32,
@@ -43,8 +91,9 @@ struct FESettings {
     java_custom_args: String,
     auto_manage_java: bool,
     preferred_mod_channel: ModChannel,
-    is_legal_accepted: bool,
-    metrics_level: Option<i32>,
+    terms_and_privacy_accepted: bool,
+    metrics_enabled: bool,
+    random_user_uuid: String,
 }
 
 // in the public interface due to `FESettings` also being in the public interface.
@@ -98,7 +147,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             language: data.language,
             reduced_motion: data.reduced_motion,
             discord_integration: data.discord_integration,
-            release_channel: data.release_channel,
+            release_channel: data.release_channel.try_into()?,
             concurrent_downloads: data.concurrent_downloads,
             show_news: data.show_news,
             xmx: data.xmx,
@@ -108,8 +157,9 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             preferred_mod_channel: data.preferred_mod_channel.try_into()?,
-            is_legal_accepted: data.is_legal_accepted,
-            metrics_level: data.metrics_level,
+            terms_and_privacy_accepted: data.terms_and_privacy_accepted,
+            metrics_enabled: data.metrics_enabled,
+            random_user_uuid: data.random_user_uuid,
         })
     }
 }
@@ -127,7 +177,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub discord_integration: Option<bool>,
     #[specta(optional)]
-    pub release_channel: Option<String>,
+    pub release_channel: Option<FEReleaseChannel>,
     #[specta(optional)]
     pub concurrent_downloads: Option<i32>,
     #[specta(optional)]
@@ -147,7 +197,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub preferred_mod_channel: Option<ModChannel>,
     #[specta(optional)]
-    pub is_legal_accepted: Option<bool>,
+    pub terms_and_privacy_accepted: Option<bool>,
     #[specta(optional)]
-    pub metrics_level: Option<i32>,
+    pub metrics_enabled: Option<bool>,
 }

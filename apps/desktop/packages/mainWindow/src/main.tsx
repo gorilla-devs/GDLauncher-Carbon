@@ -25,8 +25,9 @@ import "@gd/ui/style.css";
 import { NotificationsProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
 import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
-import RiveAppWapper from "./utils/RiveAppWapper";
+import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
+import "@/utils/analytics"; // preinit
 
 render(() => {
   const [coreModuleLoaded] = createResource(async () => {

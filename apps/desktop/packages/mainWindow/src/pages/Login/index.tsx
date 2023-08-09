@@ -26,7 +26,9 @@ export default function Login() {
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
-    routeData?.activeUuid?.data && routeData?.accounts?.data?.length! > 0;
+    routeData?.activeUuid?.data &&
+    routeData.accounts.data?.length! > 0 &&
+    routeData.settings.data?.termsAndPrivacyAccepted;
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
@@ -74,7 +76,7 @@ export default function Login() {
   });
 
   createEffect(() => {
-    if (routeData.settings.data?.isLegalAccepted) setStep(1);
+    if (routeData.settings.data?.termsAndPrivacyAccepted) setStep(1);
   });
 
   return (
@@ -83,12 +85,12 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full h-screen p-0 bg-img-loginBG.jpg">
+        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.jpg">
           <div
             style={{
               "mix-blend-mode": "hard-light",
             }}
-            class="absolute left-0 right-0 bg-darkSlate-800 top-0 bottom-0 opacity-80"
+            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
           />
           <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
             <Dropdown
@@ -108,16 +110,18 @@ export default function Login() {
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl w-140 h-110"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
               "justify-content": step() === 1 ? "flex-end" : "center",
             }}
             classList={{
               "overflow-hidden": step() === 2,
+              "w-140": step() !== 0,
+              "max-w-160": step() === 0,
             }}
           >
-            <Show when={step() < 1}>
+            <Show when={step() === 0}>
               <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
                 <img class="w-30" src={Logo} />
                 <p class="text-darkSlate-50">

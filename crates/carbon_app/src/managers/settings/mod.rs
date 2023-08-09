@@ -1,3 +1,5 @@
+use self::terms_and_privacy::TermsAndPrivacy;
+
 use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
@@ -5,16 +7,21 @@ use crate::{
     domain::runtime_path,
 };
 use anyhow::anyhow;
+use chrono::Utc;
 use std::path::PathBuf;
+
+mod terms_and_privacy;
 
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
+    pub terms_and_privacy: TermsAndPrivacy,
 }
 
 impl SettingsManager {
     pub fn new(runtime_path: PathBuf) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
+            terms_and_privacy: TermsAndPrivacy::new(),
         }
     }
 }
@@ -33,6 +40,15 @@ impl ManagerRef<'_, SettingsManager> {
     #[tracing::instrument(skip(self))]
     pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
         let db = &self.app.prisma_client;
+
+        let crate::db::app_configuration::Data {
+            secret,
+            random_user_uuid,
+            ..
+        } = self.get_settings().await?;
+
+        let random_user_uuid = uuid::Uuid::parse_str(&random_user_uuid)?;
+
         let mut queries = vec![];
 
         let mut something_changed = false;
@@ -73,7 +89,9 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(release_channel) = incoming_settings.release_channel {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::release_channel::set(release_channel)],
+                vec![app_configuration::release_channel::set(
+                    release_channel.into(),
+                )],
             ));
             something_changed = true;
         }
@@ -155,23 +173,44 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(is_legal_accepted) = incoming_settings.is_legal_accepted {
+        if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::is_legal_accepted::set(is_legal_accepted)],
+                vec![app_configuration::terms_and_privacy_accepted::set(
+                    terms_and_privacy_accepted,
+                )],
             ));
+
+            self.terms_and_privacy
+                .record_consent(
+                    terms_and_privacy::ConsentType::TermsAndPrivacy,
+                    terms_and_privacy_accepted,
+                    &random_user_uuid,
+                    &secret,
+                )
+                .await?;
+
             something_changed = true;
         }
 
-        if let Some(metrics_level) = incoming_settings.metrics_level {
-            if !(0..=3).contains(&metrics_level) {
-                return Err(anyhow::anyhow!("Invalid metrics level"));
-            }
-
+        if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::metrics_level::set(Some(metrics_level))],
+                vec![
+                    app_configuration::metrics_enabled::set(metrics_enabled),
+                    app_configuration::metrics_enabled_last_update::set(Some(Utc::now().into())),
+                ],
             ));
+
+            self.terms_and_privacy
+                .record_consent(
+                    terms_and_privacy::ConsentType::Metrics,
+                    metrics_enabled,
+                    &random_user_uuid,
+                    &secret,
+                )
+                .await?;
+
             something_changed = true;
         }
 
