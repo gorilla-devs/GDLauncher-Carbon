@@ -1,5 +1,5 @@
 use std::borrow::BorrowMut;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
@@ -13,8 +13,6 @@ use crate::domain::modplatforms::modrinth::version::{
 };
 
 use super::secure_path_join;
-
-
 
 #[derive(Debug, Copy, Clone)]
 pub enum ProgressState {

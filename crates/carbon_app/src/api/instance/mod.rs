@@ -645,9 +645,19 @@ enum CurseforgeModpack {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-pub struct ModrinthModpack {
-    pub project_id: String,
-    pub version_id: String,
+pub enum ModrinthModpack {
+    RemoteManaged {
+        project_id: String,
+        version_id: String,
+    },
+    LocalManaged {
+        project_id: String,
+        version_id: String,
+        mrpack_path: String,
+    },
+    Unmanaged {
+        mrpack_path: String,
+    },
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -890,9 +900,24 @@ impl From<CurseforgeModpack> for domain::info::CurseforgeModpack {
 
 impl From<ModrinthModpack> for domain::info::ModrinthModpack {
     fn from(value: ModrinthModpack) -> Self {
-        Self {
-            project_id: value.project_id,
-            version_id: value.version_id,
+        match value {
+            ModrinthModpack::RemoteManaged {
+                project_id,
+                version_id,
+            } => Self::RemoteManaged {
+                project_id,
+                version_id,
+            },
+            ModrinthModpack::LocalManaged {
+                project_id,
+                version_id,
+                mrpack_path,
+            } => Self::LocalManaged {
+                project_id,
+                version_id,
+                mrpack_path,
+            },
+            ModrinthModpack::Unmanaged { mrpack_path } => Self::Unmanaged { mrpack_path },
         }
     }
 }
@@ -934,9 +959,26 @@ impl From<domain::info::CurseforgeModpack> for CurseforgeModpack {
 
 impl From<domain::info::ModrinthModpack> for ModrinthModpack {
     fn from(value: domain::info::ModrinthModpack) -> Self {
-        Self {
-            project_id: value.project_id,
-            version_id: value.version_id,
+        match value {
+            domain::info::ModrinthModpack::RemoteManaged {
+                project_id,
+                version_id,
+            } => Self::RemoteManaged {
+                project_id,
+                version_id,
+            },
+            domain::info::ModrinthModpack::LocalManaged {
+                project_id,
+                version_id,
+                mrpack_path,
+            } => Self::LocalManaged {
+                project_id,
+                version_id,
+                mrpack_path,
+            },
+            domain::info::ModrinthModpack::Unmanaged { mrpack_path } => {
+                Self::Unmanaged { mrpack_path }
+            }
         }
     }
 }

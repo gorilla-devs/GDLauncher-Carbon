@@ -23,6 +23,16 @@ pub enum CurseforgeInstallSource {
     Local { archive_path: String },
 }
 
+pub enum ModrinthInstallSource {
+    Remote {
+        project_id: String,
+        version_id: String,
+    },
+    Local {
+        mrpack_path: String,
+    },
+}
+
 pub struct PrepareModpackSubtasks {
     pub t_request: Subtask,
     pub t_extract_files: Subtask,
@@ -171,23 +181,25 @@ impl PrepareModpack for ModrinthModpack {
         let t_extract_files = subtasks.t_extract_files;
         let t_download_files = subtasks.t_download_files;
         let t_addon_metadata = subtasks.t_addon_metadata;
-        t_request.start_opaque();
-        let file = app
-            .modplatforms_manager()
-            .modrinth
-            .get_version(VersionID(self.version_id.clone()))
-            .await?
-            .files
-            .into_iter()
-            .reduce(|a, b| if b.primary { b } else { a })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Modrinth project '{}' version '{}' does not have a file",
-                    self.project_id,
-                    self.version_id
-                )
-            })?;
-        t_request.complete_opaque();
+        let install_source = match self {
+            ModrinthModpack::RemoteManaged {
+                project_id,
+                version_id,
+            } => ModrinthInstallSource::Remote {
+                project_id: project_id.clone(),
+                version_id: version_id.clone(),
+            },
+            ModrinthModpack::LocalManaged {
+                project_id: _,
+                version_id: _,
+                mrpack_path,
+            } => ModrinthInstallSource::Local {
+                mrpack_path: mrpack_path.clone(),
+            },
+            ModrinthModpack::Unmanaged { mrpack_path } => ModrinthInstallSource::Local {
+                mrpack_path: mrpack_path.clone(),
+            },
+        };
 
         let (modpack_progress_tx, mut modpack_progress_rx) =
             tokio::sync::watch::channel(modrinth::ProgressState::Idle);
@@ -216,13 +228,46 @@ impl PrepareModpack for ModrinthModpack {
             t_download_files.complete_download();
         });
 
-        let modpack_info = modrinth::prepare_modpack_from_file(
-            &app,
-            &file,
-            instance_path.clone(),
-            modpack_progress_tx,
-        )
-        .await?;
+        let modpack_info = match install_source {
+            ModrinthInstallSource::Remote {
+                project_id,
+                version_id,
+            } => {
+                t_request.start_opaque();
+                let file = app
+                    .modplatforms_manager()
+                    .modrinth
+                    .get_version(VersionID(version_id.clone()))
+                    .await?
+                    .files
+                    .into_iter()
+                    .reduce(|a, b| if b.primary { b } else { a })
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Modrinth project '{}' version '{}' does not have a file",
+                            project_id,
+                            version_id
+                        )
+                    })?;
+                t_request.complete_opaque();
+                modrinth::prepare_modpack_from_file(
+                    &app,
+                    &file,
+                    instance_path.clone(),
+                    modpack_progress_tx,
+                )
+                .await?
+            }
+            ModrinthInstallSource::Local { mrpack_path } => {
+                modrinth::prepare_modpack_from_mrpack(
+                    &app,
+                    mrpack_path.into(),
+                    instance_path.clone(),
+                    modpack_progress_tx,
+                )
+                .await?
+            }
+        };
 
         downloads.extend(modpack_info.downloadables);
 
@@ -242,12 +287,12 @@ impl PrepareModpack for Modpack {
         match self {
             Self::Curseforge(modpack) => {
                 modpack
-                    .prepare_modpack(app, instance_path, &mut downloads, subtasks)
+                    .prepare_modpack(app, instance_path, downloads, subtasks)
                     .await
             }
             Self::Modrinth(modpack) => {
                 modpack
-                    .prepare_modpack(app, instance_path, &mut downloads, subtasks)
+                    .prepare_modpack(app, instance_path, downloads, subtasks)
                     .await
             }
         }

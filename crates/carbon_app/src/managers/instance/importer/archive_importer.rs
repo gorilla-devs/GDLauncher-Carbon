@@ -248,7 +248,7 @@ impl InstanceImporter for MrpackImporter {
             .as_ref()
             .map_or_else(Vec::new, |instance| {
                 vec![super::ImportableInstance {
-                    name: instance.index.name,
+                    name: instance.index.name.clone(),
                 }]
             });
         Ok(instances)
@@ -257,14 +257,14 @@ impl InstanceImporter for MrpackImporter {
     async fn import(
         &self,
         app: Arc<AppInner>,
-        index: u32,
+        _index: u32,
         name: &str,
     ) -> anyhow::Result<VisualTaskId> {
-        let lock = self.scan_result.lock.await;
+        let lock = self.scan_result.lock().await;
         let instance = lock
             .as_ref()
             .ok_or(anyhow!("No importable instance available"))?;
-        let mut content = tokio::fs::read(&instance.full_path).await?;
+        let content = tokio::fs::read(&instance.full_path).await?;
         let sha512 = tokio::task::spawn_blocking(move || {
             hex::encode(<[u8; 64] as From<_>>::from(
                 Sha512::new_with_prefix(&content).finalize(),
@@ -294,7 +294,7 @@ impl InstanceImporter for MrpackImporter {
                         version_id: version.id.clone(),
                         mrpack_path: instance.full_path.to_string_lossy().to_string(),
                     }),
-                    Some(project.icon_url),
+                    project.icon_url,
                 )
             }
             None => (
@@ -330,5 +330,4 @@ impl InstanceImporter for MrpackImporter {
             .await?;
         Ok(task_id)
     }
-
 }
