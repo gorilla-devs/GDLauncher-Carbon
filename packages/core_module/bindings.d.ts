@@ -49,7 +49,9 @@ export type Procedures = {
         { key: "modplatforms.modrinth.getVersions", input: MRFEVersionIDs, result: MRFEVersionsResponse } | 
         { key: "modplatforms.modrinth.search", input: MRFEProjectSearchParameters, result: MRFEProjectSearchResponse } | 
         { key: "modplatforms.unifiedSearch", input: FEUnifiedSearchParameters, result: FEUnifiedSearchResponse } | 
+        { key: "settings.getPrivacyStatementBody", input: never, result: string } | 
         { key: "settings.getSettings", input: never, result: FESettings } | 
+        { key: "settings.getTermsOfServiceBody", input: never, result: string } | 
         { key: "systeminfo.getTotalRAM", input: never, result: string } | 
         { key: "systeminfo.getUsedRAM", input: never, result: string } | 
         { key: "vtask.getTask", input: FETaskId, result: FETask | null } | 
@@ -146,8 +148,6 @@ export type ModFileMetadata = { modid: string; name: string | null; version: str
 export type FEEventName = "AppClosed"
 
 export type MRFEVersionFile = { hashes: MRFEHashes; url: string; filename: string; primary: boolean; size: number; file_type: MRFEAdditionalFileType | null }
-
-export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type InstanceDetails = { name: string; favorite: boolean; version: string | null; modpack: Modpack | null; global_java_args: boolean; extra_java_args: string | null; memory: MemoryRange | null; last_played: string; seconds_played: number; modloaders: ModLoader[]; notes: string; state: LaunchState; icon_revision: number }
 
@@ -292,7 +292,11 @@ export type MRFELoaderType = "bukkit" | "bungeecord" | "canvas" | "datapack" | "
 
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
+
 export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourcePack"
+
+export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
 export type CFFEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
 
@@ -307,6 +311,8 @@ export type ConfigurationParseError = { type_: ConfigurationParseErrorType; mess
 export type Set<T> = { Set: T }
 
 export type MRFEDonationLink = { id: string; platform: string; url: string }
+
+export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type CFFEFile = { id: number; gameId: number; modId: number; isAvailable: boolean; displayName: string; fileName: string; releaseType: CFFEFileReleaseType; fileStatus: CFFEFileStatus; hashes: CFFEFileHash[]; fileDate: string; fileLength: number; downloadCount: number; downloadUrl: string | null; gameVersions: string[]; sortableGameVersions: CFFESortableGameVersion[]; dependencies: CFFEFileDependency[]; exposeAsAlternative: boolean | null; parentProjectFileId: number | null; alternateFileId: number | null; isServerPack: boolean | null; serverPackFileId: number | null; isEarlyAccessContent: boolean | null; earlyAccessEndDate: string | null; fileFingerprint: string; modules: CFFEFileModule[] }
 
@@ -346,7 +352,7 @@ export type MRFEDependencyType = "required" | "optional" | "incompatible" | "emb
 
 export type Progress = "Indeterminate" | { Known: number } | { Failed: FeError }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: string; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; preferredModChannel: ModChannel; isLegalAccepted: boolean; metricsLevel: number | null }
+export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type MRFEProject = { slug: string; title: string; description: string; categories: string[]; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; body: string; additional_categories: string[]; issues_url: string | null; source_url: string | null; wiki_url: string | null; discord_url: string | null; donation_urls: MRFEDonationLink[]; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; id: string; team: string; moderator_message: MRFEModeratorMessage | null; published: string; updated: string; approved: string | null; followers: number; status: MRFEProjectStatus; license: MRFELicense; versions: string[]; game_versions: string[]; loaders: string[]; gallery: MRFEGalleryItem[] }
 
@@ -373,8 +379,6 @@ export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationPars
 export type FEUnifiedSearchType = "mod" | "modPack"
 
 export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; filename: string; urlslug: string; description: string; authors: string; sha512: string; sha1: string }
-
-export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type CFFEModSearchSortOrder = "ascending" | "descending"
 
@@ -422,6 +426,8 @@ export type ListInstanceStatus = { Valid: ValidListInstance } | { Invalid: Inval
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
 
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
+
 export type FEModFileResponse = { data: CFFEFile; pagination: CFFEPagination | null }
 
 export type FESubtaskProgress = { download: { downloaded: number; total: number } } | { item: { current: number; total: number } } | "opaque"
@@ -437,8 +443,6 @@ export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
-
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: string | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; isLegalAccepted?: boolean | null; metricsLevel?: number | null }
 
 export type FEUnifiedModLoaderType = "forge" | "neoforge" | "fabric" | "quilt" | "liteloader" | "cauldron" | "bukkit" | "bungeecord" | "canvas" | "datapack" | "folia" | "iris" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall" | { other: string }
 

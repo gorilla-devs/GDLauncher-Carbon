@@ -3,6 +3,9 @@ import { resolve } from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig(() => {
+  const config = require("@gd/config");
+  const appVersion = config.appVersion;
+
   return {
     root: __dirname,
     plugins: [],
@@ -11,6 +14,9 @@ export default defineConfig(() => {
       alias: {
         electron: "@overwolf/ow-electron",
       },
+    },
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
     },
     build: {
       outDir: "../../dist/main",

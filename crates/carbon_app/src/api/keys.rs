@@ -109,8 +109,8 @@ keys! {
     settings {
         GET_SETTINGS                                = "getSettings";
         SET_SETTINGS                                = "setSettings";
-        GET_IS_FIRST_LAUNCH                         = "getIsFirstLaunch";
-        SET_IS_FIRST_LAUNCH                         = "setIsFirstLaunch";
+        GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
+        GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
     }
 
     metrics {

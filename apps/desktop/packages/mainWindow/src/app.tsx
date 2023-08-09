@@ -6,6 +6,7 @@ import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
 import initAnalytics from "@/utils/analytics";
+import { checkForUpdates } from "./utils/updater";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -21,15 +22,11 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"], {
-    onSuccess(data) {
-      if (data.metricsLevel !== 0 && data.metricsLevel !== null) {
-        initAnalytics(data.metricsLevel);
-      }
-    },
-  });
+  initAnalytics();
+  checkForUpdates();
 
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
 
   createEffect(() => {
     if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {

@@ -5,7 +5,7 @@ CREATE TABLE "AppConfiguration" (
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
     "language" TEXT NOT NULL DEFAULT 'english',
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
-    "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
+    "releaseChannel" TEXT NOT NULL,
     "activeAccountUuid" TEXT,
     "concurrentDownloads" INTEGER NOT NULL DEFAULT 8,
     "showNews" BOOLEAN NOT NULL DEFAULT true,
@@ -17,8 +17,12 @@ CREATE TABLE "AppConfiguration" (
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
     "preferredModChannel" INTEGER NOT NULL DEFAULT 2,
-    "isLegalAccepted" BOOLEAN NOT NULL DEFAULT false,
-    "metricsLevel" INTEGER
+    "randomUserUuid" TEXT NOT NULL,
+    "secret" BLOB NOT NULL,
+    "termsAndPrivacyAccepted" BOOLEAN NOT NULL DEFAULT false,
+    "termsAndPrivacyAcceptedChecksum" TEXT,
+    "metricsEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "metricsEnabledLastUpdate" DATETIME
 );
 
 -- CreateTable
