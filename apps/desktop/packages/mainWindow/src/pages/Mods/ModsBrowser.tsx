@@ -16,6 +16,7 @@ import {
   CFFEModSearchSortField,
   FESearchAPI,
   FEUnifiedModLoaderType,
+  FEUnifiedSearchResult,
   InstanceDetails,
   MRFESearchIndex,
   Mod,
@@ -44,7 +45,7 @@ const ModsBrowser = () => {
   const [t] = useTransContext();
 
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
-  const [instanceDetail, setInstanceDetails] = createSignal<
+  const [instanceDetails, setinstanceDetails] = createSignal<
     InstanceDetails | undefined
   >(undefined);
 
@@ -76,18 +77,18 @@ const ModsBrowser = () => {
 
   createEffect(() => {
     if (instanceId() !== undefined) {
-      const instanceDetails = rspc.createQuery(() => [
+      const InstanceDetails = rspc.createQuery(() => [
         "instance.getInstanceDetails",
         instanceId() as number,
       ]);
 
-      if (instanceDetails.data) setInstanceDetails(instanceDetails.data);
+      if (InstanceDetails.data) setinstanceDetails(InstanceDetails.data);
     }
   });
 
   onCleanup(() => {
     setInstanceMods([]);
-    setInstanceDetails(undefined);
+    setinstanceDetails(undefined);
   });
 
   createEffect(() => {
@@ -144,13 +145,9 @@ const ModsBrowser = () => {
   const [imageResource] = createResource(instanceId, fetchImage);
 
   const instanceModloaders = () =>
-    instanceDetail()?.modloaders.map((modloader) => modloader.type_);
+    instanceDetails()?.modloaders.map((modloader) => modloader.type_);
   const instancePlatform = () =>
-    Object.keys(instanceDetail()?.modpack || {})[0]?.toLocaleLowerCase();
-
-  createEffect(() => {
-    console.log("infiniteQuery.query.searchApi", infiniteQuery.query.searchApi);
-  });
+    Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
 
   createEffect(() => {
     const modloaders = instanceModloaders();
@@ -172,115 +169,140 @@ const ModsBrowser = () => {
         ref={(el) => (containrRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
-        <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
-          <Show when={instanceDetail()}>
-            <div class="border-1 border-solid h-10 mb-4 rounded-lg p-2 box-border flex items-center border-green-500">
-              <div
-                class="w-6 h-6 bg-center bg-cover mr-4"
-                style={{
-                  "background-image": imageResource()
-                    ? `url("${imageResource()}")`
-                    : `url("${DefaultImg}")`,
-                }}
-              />
-              <h2 class="m-0">{instanceDetail()?.name}</h2>
-            </div>
-          </Show>
-          <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
-            <Input
-              placeholder="Type Here"
-              icon={<div class="i-ri:search-line" />}
-              class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
-              onInput={(e) => {
-                const target = e.target as HTMLInputElement;
-                infiniteQuery.setQuery({ searchQuery: target.value });
-              }}
-            />
-            <div class="flex items-center gap-3">
-              <p class="text-darkSlate-50">
-                <Trans
-                  key="instance.sort_by"
-                  options={{
-                    defaultValue: "Sort by:",
+        <Switch>
+          <Match
+            when={
+              mods().length === 0 &&
+              infiniteQuery?.infiniteQuery?.isLoading &&
+              infiniteQuery?.infiniteQuery?.isInitialLoading
+            }
+          >
+            <Skeleton.filters />
+          </Match>
+          <Match
+            when={
+              mods().length > 0 &&
+              !infiniteQuery?.infiniteQuery.isInitialLoading
+            }
+          >
+            <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
+              <Show when={instanceDetails()}>
+                <div class="border-1 border-solid h-10 mb-4 rounded-lg p-2 box-border flex items-center border-green-500">
+                  <div
+                    class="w-6 h-6 bg-center bg-cover mr-4"
+                    style={{
+                      "background-image": imageResource()
+                        ? `url("${imageResource()}")`
+                        : `url("${DefaultImg}")`,
+                    }}
+                  />
+                  <h2 class="m-0">{instanceDetails()?.name}</h2>
+                </div>
+              </Show>
+              <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
+                <Input
+                  placeholder="Type Here"
+                  icon={<div class="i-ri:search-line" />}
+                  class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
+                  onInput={(e) => {
+                    const target = e.target as HTMLInputElement;
+                    infiniteQuery.setQuery({ searchQuery: target.value });
                   }}
                 />
-              </p>
-              <Dropdown
-                options={sortingFields().map((field) => ({
-                  label: t(`instance.sort_by_${field}`),
-                  key: field,
-                }))}
-                onChange={(val) => {
-                  const sortIndex = isCurseforge()
-                    ? {
-                        curseForge: val.key as CFFEModSearchSortField,
-                      }
-                    : {
-                        modrinth: val.key as MRFESearchIndex,
-                      };
-                  infiniteQuery.setQuery({
-                    sortIndex,
-                  });
-                }}
-                value={0}
-                rounded
-              />
-              <Dropdown
-                options={modloaders.map((modloader) => ({
-                  label: t(`modloader_${modloader}`),
-                  key: modloader,
-                }))}
-                onChange={(val) => {
-                  const prevModloaders = infiniteQuery.query.modloaders || [];
-                  const mappedValue =
-                    val.key === "any"
-                      ? null
-                      : [...prevModloaders, val.key as FEUnifiedModLoaderType];
+                <div class="flex items-center gap-3">
+                  <p class="text-darkSlate-50">
+                    <Trans
+                      key="instance.sort_by"
+                      options={{
+                        defaultValue: "Sort by:",
+                      }}
+                    />
+                  </p>
+                  <Dropdown
+                    options={sortingFields().map((field) => ({
+                      label: t(`instance.sort_by_${field}`),
+                      key: field,
+                    }))}
+                    onChange={(val) => {
+                      const sortIndex = isCurseforge()
+                        ? {
+                            curseForge: val.key as CFFEModSearchSortField,
+                          }
+                        : {
+                            modrinth: val.key as MRFESearchIndex,
+                          };
+                      infiniteQuery.setQuery({
+                        sortIndex,
+                      });
+                    }}
+                    value={0}
+                    rounded
+                  />
+                  <Dropdown
+                    options={modloaders.map((modloader) => ({
+                      label: t(`modloader_${modloader}`),
+                      key: modloader,
+                    }))}
+                    onChange={(val) => {
+                      const prevModloaders =
+                        infiniteQuery.query.modloaders || [];
+                      const mappedValue =
+                        val.key === "any"
+                          ? null
+                          : [
+                              ...prevModloaders,
+                              val.key as FEUnifiedModLoaderType,
+                            ];
 
-                  infiniteQuery.setQuery({
-                    modloaders: mappedValue,
-                  });
-                }}
-                value={defaultModloader()}
-                rounded
-              />
-              <Dropdown
-                options={ModpackPlatforms.map((platform) => ({
-                  label: (
-                    <div class="flex items-center gap-2">
-                      <PlatformIcon platform={platform} />
-                      <p class="m-0">{platform}</p>
-                    </div>
-                  ),
-                  key: platform,
-                }))}
-                value={capitalize(infiniteQuery.query.searchApi)}
-                onChange={(val) => {
-                  infiniteQuery.setQuery({
-                    searchApi: (val.key as string).toLowerCase() as FESearchAPI,
-                    categories: [],
-                    modloaders: null,
-                  });
-                }}
-                rounded
-              />
+                      infiniteQuery.setQuery({
+                        modloaders: mappedValue,
+                      });
+                    }}
+                    value={defaultModloader()}
+                    rounded
+                  />
+                  <Dropdown
+                    options={ModpackPlatforms.map((platform) => ({
+                      label: (
+                        <div class="flex items-center gap-2">
+                          <PlatformIcon platform={platform} />
+                          <p class="m-0">{platform}</p>
+                        </div>
+                      ),
+                      key: platform,
+                    }))}
+                    value={capitalize(infiniteQuery.query.searchApi)}
+                    onChange={(val) => {
+                      infiniteQuery.setQuery({
+                        searchApi: (
+                          val.key as string
+                        ).toLowerCase() as FESearchAPI,
+                        categories: [],
+                        modloaders: null,
+                      });
+                    }}
+                    rounded
+                  />
+                </div>
+                <div
+                  class="cursor-pointer text-2xl"
+                  classList={{
+                    "i-ri:sort-asc":
+                      infiniteQuery.query.sortOrder === "ascending",
+                    "i-ri:sort-desc":
+                      infiniteQuery.query.sortOrder === "descending",
+                  }}
+                  onClick={() => {
+                    const isAsc = infiniteQuery.query.sortOrder === "ascending";
+                    infiniteQuery.setQuery({
+                      sortOrder: isAsc ? "descending" : "ascending",
+                    });
+                  }}
+                />
+              </div>
             </div>
-            <div
-              class="cursor-pointer text-2xl"
-              classList={{
-                "i-ri:sort-asc": infiniteQuery.query.sortOrder === "ascending",
-                "i-ri:sort-desc":
-                  infiniteQuery.query.sortOrder === "descending",
-              }}
-              onClick={() => {
-                const isAsc = infiniteQuery.query.sortOrder === "ascending";
-                infiniteQuery.setQuery({
-                  sortOrder: isAsc ? "descending" : "ascending",
-                });
-              }}
-            />
-          </div>
-        </div>
+          </Match>
+        </Switch>
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{
@@ -311,7 +333,8 @@ const ModsBrowser = () => {
                     {(virtualItem) => {
                       const isLoaderRow = () =>
                         virtualItem.index > mods().length - 1;
-                      const mod = () => mods()[virtualItem.index];
+                      const mod = () =>
+                        mods()[virtualItem.index] as FEUnifiedSearchResult;
 
                       const hasNextPage = () =>
                         infiniteQuery.infiniteQuery.hasNextPage;
@@ -334,8 +357,9 @@ const ModsBrowser = () => {
                                 <ModRow
                                   type="Mod"
                                   data={mod()}
+                                  instanceId={instanceId()}
                                   installedMods={instanceMods()}
-                                  mcVersion={instanceDetail()?.version || ""}
+                                  mcVersion={instanceDetails()?.version || ""}
                                   modrinthCategories={
                                     routeData.modrinthCategories.data
                                   }

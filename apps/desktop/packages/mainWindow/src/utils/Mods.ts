@@ -44,6 +44,7 @@ export type ModProps = BaseProps & {
   type: "Mod";
   mcVersion?: string;
   installedMods: Mod[];
+  instanceId: number | undefined;
   modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 

@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
@@ -15,6 +15,7 @@ const Mods = () => {
   const params = useParams();
   const navigate = useGDNavigate();
 
+  const [filter, setFilter] = createSignal("");
   const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
@@ -27,6 +28,14 @@ const Mods = () => {
   const openFolderMutation = rspc.createMutation([
     "instance.openInstanceFolder",
   ]);
+
+  const filteredMods = createMemo(() =>
+    filter()
+      ? routeData.instanceMods.data?.filter((item) =>
+          item.filename.toLowerCase().includes(filter().toLowerCase())
+        )
+      : routeData.instanceMods.data
+  );
 
   const NoMods = () => {
     return (
@@ -61,10 +70,10 @@ const Mods = () => {
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
-            placeholder="Type Here"
+            onInput={(e) => setFilter(e.target.value)}
+            placeholder={t("instance.mods.search")}
             icon={<div class="i-ri:search-line" />}
             class="w-full rounded-full text-darkSlate-50"
-            inputClass=""
           />
           <div class="flex gap-3 items-center">
             <p class="text-darkSlate-50">
@@ -220,7 +229,7 @@ const Mods = () => {
           }
           fallback={<NoMods />}
         >
-          <For each={routeData.instanceMods.data as Modtype[]}>
+          <For each={filteredMods() as Modtype[]}>
             {(props) => (
               <Mod
                 mod={props}

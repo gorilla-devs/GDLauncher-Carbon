@@ -1,6 +1,5 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
-import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
 import {
   CFFEFileIndex,
@@ -10,7 +9,6 @@ import {
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Popover, Spinner, createNotification } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
-import { useLocation } from "@solidjs/router";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
@@ -133,9 +131,7 @@ const ModRow = (props: ModRowProps) => {
   const latestFilesIndexes = () =>
     props.type === "Mod" ? getCurrentMcVersionObj() : [];
 
-  const location = useLocation();
-
-  const instanceId = () => getInstanceIdFromPath(location.pathname);
+  const instanceId = () => (props as ModProps)?.instanceId;
 
   const mappedVersions = () =>
     latestFilesIndexes().map((version) => {
@@ -373,7 +369,7 @@ const ModRow = (props: ModRowProps) => {
                       <Show when={!loading()}>
                         <Button
                           size={isRowSmall() ? "small" : "medium"}
-                          disabled={loading()}
+                          disabled={loading() || !instanceId()}
                           rounded
                           onClick={() => {
                             if (props.type !== "Modpack") return;
@@ -435,7 +431,8 @@ const ModRow = (props: ModRowProps) => {
                             menuPlacement="bottom-end"
                             loading={loading()}
                             disabled={
-                              modrinthVersions()?.isFetching && !loading()
+                              (modrinthVersions()?.isFetching && !loading()) ||
+                              !instanceId()
                             }
                             options={mappedVersions()}
                             rounded
@@ -454,10 +451,7 @@ const ModRow = (props: ModRowProps) => {
                                     fileId,
                                     getProjectId(props)
                                   ),
-                                  instance_id: parseInt(
-                                    instanceId() as string,
-                                    10
-                                  ),
+                                  instance_id: instanceId() as number,
                                 });
                               }
                             }}
@@ -470,10 +464,7 @@ const ModRow = (props: ModRowProps) => {
                                     val.key,
                                     getProjectId(props)
                                   ),
-                                  instance_id: parseInt(
-                                    instanceId() as string,
-                                    10
-                                  ),
+                                  instance_id: instanceId() as number,
                                 });
                               }
                             }}

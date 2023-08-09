@@ -171,6 +171,17 @@ Skeleton.select = () => {
   return <div class="w-31	h-12 rounded-full bg-darkSlate-500" />;
 };
 
+Skeleton.filters = () => {
+  return (
+    <div class="flex gap-2 pb-4">
+      <Skeleton.select />
+      <Skeleton.select />
+      <Skeleton.select />
+      <Skeleton.select />
+    </div>
+  );
+};
+
 Skeleton.explorer = () => {
   return (
     <div class="flex flex-col gap-4">
