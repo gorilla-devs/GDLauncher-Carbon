@@ -11,5 +11,5 @@ export const NAVBAR_ROUTES = [
   },
 ];
 
-export const NEWS_URL =
-  "https://www.minecraft.net/en-us/feeds/community-content/rss";
+export const MOJANG_API = "https://launchercontent.mojang.com";
+export const NEWS_URL = `${MOJANG_API}/news.json`;

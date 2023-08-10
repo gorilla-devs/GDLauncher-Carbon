@@ -1,38 +1,73 @@
-import { XMLParser } from "fast-xml-parser";
 import axios from "axios";
-import { NEWS_URL } from "@/constants";
+import { MOJANG_API, NEWS_URL } from "@/constants";
 
-type NewsItem = {
+export interface NewsItem {
   title: string;
-  link: string;
-  description: string;
-  imageURL: string;
-  primaryTag: string;
-  pubDate: string;
-  guid: string;
-};
+  category: string;
+  date: string;
+  text: string;
+  playPageImage: PlayPageImage;
+  newsPageImage: NewsPageImage;
+  readMoreLink: string;
+  newsType: string[];
+  id: string;
+  tag?: string;
+  cardBorder?: boolean;
+  highlight?: Highlight;
+}
 
-const getHigResImage = (imgUrl: string) => {
-  return imgUrl
-    .replace("277x277", "1170x500")
-    .replace("carousel", "header")
-    .replace("GRID", "HEADER");
-};
+export interface PlayPageImage {
+  title: string;
+  url: string;
+}
+
+export interface NewsPageImage {
+  title: string;
+  url: string;
+  dimensions: Dimensions;
+}
+
+export interface Dimensions {
+  width: number;
+  height: number;
+}
+
+export interface Highlight {
+  image: Image;
+  iconImage: IconImage;
+  platforms: string[];
+  entitlements: any[];
+  title: string;
+  description: string;
+  until: string;
+  playGame?: string;
+  readMoreLink?: string;
+}
+
+export interface Image {
+  url: string;
+  title: string;
+}
+
+export interface IconImage {}
 
 export const initNews = async () => {
   try {
-    const { data: newsXml } = await axios.get(NEWS_URL);
-    const parser = new XMLParser();
-    let parsedNews = parser.parse(newsXml);
+    const { data } = await axios.get(NEWS_URL);
+
+    const filteredNews = data.entries.filter(
+      (entry: NewsItem) => entry.tag === "News"
+    );
 
     const newsArr =
-      parsedNews?.rss?.channel?.item?.map((newsEntry: NewsItem) => ({
+      filteredNews?.map((newsEntry: NewsItem) => ({
         title: newsEntry.title,
-        description: newsEntry.description,
-        image: getHigResImage(`https://minecraft.net${newsEntry.imageURL}`),
-        url: newsEntry.link,
+        description: newsEntry.text,
+        image: `${MOJANG_API}${newsEntry.newsPageImage.url}`,
+        url: newsEntry.readMoreLink,
       })) || [];
-    return newsArr;
+
+    return newsArr.splice(0, 20);
   } catch (err) {
     console.error(err);
   }
