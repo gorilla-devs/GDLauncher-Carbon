@@ -12,20 +12,27 @@ type NewsItem = {
   guid: string;
 };
 
+const getHigResImage = (imgUrl: string) => {
+  return imgUrl
+    .replace("277x277", "1170x500")
+    .replace("carousel", "header")
+    .replace("GRID", "HEADER");
+};
+
 export const initNews = async () => {
   try {
     const { data: newsXml } = await axios.get(NEWS_URL);
-
     const parser = new XMLParser();
     let parsedNews = parser.parse(newsXml);
+
     const newsArr =
       parsedNews?.rss?.channel?.item?.map((newsEntry: NewsItem) => ({
         title: newsEntry.title,
         description: newsEntry.description,
-        image: `https://minecraft.net${newsEntry.imageURL}`,
+        image: getHigResImage(`https://minecraft.net${newsEntry.imageURL}`),
         url: newsEntry.link,
       })) || [];
-    return newsArr.splice(0, 10);
+    return newsArr;
   } catch (err) {
     console.error(err);
   }
