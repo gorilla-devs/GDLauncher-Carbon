@@ -1,12 +1,11 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
-import { For, Match, Switch, createSignal } from "solid-js";
+import { For, Match, Switch } from "solid-js";
 import {
   CFFECategory,
   MRFECategory,
   FESearchAPI,
-  ModpackPlatform,
   FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
@@ -23,19 +22,18 @@ import {
 } from "@/utils/sidebar";
 
 const Sidebar = () => {
-  const [currentPlatform, setCurrentPlatform] =
-    createSignal<ModpackPlatform>("Curseforge");
-
   const infiniteQuery = useInfiniteModsQuery();
 
   const [t] = useTransContext();
 
-  const categories = () =>
-    currentPlatform() === "Curseforge"
-      ? curseforgeCategories()
-      : modrinthCategories();
-
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
+
+  const categories = () =>
+    isCurseforge()
+      ? curseforgeCategories()
+      : modrinthCategories().filter(
+          (category) => category.project_type === "modpack"
+        );
 
   const modloaders = () => supportedModloaders();
 
@@ -46,8 +44,6 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
-                setCurrentPlatform(val as ModpackPlatform);
-
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: [],

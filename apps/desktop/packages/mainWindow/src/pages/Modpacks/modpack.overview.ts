@@ -3,7 +3,6 @@ import { rspc } from "@/utils/rspcClient";
 const fetchData = ({ params }: { params: any }) => {
   const isCurseforge = params.platform === "curseforge";
   const isModrinth = params.platform === "Modrinth";
-  console.log("PLATF", params.platform);
   if (isCurseforge) {
     const modpackDetails = rspc.createQuery(() => [
       "modplatforms.curseforge.getMod",

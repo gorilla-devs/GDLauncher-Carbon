@@ -19,7 +19,7 @@ import {
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
-import { scrollTop } from "@/utils/browser";
+import { instanceId, scrollTop, setInstanceId } from "@/utils/browser";
 import {
   modpacksQuery,
   modsQuery,
@@ -53,9 +53,6 @@ export const useInfiniteModsQuery = () => {
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
-  const [instanceId, setInstanceId] = createSignal<undefined | number>(
-    undefined
-  );
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
