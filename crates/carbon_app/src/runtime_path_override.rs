@@ -1,44 +1,28 @@
-use std::path::PathBuf;
-
-use tokio::io::AsyncReadExt;
+use std::{env, path::PathBuf};
 
 pub(crate) async fn get_runtime_path_override() -> PathBuf {
-    let mut base_path = directories::ProjectDirs::from("com", "gorilladevs", "gdlauncher_carbon")
-        .unwrap()
-        .data_dir()
-        .to_path_buf();
+    let mut path: Option<PathBuf> = None;
+    #[cfg(debug_assertions)]
+    {
+        path = Some(PathBuf::from(env!("RUNTIME_PATH")));
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let mut args = env::args();
 
-    let override_path = base_path.join("runtime_path_override.txt");
-
-    if override_path.exists() {
-        println!("Runtime path override file exists, reading");
-        let mut file = tokio::fs::File::open(&override_path).await.unwrap();
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).await.unwrap();
-        let path = PathBuf::from(contents.trim());
-        println!("Runtime path override is {}", path.display());
-
-        if !path.exists() {
-            println!("Runtime path override does not exist. Creating");
-            tokio::fs::create_dir_all(&path).await.unwrap();
+        for n in 0.. {
+            let arg = args.nth(n);
+            if arg.is_none() {
+                break;
+            }
+            let arg = arg.unwrap();
+            if arg == "--runtime_path" {
+                let path_str = args.nth(n).unwrap();
+                path = Some(PathBuf::from(path_str));
+                break;
+            }
         }
-        base_path = path;
-    } else {
-        // open finder to this directory
-        #[cfg(target_os = "macos")]
-        {
-            let _ = std::process::Command::new("open")
-                .arg(&base_path)
-                .output()
-                .expect("failed to open finder");
-        }
-
-        println!(
-            "Runtime path override file does not exist. Using base {}",
-            base_path.display()
-        );
-        tokio::fs::create_dir_all(&base_path).await.unwrap();
     }
 
-    base_path
+    path.expect("Runtime path not found").join("data")
 }
