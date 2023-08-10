@@ -32,7 +32,7 @@ import {
   getProjectId,
   getSummary,
   isCurseForgeData,
-} from "@/utils/Mods";
+} from "@/utils/mods";
 import Categories from "./Categories";
 import Authors from "./Authors";
 

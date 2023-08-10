@@ -25,7 +25,7 @@ import {
   modsQuery,
   setModpacksQuery,
   setModsQuery,
-} from "@/utils/Mods";
+} from "@/utils/mods";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;

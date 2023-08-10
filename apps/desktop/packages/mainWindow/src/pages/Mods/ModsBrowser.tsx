@@ -40,6 +40,7 @@ import {
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { curseForgeModloaders } from "@/utils/sidebar";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -162,7 +163,7 @@ const ModsBrowser = () => {
   const defaultModloader = () => infiniteQuery.query.modloaders?.[0] as string;
 
   const curseforgeModpackModloaders = () => {
-    const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
+    const filtered = curseForgeModloaders().filter((modloader) =>
       supportedModloaders.includes(modloader)
     );
     return filtered;

@@ -10,7 +10,7 @@ import {
   getSummary,
   getWebsiteUrl,
   isCurseForgeData,
-} from "@/utils/Mods";
+} from "@/utils/mods";
 import { formatDownloadCount } from "@/utils/helpers";
 import { CategoryIcon } from "@/utils/instances";
 import {

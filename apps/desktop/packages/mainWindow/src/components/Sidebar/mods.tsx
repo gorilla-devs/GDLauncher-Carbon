@@ -16,16 +16,12 @@ import {
   CFFECategory,
   MRFECategory,
   FESearchAPI,
-  FEUnifiedSearchCategoryID,
   ModpackPlatform,
   FEUnifiedModLoaderType,
-  CFFEModLoaderType,
-  MRFELoader,
 } from "@gd/core_module/bindings";
-import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
+import { mcVersions, setMappedMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms, supportedModloaders } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
-import { getForgeModloaderIcon } from "@/utils/sidebar";
 import {
   CategoryIcon,
   PlatformIcon,
@@ -35,48 +31,17 @@ import {
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import DefaultImg from "/assets/images/default-instance-img.png";
-
-const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
-  if (typeof category === "string") {
-    return getForgeModloaderIcon(category);
-  } else return category.icon;
-};
-
-const ModloaderIcon = (props: {
-  modloader: CFFEModLoaderType | MRFELoader;
-}) => {
-  return (
-    // <Switch
-    //   fallback={
-    //     <>
-    //       <Show when={getModloaderIcon(props.modloader)}>
-    //         <div
-    //           class="w-4 h-4"
-    //           innerHTML={getModloaderIcon(props.modloader)}
-    //         />
-    //       </Show>
-    //     </>
-    //   }
-    // >
-    //   <Match when={typeof props.modloader === "string"}>
-    //     <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    //   </Match>
-    // </Switch>
-    <Show when={typeof props.modloader === "string"}>
-      <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    </Show>
-  );
-};
+import {
+  ModloaderIcon,
+  curseForgeModloaders,
+  curseforgeCategories,
+  getCategoryId,
+  modrinthCategories,
+} from "@/utils/sidebar";
 
 const Sidebar = () => {
   const [currentPlatform, setCurrentPlatform] =
     createSignal<ModpackPlatform>("Curseforge");
-  const [forgeCategories, setForgeCategories] = createSignal<CFFECategory[]>(
-    []
-  );
-  const [modrinthCategories, setModrinthCategories] = createSignal<
-    MRFECategory[]
-  >([]);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const infiniteQuery = useInfiniteModsQuery();
@@ -84,62 +49,26 @@ const Sidebar = () => {
   const [t] = useTransContext();
 
   createEffect(() => {
-    if (routeData.forgeCategories.data?.data) {
-      const forgeCategories = () =>
-        routeData.forgeCategories.data?.data.filter(
-          (category) => category.classId === 4471
-        ) || [];
-      setForgeCategories(forgeCategories());
-    }
-  });
-
-  createEffect(() => {
-    if (routeData.modrinthCategories.data) {
-      setModrinthCategories(
-        routeData.modrinthCategories.data.filter(
-          (category) => category.project_type === "modpack"
-        )
-      );
-    }
-  });
-
-  createEffect(() => {
-    if (routeData.minecraftVersions.data) {
-      setMcVersions(routeData.minecraftVersions.data);
-
-      setMappedMcVersions([]);
-      routeData.minecraftVersions.data.forEach((version) => {
-        if (version.type === "release") {
-          setMappedMcVersions((prev) => [
-            ...prev,
-            { label: version.id, key: version.id },
-          ]);
-        }
-      });
-      setMappedMcVersions((prev) => [
-        { key: "", label: "All version" },
-        ...prev,
-      ]);
-    }
+    mcVersions().forEach((version) => {
+      if (version.type === "release") {
+        setMappedMcVersions((prev) => [
+          ...prev,
+          { label: version.id, key: version.id },
+        ]);
+      }
+    });
+    setMappedMcVersions((prev) => [{ key: "", label: "All version" }, ...prev]);
   });
 
   const categories = () =>
     currentPlatform() === "Curseforge"
-      ? forgeCategories()
+      ? curseforgeCategories()
       : modrinthCategories();
-
-  const getCategoryId = (searchCategory: FEUnifiedSearchCategoryID) => {
-    if ("curseforge" in searchCategory) {
-      return searchCategory.curseforge;
-    } else if ("modrinth" in searchCategory) {
-      return searchCategory.modrinth;
-    }
-  };
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
   const curseforgeModpackModloaders = () => {
-    const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
+    const filtered = curseForgeModloaders().filter((modloader) =>
       supportedModloaders.includes(modloader)
     );
     return filtered;
@@ -319,7 +248,7 @@ const Sidebar = () => {
               </div>
             </Collapsable>
           </Match>
-          <Match when={forgeCategories().length === 0}>
+          <Match when={curseforgeCategories().length === 0}>
             <Skeleton.modpackSidebarCategories />
           </Match>
         </Switch>

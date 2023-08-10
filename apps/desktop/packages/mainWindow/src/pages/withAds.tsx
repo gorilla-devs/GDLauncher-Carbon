@@ -4,6 +4,11 @@ import { Outlet, useLocation, useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMcVersions } from "@/utils/mcVersion";
+import {
+  setCurseForgeModloaders,
+  setCurseforgeCategories,
+  setModrinthCategories,
+} from "@/utils/sidebar";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -16,6 +21,21 @@ function withAdsLayout() {
   createEffect(() => {
     if (routeData.minecraftVersions.data)
       setMcVersions(routeData.minecraftVersions.data);
+  });
+
+  createEffect(() => {
+    if (routeData.curseForgeModloaders.data)
+      setCurseForgeModloaders(routeData.curseForgeModloaders.data);
+  });
+
+  createEffect(() => {
+    if (routeData.curseforgeCategories.data)
+      setCurseforgeCategories(routeData.curseforgeCategories.data.data);
+  });
+
+  createEffect(() => {
+    if (routeData.modrinthCategories.data)
+      setModrinthCategories(routeData.modrinthCategories.data);
   });
 
   return (
