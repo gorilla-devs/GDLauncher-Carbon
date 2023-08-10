@@ -979,7 +979,7 @@ pub struct CFFECategory {
     pub name: String,
     pub slug: String,
     pub url: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
     pub class_id: Option<i32>,
