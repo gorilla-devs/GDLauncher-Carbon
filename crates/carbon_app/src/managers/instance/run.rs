@@ -10,6 +10,7 @@ use crate::managers::minecraft::modrinth;
 use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;
+use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 
@@ -20,7 +21,7 @@ use tracing::{debug, info};
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::{EntryType, GameLog};
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
 use futures::Future;
@@ -70,7 +71,7 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let InstanceType::Valid(data) = &mut instance.type_ else {
-            return Err(anyhow!("Instance {instance_id} is not in a valid state"))
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
         };
 
         match &data.state {
@@ -797,76 +798,52 @@ impl ManagerRef<'_, InstanceManager> {
                     };
 
                     let read_logs = async {
-                        let mut outbuf = [0u8; 1024];
-                        let mut errbuf = [0u8; 1024];
+                        async fn read_step<'a>(
+                            log: &'a watch::Sender<GameLog>,
+                            entry_type: EntryType,
+                            stream: &'a mut (impl AsyncReadExt + Unpin),
+                        ) -> io::Result<impl Future<Output = io::Result<()>> + 'a>
+                        {
+                            let mut buf = [0u8; 1024];
+                            stream.read(&mut buf[..]).await.map(|count| async move {
+                                if count > 0 {
+                                    let utf8 = String::from_utf8_lossy(&buf[0..count]);
+                                    log.send_if_modified(|log| {
+                                        log.push(entry_type, &*utf8);
+                                        false
+                                    });
+
+                                    loop {
+                                        tokio::select!(biased;
+                                            _ = tokio::time::sleep(Duration::from_millis(1)) => break,
+                                            count = stream.read(&mut buf[..]) => count.map(|count| {
+                                                if count > 0 {
+                                                    let utf8 = String::from_utf8_lossy(&buf[0..count]);
+                                                    log.send_if_modified(|log| {
+                                                        log.push(entry_type, &*utf8);
+                                                        false
+                                                    });
+                                                }
+                                            })?
+                                        );
+                                    }
+                                }
+
+                                Ok(())
+                            })
+                        }
 
                         loop {
-                            tokio::select!(biased;
-                                r = stdout.read(&mut outbuf) => match r {
-                                    Ok(count) if count > 0 => {
-                                        let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
-                                        #[cfg(debug_assertions)]
-                                        {
-                                            tracing::trace!("stdout: {}", utf8);
-                                        }
-                                        log.send_if_modified(|log| {
-                                            log.push(EntryType::StdOut, &*utf8);
-                                            false
-                                        });
+                            let r = async {
+                                tokio::select!(biased;
+                                    cont = read_step(&log, EntryType::StdOut, &mut stdout) => cont?.await,
+                                    cont = read_step(&log, EntryType::StdErr, &mut stderr) => cont?.await,
+                                )
+                            }.await;
 
-                                        loop {
-                                            tokio::select!(biased;
-                                                _ = tokio::time::sleep(Duration::from_millis(1)) => break,
-                                                r = stdout.read(&mut outbuf) => match r {
-                                                    Ok(count) if count > 0 => {
-                                                        let utf8 = String::from_utf8_lossy(&outbuf[0..count]);
-                                                        log.send_if_modified(|log| {
-                                                            log.push(EntryType::StdOut, &*utf8);
-                                                            false
-                                                        });
-                                                    },
-                                                    Ok(_) => return Ok(()),
-                                                    Err(e) => return Err(e),
-                                                },
-                                            );
-                                        }
-                                    },
-                                    Ok(_) => {},
-                                    Err(e) => return Err(e),
-                                },
-                                r = stderr.read(&mut errbuf) => match r {
-                                    Ok(count) if count > 0 => {
-                                        let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
-                                        #[cfg(debug_assertions)]
-                                        {
-                                            tracing::trace!("stderr: {}", utf8);
-                                        }
-                                        log.send_if_modified(|log| {
-                                            log.push(EntryType::StdErr, &*utf8);
-                                            false
-                                        });
-
-                                        loop {
-                                            tokio::select!(biased;
-                                                _ = tokio::time::sleep(Duration::from_millis(1)) => break,
-                                                r = stderr.read(&mut errbuf) => match r {
-                                                    Ok(count) if count > 0 => {
-                                                        let utf8 = String::from_utf8_lossy(&errbuf[0..count]);
-                                                        log.send_if_modified(|log| {
-                                                            log.push(EntryType::StdErr, &*utf8);
-                                                            false
-                                                        });
-                                                    },
-                                                    Ok(_) => return Ok(()),
-                                                    Err(e) => return Err(e),
-                                                },
-                                            );
-                                        }
-                                    },
-                                    Ok(_) => {},
-                                    Err(e) => return Err(e),
-                                },
-                            );
+                            if let Err(e) = r {
+                                tracing::error!({ error = ?e }, "game log reader died");
+                            }
 
                             log.send_if_modified(|_| true);
                         }
