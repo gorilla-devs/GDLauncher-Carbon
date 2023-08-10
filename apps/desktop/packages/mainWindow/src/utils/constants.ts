@@ -29,6 +29,6 @@ export const ModrinthSortFields: MRFESearchIndex[] = [
   "updated",
 ];
 
-export const supportedModloaders = ["forge", "fabric", "quilt"];
+export const supportedCfModloaders = ["forge", "fabric", "quilt"];
 
 export const ModpackPlatforms: ModpackPlatform[] = ["Curseforge", "Modrinth"];

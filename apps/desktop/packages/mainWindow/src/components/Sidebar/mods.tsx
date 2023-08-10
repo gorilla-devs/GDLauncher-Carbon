@@ -8,7 +8,6 @@ import {
   Match,
   Show,
   Switch,
-  createEffect,
   createResource,
   createSignal,
 } from "solid-js";
@@ -19,8 +18,7 @@ import {
   ModpackPlatform,
   FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
-import { mcVersions, setMappedMcVersions } from "@/utils/mcVersion";
-import { ModpackPlatforms, supportedModloaders } from "@/utils/constants";
+import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import {
   CategoryIcon,
@@ -33,10 +31,10 @@ import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import {
   ModloaderIcon,
-  curseForgeModloaders,
   curseforgeCategories,
   getCategoryId,
   modrinthCategories,
+  supportedModloaders,
 } from "@/utils/sidebar";
 
 const Sidebar = () => {
@@ -48,18 +46,6 @@ const Sidebar = () => {
 
   const [t] = useTransContext();
 
-  createEffect(() => {
-    mcVersions().forEach((version) => {
-      if (version.type === "release") {
-        setMappedMcVersions((prev) => [
-          ...prev,
-          { label: version.id, key: version.id },
-        ]);
-      }
-    });
-    setMappedMcVersions((prev) => [{ key: "", label: "All version" }, ...prev]);
-  });
-
   const categories = () =>
     currentPlatform() === "Curseforge"
       ? curseforgeCategories()
@@ -67,14 +53,7 @@ const Sidebar = () => {
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
-  const curseforgeModpackModloaders = () => {
-    const filtered = curseForgeModloaders().filter((modloader) =>
-      supportedModloaders.includes(modloader)
-    );
-    return filtered;
-  };
-
-  const modloaders = () => curseforgeModpackModloaders();
+  const modloaders = () => supportedModloaders();
 
   const [searchParams] = useSearchParams();
 

@@ -3,12 +3,14 @@ import AppNavbar from "@/components/Navbar";
 import { Outlet, useLocation, useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import fetchData from "./app.data";
-import { setMcVersions } from "@/utils/mcVersion";
+import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
   setCurseForgeModloaders,
   setCurseforgeCategories,
   setModrinthCategories,
+  setSupportedModloaders,
 } from "@/utils/sidebar";
+import { supportedCfModloaders } from "@/utils/constants";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -19,13 +21,36 @@ function withAdsLayout() {
   const isDetailPage = () => modpackPathRegex.test(location.pathname);
 
   createEffect(() => {
-    if (routeData.minecraftVersions.data)
+    if (routeData.minecraftVersions.data) {
       setMcVersions(routeData.minecraftVersions.data);
+      routeData.minecraftVersions.data.forEach((version) => {
+        if (version.type === "release") {
+          setMappedMcVersions((prev) => [
+            ...prev,
+            { label: version.id, key: version.id },
+          ]);
+        }
+      });
+      setMappedMcVersions((prev) => [
+        { key: "", label: "All version" },
+        ...prev,
+      ]);
+    }
   });
 
   createEffect(() => {
-    if (routeData.curseForgeModloaders.data)
+    if (routeData.curseForgeModloaders.data) {
       setCurseForgeModloaders(routeData.curseForgeModloaders.data);
+
+      const curseforgeModpackModloaders = () => {
+        const filtered = routeData.curseForgeModloaders.data?.filter(
+          (modloader) => supportedCfModloaders.includes(modloader)
+        );
+        return filtered || [];
+      };
+
+      setSupportedModloaders(curseforgeModpackModloaders());
+    }
   });
 
   createEffect(() => {

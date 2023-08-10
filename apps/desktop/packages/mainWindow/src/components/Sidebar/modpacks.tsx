@@ -1,8 +1,7 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
-
-import { For, Match, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Switch, createSignal } from "solid-js";
 import {
   CFFECategory,
   MRFECategory,
@@ -10,18 +9,17 @@ import {
   ModpackPlatform,
   FEUnifiedModLoaderType,
 } from "@gd/core_module/bindings";
-import { mcVersions, setMappedMcVersions } from "@/utils/mcVersion";
-import { ModpackPlatforms, supportedModloaders } from "@/utils/constants";
+import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { CategoryIcon, PlatformIcon } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import {
   ModloaderIcon,
-  curseForgeModloaders,
   curseforgeCategories,
   getCategoryId,
   modrinthCategories,
+  supportedModloaders,
 } from "@/utils/sidebar";
 
 const Sidebar = () => {
@@ -32,18 +30,6 @@ const Sidebar = () => {
 
   const [t] = useTransContext();
 
-  createEffect(() => {
-    mcVersions().forEach((version) => {
-      if (version.type === "release") {
-        setMappedMcVersions((prev) => [
-          ...prev,
-          { label: version.id, key: version.id },
-        ]);
-      }
-    });
-    setMappedMcVersions((prev) => [{ key: "", label: "All version" }, ...prev]);
-  });
-
   const categories = () =>
     currentPlatform() === "Curseforge"
       ? curseforgeCategories()
@@ -51,14 +37,7 @@ const Sidebar = () => {
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
-  const curseforgeModpackModloaders = () => {
-    const filtered = curseForgeModloaders().filter((modloader) =>
-      supportedModloaders.includes(modloader)
-    );
-    return filtered;
-  };
-
-  const modloaders = () => curseforgeModpackModloaders();
+  const modloaders = () => supportedModloaders();
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>

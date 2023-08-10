@@ -15,6 +15,9 @@ export const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);
 export const [curseForgeModloaders, setCurseForgeModloaders] = createSignal<
   CFFEModLoaderType[]
 >([]);
+export const [supportedModloaders, setSupportedModloaders] = createSignal<
+  CFFEModLoaderType[]
+>([]);
 export const [curseforgeCategories, setCurseforgeCategories] = createSignal<
   CFFECategory[]
 >([]);

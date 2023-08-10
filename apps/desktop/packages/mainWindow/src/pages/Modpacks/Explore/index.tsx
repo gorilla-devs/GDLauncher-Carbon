@@ -121,29 +121,39 @@ const Modpack = () => {
     }
   );
 
-  const modpack = () => {
-    const versions = routeData.modrinthProjectVersions?.data;
-    if (!routeData.modpackDetails.data || !versions) return;
-    const versionId = versions[versions.length - 1];
+  const generateModpackObj = () => {
+    const isCurseforge = routeData.isCurseforge;
 
-    const modrinth =
-      !routeData.isCurseforge && versionId
-        ? {
-            Modrinth: {
-              project_id: routeData.modpackDetails.data?.id,
-              version_id: versionId.id,
-            },
-          }
-        : undefined;
+    if (isCurseforge) {
+      if (!routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+      return {
+        Curseforge: {
+          file_id: routeData.modpackDetails.data.data.mainFileId,
+          project_id: routeData.modpackDetails.data.data.id,
+        },
+      };
+    } else {
+      const versions = routeData.modrinthProjectVersions.data;
 
-    return routeData.isCurseforge
-      ? {
-          Curseforge: {
-            file_id: routeData.modpackDetails.data?.data.mainFileId,
-            project_id: routeData.modpackDetails.data?.data.id,
-          },
-        }
-      : modrinth;
+      if (!versions || !routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+
+      const versionId = versions[versions.length - 1];
+
+      const modrinth = {
+        Modrinth: {
+          project_id: routeData.modpackDetails.data.id,
+          version_id: versionId.id,
+        },
+      };
+
+      return modrinth;
+    }
   };
 
   const instanceName = () =>
@@ -163,9 +173,9 @@ const Modpack = () => {
     if (instanceIcon) loadIconMutation.mutate(instanceIcon);
 
     const name = instanceName();
-    const modpackObj = modpack();
+    const modpackObj = generateModpackObj();
 
-    if (name && modpackObj)
+    if (name && modpackObj) {
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,
@@ -175,6 +185,7 @@ const Modpack = () => {
           Modpack: modpackObj,
         },
       });
+    }
   };
 
   createEffect(() => {
