@@ -10,7 +10,7 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
     {
         let mut args = env::args();
         while let Some(arg) = args.next() {
-            if arg == "--runtime-path" {
+            if arg == "--runtime_path" {
                 if let Some(_path) = args.next() {
                     path = Some(PathBuf::from(_path));
                     break;
