@@ -23,7 +23,7 @@ import {
   MRFELoader,
 } from "@gd/core_module/bindings";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
-import { ModpackPlatforms } from "@/utils/constants";
+import { ModpackPlatforms, supportedModloaders } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
 import {
@@ -138,11 +138,9 @@ const Sidebar = () => {
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
-  const cfModpackModloaders = ["forge", "fabric", "quilt"];
-
   const curseforgeModpackModloaders = () => {
     const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
-      cfModpackModloaders.includes(modloader)
+      supportedModloaders.includes(modloader)
     );
     return filtered;
   };
@@ -168,6 +166,7 @@ const Sidebar = () => {
               <Radio.group
                 onChange={(val) => {
                   infiniteQuery.setInstanceId(val as number);
+                  infiniteQuery.resetList();
                 }}
                 value={instanceId()}
               >
@@ -209,6 +208,7 @@ const Sidebar = () => {
                   categories: [],
                   modloaders: null,
                 });
+                infiniteQuery.resetList();
               }}
               value={capitalize(infiniteQuery?.query?.searchApi)}
             >

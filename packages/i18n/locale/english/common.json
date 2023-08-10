@@ -138,6 +138,8 @@
   "modpack.last_updated_time": "{{time}} ago",
   "modpack.authors": "Authors:",
   "modpack.modloader": "Modloader:",
+  "modpack.version_downloading": "Downloading...",
+  "modpack.version_download": "Download version",
   "instance.sort_by_popularity": "Popular",
   "instance.sort_by_lastUpdated": "Last update",
   "instance.sort_by_gameVersion": "Game version",

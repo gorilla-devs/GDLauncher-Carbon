@@ -25,17 +25,10 @@ import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
-
-const getUrlType = (url: string) => {
-  return url.match(/^\/(modpacks|mods)\/\d+\/curseforge$/)
-    ? url.match(/mods/)
-      ? "mods"
-      : "modpacks"
-    : null;
-};
+import { getUrlType } from "@/utils/instances";
 
 const getTabIndexFromPath = (path: string) => {
-  if (path.match(/\/modpacks\/.+\/.+/g)) {
+  if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
     if (path.endsWith("/changelog")) {
       return 1;
     } else if (path.endsWith("/screenshots")) {
@@ -66,29 +59,26 @@ const Modpack = () => {
 
   const instanceId = () => parseInt(searchParams.instanceId, 10);
 
-  const isModpack = getUrlType(location.pathname) === "modpacks";
+  const isModpack = () => getUrlType(location.pathname) === "modpacks";
 
-  createEffect(() => {
-    console.log("location", location.pathname);
-  });
-  const detailsType = isModpack ? "modpacks" : "mods";
+  const detailsType = () => (isModpack() ? "modpacks" : "mods");
 
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/${detailsType}/${params.id}/${params.platform}`,
+      path: `/${detailsType()}/${params.id}/${params.platform}`,
     },
     {
       label: "Changelog",
-      path: `/${detailsType}/${params.id}/${params.platform}/changelog`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/changelog`,
     },
     {
       label: "Screenshots",
-      path: `/${detailsType}/${params.id}/${params.platform}/screenshots`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/${detailsType}/${params.id}/${params.platform}/versions`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/versions`,
     },
   ];
 
@@ -239,7 +229,7 @@ const Modpack = () => {
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() => navigate(`/${detailsType}`)}
+                onClick={() => navigate(`/${detailsType()}`)}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
                 type="secondary"
@@ -392,7 +382,7 @@ const Modpack = () => {
                 <span class="mr-4">
                   <Show when={isSticky()}>
                     <Button
-                      onClick={() => navigate(`/${detailsType}`)}
+                      onClick={() => navigate(`/${detailsType()}`)}
                       size="small"
                       type="secondary"
                     >
@@ -410,7 +400,10 @@ const Modpack = () => {
                   <TabList>
                     <For each={instancePages()}>
                       {(page) => (
-                        <Link href={page.path} class="no-underline">
+                        <Link
+                          href={`${page.path}${location.search}`}
+                          class="no-underline"
+                        >
                           <Tab class="bg-transparent">{page.label}</Tab>
                         </Link>
                       )}

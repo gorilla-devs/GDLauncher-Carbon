@@ -213,6 +213,14 @@ export const fetchImage = async (id: number) => {
   } else return "";
 };
 
+export const getUrlType = (url: string) => {
+  return url.match(/^\/(modpacks|mods)\/\d+\/(curseforge|modrinth)$/)
+    ? url.match(/mods/)
+      ? "mods"
+      : "modpacks"
+    : null;
+};
+
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
   error?: InvalidListInstance;
 }

@@ -25,6 +25,7 @@ import {
   CurseForgeSortFields,
   ModpackPlatforms,
   ModrinthSortFields,
+  supportedModloaders,
 } from "@/utils/constants";
 import ModRow from "@/components/ModRow";
 import fetchData from "./modsBrowser.data";
@@ -160,6 +161,13 @@ const ModsBrowser = () => {
 
   const defaultModloader = () => infiniteQuery.query.modloaders?.[0] as string;
 
+  const curseforgeModpackModloaders = () => {
+    const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
+      supportedModloaders.includes(modloader)
+    );
+    return filtered;
+  };
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -167,21 +175,10 @@ const ModsBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match
-            when={
-              mods().length === 0 &&
-              infiniteQuery?.infiniteQuery?.isLoading &&
-              infiniteQuery?.infiniteQuery?.isInitialLoading
-            }
-          >
+          <Match when={infiniteQuery?.isLoading}>
             <Skeleton.filters />
           </Match>
-          <Match
-            when={
-              mods().length > 0 &&
-              !infiniteQuery?.infiniteQuery.isInitialLoading
-            }
-          >
+          <Match when={!infiniteQuery?.isLoading}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
               <Show when={instanceDetails()}>
                 <div
@@ -210,7 +207,7 @@ const ModsBrowser = () => {
                     onClick={() => {
                       infiniteQuery.setInstanceId(undefined);
                       setinstanceDetails(undefined);
-                      setInstanceMods(undefined);
+                      setInstanceMods([]);
                     }}
                   />
                 </div>
@@ -243,7 +240,6 @@ const ModsBrowser = () => {
                             modrinth: val.key as MRFESearchIndex,
                           };
 
-                      console.log("PPP", sortIndex);
                       infiniteQuery.setQuery({
                         sortIndex,
                       });
@@ -264,7 +260,7 @@ const ModsBrowser = () => {
                     rounded
                   />
                   <Dropdown
-                    options={(routeData.curseForgeModloaders.data || []).map(
+                    options={(curseforgeModpackModloaders() || []).map(
                       (modloader) => ({
                         label: t(`modloader_${modloader}`),
                         key: modloader,

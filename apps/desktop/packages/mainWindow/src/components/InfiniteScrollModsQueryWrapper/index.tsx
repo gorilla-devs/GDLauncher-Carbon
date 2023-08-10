@@ -30,6 +30,7 @@ import {
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
   query: FEUnifiedSearchParameters;
+  isLoading: boolean;
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
@@ -55,13 +56,18 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const [instanceId, setInstanceId] = createSignal<undefined | number>(
     undefined
   );
+  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
+    undefined
+  );
+  const [isLoading, setIsLoading] = createSignal(false);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
-  const query = () =>
-    mergedProps.type === "modPack" ? modpacksQuery : modsQuery;
+  const isModpack = () => mergedProps.type === "modPack";
+
+  const query = () => (isModpack() ? modpacksQuery : modsQuery);
   const getQueryFunction = () =>
-    mergedProps.type === "modPack" ? setModpacksQuery : setModsQuery;
+    isModpack() ? setModpacksQuery : setModsQuery;
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],
@@ -84,10 +90,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
-
-  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
-    undefined
-  );
 
   const rowVirtualizer = createVirtualizer({
     get count() {
@@ -114,21 +116,29 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   };
 
   const resetList = () => {
+    setIsLoading(true);
     infiniteQuery.remove();
     infiniteQuery.refetch();
     rowVirtualizer.scrollToIndex(0);
   };
 
   createEffect(() => {
-    const pageChanged = mergedProps.type === query().projectType;
+    if (!infiniteQuery.isLoading) setIsLoading(false);
+  });
 
-    if (pageChanged) resetList();
+  createEffect(() => {
+    if (query()) {
+      resetList();
+    }
   });
 
   const context = {
     infiniteQuery,
     get query() {
       return query();
+    },
+    get isLoading() {
+      return isLoading();
     },
     setQuery: setQueryWrapper,
     rowVirtualizer,

@@ -93,92 +93,99 @@ const ModpackBrowser = () => {
         ref={(el) => (containrRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
-        <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
-          <Input
-            placeholder="Type Here"
-            icon={<div class="i-ri:search-line" />}
-            class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
-            onInput={(e) => {
-              const target = e.target as HTMLInputElement;
-              infiniteQuery?.setQuery({ searchQuery: target.value });
-            }}
-          />
-          <div class="flex items-center gap-3">
-            <p class="text-darkSlate-50">
-              <Trans
-                key="instance.sort_by"
-                options={{
-                  defaultValue: "Sort by:",
+        <Switch>
+          <Match when={infiniteQuery?.isLoading}>
+            <Skeleton.filters />
+          </Match>
+          <Match when={!infiniteQuery?.isLoading}>
+            <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
+              <Input
+                placeholder="Type Here"
+                icon={<div class="i-ri:search-line" />}
+                class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
+                onInput={(e) => {
+                  const target = e.target as HTMLInputElement;
+                  infiniteQuery?.setQuery({ searchQuery: target.value });
                 }}
               />
-            </p>
-            <Dropdown
-              options={sortingFields().map((field) => ({
-                label: t(`instance.sort_by_${field}`),
-                key: field,
-              }))}
-              onChange={(val) => {
-                const sortIndex = isCurseforge()
-                  ? {
-                      curseForge: val.key as CFFEModSearchSortField,
-                    }
-                  : {
-                      modrinth: val.key as MRFESearchIndex,
-                    };
+              <div class="flex items-center gap-3">
+                <p class="text-darkSlate-50">
+                  <Trans
+                    key="instance.sort_by"
+                    options={{
+                      defaultValue: "Sort by:",
+                    }}
+                  />
+                </p>
+                <Dropdown
+                  options={sortingFields().map((field) => ({
+                    label: t(`instance.sort_by_${field}`),
+                    key: field,
+                  }))}
+                  onChange={(val) => {
+                    const sortIndex = isCurseforge()
+                      ? {
+                          curseForge: val.key as CFFEModSearchSortField,
+                        }
+                      : {
+                          modrinth: val.key as MRFESearchIndex,
+                        };
 
-                infiniteQuery?.setQuery({
-                  sortIndex: sortIndex,
-                });
-              }}
-              value={0}
-              rounded
-            />
-            <Show when={mappedMcVersions().length > 0}>
-              <Dropdown
-                options={mappedMcVersions()}
-                icon={<div class="i-ri:price-tag-3-fill" />}
-                rounded
-                value={mappedMcVersions()[0].key}
-                onChange={(val) => {
+                    infiniteQuery?.setQuery({
+                      sortIndex: sortIndex,
+                    });
+                  }}
+                  value={0}
+                  rounded
+                />
+                <Show when={mappedMcVersions().length > 0}>
+                  <Dropdown
+                    options={mappedMcVersions()}
+                    icon={<div class="i-ri:price-tag-3-fill" />}
+                    rounded
+                    value={mappedMcVersions()[0].key}
+                    onChange={(val) => {
+                      infiniteQuery?.setQuery({
+                        gameVersions: [val.key as string],
+                      });
+                    }}
+                  />
+                </Show>
+                <Show when={mappedMcVersions().length === 0}>
+                  <Skeleton.select />
+                </Show>
+              </div>
+              <Button
+                type="outline"
+                onClick={() => {
+                  modalsContext?.openModal({
+                    name: "instanceCreation",
+                  });
+                }}
+              >
+                <Trans
+                  key="sidebar.plus_add_instance"
+                  options={{
+                    defaultValue: "+ Add Instance",
+                  }}
+                />
+              </Button>
+              <div
+                class="cursor-pointer text-2xl"
+                classList={{
+                  "i-ri:sort-asc":
+                    infiniteQuery?.query.sortOrder === "ascending",
+                  "i-ri:sort-desc":
+                    infiniteQuery?.query.sortOrder === "descending",
+                }}
+                onClick={() => {
+                  const isAsc = infiniteQuery?.query.sortOrder === "ascending";
                   infiniteQuery?.setQuery({
-                    gameVersions: [val.key as string],
+                    sortOrder: isAsc ? "descending" : "ascending",
                   });
                 }}
               />
-            </Show>
-            <Show when={mappedMcVersions().length === 0}>
-              <Skeleton.select />
-            </Show>
-          </div>
-          <Button
-            type="outline"
-            onClick={() => {
-              modalsContext?.openModal({
-                name: "instanceCreation",
-              });
-            }}
-          >
-            <Trans
-              key="sidebar.plus_add_instance"
-              options={{
-                defaultValue: "+ Add Instance",
-              }}
-            />
-          </Button>
-          <div
-            class="cursor-pointer text-2xl"
-            classList={{
-              "i-ri:sort-asc": infiniteQuery?.query.sortOrder === "ascending",
-              "i-ri:sort-desc": infiniteQuery?.query.sortOrder === "descending",
-            }}
-            onClick={() => {
-              const isAsc = infiniteQuery?.query.sortOrder === "ascending";
-              infiniteQuery?.setQuery({
-                sortOrder: isAsc ? "descending" : "ascending",
-              });
-            }}
-          />
-          {/* <Button
+              {/* <Button
             type="outline"
             size="medium"
             icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
@@ -190,8 +197,9 @@ const ModpackBrowser = () => {
               }}
             />
           </Button> */}
-        </div>
-
+            </div>
+          </Match>
+        </Switch>
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{

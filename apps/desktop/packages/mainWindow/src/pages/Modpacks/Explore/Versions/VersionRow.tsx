@@ -15,6 +15,7 @@ type Props = {
   modVersion: MRFEVersion | CFFEFile;
   project: CFFEMod | MRFEProject | undefined;
   isCurseforge?: boolean;
+  disabled?: boolean;
 };
 
 const VersionRow = (props: Props) => {
@@ -115,8 +116,14 @@ const VersionRow = (props: Props) => {
         </div>
       </div>
       <span
-        class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
+        class="flex gap-2 select-none"
+        classList={{
+          "cursor-pointer text-lightGray-800 group-hover:text-lightSlate-50":
+            !props.disabled,
+          "cursor-not-allowed text-lightGray-800": props.disabled,
+        }}
         onClick={() => {
+          if (props.disabled) return;
           const icon = props.isCurseforge
             ? (props.project as CFFEMod).logo?.url
             : (props.project as MRFEProject).icon_url;
@@ -154,21 +161,11 @@ const VersionRow = (props: Props) => {
       >
         <Switch fallback={<div>Loading...</div>}>
           <Match when={loading()}>
-            <Trans
-              key="modpack.version_downloading"
-              options={{
-                defaultValue: "Downloading...",
-              }}
-            />
+            <Trans key="modpack.version_downloading" />
             <Spinner class="w-5 h-5" />
           </Match>
           <Match when={!loading()}>
-            <Trans
-              key="modpack.version_download"
-              options={{
-                defaultValue: "Download version",
-              }}
-            />
+            <Trans key="modpack.version_download" />
             <div class="i-ri:download-2-line" />
           </Match>
         </Switch>
