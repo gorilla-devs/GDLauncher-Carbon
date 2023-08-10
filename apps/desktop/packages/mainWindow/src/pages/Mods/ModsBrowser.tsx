@@ -25,7 +25,6 @@ import {
   CurseForgeSortFields,
   ModpackPlatforms,
   ModrinthSortFields,
-  supportedModloaders,
 } from "@/utils/constants";
 import ModRow from "@/components/ModRow";
 import fetchData from "./modsBrowser.data";
@@ -40,7 +39,7 @@ import {
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { curseForgeModloaders } from "@/utils/sidebar";
+import { supportedModloaders } from "@/utils/sidebar";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -162,13 +161,6 @@ const ModsBrowser = () => {
 
   const defaultModloader = () => infiniteQuery.query.modloaders?.[0] as string;
 
-  const curseforgeModpackModloaders = () => {
-    const filtered = curseForgeModloaders().filter((modloader) =>
-      supportedModloaders.includes(modloader)
-    );
-    return filtered;
-  };
-
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -261,12 +253,10 @@ const ModsBrowser = () => {
                     rounded
                   />
                   <Dropdown
-                    options={(curseforgeModpackModloaders() || []).map(
-                      (modloader) => ({
-                        label: t(`modloader_${modloader}`),
-                        key: modloader,
-                      })
-                    )}
+                    options={supportedModloaders().map((modloader) => ({
+                      label: t(`modloader_${modloader}`),
+                      key: modloader,
+                    }))}
                     onChange={(val) => {
                       const prevModloaders =
                         infiniteQuery.query.modloaders || [];
