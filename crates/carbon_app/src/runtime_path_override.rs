@@ -1,7 +1,8 @@
 use std::{env, path::PathBuf};
 
 pub(crate) async fn get_runtime_path_override() -> PathBuf {
-    let path: Option<PathBuf>;
+    #[allow(unused_assignments)]
+    let mut path: Option<PathBuf> = None;
     #[cfg(debug_assertions)]
     {
         path = Some(PathBuf::from(env!("RUNTIME_PATH")));
