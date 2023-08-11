@@ -31,6 +31,8 @@ window.updateNotAvailable((_) => {
 type IntervalType = ReturnType<typeof setInterval>;
 
 export const checkForUpdates = async () => {
+  if (import.meta.env.DEV) return;
+
   let interval: null | IntervalType = null;
 
   let settings = rspc.createQuery(() => ["settings.getSettings"]);
