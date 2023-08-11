@@ -9,6 +9,9 @@ export const [selectedInstancesIndexes, setSelectedInstancesIndexes] =
   createStore<{
     [id: number]: boolean;
   }>({});
+export const [selectedInstanceNames, setSelectedInstanceNames] = createStore<{
+  [id: number]: string;
+}>({});
 export const [loadingInstances, setLoadingInstances] = createStore<{
   [id: number]: FETask | null | undefined;
 }>({});

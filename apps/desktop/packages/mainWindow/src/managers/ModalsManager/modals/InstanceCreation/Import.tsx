@@ -88,6 +88,7 @@ const Import = (props: Props) => {
         importInstanceMutation.mutate({
           entity: selectedEntity(),
           index: nextInstanceIndex,
+          name: "", // TODO: edit name
         });
       }
     }
@@ -105,7 +106,11 @@ const Import = (props: Props) => {
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
 
-  const currentlySupportedEnties = ["legacygdlauncher"];
+  const currentlySupportedEntities = [
+    "legacygdlauncher",
+    "mrpack",
+    "curseforgezip",
+  ];
 
   createEffect(() => {
     scanImportableInstancesMutation.mutate(selectedEntity());
@@ -134,36 +139,69 @@ const Import = (props: Props) => {
     }
   });
 
+  const isMRPack = (entity: FEEntity): entity is { mrpack: string } => {
+    if (typeof entity === "string") {
+      return false;
+    } else {
+      return "mrpack" in entity;
+    }
+  };
+
+  const isCurseforgeZip = (
+    entity: FEEntity
+  ): entity is { curseforgezip: string } => {
+    if (typeof entity === "string") {
+      return false;
+    } else {
+      return "curseforgezip" in entity;
+    }
+  };
+
+  const nameFromEntity = (entity: FEEntity): string => {
+    if (isCurseforgeZip(entity)) {
+      return "curseforgezip";
+    } else if (isMRPack(entity)) {
+      return "mrpack";
+    } else {
+      return entity;
+    }
+  };
+
   return (
     <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
       <div class="flex flex-col gap-4 w-full">
         <div class="overflow-x-auto w-fill">
           <div class="flex gap-4 py-2">
             <For each={entities.data}>
-              {(entity) => (
-                <div
-                  class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
-                  classList={{
-                    "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
-                      !currentlySupportedEnties.includes(entity) ||
-                      selectedEntity() !== entity,
-                    "border-2 border-solid border-primary-500":
-                      currentlySupportedEnties.includes(entity) ||
-                      selectedEntity() === entity,
-                  }}
-                  onClick={() => {
-                    if (currentlySupportedEnties.includes(entity))
-                      setSelectedEntity(entity);
-                  }}
-                >
-                  <Show when={entity !== "legacygdlauncher"}>
-                    <span class="absolute rounded-full text-white text-xs -top-2 -right-4 bg-green-500 px-1">
-                      <Trans key="instances.import_entity_coming_soon" />
-                    </span>
-                  </Show>
-                  {t(`entity.${entity}`)}
-                </div>
-              )}
+              {(entity) => {
+                const entityName = nameFromEntity(entity);
+                return (
+                  <div
+                    class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
+                    classList={{
+                      "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
+                        !currentlySupportedEntities.includes(entityName) ||
+                        selectedEntity() !== entity,
+                      "border-2 border-solid border-primary-500":
+                        currentlySupportedEntities.includes(entityName) ||
+                        selectedEntity() === entity,
+                    }}
+                    onClick={() => {
+                      if (currentlySupportedEntities.includes(entityName))
+                        setSelectedEntity(entity);
+                    }}
+                  >
+                    <Show
+                      when={!currentlySupportedEntities.includes(entityName)}
+                    >
+                      <span class="absolute rounded-full text-white text-xs -top-2 -right-4 bg-green-500 px-1">
+                        <Trans key="instances.import_entity_coming_soon" />
+                      </span>
+                    </Show>
+                    {t(`entity.${entityName}`)}
+                  </div>
+                );
+              }}
             </For>
           </div>
         </div>
@@ -296,6 +334,7 @@ const Import = (props: Props) => {
           importInstanceMutation.mutate({
             entity: selectedEntity(),
             index: parsedIndex,
+            name: "", // TODO
           });
         }}
       >

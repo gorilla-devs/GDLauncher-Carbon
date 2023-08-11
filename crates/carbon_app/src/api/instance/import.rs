@@ -16,8 +16,8 @@ use crate::{
 pub enum FEEntity {
     LegacyGDLauncher,
     MRPack(String),
-    Modrinth,
     CurseForgeZip(String),
+    Modrinth,
     CurseForge,
     ATLauncher,
     Technic,

@@ -13,8 +13,8 @@ pub mod legacy_gdlauncher;
 pub enum Entity {
     LegacyGDLauncher,
     MRPack(String),
-    Modrinth,
     CurseForgeZip(String),
+    Modrinth,
     CurseForge,
     ATLauncher,
     Technic,
