@@ -2,7 +2,7 @@ import path from "path";
 import os from "os";
 import { spawn } from "child_process";
 import type { ChildProcessWithoutNullStreams } from "child_process";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 
 const isDev = import.meta.env.MODE === "development";
 
@@ -34,14 +34,18 @@ const loadCoreModule: CoreModule = () =>
     let coreModule: ChildProcessWithoutNullStreams | null = null;
 
     try {
-      coreModule = spawn(coreModulePath, [], {
-        shell: false,
-        detached: false,
-        stdio: "pipe",
-        env: {
-          RUST_BACKTRACE: "full",
-        },
-      });
+      coreModule = spawn(
+        coreModulePath,
+        ["--runtime_path", app.getPath("userData")],
+        {
+          shell: false,
+          detached: false,
+          stdio: "pipe",
+          env: {
+            RUST_BACKTRACE: "full",
+          },
+        }
+      );
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
       return reject(err);

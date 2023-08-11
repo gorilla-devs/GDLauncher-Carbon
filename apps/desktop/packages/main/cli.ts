@@ -1,5 +1,7 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
+import fs from "fs";
+import path from "path";
 import handleUncaughtException from "./handleUncaughtException";
 
 const args = process.argv.slice(1);
@@ -30,11 +32,31 @@ function validateArgument(arg: string): Argument | null {
   return null;
 }
 
-const overrideDataPath = validateArgument("--gdl_override_data_path");
-if (overrideDataPath?.value) {
-  app.setPath("userData", overrideDataPath?.value);
-}
+if (app.isPackaged) {
+  const overrideDataPath = validateArgument("--runtime_path");
+  if (overrideDataPath?.value) {
+    app.setPath("userData", overrideDataPath?.value);
+  } else {
+    const userData = path.join(app.getPath("appData"), "gdlauncher_carbon");
+    const runtimeOverridePath = path.join(userData, "runtime_path_override");
 
+    const runtimePathExists = fs.existsSync(runtimeOverridePath);
+
+    if (runtimePathExists) {
+      const override = fs.readFileSync(runtimeOverridePath);
+      app.setPath("userData", override.toString());
+    } else {
+      app.setPath("userData", userData);
+    }
+  }
+} else {
+  const userData = import.meta.env.RUNTIME_PATH;
+  if (!userData) {
+    throw new Error("Missing runtime path");
+  }
+
+  app.setPath("userData", userData);
+}
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );

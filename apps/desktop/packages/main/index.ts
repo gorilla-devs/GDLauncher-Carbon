@@ -15,12 +15,13 @@ import {
 import { release } from "os";
 import { join, resolve } from "path";
 import os from "os";
-import "./cli";
-import coreModule from "./CoreModuleLoaded";
+import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
+import coreModule from "./coreModule";
 import "./preloadListeners";
 import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
+import "./appMenu";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
