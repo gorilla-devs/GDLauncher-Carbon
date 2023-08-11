@@ -8,7 +8,7 @@ export default function initAutoUpdater(win: BrowserWindow) {
   ipcMain.handle(
     "checkForUpdates",
     async (_, selectedChannel: FEReleaseChannel) => {
-      if (__APP_VERSION__.includes("snapshot")) {
+      if (import.meta.env.DEV || __APP_VERSION__.includes("snapshot")) {
         return null;
       }
 
