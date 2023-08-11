@@ -104,8 +104,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .iter()
                 .find(|instance| instance.shortpath == shortpath);
 
-            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else { continue };
-            let InstanceType::Valid(data) = &instance.type_ else { continue };
+            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else {
+                continue;
+            };
+            let InstanceType::Valid(data) = &instance.type_ else {
+                continue;
+            };
 
             let instance_id = match cached {
                 Some(cached) => InstanceId(cached.id),
@@ -830,7 +834,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_temp()
-            .maketmp()
+            .maketmpdir()
             .await?;
 
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
@@ -1017,7 +1021,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         let json = schema::make_instance_config(info.clone())?;
-        tokio::fs::write(path.join("instance.json"), json).await?;
+
+        self.app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .write_file_atomic(path.join("instance.json"), json)
+            .await?;
 
         let name_matches = Some(&data.config.name) == update.name.as_ref();
         data.config = info;
@@ -1063,6 +1073,45 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Ok(()) as anyhow::Result<()>
             });
         }
+
+        Ok(())
+    }
+
+    pub async fn update_playtime(
+        self,
+        instance_id: InstanceId,
+        added_seconds: u64,
+    ) -> anyhow::Result<()> {
+        let mut instances = self.instances.write().await;
+        let instance = instances
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let shortpath = &mut instance.shortpath;
+        let data = instance.type_.data_mut()?;
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path()
+            .join(shortpath as &str);
+
+        data.config.last_played = Utc::now();
+        data.config.seconds_played += added_seconds;
+
+        let json = schema::make_instance_config(data.config.clone())?;
+
+        self.app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .write_file_atomic(path.join("instance.json"), json)
+            .await?;
+
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         Ok(())
     }
@@ -1137,7 +1186,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_temp()
-            .maketmp()
+            .maketmpdir()
             .await?;
 
         let path2 = path.clone();
