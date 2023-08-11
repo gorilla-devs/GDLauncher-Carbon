@@ -39,7 +39,7 @@ const Sidebar = () => {
 
   const categories = () =>
     isCurseforge()
-      ? curseforgeCategories()
+      ? curseforgeCategories().filter((category) => category.classId === 6)
       : modrinthCategories().filter(
           (category) => category.project_type === "mod"
         );

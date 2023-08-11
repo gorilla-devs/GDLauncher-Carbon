@@ -240,17 +240,14 @@ const Modpack = () => {
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() => navigate(`/${detailsType()}`)}
+                onClick={() =>
+                  navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                }
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
                 type="secondary"
               >
-                <Trans
-                  key="instance.step_back"
-                  options={{
-                    defaultValue: "Back",
-                  }}
-                />
+                <Trans key="instance.step_back" />
               </Button>
             </div>
             <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
@@ -396,17 +393,14 @@ const Modpack = () => {
                 <span class="mr-4">
                   <Show when={isSticky()}>
                     <Button
-                      onClick={() => navigate(`/${detailsType()}`)}
+                      onClick={() =>
+                        navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                      }
                       size="small"
                       type="secondary"
                     >
                       <div class="text-2xl i-ri:arrow-drop-left-line" />
-                      <Trans
-                        key="instance.step_back"
-                        options={{
-                          defaultValue: "Back",
-                        }}
-                      />
+                      <Trans key="instance.step_back" />
                     </Button>
                   </Show>
                 </span>

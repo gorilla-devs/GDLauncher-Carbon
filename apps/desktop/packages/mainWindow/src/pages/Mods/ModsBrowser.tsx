@@ -14,23 +14,17 @@ import {
 import {
   CFFEModSearchSortField,
   FESearchAPI,
-  FEUnifiedModLoaderType,
   FEUnifiedSearchResult,
   InstanceDetails,
   MRFESearchIndex,
   Mod,
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import {
-  CurseForgeSortFields,
-  ModpackPlatforms,
-  ModrinthSortFields,
-} from "@/utils/constants";
+import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import ModRow from "@/components/ModRow";
 import fetchData from "./modsBrowser.data";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
-import { PlatformIcon, fetchImage } from "@/utils/instances";
-import { capitalize } from "@/utils/helpers";
+import { fetchImage } from "@/utils/instances";
 import { FetchingModpacks, NoModpacksAvailable } from "./ModsStatus";
 import {
   ErrorFetchingModpacks,
@@ -39,7 +33,6 @@ import {
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { supportedModloaders } from "@/utils/sidebar";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -159,8 +152,6 @@ const ModsBrowser = () => {
     }
   });
 
-  const defaultModloader = () => infiniteQuery.query.modloaders?.[0] as string;
-
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -250,51 +241,6 @@ const ModsBrowser = () => {
                             }
                           ).modrinth
                     }
-                    rounded
-                  />
-                  <Dropdown
-                    options={supportedModloaders().map((modloader) => ({
-                      label: t(`modloader_${modloader}`),
-                      key: modloader,
-                    }))}
-                    onChange={(val) => {
-                      const prevModloaders =
-                        infiniteQuery.query.modloaders || [];
-                      const mappedValue =
-                        val.key === "any"
-                          ? null
-                          : [
-                              ...prevModloaders,
-                              val.key as FEUnifiedModLoaderType,
-                            ];
-
-                      infiniteQuery.setQuery({
-                        modloaders: mappedValue,
-                      });
-                    }}
-                    value={defaultModloader()}
-                    rounded
-                  />
-                  <Dropdown
-                    options={ModpackPlatforms.map((platform) => ({
-                      label: (
-                        <div class="flex items-center gap-2">
-                          <PlatformIcon platform={platform} />
-                          <p class="m-0">{platform}</p>
-                        </div>
-                      ),
-                      key: platform,
-                    }))}
-                    value={capitalize(infiniteQuery.query.searchApi)}
-                    onChange={(val) => {
-                      infiniteQuery.setQuery({
-                        searchApi: (
-                          val.key as string
-                        ).toLowerCase() as FESearchAPI,
-                        categories: [],
-                        modloaders: null,
-                      });
-                    }}
                     rounded
                   />
                 </div>
