@@ -13,7 +13,8 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info};
 
@@ -24,7 +25,7 @@ use crate::managers::instance::log::EntryType;
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
 use futures::Future;
-use tokio::sync::{watch, Semaphore};
+use tokio::sync::{watch, Mutex, Semaphore};
 use tokio::task::JoinHandle;
 
 use anyhow::{anyhow, bail};
@@ -779,6 +780,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
+                    let start_time = Utc::now();
+
                     let (log_id, log) = app.instance_manager().create_log(instance_id).await;
                     let _ = app.instance_manager()
                         .change_launch_state(
@@ -786,13 +789,15 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Running(RunningInstance {
                                 process_id: child.id().expect("child process id is not present even though child process was started"),
                                 kill_tx,
-                                start_time: Utc::now(),
+                                start_time,
                                 log: log_id,
                             }),
                         )
                         .await;
 
-                    let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
+                    let (Some(mut stdout), Some(mut stderr)) =
+                        (child.stdout.take(), child.stderr.take())
+                    else {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };
 
@@ -872,11 +877,40 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     };
 
+                    let mut last_stored_time = start_time;
+                    let update_playtime = async {
+                        loop {
+                            tokio::time::sleep(Duration::from_secs(60)).await;
+                            let now = Utc::now();
+                            let diff = now - last_stored_time;
+                            last_stored_time = now;
+                            let r = app
+                                .instance_manager()
+                                .update_playtime(instance_id, diff.num_seconds() as u64)
+                                .await;
+                            if let Err(e) = r {
+                                tracing::error!({ error = ?e }, "error updating instance playtime");
+                            }
+                        }
+                    };
+
                     tokio::select! {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
-                        // canceled by one of the others being selected
+                        // infallible, canceled by the above tasks
                         _ = read_logs => {},
+                        _ = update_playtime => {}
+                    }
+
+                    let r = app
+                        .instance_manager()
+                        .update_playtime(
+                            instance_id,
+                            (Utc::now() - last_stored_time).num_seconds() as u64,
+                        )
+                        .await;
+                    if let Err(e) = r {
+                        tracing::error!({ error = ?e }, "error updating instance playtime");
                     }
 
                     if let Ok(exitcode) = child.wait().await {
