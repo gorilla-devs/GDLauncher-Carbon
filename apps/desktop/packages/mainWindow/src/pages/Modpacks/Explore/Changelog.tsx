@@ -16,7 +16,7 @@ import {
   CFFEFileIndex,
   FEModResponse,
 } from "@gd/core_module/bindings";
-import { sortArrayByGameVersion } from "@/utils/Mods";
+import { sortArrayByGameVersion } from "@/utils/mods";
 
 const Changelog = () => {
   const params = useParams();

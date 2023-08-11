@@ -9,6 +9,11 @@ export const NAVBAR_ROUTES = [
     path: "/modpacks",
     icon: "i-ri:compass-line",
   },
+  {
+    label: "mods",
+    path: "/mods",
+    icon: "i-ri:compass-line",
+  },
 ];
 
 export const MOJANG_API = "https://launchercontent.mojang.com";

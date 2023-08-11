@@ -16,7 +16,7 @@ import {
   getName,
   getProjectId,
   isCurseForgeData,
-} from "@/utils/Mods";
+} from "@/utils/mods";
 import Authors from "@/components/ModRow/Authors";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";

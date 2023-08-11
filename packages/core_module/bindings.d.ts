@@ -274,7 +274,7 @@ export type MRFETeamResponse = MRFETeamMember[]
 
 export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
-export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
+export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 

@@ -1,4 +1,4 @@
-import { ModRowProps, isCurseForgeData } from "@/utils/Mods";
+import { ModRowProps, isCurseForgeData } from "@/utils/mods";
 import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tooltip } from "@gd/ui";
 import { CFFEModAuthor, FEUnifiedSearchResult } from "@gd/core_module/bindings";
