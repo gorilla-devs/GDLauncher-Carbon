@@ -12,10 +12,32 @@ export default function initAutoUpdater(win: BrowserWindow) {
         return null;
       }
 
+      let selectedChannelNumber;
+      switch (selectedChannel) {
+        case "stable":
+          selectedChannelNumber = 0;
+          break;
+        case "beta":
+          selectedChannelNumber = 1;
+          break;
+        case "alpha":
+          selectedChannelNumber = 2;
+          break;
+      }
+
+      let currentChannelNumber;
+      if (__APP_VERSION__.includes("beta")) {
+        currentChannelNumber = 1;
+      } else if (__APP_VERSION__.includes("alpha")) {
+        currentChannelNumber = 2;
+      } else {
+        currentChannelNumber = 0;
+      }
+
       autoUpdater.channel =
         selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
-      autoUpdater.allowDowngrade = selectedChannel !== "stable";
+      autoUpdater.allowDowngrade = selectedChannelNumber < currentChannelNumber;
       console.log("Checking for updates", selectedChannel);
       console.log("Current version", autoUpdater.currentVersion);
       autoUpdater.checkForUpdates();
