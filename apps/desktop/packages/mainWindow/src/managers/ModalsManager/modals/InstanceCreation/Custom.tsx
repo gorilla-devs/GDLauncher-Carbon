@@ -375,8 +375,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           (v) => v.id === (mcVersion() || mcVers?.id)
         )?.loaders || [];
 
-      console.log("TEST", title());
-
       updateInstanceMutation.mutate({
         instance: parseInt((instanceData() as Instancetype).id, 10),
         use_loaded_icon: { Set: !!bgPreview() },
@@ -736,12 +734,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 />
               </Match>
               <Match when={instanceData()}>
-                <Trans
-                  key="instance.instance_modal_instance_update"
-                  options={{
-                    defaultValue: "Update",
-                  }}
-                />
+                <Trans key="instance.instance_modal_instance_update" />
               </Match>
             </Switch>
           </Button>

@@ -210,7 +210,7 @@ const Tile = (props: Props) => {
                   "background-image": props.img
                     ? `url("${props.img as string}")`
                     : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "100%" : "120%",
+                  "background-size": props.img ? "cover" : "120%",
                 }}
               >
                 <Show when={props.isInvalid}>
