@@ -151,7 +151,9 @@ const Dropdown = (props: Props) => {
             "bg-primary-500 duration-100": props.btnDropdown && !props.disabled,
             "hover:bg-primary-300": props.btnDropdown && !props.disabled,
             "cursor-pointer": !props.disabled,
-            "cursor-not-allowed bg-darkSlate-800": props.disabled,
+            "cursor-not-allowed": props.disabled && !!props.bgColorClass,
+            "cursor-not-allowed bg-darkSlate-800":
+              props.disabled && !props.bgColorClass,
           }}
         >
           <Show when={!props.btnDropdown}>
