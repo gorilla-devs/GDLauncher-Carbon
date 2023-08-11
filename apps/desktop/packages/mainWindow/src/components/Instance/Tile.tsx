@@ -307,7 +307,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={props.isLoading || isInQueue()}>
-                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
+                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-sm" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 </Show>
