@@ -16,22 +16,21 @@ export default function initAutoUpdater(win: BrowserWindow) {
         selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
       console.log("Checking for updates", selectedChannel);
-      try {
-        const latest = await autoUpdater.checkForUpdates();
-        if (!latest || latest.updateInfo.version === __APP_VERSION__) {
-          return null;
-        }
-
-        return latest;
-      } catch {
-        return null;
-      }
+      autoUpdater.checkForUpdates();
     }
   );
 
   ipcMain.handle("downloadUpdate", async () => {
     console.log("Downloading update");
     autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("update-available", (updateInfo) => {
+    win.webContents.send("updateAvailable", updateInfo);
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    win.webContents.send("updateNotAvailable");
   });
 
   autoUpdater.on("download-progress", (progress) => {
