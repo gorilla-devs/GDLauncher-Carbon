@@ -11,7 +11,7 @@ const Overview = () => {
   const [t] = useTransContext();
 
   return (
-    <div class="flex flex-col gap-4 mt-10 max-w-185">
+    <div class="flex flex-col gap-4 max-w-185 mt-10">
       <div class="w-full flex justify-center flex-wrap gap-4">
         <Show when={routeData.instanceDetails.data?.version}>
           <Card
@@ -45,7 +45,12 @@ const Overview = () => {
           </For>
         </Show>
 
-        <Show when={routeData.instanceMods.data}>
+        <Show
+          when={
+            routeData.instanceMods.data &&
+            (routeData.instanceDetails.data?.modloaders.length || 0) > 0
+          }
+        >
           <Card
             title={t("instance.overview_card_mods_title")}
             text={routeData.instanceMods.data?.length || 0}

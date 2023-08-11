@@ -263,13 +263,19 @@ export const CategoryIcon = (props: {
       fallback={
         <div>
           <Show when={getCategoryIcon(props.category)}>
-            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
+            <div
+              class="w-4 h-4"
+              innerHTML={getCategoryIcon(props.category) as string | undefined}
+            />
           </Show>
         </div>
       }
     >
       <Match when={"iconUrl" in props.category}>
-        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+        <img
+          class="h-4 w-4"
+          src={getCategoryIcon(props.category) as string | undefined}
+        />
       </Match>
     </Switch>
   );

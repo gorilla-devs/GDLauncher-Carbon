@@ -68,9 +68,7 @@ const AppUpdate = (props: ModalProps) => {
               <div class="text-left font-bold">
                 <Trans key="app_update.available_version" />
               </div>
-              <div class="text-left">
-                {updateAvailable()?.updateInfo?.version}
-              </div>
+              <div class="text-left">{updateAvailable()?.version}</div>
             </div>
           </div>
           <hr class="w-full border-darkSlate-50 mt-8" />
