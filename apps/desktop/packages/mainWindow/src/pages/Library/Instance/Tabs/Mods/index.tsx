@@ -65,6 +65,12 @@ const Mods = () => {
     );
   };
 
+  const sortAlphabetically = (a: Modtype, b: Modtype) => {
+    if (a.filename < b.filename) return -1;
+    if (a.filename > b.filename) return 1;
+    return 0;
+  };
+
   return (
     <div>
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
@@ -229,7 +235,9 @@ const Mods = () => {
           }
           fallback={<NoMods />}
         >
-          <For each={filteredMods() as Modtype[]}>
+          <For
+            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+          >
             {(props) => (
               <Mod
                 mod={props}
