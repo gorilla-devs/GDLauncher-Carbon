@@ -99,15 +99,7 @@ module.exports = {
     const packageJsonPath = path.join(__dirname, "package.json");
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
-    const version = packageJson.version;
-
-    if (!version) {
-      throw new Error(
-        "App version removed before end of build! May be corrupted!"
-      );
-    }
-
-    delete packageJson.version;
+    packageJson.version = "0.0.0";
 
     fs.writeFileSync(
       packageJsonPath,

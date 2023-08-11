@@ -2,13 +2,15 @@ import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BrowserWindow, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 
+console.log(autoUpdater.currentVersion);
+
 export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.autoDownload = false;
 
   ipcMain.handle(
     "checkForUpdates",
     async (_, selectedChannel: FEReleaseChannel) => {
-      if (import.meta.env.DEV || __APP_VERSION__.includes("snapshot")) {
+      if (__APP_VERSION__.includes("snapshot")) {
         return null;
       }
 
