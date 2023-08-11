@@ -94,6 +94,10 @@ async function createWindow() {
     });
   });
 
+  ipcMain.handle("openFileDialogExtended", async (_, options) => {
+    return dialog.showOpenDialog(options);
+  });
+
   ipcMain.handle("getCurrentOS", async () => {
     return { platform: os.platform(), arch: os.arch() };
   });

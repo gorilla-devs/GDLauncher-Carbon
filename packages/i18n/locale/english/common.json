@@ -1,6 +1,7 @@
 {
   "general.type_here": "Type Here",
   "general.search": "Search",
+  "general.browse_file": "Browse",
   "languages.italian": "Italiano",
   "languages.english": "English",
   "languages.german": "german",
@@ -144,6 +145,10 @@
   "instance.sort_by_name": "Name",
   "instance.sort_by_totalDownloads": "Total downloads",
   "instance.import": "Import",
+  "instance.import_path": "Import Path",
+  "instance.import_select_curseforgezip": "Select Curseforge Zip",
+  "instance.import_select_mrpack": "Select MRPack",
+  "instance.import_select_scan_path": "Select Scan Path",
   "instances.import_entity_coming_soon": "Coming soon",
   "instance.create_new_instance_title": "New instance",
   "instance.create_new_instance_text": "Create your own empty instance",

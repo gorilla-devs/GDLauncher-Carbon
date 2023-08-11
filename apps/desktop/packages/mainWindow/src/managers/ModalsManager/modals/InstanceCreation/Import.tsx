@@ -6,6 +6,7 @@ import {
   setCurrentInstanceIndex,
   setInstances,
   setLoadingInstances,
+  setSelectedInstanceNames,
   setSelectedInstancesIndexes,
   setTaskId,
   taskId,
@@ -19,7 +20,7 @@ import {
 import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FETask } from "@gd/core_module/bindings";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Checkbox, Spinner } from "@gd/ui";
+import { Button, Checkbox, Input, Spinner } from "@gd/ui";
 import {
   For,
   Match,
@@ -29,6 +30,8 @@ import {
   createEffect,
   createSignal,
 } from "solid-js";
+
+import { OpenDialogOptions, dialog } from "electron";
 
 type Props = {
   setIsLoading?: Setter<boolean>;
@@ -167,6 +170,31 @@ const Import = (props: Props) => {
     }
   };
 
+  const dialogPropertiesFromEntity = (entity: FEEntity): OpenDialogOptions => {
+    if (isMRPack(entity)) {
+      return {
+        title: t("instance.import_select_mrpack") as string,
+        properties: ["openFile"],
+        filters: [{ name: "Mrpack", extensions: ["mrpack"] }],
+      };
+    } else if (isCurseforgeZip(entity)) {
+      return {
+        title: t("instance.import_select_curseforgezip") as string,
+        properties: ["openFile"],
+        filters: [{ name: "Curseforge Zip", extensions: ["zip"] }],
+      };
+    } else {
+      return {
+        title: t("instance.import_select_scan_path") as string,
+        properties: ["openDirectory"],
+        filters: [],
+      };
+    }
+  };
+
+  let inputRef: HTMLInputElement | undefined;
+  const [scanPath, setScanPath] = createSignal("");
+
   return (
     <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
       <div class="flex flex-col gap-4 w-full">
@@ -179,9 +207,10 @@ const Import = (props: Props) => {
                   <div
                     class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
                     classList={{
-                      "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
-                        !currentlySupportedEntities.includes(entityName) ||
+                      "border-2 border-solid border-transparent text-darkSlate-200":
                         selectedEntity() !== entity,
+                      "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
+                        !currentlySupportedEntities.includes(entityName),
                       "border-2 border-solid border-primary-500":
                         currentlySupportedEntities.includes(entityName) ||
                         selectedEntity() === entity,
@@ -204,6 +233,31 @@ const Import = (props: Props) => {
               }}
             </For>
           </div>
+        </div>
+        <div class="flex justify-between rounded-xl bg-darkSlate-800 px-4 py-2 box-border">
+          <Input
+            ref={inputRef}
+            placeholder={t("instance.import_path") as string}
+            icon={<div class="i-ri:archive-drawer" />}
+            class="w-full rounded-full"
+            onInput={(e) => setScanPath(e.target.value)}
+            // disabled={}
+          />
+          <Button
+            disabled={isAllImported()}
+            onClick={() => {
+              const dialogProperties = dialogPropertiesFromEntity(
+                selectedEntity()
+              );
+              console.log(dialogProperties);
+              window
+                .openFileDialogExtended(dialogProperties)
+                .then((files) => {});
+            }}
+          >
+            <div class="i-ri:archive-drawer-fill" />
+            <Trans key="general.browse_file" />
+          </Button>
         </div>
         <div class="w-full bg-darkSlate-800 rounded-xl box-border flex flex-col overflow-hidden h-50">
           <div class="flex justify-between w-full bg-darkSlate-900 px-4 py-2 box-border">

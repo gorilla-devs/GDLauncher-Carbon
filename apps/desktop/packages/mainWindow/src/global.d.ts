@@ -12,6 +12,9 @@ declare global {
     report: any;
     getAdSize: () => Promise<BoundsSize>;
     openFileDialog: (filters?: any) => Promise<Electron.OpenDialogReturnValue>;
+    openFileDialogExtended: (
+      options: Electron.OpenDialogOptions
+    ) => Promise<Electron.OpenDialogReturnValue>;
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;

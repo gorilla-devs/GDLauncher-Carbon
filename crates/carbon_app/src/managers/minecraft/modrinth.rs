@@ -83,7 +83,7 @@ pub async fn prepare_modpack_from_mrpack(
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
 
     let file_path_clone = mrpack_path.clone();
-    let (mut archive, index) = spawn_blocking(move || {
+    let (archive, index) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
         let mut archive = zip::ZipArchive::new(file)?;
         let index: ModpackIndex = {
