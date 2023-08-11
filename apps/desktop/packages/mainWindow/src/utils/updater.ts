@@ -20,6 +20,7 @@ window.updateDownloaded((_) => {
 });
 
 window.updateAvailable((_, result) => {
+  console.log("Update available", result);
   setUpdateAvailable(result);
 });
 
