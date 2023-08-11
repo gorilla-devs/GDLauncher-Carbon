@@ -72,7 +72,7 @@ const defaultModals = {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true,
   },
-} satisfies Hash;
+};
 
 type ModalName = keyof typeof defaultModals;
 
