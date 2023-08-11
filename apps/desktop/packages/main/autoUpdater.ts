@@ -4,7 +4,6 @@ import { autoUpdater } from "electron-updater";
 
 export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.autoDownload = false;
-  autoUpdater.allowDowngrade = true;
 
   ipcMain.handle(
     "checkForUpdates",
@@ -12,26 +11,29 @@ export default function initAutoUpdater(win: BrowserWindow) {
       if (__APP_VERSION__.includes("snapshot")) {
         return null;
       }
+
       autoUpdater.channel =
         selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
+      autoUpdater.allowDowngrade = selectedChannel !== "stable";
       console.log("Checking for updates", selectedChannel);
-      try {
-        const latest = await autoUpdater.checkForUpdates();
-        if (!latest || latest.updateInfo.version === __APP_VERSION__) {
-          return null;
-        }
-
-        return latest;
-      } catch {
-        return null;
-      }
+      console.log("Current version", autoUpdater.currentVersion);
+      autoUpdater.checkForUpdates();
     }
   );
 
   ipcMain.handle("downloadUpdate", async () => {
     console.log("Downloading update");
     autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("update-available", (updateInfo) => {
+    console.log("Update available", updateInfo);
+    win.webContents.send("updateAvailable", updateInfo);
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    win.webContents.send("updateNotAvailable");
   });
 
   autoUpdater.on("download-progress", (progress) => {

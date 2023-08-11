@@ -3,7 +3,11 @@
 
 import type { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BoundsSize } from "./utils/adhelper";
-import type { ProgressInfo, UpdateCheckResult } from "electron-updater";
+import type {
+  ProgressInfo,
+  UpdateCheckResult,
+  UpdateInfo,
+} from "electron-updater";
 
 declare global {
   interface Window {
@@ -22,6 +26,12 @@ declare global {
       cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
     ) => void;
     updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void;
+    updateAvailable: (
+      cb: (event: Electron.IpcRendererEvent, updateInfo: UpdateInfo) => void
+    ) => void;
+    updateNotAvailable: (
+      cb: (event: Electron.IpcRendererEvent) => void
+    ) => void;
     installUpdate: () => void;
     downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
