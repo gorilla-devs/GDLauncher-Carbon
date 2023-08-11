@@ -216,6 +216,9 @@ impl PrepareModpack for ModrinthModpack {
                         modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
                             t_extract_files.update_items(count as u32, total as u32)
                         }
+                        modrinth::ProgressState::ExtractingPackClientOverrides(count, total) => {
+                            t_extract_files.update_items(count as u32, total as u32)
+                        }
                         modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
                             t_addon_metadata.update_items(count as u32, total as u32)
                         }

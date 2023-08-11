@@ -2,8 +2,10 @@ use std::borrow::BorrowMut;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::bail;
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
+use zip::ZipArchive;
 
 use crate::domain::runtime_path::InstancePath;
 use crate::managers::App;
@@ -19,6 +21,7 @@ pub enum ProgressState {
     Idle,
     DownloadingMRPack(u64, u64),
     ExtractingPackOverrides(u64, u64),
+    ExtractingPackClientOverrides(u64, u64),
     AcquiringPackMetadata(u64, u64),
 }
 
@@ -164,47 +167,7 @@ pub async fn prepare_modpack_from_mrpack(
     };
 
     let data_path = instance_path.get_data_path();
-    let overrides_folder_name = "overrides";
-    spawn_blocking(move || {
-        let total_archive_files = archive.len() as u64;
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            if !(file.name().starts_with(overrides_folder_name)) {
-                continue;
-            }
-
-            let out_path = match file.enclosed_name() {
-                Some(path) => secure_path_join(
-                    Path::new(&data_path),
-                    path.strip_prefix(overrides_folder_name).expect(
-                        "valid path as we skipped paths that did not start with this prefix",
-                    ),
-                )?,
-                None => continue,
-            };
-
-            if file.name().ends_with('/') {
-                continue;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    if !parent.exists() {
-                        std::fs::create_dir_all(parent)?;
-                    }
-                }
-                let mut out_file = std::fs::File::create(&out_path)?;
-
-                std::io::copy(&mut file, &mut out_file)?;
-            }
-
-            progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
-                i as u64,
-                total_archive_files,
-            ))?;
-        }
-
-        Ok::<(), anyhow::Error>(())
-    })
-    .await??;
+    copy_overrides(archive, data_path, progress_percentage_sender).await?;
 
     tokio::fs::remove_file(&mrpack_path).await?;
 
@@ -212,4 +175,59 @@ pub async fn prepare_modpack_from_mrpack(
         index,
         downloadables,
     })
+}
+
+pub async fn copy_overrides(
+    archive: ZipArchive<std::fs::File>,
+    data_path: PathBuf,
+    progress_percentage_sender: Arc<tokio::sync::watch::Sender<ProgressState>>,
+) -> anyhow::Result<()> {
+    let mut archive = archive;
+    spawn_blocking(move || {
+        let total_archive_files = archive.len() as u64;
+        for overrides_folder_name in ["overrides", "client-overrides"] {
+            for i in 0..archive.len() {
+                let mut file = archive.by_index(i)?;
+                if !(file.name().starts_with(overrides_folder_name)) {
+                    continue;
+                }
+
+                let out_path = match file.enclosed_name() {
+                    Some(path) => secure_path_join(
+                        Path::new(&data_path),
+                        path.strip_prefix(overrides_folder_name).expect(
+                            "valid path as we skipped paths that did not start with this prefix",
+                        ),
+                    )?,
+                    None => continue,
+                };
+
+                if file.name().ends_with('/') {
+                    continue;
+                } else {
+                    if let Some(parent) = out_path.parent() {
+                        if !parent.exists() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                    }
+                    let mut out_file = std::fs::File::create(&out_path)?;
+
+                    std::io::copy(&mut file, &mut out_file)?;
+                }
+
+                progress_percentage_sender.send(match overrides_folder_name {
+                    "overrides" => {
+                        ProgressState::ExtractingPackOverrides(i as u64, total_archive_files)
+                    }
+                    "client-overrides" => {
+                        ProgressState::ExtractingPackClientOverrides(i as u64, total_archive_files)
+                    }
+                    _ => bail!("unknown overrides folder"),
+                })?;
+            }
+        }
+
+        Ok::<(), anyhow::Error>(())
+    })
+    .await?
 }
