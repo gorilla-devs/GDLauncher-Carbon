@@ -1,6 +1,6 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import { ProgressInfo } from "electron-updater";
+import { ProgressInfo, UpdateInfo } from "electron-updater";
 
 contextBridge.exposeInMainWorld(
   "checkForUpdates",
@@ -26,4 +26,16 @@ contextBridge.exposeInMainWorld(
   "updateDownloaded",
   async (cb: (_ev: IpcRendererEvent) => void) =>
     ipcRenderer.on("updateDownloaded", cb)
+);
+
+contextBridge.exposeInMainWorld(
+  "updateAvailable",
+  async (cb: (_ev: IpcRendererEvent, _updateInfo: UpdateInfo) => void) =>
+    ipcRenderer.on("updateAvailable", cb)
+);
+
+contextBridge.exposeInMainWorld(
+  "updateNotAvailable",
+  async (cb: (_ev: IpcRendererEvent) => void) =>
+    ipcRenderer.on("updateNotAvailable", cb)
 );

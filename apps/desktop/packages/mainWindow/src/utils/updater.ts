@@ -1,10 +1,10 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings";
-import { UpdateCheckResult } from "electron-updater";
+import { UpdateInfo } from "electron-updater";
 import { createEffect, createSignal } from "solid-js";
 import { rspc } from "./rspcClient";
 
 export const [updateAvailable, setUpdateAvailable] =
-  createSignal<UpdateCheckResult | null>(null);
+  createSignal<UpdateInfo | null>(null);
 
 export const [updateProgress, setUpdateProgress] = createSignal(0);
 export const [updateDownloaded, setUpdateDownloaded] = createSignal(false);
@@ -17,6 +17,14 @@ window.onDownloadProgress((_, progress) => {
 
 window.updateDownloaded((_) => {
   setUpdateDownloaded(true);
+});
+
+window.updateAvailable((_, result) => {
+  setUpdateAvailable(result);
+});
+
+window.updateNotAvailable((_) => {
+  setUpdateAvailable(null);
 });
 
 type IntervalType = ReturnType<typeof setInterval>;
@@ -32,24 +40,14 @@ export const checkForUpdates = async () => {
     if (!lastChannel || settings.data.releaseChannel !== lastChannel) {
       lastChannel = settings.data!.releaseChannel;
 
-      const check = async () => {
-        const isUpdateAvailable = await window.checkForUpdates(lastChannel!);
-
-        if (isUpdateAvailable) {
-          setUpdateAvailable(isUpdateAvailable);
-        } else {
-          setUpdateAvailable(null);
-        }
-      };
-
       if (interval) {
         clearInterval(interval);
         interval = null;
       }
 
-      check();
+      window.checkForUpdates(lastChannel!);
       interval = setInterval(() => {
-        check();
+        window.checkForUpdates(lastChannel!);
       }, 60 * 30 * 1000);
     }
   });
