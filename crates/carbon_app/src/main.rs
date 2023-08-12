@@ -77,7 +77,7 @@ pub async fn main() {
     info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
 
-    logger::setup_logger(&runtime_path).await;
+    let _guard = logger::setup_logger(&runtime_path).await;
 
     info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
