@@ -9,9 +9,11 @@ let startupEventSent = false;
 let backlog: Array<[string, any]> = [];
 
 function clearBacklog() {
+  console.log("Clearing metrics backlog");
   backlog.forEach(([eventName, properties]) => {
     posthog.capture(eventName, properties);
   });
+  console.log("Metrics backlog cleared");
 
   backlog = [];
 }
@@ -64,7 +66,12 @@ function initAnalytics() {
       if (!settings.data) return;
 
       if (settings.data?.metricsEnabled && !posthog.has_opted_in_capturing()) {
-        posthog.opt_in_capturing();
+        posthog.opt_in_capturing({
+          capture_properties: {
+            $current_url: window.location.hash,
+            $pathname: window.location.hash,
+          },
+        });
 
         if (!startupEventSent) {
           clearBacklog();
@@ -121,7 +128,10 @@ export function trackPageView() {
         },
       ]);
     } else {
-      posthog.capture("$pageview");
+      posthog.capture("$pageview", {
+        $pathname: window.location.hash,
+        $current_url: window.location.hash,
+      });
     }
   }
 }

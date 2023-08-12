@@ -210,7 +210,7 @@ const Tile = (props: Props) => {
                   "background-image": props.img
                     ? `url("${props.img as string}")`
                     : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "100%" : "120%",
+                  "background-size": props.img ? "cover" : "120%",
                 }}
               >
                 <Show when={props.isInvalid}>
@@ -264,7 +264,7 @@ const Tile = (props: Props) => {
                   }
                 >
                   <div class="flex flex-col justify-center items-center gap-2 z-20 w-full h-full">
-                    <h3 class="m-0 text-center text-3xl opacity-50">
+                    <h3 class="m-0 text-center opacity-50 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>
                     <div class="h-10">
@@ -297,7 +297,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={validInstance()?.modpack_platform}>
-                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg top-2 right-2 p-2 border-solid border-darkSlate-600">
+                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg p-2 border-solid top-2 right-2 border-darkSlate-600">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
@@ -307,14 +307,14 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={props.isLoading || isInQueue()}>
-                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
+                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-sm" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 </Show>
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
-                  class="absolute left-0 bottom-0 z-40 rounded-full bg-primary-500 h-1"
+                  class="absolute left-0 bottom-0 rounded-full z-40 bg-primary-500 h-1"
                   style={{
                     width: `${props.percentage}%`,
                   }}

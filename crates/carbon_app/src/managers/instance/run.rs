@@ -1,51 +1,47 @@
-use crate::domain::instance::info::StandardVersion;
-use crate::managers::instance::modpacks::PrepareModpack;
-use crate::managers::AppInner;
-
 use daedalus::minecraft::{LibraryGroup, VersionInfo};
 
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
     domain::{
-        instance::{self as domain, GameLogId},
+        instance::{
+            self as domain,
+            info::{GameVersion, Instance, StandardVersion},
+            GameLogId,
+        },
         java::{JavaComponent, SystemJavaProfileName},
         runtime_path::{InstancePath, RuntimePath},
         vtask::VisualTaskId,
     },
     managers::{
-        instance::{log::EntryType, schema::make_instance_config},
+        self,
+        account::FullAccount,
+        instance::{log::EntryType, modpacks::PrepareModpack, schema::make_instance_config},
         java::managed::Step,
         minecraft::minecraft::get_lwjgl_meta,
-        vtask::Subtask,
+        vtask::{NonFailedDismissError, Subtask, TaskState, VisualTask},
+        AppInner, ManagerRef,
     },
 };
 
 use std::{fmt::Debug, path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 
-use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio::{
+    io::AsyncReadExt,
+    sync::{mpsc, watch, Semaphore},
+    task::JoinHandle,
+};
 use tracing::{debug, info};
 
 use chrono::{DateTime, Utc};
 use futures::Future;
-use tokio::sync::{watch, Semaphore};
-use tokio::task::JoinHandle;
 
 use anyhow::{anyhow, bail, Context};
 
-use crate::{
-    domain::instance::info::{GameVersion, Instance},
-    managers::{
-        self,
-        account::FullAccount,
-        vtask::{NonFailedDismissError, TaskState, VisualTask},
-        ManagerRef,
-    },
+use super::{
+    modloaders::PrepareModLoader, modpacks::PrepareModpackSubtasks, InstanceId, InstanceManager,
+    InstanceType, InvalidInstanceIdError,
 };
-
-use super::modloaders::PrepareModLoader;
-use super::modpacks::PrepareModpackSubtasks;
-use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
@@ -76,7 +72,7 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let InstanceType::Valid(data) = &mut instance.type_ else {
-            return Err(anyhow!("Instance {instance_id} is not in a valid state"))
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
         };
 
         match &data.state {
@@ -599,6 +595,8 @@ async fn prepare_game_launch_task(
 
             let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
+            let start_time = Utc::now();
+
             let (log_id, log) = app.instance_manager().create_log(info.instance_id).await;
             let _ = app
                 .instance_manager()
@@ -609,15 +607,17 @@ async fn prepare_game_launch_task(
                             "child process id is not present even though child process was started",
                         ),
                         kill_tx,
-                        start_time: Utc::now(),
+                        start_time,
                         log: log_id,
                     }),
                 )
                 .await;
 
-            let (Some(mut stdout), Some(mut stderr)) = (child.stdout.take(), child.stderr.take()) else {
-                        panic!("stdout and stderr are not available even though the child process was created with both enabled");
-                    };
+            let (Some(mut stdout), Some(mut stderr)) =
+                (child.stdout.take(), child.stderr.take())
+            else {
+                panic!("stdout and stderr are not availible even though the child process was created with both enabled");
+            };
 
             let read_logs = async {
                 let mut outbuf = [0u8; 1024];
@@ -695,11 +695,40 @@ async fn prepare_game_launch_task(
                 }
             };
 
+            let mut last_stored_time = start_time;
+            let update_playtime = async {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    let now = Utc::now();
+                    let diff = now - last_stored_time;
+                    last_stored_time = now;
+                    let r = app
+                        .instance_manager()
+                        .update_playtime(info.instance_id, diff.num_seconds() as u64)
+                        .await;
+                    if let Err(e) = r {
+                        tracing::error!({ error = ?e }, "error updating instance playtime");
+                    }
+                }
+            };
+
             tokio::select! {
                 _ = child.wait() => {},
                 _ = kill_rx.recv() => drop(child.kill().await),
-                // canceled by one of the others being selected
+                // infallible, canceled by the above tasks
                 _ = read_logs => {},
+                _ = update_playtime => {}
+            }
+
+            let r = app
+                .instance_manager()
+                .update_playtime(
+                    info.instance_id,
+                    (Utc::now() - last_stored_time).num_seconds() as u64,
+                )
+                .await;
+            if let Err(e) = r {
+                tracing::error!({ error = ?e }, "error updating instance playtime");
             }
 
             if let Ok(exitcode) = child.wait().await {

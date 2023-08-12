@@ -1,18 +1,14 @@
-import { useModal } from "@/managers/ModalsManager";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
-import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
 import {
   CFFEFileIndex,
   MRFEVersion,
   MRFEVersionsResponse,
-  Mod,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Dropdown, Popover, Spinner, createNotification } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
-import { useLocation } from "@solidjs/router";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
@@ -36,15 +32,12 @@ import {
   getProjectId,
   getSummary,
   isCurseForgeData,
-} from "@/utils/Mods";
+} from "@/utils/mods";
 import Categories from "./Categories";
 import Authors from "./Authors";
 
 const ModRow = (props: ModRowProps) => {
   const [loading, setLoading] = createSignal(false);
-  const [mods, setMods] = createSignal<
-    CreateQueryResult<Mod[], RSPCError> | undefined
-  >(undefined);
   const [modrinthVersions, setModVersions] = createSignal<
     CreateQueryResult<MRFEVersionsResponse, RSPCError> | undefined
   >(undefined);
@@ -77,7 +70,6 @@ const ModRow = (props: ModRowProps) => {
   const mergedProps = mergeProps({ type: "Modpack" }, props);
   const navigate = useGDNavigate();
   const addNotification = createNotification();
-  const modalsContext = useModal();
 
   const prepareInstanceMutation = rspc.createMutation(
     ["instance.prepareInstance"],
@@ -117,20 +109,13 @@ const ModRow = (props: ModRowProps) => {
   );
 
   const handleExplore = () => {
-    if (mergedProps.type === "Modpack") {
-      navigate(
-        `/modpacks/${getProjectId(props)}/${
-          isCurseForgeData(props.data) ? "curseforge" : "modrinth"
-        }`
-      );
-    } else {
-      modalsContext?.openModal(
-        {
-          name: "modDetails",
-        },
-        { mod: props.data }
-      );
-    }
+    navigate(
+      `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
+        props
+      )}/${
+        isCurseForgeData(props.data) ? "curseforge" : "modrinth"
+      }?instanceId=${instanceId()}`
+    );
   };
 
   const getCurrentMcVersionObj = () => {
@@ -140,7 +125,7 @@ const ModRow = (props: ModRowProps) => {
       );
     } else {
       return (modrinthVersions()?.data || []).filter((version) =>
-        version.game_versions.includes((props as ModProps).mcVersion)
+        version.game_versions.includes((props as ModProps).mcVersion || "")
       );
     }
   };
@@ -148,20 +133,7 @@ const ModRow = (props: ModRowProps) => {
   const latestFilesIndexes = () =>
     props.type === "Mod" ? getCurrentMcVersionObj() : [];
 
-  const location = useLocation();
-
-  const instanceId = () => getInstanceIdFromPath(location.pathname);
-
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      setMods(
-        rspc.createQuery(() => [
-          "instance.getInstanceMods",
-          parseInt(instanceId() as string, 10),
-        ])
-      );
-    }
-  });
+  const instanceId = () => (props as ModProps)?.instanceId;
 
   const mappedVersions = () =>
     latestFilesIndexes().map((version) => {
@@ -188,7 +160,7 @@ const ModRow = (props: ModRowProps) => {
   });
 
   const isModInstalled = () =>
-    mods()?.data?.find(
+    (props as ModProps)?.installedMods?.find(
       (mod) =>
         (isCurseForgeData(props.data)
           ? mod.curseforge?.project_id
@@ -275,7 +247,7 @@ const ModRow = (props: ModRowProps) => {
           />
         </div>
         <div class="flex gap-4 items-center">
-          <div class="flex gap-2 items-center text-darkSlate-100">
+          <div class="flex items-center gap-2 text-darkSlate-100">
             <i class="text-darkSlate-100 i-ri:time-fill" />
             <div class="whitespace-nowrap text-sm">
               {formatDistanceToNowStrict(
@@ -350,10 +322,10 @@ const ModRow = (props: ModRowProps) => {
   return (
     <div
       ref={(el) => (containrRef = el)}
-      class="relative flex flex-col gap-4 p-5 bg-darkSlate-700 rounded-2xl box-border overflow-hidden h-36"
+      class="flex flex-col gap-4 overflow-hidden relative p-5 bg-darkSlate-700 rounded-2xl box-border h-36"
     >
-      <div class="absolute top-0 right-0 bottom-0 left-0 z-10 bg-gradient-to-r from-darkSlate-700 from-50%" />
-      <div class="absolute top-0 right-0 bottom-0 left-0 bg-gradient-to-t from-darkSlate-700 z-10" />
+      <div class="absolute z-10 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
+      <div class="absolute inset-0 from-darkSlate-700 z-10 bg-gradient-to-t" />
       <Show when={getLogoUrl(props)}>
         <img
           class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
@@ -365,7 +337,7 @@ const ModRow = (props: ModRowProps) => {
           <div class="flex flex-col gap-2 w-full z-10 bg-repeat-none">
             <Title />
             <div class="flex justify-between w-full">
-              <p class="m-0 text-sm text-darkSlate-50 overflow-hidden text-ellipsis max-w-full max-h-15">
+              <p class="text-sm overflow-hidden text-ellipsis m-0 text-darkSlate-50 max-w-full max-h-15">
                 <Switch>
                   <Match when={isRowSmall()}>
                     {truncateText(getSummary(props), 60)}
@@ -378,18 +350,13 @@ const ModRow = (props: ModRowProps) => {
               <div class="flex w-full justify-end items-end">
                 <Switch>
                   <Match when={mergedProps.type === "Modpack"}>
-                    <div class="flex gap-3 items-center">
+                    <div class="flex items-center gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans
-                          key="instance.explore_modpack"
-                          options={{
-                            defaultValue: "Explore",
-                          }}
-                        />
+                        <Trans key="instance.explore_modpack" />
                       </Button>
                       <Show when={loading()}>
                         <Button>
@@ -430,12 +397,7 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans
-                              key="instance.download_latest"
-                              options={{
-                                defaultValue: "Download Latest",
-                              }}
-                            />
+                            <Trans key="instance.download_latest" />
                           </Show>
                         </Button>
                       </Show>
@@ -446,21 +408,9 @@ const ModRow = (props: ModRowProps) => {
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
                         type="outline"
-                        onClick={() =>
-                          modalsContext?.openModal(
-                            {
-                              name: "modDetails",
-                            },
-                            { mod: props.data }
-                          )
-                        }
+                        onClick={() => handleExplore()}
                       >
-                        <Trans
-                          key="instance.explore_modpack"
-                          options={{
-                            defaultValue: "Explore",
-                          }}
-                        />
+                        <Trans key="instance.explore_modpack" />
                       </Button>
                       <Switch>
                         <Match when={!isModInstalled()}>
@@ -468,7 +418,8 @@ const ModRow = (props: ModRowProps) => {
                             menuPlacement="bottom-end"
                             loading={loading()}
                             disabled={
-                              modrinthVersions()?.isFetching && !loading()
+                              (modrinthVersions()?.isFetching && !loading()) ||
+                              !instanceId()
                             }
                             options={mappedVersions()}
                             rounded
@@ -487,10 +438,7 @@ const ModRow = (props: ModRowProps) => {
                                     fileId,
                                     getProjectId(props)
                                   ),
-                                  instance_id: parseInt(
-                                    instanceId() as string,
-                                    10
-                                  ),
+                                  instance_id: instanceId() as number,
                                 });
                               }
                             }}
@@ -503,10 +451,7 @@ const ModRow = (props: ModRowProps) => {
                                     val.key,
                                     getProjectId(props)
                                   ),
-                                  instance_id: parseInt(
-                                    instanceId() as string,
-                                    10
-                                  ),
+                                  instance_id: instanceId() as number,
                                 });
                               }
                             }}
@@ -528,12 +473,7 @@ const ModRow = (props: ModRowProps) => {
                           <Button
                             variant={isModInstalled() ? "green" : "primary"}
                           >
-                            <Trans
-                              key="mod.downloaded"
-                              options={{
-                                defaultValue: "Downloaded",
-                              }}
-                            />
+                            <Trans key="mod.downloaded" />
                           </Button>
                         </Match>
                       </Switch>

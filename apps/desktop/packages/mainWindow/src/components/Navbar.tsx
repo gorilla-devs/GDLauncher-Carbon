@@ -65,7 +65,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center text-white bg-darkSlate-800 px-5 h-15">
+      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -74,7 +74,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex text-white w-full m-0 list-none items-center gap-6 pl-10">
+          <ul class="flex text-white w-full m-0 items-center list-none gap-6 pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -97,7 +97,9 @@ const AppNavbar = () => {
                         >
                           <Tab>
                             <div class="flex items-center gap-2">
-                              <i class={"w-5 h-5 " + route.icon} />
+                              <Show when={route.icon}>
+                                <i class={"w-5 h-5 " + route.icon} />
+                              </Show>
                               <li class="no-underline">{route.label}</li>
                             </div>
                           </Tab>

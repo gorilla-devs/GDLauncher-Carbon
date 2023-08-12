@@ -449,6 +449,7 @@ const Import = (props: Props) => {
       <Button
         disabled={isAllImported()}
         onClick={() => {
+          if (isLoading()) return;
           setIsLoading(true);
           props?.setIsLoading?.(true);
           const firstSelectedEntry = selectedEntires()[0];

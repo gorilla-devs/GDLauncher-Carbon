@@ -6,7 +6,8 @@
   "author": "GorillaDevs Inc.",
   "license": "ARR",
   "type": "module",
-  "_comment": "DO NOT MANUALLY ADD A VERSION IN HERE",
+  "_comment": "DO NOT MANUALLY EDIT THE VERSION",
+  "version": "0.0.0",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",

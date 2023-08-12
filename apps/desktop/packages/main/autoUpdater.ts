@@ -2,9 +2,10 @@ import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { BrowserWindow, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 
+console.log(autoUpdater.currentVersion);
+
 export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.autoDownload = false;
-  autoUpdater.allowDowngrade = true;
 
   ipcMain.handle(
     "checkForUpdates",
@@ -12,26 +13,51 @@ export default function initAutoUpdater(win: BrowserWindow) {
       if (__APP_VERSION__.includes("snapshot")) {
         return null;
       }
+
+      let selectedChannelNumber;
+      switch (selectedChannel) {
+        case "stable":
+          selectedChannelNumber = 0;
+          break;
+        case "beta":
+          selectedChannelNumber = 1;
+          break;
+        case "alpha":
+          selectedChannelNumber = 2;
+          break;
+      }
+
+      let currentChannelNumber;
+      if (__APP_VERSION__.includes("beta")) {
+        currentChannelNumber = 1;
+      } else if (__APP_VERSION__.includes("alpha")) {
+        currentChannelNumber = 2;
+      } else {
+        currentChannelNumber = 0;
+      }
+
       autoUpdater.channel =
         selectedChannel === "stable" ? "latest" : selectedChannel;
       autoUpdater.allowPrerelease = selectedChannel !== "stable";
+      autoUpdater.allowDowngrade = selectedChannelNumber < currentChannelNumber;
       console.log("Checking for updates", selectedChannel);
-      try {
-        const latest = await autoUpdater.checkForUpdates();
-        if (!latest || latest.updateInfo.version === __APP_VERSION__) {
-          return null;
-        }
-
-        return latest;
-      } catch {
-        return null;
-      }
+      console.log("Current version", autoUpdater.currentVersion);
+      autoUpdater.checkForUpdates();
     }
   );
 
   ipcMain.handle("downloadUpdate", async () => {
     console.log("Downloading update");
     autoUpdater.downloadUpdate();
+  });
+
+  autoUpdater.on("update-available", (updateInfo) => {
+    console.log("Update available", updateInfo);
+    win.webContents.send("updateAvailable", updateInfo);
+  });
+
+  autoUpdater.on("update-not-available", () => {
+    win.webContents.send("updateNotAvailable");
   });
 
   autoUpdater.on("download-progress", (progress) => {

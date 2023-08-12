@@ -40,7 +40,7 @@ const AppUpdate = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <Show when={os()?.platform}>
-        <div class="flex flex-col min-h-60 overflow-hidden w-160">
+        <div class="flex flex-col overflow-hidden min-h-60 w-160">
           <p>
             <Trans key="app_update.new_update_available_text" />
           </p>
@@ -63,21 +63,19 @@ const AppUpdate = (props: ModalProps) => {
               </div>
               <div class="text-left">{__APP_VERSION__}</div>
             </div>
-            <div class="i-ri:arrow-right-double-fill text-2xl" />
+            <div class="text-2xl i-ri:arrow-right-double-fill" />
             <div class="flex flex-col gap-4">
               <div class="text-left font-bold">
                 <Trans key="app_update.available_version" />
               </div>
-              <div class="text-left">
-                {updateAvailable()?.updateInfo?.version}
-              </div>
+              <div class="text-left">{updateAvailable()?.version}</div>
             </div>
           </div>
           <hr class="w-full border-darkSlate-50 mt-8" />
           <Show when={updateProgress()}>
             <Progressbar percentage={updateProgress()} />
           </Show>
-          <div class="flex items-center justify-center flex-1 mt-20 mb-4">
+          <div class="flex items-center justify-center flex-1 mb-4 mt-20">
             <Switch>
               <Match when={os()?.platform === "darwin"}>
                 <Button

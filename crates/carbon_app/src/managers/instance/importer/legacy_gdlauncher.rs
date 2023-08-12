@@ -233,22 +233,20 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 let count = walked_dir.len() as u32;
                 subtask.update_items(0, count);
 
-                let instances_path = app_clone
+                let instance_manager = app_clone.instance_manager();
+                let instances = instance_manager.instances.read().await;
+
+                let instance_shortpath = &instances
+                    .get(&created_instance_id)
+                    .unwrap()
+                    .shortpath;
+
+                let instance_path = app_clone
                     .settings_manager()
                     .runtime_path
                     .get_instances()
-                    .to_path();
-
-                let instance_path = instances_path.join(
-                    &app_clone
-                        .instance_manager()
-                        .instances
-                        .read()
-                        .await
-                        .get(&created_instance_id)
-                        .unwrap()
-                        .shortpath,
-                );
+                    .get_instance_path(&instance_shortpath)
+                    .get_data_path();
 
                 for (i, entry) in walked_dir.into_iter().enumerate() {
                     let is_dir = entry.file_type().is_dir();

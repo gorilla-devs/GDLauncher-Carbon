@@ -47,6 +47,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -55,6 +56,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
         run: pnpm test
   ubuntu_x64:
     defaults:
@@ -93,6 +95,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -101,6 +104,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
   windows_x64:
     defaults:
@@ -144,6 +148,7 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
         shell: bash
@@ -156,5 +161,6 @@ jobs:
         env:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
+          MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test

@@ -18,23 +18,16 @@ const Settings = () => {
     }
   );
 
-  let totalRam = rspc.createQuery(() => ["systeminfo.getTotalRAM"]);
-
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const mbTotalRAM = () => Number(totalRam.data) / 1024 / 1024;
+  const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
 
   return (
     <div class="pt-10 divide-y divide-darkSlate-600">
       <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
-            <Trans
-              key="java.java_memory_title"
-              options={{
-                defaultValue: "Java Memory",
-              }}
-            />
+            <Trans key="java.java_memory_title" />
           </h5>
           <Switch
             checked={!!routeData?.instanceDetails?.data?.memory}
@@ -89,20 +82,15 @@ const Settings = () => {
       <div class="mb-6">
         <div class="w-full flex justify-between items-center mb-4">
           <h5 class="m-0">
-            <Trans
-              key="java.java_arguments_title"
-              options={{
-                defaultValue: "Java Arguments",
-              }}
-            />
+            <Trans key="java.java_arguments_title" />
           </h5>
           <Switch
-            checked={routeData?.instanceDetails?.data?.global_java_args}
-            onChange={(e) => {
+            checked={!!routeData?.instanceDetails?.data?.extra_java_args}
+            onChange={() => {
               updateInstanceMutation.mutate({
                 memory: null,
-                extra_java_args: null,
-                global_java_args: { Set: e.target.checked },
+                extra_java_args: { Set: " " },
+                global_java_args: null,
                 modloader: null,
                 name: null,
                 notes: null,
@@ -113,7 +101,7 @@ const Settings = () => {
             }}
           />
         </div>
-        <Show when={routeData?.instanceDetails?.data?.global_java_args}>
+        <Show when={!!routeData?.instanceDetails?.data?.extra_java_args}>
           <div class="flex w-full gap-4 items-center">
             <Input
               class="w-full"
@@ -150,12 +138,7 @@ const Settings = () => {
                 });
               }}
             >
-              <Trans
-                key="java.reset_java_args"
-                options={{
-                  defaultValue: "Reset",
-                }}
-              />
+              <Trans key="java.reset_java_args" />
             </Button>
           </div>
         </Show>

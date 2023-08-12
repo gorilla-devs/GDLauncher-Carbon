@@ -13,6 +13,7 @@ import { createStore } from "solid-js/store";
 import fetchData from "../Library/library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
+import DefaultImg from "/assets/images/default-instance-img.png";
 
 const Home = () => {
   const [t] = useTransContext();
@@ -40,6 +41,7 @@ const Home = () => {
               onClick={(news) => {
                 window.openExternalLink(news.url || "");
               }}
+              fallBackImg={DefaultImg}
             />
           </Match>
           <Match
@@ -88,7 +90,7 @@ const Home = () => {
           >
             <div class="w-full h-full flex flex-col justify-center items-center mt-12">
               <img src={skull} class="w-16 h-16" />
-              <p class="text-darkSlate-50 max-w-100 text-center">
+              <p class="text-darkSlate-50 text-center max-w-100">
                 <Trans
                   key="instance.no_instances_text"
                   options={{

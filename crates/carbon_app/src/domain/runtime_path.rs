@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::Deref,
     path::{Path, PathBuf},
@@ -165,7 +166,7 @@ impl TempPath {
         self.0.clone()
     }
 
-    pub async fn maketmp(&self) -> anyhow::Result<Tempfolder> {
+    pub async fn maketmp<T: tempentry::TempEntryType>(&self) -> anyhow::Result<TempEntry<T>> {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time is somehow pre-epoch")
@@ -180,8 +181,13 @@ impl TempPath {
                 path.push(format!("{time}{i}"));
             }
 
-            if tokio::fs::create_dir_all(&path).await.is_ok() {
-                return Ok(Tempfolder(path));
+            let path_copy = path.clone();
+
+            if tokio::task::spawn_blocking(move || T::create(&path_copy))
+                .await
+                .is_ok()
+            {
+                return Ok(TempEntry(path, PhantomData));
             }
 
             path.pop();
@@ -189,11 +195,65 @@ impl TempPath {
 
         Err(anyhow!("Could not create tmpdir"))
     }
+
+    pub async fn maketmpdir(&self) -> anyhow::Result<TempEntry<tempentry::Folder>> {
+        self.maketmp().await
+    }
+
+    pub async fn maketmpfile(&self) -> anyhow::Result<TempEntry<tempentry::File>> {
+        self.maketmp().await
+    }
+
+    pub async fn write_file_atomic(
+        &self,
+        path: impl AsRef<Path>,
+        data: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()> {
+        let tmp = self.maketmpfile().await?;
+        tokio::fs::write(&*tmp, data).await?;
+        tmp.rename(path).await?;
+
+        Ok(())
+    }
 }
 
-pub struct Tempfolder(PathBuf);
+pub struct TempEntry<T: tempentry::TempEntryType>(PathBuf, PhantomData<T>);
 
-impl Tempfolder {
+pub mod tempentry {
+    use std::{io, path::Path};
+
+    pub trait TempEntryType {
+        // tokio::fs is just implemented as a spawn_blocking wrapper for the most part.
+        fn create(path: &Path) -> io::Result<()>;
+        fn drop_for(path: &Path);
+    }
+
+    pub struct Folder;
+    pub struct File;
+
+    impl TempEntryType for Folder {
+        fn create(path: &Path) -> io::Result<()> {
+            std::fs::create_dir_all(path)
+        }
+
+        fn drop_for(path: &Path) {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+
+    impl TempEntryType for File {
+        fn create(path: &Path) -> io::Result<()> {
+            // files will be created on write
+            Ok(())
+        }
+
+        fn drop_for(path: &Path) {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+impl<T: tempentry::TempEntryType> TempEntry<T> {
     /// Extract the contained path without deleting the tmpdir.
     pub fn into_path(self) -> PathBuf {
         let v = ManuallyDrop::new(self);
@@ -209,7 +269,7 @@ impl Tempfolder {
     }
 }
 
-impl Deref for Tempfolder {
+impl<T: tempentry::TempEntryType> Deref for TempEntry<T> {
     type Target = Path;
 
     fn deref(&self) -> &Self::Target {
@@ -217,9 +277,9 @@ impl Deref for Tempfolder {
     }
 }
 
-impl Drop for Tempfolder {
+impl<T: tempentry::TempEntryType> Drop for TempEntry<T> {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        T::drop_for(&*self)
     }
 }
 
