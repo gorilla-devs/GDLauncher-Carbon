@@ -114,6 +114,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             instances.push(super::ImportableInstance {
                 entity: Entity::LegacyGDLauncher,
                 name: instance.name.clone(),
+                import_once: true,
             });
         }
 

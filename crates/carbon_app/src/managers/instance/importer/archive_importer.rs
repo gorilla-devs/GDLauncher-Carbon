@@ -120,6 +120,7 @@ impl InstanceImporter for CurseForgeZipImporter {
             .map(|instance| super::ImportableInstance {
                 entity: Entity::CurseForgeZip,
                 name: instance.manifest.name.clone(),
+                import_once: false,
             })
             .collect();
         Ok(instances)
@@ -300,6 +301,7 @@ impl InstanceImporter for MrpackImporter {
             .map(|instance| super::ImportableInstance {
                 entity: Entity::MRPack,
                 name: instance.index.name.clone(),
+                import_once: false,
             })
             .collect();
         Ok(instances)

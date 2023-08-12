@@ -33,6 +33,7 @@ impl Entity {
 pub struct ImportableInstance {
     pub entity: Entity,
     pub name: String,
+    pub import_once: bool,
 }
 
 #[async_trait::async_trait]

@@ -65,6 +65,7 @@ impl From<importer::Entity> for FEEntity {
 pub struct FEImportableInstance {
     pub entity: FEEntity,
     pub name: String,
+    pub import_once: bool,
 }
 
 impl From<importer::ImportableInstance> for FEImportableInstance {
@@ -72,6 +73,7 @@ impl From<importer::ImportableInstance> for FEImportableInstance {
         Self {
             entity: instance.entity.into(),
             name: instance.name,
+            import_once: instance.import_once,
         }
     }
 }

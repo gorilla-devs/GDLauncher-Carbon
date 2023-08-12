@@ -3,10 +3,12 @@ import {
   instances,
   loadingInstances,
   selectedInstancesIndexes,
+  selectedInstancesNames,
   setCurrentInstanceIndex,
   setInstances,
   setLoadingInstances,
   setSelectedInstancesIndexes,
+  setSelectedInstancesNames,
   setTaskId,
   taskId,
 } from "@/utils/import";
@@ -30,6 +32,7 @@ import {
   createEffect,
   createSignal,
 } from "solid-js";
+import { createStore, reconcile } from "solid-js/store";
 
 type Props = {
   setIsLoading?: Setter<boolean>;
@@ -38,6 +41,9 @@ type Props = {
 const Import = (props: Props) => {
   const [selectedEntity, setSelectedEntity] =
     createSignal<FEEntity>("legacygdlauncher");
+  const [prevSelectedEntity, setPrevSelectedEntity] =
+    createSignal<FEEntity>("legacygdlauncher");
+
   const [isLoading, setIsLoading] = createSignal(false);
 
   const [t] = useTransContext();
@@ -47,6 +53,7 @@ const Import = (props: Props) => {
   ]);
 
   const entries = () => Object.entries(selectedInstancesIndexes);
+
   const selectedEntires = () =>
     entries().filter(([_i, isSelected]) => isSelected);
 
@@ -89,7 +96,10 @@ const Import = (props: Props) => {
         importInstanceMutation.mutate({
           entity: selectedEntity(),
           index: nextInstanceIndex,
-          name: "", // TODO: edit name
+          name:
+            selectedInstancesNames[nextInstanceIndex] ||
+            instances()?.data?.at(nextInstanceIndex)?.name ||
+            "Unknown Instance Name",
         });
       }
     }
@@ -113,7 +123,15 @@ const Import = (props: Props) => {
     "curseforgezip",
   ];
 
-  let inputRef: HTMLInputElement | undefined;
+  let scanPathInputRef: HTMLInputElement | undefined;
+
+  let instanceNameInputRefs: {
+    [id: number]: HTMLInputElement | undefined;
+  } = {};
+
+  const [instanceNameEditModes, setInstanceNameEditModes] = createStore<{
+    [id: number]: boolean;
+  }>({});
 
   const [scanPaths, setScanPaths] = createSignal<string[]>([]);
 
@@ -180,8 +198,18 @@ const Import = (props: Props) => {
   };
 
   createEffect(() => {
-    if (inputRef !== undefined) {
-      inputRef.placeholder = placeholderFromEntity(selectedEntity());
+    if (scanPathInputRef !== undefined) {
+      scanPathInputRef.placeholder = placeholderFromEntity(selectedEntity());
+    }
+  });
+
+  // wipe stored values on selectedEntity change
+  createEffect(() => {
+    if (prevSelectedEntity() !== selectedEntity()) {
+      setPrevSelectedEntity(selectedEntity());
+      setSelectedInstancesIndexes(reconcile({}));
+      setSelectedInstancesNames(reconcile({}));
+      setInstanceNameEditModes(reconcile({}));
     }
   });
 
@@ -223,11 +251,12 @@ const Import = (props: Props) => {
         </div>
         <div class="flex justify-between rounded-xl bg-darkSlate-800 px-4 py-2 box-border">
           <Input
-            ref={inputRef}
+            ref={scanPathInputRef}
             placeholder={t("instance.import_path") as string}
             icon={<div class="i-ri:archive-drawer" />}
             class="w-full rounded-full"
             onInput={(e) => setScanPaths(e.target.value.split(";"))}
+            width={"100%"}
             // disabled={}
           />
           <Button
@@ -239,8 +268,8 @@ const Import = (props: Props) => {
                 if (!result.canceled) {
                   if (result.filePaths[0]) {
                     setScanPaths(result.filePaths);
-                    if (inputRef !== undefined)
-                      inputRef.value = result.filePaths.join(";");
+                    if (scanPathInputRef !== undefined)
+                      scanPathInputRef.value = result.filePaths.join(";");
                   }
                 }
               });
@@ -313,15 +342,65 @@ const Import = (props: Props) => {
                             }));
                           }}
                         />
-                        <span
-                          classList={{
-                            "text-darkSlate-500": importedInstances().includes(
-                              i()
-                            ),
-                          }}
-                        >
-                          {instance.name}
-                        </span>
+                        <Switch>
+                          <Match when={instanceNameEditModes[i()]}>
+                            <Input
+                              ref={instanceNameInputRefs[i()]}
+                              placeholder={t("instance.import_path") as string}
+                              icon={<div class="i-ri:archive-drawer" />}
+                              class="w-full rounded-full"
+                              onInput={(e) => {
+                                setSelectedInstancesNames((prev) => ({
+                                  ...prev,
+                                  [i()]: e.target.value,
+                                }));
+                              }}
+                              width={"100%"}
+                              // disabled={}
+                              value={
+                                selectedInstancesNames[i()] || instance.name
+                              }
+                            />
+                            <Button
+                              onClick={() => {
+                                setInstanceNameEditModes((prev) => ({
+                                  ...prev,
+                                  [i()]: false,
+                                }));
+                              }}
+                            >
+                              <div class="i-ri:check-fill" />
+                            </Button>
+                          </Match>
+                          <Match when={!instanceNameEditModes[i()]}>
+                            <span
+                              classList={{
+                                "text-darkSlate-500":
+                                  importedInstances().includes(i()),
+                              }}
+                            >
+                              {selectedInstancesNames[i()] || instance.name}
+                            </span>
+                            <Show
+                              when={
+                                selectedInstancesIndexes[i()] &&
+                                (loadingInstances[i()] === null ||
+                                  loadingInstances[i()] === undefined)
+                              }
+                            >
+                              <Button
+                                onClick={() => {
+                                  setInstanceNameEditModes((prev) => ({
+                                    ...prev,
+                                    [i()]: true,
+                                  }));
+                                }}
+                              >
+                                <div class="i-ri:pencil-fill" />
+                              </Button>
+                            </Show>
+                          </Match>
+                        </Switch>
                       </div>
                       <Show
                         when={
@@ -379,7 +458,10 @@ const Import = (props: Props) => {
           importInstanceMutation.mutate({
             entity: selectedEntity(),
             index: parsedIndex,
-            name: instances()?.data?.at(parsedIndex)?.name || "", // TODO: editable name
+            name:
+              selectedInstancesNames[parsedIndex] ||
+              instances()?.data?.at(parsedIndex)?.name ||
+              "Unknown Instance Name",
           });
         }}
       >

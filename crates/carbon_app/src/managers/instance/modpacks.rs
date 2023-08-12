@@ -60,6 +60,7 @@ impl PrepareModpack for CurseforgeModpack {
         downloads: &mut Vec<Downloadable>,
         subtasks: PrepareModpackSubtasks,
     ) -> anyhow::Result<StandardVersion> {
+        tracing::info!("Preparing curseforge modpack `{:?}`", self);
         let t_request = subtasks.t_request;
         let t_extract_files = subtasks.t_extract_files;
         let t_download_files = subtasks.t_download_files;
@@ -125,6 +126,7 @@ impl PrepareModpack for CurseforgeModpack {
                 project_id,
                 file_id,
             } => {
+                tracing::info!("Curseforge Remote install");
                 t_request.start_opaque();
                 let file = app
                     .modplatforms_manager()
@@ -146,6 +148,7 @@ impl PrepareModpack for CurseforgeModpack {
                 .await?
             }
             CurseforgeInstallSource::Local { archive_path } => {
+                tracing::info!("Curseforge Local install");
                 let file_size = std::fs::metadata(&archive_path)?.len();
                 // show pack as already downloaded
                 modpack_progress_tx.send_modify(|progress| {
@@ -178,6 +181,7 @@ impl PrepareModpack for ModrinthModpack {
         downloads: &mut Vec<Downloadable>,
         subtasks: PrepareModpackSubtasks,
     ) -> anyhow::Result<StandardVersion> {
+        tracing::info!("Preparing modrinth modpack `{:?}`", self);
         let t_request = subtasks.t_request;
         let t_extract_files = subtasks.t_extract_files;
         let t_download_files = subtasks.t_download_files;
@@ -237,6 +241,7 @@ impl PrepareModpack for ModrinthModpack {
                 project_id,
                 version_id,
             } => {
+                tracing::info!("Modrinth Remote Install");
                 t_request.start_opaque();
                 let file = app
                     .modplatforms_manager()
@@ -263,6 +268,13 @@ impl PrepareModpack for ModrinthModpack {
                 .await?
             }
             ModrinthInstallSource::Local { mrpack_path } => {
+                tracing::info!("Modrinth Local Install");
+                // TODO
+                // let file_size = std::fs::metadata(&mrpack_path)?.len();
+                // show pack as already downloaded
+                // modpack_progress_tx.send_modify(|progress| {
+                //     progress..set((file_size, file_size))
+                // });
                 modrinth::prepare_modpack_from_mrpack(
                     &app,
                     mrpack_path.into(),

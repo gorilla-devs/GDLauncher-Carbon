@@ -124,6 +124,8 @@ export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadd
 
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 
+export type FEScanEntity = { entity: FEEntity; scanPaths: string[] }
+
 export type CFFEModAsset = { id: number; modId: number; title: string; description: string; thumbnailUrl: string; url: string }
 
 /**
@@ -175,8 +177,6 @@ export type CFFEModFileParameters = { modId: number; fileId: number }
 
 export type OpenInstanceFolder = { instance_id: FEInstanceId; folder: InstanceFolder }
 
-export type FEImportInstance = { entity: FEEntity; index: number; name: string }
-
 export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
 export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
@@ -186,8 +186,6 @@ export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningO
 export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
 
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
-
-export type FEScanEntity = { entity: FEEntity; scanPaths: string[] }
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
 
@@ -288,6 +286,8 @@ export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 export type FEUnifiedModSortIndex = { curseForge: CFFEModSearchSortField } | { modrinth: MRFESearchIndex }
 
 export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
+
+export type FEImportInstance = { entity: FEEntity; index: number; name: string }
 
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
@@ -419,7 +419,7 @@ export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type CFFEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
-export type FEImportableInstance = { entity: FEEntity; name: string }
+export type FEImportableInstance = { entity: FEEntity; name: string; importOnce: boolean }
 
 export type CFFEMod = { id: number; gameId: number; name: string; slug: string; links: CFFEModLinks; summary: string; status: CFFEModStatus; downloadCount: number; isFeatured: boolean; primaryCategoryId: number; categories: CFFECategory[]; classId: number | null; authors: CFFEModAuthor[]; logo: CFFEModAsset | null; screenshots: CFFEModAsset[]; mainFileId: number; latestFiles: CFFEFile[]; latestFilesIndexes: CFFEFileIndex[]; dateCreated: string; dateModified: string; dateReleased: string; allowModDistribution: boolean | null; gamePopularityRank: number; isAvailable: boolean; thumbsUpCount: number }
 
