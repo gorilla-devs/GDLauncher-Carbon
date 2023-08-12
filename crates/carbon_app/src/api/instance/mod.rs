@@ -286,8 +286,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .collect::<Vec<_>>())
         }
 
-        mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
-            import::scan_importable_instances(app, entity).await
+        query GET_IMPORTABLE_ENTITY_DEFAULT_SCAN_PATH[app, entity: import::FEEntity] {
+            import::get_default_scan_path(app, entity).await
+        }
+
+        mutation SCAN_IMPORTABLE_INSTANCES[app, args: import::FEScanEntity] {
+            import::scan_importable_instances(app, args.entity, args.scan_paths.into_iter().map(Into::into).collect()).await
         }
 
         query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {

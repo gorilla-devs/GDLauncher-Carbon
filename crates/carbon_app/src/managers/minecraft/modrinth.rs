@@ -2,7 +2,7 @@ use std::borrow::BorrowMut;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 use zip::ZipArchive;
@@ -71,24 +71,41 @@ pub async fn prepare_modpack_from_file(
 
     let progress_percentage_sender = progress_percentage_sender.await??;
 
-    prepare_modpack_from_mrpack(app, file_path, instance_path, progress_percentage_sender).await
+    prepare_modpack_from_mrpack(app, file_path, instance_path, true, progress_percentage_sender).await
 }
 
 pub async fn prepare_modpack_from_mrpack(
     app: &App,
     mrpack_path: PathBuf,
     instance_path: InstancePath,
+    remove_after: bool,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
 
     let file_path_clone = mrpack_path.clone();
     let (archive, index) = spawn_blocking(move || {
-        let file = std::fs::File::open(file_path_clone)?;
-        let mut archive = zip::ZipArchive::new(file)?;
+        let file = std::fs::File::open(&file_path_clone)
+            .with_context(|| format!("Error reading `{}`", file_path_clone.to_string_lossy()))?;
+        let mut archive = zip::ZipArchive::new(file).with_context(|| {
+            format!(
+                "Error reading archive `{}`",
+                file_path_clone.to_string_lossy()
+            )
+        })?;
         let index: ModpackIndex = {
-            let file = archive.by_name("modrinth.index.json")?;
-            serde_json::from_reader(file)?
+            let file = archive.by_name("modrinth.index.json").with_context(|| {
+                format!(
+                    "Error reading `modrinth.index.json` from `{}`",
+                    file_path_clone.to_string_lossy()
+                )
+            })?;
+            serde_json::from_reader(file).with_context(|| {
+                format!(
+                    "Error parsing `modrinth.index.json` from `{}`",
+                    file_path_clone.to_string_lossy()
+                )
+            })?
         };
 
         Ok::<_, anyhow::Error>((archive, index))
@@ -126,7 +143,9 @@ pub async fn prepare_modpack_from_mrpack(
         let files_len = required_files.len() as u64;
 
         let data_path = instance_path.get_data_path();
-        tokio::fs::create_dir_all(&data_path).await?;
+        tokio::fs::create_dir_all(&data_path)
+            .await
+            .with_context(|| format!("error creating directory {}", data_path.to_string_lossy()))?;
 
         for file in required_files {
             let semaphore = semaphore.clone();
@@ -169,7 +188,11 @@ pub async fn prepare_modpack_from_mrpack(
     let data_path = instance_path.get_data_path();
     copy_overrides(archive, data_path, progress_percentage_sender).await?;
 
-    tokio::fs::remove_file(&mrpack_path).await?;
+    if remove_after {
+        tokio::fs::remove_file(&mrpack_path)
+            .await
+            .with_context(|| format!("Error removing file {}", mrpack_path.to_string_lossy()))?;
+    }
 
     Ok(ModpackInfo {
         index,

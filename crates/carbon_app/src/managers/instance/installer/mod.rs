@@ -642,7 +642,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                         })
                                         .peekable();
 
-                                    let mut matched_version = matching_versions.peek().map(|f| *f);
+                                    let mut matched_version = matching_versions.peek().copied();
                                     let mut matched_channel = ModChannel::Alpha;
 
                                     for version in matching_versions {
@@ -919,7 +919,7 @@ impl ResourceInstaller for ModrinthModInstaller {
                                             .peekable();
 
                                         let mut matched_version =
-                                            matching_versions.peek().map(|f| *f);
+                                            matching_versions.peek().copied();
                                         let mut matched_channel = ModChannel::Alpha;
 
                                         for version in matching_versions {

@@ -146,6 +146,8 @@
   "instance.sort_by_totalDownloads": "Total downloads",
   "instance.import": "Import",
   "instance.import_path": "Import Path",
+  "instance.import_mrpack": "MRPack",
+  "instance.import_curseforgezip": "Curaseforge Zip",
   "instance.import_select_curseforgezip": "Select Curseforge Zip",
   "instance.import_select_mrpack": "Select MRPack",
   "instance.import_select_scan_path": "Select Scan Path",

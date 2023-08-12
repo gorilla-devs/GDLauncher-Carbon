@@ -97,6 +97,7 @@ keys! {
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
         GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
+        GET_IMPORTABLE_ENTITY_DEFAULT_SCAN_PATH     = "getImportableEntityDefaultScanPath";
         IMPORT_INSTANCE                             = "importInstance";
     }
 

@@ -12,8 +12,8 @@ pub mod legacy_gdlauncher;
 #[derive(Debug, Serialize, Deserialize, EnumIter)]
 pub enum Entity {
     LegacyGDLauncher,
-    MRPack(String),
-    CurseForgeZip(String),
+    MRPack,
+    CurseForgeZip,
     Modrinth,
     CurseForge,
     ATLauncher,
@@ -31,6 +31,7 @@ impl Entity {
 }
 
 pub struct ImportableInstance {
+    pub entity: Entity,
     pub name: String,
 }
 
@@ -38,7 +39,8 @@ pub struct ImportableInstance {
 pub trait InstanceImporter {
     type Config: Sized;
 
-    async fn scan(&mut self, app: Arc<AppInner>, path: Option<PathBuf>) -> anyhow::Result<()>;
+    async fn scan(&mut self, app: Arc<AppInner>, scan_paths: Vec<PathBuf>) -> anyhow::Result<()>;
+    async fn get_default_scan_path(&self, app: Arc<AppInner>) -> anyhow::Result<Option<PathBuf>>;
     async fn get_available(&self) -> anyhow::Result<Vec<ImportableInstance>>;
     async fn import(&self, app: Arc<AppInner>, index: u32, name: &str) -> anyhow::Result<VisualTaskId>;
 }
@@ -47,6 +49,7 @@ pub trait InstanceImporter {
 pub struct Importer {
     pub legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter,
     pub curseforge_zip: archive_importer::CurseForgeZipImporter,
+    pub mrpack: archive_importer::MrpackImporter,
 }
 
 #[derive(Debug)]

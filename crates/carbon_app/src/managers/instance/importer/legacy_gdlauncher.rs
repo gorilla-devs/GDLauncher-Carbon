@@ -14,14 +14,10 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{
-        instance::InstanceVersionSource,
-        vtask::Subtask,
-        AppInner,
-    },
+    managers::{instance::InstanceVersionSource, vtask::Subtask, AppInner},
 };
 
-use super::InstanceImporter;
+use super::{InstanceImporter, Entity};
 
 #[derive(Debug, Default)]
 pub struct LegacyGDLauncherImporter {
@@ -32,11 +28,14 @@ pub struct LegacyGDLauncherImporter {
 impl InstanceImporter for LegacyGDLauncherImporter {
     type Config = LegacyGDLauncherConfigWrapper;
 
-    async fn scan(&mut self, app: Arc<AppInner>, _path: Option<PathBuf>) -> anyhow::Result<()> {
-        let mut old_gdl_base_path = directories::BaseDirs::new()
-            .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
-            .data_dir()
-            .join("gdlauncher_next");
+    async fn scan(&mut self, app: Arc<AppInner>, scan_paths: Vec<PathBuf>) -> anyhow::Result<()> {
+        let mut old_gdl_base_path = match scan_paths.first() {
+            Some(path) => path.clone(),
+            None => directories::BaseDirs::new()
+                .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
+                .data_dir()
+                .join("gdlauncher_next"),
+        };
 
         let override_path = old_gdl_base_path.join("override.data");
 
@@ -98,12 +97,22 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(())
     }
 
+    async fn get_default_scan_path(&self, _app: Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
+        Ok(Some(
+            directories::BaseDirs::new()
+                .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
+                .data_dir()
+                .join("gdlauncher_next"),
+        ))
+    }
+
     async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
         let mut instances = Vec::new();
 
         let lock = self.results.lock().await;
         for instance in lock.iter() {
             instances.push(super::ImportableInstance {
+                entity: Entity::LegacyGDLauncher,
                 name: instance.name.clone(),
             });
         }
@@ -111,7 +120,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(instances)
     }
 
-    async fn import(&self, app: Arc<AppInner>, index: u32, name: &str) -> anyhow::Result<VisualTaskId> {
+    async fn import(
+        &self,
+        app: Arc<AppInner>,
+        index: u32,
+        name: &str,
+    ) -> anyhow::Result<VisualTaskId> {
         let lock = self.results.lock().await;
         let instance = lock
             .get(index as usize)
@@ -314,7 +328,7 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         let mut importer = super::LegacyGDLauncherImporter::default();
-        importer.scan(app.app.clone(), None).await.unwrap();
+        importer.scan(app.app.clone(), vec![]).await.unwrap();
 
         let instances = importer.get_available().await.unwrap();
 

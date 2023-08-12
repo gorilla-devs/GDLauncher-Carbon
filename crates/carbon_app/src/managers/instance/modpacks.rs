@@ -156,6 +156,7 @@ impl PrepareModpack for CurseforgeModpack {
                     &app,
                     archive_path.into(),
                     instance_path.clone(),
+                    false,
                     modpack_progress_tx,
                 )
                 .await?
@@ -266,6 +267,7 @@ impl PrepareModpack for ModrinthModpack {
                     &app,
                     mrpack_path.into(),
                     instance_path.clone(),
+                    false,
                     modpack_progress_tx,
                 )
                 .await?

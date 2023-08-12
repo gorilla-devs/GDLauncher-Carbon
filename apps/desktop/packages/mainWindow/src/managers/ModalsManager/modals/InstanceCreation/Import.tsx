@@ -6,7 +6,6 @@ import {
   setCurrentInstanceIndex,
   setInstances,
   setLoadingInstances,
-  setSelectedInstanceNames,
   setSelectedInstancesIndexes,
   setTaskId,
   taskId,
@@ -21,6 +20,7 @@ import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FETask } from "@gd/core_module/bindings";
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Checkbox, Input, Spinner } from "@gd/ui";
+import { OpenDialogOptions } from "electron";
 import {
   For,
   Match,
@@ -30,8 +30,6 @@ import {
   createEffect,
   createSignal,
 } from "solid-js";
-
-import { OpenDialogOptions, dialog } from "electron";
 
 type Props = {
   setIsLoading?: Setter<boolean>;
@@ -115,8 +113,15 @@ const Import = (props: Props) => {
     "curseforgezip",
   ];
 
+  let inputRef: HTMLInputElement | undefined;
+
+  const [scanPaths, setScanPaths] = createSignal<string[]>([]);
+
   createEffect(() => {
-    scanImportableInstancesMutation.mutate(selectedEntity());
+    scanImportableInstancesMutation.mutate({
+      entity: selectedEntity(),
+      scanPaths: scanPaths(),
+    });
   });
 
   const selectAll = (checked: boolean) => {
@@ -142,58 +147,43 @@ const Import = (props: Props) => {
     }
   });
 
-  const isMRPack = (entity: FEEntity): entity is { mrpack: string } => {
-    if (typeof entity === "string") {
-      return false;
-    } else {
-      return "mrpack" in entity;
-    }
-  };
-
-  const isCurseforgeZip = (
-    entity: FEEntity
-  ): entity is { curseforgezip: string } => {
-    if (typeof entity === "string") {
-      return false;
-    } else {
-      return "curseforgezip" in entity;
-    }
-  };
-
-  const nameFromEntity = (entity: FEEntity): string => {
-    if (isCurseforgeZip(entity)) {
-      return "curseforgezip";
-    } else if (isMRPack(entity)) {
-      return "mrpack";
-    } else {
-      return entity;
-    }
-  };
-
   const dialogPropertiesFromEntity = (entity: FEEntity): OpenDialogOptions => {
-    if (isMRPack(entity)) {
+    if (entity === "mrpack") {
       return {
         title: t("instance.import_select_mrpack") as string,
-        properties: ["openFile"],
+        properties: ["openFile", "multiSelections"],
         filters: [{ name: "Mrpack", extensions: ["mrpack"] }],
       };
-    } else if (isCurseforgeZip(entity)) {
+    } else if (entity === "curseforgezip") {
       return {
         title: t("instance.import_select_curseforgezip") as string,
-        properties: ["openFile"],
+        properties: ["openFile", "multiSelections"],
         filters: [{ name: "Curseforge Zip", extensions: ["zip"] }],
       };
     } else {
       return {
         title: t("instance.import_select_scan_path") as string,
-        properties: ["openDirectory"],
+        properties: ["openDirectory", "multiSelections"],
         filters: [],
       };
     }
   };
 
-  let inputRef: HTMLInputElement | undefined;
-  const [scanPath, setScanPath] = createSignal("");
+  const placeholderFromEntity = (entity: FEEntity): string => {
+    if (entity === "mrpack") {
+      return t("instance.import_mrpack");
+    } else if (entity === "curseforgezip") {
+      return t("instance.import_curseforgezip");
+    } else {
+      return t("instance.import_path");
+    }
+  };
+
+  createEffect(() => {
+    if (inputRef !== undefined) {
+      inputRef.placeholder = placeholderFromEntity(selectedEntity());
+    }
+  });
 
   return (
     <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
@@ -202,7 +192,6 @@ const Import = (props: Props) => {
           <div class="flex gap-4 py-2">
             <For each={entities.data}>
               {(entity) => {
-                const entityName = nameFromEntity(entity);
                 return (
                   <div
                     class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
@@ -210,24 +199,22 @@ const Import = (props: Props) => {
                       "border-2 border-solid border-transparent text-darkSlate-200":
                         selectedEntity() !== entity,
                       "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
-                        !currentlySupportedEntities.includes(entityName),
+                        !currentlySupportedEntities.includes(entity),
                       "border-2 border-solid border-primary-500":
-                        currentlySupportedEntities.includes(entityName) ||
+                        currentlySupportedEntities.includes(entity) ||
                         selectedEntity() === entity,
                     }}
                     onClick={() => {
-                      if (currentlySupportedEntities.includes(entityName))
+                      if (currentlySupportedEntities.includes(entity))
                         setSelectedEntity(entity);
                     }}
                   >
-                    <Show
-                      when={!currentlySupportedEntities.includes(entityName)}
-                    >
+                    <Show when={!currentlySupportedEntities.includes(entity)}>
                       <span class="absolute rounded-full text-white text-xs -top-2 -right-4 bg-green-500 px-1">
                         <Trans key="instances.import_entity_coming_soon" />
                       </span>
                     </Show>
-                    {t(`entity.${entityName}`)}
+                    {t(`entity.${entity}`)}
                   </div>
                 );
               }}
@@ -240,19 +227,23 @@ const Import = (props: Props) => {
             placeholder={t("instance.import_path") as string}
             icon={<div class="i-ri:archive-drawer" />}
             class="w-full rounded-full"
-            onInput={(e) => setScanPath(e.target.value)}
+            onInput={(e) => setScanPaths(e.target.value.split(";"))}
             // disabled={}
           />
           <Button
-            disabled={isAllImported()}
             onClick={() => {
               const dialogProperties = dialogPropertiesFromEntity(
                 selectedEntity()
               );
-              console.log(dialogProperties);
-              window
-                .openFileDialogExtended(dialogProperties)
-                .then((files) => {});
+              window.openFileDialogExtended(dialogProperties).then((result) => {
+                if (!result.canceled) {
+                  if (result.filePaths[0]) {
+                    setScanPaths(result.filePaths);
+                    if (inputRef !== undefined)
+                      inputRef.value = result.filePaths.join(";");
+                  }
+                }
+              });
             }}
           >
             <div class="i-ri:archive-drawer-fill" />
@@ -388,7 +379,7 @@ const Import = (props: Props) => {
           importInstanceMutation.mutate({
             entity: selectedEntity(),
             index: parsedIndex,
-            name: "", // TODO
+            name: instances()?.data?.at(parsedIndex)?.name || "", // TODO: editable name
           });
         }}
       >

@@ -31,7 +31,7 @@ use futures::Future;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
 
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 
 use crate::{
     domain::instance::info::{GameVersion, Instance},
@@ -335,7 +335,14 @@ async fn prepare_game_installation_task(
                     &mut downloads,
                     subtasks,
                 )
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Error preparing modpack `{:?}` at {} ",
+                        &modpack,
+                        &info.instance_path.get_root().to_string_lossy()
+                    )
+                })?;
 
             tracing::info!("Modpack version: {:?}", v);
 

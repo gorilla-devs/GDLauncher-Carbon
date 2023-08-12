@@ -2,6 +2,7 @@ use std::borrow::BorrowMut;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use anyhow::Context;
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 
@@ -108,24 +109,48 @@ pub async fn prepare_modpack_from_addon(
 
     let progress_percentage_sender = progress_percentage_sender.await??;
 
-    prepare_modpack_from_zip(app, file_path, instance_path, progress_percentage_sender).await
+    prepare_modpack_from_zip(
+        app,
+        file_path,
+        instance_path,
+        true,
+        progress_percentage_sender,
+    )
+    .await
 }
 
 pub async fn prepare_modpack_from_zip(
     app: &App,
     zip_path: PathBuf,
     instance_path: InstancePath,
+    remove_after: bool,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
 
     let file_path_clone = zip_path.clone();
     let (mut archive, manifest) = spawn_blocking(move || {
-        let file = std::fs::File::open(file_path_clone)?;
-        let mut archive = zip::ZipArchive::new(file)?;
+        let file = std::fs::File::open(&file_path_clone)
+            .with_context(|| format!("Error reading `{}`", file_path_clone.to_string_lossy()))?;
+        let mut archive = zip::ZipArchive::new(file).with_context(|| {
+            format!(
+                "Error reading archive `{}`",
+                file_path_clone.to_string_lossy()
+            )
+        })?;
         let manifest: curseforge::manifest::Manifest = {
-            let file = archive.by_name("manifest.json")?;
-            serde_json::from_reader(file)?
+            let file = archive.by_name("manifest.json").with_context(|| {
+                format!(
+                    "Error reading `manifest.json` from `{}`",
+                    file_path_clone.to_string_lossy()
+                )
+            })?;
+            serde_json::from_reader(file).with_context(|| {
+                format!(
+                    "Error parsing `manifest.json` from `{}`",
+                    file_path_clone.to_string_lossy()
+                )
+            })?
         };
 
         Ok::<_, anyhow::Error>((archive, manifest))
@@ -160,7 +185,7 @@ pub async fn prepare_modpack_from_zip(
                     .await?;
 
                 let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
-                let target_path = secure_path_join(&instance_path, mod_file.file_name)?;
+                let target_path = secure_path_join(instance_path, mod_file.file_name)?;
 
                 let downloadable = Downloadable::new(
                     mod_file
@@ -191,7 +216,14 @@ pub async fn prepare_modpack_from_zip(
 
     let override_folder_name = manifest.overrides.clone();
     let override_full_path = instance_path.get_data_path();
-    tokio::fs::create_dir_all(&override_full_path).await?;
+    tokio::fs::create_dir_all(&override_full_path)
+        .await
+        .with_context(|| {
+            format!(
+                "Error creating directory {}",
+                override_full_path.to_string_lossy()
+            )
+        })?;
     spawn_blocking(move || {
         let total_archive_files = archive.len() as u64;
         for i in 0..archive.len() {
@@ -235,7 +267,11 @@ pub async fn prepare_modpack_from_zip(
     })
     .await??;
 
-    tokio::fs::remove_file(&zip_path).await?;
+    if remove_after {
+        tokio::fs::remove_file(&zip_path)
+            .await
+            .with_context(|| format!("Error removing file {}", zip_path.to_string_lossy()))?;
+    }
 
     Ok(ModpackInfo {
         manifest,
