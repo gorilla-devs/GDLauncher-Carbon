@@ -270,11 +270,13 @@ impl PrepareModpack for ModrinthModpack {
             ModrinthInstallSource::Local { mrpack_path } => {
                 tracing::info!("Modrinth Local Install");
                 // TODO
-                // let file_size = std::fs::metadata(&mrpack_path)?.len();
+                let file_size = std::fs::metadata(&mrpack_path)?.len();
                 // show pack as already downloaded
-                // modpack_progress_tx.send_modify(|progress| {
-                //     progress..set((file_size, file_size))
-                // });
+                modpack_progress_tx.send(modrinth::ProgressState::DownloadingMRPack(
+                    file_size,
+                    file_size,
+                ))?;
+
                 modrinth::prepare_modpack_from_mrpack(
                     &app,
                     mrpack_path.into(),

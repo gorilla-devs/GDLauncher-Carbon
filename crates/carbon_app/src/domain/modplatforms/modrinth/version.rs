@@ -74,7 +74,7 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
             .ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
         let mut modloaders = HashSet::new();
         for (key, version) in value.loaders.into_iter() {
-            let modloader_name = key.strip_suffix("_loader").unwrap_or(&key);
+            let modloader_name = key.strip_suffix("-loader").unwrap_or(&key);
             modloaders.insert(ModLoader {
                 type_: modloader_name.parse()?,
                 version: format!("{}-{}", &minecraft_version, version),

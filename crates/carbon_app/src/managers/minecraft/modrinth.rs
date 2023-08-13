@@ -134,6 +134,10 @@ pub async fn prepare_modpack_from_mrpack(
         .cloned()
         .collect();
 
+    // TODO: handle presenting optional files to the user.
+    // perhaps install but disable them by defualt?
+    tracing::info!("mrpack optional files: {:?}", &_optional_files);
+
     let downloadables = {
         let mut handles = Vec::new();
 
@@ -185,14 +189,17 @@ pub async fn prepare_modpack_from_mrpack(
             .collect::<Result<Vec<_>, _>>()?
     };
 
+
     let data_path = instance_path.get_data_path();
     copy_overrides(archive, data_path, progress_percentage_sender).await?;
+
 
     if remove_after {
         tokio::fs::remove_file(&mrpack_path)
             .await
             .with_context(|| format!("Error removing file {}", mrpack_path.to_string_lossy()))?;
     }
+
 
     Ok(ModpackInfo {
         index,
