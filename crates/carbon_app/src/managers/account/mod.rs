@@ -328,7 +328,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     }
                     _ => {}
                 }
-
             }
         }
 

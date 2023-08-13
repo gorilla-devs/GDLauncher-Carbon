@@ -71,7 +71,14 @@ pub async fn prepare_modpack_from_file(
 
     let progress_percentage_sender = progress_percentage_sender.await??;
 
-    prepare_modpack_from_mrpack(app, file_path, instance_path, true, progress_percentage_sender).await
+    prepare_modpack_from_mrpack(
+        app,
+        file_path,
+        instance_path,
+        true,
+        progress_percentage_sender,
+    )
+    .await
 }
 
 pub async fn prepare_modpack_from_mrpack(
@@ -189,17 +196,14 @@ pub async fn prepare_modpack_from_mrpack(
             .collect::<Result<Vec<_>, _>>()?
     };
 
-
     let data_path = instance_path.get_data_path();
     copy_overrides(archive, data_path, progress_percentage_sender).await?;
-
 
     if remove_after {
         tokio::fs::remove_file(&mrpack_path)
             .await
             .with_context(|| format!("Error removing file {}", mrpack_path.to_string_lossy()))?;
     }
-
 
     Ok(ModpackInfo {
         index,

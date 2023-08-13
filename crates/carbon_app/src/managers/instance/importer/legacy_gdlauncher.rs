@@ -17,7 +17,7 @@ use crate::{
     managers::{instance::InstanceVersionSource, vtask::Subtask, AppInner},
 };
 
-use super::{InstanceImporter, Entity};
+use super::{Entity, InstanceImporter};
 
 #[derive(Debug, Default)]
 pub struct LegacyGDLauncherImporter {
@@ -236,10 +236,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 let instance_manager = app_clone.instance_manager();
                 let instances = instance_manager.instances.read().await;
 
-                let instance_shortpath = &instances
-                    .get(&created_instance_id)
-                    .unwrap()
-                    .shortpath;
+                let instance_shortpath = &instances.get(&created_instance_id).unwrap().shortpath;
 
                 let instance_path = app_clone
                     .settings_manager()

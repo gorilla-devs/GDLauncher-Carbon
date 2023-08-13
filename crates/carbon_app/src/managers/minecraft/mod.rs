@@ -1,4 +1,4 @@
-use std::path::{PathBuf, Path, Component};
+use std::path::{Component, Path, PathBuf};
 
 use carbon_net::Downloadable;
 use daedalus::{

@@ -273,8 +273,7 @@ impl PrepareModpack for ModrinthModpack {
                 let file_size = std::fs::metadata(&mrpack_path)?.len();
                 // show pack as already downloaded
                 modpack_progress_tx.send(modrinth::ProgressState::DownloadingMRPack(
-                    file_size,
-                    file_size,
+                    file_size, file_size,
                 ))?;
 
                 modrinth::prepare_modpack_from_mrpack(

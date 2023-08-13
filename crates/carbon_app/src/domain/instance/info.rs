@@ -47,7 +47,7 @@ pub enum CurseforgeModpack {
     },
     Unmanaged {
         archive_path: String,
-    }
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -63,8 +63,7 @@ pub enum ModrinthModpack {
     },
     Unmanaged {
         mrpack_path: String,
-    }
-
+    },
 }
 
 #[derive(Debug, Clone)]
