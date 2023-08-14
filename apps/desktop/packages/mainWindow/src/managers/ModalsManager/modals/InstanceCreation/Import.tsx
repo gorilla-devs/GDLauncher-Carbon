@@ -121,11 +121,12 @@ const Import = (props: Props) => {
   };
 
   const areAllSelected = () =>
-    Object.values(selectedInstancesIndexes).filter((instance) => instance)
-      .length === instances()?.data?.length;
+    Object.values(selectedInstancesIndexes).every((instance) => instance);
+  const getEverySelectedInstance = () =>
+    Object.values(selectedInstancesIndexes).filter((instance) => instance);
 
   const isAllImported = () =>
-    importedInstances().length === instances()?.data?.length;
+    importedInstances().length === getEverySelectedInstance().length;
 
   createEffect(() => {
     if (isAllImported()) {
@@ -246,13 +247,13 @@ const Import = (props: Props) => {
                           loadingInstances[i()] !== undefined
                         }
                       >
-                        <div class="flex justify-between w-full">
+                        <div class="flex justify-between w-full items-center">
                           <Show
                             when={isProgressKnown(
                               (loadingInstances[i()] as FETask).progress
                             )}
                           >
-                            <div class="w-1/2 relative rounded-lg overflow-hidden bg-darkSlate-600">
+                            <div class="w-1/2 relative rounded-lg overflow-hidden bg-darkSlate-600 h-1">
                               <div
                                 class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{

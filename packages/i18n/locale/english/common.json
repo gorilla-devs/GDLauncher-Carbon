@@ -175,6 +175,7 @@
   "instance.instance_version_release": "Stable",
   "instance.instance_version_snapshot": "Snapshot",
   "instance.instance_version_others": "Others",
+  "instance.instance_mc_version": "Minecraft version",
   "instance.overview_card_mods_title": "Mods",
   "instance.overview_card_played_time_title": "Played time",
   "instance.overview_card_last_played_title": "Last played",
