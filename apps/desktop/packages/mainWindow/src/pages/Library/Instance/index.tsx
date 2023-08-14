@@ -462,8 +462,8 @@ const Instance = () => {
                       ref={innerContainerRef}
                       class="flex justify-between cursor-default flex-row"
                     >
-                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-center h-full">
+                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600 flex-wrap">
+                        <div class="m-0 flex gap-2 items-center">
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
                           >
@@ -487,7 +487,7 @@ const Instance = () => {
                             undefined
                           }
                         >
-                          <div class="flex gap-2 items-center h-full">
+                          <div class="flex gap-2 items-center">
                             <div class="i-ri:time-fill" />
                             <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
@@ -557,20 +557,10 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
-                              <Trans
-                                key="instance.play"
-                                options={{
-                                  defaultValue: "play",
-                                }}
-                              />
+                              <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
-                              <Trans
-                                key="instance.stop"
-                                options={{
-                                  defaultValue: "stop",
-                                }}
-                              />
+                              <Trans key="instance.stop" />
                             </Match>
                           </Switch>
                         </Button>
@@ -638,20 +628,10 @@ const Instance = () => {
                   >
                     <Switch>
                       <Match when={!isRunning()}>
-                        <Trans
-                          key="instance.play"
-                          options={{
-                            defaultValue: "play",
-                          }}
-                        />
+                        <Trans key="instance.play" />
                       </Match>
                       <Match when={isRunning()}>
-                        <Trans
-                          key="instance.stop"
-                          options={{
-                            defaultValue: "stop",
-                          }}
-                        />
+                        <Trans key="instance.stop" />
                       </Match>
                     </Switch>
                   </Button>

@@ -43,7 +43,7 @@ const Authors = (props: Props) => {
 
   return (
     <Show when={getAuthors()?.length > 0}>
-      <div class="flex gap-2 items-center h-full">
+      <div class="flex gap-2 items-center">
         <div class="i-ri:user-fill" />
         <For each={getAuthors()}>
           {(author) => (
