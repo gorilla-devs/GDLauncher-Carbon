@@ -255,7 +255,7 @@ const Import = (props: Props) => {
                           >
                             <div class="w-1/2 relative rounded-lg overflow-hidden bg-darkSlate-600 h-1">
                               <div
-                                class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
+                                class="bg-primary-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{
                                   width: `${
                                     (
