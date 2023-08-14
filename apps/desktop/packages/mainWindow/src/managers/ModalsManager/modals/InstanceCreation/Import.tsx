@@ -260,7 +260,7 @@ const Import = (props: Props) => {
           />
           <Button
             // class="rounded-full"
-            icon={<div class="i-ri:archive-drawer-fill w-2 h-2" />}
+            icon={<div class="i-ri:archive-drawer-fill text-4xl" />}
             iconRight={true}
             onClick={() => {
               const dialogProperties = dialogPropertiesFromEntity(
