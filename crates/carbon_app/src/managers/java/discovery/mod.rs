@@ -22,9 +22,9 @@ pub struct MockDiscovery;
 impl Discovery for MockDiscovery {
     async fn find_java_paths(&self) -> Vec<PathBuf> {
         vec![
-            PathBuf::from("/usr/bin/java"),
-            PathBuf::from("/opt/java/bin/java"),
-            PathBuf::from("/opt/homebrew/opt/openjdk/bin/java"),
+            PathBuf::from("/java1"),
+            PathBuf::from("/java2"),
+            PathBuf::from("/java3"),
         ]
     }
 }
