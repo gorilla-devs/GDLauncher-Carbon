@@ -121,15 +121,18 @@ const Import = (props: Props) => {
   };
 
   const areAllSelected = () =>
-    Object.values(selectedInstancesIndexes).every((instance) => instance);
+    Object.values(selectedInstancesIndexes).every((instance) => instance) &&
+    Object.values(selectedInstancesIndexes).length > 0;
 
   const getEverySelectedInstance = () =>
     Object.values(selectedInstancesIndexes).filter((instance) => instance);
+
   const getLoadingInstances = () =>
     Object.values(loadingInstances).filter((loading) => loading);
 
   const isAllImported = () =>
-    importedInstances().length === getEverySelectedInstance().length;
+    importedInstances().length === getEverySelectedInstance().length &&
+    getEverySelectedInstance().length > 0;
 
   createEffect(() => {
     if (isAllImported()) {
@@ -212,11 +215,11 @@ const Import = (props: Props) => {
           </div>
           <Switch>
             <Match when={(instances()?.data?.length || 0) > 0}>
-              <div class="p-4 h-full w-full box-border flex flex-col gap-4">
+              <div class="py-4 pl-4 pr-2 h-full w-full box-border flex flex-col gap-4 overflow-y-auto">
                 <For each={instances()?.data}>
                   {(instance, i) => (
                     <div class="flex justify-between">
-                      <div class="flex gap-2 w-full">
+                      <div class="flex gap-2 w-full mr-1">
                         <Checkbox
                           disabled={
                             importedInstances().includes(i()) ||
