@@ -151,6 +151,15 @@ const Import = (props: Props) => {
     });
   };
 
+  const finishEditAll = () => {
+    instances()?.data?.forEach((_instance, i) => {
+      setInstanceNameEditModes((prev) => ({
+        ...prev,
+        [i]: false,
+      }));
+    });
+  };
+
   const areAllSelected = () =>
     Object.values(selectedInstancesIndexes).filter((instance) => instance)
       .length === instances()?.data?.length;
@@ -207,9 +216,11 @@ const Import = (props: Props) => {
   createEffect(() => {
     if (prevSelectedEntity() !== selectedEntity()) {
       setPrevSelectedEntity(selectedEntity());
+      // TODO: restore some of these settings on switch back?
       setSelectedInstancesIndexes(reconcile({}));
       setSelectedInstancesNames(reconcile({}));
       setInstanceNameEditModes(reconcile({}));
+      setImportedInstances(reconcile([]));
     }
   });
 
@@ -351,7 +362,7 @@ const Import = (props: Props) => {
                                 placeholder={
                                   t("instance.import_path") as string
                                 }
-                                class="w-full rounded-md"
+                                class="w-full rounded-md pr-4"
                                 onInput={(e) => {
                                   setSelectedInstancesNames((prev) => ({
                                     ...prev,
@@ -365,7 +376,7 @@ const Import = (props: Props) => {
                                 }
                               />
                               <div
-                                class="rounded-md cursor-pointer hover:bg-darkSlate-700 py-1 px-3 hover:text-blue-600"
+                                class="rounded-md cursor-pointer hover:bg-primary-300 py-1 px-3 vertical-mid"
                                 onClick={() => {
                                   setInstanceNameEditModes((prev) => ({
                                     ...prev,
@@ -391,11 +402,12 @@ const Import = (props: Props) => {
                                 when={
                                   selectedInstancesIndexes[i()] &&
                                   (loadingInstances[i()] === null ||
-                                    loadingInstances[i()] === undefined)
+                                    loadingInstances[i()] === undefined) &&
+                                  !importedInstances().includes(i())
                                 }
                               >
                                 <div
-                                  class="rounded-md cursor-pointer hover:bg-darkSlate-700 py-1 px-3 hover:text-blue-600"
+                                  class="rounded-md cursor-pointer hover:bg-primary-300 py-1 px-3 vertical-mid"
                                   onClick={() => {
                                     setInstanceNameEditModes((prev) => ({
                                       ...prev,
@@ -458,6 +470,7 @@ const Import = (props: Props) => {
         disabled={isAllImported()}
         onClick={() => {
           if (isLoading()) return;
+          finishEditAll();
           setIsLoading(true);
           props?.setIsLoading?.(true);
           const firstSelectedEntry = selectedEntires()[0];
