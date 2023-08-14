@@ -122,8 +122,11 @@ const Import = (props: Props) => {
 
   const areAllSelected = () =>
     Object.values(selectedInstancesIndexes).every((instance) => instance);
+
   const getEverySelectedInstance = () =>
     Object.values(selectedInstancesIndexes).filter((instance) => instance);
+  const getLoadingInstances = () =>
+    Object.values(loadingInstances).filter((loading) => loading);
 
   const isAllImported = () =>
     importedInstances().length === getEverySelectedInstance().length;
@@ -174,8 +177,7 @@ const Import = (props: Props) => {
               disabled={
                 isAllImported() ||
                 importedInstances().length > 0 ||
-                Object.values(loadingInstances).filter((loading) => loading)
-                  .length > 0
+                getLoadingInstances().length > 0
               }
               checked={areAllSelected()}
               onChange={(checked) => {
@@ -188,14 +190,12 @@ const Import = (props: Props) => {
                 "text-darkSlate-600":
                   isAllImported() ||
                   importedInstances().length > 0 ||
-                  Object.values(loadingInstances).filter((loading) => loading)
-                    .length > 0,
+                  getLoadingInstances().length > 0,
               }}
               onClick={() => {
                 if (
                   (!isAllImported() || importedInstances().length === 0) &&
-                  Object.values(loadingInstances).filter((loading) => loading)
-                    .length === 0
+                  getLoadingInstances().length === 0
                 )
                   selectAll(!areAllSelected());
               }}
@@ -302,12 +302,7 @@ const Import = (props: Props) => {
         }}
       >
         <Switch>
-          <Match
-            when={
-              Object.values(selectedInstancesIndexes).filter((id) => id)
-                .length > 0 && !isLoading()
-            }
-          >
+          <Match when={getEverySelectedInstance().length > 0 && !isLoading()}>
             <div class="i-ri:folder-open-fill" />
             <Trans
               key="instance.import_instance_amount"
@@ -318,12 +313,7 @@ const Import = (props: Props) => {
               }}
             />
           </Match>
-          <Match
-            when={
-              Object.values(selectedInstancesIndexes).filter((id) => id)
-                .length === 0 && !isLoading()
-            }
-          >
+          <Match when={getEverySelectedInstance().length === 0 && !isLoading()}>
             <div class="i-ri:folder-open-fill" />
             <Trans key="instance.import_instance" />
           </Match>
