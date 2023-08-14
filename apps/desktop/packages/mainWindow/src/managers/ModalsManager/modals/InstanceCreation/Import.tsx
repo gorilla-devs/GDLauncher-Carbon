@@ -249,17 +249,19 @@ const Import = (props: Props) => {
             </For>
           </div>
         </div>
-        <div class="flex justify-between rounded-xl bg-darkSlate-800 px-4 py-2 box-border">
+        <div class="flex justify-between bg-darkSlate-800 px-4 py-2 box-border rounded-xl">
           <Input
             ref={scanPathInputRef}
             placeholder={t("instance.import_path") as string}
-            icon={<div class="i-ri:archive-drawer" />}
-            class="w-full rounded-full"
+            class="w-full pr-4 py-0 rounded-md"
+            inputClass="py-0"
             onInput={(e) => setScanPaths(e.target.value.split(";"))}
-            width={"100%"}
             // disabled={}
           />
           <Button
+            // class="rounded-full"
+            icon={<div class="i-ri:archive-drawer-fill w-2 h-2" />}
+            iconRight={true}
             onClick={() => {
               const dialogProperties = dialogPropertiesFromEntity(
                 selectedEntity()
@@ -275,7 +277,6 @@ const Import = (props: Props) => {
               });
             }}
           >
-            <div class="i-ri:archive-drawer-fill" />
             <Trans key="general.browse_file" />
           </Button>
         </div>
@@ -344,61 +345,68 @@ const Import = (props: Props) => {
                         />
                         <Switch>
                           <Match when={instanceNameEditModes[i()]}>
-                            <Input
-                              ref={instanceNameInputRefs[i()]}
-                              placeholder={t("instance.import_path") as string}
-                              icon={<div class="i-ri:archive-drawer" />}
-                              class="w-full rounded-full"
-                              onInput={(e) => {
-                                setSelectedInstancesNames((prev) => ({
-                                  ...prev,
-                                  [i()]: e.target.value,
-                                }));
-                              }}
-                              width={"100%"}
-                              // disabled={}
-                              value={
-                                selectedInstancesNames[i()] || instance.name
-                              }
-                            />
-                            <Button
-                              onClick={() => {
-                                setInstanceNameEditModes((prev) => ({
-                                  ...prev,
-                                  [i()]: false,
-                                }));
-                              }}
-                            >
-                              <div class="i-ri:check-fill" />
-                            </Button>
-                          </Match>
-                          <Match when={!instanceNameEditModes[i()]}>
-                            <span
-                              classList={{
-                                "text-darkSlate-500":
-                                  importedInstances().includes(i()),
-                              }}
-                            >
-                              {selectedInstancesNames[i()] || instance.name}
-                            </span>
-                            <Show
-                              when={
-                                selectedInstancesIndexes[i()] &&
-                                (loadingInstances[i()] === null ||
-                                  loadingInstances[i()] === undefined)
-                              }
-                            >
-                              <Button
+                            <div class="flex justify-between w-full">
+                              <Input
+                                ref={instanceNameInputRefs[i()]}
+                                placeholder={
+                                  t("instance.import_path") as string
+                                }
+                                class="w-full rounded-md"
+                                onInput={(e) => {
+                                  setSelectedInstancesNames((prev) => ({
+                                    ...prev,
+                                    [i()]: e.target.value,
+                                  }));
+                                }}
+                                width={"100%"}
+                                // disabled={}
+                                value={
+                                  selectedInstancesNames[i()] || instance.name
+                                }
+                              />
+                              <div
+                                class="rounded-md cursor-pointer hover:bg-darkSlate-700 py-1 px-3 hover:text-blue-600"
                                 onClick={() => {
                                   setInstanceNameEditModes((prev) => ({
                                     ...prev,
-                                    [i()]: true,
+                                    [i()]: false,
                                   }));
                                 }}
                               >
-                                <div class="i-ri:pencil-fill" />
-                              </Button>
-                            </Show>
+                                <div class="i-ri:check-fill" />
+                              </div>
+                            </div>
+                          </Match>
+                          <Match when={!instanceNameEditModes[i()]}>
+                            <div class="flex justify-between w-full">
+                              <span
+                                classList={{
+                                  "text-darkSlate-500":
+                                    importedInstances().includes(i()),
+                                }}
+                              >
+                                {selectedInstancesNames[i()] || instance.name}
+                              </span>
+                              <Show
+                                when={
+                                  selectedInstancesIndexes[i()] &&
+                                  (loadingInstances[i()] === null ||
+                                    loadingInstances[i()] === undefined)
+                                }
+                              >
+                                <div
+                                  class="rounded-md cursor-pointer hover:bg-darkSlate-700 py-1 px-3 hover:text-blue-600"
+                                  onClick={() => {
+                                    setInstanceNameEditModes((prev) => ({
+                                      ...prev,
+                                      [i()]: true,
+                                    }));
+                                  }}
+                                >
+                                  <div class="i-ri:pencil-fill" />
+                                </div>
+                              </Show>
+                            </div>
                           </Match>
                         </Switch>
                       </div>
