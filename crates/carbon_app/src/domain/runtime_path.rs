@@ -98,7 +98,7 @@ impl InstancesPath {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InstancePath(PathBuf);
 
 impl InstancePath {

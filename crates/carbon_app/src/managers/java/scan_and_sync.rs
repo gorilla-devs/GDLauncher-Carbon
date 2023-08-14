@@ -29,22 +29,63 @@ pub async fn add_java_component_to_db(
     db: &Arc<PrismaClient>,
     java_component: JavaComponent,
 ) -> anyhow::Result<String> {
-    let res = db
-        .java()
-        .create(
-            java_component.path,
-            java_component.version.major as i32,
-            java_component.version.try_into()?,
-            java_component._type.to_string(),
-            java_component.os.to_string(),
-            java_component.arch.to_string(),
-            java_component.vendor,
-            vec![],
-        )
-        .exec()
-        .await?;
+    let already_existing_component =
+        get_java_component_from_db(db, java_component.path.clone()).await?;
 
-    Ok(res.id)
+    let already_existing_component = already_existing_component
+        .map(|data| {
+            (
+                JavaComponent::try_from(data.clone()),
+                data.is_valid,
+                data.id,
+            )
+        })
+        .and_then(|res| {
+            let resp = res.0.ok();
+
+            match resp {
+                Some(val) => Some((val, res.1, res.2)),
+                None => None,
+            }
+        });
+
+    if let Some((component, is_valid, id)) = already_existing_component {
+        if component == java_component {
+            if !is_valid {
+                db.java()
+                    .update(
+                        crate::db::java::id::equals(id.clone()),
+                        vec![crate::db::java::is_valid::set(true)],
+                    )
+                    .exec()
+                    .await?;
+            }
+
+            return Ok(id);
+        }
+
+        anyhow::bail!(
+            "Component with path {} already exists in db but with different configuration",
+            java_component.path
+        );
+    } else {
+        let res = db
+            .java()
+            .create(
+                java_component.path,
+                java_component.version.major as i32,
+                java_component.version.to_string(),
+                java_component._type.to_string(),
+                java_component.os.to_string(),
+                java_component.arch.to_string(),
+                java_component.vendor,
+                vec![],
+            )
+            .exec()
+            .await?;
+
+        Ok(res.id)
+    }
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
@@ -233,8 +274,8 @@ where
 {
     let managed_javas = db
         .java()
-        .find_many(vec![crate::db::java::WhereParam::Type(
-            StringFilter::Equals(JavaComponentType::Managed.to_string()),
+        .find_many(vec![crate::db::java::r#type::equals(
+            JavaComponentType::Managed.to_string(),
         )])
         .exec()
         .await?;
@@ -339,16 +380,76 @@ mod test {
     };
 
     #[tokio::test]
+    async fn test_add_component_to_db() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+
+        let java_path = "/usr/bin/java2".to_string();
+
+        let java_component = JavaComponent {
+            path: java_path.clone(),
+            version: JavaVersion::from_major(8),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        assert_eq!(java_components.len(), 0);
+
+        add_java_component_to_db(db, java_component.clone())
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        assert_eq!(java_components.len(), 1);
+        assert_eq!(java_components[0].path, "/usr/bin/java2");
+        assert!(java_components[0].is_valid);
+
+        db.java()
+            .update(
+                crate::db::java::path::equals(java_path.clone()),
+                vec![crate::db::java::is_valid::set(false)],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        assert_eq!(java_components.len(), 1);
+        assert!(!java_components[0].is_valid);
+
+        add_java_component_to_db(db, java_component).await.unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+        assert_eq!(java_components.len(), 1);
+        assert!(java_components[0].is_valid);
+
+        let almost_equal_java_component = JavaComponent {
+            path: java_path.clone(),
+            version: JavaVersion::from_major(9), // different version
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+
+        let result = add_java_component_to_db(db, almost_equal_java_component).await;
+
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
     async fn test_scan_and_sync_local() {
         let app = setup_managers_for_test().await;
         let db = &app.prisma_client;
 
         let discovery = &MockDiscovery;
         let java_checker = &MockJavaChecker;
-        // // Insert one already existing path (/usr/bin/java) and one that should not exist anymore, hence removed (/usr/bin/java2)
+        // Insert one already existing path (/usr/bin/java) and one that should not exist anymore, hence removed (/usr/bin/java2)
 
         let component_to_remove = JavaComponent {
-            path: "/usr/bin/java2".to_string(),
+            path: "/java1".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86_32,
@@ -360,7 +461,7 @@ mod test {
             .unwrap();
 
         let component_to_keep = JavaComponent {
-            path: "/usr/bin/java".to_string(),
+            path: "/java4".to_string(),
             version: JavaVersion::from_major(8),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86_32,

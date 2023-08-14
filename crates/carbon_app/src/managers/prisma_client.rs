@@ -83,7 +83,6 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
 
         let sr = ring::rand::SystemRandom::new();
         sr.fill(&mut buf).unwrap();
-        println!("Buffer: {:?}", buf);
 
         let release_channel = match APP_VERSION {
             v if v.contains("alpha") => "alpha",

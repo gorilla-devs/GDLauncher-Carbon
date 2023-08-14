@@ -199,8 +199,8 @@ impl JavaVendor {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Hash)]
 pub struct JavaVersion {
     pub major: u16,
-    pub minor: Option<u16>,
-    pub patch: Option<String>,
+    pub minor: u16,
+    pub patch: String,
     pub update_number: Option<String>,
     pub prerelease: Option<String>,
     pub build_metadata: Option<String>,
@@ -217,8 +217,8 @@ impl TryFrom<&str> for JavaVersion {
         if let Some(captures) = regex.captures(version_string) {
             let mut version = JavaVersion {
                 major: 0,
-                minor: None,
-                patch: None,
+                minor: 0,
+                patch: "0".to_string(),
                 update_number: None,
                 prerelease: None,
                 build_metadata: None,
@@ -233,12 +233,12 @@ impl TryFrom<&str> for JavaVersion {
                     }
                     "minor" => {
                         if let Some(minor) = captures.name("minor") {
-                            version.minor = Some(minor.as_str().parse()?);
+                            version.minor = minor.as_str().parse()?;
                         }
                     }
                     "patch" => {
                         if let Some(patch) = captures.name("patch") {
-                            version.patch = Some(patch.as_str().parse()?);
+                            version.patch = patch.as_str().parse()?;
                         }
                     }
                     "update_number" => {
@@ -264,11 +264,9 @@ impl TryFrom<&str> for JavaVersion {
 
             // 1.8.0_832 -> 8.0.832
             if version.major == 1 {
-                version.major = version.minor.ok_or(anyhow::anyhow!(
-                    "No minor version found, but 1.x format found"
-                ))?;
-                version.minor = version.patch.map(|p| p.parse().unwrap_or(0));
-                version.patch = version.update_number;
+                version.major = version.minor;
+                version.minor = version.patch.parse()?;
+                version.patch = version.update_number.unwrap_or("0".to_string());
                 version.update_number = None;
             }
 
@@ -284,8 +282,8 @@ impl From<JavaVersion> for String {
         format!(
             "{}.{}.{}{}{}{}",
             v.major,
-            v.minor.unwrap_or(0),
-            v.patch.unwrap_or_default(),
+            v.minor,
+            v.patch,
             v.update_number.map(|u| format!("_{u}")).unwrap_or_default(),
             v.prerelease.map(|p| format!("-{p}")).unwrap_or_default(),
             v.build_metadata
@@ -305,8 +303,8 @@ impl JavaVersion {
     pub fn from_major(major: u16) -> Self {
         Self {
             major,
-            minor: None,
-            patch: None,
+            minor: 0,
+            patch: "0".to_string(),
             update_number: None,
             prerelease: None,
             build_metadata: None,
@@ -407,8 +405,8 @@ mod test {
                 output: "19.0.1",
                 expected: Some(JavaVersion {
                     major: 19,
-                    minor: Some(0),
-                    patch: Some("1".to_owned()),
+                    minor: 0,
+                    patch: "1".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: None,
@@ -422,8 +420,8 @@ mod test {
                 output: "1.8.0_352-b08",
                 expected: Some(JavaVersion {
                     major: 8,
-                    minor: Some(0),
-                    patch: Some("352".to_owned()),
+                    minor: 0,
+                    patch: "352".to_owned(),
                     update_number: None,
                     prerelease: Some("b08".to_owned()),
                     build_metadata: None,
@@ -433,8 +431,8 @@ mod test {
                 output: "19.0.1+10",
                 expected: Some(JavaVersion {
                     major: 19,
-                    minor: Some(0),
-                    patch: Some("1".to_owned()),
+                    minor: 0,
+                    patch: "1".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: Some("10".to_owned()),
@@ -444,8 +442,8 @@ mod test {
                 output: "1.4.0_03-b04",
                 expected: Some(JavaVersion {
                     major: 4,
-                    minor: Some(0),
-                    patch: Some("03".to_owned()),
+                    minor: 0,
+                    patch: "03".to_owned(),
                     update_number: None,
                     prerelease: Some("b04".to_owned()),
                     build_metadata: None,
@@ -455,8 +453,8 @@ mod test {
                 output: "17.0.6-beta+2-202211152348",
                 expected: Some(JavaVersion {
                     major: 17,
-                    minor: Some(0),
-                    patch: Some("6".to_owned()),
+                    minor: 0,
+                    patch: "6".to_owned(),
                     update_number: None,
                     prerelease: Some("beta".to_owned()),
                     build_metadata: Some("2-202211152348".to_owned()),
@@ -466,8 +464,8 @@ mod test {
                 output: "1.8.0_362-beta-202211161809-b03+152",
                 expected: Some(JavaVersion {
                     major: 8,
-                    minor: Some(0),
-                    patch: Some("362".to_owned()),
+                    minor: 0,
+                    patch: "362".to_owned(),
                     update_number: None,
                     prerelease: Some("beta-202211161809-b03".to_owned()),
                     build_metadata: Some("152".to_owned()),
@@ -477,8 +475,8 @@ mod test {
                 output: "18.0.2.1+1",
                 expected: Some(JavaVersion {
                     major: 18,
-                    minor: Some(0),
-                    patch: Some("2.1".to_owned()),
+                    minor: 0,
+                    patch: "2.1".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: Some("1".to_owned()),
@@ -488,8 +486,8 @@ mod test {
                 output: "17.0.5+8",
                 expected: Some(JavaVersion {
                     major: 17,
-                    minor: Some(0),
-                    patch: Some("5".to_owned()),
+                    minor: 0,
+                    patch: "5".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: Some("8".to_owned()),
@@ -499,8 +497,8 @@ mod test {
                 output: "17.0.5+8-LTS",
                 expected: Some(JavaVersion {
                     major: 17,
-                    minor: Some(0),
-                    patch: Some("5".to_owned()),
+                    minor: 0,
+                    patch: "5".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: Some("8-LTS".to_owned()),

@@ -14,8 +14,7 @@ use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info};
 
@@ -26,7 +25,7 @@ use crate::managers::instance::log::{EntryType, GameLog};
 use crate::managers::instance::schema::make_instance_config;
 use chrono::{DateTime, Utc};
 use futures::Future;
-use tokio::sync::{watch, Mutex, Semaphore};
+use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
 
 use anyhow::{anyhow, bail};
@@ -60,6 +59,7 @@ type InstanceCallback = Box<
 >;
 
 impl ManagerRef<'_, InstanceManager> {
+    #[tracing::instrument(skip(self, callback_task))]
     pub async fn prepare_game(
         self,
         instance_id: InstanceId,
@@ -128,6 +128,8 @@ impl ManagerRef<'_, InstanceManager> {
         let instance_path = runtime_path
             .get_instances()
             .get_instance_path(&instance.shortpath);
+
+        tracing::debug!("instance path: {:?}", instance_path);
 
         let mut version = match config.game_configuration.version {
             Some(GameVersion::Standard(ref v)) => Some(v.clone()),
@@ -404,7 +406,13 @@ impl ManagerRef<'_, InstanceManager> {
                         )?,
                     );
 
-                    match app.java_manager().get_usable_java(required_java).await? {
+                    tracing::debug!("Required java: {:?}", required_java);
+
+                    let usable_java = app.java_manager().get_usable_java(required_java).await?;
+
+                    tracing::debug!("Usable java: {:?}", usable_java);
+
+                    match usable_java {
                         Some(path) => path,
                         None => {
                             let t_download_java = task
