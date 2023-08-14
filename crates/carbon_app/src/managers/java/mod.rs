@@ -222,6 +222,7 @@ impl ManagerRef<'_, JavaManager> {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     pub async fn get_usable_java(
         self,
         target_profile: SystemJavaProfileName,
