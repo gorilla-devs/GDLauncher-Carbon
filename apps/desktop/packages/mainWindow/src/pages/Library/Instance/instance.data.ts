@@ -16,7 +16,9 @@ const fetchData = ({ params }) => {
     parseInt(params.id, 10),
   ]);
 
-  return { instanceDetails, instanceMods, instancesUngrouped };
+  const totalRam = rspc.createQuery(() => ["systeminfo.getTotalRAM"]);
+
+  return { instanceDetails, instanceMods, instancesUngrouped, totalRam };
 };
 
 export default fetchData;

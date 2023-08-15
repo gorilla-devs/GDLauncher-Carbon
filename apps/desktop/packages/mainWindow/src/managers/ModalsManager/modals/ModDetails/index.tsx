@@ -8,6 +8,7 @@ import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { getInstanceIdFromPath } from "@/utils/routes";
+import Authors from "@/components/ModRow/Authors";
 import {
   getDataCreation,
   getFileId,
@@ -16,8 +17,7 @@ import {
   getName,
   getProjectId,
   isCurseForgeData,
-} from "@/utils/Mods";
-import Authors from "@/components/ModRow/Authors";
+} from "@/utils/mods";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
 import { CreateQueryResult } from "@tanstack/solid-query";

@@ -5,7 +5,7 @@ CREATE TABLE "AppConfiguration" (
     "reducedMotion" BOOLEAN NOT NULL DEFAULT false,
     "language" TEXT NOT NULL DEFAULT 'english',
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
-    "releaseChannel" TEXT NOT NULL DEFAULT 'stable',
+    "releaseChannel" TEXT NOT NULL,
     "activeAccountUuid" TEXT,
     "concurrentDownloads" INTEGER NOT NULL DEFAULT 8,
     "showNews" BOOLEAN NOT NULL DEFAULT true,

@@ -1,8 +1,23 @@
 import { builtinModules } from "module";
 import { resolve } from "path";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const config = require("@gd/config");
+  const appVersion = config.appVersion;
+  const env = loadEnv(mode, resolve(__dirname, "../../../../"), "");
+  const isDev = mode === "development";
+
+  const definitions = {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  };
+
+  if (isDev) {
+    definitions["import.meta.env.RUNTIME_PATH"] = JSON.stringify(
+      env.RUNTIME_PATH
+    );
+  }
+
   return {
     root: __dirname,
     plugins: [],
@@ -12,6 +27,7 @@ export default defineConfig(() => {
         electron: "@overwolf/ow-electron",
       },
     },
+    define: definitions,
     build: {
       outDir: "../../dist/main",
       lib: {

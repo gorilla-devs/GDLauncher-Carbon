@@ -1,8 +1,10 @@
 use std::path::PathBuf;
 
-use crate::db::{self, app_configuration, PrismaClient};
-use ring::rand::{SecureRandom, SystemRandom};
-use sha2::{Digest, Sha512};
+use crate::{
+    app_version::APP_VERSION,
+    db::{self, app_configuration, PrismaClient},
+};
+use ring::rand::SecureRandom;
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, instrument, trace};
@@ -81,11 +83,22 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
 
         let sr = ring::rand::SystemRandom::new();
         sr.fill(&mut buf).unwrap();
-        println!("Buffer: {:?}", buf);
+
+        let release_channel = match APP_VERSION {
+            v if v.contains("alpha") => "alpha",
+            v if v.contains("beta") => "beta",
+            _ => "stable",
+        }
+        .to_string();
 
         db_client
             .app_configuration()
-            .create(find_appropriate_default_xmx().await, Vec::from(buf), vec![])
+            .create(
+                release_channel,
+                find_appropriate_default_xmx().await,
+                Vec::from(buf),
+                vec![],
+            )
             .exec()
             .await?;
     }

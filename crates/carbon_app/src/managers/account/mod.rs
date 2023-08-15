@@ -730,6 +730,7 @@ pub enum ValidateAccountError {
     AccountMissing(String),
 }
 
+#[derive(Debug)]
 pub struct FullAccount {
     pub username: String,
     pub uuid: String,
@@ -737,6 +738,7 @@ pub struct FullAccount {
     pub last_used: DateTime<FixedOffset>,
 }
 
+#[derive(Debug)]
 pub enum FullAccountType {
     Offline,
     Microsoft {

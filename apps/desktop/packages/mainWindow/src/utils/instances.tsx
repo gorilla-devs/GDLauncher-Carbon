@@ -213,6 +213,14 @@ export const fetchImage = async (id: number) => {
   } else return "";
 };
 
+export const getUrlType = (url: string) => {
+  return url.match(/^\/(modpacks|mods)\/\d+\/(curseforge|modrinth)(\/[^/]+)*$/)
+    ? url.match(/mods/)
+      ? "mods"
+      : "modpacks"
+    : null;
+};
+
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
   error?: InvalidListInstance;
 }
@@ -255,13 +263,19 @@ export const CategoryIcon = (props: {
       fallback={
         <div>
           <Show when={getCategoryIcon(props.category)}>
-            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
+            <div
+              class="w-4 h-4"
+              innerHTML={getCategoryIcon(props.category) as string | undefined}
+            />
           </Show>
         </div>
       }
     >
       <Match when={"iconUrl" in props.category}>
-        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+        <img
+          class="h-4 w-4"
+          src={getCategoryIcon(props.category) as string | undefined}
+        />
       </Match>
     </Switch>
   );

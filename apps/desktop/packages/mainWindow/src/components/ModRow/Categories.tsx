@@ -1,4 +1,4 @@
-import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/Mods";
+import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/mods";
 import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tag, Tooltip } from "@gd/ui";
 import {

@@ -17,7 +17,7 @@ function watchMain(mainWindow) {
   });
 
   return build({
-    configFile: "packages/main/vite.config.js",
+    configFile: "packages/main/vite.config.cjs",
     mode: "development",
     plugins: [
       {

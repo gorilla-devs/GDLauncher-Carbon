@@ -1,5 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const dotenv = require("dotenv");
+
+dotenv.config({
+  path: "../../.env",
+});
 
 let arch = process.argv[4].replace(/-/g, "");
 let os = process.argv[5].replace(/-/g, "");
@@ -34,12 +39,16 @@ let publish =
     ? undefined
     : {
         provider: "generic",
-        url: process.env.GENERIC_PUBLISH_URL.replace("${arch}", arch),
+        url:
+          (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn") +
+          "/" +
+          process.env.PUBLISH_URL_FOLDER,
       };
 
 module.exports = {
   productName: "GDLauncher",
   appId: "org.gorilladevs.GDLauncher",
+  generateUpdatesFilesForAllChannels: true,
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
   publish,
   asar: true,
@@ -51,7 +60,7 @@ module.exports = {
   extraResources: [
     {
       from: "binaries/${arch}",
-      to: `.`,
+      to: `binaries`,
     },
   ],
   npmRebuild: false,
@@ -63,24 +72,24 @@ module.exports = {
     },
   ],
   win: {
-    target: ["dir", "zip", "nsis"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "nsis"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     verifyUpdateCodeSignature: false,
   },
   nsis: {
     oneClick: false,
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    allowToChangeInstallationDirectory: false,
     deleteAppDataOnUninstall: false,
   },
   mac: {
-    target: ["dir", "zip", "dmg"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.bundles.plist",
   },
   linux: {
-    target: ["dir", "zip"],
+    target: appChannel === "snapshot" ? ["zip"] : ["zip", "appImage"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
   },
   afterAllArtifactBuild: (buildResult) => {
@@ -90,15 +99,7 @@ module.exports = {
     const packageJsonPath = path.join(__dirname, "package.json");
     const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
-    const version = packageJson.version;
-
-    if (!version) {
-      throw new Error(
-        "App version removed before end of build! May be corrupted!"
-      );
-    }
-
-    delete packageJson.version;
+    packageJson.version = "0.0.0";
 
     fs.writeFileSync(
       packageJsonPath,

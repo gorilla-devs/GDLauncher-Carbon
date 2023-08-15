@@ -1,19 +1,41 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { FEReleaseChannel } from "@gd/core_module/bindings";
+import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
+import { ProgressInfo, UpdateInfo } from "electron-updater";
 
-contextBridge.exposeInMainWorld("checkUpdate", async () =>
-  ipcRenderer.invoke("checkUpdate")
+contextBridge.exposeInMainWorld(
+  "checkForUpdates",
+  async (releaseChannel: FEReleaseChannel) =>
+    ipcRenderer.invoke("checkForUpdates", releaseChannel)
 );
 
 contextBridge.exposeInMainWorld("installUpdate", async () =>
   ipcRenderer.invoke("installUpdate")
 );
 
-contextBridge.exposeInMainWorld("updateAvailable", async (cb: any) =>
-  ipcRenderer.on("updateAvailable", cb)
+contextBridge.exposeInMainWorld("downloadUpdate", async () =>
+  ipcRenderer.invoke("downloadUpdate")
 );
 
 contextBridge.exposeInMainWorld(
-  "releaseChannel",
-  async (releaseChannel: string) =>
-    ipcRenderer.send("releaseChannel", releaseChannel)
+  "onDownloadProgress",
+  async (cb: (_ev: IpcRendererEvent, _progressInfo: ProgressInfo) => void) =>
+    ipcRenderer.on("downloadProgress", cb)
+);
+
+contextBridge.exposeInMainWorld(
+  "updateDownloaded",
+  async (cb: (_ev: IpcRendererEvent) => void) =>
+    ipcRenderer.on("updateDownloaded", cb)
+);
+
+contextBridge.exposeInMainWorld(
+  "updateAvailable",
+  async (cb: (_ev: IpcRendererEvent, _updateInfo: UpdateInfo) => void) =>
+    ipcRenderer.on("updateAvailable", cb)
+);
+
+contextBridge.exposeInMainWorld(
+  "updateNotAvailable",
+  async (cb: (_ev: IpcRendererEvent) => void) =>
+    ipcRenderer.on("updateNotAvailable", cb)
 );

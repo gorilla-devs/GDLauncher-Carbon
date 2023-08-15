@@ -4,7 +4,8 @@ import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
-import BrowserData from "@/pages/Modpacks/browser.data";
+import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
+import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
@@ -88,12 +89,49 @@ export const routes: RouteDefinition[] = [
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
-        data: BrowserData,
+        data: ModpackBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Browser")),
-            data: BrowserData,
+            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser")),
+          },
+        ],
+      },
+      {
+        path: "/mods",
+        component: lazy(() => import("@/pages/Mods")),
+        data: ModsBrowserData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Mods/ModsBrowser")),
+          },
+        ],
+      },
+      {
+        path: "/mods/:id/:platform",
+        component: lazy(() => import("@/pages/Modpacks/Explore")),
+        data: ModpackData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+          },
+          {
+            path: "/versions",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
+            data: ModpackVersionsData,
+          },
+          {
+            path: "/changelog",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+          },
+          {
+            path: "/screenshots",
+            component: lazy(
+              () => import("@/pages/Modpacks/Explore/Screenshots")
+            ),
+            data: ModpackScreenshotsData,
           },
         ],
       },

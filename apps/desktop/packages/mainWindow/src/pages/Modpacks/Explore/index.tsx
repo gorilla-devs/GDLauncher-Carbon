@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse, MRFEProject } from "@gd/core_module/bindings";
+import { FEModResponse, MRFEProject, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -18,12 +18,30 @@ import {
   useLocation,
   useParams,
   useRouteData,
+  useSearchParams,
 } from "@solidjs/router";
-import { For, Match, Show, Switch, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
+import { getUrlType } from "@/utils/instances";
+
+const getTabIndexFromPath = (path: string) => {
+  if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
+    if (path.endsWith("/changelog")) {
+      return 1;
+    } else if (path.endsWith("/screenshots")) {
+      return 2;
+    } else if (path.endsWith("/versions")) {
+      return 3;
+    } else {
+      return 0;
+    }
+  }
+
+  return 0;
+};
 
 const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
@@ -31,41 +49,38 @@ const Modpack = () => {
   const params = useParams();
   const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
+
+  const location = useLocation();
+
+  const indexTab = () => getTabIndexFromPath(location.pathname);
+
+  const [searchParams] = useSearchParams();
+
+  const instanceId = () => parseInt(searchParams.instanceId, 10);
+
+  const isModpack = () => getUrlType(location.pathname) === "modpacks";
+
+  const detailsType = () => (isModpack() ? "modpacks" : "mods");
 
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/modpacks/${params.id}/${params.platform}`,
+      path: `/${detailsType()}/${params.id}/${params.platform}`,
     },
     {
       label: "Changelog",
-      path: `/modpacks/${params.id}/${params.platform}/changelog`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/changelog`,
     },
     {
       label: "Screenshots",
-      path: `/modpacks/${params.id}/${params.platform}/screenshots`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/screenshots`,
     },
     {
       label: "Versions",
-      path: `/modpacks/${params.id}/${params.platform}/versions`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/versions`,
     },
   ];
-
-  const getTabIndexFromPath = (path: string) => {
-    if (path.match(/\/modpacks\/.+\/.+/g)) {
-      if (path.endsWith("/changelog")) {
-        return 1;
-      } else if (path.endsWith("/screenshots")) {
-        return 2;
-      } else if (path.endsWith("/versions")) {
-        return 3;
-      } else {
-        return 0;
-      }
-    }
-
-    return 0;
-  };
 
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
@@ -106,29 +121,39 @@ const Modpack = () => {
     }
   );
 
-  const modpack = () => {
-    const versions = routeData.modrinthProjectVersions?.data;
-    if (!routeData.modpackDetails.data || !versions) return;
-    const versionId = versions[versions.length - 1];
+  const generateModpackObj = () => {
+    const isCurseforge = routeData.isCurseforge;
 
-    const modrinth =
-      !routeData.isCurseforge && versionId
-        ? {
-            Modrinth: {
-              project_id: routeData.modpackDetails.data?.id,
-              version_id: versionId.id,
-            },
-          }
-        : undefined;
+    if (isCurseforge) {
+      if (!routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+      return {
+        Curseforge: {
+          file_id: routeData.modpackDetails.data.data.mainFileId,
+          project_id: routeData.modpackDetails.data.data.id,
+        },
+      };
+    } else {
+      const versions = routeData.modrinthProjectVersions.data;
 
-    return routeData.isCurseforge
-      ? {
-          Curseforge: {
-            file_id: routeData.modpackDetails.data?.data.mainFileId,
-            project_id: routeData.modpackDetails.data?.data.id,
-          },
-        }
-      : modrinth;
+      if (!versions || !routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+
+      const versionId = versions[versions.length - 1];
+
+      const modrinth = {
+        Modrinth: {
+          project_id: routeData.modpackDetails.data.id,
+          version_id: versionId.id,
+        },
+      };
+
+      return modrinth;
+    }
   };
 
   const instanceName = () =>
@@ -148,9 +173,9 @@ const Modpack = () => {
     if (instanceIcon) loadIconMutation.mutate(instanceIcon);
 
     const name = instanceName();
-    const modpackObj = modpack();
+    const modpackObj = generateModpackObj();
 
-    if (name && modpackObj)
+    if (name && modpackObj) {
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,
@@ -160,11 +185,32 @@ const Modpack = () => {
           Modpack: modpackObj,
         },
       });
+    }
   };
 
-  const location = useLocation();
+  createEffect(() => {
+    if (instanceId() !== undefined && !isNaN(instanceId())) {
+      const mods = rspc.createQuery(() => [
+        "instance.getInstanceMods",
+        instanceId() as number,
+      ]);
 
-  const indexTab = () => getTabIndexFromPath(location.pathname);
+      if (mods.data) setInstanceMods(mods.data);
+    }
+  });
+
+  const projectId = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data.id
+      : routeData.modpackDetails.data?.id;
+
+  const isModInstalled = () =>
+    instanceMods()?.find(
+      (mod) =>
+        (routeData.isCurseforge
+          ? mod.curseforge?.project_id
+          : mod.modrinth?.project_id) === projectId()
+    ) !== undefined;
 
   return (
     <ContentWrapper>
@@ -194,17 +240,14 @@ const Modpack = () => {
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() => navigate("/modpacks")}
+                onClick={() =>
+                  navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                }
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
                 type="secondary"
               >
-                <Trans
-                  key="instance.step_back"
-                  options={{
-                    defaultValue: "Back",
-                  }}
-                />
+                <Trans key="instance.step_back" />
               </Button>
             </div>
             <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
@@ -299,24 +342,38 @@ const Modpack = () => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <Button
-                        uppercase
-                        size="large"
-                        disabled={routeData.modpackDetails.isInitialLoading}
-                        onClick={() => handleDownload()}
-                      >
-                        <Show when={loading()}>
-                          <Spinner />
-                        </Show>
-                        <Show when={!loading()}>
-                          <Trans
-                            key="modpack.download"
-                            options={{
-                              defaultValue: "Download",
-                            }}
-                          />
-                        </Show>
-                      </Button>
+                      <Switch>
+                        <Match when={!isModInstalled()}>
+                          <Button
+                            uppercase
+                            size="large"
+                            disabled={
+                              routeData.modpackDetails.isInitialLoading ||
+                              (!isModpack() && !instanceId())
+                            }
+                            onClick={() => handleDownload()}
+                          >
+                            <Show when={loading()}>
+                              <Spinner />
+                            </Show>
+                            <Show when={!loading()}>
+                              <Trans key="modpack.download" />
+                            </Show>
+                          </Button>
+                        </Match>
+                        <Match when={isModInstalled()}>
+                          <Button
+                            variant={isModInstalled() ? "green" : "primary"}
+                          >
+                            <Trans
+                              key="mod.downloaded"
+                              options={{
+                                defaultValue: "Downloaded",
+                              }}
+                            />
+                          </Button>
+                        </Match>
+                      </Switch>
                     </div>
                   </div>
                 </div>
@@ -336,17 +393,14 @@ const Modpack = () => {
                 <span class="mr-4">
                   <Show when={isSticky()}>
                     <Button
-                      onClick={() => navigate("/modpacks")}
+                      onClick={() =>
+                        navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                      }
                       size="small"
                       type="secondary"
                     >
                       <div class="text-2xl i-ri:arrow-drop-left-line" />
-                      <Trans
-                        key="instance.step_back"
-                        options={{
-                          defaultValue: "Back",
-                        }}
-                      />
+                      <Trans key="instance.step_back" />
                     </Button>
                   </Show>
                 </span>
@@ -354,7 +408,10 @@ const Modpack = () => {
                   <TabList>
                     <For each={instancePages()}>
                       {(page) => (
-                        <Link href={page.path} class="no-underline">
+                        <Link
+                          href={`${page.path}${location.search}`}
+                          class="no-underline"
+                        >
                           <Tab class="bg-transparent">{page.label}</Tab>
                         </Link>
                       )}
@@ -365,7 +422,10 @@ const Modpack = () => {
                   <Button
                     uppercase
                     size="small"
-                    disabled={routeData.modpackDetails.isInitialLoading}
+                    disabled={
+                      routeData.modpackDetails.isInitialLoading ||
+                      (!isModpack() && !instanceId())
+                    }
                     onClick={() => handleDownload()}
                   >
                     <Show when={loading()}>

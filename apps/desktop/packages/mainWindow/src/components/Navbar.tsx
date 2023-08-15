@@ -1,5 +1,5 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, onMount } from "solid-js";
+import { For, Show, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
 import { Tab, TabList, Tabs, Spacing, Button } from "@gd/ui";
@@ -10,7 +10,7 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import { checkForUpdates } from "@/utils/updaterhelper";
+import updateAvailable from "@/utils/updater";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 
@@ -63,13 +63,9 @@ const AppNavbar = () => {
     }
   });
 
-  onMount(() => {
-    checkForUpdates();
-  });
-
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center text-white bg-darkSlate-800 px-5 h-15">
+      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -78,7 +74,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex text-white w-full m-0 list-none items-center gap-6 pl-10">
+          <ul class="flex text-white w-full m-0 items-center list-none gap-6 pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -101,7 +97,9 @@ const AppNavbar = () => {
                         >
                           <Tab>
                             <div class="flex items-center gap-2">
-                              <i class={"w-5 h-5 " + route.icon} />
+                              <Show when={route.icon}>
+                                <i class={"w-5 h-5 " + route.icon} />
+                              </Show>
                               <li class="no-underline">{route.label}</li>
                             </div>
                           </Tab>
@@ -148,12 +146,16 @@ const AppNavbar = () => {
                       />
                     </Tab>
                   </div>
-                  {/* <div
-                    class="text-2xl cursor-pointer text-dark-slate-50 i-ri:notification-2-fill"
-                    onClick={() =>
-                      modalsContext?.openModal({ name: "notification" })
-                    }
-                  /> */}
+                  <Show when={updateAvailable()}>
+                    <Tab ignored>
+                      <div
+                        class="text-2xl cursor-pointer text-green-600 i-ri:download-2-fill"
+                        onClick={() =>
+                          modalsContext?.openModal({ name: "appUpdate" })
+                        }
+                      />
+                    </Tab>
+                  </Show>
                 </div>
               </TabList>
             </Tabs>

@@ -1,160 +1,49 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
-import fetchData from "@/pages/Modpacks/browser.data";
-import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { For, Match, Switch } from "solid-js";
 import {
   CFFECategory,
   MRFECategory,
   FESearchAPI,
-  FEUnifiedSearchCategoryID,
-  ModpackPlatform,
   FEUnifiedModLoaderType,
-  CFFEModLoaderType,
-  MRFELoader,
 } from "@gd/core_module/bindings";
-import { useInfiniteModpacksQuery } from "@/pages/Modpacks";
-import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
-import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { CategoryIcon, PlatformIcon } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
-
-const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
-  if (typeof category === "string") {
-    return getForgeModloaderIcon(category);
-  } else return category.icon;
-};
-
-const ModloaderIcon = (props: {
-  modloader: CFFEModLoaderType | MRFELoader;
-}) => {
-  return (
-    // <Switch
-    //   fallback={
-    //     <>
-    //       <Show when={getModloaderIcon(props.modloader)}>
-    //         <div
-    //           class="w-4 h-4"
-    //           innerHTML={getModloaderIcon(props.modloader)}
-    //         />
-    //       </Show>
-    //     </>
-    //   }
-    // >
-    //   <Match when={typeof props.modloader === "string"}>
-    //     <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    //   </Match>
-    // </Switch>
-    <Show when={typeof props.modloader === "string"}>
-      <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    </Show>
-  );
-};
+import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
+import {
+  ModloaderIcon,
+  curseforgeCategories,
+  getCategoryId,
+  modrinthCategories,
+  supportedModloaders,
+} from "@/utils/sidebar";
 
 const Sidebar = () => {
-  const [currentPlatform, setCurrentPlatform] =
-    createSignal<ModpackPlatform>("Curseforge");
-  const [forgeCategories, setForgeCategories] = createSignal<CFFECategory[]>(
-    []
-  );
-  const [modrinthCategories, setModrinthCategories] = createSignal<
-    MRFECategory[]
-  >([]);
-
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const infiniteQuery = useInfiniteModpacksQuery();
+  const infiniteQuery = useInfiniteModsQuery();
 
   const [t] = useTransContext();
 
-  createEffect(() => {
-    if (routeData.forgeCategories.data?.data) {
-      const forgeCategories = () =>
-        routeData.forgeCategories.data?.data.filter(
-          (category) => category.classId === 4471
-        ) || [];
-      setForgeCategories(forgeCategories());
-    }
-  });
-
-  createEffect(() => {
-    if (routeData.modrinthCategories.data) {
-      setModrinthCategories(
-        routeData.modrinthCategories.data.filter(
-          (category) => category.project_type === "modpack"
-        )
-      );
-    }
-  });
-
-  createEffect(() => {
-    if (routeData.minecraftVersions.data) {
-      setMcVersions(routeData.minecraftVersions.data);
-
-      setMappedMcVersions([]);
-      routeData.minecraftVersions.data.forEach((version) => {
-        if (version.type === "release") {
-          setMappedMcVersions((prev) => [
-            ...prev,
-            { label: version.id, key: version.id },
-          ]);
-        }
-      });
-      setMappedMcVersions((prev) => [
-        { key: "", label: "All version" },
-        ...prev,
-      ]);
-    }
-  });
-
-  const categories = () =>
-    currentPlatform() === "Curseforge"
-      ? forgeCategories()
-      : modrinthCategories();
-
-  const getCategoryId = (searchCategory: FEUnifiedSearchCategoryID) => {
-    if ("curseforge" in searchCategory) {
-      return searchCategory.curseforge;
-    } else if ("modrinth" in searchCategory) {
-      return searchCategory.modrinth;
-    }
-  };
-
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
 
-  const cfModpackModloaders = ["forge", "fabric", "quilt"];
+  const categories = () =>
+    isCurseforge()
+      ? curseforgeCategories().filter((category) => category.classId === 4471)
+      : modrinthCategories().filter(
+          (category) => category.project_type === "modpack"
+        );
 
-  const curseforgeModpackModloaders = () => {
-    const filtered = routeData.curseForgeModloaders.data?.filter((modloader) =>
-      cfModpackModloaders.includes(modloader)
-    );
-    return filtered;
-  };
-
-  // const modrinthModpackModloaders = () => {
-  //   const filtered = routeData.modrinthModloaders.data?.filter((modloader) =>
-  //     modloader.supported_project_types.includes("modpack" as MRFEProjectType)
-  //   );
-  //   return filtered;
-  // };
-
-  // const modloaders = () =>
-  //   isCurseforge()
-  //     ? curseforgeModpackModloaders()
-  //     : modrinthModpackModloaders();
-  const modloaders = () => curseforgeModpackModloaders();
+  const modloaders = () => supportedModloaders();
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
       <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
-        <Collapsable title={t("Platform")} noPadding>
+        <Collapsable title={t("general.platform")} noPadding>
           <div class="flex flex-col gap-3">
             <Radio.group
               onChange={(val) => {
-                setCurrentPlatform(val as ModpackPlatform);
-
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: [],
@@ -176,7 +65,7 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
-        <Collapsable title={t("Modloader")} noPadding>
+        <Collapsable title={t("general.modloaders")} noPadding>
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
@@ -216,7 +105,7 @@ const Sidebar = () => {
         </Collapsable>
         <Switch>
           <Match when={categories().length > 0}>
-            <Collapsable title={t("Categories")} noPadding>
+            <Collapsable title={t("general.categories")} noPadding>
               <div class="flex flex-col gap-3">
                 <For each={categories()}>
                   {(category) => {
@@ -270,7 +159,7 @@ const Sidebar = () => {
               </div>
             </Collapsable>
           </Match>
-          <Match when={forgeCategories().length === 0}>
+          <Match when={curseforgeCategories().length === 0}>
             <Skeleton.modpackSidebarCategories />
           </Match>
         </Switch>

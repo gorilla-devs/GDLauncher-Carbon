@@ -1,7 +1,7 @@
 import { build } from "vite";
 
 await build({
-  configFile: "packages/main/vite.config.js",
+  configFile: "packages/main/vite.config.cjs",
   mode: "production",
 });
 await build({

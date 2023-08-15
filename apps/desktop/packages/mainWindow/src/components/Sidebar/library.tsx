@@ -107,7 +107,7 @@ const Sidebar = () => {
           >
             <Input
               ref={inputRef}
-              placeholder={t("general.search") as string}
+              placeholder={t("general.search")}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}

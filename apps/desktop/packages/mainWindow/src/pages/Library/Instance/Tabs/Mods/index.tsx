@@ -1,20 +1,21 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
 import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
-import { useModal } from "@/managers/ModalsManager";
 import { createStore } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
-import { getModrinthData } from "@/utils/instances";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
-  const modalsContext = useModal();
+  const navigate = useGDNavigate();
+
+  const [filter, setFilter] = createSignal("");
   const [selectedMods, setSelectedMods] = createStore<{
     [id: string]: boolean;
   }>({});
@@ -28,9 +29,13 @@ const Mods = () => {
     "instance.openInstanceFolder",
   ]);
 
-  const isModrinth = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack);
+  const filteredMods = createMemo(() =>
+    filter()
+      ? routeData.instanceMods.data?.filter((item) =>
+          item.filename.toLowerCase().includes(filter().toLowerCase())
+        )
+      : routeData.instanceMods.data
+  );
 
   const NoMods = () => {
     return (
@@ -50,25 +55,20 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal(
-                { name: "addMod" },
-                {
-                  mcVersion: routeData.instanceDetails.data?.version,
-                  isCurseforge: !isModrinth(),
-                }
-              );
+              navigate(`/mods?instanceId=${params.id}`);
             }}
           >
-            <Trans
-              key="instance.add_mod"
-              options={{
-                defaultValue: "+ Add Mod",
-              }}
-            />
+            <Trans key="instance.add_mod" />
           </Button>
         </div>
       </div>
     );
+  };
+
+  const sortAlphabetically = (a: Modtype, b: Modtype) => {
+    if (a.filename < b.filename) return -1;
+    if (a.filename > b.filename) return 1;
+    return 0;
   };
 
   return (
@@ -76,10 +76,10 @@ const Mods = () => {
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
-            placeholder="Type Here"
+            onInput={(e) => setFilter(e.target.value)}
+            placeholder={t("instance.mods.search")}
             icon={<div class="i-ri:search-line" />}
             class="w-full rounded-full text-darkSlate-50"
-            inputClass=""
           />
           <div class="flex gap-3 items-center">
             <p class="text-darkSlate-50">
@@ -103,21 +103,10 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              modalsContext?.openModal(
-                { name: "addMod" },
-                {
-                  mcVersion: routeData.instanceDetails.data?.version,
-                  isCurseforge: !isModrinth(),
-                }
-              );
+              navigate(`/mods?instanceId=${params.id}`);
             }}
           >
-            <Trans
-              key="instance.add_mod"
-              options={{
-                defaultValue: "+ Add Mod",
-              }}
-            />
+            <Trans key="instance.add_mod" />
           </Button>
         </div>
         <div class="flex justify-between text-darkSlate-50 z-10 mb-6">
@@ -246,7 +235,9 @@ const Mods = () => {
           }
           fallback={<NoMods />}
         >
-          <For each={routeData.instanceMods.data as Modtype[]}>
+          <For
+            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+          >
             {(props) => (
               <Mod
                 mod={props}

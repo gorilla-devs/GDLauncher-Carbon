@@ -20,6 +20,7 @@ type SliderProps = {
   slides: SlideProps[];
   alignment?: string;
   onClick?: any;
+  fallBackImg: string | undefined;
   onSlideClick?: (_news: SlideProps) => void;
 };
 
@@ -30,6 +31,7 @@ interface CarouselProps {
   disableAutoRotation?: boolean;
   showArrows?: boolean;
   showIndicators?: boolean;
+  fallBackImg?: string;
   onClick?: (_news: SlideProps) => void;
 }
 
@@ -115,7 +117,7 @@ const News = (props: CarouselProps) => {
             <div
               class="flex-grow flex-shrink-0 inset-0 transform min-h-80 w-full flex justify-center items-center hidden box-border bg-no-repeat bg-center bg-cover"
               style={{
-                "background-image": `url('${slide.image}')`,
+                "background-image": `url('${slide.image}'), url('${props.fallBackImg}')`,
               }}
             >
               <div
@@ -185,6 +187,7 @@ const News = (props: CarouselProps) => {
       </Show>
       <Show when={props.slides}>
         <Slider
+          fallBackImg={props.fallBackImg}
           currentImageIndex={currentImageIndex()}
           slides={props.slides}
           onSlideClick={(news) => props?.onClick?.(news)}

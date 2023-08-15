@@ -1,10 +1,10 @@
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "production")]
 #[inline(always)]
 pub fn get_client() -> reqwest_middleware::ClientBuilder {
     iridium::get_client()
 }
 
-#[cfg(debug_assertions)]
+#[cfg(not(feature = "production"))]
 #[inline(always)]
 pub fn get_client() -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};

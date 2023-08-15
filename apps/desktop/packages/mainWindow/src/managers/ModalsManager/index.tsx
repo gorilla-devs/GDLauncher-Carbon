@@ -40,10 +40,6 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/Java/AddJava")),
     title: "Add java version",
   },
-  addMod: {
-    component: lazy(() => import("./modals/AddMod")),
-    title: "Add mod",
-  },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
     title: "Mod Details",
@@ -63,6 +59,10 @@ const defaultModals: Hash = {
   confirmInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
     title: "Confirm Instance Deletion",
+  },
+  appUpdate: {
+    component: lazy(() => import("./modals/AppUpdate")),
+    title: "New App Version Available",
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
