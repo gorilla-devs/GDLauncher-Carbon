@@ -15,7 +15,7 @@ use crate::{
     db::PrismaClient,
     domain::java::{
         Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
-        SystemJavaProfileName,
+        SystemJavaProfileName, SystemJavaProfileNameIter,
     },
     managers::java::java_checker::RealJavaChecker,
 };
@@ -336,29 +336,11 @@ impl ManagerRef<'_, JavaManager> {
             )
             .await?;
 
-        if update_target_profile {
-            self.app
-                .prisma_client
-                .java_system_profile()
-                .update(
-                    crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                        target_profile.to_string(),
-                    ),
-                    vec![crate::db::java_system_profile::SetParam::ConnectJava(
-                        crate::db::java::UniqueWhereParam::IdEquals(id.clone()),
-                    )],
-                )
-                .exec()
-                .await?;
-
-            self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
-        }
-
         let java = self
             .app
             .prisma_client
             .java()
-            .find_unique(UniqueWhereParam::IdEquals(id))
+            .find_unique(UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?;
 
@@ -373,6 +355,48 @@ impl ManagerRef<'_, JavaManager> {
             None => anyhow::bail!("downloaded java was not present in db"),
         };
 
+        if update_target_profile {
+            self.app
+                .prisma_client
+                .java_system_profile()
+                .update(
+                    crate::db::java_system_profile::name::equals(target_profile.to_string()),
+                    vec![crate::db::java_system_profile::java::connect(
+                        crate::db::java::id::equals(id.clone()),
+                    )],
+                )
+                .exec()
+                .await?;
+
+            let system_profiles_in_db = self.get_system_java_profiles().await?;
+
+            for SystemJavaProfile {
+                name: system_profile,
+                java_id,
+            } in system_profiles_in_db
+            {
+                if system_profile == target_profile
+                    || !system_profile.is_java_version_compatible(&java.version)
+                    || java_id.is_some()
+                {
+                    continue;
+                }
+
+                self.app
+                    .prisma_client
+                    .java_system_profile()
+                    .update(
+                        crate::db::java_system_profile::name::equals(system_profile.to_string()),
+                        vec![crate::db::java_system_profile::java::connect(
+                            crate::db::java::id::equals(id.clone()),
+                        )],
+                    )
+                    .exec()
+                    .await?;
+            }
+            self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+        }
+
         Ok(Some(java))
     }
 }
@@ -380,9 +404,33 @@ impl ManagerRef<'_, JavaManager> {
 #[cfg(test)]
 mod test {
     use crate::{
-        domain::java::{JavaArch, JavaOs, JavaVendor},
+        domain::java::{JavaArch, JavaOs, JavaVendor, SystemJavaProfileName},
         setup_managers_for_test,
     };
+
+    #[tokio::test]
+    async fn test_require_java_install() {
+        let app = setup_managers_for_test().await;
+
+        let java_manager = app.java_manager();
+
+        // Should update both gamma and beta
+        let _ = java_manager
+            .require_java_install(SystemJavaProfileName::Gamma, true, None)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let profiles_in_db = java_manager.get_system_java_profiles().await.unwrap();
+
+        assert_eq!(
+            profiles_in_db
+                .iter()
+                .filter(|p| p.java_id.is_some())
+                .count(),
+            2
+        );
+    }
 
     #[tokio::test]
     async fn test_managed_service() {
@@ -436,7 +484,7 @@ mod test {
             .delete_java_version(from_db.id.clone())
             .await;
 
-        assert!(!result_first_delete.is_ok());
+        assert!(result_first_delete.is_err());
 
         app.prisma_client
             .app_configuration()
