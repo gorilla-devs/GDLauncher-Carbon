@@ -240,7 +240,6 @@ const Import = (props: Props) => {
                       "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
                         !currentlySupportedEntities.includes(entity),
                       "border-2 border-solid border-primary-500":
-                        currentlySupportedEntities.includes(entity) ||
                         selectedEntity() === entity,
                     }}
                     onClick={() => {
@@ -260,17 +259,16 @@ const Import = (props: Props) => {
             </For>
           </div>
         </div>
-        <div class="flex justify-between bg-darkSlate-800 px-4 py-2 box-border rounded-xl">
+        <div class="flex justify-between items-center bg-darkSlate-800 px-4 box-border rounded-xl py-3">
           <Input
             ref={scanPathInputRef}
             placeholder={t("instance.import_path") as string}
             class="w-full pr-4 py-0 rounded-md"
+            inputColor="bg-darkSlate-700"
             inputClass="py-0"
             onInput={(e) => setScanPaths(e.target.value.split(";"))}
-            // disabled={}
           />
           <Button
-            // class="rounded-full"
             icon={<div class="i-ri:archive-drawer-fill text-4xl" />}
             iconRight={true}
             onClick={() => {
