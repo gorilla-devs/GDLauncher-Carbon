@@ -60,6 +60,7 @@ type InstanceCallback = Box<
 >;
 
 impl ManagerRef<'_, InstanceManager> {
+    #[tracing::instrument(skip(self, callback_task))]
     pub async fn prepare_game(
         self,
         instance_id: InstanceId,
@@ -129,7 +130,9 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instances()
             .get_instance_path(&instance.shortpath);
 
-        let version = match config.game_configuration.version {
+        tracing::debug!("instance path: {:?}", instance_path);
+
+        let mut version = match config.game_configuration.version {
             Some(GameVersion::Standard(ref v)) => Some(v.clone()),
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
             None if config.modpack.as_ref().is_some() => None,
@@ -762,7 +765,13 @@ pub async fn prepare_java(
                 .component as &str,
         )?);
 
-    match app.java_manager().get_usable_java(required_java).await? {
+    tracing::debug!("Required java: {:?}", required_java);
+
+    let usable_java = app.java_manager().get_usable_java(required_java).await?;
+
+    tracing::debug!("Usable java: {:?}", usable_java);
+
+    match usable_java {
         Some(path) => Ok(Some(path)),
         None => {
             let t_download_java = task.subtask(Translation::InstanceTaskLaunchDownloadJava);

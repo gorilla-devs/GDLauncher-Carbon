@@ -47,7 +47,14 @@ impl JavaChecker for RealJavaChecker {
                     .expect("This should never fail"),
             )
             .output()
-            .await?;
+            .await
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "Cannot execute java checker command on {:?} - {}",
+                    java_bin_path,
+                    err
+                )
+            })?;
 
         let output = String::from_utf8(output.stdout)?;
         let parsed_output = parse_cmd_output_java(&output)?;
@@ -69,15 +76,15 @@ pub struct MockJavaChecker;
 impl JavaChecker for MockJavaChecker {
     async fn get_bin_info(
         &self,
-        _path: &Path,
+        path: &Path,
         _type: JavaComponentType,
     ) -> anyhow::Result<JavaComponent> {
         Ok(JavaComponent {
-            path: _path.to_string_lossy().to_string(),
+            path: path.to_string_lossy().to_string(),
             version: JavaVersion {
                 major: 19,
-                minor: Some(0),
-                patch: Some("1".to_owned()),
+                minor: 0,
+                patch: path.to_string_lossy().to_string(),
                 update_number: None,
                 prerelease: None,
                 build_metadata: Some("10".to_owned()),
