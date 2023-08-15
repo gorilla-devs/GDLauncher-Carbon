@@ -11,10 +11,10 @@ const fetchData = ({ params }) => {
     "instance.getInstancesUngrouped",
   ]);
 
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    parseInt(params.id, 10),
-  ]);
+  const instanceMods = rspc.createQuery(
+    () => ["instance.getInstanceMods", parseInt(params.id, 10)],
+    { refetchOnWindowFocus: true }
+  );
 
   const totalRam = rspc.createQuery(() => ["systeminfo.getTotalRAM"]);
 
