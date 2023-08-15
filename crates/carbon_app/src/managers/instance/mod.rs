@@ -7,6 +7,7 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::runtime_path::InstancePath;
 
 use anyhow::bail;
 use anyhow::{anyhow, Context};
@@ -1273,6 +1274,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         opener::open(path)?;
 
         Ok(())
+    }
+
+    pub async fn get_path(self, instance_id: InstanceId) -> anyhow::Result<InstancePath> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&instance.shortpath);
+        Ok(path)
     }
 
     /// Delete an instance group and move all contained instances into the default group.
