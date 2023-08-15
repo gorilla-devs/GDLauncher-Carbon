@@ -2,14 +2,15 @@ import { rspc } from "@/utils/rspcClient";
 
 //@ts-ignore
 const fetchData = ({ params }) => {
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    parseInt(params.id, 10),
-  ]);
+  const instanceDetails = rspc.createQuery(
+    () => ["instance.getInstanceDetails", parseInt(params.id, 10)],
+    { refetchOnWindowFocus: true }
+  );
 
-  const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped",
-  ]);
+  const instancesUngrouped = rspc.createQuery(
+    () => ["instance.getInstancesUngrouped"],
+    { refetchOnWindowFocus: true }
+  );
 
   const instanceMods = rspc.createQuery(
     () => ["instance.getInstanceMods", parseInt(params.id, 10)],

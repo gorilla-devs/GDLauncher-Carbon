@@ -16,9 +16,10 @@ const fetchData = () => {
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
-  const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped",
-  ]);
+  const instancesUngrouped = rspc.createQuery(
+    () => ["instance.getInstancesUngrouped"],
+    { refetchOnWindowFocus: true }
+  );
 
   return {
     forgeCategories,
