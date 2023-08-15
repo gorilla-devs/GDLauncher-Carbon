@@ -19,12 +19,12 @@ pub struct Manifest {
 #[serde(rename_all = "camelCase")]
 pub struct Minecraft {
     pub version: String,
-    pub mod_loaders: Vec<ModLoaders>,
+    pub mod_loaders: Vec<CFModLoader>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ModLoaders {
+pub struct CFModLoader {
     pub id: String,
     pub primary: bool,
 }

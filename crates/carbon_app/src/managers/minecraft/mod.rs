@@ -68,6 +68,18 @@ pub fn path_clean<P: AsRef<Path>>(path: P) -> PathBuf {
     }
 }
 
+pub fn absolute_clean_path<P: AsRef<Path>>(path: P) -> anyhow::Result<PathBuf> {
+    let path = path.as_ref();
+
+    let absolute_path = path_clean(if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    });
+
+    Ok(absolute_path)
+}
+
 /// lexically checks that the join operation does not climb above the root
 /// the returned bath is guaranteed to be under the provided root baring the influence of symbolic
 /// links. This should be later checked by calling `canonicalize` after we are sure the parent

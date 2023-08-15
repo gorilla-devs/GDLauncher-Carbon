@@ -68,6 +68,8 @@ async-recursion = "1.0.4"
 serde-enum-str = "0.3.2"
 markdown = { workspace = true }
 ring = { workspace = true }
+async_zip = { version = "0.0.15", features = ["tokio", "tokio-fs", "chrono", "deflate", "async-compression"] }
+glob = "0.3.1"
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
