@@ -114,6 +114,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             instances.push(super::ImportableInstance {
                 entity: Entity::LegacyGDLauncher,
                 name: instance.name.clone(),
+                icon: None,
                 import_once: true,
             });
         }
@@ -176,8 +177,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 };
 
                 let curseforge_modpack = CurseforgeModpack::RemoteManaged {
-                    project_id,
-                    file_id,
+                    project_id: project_id as u32,
+                    file_id: file_id as u32,
                 };
 
                 break 'a InstanceVersionSource::Modpack(Modpack::Curseforge(curseforge_modpack));

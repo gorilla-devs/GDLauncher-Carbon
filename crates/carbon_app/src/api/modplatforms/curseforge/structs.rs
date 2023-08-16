@@ -39,9 +39,9 @@ impl From<mpcf::FeaturedModsResponse> for CFFEFeaturedModsResponse {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFile {
-    pub id: i32,
-    pub game_id: i32,
-    pub mod_id: i32,
+    pub id: u32,
+    pub game_id: u32,
+    pub mod_id: u32,
     pub is_available: bool,
     pub display_name: String,
     pub file_name: String,
@@ -56,10 +56,10 @@ pub struct CFFEFile {
     pub sortable_game_versions: Vec<CFFESortableGameVersion>,
     pub dependencies: Vec<CFFEFileDependency>,
     pub expose_as_alternative: Option<bool>,
-    pub parent_project_file_id: Option<i32>,
-    pub alternate_file_id: Option<i32>,
+    pub parent_project_file_id: Option<u32>,
+    pub alternate_file_id: Option<u32>,
     pub is_server_pack: Option<bool>,
-    pub server_pack_file_id: Option<i32>,
+    pub server_pack_file_id: Option<u32>,
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: String,
@@ -113,7 +113,7 @@ impl From<mpcf::File> for CFFEFile {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFileDependency {
-    pub mod_id: i32,
+    pub mod_id: u32,
     pub relation_type: CFFEFileRelationType,
 }
 
@@ -261,7 +261,7 @@ impl From<mpcf::FileModule> for CFFEFileModule {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFingerprintFuzzyMatch {
-    pub id: i32,
+    pub id: u32,
     pub file: CFFEFile,
     pub latest_files: Vec<CFFEFile>,
     pub fingerprints: Vec<String>,
@@ -307,7 +307,7 @@ impl From<mpcf::FingerprintFuzzyMatchResult> for CFFEFingerprintFuzzyMatchResult
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFingerprintMatch {
-    pub id: i32,
+    pub id: u32,
     pub file: CFFEFile,
     pub latest_files: Vec<CFFEFile>,
 }
@@ -396,7 +396,7 @@ impl From<mpcf::FolderFingerprint> for CFFEFolderFingerprint {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEGame {
-    pub id: i32,
+    pub id: u32,
     pub name: String,
     pub slug: String,
     pub date_modified: String, // date-time
@@ -422,14 +422,14 @@ impl From<mpcf::Game> for CFFEGame {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEMinecraftGameVersion {
-    pub id: i32,
-    pub game_version_id: i32,
+    pub id: u32,
+    pub game_version_id: u32,
     pub version_string: String,
     pub jar_download_url: String,
     pub json_download_url: String,
     pub approved: bool,
     pub date_modified: String, // date-time
-    pub game_version_type_id: i32,
+    pub game_version_type_id: u32,
     pub game_version_status: CFFEGameVersionStatus,
     pub game_version_type_status: CFFEGameVersionTypeStatus,
 }
@@ -478,9 +478,9 @@ impl From<mpcf::MinecraftModLoaderIndex> for CFFEMinecraftModLoaderIndex {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEMinecraftModLoaderVersion {
-    pub id: i32,
-    pub game_version_id: i32,
-    pub minecraft_game_version_id: i32,
+    pub id: u32,
+    pub game_version_id: u32,
+    pub minecraft_game_version_id: u32,
     pub forge_version: String,
     pub name: String,
     pub mod_loader_type: CFFEModLoaderType,
@@ -496,12 +496,12 @@ pub struct CFFEMinecraftModLoaderVersion {
     pub libraries_install_location: String,
     pub minecraft_version: String,
     pub additional_files_json: String,
-    pub mod_loader_game_version_id: i32,
-    pub mod_loader_game_version_type_id: i32,
+    pub mod_loader_game_version_id: u32,
+    pub mod_loader_game_version_type_id: u32,
     pub mod_loader_game_version_status: CFFEGameVersionStatus,
     pub mod_loader_game_version_type_status: CFFEGameVersionTypeStatus,
-    pub mc_game_version_id: i32,
-    pub mc_game_version_type_id: i32,
+    pub mc_game_version_id: u32,
+    pub mc_game_version_type_id: u32,
     pub mc_game_version_status: CFFEGameVersionStatus,
     pub mc_game_version_type_status: CFFEGameVersionTypeStatus,
     pub install_profile_json: String,
@@ -551,8 +551,8 @@ impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEMod {
-    pub id: i32,
-    pub game_id: i32,
+    pub id: u32,
+    pub game_id: u32,
     pub name: String,
     pub slug: String,
     pub links: CFFEModLinks,
@@ -560,22 +560,22 @@ pub struct CFFEMod {
     pub status: CFFEModStatus,
     pub download_count: u32,
     pub is_featured: bool,
-    pub primary_category_id: i32,
+    pub primary_category_id: u32,
     pub categories: Vec<CFFECategory>,
-    pub class_id: Option<i32>, // TODO: Add all options to enum and use it
+    pub class_id: Option<u32>, // TODO: Add all options to enum and use it
     pub authors: Vec<CFFEModAuthor>,
     pub logo: Option<CFFEModAsset>,
     pub screenshots: Vec<CFFEModAsset>,
-    pub main_file_id: i32,
+    pub main_file_id: u32,
     pub latest_files: Vec<CFFEFile>,
     pub latest_files_indexes: Vec<CFFEFileIndex>,
     pub date_created: String,  // date-time
     pub date_modified: String, // date-time
     pub date_released: String, // date-time
     pub allow_mod_distribution: Option<bool>,
-    pub game_popularity_rank: i32,
+    pub game_popularity_rank: u32,
     pub is_available: bool,
-    pub thumbs_up_count: i32,
+    pub thumbs_up_count: u32,
 }
 
 impl From<mpcf::Mod> for CFFEMod {
@@ -661,11 +661,11 @@ impl From<CFFEClassId> for mpcf::ClassId {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModDependencies {
-    pub id: i32,
-    pub mod_id: i32,
-    pub file_id: i32,
-    pub file_dependency_id: i32,
-    pub type_id: i32,
+    pub id: u32,
+    pub mod_id: u32,
+    pub file_id: u32,
+    pub file_dependency_id: u32,
+    pub type_id: u32,
     pub dependency_type: CFFEDependencyType,
 }
 
@@ -701,12 +701,12 @@ impl From<mpcf::ModFileModule> for CFFEModFileModule {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModFileStat {
-    pub mod_id: i32,
-    pub file_id: i32,
+    pub mod_id: u32,
+    pub file_id: u32,
     pub timestamp: String, // date-time
     pub total_downloads: u32,
     pub downloads: u32,
-    pub update_count: i32,
+    pub update_count: u32,
 }
 
 impl From<mpcf::ModFileStat> for CFFEModFileStat {
@@ -725,10 +725,10 @@ impl From<mpcf::ModFileStat> for CFFEModFileStat {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModFileVersion {
-    pub id: i32,
-    pub mod_id: i32,
-    pub file_id: i32,
-    pub game_version_id: i32,
+    pub id: u32,
+    pub mod_id: u32,
+    pub file_id: u32,
+    pub game_version_id: u32,
     pub game_version: String,
 }
 
@@ -975,16 +975,16 @@ impl From<CFModStatus> for CFFEModStatus {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFECategory {
-    pub id: i32,
+    pub id: u32,
     pub name: String,
     pub slug: String,
     pub url: String,
     pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
-    pub class_id: Option<i32>,
-    pub parent_category_id: Option<i32>,
-    pub display_index: Option<i32>,
+    pub class_id: Option<u32>,
+    pub parent_category_id: Option<u32>,
+    pub display_index: Option<u32>,
 }
 
 impl From<mpcf::Category> for CFFECategory {
@@ -1007,7 +1007,7 @@ impl From<mpcf::Category> for CFFECategory {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModAuthor {
-    pub id: i32,
+    pub id: u32,
     pub name: String,
     pub url: String,
 }
@@ -1025,8 +1025,8 @@ impl From<mpcf::ModAuthor> for CFFEModAuthor {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModAsset {
-    pub id: i32,
-    pub mod_id: i32,
+    pub id: u32,
+    pub mod_id: u32,
     pub title: String,
     pub description: String,
     pub thumbnail_url: String,
@@ -1050,10 +1050,10 @@ impl From<mpcf::ModAsset> for CFFEModAsset {
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFileIndex {
     pub game_version: String,
-    pub file_id: i32,
+    pub file_id: u32,
     pub filename: String,
     pub release_type: CFFEFileReleaseType,
-    pub game_version_type_id: Option<i32>,
+    pub game_version_type_id: Option<u32>,
     pub mod_loader: Option<CFFEModLoaderType>,
 }
 
@@ -1099,10 +1099,10 @@ impl From<mpcf::DependencyType> for CFFEDependencyType {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEPagination {
-    pub index: i32,
-    pub page_size: i32,
-    pub result_count: i32,
-    pub total_count: i32,
+    pub index: u32,
+    pub page_size: u32,
+    pub result_count: u32,
+    pub total_count: u32,
 }
 
 impl From<mpcf::Pagination> for CFFEPagination {

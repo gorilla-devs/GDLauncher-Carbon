@@ -32,6 +32,7 @@ impl Entity {
 pub struct ImportableInstance {
     pub entity: Entity,
     pub name: String,
+    pub icon: Option<String>,
     pub import_once: bool,
 }
 

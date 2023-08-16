@@ -510,8 +510,8 @@ impl CurseforgeModInstaller {
             .modplatforms_manager()
             .curseforge
             .get_mod_file(ModFileParameters {
-                mod_id: project_id as i32,
-                file_id: file_id as i32,
+                mod_id: project_id,
+                file_id: file_id,
             })
             .await?
             .data;

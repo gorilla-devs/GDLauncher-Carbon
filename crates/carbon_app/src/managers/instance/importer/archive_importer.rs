@@ -16,17 +16,60 @@ use crate::{
 
 use anyhow::Context;
 use sha2::{digest::Digest, Sha512};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    io::{Read, Seek},
+    path::PathBuf,
+    sync::Arc,
+};
 use tokio::{sync::Mutex, task::spawn_blocking};
 
 use crate::domain::modplatforms::modrinth::{search::VersionHashesQuery, version::HashAlgorithm};
 
 use super::{Entity, InstanceImporter};
 
+#[derive(Debug, Clone)]
+pub enum CurseForgeImportedModpack {
+    Managed {
+        project_id: u32,
+        file_id: u32,
+        archive_path: PathBuf,
+        icon: Option<String>,
+        name: String,
+        file_name: String,
+    },
+    Unmanaged {
+        archive_path: PathBuf,
+    },
+}
+
+impl From<CurseForgeImportedModpack> for Modpack {
+    fn from(value: CurseForgeImportedModpack) -> Self {
+        match value {
+            CurseForgeImportedModpack::Managed {
+                project_id,
+                file_id,
+                archive_path,
+                ..
+            } => Modpack::Curseforge(CurseforgeModpack::LocalManaged {
+                project_id,
+                file_id,
+                archive_path: archive_path.to_string_lossy().to_string(),
+            }),
+            CurseForgeImportedModpack::Unmanaged { archive_path } => {
+                Modpack::Curseforge(CurseforgeModpack::Unmanaged {
+                    archive_path: archive_path.to_string_lossy().to_string(),
+                })
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CurseForgeManifestWrapper {
     full_path: PathBuf,
     manifest: curseforge::manifest::Manifest,
+    modpack: CurseForgeImportedModpack,
+    icon: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -60,33 +103,76 @@ impl InstanceImporter for CurseForgeZipImporter {
         for path in scan_paths {
             let file_path_clone = path.clone();
 
-            // make sure this is a valid modpack
-            let manifest = spawn_blocking(move || {
-                let file = std::fs::File::open(&file_path_clone).with_context(|| {
+            // make sure this is a valid modpack and check if it's known by curseforge
+            let (manifest, murmur2, sha1_hash) = spawn_blocking(move || {
+                let mut file = std::fs::File::open(&file_path_clone).with_context(|| {
                     format!("Error reading `{}`", file_path_clone.to_string_lossy())
                 })?;
+
+                let (sha1_hash, archive_murmur2) = {
+                    let mut content = Vec::new();
+                    let _archive_size = file.read_to_end(&mut content).with_context(|| {
+                        format!(
+                            "Error reading archive `{}`",
+                            file_path_clone.to_string_lossy()
+                        )
+                    })?;
+                    file.rewind().with_context(|| {
+                        format!(
+                            "Error reading archive `{}`",
+                            file_path_clone.to_string_lossy()
+                        )
+                    })?;
+                    use sha1::Digest;
+                    let mut hasher = sha1::Sha1::new();
+                    hasher.update(&content);
+                    let hash = hasher.finalize();
+                    let sha1_hash = hex::encode(hash);
+                    let archive_murmur2 = murmurhash32::murmurhash2({
+                        // drop whitespace
+                        content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+                        &content
+                    });
+                    (sha1_hash, archive_murmur2)
+                };
+
                 let mut archive = zip::ZipArchive::new(file).with_context(|| {
                     format!(
                         "Error reading archive `{}`",
                         file_path_clone.to_string_lossy()
                     )
                 })?;
-                let manifest: curseforge::manifest::Manifest = {
-                    let file = archive.by_name("manifest.json").with_context(|| {
+
+                let (manifest, murmur2) = {
+                    let mut file = archive.by_name("manifest.json").with_context(|| {
                         format!(
                             "Error reading `manifest.json` from `{}`",
                             file_path_clone.to_string_lossy()
                         )
                     })?;
-                    serde_json::from_reader(file).with_context(|| {
-                        format!(
-                            "Error parsing `manifest.json` from `{}`",
-                            file_path_clone.to_string_lossy()
-                        )
-                    })?
+                    let mut content = Vec::new();
+                    let _size = file.read_to_end(&mut content)?;
+                    let manifest: curseforge::manifest::Manifest = serde_json::from_slice(&content)
+                        .with_context(|| {
+                            format!(
+                                "Error parsing `manifest.json` from `{}`",
+                                file_path_clone.to_string_lossy()
+                            )
+                        })?;
+                    let murmur2 = murmurhash32::murmurhash2({
+                        // drop whitespace
+                        // content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+                        &content
+                    });
+                    tracing::debug!(
+                        "`{}/manifest.json` murmur2 hash: `{}`",
+                        file_path_clone.to_string_lossy(),
+                        &murmur2
+                    );
+                    (manifest, murmur2)
                 };
 
-                Ok::<_, anyhow::Error>(manifest)
+                Ok::<_, anyhow::Error>((manifest, murmur2, sha1_hash))
             })
             .await??;
 
@@ -97,10 +183,82 @@ impl InstanceImporter for CurseForgeZipImporter {
                 )));
             }
 
+            let fp_response = app
+                .modplatforms_manager()
+                .curseforge
+                .get_fingerprints(&[murmur2])
+                .await?
+                .data;
+            let fp_matches = fp_response.exact_matches;
+            let mods_response = if !fp_matches.is_empty() {
+                Some(
+                    app.modplatforms_manager()
+                        .curseforge
+                        .get_mods(ModsParameters {
+                            body: ModsParametersBody {
+                                mod_ids: fp_matches
+                                    .iter()
+                                    .map(|m| m.file.mod_id)
+                                    .collect::<Vec<_>>(),
+                            },
+                        })
+                        .await?
+                        .data,
+                )
+            } else {
+                None
+            };
+            let modpack_matches = if let Some(mods_response) = mods_response {
+                Some(
+                    fp_response
+                        .exact_fingerprints
+                        .into_iter()
+                        .zip(fp_matches.into_iter())
+                        .zip(mods_response.into_iter())
+                        .map(|((fingerprint, fp_match), proj)| (fingerprint, fp_match, proj))
+                        .collect::<Vec<_>>(),
+                )
+            } else {
+                None
+            };
+
+            let (modpack, icon) = modpack_matches
+                .and_then(|modpack_matches| {
+                    modpack_matches.first().map(|(_, fp_match, proj)| {
+                        let icon = proj.logo.as_ref().map(|logo| logo.url.clone());
+                        (
+                            CurseForgeImportedModpack::Managed {
+                                project_id: fp_match.file.mod_id as u32,
+                                file_id: fp_match.file.id as u32,
+                                archive_path: path.clone(),
+                                icon: icon.clone(),
+                                name: proj.name.clone(),
+                                file_name: fp_match
+                                    .file
+                                    .display_name
+                                    .strip_suffix(".zip")
+                                    .map(|name| name.to_string())
+                                    .unwrap_or_else(|| fp_match.file.display_name.clone()),
+                            },
+                            icon,
+                        )
+                    })
+                })
+                .unwrap_or_else(|| {
+                    (
+                        CurseForgeImportedModpack::Unmanaged {
+                            archive_path: path.clone(),
+                        },
+                        None,
+                    )
+                });
+
             let mut lock = self.results.lock().await;
             lock.push(CurseForgeManifestWrapper {
                 full_path: path.clone(),
                 manifest,
+                modpack,
+                icon,
             });
         }
 
@@ -117,10 +275,21 @@ impl InstanceImporter for CurseForgeZipImporter {
             .lock()
             .await
             .iter()
-            .map(|instance| super::ImportableInstance {
-                entity: Entity::CurseForgeZip,
-                name: instance.manifest.name.clone(),
-                import_once: false,
+            .map(|instance| {
+                let (name, icon, known_remote) = match &instance.modpack {
+                    CurseForgeImportedModpack::Managed {
+                        icon, file_name, ..
+                    } => (file_name.clone(), icon.clone(), true),
+                    CurseForgeImportedModpack::Unmanaged { .. } => {
+                        (format!("{} - {}", &instance.manifest.name, &instance.manifest.version), None, false)
+                    }
+                };
+                super::ImportableInstance {
+                    entity: Entity::CurseForgeZip,
+                    name,
+                    icon,
+                    import_once: false,
+                }
             })
             .collect();
         Ok(instances)
@@ -137,88 +306,21 @@ impl InstanceImporter for CurseForgeZipImporter {
             .get(index as usize)
             .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
 
-        let mut content = tokio::fs::read(&instance.full_path)
-            .await
-            .with_context(|| format!("Error reading `{}`", instance.full_path.to_string_lossy()))?;
-        let murmur2 = tokio::task::spawn_blocking(move || {
-            murmurhash32::murmurhash2({
-                // curseforge's weird api
-                content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                &content
-            })
-        })
-        .await?;
-        let fp_response = app
-            .modplatforms_manager()
-            .curseforge
-            .get_fingerprints(&[murmur2])
-            .await?
-            .data;
-        let fp_matches = fp_response.exact_matches;
-        let mods_response = if !fp_matches.is_empty() {
-            Some(
-                app.modplatforms_manager()
-                    .curseforge
-                    .get_mods(ModsParameters {
-                        body: ModsParametersBody {
-                            mod_ids: fp_matches.iter().map(|m| m.file.mod_id).collect::<Vec<_>>(),
-                        },
-                    })
-                    .await?
-                    .data,
-            )
+        let use_icon = if let CurseForgeImportedModpack::Managed { icon: Some(icon_url), .. } = &instance.modpack {
+            app.instance_manager().download_icon(icon_url.clone()).await?;
+            true
         } else {
-            None
+            false
         };
-        let matches = if let Some(mods_response) = mods_response {
-            Some(
-                fp_response
-                    .exact_fingerprints
-                    .into_iter()
-                    .zip(fp_matches.into_iter())
-                    .zip(mods_response.into_iter())
-                    .map(|((fingerprint, fp_match), proj)| (fingerprint, fp_match, proj))
-                    .collect::<Vec<_>>(),
-            )
-        } else {
-            None
-        };
-        let (modpack, icon) = matches
-            .and_then(|matches| {
-                matches.first().map(|(_, fp_match, proj)| {
-                    (
-                        Modpack::Curseforge(CurseforgeModpack::LocalManaged {
-                            project_id: fp_match.file.mod_id,
-                            file_id: fp_match.file.id,
-                            archive_path: instance.full_path.to_string_lossy().to_string(),
-                        }),
-                        proj.logo.as_ref().map(|logo| logo.url.clone()),
-                    )
-                })
-            })
-            .unwrap_or_else(|| {
-                (
-                    Modpack::Curseforge(CurseforgeModpack::Unmanaged {
-                        archive_path: instance.full_path.to_string_lossy().to_string(),
-                    }),
-                    None,
-                )
-            });
 
-        if let Some(icon_url) = &icon {
-            app.instance_manager()
-                .download_icon(icon_url.clone())
-                .await?;
-        }
-
-        let install_source = InstanceVersionSource::Modpack(modpack);
+        let install_source = InstanceVersionSource::Modpack(instance.modpack.clone().into());
 
         let created_instance_id = app
             .instance_manager()
             .create_instance(
                 app.instance_manager().get_default_group().await?,
                 name.to_string(),
-                icon.is_some(),
+                use_icon,
                 install_source,
                 "".to_string(),
             )
@@ -301,6 +403,7 @@ impl InstanceImporter for MrpackImporter {
             .map(|instance| super::ImportableInstance {
                 entity: Entity::MRPack,
                 name: instance.index.name.clone(),
+                icon: None,
                 import_once: false,
             })
             .collect();

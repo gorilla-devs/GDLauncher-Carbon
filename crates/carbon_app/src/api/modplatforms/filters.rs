@@ -246,7 +246,7 @@ impl From<FEUnifiedSearchType> for curseforge::structs::CFFEClassId {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedSearchCategoryID {
-    Curseforge(i32),
+    Curseforge(u32),
     Modrinth(String),
 }
 
@@ -300,8 +300,8 @@ impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParam
                 author_id: None,
                 game_version_type_id: None,
                 slug: None,
-                index: value.index.map(|index| index as i32),
-                page_size: value.page_size.map(|page_size| page_size as i32),
+                index: value.index,
+                page_size: value.page_size,
             },
         }
     }
