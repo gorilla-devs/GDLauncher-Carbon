@@ -132,7 +132,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         tracing::debug!("instance path: {:?}", instance_path);
 
-        let mut version = match config.game_configuration.version {
+        let version = match config.game_configuration.version {
             Some(GameVersion::Standard(ref v)) => Some(v.clone()),
             Some(GameVersion::Custom(_)) => bail!("Custom versions are not supported yet"),
             None if config.modpack.as_ref().is_some() => None,

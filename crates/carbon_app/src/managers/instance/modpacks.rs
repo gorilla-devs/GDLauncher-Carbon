@@ -19,7 +19,7 @@ use crate::{
 };
 
 pub enum CurseforgeInstallSource {
-    Remote { project_id: i32, file_id: i32 },
+    Remote { project_id: u32, file_id: u32 },
     Local { archive_path: String },
 }
 

@@ -37,12 +37,12 @@ pub enum ModpackPlatform {
 #[derive(Debug, Clone)]
 pub enum CurseforgeModpack {
     RemoteManaged {
-        project_id: i32,
-        file_id: i32,
+        project_id: u32,
+        file_id: u32,
     },
     LocalManaged {
-        project_id: i32,
-        file_id: i32,
+        project_id: u32,
+        file_id: u32,
         archive_path: String,
     },
     Unmanaged {

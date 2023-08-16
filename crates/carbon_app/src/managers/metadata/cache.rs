@@ -541,8 +541,8 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                     ]),
                                                 (
                                                     murmur2 as i32,
-                                                    modinfo.id,
-                                                    fileinfo.file.id,
+                                                    modinfo.id as i32,
+                                                    fileinfo.file.id as i32,
                                                     modinfo.name,
                                                     modinfo.slug,
                                                     modinfo.summary,

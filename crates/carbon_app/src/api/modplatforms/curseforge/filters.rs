@@ -95,19 +95,19 @@ impl From<CFFEModSearchParameters> for ModSearchParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModSearchParametersQuery {
-    pub game_id: i32,
+    pub game_id: u32,
     pub search_filter: Option<String>,
     pub game_version: Option<String>,
-    pub category_ids: Option<Vec<i32>>,
+    pub category_ids: Option<Vec<u32>>,
     pub sort_order: Option<CFFEModSearchSortOrder>,
     pub sort_field: Option<CFFEModSearchSortField>,
     pub class_id: Option<CFFEClassId>,
     pub mod_loader_types: Option<Vec<CFFEModLoaderType>>,
-    pub game_version_type_id: Option<i32>,
-    pub author_id: Option<i32>,
+    pub game_version_type_id: Option<u32>,
+    pub author_id: Option<u32>,
     pub slug: Option<String>,
-    pub index: Option<i32>,
-    pub page_size: Option<i32>,
+    pub index: Option<u32>,
+    pub page_size: Option<u32>,
 }
 
 impl From<CFFEModSearchParametersQuery> for ModSearchParametersQuery {
@@ -137,7 +137,7 @@ impl From<CFFEModSearchParametersQuery> for ModSearchParametersQuery {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModFilesParameters {
-    pub mod_id: i32,
+    pub mod_id: u32,
     pub query: CFFEModFilesParametersQuery,
 }
 
@@ -158,11 +158,11 @@ pub struct CFFEModFilesParametersQuery {
     #[specta(optional)]
     pub mod_loader_type: Option<CFFEModLoaderType>,
     #[specta(optional)]
-    pub game_version_type_id: Option<i32>,
+    pub game_version_type_id: Option<u32>,
     #[specta(optional)]
-    pub index: Option<i32>,
+    pub index: Option<u32>,
     #[specta(optional)]
-    pub page_size: Option<i32>,
+    pub page_size: Option<u32>,
 }
 
 impl From<CFFEModFilesParametersQuery> for ModFilesParametersQuery {
@@ -180,8 +180,8 @@ impl From<CFFEModFilesParametersQuery> for ModFilesParametersQuery {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModFileParameters {
-    pub mod_id: i32,
-    pub file_id: i32,
+    pub mod_id: u32,
+    pub file_id: u32,
 }
 
 impl From<CFFEModFileParameters> for ModFileParameters {
@@ -196,7 +196,7 @@ impl From<CFFEModFileParameters> for ModFileParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModDescriptionParameters {
-    pub mod_id: i32,
+    pub mod_id: u32,
 }
 
 impl From<CFFEModDescriptionParameters> for ModDescriptionParameters {
@@ -210,7 +210,7 @@ impl From<CFFEModDescriptionParameters> for ModDescriptionParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModParameters {
-    pub mod_id: i32,
+    pub mod_id: u32,
 }
 
 impl From<CFFEModParameters> for ModParameters {
@@ -238,7 +238,7 @@ impl From<CFFEModsParameters> for ModsParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModsParametersBody {
-    pub mod_ids: Vec<i32>,
+    pub mod_ids: Vec<u32>,
 }
 
 impl From<CFFEModsParametersBody> for ModsParametersBody {
@@ -266,7 +266,7 @@ impl From<CFFEFilesParameters> for FilesParameters {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEFilesParametersBody {
-    pub file_ids: Vec<i32>,
+    pub file_ids: Vec<u32>,
 }
 
 impl From<CFFEFilesParametersBody> for FilesParametersBody {
@@ -280,8 +280,8 @@ impl From<CFFEFilesParametersBody> for FilesParametersBody {
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CFFEModFileChangelogParameters {
-    pub mod_id: i32,
-    pub file_id: i32,
+    pub mod_id: u32,
+    pub file_id: u32,
 }
 
 impl From<CFFEModFileChangelogParameters> for ModFileChangelogParameters {
