@@ -984,7 +984,7 @@ pub struct CFFECategory {
     pub is_class: Option<bool>,
     pub class_id: Option<u32>,
     pub parent_category_id: Option<u32>,
-    pub display_index: Option<u32>,
+    pub display_index: Option<i32>,
 }
 
 impl From<mpcf::Category> for CFFECategory {
