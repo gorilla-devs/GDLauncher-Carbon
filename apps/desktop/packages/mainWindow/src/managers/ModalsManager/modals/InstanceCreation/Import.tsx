@@ -46,6 +46,7 @@ const Import = (props: Props) => {
 
   const [isLoading, setIsLoading] = createSignal(false);
 
+  const [isLoadingInstances, setIsLoadingInstance] = createSignal(true);
   const [t] = useTransContext();
 
   const scanImportableInstancesMutation = rspc.createMutation([
@@ -113,6 +114,8 @@ const Import = (props: Props) => {
         selectedEntity(),
       ])
     );
+    setIsLoading(false);
+    setIsLoadingInstance(false);
   });
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
@@ -140,6 +143,8 @@ const Import = (props: Props) => {
       entity: selectedEntity(),
       scanPaths: scanPaths(),
     });
+    setIsLoading(true);
+    setIsLoadingInstance(true);
   });
 
   const selectAll = (checked: boolean) => {
@@ -221,6 +226,7 @@ const Import = (props: Props) => {
       setSelectedInstancesNames(reconcile({}));
       setInstanceNameEditModes(reconcile({}));
       setImportedInstances(reconcile([]));
+      setScanPaths([]);
     }
   });
 
@@ -332,6 +338,11 @@ const Import = (props: Props) => {
             </span>
           </div>
           <Switch>
+            <Match when={isLoadingInstances()} >
+              <div class="p-4 h-full w-full box-border flex flex-col justify-center items-center">
+                <Spinner />
+              </div>
+            </Match>
             <Match when={(instances()?.data?.length || 0) > 0}>
               <div class="p-4 h-full w-full box-border flex flex-col gap-4">
                 <For each={instances()?.data}>
@@ -436,14 +447,13 @@ const Import = (props: Props) => {
                               <div
                                 class="bg-green-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{
-                                  width: `${
-                                    (
-                                      (loadingInstances[i()] as FETask)
-                                        .progress as {
+                                  width: `${(
+                                    (loadingInstances[i()] as FETask)
+                                      .progress as {
                                         Known: number;
                                       }
-                                    ).Known * 100
-                                  }%`,
+                                  ).Known * 100
+                                    }%`,
                                 }}
                               />
                             </div>

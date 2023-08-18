@@ -15,7 +15,8 @@ use crate::{
 };
 
 use anyhow::Context;
-use sha2::{digest::Digest, Sha512};
+use sha1::Sha1;
+use sha2::Sha512;
 use std::{
     io::{Read, Seek},
     path::PathBuf,
@@ -64,6 +65,43 @@ impl From<CurseForgeImportedModpack> for Modpack {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ModrinthImportedModpack {
+    Managed {
+        project_id: String,
+        version_id: String,
+        mrpack_path: PathBuf,
+        icon: Option<String>,
+        name: String,
+        version_name: String,
+    },
+    Unmanaged {
+        mrpack_path: PathBuf,
+    },
+}
+
+impl From<ModrinthImportedModpack> for Modpack {
+    fn from(value: ModrinthImportedModpack) -> Self {
+        match value {
+            ModrinthImportedModpack::Managed {
+                project_id,
+                version_id,
+                mrpack_path,
+                ..
+            } => Modpack::Modrinth(ModrinthModpack::LocalManaged {
+                project_id,
+                version_id,
+                mrpack_path: mrpack_path.to_string_lossy().to_string(),
+            }),
+            ModrinthImportedModpack::Unmanaged { mrpack_path } => {
+                Modpack::Modrinth(ModrinthModpack::Unmanaged {
+                    mrpack_path: mrpack_path.to_string_lossy().to_string(),
+                })
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct CurseForgeManifestWrapper {
     full_path: PathBuf,
@@ -81,6 +119,8 @@ pub struct CurseForgeZipImporter {
 pub struct MrpackIndexWrapper {
     full_path: PathBuf,
     index: modrinth::version::ModpackIndex,
+    modpack: ModrinthImportedModpack,
+    icon: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -103,13 +143,13 @@ impl InstanceImporter for CurseForgeZipImporter {
         for path in scan_paths {
             let file_path_clone = path.clone();
 
-            // make sure this is a valid modpack and check if it's known by curseforge
-            let (manifest, murmur2, sha1_hash) = spawn_blocking(move || {
+            // make sure this is a valid modpack
+            let (manifest, murmur2, _sha1_hash) = spawn_blocking(move || {
                 let mut file = std::fs::File::open(&file_path_clone).with_context(|| {
                     format!("Error reading `{}`", file_path_clone.to_string_lossy())
                 })?;
 
-                let (sha1_hash, archive_murmur2) = {
+                let (sha1_hash, _archive_murmur2) = {
                     let mut content = Vec::new();
                     let _archive_size = file.read_to_end(&mut content).with_context(|| {
                         format!(
@@ -123,11 +163,10 @@ impl InstanceImporter for CurseForgeZipImporter {
                             file_path_clone.to_string_lossy()
                         )
                     })?;
-                    use sha1::Digest;
-                    let mut hasher = sha1::Sha1::new();
-                    hasher.update(&content);
-                    let hash = hasher.finalize();
-                    let sha1_hash = hex::encode(hash);
+                    let sha1_hash = {
+                        use sha1::Digest;
+                        hex::encode(Sha1::new_with_prefix(&content).finalize())
+                    };
                     let archive_murmur2 = murmurhash32::murmurhash2({
                         // drop whitespace
                         content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
@@ -183,6 +222,7 @@ impl InstanceImporter for CurseForgeZipImporter {
                 )));
             }
 
+            // check if it's known by curseforge
             let fp_response = app
                 .modplatforms_manager()
                 .curseforge
@@ -276,13 +316,17 @@ impl InstanceImporter for CurseForgeZipImporter {
             .await
             .iter()
             .map(|instance| {
-                let (name, icon, known_remote) = match &instance.modpack {
+                let (name, icon) = match &instance.modpack {
                     CurseForgeImportedModpack::Managed {
                         icon, file_name, ..
-                    } => (file_name.clone(), icon.clone(), true),
-                    CurseForgeImportedModpack::Unmanaged { .. } => {
-                        (format!("{} - {}", &instance.manifest.name, &instance.manifest.version), None, false)
-                    }
+                    } => (file_name.clone(), icon.clone()),
+                    CurseForgeImportedModpack::Unmanaged { .. } => (
+                        match &instance.manifest.version {
+                            Some(version) => format!("{} - {}", &instance.manifest.name, version),
+                            None => instance.manifest.name.clone(),
+                        },
+                        None,
+                    ),
                 };
                 super::ImportableInstance {
                     entity: Entity::CurseForgeZip,
@@ -306,8 +350,14 @@ impl InstanceImporter for CurseForgeZipImporter {
             .get(index as usize)
             .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
 
-        let use_icon = if let CurseForgeImportedModpack::Managed { icon: Some(icon_url), .. } = &instance.modpack {
-            app.instance_manager().download_icon(icon_url.clone()).await?;
+        let use_icon = if let CurseForgeImportedModpack::Managed {
+            icon: Some(icon_url),
+            ..
+        } = &instance.modpack
+        {
+            app.instance_manager()
+                .download_icon(icon_url.clone())
+                .await?;
             true
         } else {
             false
@@ -351,10 +401,31 @@ impl InstanceImporter for MrpackImporter {
             let file_path_clone = path.clone();
 
             // make sure this is a valid modpack
-            let index = spawn_blocking(move || {
-                let file = std::fs::File::open(&file_path_clone).with_context(|| {
+            let (index, sha512) = spawn_blocking(move || {
+                let mut file = std::fs::File::open(&file_path_clone).with_context(|| {
                     format!("Error reading `{}`", file_path_clone.to_string_lossy())
                 })?;
+                let sha512 = {
+                    let mut content = Vec::new();
+                    let _archive_size = file.read_to_end(&mut content).with_context(|| {
+                        format!(
+                            "Error reading archive `{}`",
+                            file_path_clone.to_string_lossy()
+                        )
+                    })?;
+                    file.rewind().with_context(|| {
+                        format!(
+                            "Error reading archive `{}`",
+                            file_path_clone.to_string_lossy()
+                        )
+                    })?;
+                    use sha2::Digest;
+
+                    hex::encode(<[u8; 64] as From<_>>::from(
+                        Sha512::new_with_prefix(content).finalize(),
+                    ))
+                };
+
                 let mut archive = zip::ZipArchive::new(file).with_context(|| {
                     format!(
                         "Error reading archive `{}`",
@@ -376,14 +447,53 @@ impl InstanceImporter for MrpackImporter {
                     })?
                 };
 
-                Ok::<_, anyhow::Error>(index)
+                Ok::<_, anyhow::Error>((index, sha512))
             })
             .await??;
+
+            // check if it is known by modrinth
+            let version_response = app
+                .modplatforms_manager()
+                .modrinth
+                .get_versions_from_hash(&VersionHashesQuery {
+                    hashes: vec![sha512.clone()],
+                    algorithm: HashAlgorithm::SHA512,
+                })
+                .await?;
+
+            let (modpack, icon) = match version_response.get(&sha512) {
+                Some(version) => {
+                    let project = app
+                        .modplatforms_manager()
+                        .modrinth
+                        .get_project(ProjectID(version.project_id.clone()))
+                        .await?;
+                    (
+                        ModrinthImportedModpack::Managed {
+                            project_id: project.id.clone(),
+                            version_id: version.id.clone(),
+                            mrpack_path: path.clone(),
+                            icon: project.icon_url.clone(),
+                            name: project.title.clone(),
+                            version_name: version.name.clone(),
+                        },
+                        project.icon_url.clone(),
+                    )
+                }
+                None => (
+                    ModrinthImportedModpack::Unmanaged {
+                        mrpack_path: path.clone(),
+                    },
+                    None,
+                ),
+            };
 
             let mut lock = self.results.lock().await;
             lock.push(MrpackIndexWrapper {
                 full_path: path.clone(),
                 index,
+                modpack,
+                icon,
             });
         }
 
@@ -400,11 +510,36 @@ impl InstanceImporter for MrpackImporter {
             .lock()
             .await
             .iter()
-            .map(|instance| super::ImportableInstance {
-                entity: Entity::MRPack,
-                name: instance.index.name.clone(),
-                icon: None,
-                import_once: false,
+            .map(|instance| {
+                let (name, icon) = match &instance.modpack {
+                    ModrinthImportedModpack::Managed {
+                        icon,
+                        name,
+                        version_name,
+                        ..
+                    } => (
+                        if !version_name.is_empty() {
+                            format!("{} - {}", name, version_name)
+                        } else {
+                            name.clone()
+                        },
+                        icon.clone(),
+                    ),
+                    ModrinthImportedModpack::Unmanaged { .. } => (
+                        if !instance.index.version_id.is_empty() {
+                            format!("{} - {}", &instance.index.name, &instance.index.version_id)
+                        } else {
+                            instance.index.name.clone()
+                        },
+                        None,
+                    ),
+                };
+                super::ImportableInstance {
+                    entity: Entity::MRPack,
+                    name,
+                    icon,
+                    import_once: false,
+                }
             })
             .collect();
         Ok(instances)
@@ -420,63 +555,28 @@ impl InstanceImporter for MrpackImporter {
         let instance = lock
             .get(index as usize)
             .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
-        let content = tokio::fs::read(&instance.full_path)
-            .await
-            .with_context(|| format!("Error reading `{}`", instance.full_path.to_string_lossy()))?;
-        let sha512 = tokio::task::spawn_blocking(move || {
-            hex::encode(<[u8; 64] as From<_>>::from(
-                Sha512::new_with_prefix(content).finalize(),
-            ))
-        })
-        .await?;
 
-        let version_response = app
-            .modplatforms_manager()
-            .modrinth
-            .get_versions_from_hash(&VersionHashesQuery {
-                hashes: vec![sha512.clone()],
-                algorithm: HashAlgorithm::SHA512,
-            })
-            .await?;
-
-        let (modpack, icon) = match version_response.get(&sha512) {
-            Some(version) => {
-                let project = app
-                    .modplatforms_manager()
-                    .modrinth
-                    .get_project(ProjectID(version.project_id.clone()))
-                    .await?;
-                (
-                    Modpack::Modrinth(ModrinthModpack::LocalManaged {
-                        project_id: project.id.clone(),
-                        version_id: version.id.clone(),
-                        mrpack_path: instance.full_path.to_string_lossy().to_string(),
-                    }),
-                    project.icon_url,
-                )
-            }
-            None => (
-                Modpack::Modrinth(ModrinthModpack::Unmanaged {
-                    mrpack_path: instance.full_path.to_string_lossy().to_string(),
-                }),
-                None,
-            ),
-        };
-
-        if let Some(icon_url) = &icon {
+        let use_icon = if let ModrinthImportedModpack::Managed {
+            icon: Some(icon_url),
+            ..
+        } = &instance.modpack
+        {
             app.instance_manager()
                 .download_icon(icon_url.clone())
                 .await?;
-        }
+            true
+        } else {
+            false
+        };
 
-        let install_source = InstanceVersionSource::Modpack(modpack);
+        let install_source = InstanceVersionSource::Modpack(instance.modpack.clone().into());
 
         let created_instance_id = app
             .instance_manager()
             .create_instance(
                 app.instance_manager().get_default_group().await?,
                 name.to_string(),
-                icon.is_some(),
+                use_icon,
                 install_source,
                 "".to_string(),
             )
