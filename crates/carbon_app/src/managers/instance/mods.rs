@@ -106,7 +106,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
@@ -167,7 +167,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
@@ -226,11 +226,28 @@ impl ManagerRef<'_, InstanceManager> {
 
         Ok(task_id)
     }
+
+    pub async fn get_mod_icon(&self, mod_id: String) -> anyhow::Result<Option<Vec<u8>>> {
+        let m = self
+            .app
+            .prisma_client
+            .mod_metadata()
+            .find_unique(metadb::UniqueWhereParam::IdEquals(mod_id.clone()))
+            .exec()
+            .await?
+            .ok_or(InvalidModIdError(mod_id))?;
+
+        Ok(m.logo_image)
+    }
 }
 
 #[derive(Error, Debug)]
 #[error("invalid mod id '{1}' given for instance '{0}'")]
-pub struct InvalidModIdError(InstanceId, String);
+pub struct InvalidInstanceModIdError(InstanceId, String);
+
+#[derive(Error, Debug)]
+#[error("invalid mod id '{0}'")]
+pub struct InvalidModIdError(String);
 
 #[cfg(test)]
 mod test {
