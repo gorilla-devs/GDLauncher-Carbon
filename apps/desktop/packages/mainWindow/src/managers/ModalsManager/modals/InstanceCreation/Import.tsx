@@ -142,14 +142,14 @@ const Import = (props: Props) => {
   });
 
   return (
-    <div class="p-5 h-full flex flex-col justify-between box-border items-end overflow-x-hidden">
+    <div class="h-full flex flex-col justify-between box-border p-5 items-end overflow-x-hidden">
       <div class="flex flex-col gap-4 w-full">
         <div class="overflow-x-auto w-fill">
           <div class="flex gap-4 py-2">
             <For each={entities.data}>
               {(entity) => (
                 <div
-                  class="relative flex justify-center px-4 py-2 bg-darkSlate-800 rounded-lg cursor-pointer whitespace-nowrap min-w-30"
+                  class="relative flex justify-center py-2 rounded-lg cursor-pointer whitespace-nowrap px-4 bg-darkSlate-800 min-w-30"
                   classList={{
                     "border-2 border-solid border-transparent text-darkSlate-400 cursor-not-allowed":
                       !currentlySupportedEnties.includes(entity) ||
@@ -174,7 +174,7 @@ const Import = (props: Props) => {
             </For>
           </div>
         </div>
-        <div class="w-full bg-darkSlate-800 rounded-xl box-border flex flex-col overflow-hidden h-50">
+        <div class="w-full bg-darkSlate-800 box-border flex flex-col overflow-hidden rounded-xl h-50">
           <div class="flex justify-between w-full bg-darkSlate-900 px-4 py-2 box-border">
             <Checkbox
               disabled={
@@ -215,7 +215,7 @@ const Import = (props: Props) => {
           </div>
           <Switch>
             <Match when={(instances()?.data?.length || 0) > 0}>
-              <div class="py-4 pl-4 pr-2 h-full w-full box-border flex flex-col gap-4 overflow-y-auto">
+              <div class="h-full w-full box-border flex flex-col gap-4 overflow-y-auto py-4 pl-4 pr-2">
                 <For each={instances()?.data}>
                   {(instance, i) => (
                     <div class="flex justify-between">
@@ -256,7 +256,7 @@ const Import = (props: Props) => {
                               (loadingInstances[i()] as FETask).progress
                             )}
                           >
-                            <div class="w-1/2 relative rounded-lg overflow-hidden bg-darkSlate-600 h-1">
+                            <div class="relative rounded-lg overflow-hidden h-1 w-1/2 bg-darkSlate-600">
                               <div
                                 class="bg-primary-500 text-xs absolute left-0 top-0 bottom-0"
                                 style={{
@@ -281,7 +281,7 @@ const Import = (props: Props) => {
               </div>
             </Match>
             <Match when={(instances()?.data?.length || 0) === 0}>
-              <div class="p-4 h-full w-full box-border flex flex-col justify-center items-center">
+              <div class="h-full w-full box-border flex flex-col justify-center items-center p-4">
                 <Trans key="instance.import_no_instances" />
               </div>
             </Match>
