@@ -1,5 +1,7 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
+use chrono::{TimeZone, Utc};
+
 use tokio::{
     fs::create_dir_all,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -197,6 +199,20 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 "".to_string(),
             )
             .await?;
+
+        let play_time = instance.config.time_played * 60;
+        let last_played = instance
+            .config
+            .last_played
+            .and_then(|timestamp| (timestamp / 1000).try_into().ok())
+            .and_then(|timestamp| Utc.timestamp_opt(timestamp, 0).single());
+        if let Err(e) = app
+            .instance_manager()
+            .update_playtime(created_instance_id, play_time, last_played)
+            .await
+        {
+            tracing::error!({ error = ?e }, "Error setting playtime of imported instance");
+        }
 
         let instance_full_path = instance.full_path.clone();
         let instance_background = instance.config.background.clone();

@@ -4,13 +4,14 @@ use std::fmt::Display;
 
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
+use chrono::{DateTime, Utc};
+
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
 
 use anyhow::bail;
 use anyhow::{anyhow, Context};
-use chrono::Utc;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 
@@ -1080,6 +1081,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         instance_id: InstanceId,
         added_seconds: u64,
+        last_played: Option<DateTime<Utc>>,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -1097,7 +1099,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path()
             .join(shortpath as &str);
 
-        data.config.last_played = Utc::now();
+        data.config.last_played = last_played.unwrap_or(Utc::now());
         data.config.seconds_played += added_seconds;
 
         let json = schema::make_instance_config(data.config.clone())?;

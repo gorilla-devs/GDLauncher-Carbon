@@ -707,7 +707,7 @@ async fn prepare_game_launch_task(
                     last_stored_time = now;
                     let r = app
                         .instance_manager()
-                        .update_playtime(info.instance_id, diff.num_seconds() as u64)
+                        .update_playtime(info.instance_id, diff.num_seconds() as u64, None)
                         .await;
                     if let Err(e) = r {
                         tracing::error!({ error = ?e }, "error updating instance playtime");
@@ -728,6 +728,7 @@ async fn prepare_game_launch_task(
                 .update_playtime(
                     info.instance_id,
                     (Utc::now() - last_stored_time).num_seconds() as u64,
+                    None,
                 )
                 .await;
             if let Err(e) = r {
