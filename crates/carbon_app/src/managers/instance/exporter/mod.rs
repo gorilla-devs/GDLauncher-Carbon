@@ -9,7 +9,7 @@ use strum_macros::EnumIter;
 use tokio::io::AsyncReadExt;
 
 use crate::{
-    domain::{instance::InstanceId, vtask::VisualTaskId},
+    domain::{instance::{InstanceId, info::ModLoaderType}, vtask::VisualTaskId},
     managers::{minecraft::absolute_clean_path, AppInner},
 };
 
@@ -28,6 +28,12 @@ impl ExportFormat {
         Self::iter().collect()
     }
 }
+
+static PRIMARY_LOADER_TYPES: [ModLoaderType; 3] = [
+    ModLoaderType::Forge,
+    ModLoaderType::Fabric,
+    ModLoaderType::Quilt,
+];
 
 #[async_trait::async_trait]
 pub trait InstanceExporter {
