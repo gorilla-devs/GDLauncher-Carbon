@@ -118,6 +118,13 @@ const Import = (props: Props) => {
     setIsLoadingInstance(false);
   });
 
+  createEffect(() => {
+    if (instances()?.data !== undefined && isLoadingInstances()) {
+      setIsLoadingInstance(false);
+      setIsLoading(false);
+    }
+  });
+
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
 
   const currentlySupportedEntities = [
@@ -247,9 +254,10 @@ const Import = (props: Props) => {
                         !currentlySupportedEntities.includes(entity),
                       "border-2 border-solid border-primary-500":
                         selectedEntity() === entity,
+                      "cursor-progress": isLoading()
                     }}
                     onClick={() => {
-                      if (currentlySupportedEntities.includes(entity))
+                      if (!isLoading() && currentlySupportedEntities.includes(entity))
                         setSelectedEntity(entity);
                     }}
                   >
@@ -277,6 +285,7 @@ const Import = (props: Props) => {
           <Button
             icon={<div class="i-ri:archive-drawer-fill text-4xl" />}
             iconRight={true}
+            disabled={isLoading()}
             onClick={() => {
               const dialogProperties = dialogPropertiesFromEntity(
                 selectedEntity()
