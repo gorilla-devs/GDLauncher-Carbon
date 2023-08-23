@@ -6,7 +6,7 @@ import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction } from "solid-js/store";
 import { For, Show, createResource } from "solid-js";
-import { fetchModImage } from "@/utils/instances";
+import { fetchModImage, getModpackPlatformIcon } from "@/utils/instances";
 
 type Props = {
   mod: ModType;
@@ -33,6 +33,8 @@ const Mod = (props: Props) => {
     ([instanceId, modId]) => fetchModImage(instanceId, modId)
   );
 
+  const isCurseForge = () => props.mod.curseforge;
+
   return (
     <div class="w-full h-14 flex items-center py-2 box-border">
       <div class="flex gap-4 justify-between items-center w-full">
@@ -50,8 +52,8 @@ const Mod = (props: Props) => {
                 fallback={
                   <img
                     class="w-full"
-                    src={getForgeModloaderIcon(
-                      props.mod.metadata?.modloaders[0]
+                    src={getModpackPlatformIcon(
+                      isCurseForge() ? "Curseforge" : "Modrinth"
                     )}
                   />
                 }
