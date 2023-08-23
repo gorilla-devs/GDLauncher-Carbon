@@ -213,6 +213,17 @@ export const fetchImage = async (id: number) => {
   } else return "";
 };
 
+export const fetchModImage = async (instanceId: string, modId: string) => {
+  const imageUrl = `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}`;
+  const image = await fetch(imageUrl);
+
+  const imageNotPresent = image.status === 204;
+
+  if (!imageNotPresent) {
+    return imageUrl;
+  } else return "";
+};
+
 export const getUrlType = (url: string) => {
   return url.match(/^\/(modpacks|mods)\/\d+\/(curseforge|modrinth)(\/[^/]+)*$/)
     ? url.match(/mods/)
