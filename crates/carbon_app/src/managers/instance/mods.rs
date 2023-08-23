@@ -227,15 +227,27 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(task_id)
     }
 
-    pub async fn get_mod_icon(&self, mod_id: String) -> anyhow::Result<Option<Vec<u8>>> {
+    pub async fn get_mod_icon(
+        &self,
+        instance_id: InstanceId,
+        mod_id: String,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+        let _ = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
         let m = self
             .app
             .prisma_client
-            .mod_metadata()
-            .find_unique(metadb::UniqueWhereParam::IdEquals(mod_id.clone()))
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(mod_id.clone()))
+            .with(fcdb::metadata::fetch())
             .exec()
             .await?
-            .ok_or(InvalidModIdError(mod_id))?;
+            .ok_or(InvalidModIdError(mod_id))?
+            .metadata
+            .ok_or_else(|| anyhow::anyhow!("broken db state"))?;
 
         Ok(m.logo_image)
     }

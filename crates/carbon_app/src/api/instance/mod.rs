@@ -309,7 +309,8 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 
     #[derive(Deserialize)]
     struct ModIconQuery {
-        id: String,
+        instance_id: i32,
+        mod_id: String,
     }
 
     #[derive(Deserialize)]
@@ -354,7 +355,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<ModIconQuery>| async move {
                     let icon = app.instance_manager()
-                        .get_mod_icon(query.id)
+                        .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id)
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
