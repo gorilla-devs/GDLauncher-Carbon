@@ -14,6 +14,8 @@ use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+use std::sync::{Arc, atomic};
+use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info};
@@ -788,6 +790,8 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
 
                     let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+                    let (stop_tx, mut stop_rx) = mpsc::channel::<()>(1);
+                    let stopping = Arc::new(AtomicBool::new(false));
 
                     let start_time = Utc::now();
 
@@ -798,8 +802,10 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Running(RunningInstance {
                                 process_id: child.id().expect("child process id is not present even though child process was started"),
                                 kill_tx,
+                                stop_tx,
                                 start_time,
                                 log: log_id,
+                                stopping: stopping.clone(),
                             }),
                         )
                         .await;
@@ -879,6 +885,31 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     };
 
+                    let child_pid = child.id();
+                    let (chainkill_tx, mut chainkill_rx) = mpsc::channel::<()>(1);
+
+                    if let Some(child_pid) = child_pid {
+                        tokio::spawn(async move {
+                            tokio::select! {
+                                _ = chainkill_rx.recv() => {},
+                                v = stop_rx.recv() => if v.is_some() {
+                                    stopping.store(true, atomic::Ordering::Relaxed);
+
+                                    #[cfg(target_family = "unix")]
+                                    {
+                                        let r = unsafe { libc::kill(child_pid as i32, libc::SIGTERM) };
+
+                                        match r {
+                                            0 => tracing::info!("Sent SIGTERM to running game process"),
+                                            -1 => tracing::error!({ errno = ?errno::errno() }, "Unable to send SIGTERM to running game process"),
+                                            _ => {},
+                                        }
+                                    }
+                                },
+                            }
+                        });
+                    }
+
                     tokio::select! {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
@@ -886,6 +917,8 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = read_logs => {},
                         _ = update_playtime => {}
                     }
+
+                    let _ = chainkill_tx.send(()).await;
 
                     let r = app
                         .instance_manager()
@@ -949,6 +982,26 @@ impl ManagerRef<'_, InstanceManager> {
         Ok((&instance.data()?.state).into())
     }
 
+    pub async fn stop_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let LaunchState::Running(running) = &instance.data()?.state else {
+            bail!("stop_instance called on instance that was not running")
+        };
+
+        if running.stopping.load(atomic::Ordering::Relaxed) {
+            bail!("stop_instance called on instance that was already stopping")
+        }
+
+        info!("stopping instance {instance_id}");
+        running.stop_tx.send(()).await?;
+
+        Ok(())
+    }
+
     pub async fn kill_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
@@ -988,9 +1041,11 @@ impl Debug for LaunchState {
 
 pub struct RunningInstance {
     process_id: u32,
+    stop_tx: mpsc::Sender<()>,
     kill_tx: mpsc::Sender<()>,
     start_time: DateTime<Utc>,
     log: GameLogId,
+    stopping: Arc<AtomicBool>,
 }
 
 impl From<&LaunchState> for domain::LaunchState {

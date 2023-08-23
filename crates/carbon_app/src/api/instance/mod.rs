@@ -198,7 +198,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation KILL_INSTANCE[app, id: FEInstanceId] {
             app.instance_manager()
-                .kill_instance(id.into())
+                .stop_instance(id.into())
                 .await
         }
 
