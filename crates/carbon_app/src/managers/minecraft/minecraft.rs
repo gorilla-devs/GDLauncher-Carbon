@@ -23,8 +23,8 @@ use regex::{Captures, Regex};
 use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
-use tokio::process::Child;
 use tracing::{info, warn};
+use command_group::{AsyncCommandGroup, AsyncGroupChild};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -515,7 +515,7 @@ pub async fn launch_minecraft(
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
-) -> anyhow::Result<Child> {
+) -> anyhow::Result<AsyncGroupChild> {
     let startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
@@ -543,7 +543,7 @@ pub async fn launch_minecraft(
 
     let child = command_exec.args(startup_command);
 
-    Ok(child.spawn()?)
+    Ok(child.group_spawn()?)
 }
 
 pub async fn extract_natives(

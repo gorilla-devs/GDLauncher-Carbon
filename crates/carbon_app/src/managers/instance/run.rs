@@ -811,7 +811,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
 
                     let (Some(mut stdout), Some(mut stderr)) =
-                        (child.stdout.take(), child.stderr.take())
+                        (child.inner().stdout.take(), child.inner().stderr.take())
                     else {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };
@@ -912,7 +912,10 @@ impl ManagerRef<'_, InstanceManager> {
 
                     tokio::select! {
                         _ = child.wait() => {},
-                        _ = kill_rx.recv() => drop(child.kill().await),
+                        _ = kill_rx.recv() => {
+                            let _ = child.kill();
+                            let _ = child.wait().await;
+                        },
                         // infallible, canceled by the above tasks
                         _ = read_logs => {},
                         _ = update_playtime => {}
