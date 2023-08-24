@@ -1,7 +1,11 @@
 use std::{
+    collections::VecDeque,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use anyhow::Context;
+use walkdir::WalkDir;
 
 use crate::{
     api::translation::Translation,
@@ -60,14 +64,10 @@ struct NonCurseForgeFiles {
     pub files: Vec<PathBuf>,
 }
 
-async fn collect_files<F: Fn(&Path) -> bool + Send>(
-    instance_path: InstancePath,
-    filter: F,
-) -> Vec<PathBuf> {
-}
 
 fn generate_manifest(
     instance_details: &InstanceDetails,
+    instance_path: InstancePath,
     mods: &Vec<Mod>,
     version: Option<String>,
     author: String,
@@ -75,6 +75,7 @@ fn generate_manifest(
 ) -> anyhow::Result<(Manifest, NonCurseForgeFiles)> {
     let mut primary_count = 0;
     let mut non_curseforge_mods = NonCurseForgeFiles::default();
+    let mods_path = instance_path.get_mods_path();
     Ok((
         Manifest {
             minecraft: Minecraft {
@@ -111,7 +112,9 @@ fn generate_manifest(
                         required: mod_.enabled || !use_disabled_as_optional,
                     }),
                     None => {
-                        non_curseforge_mods.files.push(mod_.clone());
+                        non_curseforge_mods
+                            .files
+                            .push(mods_path.join(mod_.filename));
                         None
                     }
                 })

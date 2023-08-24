@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -76,17 +74,6 @@ pub struct Mod {
     pub modrinth: Option<ModrinthModMetadata>,
 }
 
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LoaderMetadata {
-    pub modid: String,
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub description: Option<String>,
-    pub authors: Option<String>,
-    pub type_: info::ModLoaderType,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
     pub modid: String,
@@ -95,21 +82,6 @@ pub struct ModFileMetadata {
     pub description: Option<String>,
     pub authors: Option<String>,
     pub modloaders: Vec<info::ModLoaderType>,
-    pub loader_metadata: HashMap<info::ModLoaderType, LoaderMetadata>
-}
-
-impl From<LoaderMetadata> for ModFileMetadata {
-    fn from(value: LoaderMetadata) -> Self {
-        Self {
-            modid: value.modid.clone(),
-            name: value.name.clone(),
-            version: value.version.clone(),
-            description: value.description.clone(),
-            authors: value.authors.clone(),
-            modloaders: vec![value.type_],
-            loader_metadata: HashMap::from([(value.type_, value)]),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
