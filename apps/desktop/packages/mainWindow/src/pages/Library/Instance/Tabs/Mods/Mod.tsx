@@ -46,7 +46,7 @@ const Mod = (props: Props) => {
             }}
           />
           <div class="flex items-center gap-2">
-            <div class="h-10 w-10 rounded-xl border border-solid border-darkSlate-500">
+            <div class="h-10 w-10 rounded-xl border border-solid border-darkSlate-500 overflow-hidden flex items-center justify-center">
               <Show
                 when={imageResource()}
                 fallback={
