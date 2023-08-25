@@ -42,6 +42,7 @@ const loadCoreModule: CoreModule = () =>
           detached: false,
           stdio: "pipe",
           env: {
+            ...process.env,
             RUST_BACKTRACE: "full",
           },
         }
