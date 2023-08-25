@@ -895,15 +895,11 @@ impl ManagerRef<'_, InstanceManager> {
                                 v = stop_rx.recv() => if v.is_some() {
                                     stopping.store(true, atomic::Ordering::Relaxed);
 
-                                    #[cfg(target_family = "unix")]
-                                    {
-                                        let r = unsafe { libc::kill(child_pid as i32, libc::SIGTERM) };
+                                    let r = crate::reaper::stop_process(child_pid);
 
-                                        match r {
-                                            0 => tracing::info!("Sent SIGTERM to running game process"),
-                                            -1 => tracing::error!({ errno = ?errno::errno() }, "Unable to send SIGTERM to running game process"),
-                                            _ => {},
-                                        }
+                                    match r {
+                                        Ok(()) => tracing::info!("sent stop signal to game child process"),
+                                        Err(e) => tracing::error!({ error = ?e }, "failed to stop child process"),
                                     }
                                 },
                             }

@@ -24,6 +24,7 @@ pub mod managers;
 mod logger;
 mod once_send;
 mod runtime_path_override;
+mod reaper;
 
 #[tokio::main]
 pub async fn main() {
@@ -50,6 +51,21 @@ pub async fn main() {
 
             // exit process with ok status
             std::process::exit(0);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut iter = std::env::args().into_iter();
+        while let Some(arg) = iter.next() {
+            if arg == "--interrupt-console" {
+                if let Some(console_id) = iter.next() {
+                    let console_id = console_id.parse::<u32>().expect("Interrupt console id must be a positive integer");
+                    reaper::winapi_reaper::winapi_reaper(console_id)
+                } else {
+                    panic!("Interrupt requires a console id")
+                }
+            }
         }
     }
 
