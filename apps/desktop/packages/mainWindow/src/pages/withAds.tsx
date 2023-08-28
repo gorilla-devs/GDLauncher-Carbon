@@ -71,15 +71,16 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "grid-cols-[auto_2fr_240px] lg:grid-cols-[auto_2fr_440px]":
+              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] lg:grid-cols-[auto_2fr_440px]":
                 !isDetailPage(),
-              "grid-cols-[2fr_440px] lg:grid-cols-[2fr_240px]": isDetailPage(),
+              "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
+                isDetailPage(),
             }}
           >
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start lg:w-100 flex-initial w-[240px]"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start xs:w-[200px] sm:w-[200px] md:w-[200px] lg:w-[440px] flex-initial"
             >
               <AdsBanner />
             </div>

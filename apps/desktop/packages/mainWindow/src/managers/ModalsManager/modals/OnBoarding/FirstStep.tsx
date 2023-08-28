@@ -15,17 +15,12 @@ const FirstStep = (props: Props) => {
   );
 
   return (
-    <div class="flex flex-col items-center justify-around box-border lg:w-160 lg:h-140">
-      <div class="flex flex-col lg:mt-12 mt-6 lg:w-[35rem]">
-        <h1 class="text-center text-lg m-0 font-bold mt-10">
-          <Trans
-            key="onboarding.welcome_gdlauncher_title"
-            options={{
-              defaultValue: "Welcome to GDLauncher",
-            }}
-          />
+    <div class="flex flex-col justify-between box-border lg:w-160 h-full">
+      <div class="flex flex-col lg:w-[35rem]">
+        <h1 class="text-center text-lg m-0 mt-10 font-bold">
+          <Trans key="onboarding.welcome_gdlauncher_title" />
         </h1>
-        <pre class="text-darkSlate-100 text-left leading-6 max-w-140 whitespace-pre-line text-xs lg:text-base">
+        <pre class="text-darkSlate-100 text-left max-w-140 whitespace-pre-line text-xs lg:text-base leading-5">
           <Trans
             key="onboarding.welcome_gdlauncher_text"
             options={{

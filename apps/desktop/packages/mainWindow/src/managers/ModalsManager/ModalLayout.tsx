@@ -21,12 +21,13 @@ const ModalLayout = (props: Props) => {
 
   return (
     <div
+      class="h-full"
       onClick={(e) => {
         e.stopPropagation();
       }}
     >
       <div
-        class={`h-full relative flex flex-col bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 ${
+        class={`h-full relative flex flex-col bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 h-full ${
           props.class ?? ""
         }`}
         classList={{
@@ -49,7 +50,7 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
-          class="box-border overflow-hidden z-10"
+          class="box-border overflow-hidden z-10 h-full"
           classList={{
             "p-5": !props.noPadding,
           }}

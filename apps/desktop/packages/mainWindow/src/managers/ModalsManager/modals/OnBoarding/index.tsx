@@ -50,21 +50,23 @@ const OnBoarding = (props: ModalProps) => {
         />
       }
     >
-      <div class="select-none box-border lg:w-160 lg:h-140">
-        <div class="max-w-70 mx-auto">
+      <div class="select-none box-border lg:w-160 h-full flex flex-col">
+        <div class="max-w-70 mx-auto w-full h-15">
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
         </div>
-        <Switch>
-          <Match when={currentStep() === 0}>
-            <FirstStep nextStep={nextStep} />
-          </Match>
-          <Match when={currentStep() === 1}>
-            <SecondStep nextStep={nextStep} prevStep={prevStep} />
-          </Match>
-          <Match when={currentStep() === 2}>
-            <ThirdStep prevStep={prevStep} />
-          </Match>
-        </Switch>
+        <div class="h-full">
+          <Switch>
+            <Match when={currentStep() === 0}>
+              <FirstStep nextStep={nextStep} />
+            </Match>
+            <Match when={currentStep() === 1}>
+              <SecondStep nextStep={nextStep} prevStep={prevStep} />
+            </Match>
+            <Match when={currentStep() === 2}>
+              <ThirdStep prevStep={prevStep} />
+            </Match>
+          </Switch>
+        </div>
       </div>
     </ModalLayout>
   );

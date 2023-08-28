@@ -142,6 +142,12 @@ const theme = {
     timingFns: { loadingbar: "linear", enterScaleIn: "ease-in-out" },
     counts: { loadingbar: "infinite" },
   },
+  screens: {
+    xs: { max: "800px" }, // For the condition width <= 800
+    sm: { max: "999px" }, // For the condition width < 1000
+    md: { max: "1499px" }, // For the condition width < 1500
+    // Any width >= 1500 will be considered the default or 'lg' scenario
+  },
 };
 
 export { theme };
