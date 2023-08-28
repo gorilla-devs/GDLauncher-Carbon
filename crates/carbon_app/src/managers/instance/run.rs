@@ -811,7 +811,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
 
                     let (Some(mut stdout), Some(mut stderr)) =
-                        (child.inner().stdout.take(), child.inner().stderr.take())
+                        (child.stdout.take(), child.stderr.take())
                     else {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };

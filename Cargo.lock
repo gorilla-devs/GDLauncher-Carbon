@@ -436,7 +436,6 @@ dependencies = [
  "carbon_macro",
  "carbon_net",
  "chrono",
- "command-group",
  "daedalus",
  "derive_more",
  "directories",
@@ -599,18 +598,6 @@ dependencies = [
  "either",
  "memchr",
  "unreachable",
-]
-
-[[package]]
-name = "command-group"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5080df6b0f0ecb76cab30808f00d937ba725cebe266a3da8cd89dff92f2a9916"
-dependencies = [
- "async-trait",
- "nix",
- "tokio",
- "winapi",
 ]
 
 [[package]]
@@ -2148,18 +2135,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
 dependencies = [
  "smallvec",
-]
-
-[[package]]
-name = "nix"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"
-dependencies = [
- "bitflags",
- "cfg-if",
- "libc",
- "static_assertions",
 ]
 
 [[package]]
@@ -4034,12 +4009,6 @@ dependencies = [
  "nom",
  "unicode_categories",
 ]
-
-[[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "strum"

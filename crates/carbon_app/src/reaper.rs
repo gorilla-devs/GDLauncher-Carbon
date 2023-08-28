@@ -31,7 +31,8 @@ pub fn stop_process(pid: u32) -> anyhow::Result<()> {
         SUCCESS => {}
         ATTACH_FAILED => bail!("failed to attach to child process console"),
         SET_HANDLER_FAILED => bail!("failed to set CTRL-C handler in child process"),
-        GENERATE_CTRL_EVENT_FAILED => bail!("failed to generate CTRL-C event in child process"),
+        GET_CONSOLE_WINDOW_FAILED => bail!("failed to get the console window of the child process"),
+        CLOSE_WINDOW_FAILED => bail!("failed to close the console window of the child process"),
         c => bail!("reaper process returned unexpected exit code: {c}"),
     }
 
@@ -39,18 +40,21 @@ pub fn stop_process(pid: u32) -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-mod winapi_reaper {
+pub mod winapi_reaper {
+    use std::ptr;
+
     pub const SUCCESS: i32 = 0;
     pub const ATTACH_FAILED: i32 = 2;
     pub const SET_HANDLER_FAILED: i32 = 3;
-    pub const GENERATE_CTRL_EVENT_FAILED: i32 = 4;
+    pub const GET_CONSOLE_WINDOW_FAILED: i32 = 4;
+    pub const CLOSE_WINDOW_FAILED: i32 = 5;
 
     /// Send a ^C event to a console.
     ///
     /// A ^C event is sent to all processes connected to this console.
     pub fn winapi_reaper(console_id: u32) {
         use std::process::exit;
-        use winapi::um::wincon::*;
+        use winapi::um::{wincon::*, winuser::*, consoleapi::*};
 
         unsafe {
             // detatch this process's console if attached.
@@ -59,16 +63,22 @@ mod winapi_reaper {
 
             // attempt to attach to the child console
             if AttachConsole(console_id) != 0 {
+                let console_window = GetConsoleWindow();
+
+                if console_window == ptr::null_mut() {
+                    exit(GET_CONSOLE_WINDOW_FAILED)
+                }
+
                 // prevent ^Cing our own process so we can return exit code 0
                 if SetConsoleCtrlHandler(None, 1) == 0 {
                     exit(SET_HANDLER_FAILED)
                 }
 
-                // ^C all processes attached to this console
-                if GenerateConsoleCtrlEvent(CTRL_C_EVENT, 0) != 0 {
+                // close the console window
+                if CloseWindow(console_window) {
                     exit(SUCCESS)
                 } else {
-                    exit(GENERATE_CTRL_EVENT_FAILED)
+                    exit(CLOSE_WINDOW_FAILED)
                 }
             } else {
                 exit(ATTACH_FAILED)

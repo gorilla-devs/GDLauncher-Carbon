@@ -24,7 +24,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tracing::{info, warn};
-use command_group::{AsyncCommandGroup, AsyncGroupChild};
+use tokio::process::{Command, Child};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -515,7 +515,7 @@ pub async fn launch_minecraft(
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
-) -> anyhow::Result<AsyncGroupChild> {
+) -> anyhow::Result<Child> {
     let startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
@@ -535,15 +535,19 @@ pub async fn launch_minecraft(
         startup_command.join(" ")
     );
 
-    let mut command_exec = tokio::process::Command::new(java_component.path);
+    let mut command_exec = Command::new(java_component.path);
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
     command_exec.stderr(std::process::Stdio::piped());
 
-    let child = command_exec.args(startup_command);
+    #[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
+    let mut child = command_exec.args(startup_command);
 
-    Ok(child.group_spawn()?)
+    #[cfg(target_os = "windows")]
+    child.creation_flags(winapi::um::winbase::CREATE_NEW_CONSOLE);
+
+    Ok(child.spawn()?)
 }
 
 pub async fn extract_natives(
