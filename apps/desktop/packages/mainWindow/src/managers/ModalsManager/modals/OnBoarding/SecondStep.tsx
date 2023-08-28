@@ -11,9 +11,9 @@ const SecondStep = (props: Props) => {
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
   let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
   return (
-    <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
+    <div class="flex flex-col items-center justify-between lg:w-160 h-100 lg:h-140 box-border">
       <div class="flex flex-col h-full justify-center">
-        <div class="flex items-center gap-4 w-[35rem] mb-10">
+        <div class="flex items-center gap-4 w-100 lg:w-[35rem] mb-10">
           <p class="text-left text-darkSlate-100 m-0 font-normal w-fit leading-7">
             <Trans
               key="onboarding.java_title"

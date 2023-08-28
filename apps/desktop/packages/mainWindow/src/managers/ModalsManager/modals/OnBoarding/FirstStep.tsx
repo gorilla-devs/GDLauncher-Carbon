@@ -15,8 +15,8 @@ const FirstStep = (props: Props) => {
   );
 
   return (
-    <div class="flex flex-col items-center justify-around box-border w-160 h-140">
-      <div class="flex flex-col mt-12 w-[35rem]">
+    <div class="flex flex-col items-center justify-around box-border lg:w-160 lg:h-140">
+      <div class="flex flex-col lg:mt-12 mt-6 lg:w-[35rem]">
         <h1 class="text-center text-lg m-0 font-bold mt-10">
           <Trans
             key="onboarding.welcome_gdlauncher_title"
@@ -25,12 +25,10 @@ const FirstStep = (props: Props) => {
             }}
           />
         </h1>
-        <pre class="text-darkSlate-100 text-left leading-6 max-w-140 whitespace-pre-line">
+        <pre class="text-darkSlate-100 text-left leading-6 max-w-140 whitespace-pre-line text-xs lg:text-base">
           <Trans
             key="onboarding.welcome_gdlauncher_text"
             options={{
-              defaultValue:
-                "Hey {{user}}!\n\nWe're thrilled to have you onboard! GDLauncher is your personal Minecraft command center, designed to supercharge your gaming experience. \n\nFrom custom instances and integrated mod search to performance tweaking and design customization - everything you need is at your fingertips.\n\nWe recommend a quick tour of the app to get started. Our support team is always here to help.\n\nReady to craft your perfect Minecraft adventure? Let's get started!\n\nBest regards,\nThe GDLauncher Team",
               user: currentAccount?.username,
             }}
           />
