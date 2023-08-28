@@ -54,28 +54,28 @@ const getBinaryPath = async () => {
   }
 };
 
-const isCoreModulePresent = () => {
-  let rootPath = getRootPath();
+// const isCoreModulePresent = () => {
+//   let rootPath = getRootPath();
 
-  if (process.platform === "win32") {
-    const core_path = path.join(rootPath, "resources", "core_module.exe");
-    console.log("Core module path:", core_path);
-    return fs.existsSync(core_path);
-  } else if (process.platform === "linux") {
-    const core_path = path.join(rootPath, "resources", "core_module");
-    console.log("Core module path:", core_path);
-    return fs.existsSync(core_path);
-  } else if (process.platform === "darwin") {
-    const core_path = path.join(
-      rootPath,
-      "Contents",
-      "Resources",
-      "core_module"
-    );
-    console.log("Core module path:", core_path);
-    return fs.existsSync(core_path);
-  }
-};
+//   if (process.platform === "win32") {
+//     const core_path = path.join(rootPath, "resources", "core_module.exe");
+//     console.log("Core module path:", core_path);
+//     return fs.existsSync(core_path);
+//   } else if (process.platform === "linux") {
+//     const core_path = path.join(rootPath, "resources", "core_module");
+//     console.log("Core module path:", core_path);
+//     return fs.existsSync(core_path);
+//   } else if (process.platform === "darwin") {
+//     const core_path = path.join(
+//       rootPath,
+//       "Contents",
+//       "Resources",
+//       "core_module"
+//     );
+//     console.log("Core module path:", core_path);
+//     return fs.existsSync(core_path);
+//   }
+// };
 
 test.describe("Init Tests", () => {
   test.skip(() => isArm64(), "Only x64 is supported on macOS CI");
