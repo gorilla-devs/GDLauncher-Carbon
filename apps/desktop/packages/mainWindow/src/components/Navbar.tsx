@@ -108,7 +108,7 @@ const AppNavbar = () => {
                     }}
                   </For>
                 </div>
-                <Spacing class="w-full" />
+                <Spacing class="hidden w-full lg:block" />
                 <Tab ignored noPadding>
                   <Button
                     size="small"
@@ -160,7 +160,7 @@ const AppNavbar = () => {
               </TabList>
             </Tabs>
           </ul>
-          <div class="flex justify-end ml-4 min-w-52">
+          <div class="flex justify-end lg:min-w-52 lg:ml-4 ml-2">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

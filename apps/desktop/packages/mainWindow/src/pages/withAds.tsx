@@ -67,18 +67,19 @@ function withAdsLayout() {
     <>
       <AppNavbar />
       <div class="flex w-screen z-10 h-auto">
-        <main class="relative flex-1">
+        <main class="relative flex-grow">
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "grid-cols-[auto_2fr_440px]": !isDetailPage(),
-              "grid-cols-[2fr_440px]": isDetailPage(),
+              "grid-cols-[auto_2fr_240px] lg:grid-cols-[auto_2fr_440px]":
+                !isDetailPage(),
+              "grid-cols-[2fr_440px] lg:grid-cols-[2fr_240px]": isDetailPage(),
             }}
           >
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start w-100 flex-initial"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start lg:w-100 flex-initial w-[240px]"
             >
               <AdsBanner />
             </div>

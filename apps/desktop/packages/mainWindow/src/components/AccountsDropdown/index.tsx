@@ -422,7 +422,7 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="m-0 overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose"
+            class="lg:block m-0 overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose hidden"
             classList={{
               "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled,

@@ -195,7 +195,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   </div>
 
                   <div
-                    class="h-screen w-[440px] duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    class="h-screen w-[240px] lg:w-[440px] duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();
