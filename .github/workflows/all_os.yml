@@ -57,6 +57,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
         run: pnpm test
   ubuntu_x64:
     defaults:
@@ -105,6 +106,7 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
   windows_x64:
     defaults:
@@ -162,5 +164,6 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test
