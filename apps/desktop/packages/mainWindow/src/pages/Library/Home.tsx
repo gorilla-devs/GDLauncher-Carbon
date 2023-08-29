@@ -1,20 +1,12 @@
 import { Carousel, News, Skeleton } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import {
-  For,
-  Match,
-  Suspense,
-  Switch,
-  createEffect,
-  createSignal,
-} from "solid-js";
+import { For, Match, Switch, createEffect, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
 import fetchData from "../Library/library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { Transition } from "solid-transition-group";
 
 const Home = () => {
   const [t] = useTransContext();

@@ -227,6 +227,7 @@ const Carousel = (props: Props) => {
                   [{ transform: "scale(0)" }, { transform: "scale(1)" }],
                   {
                     duration: 100,
+                    easing: "cubic-bezier(0.68, -0.55, 0.27, 1.55)",
                   }
                 );
                 a.finished.then(done);
@@ -236,6 +237,7 @@ const Carousel = (props: Props) => {
                   [{ transform: "scale(1)" }, { transform: "scale(0)" }],
                   {
                     duration: 100,
+                    easing: "cubic-bezier(0.68, -0.55, 0.27, 1.55)",
                   }
                 );
                 a.finished.then(done);
