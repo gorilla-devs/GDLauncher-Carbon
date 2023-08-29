@@ -11,6 +11,8 @@ interface Props extends ModalProps {
   noPadding?: boolean;
   overflowHiddenDisabled?: boolean;
   background?: JSX.Element;
+  height?: string;
+  width?: string;
 }
 
 const ModalLayout = (props: Props) => {
@@ -21,7 +23,11 @@ const ModalLayout = (props: Props) => {
 
   return (
     <div
-      class="h-full"
+      class={`${props.height || ""} ${props.width || ""}`}
+      classList={{
+        "h-full": !props.height,
+        "h-auto": !props.width,
+      }}
       onClick={(e) => {
         e.stopPropagation();
       }}
