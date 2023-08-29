@@ -62,7 +62,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="flex flex-col justify-between w-100 h-60">
+      <div class="flex flex-col justify-between w-100 h-full">
         <div class="h-h-full">
           <Trans
             key="instance_confirm_deletion.confirmation_text"
