@@ -529,6 +529,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 bgColorClass="bg-darkSlate-800"
                 containerClass="w-full"
                 class="w-full"
+                placeholder={t("error.no_mc_versions")}
                 placement="bottom"
                 value={mcVersion()}
                 onChange={(l) => {

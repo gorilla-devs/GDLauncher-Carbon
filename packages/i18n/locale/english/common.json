@@ -187,6 +187,7 @@
   "instance_confirm_deletion.delete": "Delete",
   "instance.isInQueue": "In queue",
   "instance.mods.search": "Search mod",
+  "instance.instance_mc_version": "Minecraft version",
   "mod.downloaded": "Downloaded",
   "java.java_major": "Java Major",
   "java.java_vendors": "Java Distirbution",
