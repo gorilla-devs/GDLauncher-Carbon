@@ -58,11 +58,21 @@ const isCoreModulePresent = () => {
   let rootPath = getRootPath();
 
   if (process.platform === "win32") {
-    const core_path = path.join(rootPath, "resources", "core_module.exe");
+    const core_path = path.join(
+      rootPath,
+      "resources",
+      "binaries",
+      "core_module.exe"
+    );
     console.log("Core module path:", core_path);
     return fs.existsSync(core_path);
   } else if (process.platform === "linux") {
-    const core_path = path.join(rootPath, "resources", "core_module");
+    const core_path = path.join(
+      rootPath,
+      "resources",
+      "binaries",
+      "core_module"
+    );
     console.log("Core module path:", core_path);
     return fs.existsSync(core_path);
   } else if (process.platform === "darwin") {
@@ -70,6 +80,7 @@ const isCoreModulePresent = () => {
       rootPath,
       "Contents",
       "Resources",
+      "binaries",
       "core_module"
     );
     console.log("Core module path:", core_path);
