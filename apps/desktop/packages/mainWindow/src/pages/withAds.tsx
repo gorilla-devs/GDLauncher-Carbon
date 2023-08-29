@@ -11,6 +11,7 @@ import {
   setSupportedModloaders,
 } from "@/utils/sidebar";
 import { supportedCfModloaders } from "@/utils/constants";
+import adSize from "@/utils/adhelper";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -80,7 +81,10 @@ function withAdsLayout() {
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start xs:w-[200px] sm:w-[200px] md:w-[200px] lg:w-[440px] flex-initial"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
+              style={{
+                width: `${adSize.width + 40}px`,
+              }}
             >
               <AdsBanner />
             </div>

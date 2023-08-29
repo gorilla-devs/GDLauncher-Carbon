@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
+import adSize from "@/utils/adhelper";
 
 export type ModalProps = {
   title: string;
@@ -195,7 +196,10 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   </div>
 
                   <div
-                    class="h-screen xs:w-[200px] sm:w-[200px] md:w-[200px] lg:w-[440px] duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    style={{
+                      width: `${adSize.width + 40}px`,
+                    }}
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();
