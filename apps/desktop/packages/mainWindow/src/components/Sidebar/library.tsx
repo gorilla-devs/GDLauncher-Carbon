@@ -24,6 +24,7 @@ import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { CFFEModLoaderType } from "@gd/core_module/bindings";
+import { Transition } from "solid-transition-group";
 
 const Sidebar = () => {
   const location = useLocation();
@@ -146,11 +147,26 @@ const Sidebar = () => {
                       )
                     }
                   >
-                    <InstanceTile
-                      instance={instance}
-                      isSidebarOpened={isSidebarOpened()}
-                      selected={instanceId() === instance.id.toString()}
-                    />
+                    <Transition
+                      onEnter={(el, done) => {
+                        const a = el.animate(
+                          [
+                            { transform: "scale(0)" },
+                            { transform: "scale(1)" },
+                          ],
+                          {
+                            duration: 100,
+                          }
+                        );
+                        a.finished.then(done);
+                      }}
+                    >
+                      <InstanceTile
+                        instance={instance}
+                        isSidebarOpened={isSidebarOpened()}
+                        selected={instanceId() === instance.id.toString()}
+                      />
+                    </Transition>
                   </Suspense>
                 )}
               </For>

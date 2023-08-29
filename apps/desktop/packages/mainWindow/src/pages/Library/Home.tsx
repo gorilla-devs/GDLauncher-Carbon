@@ -14,6 +14,7 @@ import fetchData from "../Library/library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { Transition } from "solid-transition-group";
 
 const Home = () => {
   const [t] = useTransContext();
@@ -64,11 +65,7 @@ const Home = () => {
             <div class="mt-4">
               <Carousel title={t("your_instances")}>
                 <For each={routeData.instancesUngrouped.data}>
-                  {(instance) => (
-                    <Suspense fallback={<Skeleton.instance />}>
-                      <InstanceTile instance={instance} />
-                    </Suspense>
-                  )}
+                  {(instance) => <InstanceTile instance={instance} />}
                 </For>
               </Carousel>
             </div>

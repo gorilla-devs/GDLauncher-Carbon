@@ -1,3 +1,5 @@
+import { TransitionGroup } from "solid-transition-group";
+
 import {
   createEffect,
   createSignal,
@@ -5,7 +7,9 @@ import {
   onCleanup,
   children,
   onMount,
+  Suspense,
 } from "solid-js";
+import { Skeleton } from "../Skeleton";
 
 interface Props {
   children?: JSX.Element;
@@ -216,7 +220,30 @@ const Carousel = (props: Props) => {
           }}
           class="scrollbar-hide w-full flex items-start gap-4 overflow-x-scroll scroll-smooth"
         >
-          {mappedChildren()}
+          <Suspense fallback={<Skeleton.instance />}>
+            <TransitionGroup
+              onEnter={(el, done) => {
+                const a = el.animate(
+                  [{ transform: "scale(0)" }, { transform: "scale(1)" }],
+                  {
+                    duration: 100,
+                  }
+                );
+                a.finished.then(done);
+              }}
+              onExit={(el, done) => {
+                const a = el.animate(
+                  [{ transform: "scale(1)" }, { transform: "scale(0)" }],
+                  {
+                    duration: 100,
+                  }
+                );
+                a.finished.then(done);
+              }}
+            >
+              {mappedChildren()}
+            </TransitionGroup>
+          </Suspense>
         </div>
       </div>
     </div>
