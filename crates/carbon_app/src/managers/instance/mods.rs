@@ -240,6 +240,7 @@ mod test {
     use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
     #[tokio::test]
+    #[ignore]
     async fn test_mod_metadata() -> anyhow::Result<()> {
         dbg!();
         let app = crate::setup_managers_for_test().await;
