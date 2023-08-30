@@ -194,7 +194,7 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden h-38 w-38">
+            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
               <div
                 class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
                 classList={{
@@ -229,7 +229,7 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
+                  class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 hidden w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
@@ -297,7 +297,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={validInstance()?.modpack_platform}>
-                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg p-2 border-solid top-2 right-2 border-darkSlate-600">
+                  <div class="absolute flex justify-center items-center bg-darkSlate-900 rounded-lg border-1 p-2 border-solid top-2 right-2 border-darkSlate-600">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
@@ -307,10 +307,11 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={props.isLoading || isInQueue()}>
-                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-sm" />
+                  <div class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 </Show>
+                <div class="w-full h-full -z-10 bg-darkSlate-900" />
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
@@ -394,7 +395,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform transition-transform right-5 h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform right-5 transition-transform h-7 w-7"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
