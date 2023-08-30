@@ -31,3 +31,7 @@
 * {
   user-select: none;
 }
+
+a {
+  color: theme("colors.blue.500");
+}
