@@ -19,6 +19,7 @@ type Props = {
   noTip?: boolean;
   noPadding?: boolean;
   opened?: boolean;
+  class?: string;
 };
 
 const Tooltip = (props: Props) => {
@@ -47,7 +48,7 @@ const Tooltip = (props: Props) => {
 
   return (
     <>
-      <Show when={props.opened || tooltipOpened()}>
+      <Show when={(props.opened || tooltipOpened()) && props.content}>
         <Portal>
           <div
             ref={(el) => setToolTipRef(el)}
@@ -80,6 +81,7 @@ const Tooltip = (props: Props) => {
       </Show>
 
       <div
+        class={props.class}
         ref={(el) => setElementRef(el)}
         onMouseEnter={() => {
           hoverTimeout = setTimeout(() => {
