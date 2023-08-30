@@ -7,6 +7,7 @@ import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 // @ts-ignore
 import supportedLanguages from "@gd/i18n/supportedLanguages.json";
 // import gdlIcons from "./unocss.icons.js";
+import transformerDirectives from "@unocss/transformer-directives";
 
 const safelist = Object.values(supportedLanguages).map(
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -40,6 +41,7 @@ const unocssConfig = {
   rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
   safelist,
   theme,
+  transformers: [transformerDirectives()],
 } as unknown;
 
 export { unocssConfig };

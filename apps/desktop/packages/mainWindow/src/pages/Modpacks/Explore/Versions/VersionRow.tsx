@@ -90,7 +90,7 @@ const VersionRow = (props: Props) => {
     <div class="group flex justify-between items-center py-2 rounded-md px-2 hover:bg-darkSlate-900">
       <div class="flex flex-col">
         <h4 class="m-0 font-medium group-hover:text-lightSlate-200">
-          {getName()}
+          {getName().replaceAll(".zip", "")}
         </h4>
         <div class="flex justify-between items-center">
           <div class="flex justify-between">
@@ -116,9 +116,9 @@ const VersionRow = (props: Props) => {
         </div>
       </div>
       <span
-        class="flex gap-2 select-none"
+        class="flex gap-2 select-none items-center"
         classList={{
-          "cursor-pointer text-lightGray-800 group-hover:text-lightSlate-50":
+          "cursor-pointer text-lightGray-800 group-hover:text-lightSlate-50 group-hover:text-lg transition transition-all duration-75 ease-in-out":
             !props.disabled,
           "cursor-not-allowed text-lightGray-800": props.disabled,
         }}
@@ -159,7 +159,7 @@ const VersionRow = (props: Props) => {
           });
         }}
       >
-        <Switch fallback={<div>Loading...</div>}>
+        <Switch>
           <Match when={loading()}>
             <Trans key="modpack.version_downloading" />
             <Spinner class="w-5 h-5" />

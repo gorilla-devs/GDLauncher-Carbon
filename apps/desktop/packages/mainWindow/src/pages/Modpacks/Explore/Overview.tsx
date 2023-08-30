@@ -18,7 +18,7 @@ const Overview = () => {
           "iframe",
         ]),
         allowedAttributes: {
-          a: ["href", "name", "target"],
+          a: ["href", "name", "target", "class"],
           img: ["src", "width", "height"],
           iframe: ["src", "width", "height", "allowfullscreen"],
         },
@@ -27,6 +27,9 @@ const Overview = () => {
           "i.imgur.com",
           "cdn.ko-fi.com",
         ],
+        transformTags: {
+          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
+        },
       });
 
     return (
