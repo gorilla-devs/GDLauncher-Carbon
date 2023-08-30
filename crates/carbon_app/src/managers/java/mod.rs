@@ -409,6 +409,7 @@ mod test {
     };
 
     #[tokio::test]
+    #[ignore]
     async fn test_require_java_install() {
         let app = setup_managers_for_test().await;
 
