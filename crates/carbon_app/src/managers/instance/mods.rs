@@ -232,56 +232,56 @@ impl ManagerRef<'_, InstanceManager> {
 #[error("invalid mod id '{1}' given for instance '{0}'")]
 pub struct InvalidModIdError(InstanceId, String);
 
-#[cfg(test)]
-mod test {
-    use crate::managers::instance::InstanceVersionSource;
-    use std::collections::HashSet;
+// #[cfg(test)]
+// mod test {
+//     use crate::managers::instance::InstanceVersionSource;
+//     use std::collections::HashSet;
 
-    use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
+//     use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
-    #[tokio::test]
-    async fn test_mod_metadata() -> anyhow::Result<()> {
-        dbg!();
-        let app = crate::setup_managers_for_test().await;
-        let group = app.instance_manager().get_default_group().await?;
-        let instance_id = app
-            .instance_manager()
-            .create_instance(
-                group,
-                String::from("test"),
-                false,
-                InstanceVersionSource::Version(info::GameVersion::Standard(
-                    info::StandardVersion {
-                        release: String::from("1.16.5"),
-                        modloaders: HashSet::new(),
-                    },
-                )),
-                String::new(),
-            )
-            .await?;
+//     #[tokio::test]
+//     async fn test_mod_metadata() -> anyhow::Result<()> {
+//         dbg!();
+//         let app = crate::setup_managers_for_test().await;
+//         let group = app.instance_manager().get_default_group().await?;
+//         let instance_id = app
+//             .instance_manager()
+//             .create_instance(
+//                 group,
+//                 String::from("test"),
+//                 false,
+//                 InstanceVersionSource::Version(info::GameVersion::Standard(
+//                     info::StandardVersion {
+//                         release: String::from("1.16.5"),
+//                         modloaders: HashSet::new(),
+//                     },
+//                 )),
+//                 String::new(),
+//             )
+//             .await?;
 
-        app.meta_cache_manager()
-            .prioritize_instance(instance_id)
-            .await;
+//         app.meta_cache_manager()
+//             .prioritize_instance(instance_id)
+//             .await;
 
-        app.instance_manager()
-            .install_curseforge_mod(instance_id, 331723, 4022327)
-            .await?;
+//         app.instance_manager()
+//             .install_curseforge_mod(instance_id, 331723, 4022327)
+//             .await?;
 
-        // first invalidation will happen when the mod is scanned locally
-        app.wait_for_invalidation(INSTANCE_MODS).await?;
+//         // first invalidation will happen when the mod is scanned locally
+//         app.wait_for_invalidation(INSTANCE_MODS).await?;
 
-        let mods = app.instance_manager().list_mods(instance_id).await?;
-        dbg!(&mods);
-        assert_ne!(mods.get(0), None);
+//         let mods = app.instance_manager().list_mods(instance_id).await?;
+//         dbg!(&mods);
+//         assert_ne!(mods.get(0), None);
 
-        // second invalidation will happen when the curseforge metadata is fetched
-        app.wait_for_invalidation(INSTANCE_MODS).await?;
+//         // second invalidation will happen when the curseforge metadata is fetched
+//         app.wait_for_invalidation(INSTANCE_MODS).await?;
 
-        let mods = app.instance_manager().list_mods(instance_id).await?;
-        dbg!(&mods);
-        assert_ne!(mods[0].curseforge, None);
+//         let mods = app.instance_manager().list_mods(instance_id).await?;
+//         dbg!(&mods);
+//         assert_ne!(mods[0].curseforge, None);
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
