@@ -31,8 +31,8 @@ const ThirdStep = (props: Props) => {
 
   const CreateInstance = () => {
     return (
-      <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
-        <div class="w-[35rem]">
+      <div class="flex flex-col items-center justify-between lg:w-160 h-full box-border">
+        <div class="lg:w-[35rem]">
           <div class="flex justify-center items-center flex-col mt-20">
             <img class="w-50" src={Logo} />
           </div>
@@ -88,10 +88,10 @@ const ThirdStep = (props: Props) => {
   };
 
   return (
-    <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
+    <div class="flex flex-col items-center justify-between w-120 h-120 lg:w-160 h-full box-border">
       <Switch>
         <Match when={instances.data && instances.data?.length > 0}>
-          <div class="mt-20 h-full max-w-full">
+          <div class="mt-10 lg:mt-20 h-full max-w-full">
             <Import setIsLoading={setIsLoading} />
           </div>
         </Match>

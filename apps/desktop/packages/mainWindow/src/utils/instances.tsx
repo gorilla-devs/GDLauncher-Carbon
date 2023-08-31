@@ -214,7 +214,9 @@ export const fetchImage = async (id: number) => {
 };
 
 export const getUrlType = (url: string) => {
-  return url.match(/^\/(modpacks|mods)\/\d+\/(curseforge|modrinth)(\/[^/]+)*$/)
+  return url.match(
+    /^\/(modpacks|mods)\/[a-zA-Z0-9]+\/(curseforge|modrinth)(\/[^/]+)*$/
+  )
     ? url.match(/mods/)
       ? "mods"
       : "modpacks"

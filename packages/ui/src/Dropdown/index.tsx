@@ -69,7 +69,7 @@ const Dropdown = (props: Props) => {
 
   const [selectedValue, setSelectedValue] = createSignal<Option>(
     // eslint-disable-next-line solid/reactivity
-    defaultValue()
+    defaultValue() || props.placeholder
   );
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
@@ -170,7 +170,7 @@ const Dropdown = (props: Props) => {
                   props.disabled && !props.textColorClass && !props.btnDropdown,
               }}
             >
-              {selectedValue()?.label}
+              {selectedValue()?.label ?? props.placeholder}
             </span>
           </Show>
           <span
