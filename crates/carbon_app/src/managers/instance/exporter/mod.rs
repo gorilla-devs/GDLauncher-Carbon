@@ -45,12 +45,20 @@ static PRIMARY_LOADER_TYPES: [ModLoaderType; 3] = [
 
 #[async_trait::async_trait]
 pub trait InstanceExporter {
-    async fn export<F: Fn(&Path) -> bool + Send>(
+    async fn prepare(
         &self,
         app: Arc<AppInner>,
         instance_id: InstanceId,
+        ignore_patterns: Vec<String>,
+        optional_patterns: Vec<String>,
+    ) -> anyhow::Result<VisualTaskId>;
+
+    async fn get_exported_files_list<D>(&self) -> anyhow::Result<Vec<ExportInstanceFileEntry<D>>>;
+
+    async fn export(
+        &self,
+        app: Arc<AppInner>,
         output_path: PathBuf,
-        filter: F,
     ) -> anyhow::Result<VisualTaskId>;
 }
 
@@ -173,10 +181,11 @@ pub enum ExportInstanceFileMode {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ExportInstanceFileInfo {
+pub struct ExportInstanceFileInfo<D> {
     relative_path: PathBuf,
     full_path: PathBuf,
     export_mode: ExportInstanceFileMode,
+    platform_data: Option<D>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -186,16 +195,16 @@ pub struct ExportInstanceDirInfo {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum ExportInstanceFileEntry {
-    File(ExportInstanceFileInfo),
+pub enum ExportInstanceFileEntry<D> {
+    File(ExportInstanceFileInfo<D>),
     Dir {
         info: ExportInstanceDirInfo,
-        entries: Vec<ExportInstanceFileEntry>,
+        entries: Vec<ExportInstanceFileEntry<D>>,
     },
 }
 
-impl ExportInstanceFileEntry {
-    pub fn flatten(self) -> Vec<ExportInstanceFileInfo> {
+impl<D> ExportInstanceFileEntry<D> {
+    pub fn flatten(self) -> Vec<ExportInstanceFileInfo<D>> {
         match self {
             Self::File(info) => vec![info],
             Self::Dir { info: _, entries } => entries
@@ -205,20 +214,44 @@ impl ExportInstanceFileEntry {
                 .collect(),
         }
     }
+
+    pub fn flatten_ref(&self) -> Vec<&ExportInstanceFileInfo<D>> {
+        match self {
+            Self::File(info) => vec![info],
+            Self::Dir { info: _, entries } => entries
+                .into_iter()
+                .map(|entry| entry.flatten_ref())
+                .flatten()
+                .collect(),
+        }
+    }
+
+    pub fn flatten_mut(&mut self) -> Vec<&mut ExportInstanceFileInfo<D>> {
+        match self {
+            Self::File(info) => vec![info],
+            Self::Dir { info: _, entries } => entries
+                .into_iter()
+                .map(|entry| entry.flatten_mut())
+                .flatten()
+                .collect(),
+        }
+    }
 }
 
 #[async_recursion::async_recursion]
-pub async fn collect_files<
-    RP: AsRef<Path> + Send,
-    SP: AsRef<Path> + Send,
-    IF: Fn(&Path, &Path) -> bool + Send,
-    OF: Fn(&Path, &Path) -> bool + Send,
->(
+pub async fn collect_files<RP, SP, IF, OF, D>(
     root_dir: RP,
     dir: SP,
     ignore_filter: IF,
     optional_filter: OF,
-) -> anyhow::Result<Vec<ExportInstanceFileEntry>> {
+) -> anyhow::Result<Vec<ExportInstanceFileEntry<D>>>
+where
+    RP: AsRef<Path> + Send,
+    SP: AsRef<Path> + Send,
+    IF: Arc<Fn(&Path, &Path) -> bool + Send>,
+    OF: Arc<Fn(&Path, &Path) -> bool + Send>,
+    D: Send,
+{
     let dir = dir.as_ref();
     let root_dir = root_dir.as_ref();
     let mut out_entires = Vec::new();
@@ -235,13 +268,16 @@ pub async fn collect_files<
         let entry_path = entry.path();
         // follow symlinks by canonicalizing path
         let canonical_entry_path = tokio::fs::canonicalize(&entry_path).await?;
-        let relative_path = entry_path.strip_prefix(&root_dir).with_context(|| {
-            format!(
-                "Walked path {} not relative to instance {}",
-                entry_path.to_string_lossy(),
-                root_dir.to_string_lossy()
-            )
-        })?;
+        let relative_path = entry_path
+            .strip_prefix(&root_dir)
+            .with_context(|| {
+                format!(
+                    "Walked path {} not relative to instance {}",
+                    entry_path.to_string_lossy(),
+                    root_dir.to_string_lossy()
+                )
+            })?
+            .to_path_buf();
         if canonical_entry_path.is_dir() {
             out_entires.push(ExportInstanceFileEntry::Dir {
                 info: ExportInstanceDirInfo {
@@ -257,8 +293,8 @@ pub async fn collect_files<
                 .await?,
             });
         } else {
-            let ignore = ignore_filter(relative_path, &canonical_entry_path);
-            let optional = optional_filter(relative_path, &canonical_entry_path);
+            let ignore = ignore_filter(&relative_path, &canonical_entry_path);
+            let optional = optional_filter(&relative_path, &canonical_entry_path);
 
             let export_entry = ExportInstanceFileEntry::File(ExportInstanceFileInfo {
                 relative_path: relative_path.to_path_buf(),
@@ -270,6 +306,7 @@ pub async fn collect_files<
                 } else {
                     ExportInstanceFileMode::Required
                 },
+                platform_data: None,
             });
             out_entires.push(export_entry);
         }

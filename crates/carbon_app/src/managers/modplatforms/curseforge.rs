@@ -129,7 +129,7 @@ impl CurseForge {
         &self,
         hashes: &[u32],
     ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
-        let url = self.base_url.join("fingerprints")?;
+        let url = self.base_url.join("fingerprints/432")?;
 
         let body = json!({ "fingerprints": hashes });
 
