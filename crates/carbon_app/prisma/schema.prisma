@@ -126,6 +126,7 @@ model ModMetadata {
   description String?
   authors     String?
   modloaders  String
+	logoImage   Bytes?
   curseforge  CurseForgeModCache?
   modrinth    ModrinthModCache?
   cachedFiles ModFileCache[]
