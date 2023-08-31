@@ -1,14 +1,28 @@
 import Card from "@/components/Card";
 import { Trans, useTransContext } from "@gd/i18n";
-import { For, Show } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import fetchData from "./instance.data";
 import { useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import { format, formatDistance } from "date-fns";
+import { convertSecondsToHumanTime } from "@/utils/helpers";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [t] = useTransContext();
+
+  const last_played_distance = () => {
+    const last_played = new Date((routeData.instanceDetails.data as InstanceDetails)?.last_played)
+    const last_played_time = last_played.getTime()
+    const now = Date.now();
+    const diff = now - last_played_time;
+    const days = diff / (1000 * 60 * 60 * 24);
+    if (days < 15) {
+      return formatDistance(last_played_time, now, { addSuffix: true })
+    } else {
+      return format(last_played, 'PPP')
+    }
+  };
 
   return (
     <div class="flex flex-col gap-4 max-w-185 mt-10">
@@ -59,25 +73,15 @@ const Overview = () => {
         </Show>
         <Show when={routeData.instanceDetails.data?.seconds_played}>
           <Card
+            text={convertSecondsToHumanTime(routeData.instanceDetails.data?.seconds_played || 0)}
             title={t("instance.overview_card_played_time_title")}
-            text={formatDistance(
-              new Date(
-                routeData.instanceDetails.data?.last_played || Date.now()
-              ).getTime(),
-              Date.now()
-            )}
             icon="clock"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.last_played}>
           <Card
             title={t("instance.overview_card_last_played_title")}
-            text={format(
-              new Date(
-                (routeData.instanceDetails.data as InstanceDetails)?.last_played
-              ),
-              "PPP"
-            )}
+            text={last_played_distance()}
             icon="sign"
           />
         </Show>
