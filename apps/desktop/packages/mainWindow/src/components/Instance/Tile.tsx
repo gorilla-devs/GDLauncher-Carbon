@@ -323,13 +323,21 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="overflow-hidden max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
+              class="max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
                 "text-lightGray-900": props.isLoading || isInQueue(),
               }}
             >
-              {props.instance.name}
+              <Tooltip
+                content={
+                  props.instance.name.length > 20 ? props.instance.name : ""
+                }
+                placement="top"
+                class="max-w-38 w-full text-ellipsis overflow-hidden"
+              >
+                {props.instance.name}
+              </Tooltip>
             </h4>
             <Switch>
               <Match when={!props.isLoading}>
@@ -356,7 +364,6 @@ const Tile = (props: Props) => {
               </Match>
             </Switch>
           </div>
-          {/* </Tooltip> */}
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
@@ -479,11 +486,7 @@ const Tile = (props: Props) => {
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar-small"}>
-        <Tooltip
-          content={props.instance.name}
-          placement="right"
-          // color="bg-darkSlate-400"
-        >
+        <Tooltip content={props.instance.name} placement="right">
           <div
             onClick={(e) => {
               if (
