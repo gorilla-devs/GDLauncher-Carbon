@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
+import adSize from "@/utils/adhelper";
 
 export type ModalProps = {
   title: string;
@@ -171,22 +172,18 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const preventClose = defaultModals[modal.name].preventClose;
 
               return (
-                <>
+                <div class="h-screen w-screen absolute inset-0 flex">
                   <div
-                    class="absolute bottom-0 top-0 left-0 flex justify-center items-center z-999"
+                    class="relative flex flex-grow z-999 h-full justify-center items-center"
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();
                       }
                     }}
-                    classList={{
-                      "right-0": location.pathname === "/",
-                      "right-[440px]": location.pathname !== "/",
-                    }}
                   >
                     <div
                       style={{ "z-index": `${index() + 1}` }}
-                      class="duration-100 ease-in-out animate-enterScaleIn"
+                      class="duration-100 ease-in-out animate-enterScaleIn h-3/4"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -195,18 +192,21 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
+                    <div class="absolute inset-0 bg-darkSlate-900 opacity-80 backdrop-blur-sm" />
                   </div>
+
                   <div
-                    class="h-screen w-screen absolute duration-100 ease-in-out text-white transition-all backdrop-blur-sm grid place-items-center z-99 origin-center"
+                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    style={{
+                      width: `${adSize.width + 40}px`,
+                    }}
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();
                       }
                     }}
-                  >
-                    <div class="h-screen w-screen bg-darkSlate-900 opacity-80" />
-                  </div>
-                </>
+                  />
+                </div>
               );
             }}
           </For>

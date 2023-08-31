@@ -11,6 +11,7 @@ import {
   setSupportedModloaders,
 } from "@/utils/sidebar";
 import { supportedCfModloaders } from "@/utils/constants";
+import adSize from "@/utils/adhelper";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -67,18 +68,23 @@ function withAdsLayout() {
     <>
       <AppNavbar />
       <div class="flex w-screen z-10 h-auto">
-        <main class="relative flex-1">
+        <main class="relative flex-grow">
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "grid-cols-[auto_2fr_440px]": !isDetailPage(),
-              "grid-cols-[2fr_440px]": isDetailPage(),
+              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] lg:grid-cols-[auto_2fr_440px]":
+                !isDetailPage(),
+              "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
+                isDetailPage(),
             }}
           >
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start w-100 flex-initial"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
+              style={{
+                width: `${adSize.width + 40}px`,
+              }}
             >
               <AdsBanner />
             </div>

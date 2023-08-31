@@ -14,6 +14,7 @@ import fetchData from "../Library/library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import UnstableCard from "@/components/UnstableCard";
 
 const Home = () => {
   const [t] = useTransContext();
@@ -34,6 +35,7 @@ const Home = () => {
   return (
     <div>
       <div>
+        <UnstableCard />
         <Switch>
           <Match when={news.length > 0 && isNewsVisible()}>
             <News
