@@ -6,7 +6,7 @@ const ManualStep = (props: StepsProps) => {
   return (
     <div class="w-110 h-65">
       <div class="flex flex-col justify-between w-full h-full">
-        <div class="flex flex-col justify-center items-center h-13 border-dashed border-2 py-4 border-primary-500">
+        <div class="flex flex-col justify-center items-center h-13 py-4 border-dashed border-2 border-primary-500">
           <div class="flex flex-col justify-center items-center gap-2">
             <div class="text-darkSlate-500 text-xl w-6 i-ri:folder-open-fill" />
             <p class="m-0 text-darkSlate-500">

@@ -178,6 +178,7 @@
   "instance.instance_version_old_alpha": "Old alpha",
   "instance.instance_version_old_beta": "Old beta",
   "instance.instance_version_others": "Others",
+  "instance.instance_mc_version": "Minecraft version",
   "instance.instance_loader_version": "Loader version",
   "instance.overview_card_mods_title": "Mods",
   "instance.overview_card_played_time_title": "Played time",
