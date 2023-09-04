@@ -3,12 +3,9 @@ use std::collections::HashSet;
 
 use std::collections::VecDeque;
 use std::io::Cursor;
-use std::io::Read;
-use std::io::Seek;
 use std::path::PathBuf;
 use std::usize;
 
-use image::ImageOutputFormat;
 use md5::Digest;
 
 use sha2::Sha512;
@@ -304,22 +301,21 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     path.set_extension("jar.disabled");
                                 }
 
-                                let content = tokio::fs::read(path).await?;
-                                let (content, sha512, meta, murmur2) =
+                                let mut content = tokio::fs::read(path).await?;
+                                let (sha512, meta, murmur2) =
                                     tokio::task::spawn_blocking(move || {
-                                        let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
-                                        let meta = super::mods::parse_metadata(Cursor::new(&content));
-
-                                        // curseforge's api removes whitespace in murmur2 hashes
-                                        let mut murmur_content = content.clone();
-                                        murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                                        let murmur2 = murmurhash32::murmurhash2(&murmur_content);
-
                                         (
-                                            content,
-                                            sha512,
-                                            meta,
-                                            murmur2,
+                                            <[u8; 64] as From<_>>::from(
+                                                Sha512::new_with_prefix(&content).finalize(),
+                                            ),
+                                            super::mods::parse_metadata(Cursor::new(&content)),
+                                            murmurhash32::murmurhash2({
+                                                // curseforge's weird api
+                                                content.retain(|&x| {
+                                                    x != 9 && x != 10 && x != 13 && x != 32
+                                                });
+                                                &content
+                                            }),
                                         )
                                     })
                                     .await?;
@@ -340,39 +336,13 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     .exec()
                                     .await?;
 
-
-                                let (meta_id, meta, logo_data) = match dbmeta {
-                                    Some(dbmeta) => (dbmeta.id, None, None),
-                                    None => {
-                                        let logo_data = 'logo: {
-                                            let Some(meta) = &meta else { break 'logo None };
-
-                                            let logo_data = (|| {
-                                                let Some(logo_file) = &meta.logo_file else { return Ok(None) };
-                                                let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
-                                                let Ok(mut file) = zip.by_name(logo_file) else { return Ok(None) };
-                                                let mut image = Vec::with_capacity(file.size() as usize);
-                                                file.read_to_end(&mut image)?;
-                                                let scaled = scale_mod_image(&image[..])?;
-                                                Ok::<_, anyhow::Error>(Some(scaled))
-                                            })();
-
-                                            match logo_data {
-                                                Ok(data) => data,
-                                                Err(e) => {
-                                                    error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
-                                                    None
-                                                },
-                                            }
-                                        };
-
-
-                                        (Uuid::new_v4().to_string(), Some(meta), logo_data)
-                                    },
+                                let (meta_id, meta) = match dbmeta {
+                                    Some(dbmeta) => (dbmeta.id, None),
+                                    None => (Uuid::new_v4().to_string(), Some(meta)),
                                 };
 
                                 Ok::<_, anyhow::Error>(Some((
-                                    subpath, filesize, enabled, sha512, murmur2, meta_id, meta, logo_data,
+                                    subpath, filesize, enabled, sha512, murmur2, meta_id, meta,
                                 )))
                             }
                         });
@@ -383,16 +353,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                             .into_iter()
                             .filter_map(|m| m.unwrap_or(None))
                             .map(
-                                |(
-                                    subpath,
-                                    filesize,
-                                    enabled,
-                                    sha512,
-                                    murmur2,
-                                    meta_id,
-                                    meta,
-                                    logo_data,
-                                )| {
+                                |(subpath, filesize, enabled, sha512, murmur2, meta_id, meta)| {
                                     (
                                         (
                                             *instance_id,
@@ -424,7 +385,6 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                             meta.description,
                                                         ),
                                                         metadb::SetParam::SetAuthors(meta.authors),
-                                                        metadb::SetParam::SetLogoImage(logo_data),
                                                     ],
 
                                                     // Prisma sucks and is generating invalid sql.
@@ -435,7 +395,6 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                         metadb::SetParam::SetVersion(None),
                                                         metadb::SetParam::SetDescription(None),
                                                         metadb::SetParam::SetAuthors(None),
-                                                        metadb::SetParam::SetLogoImage(None),
                                                     ],
                                                 },
                                             )
@@ -893,45 +852,4 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         });
     }
-}
-
-fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
-    use image::imageops::*;
-
-    const TARGET_SIZE: f32 = 45.0;
-
-    let reader = image::io::Reader::new(Cursor::new(image))
-        .with_guessed_format()
-        .expect("cursor io cannot fail");
-
-    let image = reader.decode()?;
-
-    let mut target = image::RgbaImage::new(45, 45);
-
-    let width = image.width() as f32;
-    let height = image.height() as f32;
-
-    if width != 0.0 && height != 0.0 {
-        let scale = f32::min(TARGET_SIZE / width, TARGET_SIZE / height);
-        let scaled_width = width * scale;
-        let scaled_height = height * scale;
-        let x_offset = (TARGET_SIZE - scaled_width) * 0.5;
-        let y_offset = (TARGET_SIZE - scaled_height) * 0.5;
-
-        overlay(
-            &mut target,
-            &resize(
-                &image,
-                scaled_width as u32,
-                scaled_height as u32,
-                FilterType::Nearest,
-            ),
-            x_offset as i64,
-            y_offset as i64,
-        );
-    }
-
-    let mut output = Vec::<u8>::new();
-    target.write_to(&mut Cursor::new(&mut output), ImageOutputFormat::Png)?;
-    Ok(output)
 }

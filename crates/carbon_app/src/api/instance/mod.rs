@@ -308,12 +308,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     }
 
     #[derive(Deserialize)]
-    struct ModIconQuery {
-        instance_id: i32,
-        mod_id: String,
-    }
-
-    #[derive(Deserialize)]
     struct IconPathQuery {
         path: String,
     }
@@ -349,24 +343,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                     })
                 },
             ),
-        )
-        .route(
-            "/modIcon",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<ModIconQuery>| async move {
-                    let icon = app.instance_manager()
-                        .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id)
-                        .await
-                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
-
-                    Ok::<_, AxumError>(match icon {
-                        Some(icon) => {
-                            (StatusCode::OK, icon)
-                        }
-                        None => (StatusCode::NO_CONTENT, Vec::new()),
-                    })
-                }
-            )
         )
         .route(
             "/loadIcon",
