@@ -175,7 +175,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 <div class="h-screen w-screen absolute inset-0 flex">
                   <div
                     class="relative flex flex-grow z-999 h-full justify-center items-center"
-                    onClick={() => {
+                    onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();
                       }
@@ -183,6 +183,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   >
                     <div
                       style={{ "z-index": `${index() + 1}` }}
+                      onMouseDown={(e) => e.stopPropagation()}
                       class="duration-100 ease-in-out animate-enterScaleIn h-3/4"
                     >
                       <Dynamic

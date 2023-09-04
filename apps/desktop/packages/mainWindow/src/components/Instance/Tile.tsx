@@ -181,7 +181,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="relative flex justify-center flex-col select-none group items-start z-50"
+            class="flex justify-center flex-col relative select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -217,7 +217,7 @@ const Tile = (props: Props) => {
                   <h2 class="text-sm text-center z-20">
                     <Trans key="instance.error_invalid" />
                   </h2>
-                  <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
                   <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
@@ -229,7 +229,7 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 hidden w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 transition-all h-12 hidden w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
@@ -263,8 +263,8 @@ const Tile = (props: Props) => {
                     props.percentage !== null
                   }
                 >
-                  <div class="flex flex-col justify-center items-center gap-2 z-20 w-full h-full">
-                    <h3 class="m-0 text-center opacity-50 text-3xl">
+                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2">
+                    <h3 class="text-center opacity-50 m-0 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>
                     <div class="h-10">
@@ -297,7 +297,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={validInstance()?.modpack_platform}>
-                  <div class="absolute flex justify-center items-center bg-darkSlate-900 rounded-lg border-1 p-2 border-solid top-2 right-2 border-darkSlate-600">
+                  <div class="absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
@@ -368,7 +368,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full gap-4 box-border cursor-pointer px-3 h-14 erelative"
+            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-3 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
