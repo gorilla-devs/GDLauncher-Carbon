@@ -1,11 +1,12 @@
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { rspc } from "@/utils/rspcClient";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
-import { CFFEModLoaderType, Mod as ModType } from "@gd/core_module/bindings";
+import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction } from "solid-js/store";
-import { For, Show } from "solid-js";
+import { For, Show, createResource } from "solid-js";
+import { fetchModImage, getModpackPlatformIcon } from "@/utils/instances";
 
 type Props = {
   mod: ModType;
@@ -27,6 +28,13 @@ const Mod = (props: Props) => {
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
+  const [imageResource] = createResource(
+    () => [params.id, props.mod.id] as const,
+    ([instanceId, modId]) => fetchModImage(instanceId, modId)
+  );
+
+  const isCurseForge = () => props.mod.curseforge;
+
   return (
     <div class="w-full h-14 flex items-center py-2 box-border">
       <div class="flex gap-4 justify-between items-center w-full">
@@ -38,7 +46,21 @@ const Mod = (props: Props) => {
             }}
           />
           <div class="flex items-center gap-2">
-            <div class="h-10 w-10 rounded-xl bg-green-500" />
+            <div class="h-10 w-10 rounded-xl border border-solid border-darkSlate-500 overflow-hidden flex items-center justify-center">
+              <Show
+                when={imageResource()}
+                fallback={
+                  <img
+                    class="w-full"
+                    src={getModpackPlatformIcon(
+                      isCurseForge() ? "Curseforge" : "Modrinth"
+                    )}
+                  />
+                }
+              >
+                <img class="w-full h-full" src={imageResource()} />
+              </Show>
+            </div>
             <div class="flex flex-col">
               {props.mod.curseforge?.name ||
                 props.mod.metadata?.name ||
@@ -50,9 +72,7 @@ const Mod = (props: Props) => {
                       <Show when={modloader}>
                         <img
                           class="w-4 h-4"
-                          src={getForgeModloaderIcon(
-                            modloader as CFFEModLoaderType
-                          )}
+                          src={getForgeModloaderIcon(modloader)}
                         />
                       </Show>
                       <p class="m-0 text-darkSlate-500 text-sm">
