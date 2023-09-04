@@ -119,8 +119,7 @@ CREATE TABLE "ModMetadata" (
     "version" TEXT,
     "description" TEXT,
     "authors" TEXT,
-    "modloaders" TEXT NOT NULL,
-    "logoImage" BLOB
+    "modloaders" TEXT NOT NULL
 );
 
 -- CreateTable
