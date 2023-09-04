@@ -311,7 +311,6 @@ const Tile = (props: Props) => {
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 </Show>
-                <div class="w-full h-full -z-10 bg-darkSlate-900" />
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
