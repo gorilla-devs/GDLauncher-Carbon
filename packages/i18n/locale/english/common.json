@@ -162,6 +162,7 @@
   "instance.instance_import_tab": "Import",
   "instance.clear_filters_modpacks": "Clear filters",
   "instance.download_latest": "Download Latest",
+  "instance.no_instance_selected": "No instance selected",
   "instance.explore_modpack": "Explore",
   "instance.action_open_folder": "Open folder",
   "instance.action_delete": "Delete",

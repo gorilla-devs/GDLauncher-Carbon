@@ -4,14 +4,10 @@ import { For, Match, Suspense, Switch } from "solid-js";
 import VersionRow from "./VersionRow";
 import { Skeleton } from "@gd/ui";
 import { getUrlType } from "@/utils/instances";
+import { rspc } from "@/utils/rspcClient";
 
 const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-
-  const versions = () =>
-    (routeData.isCurseforge
-      ? routeData.curseforgeGetModFiles.data?.data
-      : routeData.modrinthProjectVersions.data) || [];
 
   const location = useLocation();
 
@@ -20,6 +16,38 @@ const Versions = () => {
   const instanceId = () => parseInt(searchParams.instanceId, 10);
 
   const isModpack = () => getUrlType(location.pathname) === "modpacks";
+
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId() as number,
+  ]);
+
+  const modplatform = () => instanceDetails.data?.modloaders[0].type_;
+
+  const versions = () => {
+    const mrVersions = routeData.modrinthProjectVersions?.data?.filter(
+      (version) => {
+        console.log(modplatform());
+        if (modplatform()) {
+          return version.loaders.includes(modplatform() as unknown as string);
+        }
+        return true;
+      }
+    );
+
+    const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
+      (version) => {
+        if (modplatform()) {
+          return version.gameVersions.some(
+            (_version) => modplatform() === _version.toLowerCase()
+          );
+        }
+        return true;
+      }
+    );
+
+    return mrVersions || cfVersions || [];
+  };
 
   return (
     <Suspense fallback={<Skeleton.modpackVersionList />}>

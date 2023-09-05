@@ -14,6 +14,7 @@ import {
 import {
   CFFEModSearchSortField,
   FESearchAPI,
+  FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   InstanceDetails,
   MRFESearchIndex,
@@ -144,19 +145,24 @@ const ModsBrowser = () => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
 
-    if (modloaders && platform) {
-      infiniteQuery.setQuery({
-        modloaders: modloaders,
-        searchApi: platform as FESearchAPI,
-      });
+    const newQuery: Partial<FEUnifiedSearchParameters> = {};
+
+    if (platform) {
+      newQuery["searchApi"] = platform as FESearchAPI;
     }
+
+    if (modloaders) {
+      newQuery["modloaders"] = modloaders;
+    }
+
+    infiniteQuery.setQuery(newQuery);
   });
 
   return (
     <div class="box-border h-full w-full relative">
       <div
         ref={(el) => (containrRef = el)}
-        class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
+        class="flex flex-col bg-darkSlate-800 z-10 px-5 pt-5"
       >
         <Switch>
           <Match when={infiniteQuery?.isLoading}>
@@ -190,6 +196,9 @@ const ModsBrowser = () => {
                     class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
                     onClick={() => {
                       infiniteQuery.setInstanceId(undefined);
+                      infiniteQuery.setQuery({
+                        modloaders: null,
+                      });
                       setinstanceDetails(undefined);
                       setInstanceMods([]);
                     }}
@@ -201,6 +210,7 @@ const ModsBrowser = () => {
                   placeholder="Type Here"
                   icon={<div class="i-ri:search-line" />}
                   class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
+                  value={infiniteQuery.query.searchQuery!}
                   onInput={(e) => {
                     const target = e.target as HTMLInputElement;
                     infiniteQuery.setQuery({ searchQuery: target.value });

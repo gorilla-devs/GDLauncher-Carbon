@@ -7,7 +7,7 @@ import {
   MRFEVersionsResponse,
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Dropdown, Popover, Spinner, createNotification } from "@gd/ui";
+import { Button, Popover, Spinner, createNotification } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -130,25 +130,7 @@ const ModRow = (props: ModRowProps) => {
     }
   };
 
-  const latestFilesIndexes = () =>
-    props.type === "Mod" ? getCurrentMcVersionObj() : [];
-
   const instanceId = () => (props as ModProps)?.instanceId;
-
-  const mappedVersions = () =>
-    latestFilesIndexes().map((version) => {
-      if (!isCurseForgeData(props.data)) {
-        return {
-          key: (version as MRFEVersion).id,
-          label: (version as MRFEVersion).name,
-        };
-      } else {
-        return {
-          key: (version as CFFEFileIndex).fileId,
-          label: (version as CFFEFileIndex).filename,
-        };
-      }
-    });
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onMutate() {
@@ -414,16 +396,16 @@ const ModRow = (props: ModRowProps) => {
                       </Button>
                       <Switch>
                         <Match when={!isModInstalled()}>
-                          <Dropdown.button
-                            menuPlacement="bottom-end"
+                          <Button
+                            size={isRowSmall() ? "small" : "medium"}
                             loading={loading()}
                             disabled={
                               (modrinthVersions()?.isFetching && !loading()) ||
                               !instanceId()
                             }
-                            options={mappedVersions()}
+                            // options={mappedVersions()}
                             rounded
-                            value={mappedVersions()[0]?.key}
+                            // value={mappedVersions()[0]?.key}
                             onClick={() => {
                               if (props.type !== "Mod") return;
                               const fileVersion = getCurrentMcVersionObj()?.[0];
@@ -456,18 +438,18 @@ const ModRow = (props: ModRowProps) => {
                               }
                             }}
                           >
-                            <Show when={loading()}>
-                              <Spinner />
-                            </Show>
-                            <Show when={!loading()}>
-                              <Trans
-                                key="instance.download_latest"
-                                options={{
-                                  defaultValue: "Download Latest",
-                                }}
-                              />
-                            </Show>
-                          </Dropdown.button>
+                            <Switch>
+                              <Match when={isNaN(instanceId() || NaN)}>
+                                <Trans key="instance.no_instance_selected" />
+                              </Match>
+                              <Match when={loading()}>
+                                <Spinner />
+                              </Match>
+                              <Match when={!loading()}>
+                                <Trans key="instance.download_latest" />
+                              </Match>
+                            </Switch>
+                          </Button>
                         </Match>
                         <Match when={isModInstalled()}>
                           <Button
