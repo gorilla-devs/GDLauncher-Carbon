@@ -424,7 +424,7 @@ const ModRow = (props: ModRowProps) => {
                                 });
                               }
                             }}
-                            onChange={(val) => {
+                            onChange={(val: any) => {
                               setLoading(true);
 
                               if (instanceId()) {
