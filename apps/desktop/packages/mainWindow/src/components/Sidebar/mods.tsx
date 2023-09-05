@@ -132,9 +132,6 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
-                createEffect(() => {
-                  console.log(instanceId());
-                });
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
