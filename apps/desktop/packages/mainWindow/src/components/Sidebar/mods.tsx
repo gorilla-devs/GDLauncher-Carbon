@@ -3,14 +3,7 @@ import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Mods/modsBrowser.data";
 import { useRouteData, useSearchParams } from "@solidjs/router";
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createResource,
-} from "solid-js";
+import { For, Match, Show, Switch, createResource } from "solid-js";
 import {
   CFFECategory,
   MRFECategory,

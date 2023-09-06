@@ -25,11 +25,20 @@ const Versions = () => {
   const modplatform = () => instanceDetails.data?.modloaders[0].type_;
 
   const versions = () => {
+    function compareModloader(version: string): boolean {
+      if (modplatform() === "forge") {
+        return version === "forge";
+      } else if (modplatform() === "fabric" || modplatform() === "quilt") {
+        return version === "fabric" || version === "quilt";
+      }
+
+      return version === modplatform();
+    }
+
     const mrVersions = routeData.modrinthProjectVersions?.data?.filter(
       (version) => {
-        console.log(modplatform());
         if (modplatform()) {
-          return version.loaders.includes(modplatform() as unknown as string);
+          return version.loaders.some(compareModloader);
         }
         return true;
       }
@@ -38,8 +47,8 @@ const Versions = () => {
     const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
       (version) => {
         if (modplatform()) {
-          return version.gameVersions.some(
-            (_version) => modplatform() === _version.toLowerCase()
+          return version.gameVersions.some((_version) =>
+            compareModloader(_version.toLowerCase())
           );
         }
         return true;

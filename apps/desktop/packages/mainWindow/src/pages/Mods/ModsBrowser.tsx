@@ -144,6 +144,7 @@ const ModsBrowser = () => {
   createEffect(() => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
+    const _ = instanceId();
 
     const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
@@ -152,7 +153,19 @@ const ModsBrowser = () => {
     }
 
     if (modloaders) {
-      newQuery["modloaders"] = modloaders;
+      newQuery["modloaders"] = [];
+
+      if (modloaders.includes("forge")) {
+        newQuery["modloaders"].push("forge");
+      } else if (
+        modloaders.includes("fabric") ||
+        modloaders.includes("quilt")
+      ) {
+        newQuery["modloaders"].push("fabric");
+        newQuery["modloaders"].push("quilt");
+      } else {
+        newQuery["modloaders"] = [...modloaders];
+      }
     }
 
     infiniteQuery.setQuery(newQuery);
