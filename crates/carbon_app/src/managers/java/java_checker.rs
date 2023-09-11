@@ -40,7 +40,8 @@ impl JavaChecker for RealJavaChecker {
 
         // Run java
         let output_cmd = Command::new(java_bin_path)
-            .current_dir(java_checker_path.parent().expect("This should never fail"))
+            .arg("-cp")
+            .arg(java_checker_path.parent().expect("This should never fail"))
             .arg(
                 JAVA_CHECK_APP_NAME
                     .strip_suffix(".class")
@@ -126,3 +127,27 @@ impl JavaChecker for MockJavaCheckerInvalid {
         bail!("Expected failure");
     }
 }
+
+// #[cfg(test)]
+// mod test {
+//     #[tokio::test]
+//     async fn test_get_bin_info() {
+//         use std::path::PathBuf;
+
+//         use crate::domain::java::{JavaArch, JavaComponentType, JavaOs};
+
+//         use super::{JavaChecker, RealJavaChecker};
+
+//         let java_checker = RealJavaChecker;
+//         let java_bin_path = PathBuf::from(
+//             "\\\\?\\C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.6.10-hotspot\\bin\\java.exe",
+//         );
+
+//         let java_component = java_checker
+//             .get_bin_info(&java_bin_path, JavaComponentType::Local)
+//             .await
+//             .unwrap();
+
+//         println!("{:?}", java_component);
+//     }
+// }
