@@ -39,7 +39,7 @@ impl JavaChecker for RealJavaChecker {
         }
 
         // Run java
-        let output = Command::new(java_bin_path)
+        let output_cmd = Command::new(java_bin_path)
             .current_dir(java_checker_path.parent().expect("This should never fail"))
             .arg(
                 JAVA_CHECK_APP_NAME
@@ -56,7 +56,17 @@ impl JavaChecker for RealJavaChecker {
                 )
             })?;
 
-        let output = String::from_utf8(output.stdout)?;
+        let output = String::from_utf8(output_cmd.stdout)?;
+        let error_output = String::from_utf8(output_cmd.stderr)?;
+
+        if !error_output.is_empty() {
+            tracing::warn!(
+                "Java checker command failed on {:?} - {}",
+                java_bin_path,
+                error_output,
+            );
+        }
+
         let parsed_output = match parse_cmd_output_java(&output) {
             Ok(parsed_output) => parsed_output,
             Err(err) => {
