@@ -102,10 +102,10 @@ impl JavaChecker for MockJavaChecker {
             version: JavaVersion {
                 major: 19,
                 minor: 0,
-                patch: path.to_string_lossy().to_string(),
+                patch: "0".to_string(),
                 update_number: None,
                 prerelease: None,
-                build_metadata: Some("10".to_owned()),
+                build_metadata: None,
             },
             arch: JavaArch::X86_32,
             _type: JavaComponentType::Local,
