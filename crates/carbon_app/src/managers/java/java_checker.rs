@@ -57,7 +57,14 @@ impl JavaChecker for RealJavaChecker {
             })?;
 
         let output = String::from_utf8(output.stdout)?;
-        let parsed_output = parse_cmd_output_java(&output)?;
+        let parsed_output = match parse_cmd_output_java(&output) {
+            Ok(parsed_output) => parsed_output,
+            Err(err) => {
+                tracing::warn!("Cannot parse java checker output - {}", err);
+                tracing::warn!("Output: {}", output);
+                bail!("Cannot parse java checker output - {}", err);
+            }
+        };
 
         Ok(JavaComponent {
             path: java_bin_path.to_string_lossy().to_string(),
