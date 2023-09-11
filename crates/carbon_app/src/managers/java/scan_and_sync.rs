@@ -151,16 +151,7 @@ where
             // If it is valid, check whether it's in the DB
             Ok(java_component) => {
                 trace!("Java is valid: {:?}", java_component);
-                match db_entry {
-                    // If it is in the db, update it to valid. Also make sure the version is in sync. If Major is not in sync, that is a problem
-                    Some(_) => {
-                        // TODO
-                    }
-                    // If it isn't in the db, add it
-                    None => {
-                        add_java_component_to_db(db, java_component).await?;
-                    }
-                }
+                add_java_component_to_db(db, java_component).await?;
             }
             // If it isn't valid, check whether it's in the DB
             Err(err) => {

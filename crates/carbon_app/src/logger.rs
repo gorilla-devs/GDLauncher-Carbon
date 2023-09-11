@@ -25,6 +25,7 @@ fn generate_logs_filters() -> String {
         "h2::codec::framed_read=warn",
         "h2::codec::framed_write=warn",
         "h2::proto::settings=warn",
+        "tungstenite::protocol=warn",
         "mobc=trace",
     ];
 

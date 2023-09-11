@@ -195,7 +195,13 @@ impl Managed for AzulZulu {
             tracing::warn!("Could not delete downloaded file: {}", e);
         }
 
-        let main_binary_path = result?;
+        let main_binary_path = {
+            let tmp = result?;
+            match tmp.canonicalize() {
+                Ok(p) => p,
+                Err(_) => tmp,
+            }
+        };
 
         let java_component = java_checker
             .get_bin_info(
