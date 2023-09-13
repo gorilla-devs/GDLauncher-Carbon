@@ -21,6 +21,9 @@ async-trait = "0.1.61"
 axum = "0.6.2"
 chrono = "0.4.23"
 derive_more = "0.99.17"
+openssl = { version = "0.10", features = [
+  "vendored",
+] } # required to vendor openssl for steam deck
 directories = "4.0.1"
 dotenvy = "0.15.6"
 flate2 = "1.0.25"
@@ -46,7 +49,11 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
   "migrations",
 ], default_features = false }
 regex = "1.7.0"
-reqwest = { version = "0.11.13", features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11.13", default-features = false, features = [
+  "json",
+  "blocking",
+  "stream",
+] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
@@ -81,7 +88,7 @@ uuid = "1.2.2"
 winreg = "0.10.1"
 zip = "0.6.3"
 tempdir = "0.3.7"
-sentry = "0.30.0"
+sentry = "0.31.6"
 syn = "2.0.11"
 quote = "1.0.26"
 url = "2.3.1"

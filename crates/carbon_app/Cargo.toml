@@ -21,7 +21,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
 # tracing-forest = { workspace = true }
-reqwest = { workspace = true, features = ["blocking", "json"] }
+reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
