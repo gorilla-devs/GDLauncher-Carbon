@@ -12,10 +12,12 @@ import RightHandSide from "./components/RightHandSide";
 import PageTitle from "./components/PageTitle";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
+import { useModal } from "@/managers/ModalsManager";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
   const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -269,6 +271,20 @@ const General = () => {
                 });
               }}
             />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title>
+            <Trans key="settings.rerun_onboarding" />
+          </Title>
+          <RightHandSide>
+            <Button
+              onClick={() => {
+                modalsContext?.openModal({ name: "onBoarding" });
+              }}
+            >
+              <Trans key="settings.rerun_onboarding" />
+            </Button>
           </RightHandSide>
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
