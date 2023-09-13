@@ -279,6 +279,7 @@ const General = () => {
           </Title>
           <RightHandSide>
             <Button
+              size="small"
               onClick={() => {
                 modalsContext?.openModal({ name: "onBoarding" });
               }}
