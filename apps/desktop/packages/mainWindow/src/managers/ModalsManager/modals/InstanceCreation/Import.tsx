@@ -289,7 +289,7 @@ const Import = (props: Props) => {
         </div>
       </div>
       <Button
-        disabled={isAllImported()}
+        disabled={isAllImported() || selectedEntires().length === 0}
         onClick={() => {
           if (isLoading()) return;
           setIsLoading(true);
