@@ -165,9 +165,7 @@ mod app {
                 .invalidation_channel
                 .send(InvalidationEvent::new(key.full, args))
             {
-                Ok(_) => {
-                    tracing::debug!("invalidated {}", key.full);
-                }
+                Ok(_) => {}
                 Err(e) => {
                     error!("Error sending invalidation request: {e}");
                 }

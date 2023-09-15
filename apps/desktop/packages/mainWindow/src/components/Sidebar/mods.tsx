@@ -58,7 +58,7 @@ const Sidebar = () => {
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
-      <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
+      <div class="h-full w-full box-border overflow-y-auto px-4 py-5">
         <Show when={filteredInstances()}>
           <Collapsable title={t("general.instances")} noPadding>
             <div class="flex flex-col gap-3">
@@ -103,7 +103,6 @@ const Sidebar = () => {
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: [],
-                  modloaders: null,
                 });
                 infiniteQuery.resetList();
               }}
@@ -126,8 +125,6 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
-                const modloaderName = () => capitalize(modloader);
-
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
@@ -136,13 +133,13 @@ const Sidebar = () => {
                           infiniteQuery?.query.modloaders || [];
 
                         const filteredModloaders = prevModloaders.filter(
-                          (modloader) => modloader !== modloaderName()
+                          (_modloader) => _modloader !== modloader
                         );
 
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloaderName() as FEUnifiedModLoaderType,
+                              modloader as FEUnifiedModLoaderType,
                             ]
                           : filteredModloaders;
 
@@ -151,9 +148,13 @@ const Sidebar = () => {
                             newModloaders.length === 0 ? null : newModloaders,
                         });
                       }}
+                      checked={infiniteQuery.query.modloaders?.includes(
+                        modloader
+                      )}
+                      disabled={!isNaN(instanceId())}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloaderName())}</p>
+                    <p class="m-0">{capitalize(modloader)}</p>
                   </div>
                 );
               }}

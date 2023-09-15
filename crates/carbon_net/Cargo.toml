@@ -10,14 +10,14 @@ crate-type = ["lib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+reqwest = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-reqwest = { workspace = true, features = ["json", "stream"] }
 sha2 = { workspace = true }
 sha1 = { workspace = true }
-md-5 = {workspace = true }
+md-5 = { workspace = true }
 futures = { workspace = true }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
+tokio = { workspace = true }
 hex = { workspace = true }

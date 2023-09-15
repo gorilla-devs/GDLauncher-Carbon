@@ -72,7 +72,7 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] lg:grid-cols-[auto_2fr_440px]":
+              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] xl:grid-cols-[auto_2fr_440px]":
                 !isDetailPage(),
               "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
                 isDetailPage(),

@@ -5,6 +5,33 @@ use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
 };
 
+fn generate_logs_filters() -> String {
+    let filters = &[
+        "debug",
+        "carbon_app=trace",
+        "hyper::client::pool=warn",
+        "reqwest::connect=warn",
+        "hyper::proto::h1::conn=warn",
+        "hyper::proto::h1::io=warn",
+        "hyper::proto::h1::decode=warn",
+        "quaint::connector::metrics=warn",
+        "hyper::client::connect::http=warn",
+        "hyper::client::connect::dns=warn",
+        "quaint::pooled::manager=warn",
+        "rustls::client::hs=warn",
+        "rustls::client::tls13=warn",
+        "h2::client=warn",
+        "rustls::client::common=warn",
+        "h2::codec::framed_read=warn",
+        "h2::codec::framed_write=warn",
+        "h2::proto::settings=warn",
+        "tungstenite::protocol=warn",
+        "mobc=trace",
+    ];
+
+    filters.to_vec().join(",")
+}
+
 pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
     let logs_path = runtime_path.join("__gdl_logs__");
 
@@ -14,10 +41,7 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
 
-    let filter = EnvFilter::try_new(
-        "debug,carbon_app=trace,hyper::client::pool=warn,reqwest::connect=warn,hyper::proto::h1::io=warn,hyper::proto::h1::decode=warn,hyper::proto::h1::conn=warn,quaint::connector::metrics=warn,hyper::client::connect::http=warn,hyper::client::connect::dns=warn",
-    )
-    .unwrap();
+    let filter = EnvFilter::try_new(generate_logs_filters()).unwrap();
 
     // let processor = tracing_forest::Printer::new()
     //     .formatter(tracing_forest::printer::Pretty)

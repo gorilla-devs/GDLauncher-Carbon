@@ -151,16 +151,7 @@ where
             // If it is valid, check whether it's in the DB
             Ok(java_component) => {
                 trace!("Java is valid: {:?}", java_component);
-                match db_entry {
-                    // If it is in the db, update it to valid. Also make sure the version is in sync. If Major is not in sync, that is a problem
-                    Some(_) => {
-                        // TODO
-                    }
-                    // If it isn't in the db, add it
-                    None => {
-                        add_java_component_to_db(db, java_component).await?;
-                    }
-                }
+                add_java_component_to_db(db, java_component).await?;
             }
             // If it isn't valid, check whether it's in the DB
             Err(err) => {
@@ -458,7 +449,7 @@ mod test {
 
         let component_to_remove = JavaComponent {
             path: "/java1".to_string(),
-            version: JavaVersion::from_major(8),
+            version: JavaVersion::from_major(19),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86_32,
             os: JavaOs::Linux,
@@ -470,7 +461,7 @@ mod test {
 
         let component_to_keep = JavaComponent {
             path: "/java4".to_string(),
-            version: JavaVersion::from_major(8),
+            version: JavaVersion::from_major(19),
             _type: JavaComponentType::Local,
             arch: JavaArch::X86_32,
             os: JavaOs::Linux,
@@ -485,10 +476,9 @@ mod test {
             .await
             .unwrap();
 
-        // Ensure /usr/bin/java is still there but /usr/bin/java2 is gone. Also ensure /opt/java/bin/java and
-        // /opt/homebrew/opt/openjdk/bin/java" are added
-
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+
+        println!("{:?}", java_components);
 
         assert_eq!(java_components.len(), 3);
     }

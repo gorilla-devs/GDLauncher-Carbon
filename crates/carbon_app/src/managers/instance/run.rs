@@ -494,11 +494,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 .into_iter()
                                 .find(|v| v.id == version.release)
                                 .ok_or_else(|| {
-                                    anyhow!("Could not find forge versions for {}", version.release)
+                                    anyhow!("Could not find any forge versions for mc version {}", version.release)
                                 })?
                                 .loaders
                                 .into_iter()
-                                .find(|v| v.id == format!("{}-{}", version.release, forge_version))
+                                .find(|v| {
+                                    let exact_match = v.id == format!("{}-{}", version.release, forge_version);
+                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, forge_version));
+
+                                    exact_match || fuzzy_match
+                                })
                                 .ok_or_else(|| {
                                     anyhow!(
                                         "Could not find forge version {}-{} for minecraft version {}",
