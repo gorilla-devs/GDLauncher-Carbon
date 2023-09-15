@@ -40,7 +40,7 @@ prisma-client-rust = { workspace = true, features = [
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
-image = { workspace = true, features = ["png"], default-features = false }
+image = { workspace = true }
 task-local-extensions = { workspace = true }
 hyper = { workspace = true }
 zip = { workspace = true }
@@ -68,6 +68,7 @@ async-recursion = "1.0.4"
 serde-enum-str = "0.3.2"
 markdown = { workspace = true }
 ring = { workspace = true }
+num_cpus = { workspace = true }
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

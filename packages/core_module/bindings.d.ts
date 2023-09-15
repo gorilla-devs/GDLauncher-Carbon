@@ -408,7 +408,7 @@ export type MRFEProjectSearchResult = { slug: string; title: string; description
 
 export type CFFEFileStatus = "processing" | "changesRequired" | "underReview" | "approved" | "rejected" | "malwareDetected" | "deleted" | "archived" | "testing" | "released" | "readyForReview" | "deprecated" | "baking" | "awaitingPublishing" | "failedPublishing"
 
-export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; filename: string; urlslug: string; description: string; authors: string; sha512: string; sha1: string }
+export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; urlslug: string; description: string; authors: string }
 
 export type CauseSegment = { display: string; debug: string }
 

@@ -101,8 +101,8 @@ impl Managed for AzulZulu {
                 let is_single_root_dir = archive.file_names().all(|file_name| {
                     let path = Path::new(file_name);
                     let Some(os_str) = path.components().next() else {
-                    return false;
-                };
+                        return false;
+                    };
                     os_str.as_os_str() == root_dir
                 });
 

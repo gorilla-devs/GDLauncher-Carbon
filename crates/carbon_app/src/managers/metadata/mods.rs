@@ -647,7 +647,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
     // Used a block and let else instead of an if let to avoid what appears to be a
     // borrow checker life extension bug.
     'modstoml: {
-        let Ok(mut file) = zip.by_name("META-INF/mods.toml") else { break 'modstoml };
+        let Ok(mut file) = zip.by_name("META-INF/mods.toml") else {
+            break 'modstoml;
+        };
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
         let modstoml = toml::from_str::<ModsToml>(&content)?;
@@ -684,7 +686,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
     }
 
     'fabric_mod_json: {
-        let Ok(mut file) = zip.by_name("fabric.mod.json") else { break 'fabric_mod_json };
+        let Ok(mut file) = zip.by_name("fabric.mod.json") else {
+            break 'fabric_mod_json;
+        };
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
@@ -694,7 +698,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
     }
 
     'quilt_mod_json: {
-        let Ok(mut file) = zip.by_name("quilt.mod.json") else { break 'quilt_mod_json };
+        let Ok(mut file) = zip.by_name("quilt.mod.json") else {
+            break 'quilt_mod_json;
+        };
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
@@ -704,7 +710,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
     }
 
     'mcmodinfo: {
-        let Ok(file) = zip.by_name("mcmod.info") else { break 'mcmodinfo };
+        let Ok(file) = zip.by_name("mcmod.info") else {
+            break 'mcmodinfo;
+        };
 
         let mcmod: McModInfo =
             serde_json::from_reader::<_, McModInfoContainer>(file)?.try_into()?;

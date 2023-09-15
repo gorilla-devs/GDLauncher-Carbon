@@ -116,7 +116,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         let tasklist = self.tasks.read().await;
         let Some(task) = tasklist.get(&task_id) else {
             info!("task already exited");
-            return Ok(())
+            return Ok(());
         };
 
         let mut notify = task.notify_rx.clone();

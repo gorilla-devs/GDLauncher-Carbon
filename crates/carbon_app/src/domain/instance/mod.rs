@@ -99,12 +99,9 @@ pub struct ModrinthModMetadata {
     pub project_id: String,
     pub version_id: String,
     pub title: String,
-    pub filename: String,
     pub urlslug: String,
     pub description: String,
     pub authors: String,
-    pub sha512: String,
-    pub sha1: String,
 }
 
 #[derive(Debug, Copy, Clone)]

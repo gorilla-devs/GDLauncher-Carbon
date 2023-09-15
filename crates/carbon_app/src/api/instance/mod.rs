@@ -794,12 +794,9 @@ struct ModrinthModMetadata {
     pub project_id: String,
     pub version_id: String,
     pub title: String,
-    pub filename: String,
     pub urlslug: String,
     pub description: String,
     pub authors: String,
-    pub sha512: String,
-    pub sha1: String,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -1090,12 +1087,9 @@ impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
             project_id: value.project_id,
             version_id: value.version_id,
             title: value.title,
-            filename: value.filename,
             urlslug: value.urlslug,
             description: value.description,
             authors: value.authors,
-            sha512: value.sha512,
-            sha1: value.sha1,
         }
     }
 }

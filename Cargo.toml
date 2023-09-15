@@ -29,11 +29,12 @@ futures = "0.3.25"
 httpdate = "1.0.2"
 hyper = "0.14.25"
 itertools = "0.10.5"
-image = { version = "0.24.5", features = ["png"], default-features = false }
+image = { version = "0.24.5" }
 jsonwebtoken = "8.2.0"
 # libc = "0.2"
 md-5 = "0.10.5"
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
+num_cpus = "1.16.0"
 opener = "0.6.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",

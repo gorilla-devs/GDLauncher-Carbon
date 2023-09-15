@@ -4,7 +4,10 @@ use thiserror::Error;
 use crate::domain::instance::info::ModLoaderType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
-use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use crate::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
+};
 use crate::{db::read_filters::IntFilter, domain::instance as domain};
 
 use super::{
@@ -73,12 +76,9 @@ impl ManagerRef<'_, InstanceManager> {
                         project_id: m.project_id,
                         version_id: m.version_id,
                         title: m.title,
-                        filename: m.filename,
                         urlslug: m.urlslug,
                         description: m.description,
                         authors: m.authors,
-                        sha512: m.sha_512,
-                        sha1: m.sha_1,
                     }
                 }),
             });
@@ -237,19 +237,60 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let m = self
+        let r = self
             .app
             .prisma_client
             .mod_file_cache()
             .find_unique(fcdb::UniqueWhereParam::IdEquals(mod_id.clone()))
-            .with(fcdb::metadata::fetch())
+            .with(
+                fcdb::metadata::fetch()
+                    .with(metadb::logo_image::fetch())
+                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+            )
             .exec()
             .await?
             .ok_or(InvalidModIdError(mod_id))?
             .metadata
             .ok_or_else(|| anyhow::anyhow!("broken db state"))?;
 
-        Ok(m.logo_image)
+        let local_image = r
+            .logo_image
+            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+            .map(|m| m.data);
+
+        let cf_image = r
+            .curseforge
+            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+            .map(|cf| {
+                cf.logo_image
+                    .ok_or_else(|| anyhow::anyhow!("broken db state"))
+            })
+            .transpose()?
+            .flatten()
+            .map(|img| img.data)
+            .flatten();
+
+        let mr_image = r
+            .modrinth
+            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+            .map(|mr| {
+                mr.logo_image
+                    .ok_or_else(|| anyhow::anyhow!("broken db state"))
+            })
+            .transpose()?
+            .flatten()
+            .map(|img| img.data)
+            .flatten();
+
+        let logo_image = match (local_image, cf_image, mr_image) {
+            (_, Some(cf_image), _) => Some(cf_image),
+            (_, _, Some(mr_image)) => Some(mr_image),
+            (Some(local_image), _, _) => Some(local_image),
+            _ => None,
+        };
+
+        Ok(logo_image)
     }
 }
 
