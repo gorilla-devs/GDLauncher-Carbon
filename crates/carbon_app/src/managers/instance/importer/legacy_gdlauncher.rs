@@ -14,11 +14,7 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{
-        instance::InstanceVersionSource,
-        vtask::Subtask,
-        AppInner,
-    },
+    managers::{instance::InstanceVersionSource, vtask::Subtask, AppInner},
 };
 
 use super::InstanceImporter;
