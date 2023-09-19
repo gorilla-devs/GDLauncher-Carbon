@@ -37,7 +37,8 @@ const Mod = (props: Props) => {
 
   const [imageResource] = createResource(
     () => [params.id, props.mod.id, imagePlatform()] as const,
-    ([instanceId, modId, platform]) => fetchModImage(instanceId, modId, platform)
+    ([instanceId, modId, platform]) =>
+      fetchModImage(instanceId, modId, platform)
   );
 
   const isCurseForge = () => props.mod.curseforge;
