@@ -7,8 +7,8 @@ pub struct Instance {
     pub name: String,
     #[serde(default)]
     pub icon: InstanceIcon,
-    #[serde(default = "Utc::now")]
-    pub last_played: DateTime<Utc>,
+    #[serde(default)]
+    pub last_played: Option<DateTime<Utc>>,
     #[serde(default)]
     pub seconds_played: u64,
     #[serde(default)]

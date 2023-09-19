@@ -31,7 +31,7 @@ pub struct InstanceDetails {
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
-    pub last_played: DateTime<Utc>,
+    pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
