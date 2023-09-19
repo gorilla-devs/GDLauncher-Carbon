@@ -211,7 +211,7 @@ impl TryFrom<&str> for JavaVersion {
 
     fn try_from(version_string: &str) -> Result<Self, Self::Error> {
         let regex = Regex::new(
-            r#"^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?)(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
+            r#"^(?P<major>0|[1-9]\d*)(?:\.(?P<minor>0|[1-9]\d*))?(?:\.(?P<patch>0|[1-9]\d*(?:\.[0-9]+)?))?(?:_(?P<update_number>[0-9]+)?)?(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<build_metadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?"#,
         )?;
 
         if let Some(captures) = regex.captures(version_string) {
@@ -407,6 +407,28 @@ mod test {
                     major: 19,
                     minor: 0,
                     patch: "1".to_owned(),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "19.0",
+                expected: Some(JavaVersion {
+                    major: 19,
+                    minor: 0,
+                    patch: "0".to_owned(),
+                    update_number: None,
+                    prerelease: None,
+                    build_metadata: None,
+                }),
+            },
+            TestCase {
+                output: "19",
+                expected: Some(JavaVersion {
+                    major: 19,
+                    minor: 0,
+                    patch: "0".to_owned(),
                     update_number: None,
                     prerelease: None,
                     build_metadata: None,
