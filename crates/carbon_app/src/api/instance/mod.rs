@@ -311,6 +311,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     struct ModIconQuery {
         instance_id: i32,
         mod_id: String,
+        platform: String,
     }
 
     #[derive(Deserialize)]
@@ -354,8 +355,15 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             "/modIcon",
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<ModIconQuery>| async move {
+                    let platformid = match &query.platform as &str {
+                        "metadata" => 0,
+                        "curseforge" => 1,
+                        "modrinth" => 2,
+                        _ => return Err(FeError::from_anyhow(&anyhow::anyhow!("unsupported platform")).make_axum()),
+                    };
+
                     let icon = app.instance_manager()
-                        .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id)
+                        .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id, platformid)
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
@@ -777,26 +785,29 @@ struct ModFileMetadata {
     description: Option<String>,
     authors: Option<String>,
     modloaders: Vec<CFFEModLoaderType>,
+    has_image: bool,
 }
 
 #[derive(Type, Serialize, Debug)]
 struct CurseForgeModMetadata {
-    pub project_id: u32,
-    pub file_id: u32,
-    pub name: String,
-    pub urlslug: String,
-    pub summary: String,
-    pub authors: String,
+    project_id: u32,
+    file_id: u32,
+    name: String,
+    urlslug: String,
+    summary: String,
+    authors: String,
+    has_image: bool,
 }
 
 #[derive(Type, Serialize, Debug)]
 struct ModrinthModMetadata {
-    pub project_id: String,
-    pub version_id: String,
-    pub title: String,
-    pub urlslug: String,
-    pub description: String,
-    pub authors: String,
+    project_id: String,
+    version_id: String,
+    title: String,
+    urlslug: String,
+    description: String,
+    authors: String,
+    has_image: bool,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -1064,6 +1075,7 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             description: value.description,
             authors: value.authors,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            has_image: value.has_image,
         }
     }
 }
@@ -1077,6 +1089,7 @@ impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
             urlslug: value.urlslug,
             summary: value.summary,
             authors: value.authors,
+            has_image: value.has_image,
         }
     }
 }
@@ -1090,6 +1103,7 @@ impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
             urlslug: value.urlslug,
             description: value.description,
             authors: value.authors,
+            has_image: value.has_image,
         }
     }
 }

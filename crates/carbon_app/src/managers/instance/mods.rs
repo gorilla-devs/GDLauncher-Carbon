@@ -33,8 +33,9 @@ impl ManagerRef<'_, InstanceManager> {
             ))])
             .with(
                 fcdb::metadata::fetch()
-                    .with(metadb::curseforge::fetch())
-                    .with(metadb::modrinth::fetch()),
+                    .with(metadb::logo_image::fetch())
+                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
             )
             .exec()
             .await?
@@ -56,6 +57,12 @@ impl ManagerRef<'_, InstanceManager> {
                             // ignore unknown modloaders
                             .flat_map(|loader| ModLoaderType::try_from(loader).ok())
                             .collect::<Vec<_>>(),
+                        has_image: m
+                            .logo_image
+                            .as_ref()
+                            .map(|v| v.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     })
                 }),
                 curseforge: m
@@ -70,6 +77,13 @@ impl ManagerRef<'_, InstanceManager> {
                         urlslug: m.urlslug,
                         summary: m.summary,
                         authors: m.authors,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }),
                 modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
                     domain::ModrinthModMetadata {
@@ -79,6 +93,13 @@ impl ManagerRef<'_, InstanceManager> {
                         urlslug: m.urlslug,
                         description: m.description,
                         authors: m.authors,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }
                 }),
             });
@@ -231,6 +252,7 @@ impl ManagerRef<'_, InstanceManager> {
         &self,
         instance_id: InstanceId,
         mod_id: String,
+        platformid: i32,
     ) -> anyhow::Result<Option<Vec<u8>>> {
         let instances = self.instances.read().await;
         let _ = instances
@@ -254,40 +276,34 @@ impl ManagerRef<'_, InstanceManager> {
             .metadata
             .ok_or_else(|| anyhow::anyhow!("broken db state"))?;
 
-        let local_image = r
-            .logo_image
-            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
-            .map(|m| m.data);
-
-        let cf_image = r
-            .curseforge
-            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
-            .map(|cf| {
-                cf.logo_image
-                    .ok_or_else(|| anyhow::anyhow!("broken db state"))
-            })
-            .transpose()?
-            .flatten()
-            .map(|img| img.data)
-            .flatten();
-
-        let mr_image = r
-            .modrinth
-            .ok_or_else(|| anyhow::anyhow!("broken db state"))?
-            .map(|mr| {
-                mr.logo_image
-                    .ok_or_else(|| anyhow::anyhow!("broken db state"))
-            })
-            .transpose()?
-            .flatten()
-            .map(|img| img.data)
-            .flatten();
-
-        let logo_image = match (local_image, cf_image, mr_image) {
-            (_, Some(cf_image), _) => Some(cf_image),
-            (_, _, Some(mr_image)) => Some(mr_image),
-            (Some(local_image), _, _) => Some(local_image),
-            _ => None,
+        let logo_image = match platformid {
+            0 => r
+                .logo_image
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|m| m.data),
+            1 => r
+                .curseforge
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|cf| {
+                    cf.logo_image
+                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
+                })
+                .transpose()?
+                .flatten()
+                .map(|img| img.data)
+                .flatten(),
+            2 => r
+                .modrinth
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|mr| {
+                    mr.logo_image
+                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
+                })
+                .transpose()?
+                .flatten()
+                .map(|img| img.data)
+                .flatten(),
+            _ => bail!("unsupported platform"),
         };
 
         Ok(logo_image)

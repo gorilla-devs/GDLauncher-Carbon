@@ -213,8 +213,10 @@ export const fetchImage = async (id: number) => {
   } else return "";
 };
 
-export const fetchModImage = async (instanceId: string, modId: string) => {
-  const imageUrl = `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}`;
+export const fetchModImage = async (instanceId: string, modId: string, platform: string) => {
+  if (platform == null) return "";
+
+  const imageUrl = `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
   const image = await fetch(imageUrl);
 
   const imageNotPresent = image.status === 204;

@@ -504,6 +504,7 @@ impl From<ModFileMetadata> for domain::ModFileMetadata {
             description: value.description,
             authors: value.authors,
             modloaders: value.modloaders,
+            has_image: value.logo_file.is_some(),
         }
     }
 }

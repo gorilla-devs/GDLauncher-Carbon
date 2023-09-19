@@ -58,12 +58,15 @@ pub struct MetaCacheManager {
     scanned_instances: Mutex<HashSet<InstanceId>>,
     ignored_remote_cf_hashes: RwLock<HashSet<u32>>,
     ignored_remote_mr_hashes: RwLock<HashSet<String>>,
+    failed_cf_thumbs: RwLock<HashMap<i32, (std::time::Instant, u32)>>,
+    failed_mr_thumbs: RwLock<HashMap<String, (std::time::Instant, u32)>>,
     priority_instance: Mutex<Option<InstanceId>>,
     remote_instance: watch::Sender<Option<InstanceId>>,
     waiting_notify: watch::Sender<()>,
     // local cache notify, remote cache notify
     background_watches: OnceSend<(watch::Receiver<()>, watch::Receiver<Option<InstanceId>>)>,
     image_scale_semaphore: Semaphore,
+    image_download_semaphore: Semaphore,
 }
 
 impl Default for MetaCacheManager {
@@ -82,11 +85,14 @@ impl MetaCacheManager {
             scanned_instances: Mutex::new(HashSet::new()),
             ignored_remote_cf_hashes: RwLock::new(HashSet::new()),
             ignored_remote_mr_hashes: RwLock::new(HashSet::new()),
+            failed_cf_thumbs: RwLock::new(HashMap::new()),
+            failed_mr_thumbs: RwLock::new(HashMap::new()),
             priority_instance: Mutex::new(None),
             remote_instance: remote_tx,
             waiting_notify: local_tx,
             background_watches: OnceSend::new((local_rx, remote_rx)),
             image_scale_semaphore: Semaphore::new(num_cpus::get()),
+            image_download_semaphore: Semaphore::new(10),
         }
     }
 }
@@ -174,8 +180,29 @@ impl ManagerRef<'_, MetaCacheManager> {
         let app_local = self.app.clone();
         let app_cf = self.app.clone();
         let app_mr = self.app.clone();
+        let app_debounce = self.app.clone();
         let cf_remote_watch = remote_watch.clone();
-        let mr_remote_watch = remote_watch;
+        let mr_remote_watch = remote_watch.clone();
+        let debounce_remote_watch = remote_watch;
+
+        let (list_debounce_tx, mut list_debounce_rx) = mpsc::unbounded_channel::<()>();
+
+        let cf_list_debounce_tx = list_debounce_tx.clone();
+        let mr_list_debounce_tx = list_debounce_tx;
+
+        tokio::spawn(async move {
+            while list_debounce_rx.recv().await.is_some() {
+                let target_instance = (*debounce_remote_watch.borrow()).clone();
+
+                // clear notification queue
+                while list_debounce_rx.try_recv().is_ok() {}
+
+                if let Some(target_instance) = target_instance {
+                    app_debounce.invalidate(INSTANCE_MODS, Some(target_instance.0.into()));
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                }
+            }
+        });
 
         tokio::spawn(async move {
             let app = app_local;
@@ -339,6 +366,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         tokio::spawn(async move {
             let app = app_cf;
+            let list_debounce = &cf_list_debounce_tx;
             let mut remote_watch = cf_remote_watch;
 
             while remote_watch.changed().await.is_ok() {
@@ -402,13 +430,25 @@ impl ManagerRef<'_, MetaCacheManager> {
                         let app = &app;
                         let futures = modlist
                             .map(|(instance_id, filename, project_id, file_id, row)| async move {
+                                let mcm = app.meta_cache_manager();
+
+                                {
+                                    let fails = mcm.failed_cf_thumbs.read().await;
+                                    if let Some((time, _)) = fails.get(&project_id) {
+                                        if *time > std::time::Instant::now() {
+                                            return
+                                        } else {
+                                            mcm.failed_cf_thumbs.write().await.remove(&project_id);
+                                        }
+                                    }
+                                }
+
                                 let r = async {
-                                    let mcm = app.meta_cache_manager();
-                                    let guard = mcm
-                                        .image_scale_semaphore
+                                    let dl_guard = mcm
+                                        .image_download_semaphore
                                         .acquire()
                                         .await
-                                        .expect("the image scale semaphore is never closed");
+                                        .expect("the image download semaphore is never closed");
 
                                     debug!("thumbnailing curseforge mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
@@ -421,6 +461,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                                         .bytes()
                                         .await?;
 
+                                    drop(dl_guard);
+
+                                    let scale_guard = mcm
+                                        .image_scale_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image scale semaphore is never closed");
+
                                     let image = icon.to_vec();
 
                                     let image = tokio::task::spawn_blocking(move || {
@@ -429,7 +477,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     })
                                         .await??;
 
-                                    drop(guard);
+                                    drop(scale_guard);
 
                                     app.prisma_client.curse_forge_mod_image_cache()
                                         .update(
@@ -444,15 +492,27 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                                     debug!("saved curseforge mod thumbnail for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
+                                    let _ = list_debounce.send(());
                                     Ok::<_, anyhow::Error>(())
                                 }.await;
 
                                 if let Err(e) = r {
-                                    error!({ error = ?e }, "error downloading mod icon for {}", row.metadata_id)
+                                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id}, image url: {})", row.url);
+
+                                    let mut fails = mcm.failed_cf_thumbs.write().await;
+                                    fails.entry(project_id)
+                                        .and_modify(|v| *v = (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
+                                            v.1 + 1,
+                                        ))
+                                        .or_insert_with(|| (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(2),
+                                            1
+                                        ));
                                 }
                             });
 
-                        futures::future::join_all(futures).await;
+                        futures::future::join_all(futures).await.into_iter();
                     };
 
                     let fut = async {
@@ -501,6 +561,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         )>();
 
                         let app_db = app.clone();
+                        let list_debounce = list_debounce.clone();
                         tokio::spawn(async move {
                             while let Some((fingerprints, batch, fp_response, mods_response)) =
                                 batch_rx.recv().await
@@ -547,7 +608,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     });
 
                                 futures::future::join_all(futures).await;
-                                app_db.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+                                let _ = list_debounce.send(());
                             }
                         });
 
@@ -615,6 +676,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         tokio::spawn(async move {
             let app = app_mr;
+            let list_debounce = &mr_list_debounce_tx;
             let mut remote_watch = mr_remote_watch;
 
             while remote_watch.changed().await.is_ok() {
@@ -679,13 +741,25 @@ impl ManagerRef<'_, MetaCacheManager> {
                         let futures = modlist
                             .into_iter()
                             .map(|(instance_id, filename, project_id, version_id, row)| async move {
+                                let mcm = app.meta_cache_manager();
+
+                                {
+                                    let fails = mcm.failed_mr_thumbs.read().await;
+                                    if let Some((time, _)) = fails.get(&project_id) {
+                                        if *time > std::time::Instant::now() {
+                                            return
+                                        } else {
+                                            mcm.failed_mr_thumbs.write().await.remove(&project_id);
+                                        }
+                                    }
+                                }
+
                                 let r = async {
-                                    let mcm = app.meta_cache_manager();
-                                    let guard = mcm
-                                        .image_scale_semaphore
+                                    let dl_guard = mcm
+                                        .image_download_semaphore
                                         .acquire()
                                         .await
-                                        .expect("the image scale semaphore is never closed");
+                                        .expect("the image download semaphore is never closed");
 
                                     debug!("thumbnailing modrinth mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
 
@@ -698,6 +772,13 @@ impl ManagerRef<'_, MetaCacheManager> {
                                         .bytes()
                                         .await?;
 
+                                    drop(dl_guard);
+                                    let scale_guard = mcm
+                                        .image_scale_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image scale semaphore is never closed");
+
                                     let image = icon.to_vec();
 
                                     let image = tokio::task::spawn_blocking(move || {
@@ -706,7 +787,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     })
                                         .await??;
 
-                                    drop(guard);
+                                    drop(scale_guard);
 
                                     app.prisma_client.modrinth_mod_image_cache()
                                         .update(
@@ -721,15 +802,27 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                                     debug!("saved modrinth mod thumbnail for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
 
+                                    let _ = list_debounce.send(());
                                     Ok::<_, anyhow::Error>(())
                                 }.await;
 
                                 if let Err(e) = r {
-                                    error!({ error = ?e }, "error downloading mod icon for {}", row.metadata_id)
+                                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", row.url);
+
+                                    let mut fails = mcm.failed_mr_thumbs.write().await;
+                                    fails.entry(project_id)
+                                        .and_modify(|v| *v = (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
+                                            v.1 + 1,
+                                        ))
+                                        .or_insert_with(|| (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(2),
+                                            1
+                                        ));
                                 }
                             });
 
-                        futures::future::join_all(futures).await;
+                        futures::future::join_all(futures).await.into_iter();
                     };
 
                     let fut = async {
@@ -777,6 +870,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         )>();
 
                         let app_db = app.clone();
+                        let list_debounce = list_debounce.clone();
                         tokio::spawn(async move {
                             while let Some((sha512_hashes, batch, versions, projects, teams)) =
                                 batch_rx.recv().await
@@ -842,7 +936,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                                     });
 
                                 futures::future::join_all(futures).await;
-                                app_db.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+                                let _ = list_debounce.send(());
                             }
                         });
 
