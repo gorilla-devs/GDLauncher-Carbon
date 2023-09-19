@@ -706,7 +706,7 @@ struct InstanceDetails {
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
-    last_played: DateTime<Utc>,
+    last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     notes: String,
