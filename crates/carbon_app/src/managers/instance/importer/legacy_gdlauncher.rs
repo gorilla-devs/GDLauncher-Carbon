@@ -7,18 +7,14 @@ use tokio::{
 };
 
 use crate::{
-    api::{instance::import::FEEntity, keys, translation::Translation},
+    api::{instance::import::FEEntity, keys},
     domain::{
         instance::info::{
             CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },
-    managers::{
-        instance::InstanceVersionSource,
-        vtask::{Subtask, VisualTask},
-        AppInner,
-    },
+    managers::{instance::InstanceVersionSource, vtask::Subtask, AppInner},
 };
 
 use super::InstanceImporter;
@@ -72,7 +68,9 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
 
                 let config = tokio::fs::read_to_string(config).await?;
-                let Ok(config): Result<LegacyGDLauncherConfig, serde_json::Error> = serde_json::from_str(&config) else {
+                let Ok(config): Result<LegacyGDLauncherConfig, serde_json::Error> =
+                    serde_json::from_str(&config)
+                else {
                     tracing::info!(
                         "Failed to parse legacy gdlauncher config: {}",
                         child.path().display()
@@ -131,8 +129,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
             .and_then(|loader_type| {
                 let Some(ref loader_version) = instance.config.loader.loader_version else {
-                        return None;
-                    };
+                    return None;
+                };
 
                 Some(ModLoader {
                     type_: loader_type,
@@ -153,11 +151,10 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
 
                 let Some(project_id) = instance.config.loader.project_id else {
-                        return Err(anyhow::anyhow!("Missing project id"));
-
+                    return Err(anyhow::anyhow!("Missing project id"));
                 };
                 let Some(file_id) = instance.config.loader.file_id else {
-                        return Err(anyhow::anyhow!("Missing file id"));
+                    return Err(anyhow::anyhow!("Missing file id"));
                 };
 
                 let curseforge_modpack = CurseforgeModpack {
@@ -301,6 +298,7 @@ struct _Loader {
     source_name: Option<String>,
 }
 
+#[cfg(test)]
 mod test {
     use crate::managers::instance::importer::InstanceImporter;
 

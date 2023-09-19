@@ -141,7 +141,9 @@ impl GameLog {
     /// Get the first log entry before the given line
     pub fn get_entry(&self, line: usize) -> Option<LogEntry> {
         for i in (0..=line).rev() {
-            let Some(entry) = self.lines.get(i) else { return None };
+            let Some(entry) = self.lines.get(i) else {
+                return None;
+            };
 
             if let Some(entry) = entry {
                 return Some(LogEntry {
@@ -172,7 +174,9 @@ impl GameLog {
         };
 
         for i in (0..end).rev() {
-            let Some(entry) = self.lines.get(i) else { continue };
+            let Some(entry) = self.lines.get(i) else {
+                continue;
+            };
 
             if let Some(entry) = entry {
                 entries.push(LogEntry {

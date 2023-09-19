@@ -242,7 +242,7 @@ pub mod tempentry {
     }
 
     impl TempEntryType for File {
-        fn create(path: &Path) -> io::Result<()> {
+        fn create(_path: &Path) -> io::Result<()> {
             // files will be created on write
             Ok(())
         }

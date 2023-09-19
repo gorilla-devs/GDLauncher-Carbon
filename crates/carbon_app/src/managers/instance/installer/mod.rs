@@ -264,7 +264,12 @@ impl Installer {
                 .get(&instance_id)
                 .ok_or(InvalidInstanceIdError(instance_id))?;
 
-            let Instance { type_: InstanceType::Valid(data), shortpath, .. } = &instance else {
+            let Instance {
+                type_: InstanceType::Valid(data),
+                shortpath,
+                ..
+            } = &instance
+            else {
                 bail!("install called with invalid instance");
             };
 

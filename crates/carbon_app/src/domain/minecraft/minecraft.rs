@@ -37,7 +37,7 @@ pub fn libraries_into_vec_downloadable(
 
             let maven_path = library.name.into_path();
             let Ok(maven_url) = library.name.into_url(base_url) else {
-                continue
+                continue;
             };
 
             files.push(carbon_net::Downloadable {
@@ -187,9 +187,10 @@ pub fn chain_lwjgl_libs_with_base_libs(
                         artifact.path.clone()
                     } else if let Some(classifiers) = downloads.classifiers.as_ref() {
                         let Some(native_name) = library
-                        .natives
-                        .as_ref()
-                        .and_then(|natives| natives.get(&Os::native())) else {
+                            .natives
+                            .as_ref()
+                            .and_then(|natives| natives.get(&Os::native()))
+                        else {
                             return None;
                         };
 

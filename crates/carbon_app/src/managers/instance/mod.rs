@@ -7,7 +7,6 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
-use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
@@ -1393,7 +1392,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let InstanceType::Valid(data) = &instance.type_ else { return Ok(None) };
+        let InstanceType::Valid(data) = &instance.type_ else {
+            return Ok(None);
+        };
 
         match &data.config.icon {
             InstanceIcon::Default => Ok(None),

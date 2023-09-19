@@ -82,6 +82,7 @@ pub struct ModFileMetadata {
     pub description: Option<String>,
     pub authors: Option<String>,
     pub modloaders: Vec<info::ModLoaderType>,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +93,7 @@ pub struct CurseForgeModMetadata {
     pub urlslug: String,
     pub summary: String,
     pub authors: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,12 +101,10 @@ pub struct ModrinthModMetadata {
     pub project_id: String,
     pub version_id: String,
     pub title: String,
-    pub filename: String,
     pub urlslug: String,
     pub description: String,
     pub authors: String,
-    pub sha512: String,
-    pub sha1: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Copy, Clone)]

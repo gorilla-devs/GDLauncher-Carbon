@@ -28,9 +28,17 @@ const Mod = (props: Props) => {
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
+  const imagePlatform = () => {
+    if (props.mod.curseforge?.has_image) return "curseforge";
+    else if (props.mod.modrinth?.has_image) return "modrinth";
+    else if (props.mod.metadata?.has_image) return "metadata";
+    else return null;
+  };
+
   const [imageResource] = createResource(
-    () => [params.id, props.mod.id] as const,
-    ([instanceId, modId]) => fetchModImage(instanceId, modId)
+    () => [params.id, props.mod.id, imagePlatform()] as const,
+    ([instanceId, modId, platform]) =>
+      fetchModImage(instanceId, modId, platform)
   );
 
   const isCurseForge = () => props.mod.curseforge;
