@@ -20,6 +20,7 @@ import Row from "./components/Row";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
 import RightHandSide from "./components/RightHandSide";
+import { generateSequence } from "@/utils/helpers";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -95,7 +96,7 @@ const Java = () => {
         />
       </PageTitle>
       <RowsContainer>
-        <Row>
+        <Row class="flex-col items-stretch">
           <Title>
             <Trans
               key="java.java_memory_title"
@@ -104,18 +105,12 @@ const Java = () => {
               }}
             />
           </Title>
-          <RightHandSide class="flex w-86 gap box-content gap-12">
+          <div class="flex gap-4 justify-center items-center w-full">
             <Slider
               min={256}
               max={mbTotalRAM()}
               steps={1}
-              marks={{
-                256: "256MB",
-                [Math.round(mbTotalRAM() / 2)]: `${Math.round(
-                  mbTotalRAM() / 2
-                )}MB`,
-                [mbTotalRAM()]: `${mbTotalRAM()}MB`,
-              }}
+              marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
               onChange={(val) =>
                 settingsMutation.mutate({
@@ -132,7 +127,7 @@ const Java = () => {
                 });
               }}
             />
-          </RightHandSide>
+          </div>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
