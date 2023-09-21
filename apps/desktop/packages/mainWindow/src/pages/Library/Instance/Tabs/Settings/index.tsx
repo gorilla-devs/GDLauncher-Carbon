@@ -4,7 +4,7 @@ import { Trans } from "@gd/i18n";
 import { Button, Input, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
-import { Show, Suspense } from "solid-js";
+import { Show, Suspense, createMemo } from "solid-js";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import Title from "@/pages/Settings/components/Title";
 import Row from "@/pages/Settings/components/Row";
@@ -23,6 +23,12 @@ const Settings = () => {
   );
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const initialJavaArgs = createMemo((prev: string | null) => {
+    if (prev) return prev;
+
+    return routeData?.instanceDetails?.data?.extra_java_args as string | null;
+  }, null);
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
 
@@ -178,24 +184,7 @@ const Settings = () => {
             <Input
               class="w-full"
               value={routeData?.instanceDetails?.data?.extra_java_args || ""}
-              onInput={(e) => {
-                let value = e.target.value;
-                if (
-                  routeData?.instanceDetails?.data?.extra_java_args === value
-                ) {
-                  return;
-                }
-
-                queryClient.setQueryData(
-                  ["instance.getInstanceDetails"],
-                  (oldData: InstanceDetails | undefined) => {
-                    if (!oldData || oldData.extra_java_args === value) return;
-                    oldData.extra_java_args = value;
-                    return oldData;
-                  }
-                );
-              }}
-              onBlur={(e) => {
+              onChange={(e) => {
                 updateInstanceMutation.mutate({
                   memory: null,
                   extra_java_args: { Set: e.target.value },
@@ -213,6 +202,28 @@ const Settings = () => {
               rounded={false}
               type="secondary"
               class="h-10"
+              textColor="text-red-500"
+              onClick={() => {
+                updateInstanceMutation.mutate({
+                  memory: null,
+                  extra_java_args: { Set: initialJavaArgs() },
+                  global_java_args: null,
+                  modloader: null,
+                  name: null,
+                  notes: null,
+                  use_loaded_icon: null,
+                  version: null,
+                  instance: parseInt(params.id, 10),
+                });
+              }}
+            >
+              <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+            </Button>
+            <Button
+              rounded={false}
+              type="secondary"
+              class="h-10"
+              textColor="text-red-500"
               onClick={() => {
                 updateInstanceMutation.mutate({
                   memory: null,
@@ -227,7 +238,7 @@ const Settings = () => {
                 });
               }}
             >
-              <Trans key="java.reset_java_args" />
+              <i class="w-5 h-5 i-ri:close-fill" />
             </Button>
           </div>
         </Show>
