@@ -58,19 +58,19 @@ mod app {
     pub struct AppInner {
         settings_manager: SettingsManager,
         java_manager: JavaManager,
-        pub(crate) minecraft_manager: MinecraftManager,
+        minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
-        pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
+        invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
         instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
-        pub(crate) metrics_manager: MetricsManager,
-        pub(crate) modplatforms_manager: ModplatformsManager,
+        metrics_manager: MetricsManager,
+        modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub(crate) task_manager: VisualTaskManager,
-        pub(crate) system_info_manager: SystemInfoManager,
-        pub(crate) rich_presence_manager: rich_presence::RichPresenceManager,
+        task_manager: VisualTaskManager,
+        system_info_manager: SystemInfoManager,
+        rich_presence_manager: rich_presence::RichPresenceManager,
     }
 
     macro_rules! manager_getter {
