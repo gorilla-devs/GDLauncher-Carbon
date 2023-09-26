@@ -125,8 +125,7 @@ where
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
 
-        // Attempt to canonicalize path
-        let resolved_java_path = match tokio::fs::canonicalize(local_java).await {
+        let resolved_java_path = match dunce::canonicalize(local_java) {
             Ok(canonical_path) => canonical_path,
             Err(err) => {
                 tracing::warn!("Error resolving canonical java path: {}", err);

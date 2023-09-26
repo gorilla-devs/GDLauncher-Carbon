@@ -85,7 +85,7 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     javas.dedup();
     javas
         .into_iter()
-        .map(|p| match p.canonicalize() {
+        .map(|p| match dunce::canonicalize(&p) {
             Ok(p) => p,
             Err(_) => p,
         })
@@ -231,7 +231,7 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
 
     javas
         .into_iter()
-        .map(|p| match p.canonicalize() {
+        .map(|p| match dunce::canonicalize(&p) {
             Ok(p) => p,
             Err(_) => p,
         })
@@ -276,7 +276,7 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
 
     javas
         .into_iter()
-        .map(|p| match p.canonicalize() {
+        .map(|p| match dunce::canonicalize(&p) {
             Ok(p) => p,
             Err(_) => p,
         })
