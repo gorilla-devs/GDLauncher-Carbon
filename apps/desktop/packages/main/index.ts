@@ -22,6 +22,7 @@ import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
+import "./runtimePath";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();

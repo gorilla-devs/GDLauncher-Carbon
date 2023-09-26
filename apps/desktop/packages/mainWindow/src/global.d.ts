@@ -39,6 +39,7 @@ declare global {
     openCMPWindow: () => void;
     getCoreModulePort: () => Promise<number>;
     getCurrentOS: () => Promise<{ platform: string; arch: string }>;
+    changeRuntimePath: (newPath: string) => Promise<void>;
   }
 }
 

@@ -55,6 +55,7 @@
     "eslint-plugin-solid": "^0.9.1",
     "event-lite": "^0.1.2",
     "fast-xml-parser": "^4.1.2",
+    "fs-extra": "^11.1.1",
     "jsdom": "^20.0.3",
     "marked": "^5.1.1",
     "playwright": "^1.29.1",

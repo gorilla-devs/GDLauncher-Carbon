@@ -3,6 +3,10 @@ import * as Sentry from "@sentry/electron/main";
 import fs from "fs";
 import path from "path";
 import handleUncaughtException from "./handleUncaughtException";
+import {
+  INITIAL_RUNTIME_PATH,
+  RUNTIME_PATH_OVERRIDE_NAME,
+} from "./runtimePath";
 
 const args = process.argv.slice(1);
 
@@ -38,13 +42,20 @@ if (app.isPackaged) {
     app.setPath("userData", overrideDataPath?.value);
   } else {
     const userData = path.join(app.getPath("appData"), "gdlauncher_carbon");
-    const runtimeOverridePath = path.join(userData, "runtime_path_override");
+
+    INITIAL_RUNTIME_PATH.value = userData;
+
+    const runtimeOverridePath = path.join(userData, RUNTIME_PATH_OVERRIDE_NAME);
 
     const runtimePathExists = fs.existsSync(runtimeOverridePath);
 
+    let override: string | null = null;
     if (runtimePathExists) {
-      const override = fs.readFileSync(runtimeOverridePath);
-      app.setPath("userData", override.toString());
+      override = fs.readFileSync(runtimeOverridePath).toString();
+    }
+
+    if (override) {
+      app.setPath("userData", override);
     } else {
       app.setPath("userData", userData);
     }
@@ -57,6 +68,7 @@ if (app.isPackaged) {
 
   app.setPath("userData", userData);
 }
+
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );
