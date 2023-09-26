@@ -11,13 +11,10 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{
-        instance::InstanceVersionSource,
-        AppInner,
-    },
+    managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::{InstanceImporter, ImportScanStatus, ImportableInstance, InvalidImportEntry};
+use super::{ImportScanStatus, ImportableInstance, InstanceImporter, InvalidImportEntry};
 
 #[derive(Debug)]
 enum State {
@@ -41,9 +38,7 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
-        Self {
-            name: value.name,
-        }
+        Self { name: value.name }
     }
 }
 
@@ -71,27 +66,23 @@ impl LegacyGDLauncherImporter {
     async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<ImportEntry>> {
         let config = path.join("config.json");
         if !config.is_file() {
-            return Ok(None)
+            return Ok(None);
         }
 
         let config = tokio::fs::read_to_string(config).await?;
         let config = serde_json::from_str::<LegacyGDLauncherConfig>(&config);
-        let name = path.file_name().expect("filename cannot be empty").to_string_lossy().to_string();
+        let name = path
+            .file_name()
+            .expect("filename cannot be empty")
+            .to_string_lossy()
+            .to_string();
 
         match config {
-            Ok(config) => {
-                Ok(Some(ImportEntry::Valid(Importable {
-                    name,
-                    path,
-                    config,
-                })))
-            },
-            Err(_) => {
-                Ok(Some(ImportEntry::Invalid(InvalidImportEntry {
-                    name,
-                    reason: Translation::InstanceImportLegacyBadConfigFile,
-                })))
-            }
+            Ok(config) => Ok(Some(ImportEntry::Valid(Importable { name, path, config }))),
+            Err(_) => Ok(Some(ImportEntry::Invalid(InvalidImportEntry {
+                name,
+                reason: Translation::InstanceImportLegacyBadConfigFile,
+            }))),
         }
     }
 }
@@ -100,7 +91,7 @@ impl LegacyGDLauncherImporter {
 impl InstanceImporter for LegacyGDLauncherImporter {
     async fn scan(&self, _app: &Arc<AppInner>, mut scan_path: PathBuf) -> anyhow::Result<()> {
         if !scan_path.is_dir() {
-            return Ok(())
+            return Ok(());
         }
 
         let override_path = scan_path.join("override.data");
@@ -121,7 +112,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
         if instances_path.is_dir() {
             let Ok(mut instances) = tokio::fs::read_dir(&instances_path).await else {
-                return Ok(())
+                return Ok(());
             };
 
             while let Some(instance) = instances.next_entry().await? {
@@ -158,17 +149,22 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         match &*self.state.read().await {
             State::None => ImportScanStatus::NoResults,
             State::Single(result) => ImportScanStatus::SingleResult(result.clone().into()),
-            State::Multi(results) => ImportScanStatus::MultiResult(results.iter().map(|r| r.clone().into()).collect()),
+            State::Multi(results) => {
+                ImportScanStatus::MultiResult(results.iter().map(|r| r.clone().into()).collect())
+            }
         }
     }
 
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
         let instance = match &*self.state.read().await {
             State::Single(ImportEntry::Valid(entry)) if index == 0 => Some(entry.clone()),
-            State::Multi(entries) => entries.get(index as usize).map(|r| match r {
-                ImportEntry::Valid(entry) => Some(entry.clone()),
-                _ => None,
-            }).flatten(),
+            State::Multi(entries) => entries
+                .get(index as usize)
+                .map(|r| match r {
+                    ImportEntry::Valid(entry) => Some(entry.clone()),
+                    _ => None,
+                })
+                .flatten(),
             _ => None,
         };
 
@@ -182,8 +178,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
             .and_then(|loader_type| {
                 let Some(ref loader_version) = instance.config.loader.loader_version else {
-                        return None;
-                    };
+                    return None;
+                };
 
                 Some(ModLoader {
                     type_: loader_type,
@@ -204,11 +200,10 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
 
                 let Some(project_id) = instance.config.loader.project_id else {
-                        return Err(anyhow!("Missing project id"));
-
+                    return Err(anyhow!("Missing project id"));
                 };
                 let Some(file_id) = instance.config.loader.file_id else {
-                        return Err(anyhow!("Missing file id"));
+                    return Err(anyhow!("Missing file id"));
                 };
 
                 let curseforge_modpack = CurseforgeModpack {
@@ -216,7 +211,10 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     file_id: file_id as u32,
                 };
 
-                break 'a InstanceVersionSource::ModpackWithKnownVersion(standard_version, Modpack::Curseforge(curseforge_modpack));
+                break 'a InstanceVersionSource::ModpackWithKnownVersion(
+                    standard_version,
+                    Modpack::Curseforge(curseforge_modpack),
+                );
             } else {
                 break 'a InstanceVersionSource::Version(standard_version);
             }
@@ -232,38 +230,49 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             let instance = &instance;
             async move {
                 let path = instance_path.join("instance");
-                tokio::fs::write(instance_path.join(".first_run_incomplete"), "skip-modpack-init").await?;
+                tokio::fs::write(
+                    instance_path.join(".first_run_incomplete"),
+                    "skip-modpack-init",
+                )
+                .await?;
 
                 // create copy-filter function in file utils for all importers
-                crate::domain::runtime_path::copy_dir_filter(
-                    &instance.path,
-                    &path,
-                    |path| match path.to_str() {
-                        Some(
-                            | "config.json"
-                            | "manifest.json"
-                            | "installing.lock"
-                            | "natives"
-                        ) => false,
-                        Some(p) if Some(p) == instance.config.background.as_ref().map(|x| x.as_str()) => false,
+                crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
+                    match path.to_str() {
+                        Some("config.json" | "manifest.json" | "installing.lock" | "natives") => {
+                            false
+                        }
+                        Some(p)
+                            if Some(p)
+                                == instance.config.background.as_ref().map(|x| x.as_str()) =>
+                        {
+                            false
+                        }
                         _ => true,
-                    },
-                ).await?;
+                    }
+                })
+                .await?;
 
                 Ok(())
             }
         };
 
-        let id = app.instance_manager().create_instance_ext(
-            app.instance_manager().get_default_group().await?,
-            instance.name.clone(),
-            instance.config.background.is_some(),
-            instance_version_source,
-            String::new(),
-            initializer,
-        ).await?;
+        let id = app
+            .instance_manager()
+            .create_instance_ext(
+                app.instance_manager().get_default_group().await?,
+                instance.name.clone(),
+                instance.config.background.is_some(),
+                instance_version_source,
+                String::new(),
+                initializer,
+            )
+            .await?;
 
-        app.instance_manager().prepare_game(id, None, None).await.map(|r| r.1)
+        app.instance_manager()
+            .prepare_game(id, None, None)
+            .await
+            .map(|r| r.1)
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{sync::Arc, path::PathBuf};
+use std::{path::PathBuf, sync::Arc};
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     api::vtask::FETaskId,
     managers::{
-        instance::importer::{self, Entity, ImportScanStatus, ImportEntry},
+        instance::importer::{self, Entity, ImportEntry, ImportScanStatus},
         AppInner,
     },
 };
@@ -81,28 +81,38 @@ pub struct FEImportInstance {
     pub index: u32,
 }
 
-pub async fn scan_importable_instances(app: Arc<AppInner>, _entity: FEEntity) -> anyhow::Result<()> {
+pub async fn scan_importable_instances(
+    app: Arc<AppInner>,
+    _entity: FEEntity,
+) -> anyhow::Result<()> {
     app.instance_manager()
         .import_manager()
-        .set_scan_target(Some((Entity::LegacyGDLauncher, PathBuf::from("/home/admin/lpwinsync/gdlauncher_next"))))
+        .set_scan_target(Some((
+            Entity::LegacyGDLauncher,
+            PathBuf::from("/home/admin/lpwinsync/gdlauncher_next"),
+        )))
 }
 
 pub async fn get_importable_instances(
     app: Arc<AppInner>,
     _entity: FEEntity,
 ) -> anyhow::Result<Vec<FEImportableInstance>> {
-    let status = app.instance_manager()
+    let status = app
+        .instance_manager()
         .import_manager()
         .scan_status()
         .await?;
 
     let v = match status.status {
         ImportScanStatus::SingleResult(ImportEntry::Valid(r)) => vec![r.into()],
-        ImportScanStatus::MultiResult(r) => r.into_iter()
+        ImportScanStatus::MultiResult(r) => r
+            .into_iter()
             .filter_map(|r| match r {
                 ImportEntry::Valid(r) => Some(r),
                 _ => None,
-            }).map(Into::into).collect(),
+            })
+            .map(Into::into)
+            .collect(),
         _ => vec![],
     };
 
@@ -113,7 +123,8 @@ pub async fn import_instance(
     app: Arc<AppInner>,
     args: FEImportInstance,
 ) -> anyhow::Result<FETaskId> {
-    Ok(app.instance_manager()
+    Ok(app
+        .instance_manager()
         .import_manager()
         .begin_import(args.index)
         .await?

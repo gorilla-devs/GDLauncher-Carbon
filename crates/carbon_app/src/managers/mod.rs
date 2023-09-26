@@ -135,7 +135,10 @@ mod app {
             let _app = app.clone();
             tokio::spawn(async move {
                 _app.meta_cache_manager().launch_background_tasks().await;
-                _app.clone().instance_manager().launch_background_tasks().await;
+                _app.clone()
+                    .instance_manager()
+                    .launch_background_tasks()
+                    .await;
             });
 
             let _app = app.clone();

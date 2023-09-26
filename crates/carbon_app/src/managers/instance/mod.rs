@@ -11,8 +11,8 @@ use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use fs_extra::dir::CopyOptions;
-use futures::Future;
 use futures::future::BoxFuture;
+use futures::Future;
 
 use prisma_client_rust::Direction;
 use rspc::Type;
@@ -835,14 +835,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        self.create_instance_ext(
-            group,
-            name,
-            use_loaded_icon,
-            version,
-            notes,
-            |_| async { Ok(()) },
-        ).await
+        self.create_instance_ext(group, name, use_loaded_icon, version, notes, |_| async {
+            Ok(())
+        })
+        .await
     }
 
     pub async fn create_instance_ext<F, I>(
@@ -882,7 +878,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (version, modpack) = match version {
             InstanceVersionSource::Version(version) => (Some(version), None),
             InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
-            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => (Some(version), Some(modpack)),
+            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => {
+                (Some(version), Some(modpack))
+            }
         };
 
         let info = info::Instance {
@@ -1425,7 +1423,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let InstanceType::Valid(data) = &instance.type_ else { return Ok(None) };
+        let InstanceType::Valid(data) = &instance.type_ else {
+            return Ok(None);
+        };
 
         match &data.config.icon {
             InstanceIcon::Default => Ok(None),

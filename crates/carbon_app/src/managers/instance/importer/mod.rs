@@ -1,4 +1,4 @@
-use std::{sync::Arc, path::PathBuf};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,11 @@ use strum_macros::EnumIter;
 use tokio::sync::{watch, RwLock};
 use tracing::debug;
 
-use crate::{domain::vtask::VisualTaskId, managers::{AppInner, ManagerRef}, api::translation::Translation};
+use crate::{
+    api::translation::Translation,
+    domain::vtask::VisualTaskId,
+    managers::{AppInner, ManagerRef},
+};
 
 use self::legacy_gdlauncher::LegacyGDLauncherImporter;
 
@@ -31,7 +35,8 @@ impl InstanceImportManager {
 
 impl ManagerRef<'_, InstanceImportManager> {
     pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {
-        self.scan_path.send(path)
+        self.scan_path
+            .send(path)
             .map_err(|_| anyhow!("import scanning background task has died"))?;
 
         Ok(())
@@ -53,7 +58,7 @@ impl ManagerRef<'_, InstanceImportManager> {
                             .write()
                             .await = None;
 
-                        break
+                        break;
                     };
 
                     let scanner = entity.create_importer();
@@ -75,7 +80,7 @@ impl ManagerRef<'_, InstanceImportManager> {
                     let target_changed = async {
                         while rx.changed().await.is_ok() {
                             if matches!(&*rx.borrow(), Some((e, p)) if e == &entity && p == &path) {
-                                break
+                                break;
                             }
                         }
                     };
@@ -139,7 +144,7 @@ impl Entity {
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
         match self {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }
