@@ -60,7 +60,7 @@ reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
 serde = "1.0.147"
 serde_json = "1.0.89"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "6db55f002e15ea28b0eaac4eff897e73bbc8febd" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "5ab34fb44f5b37d0ac2df9e9dfdb12039cd3117e" }
 sha1 = "0.10.5"
 sha2 = "0.10.6"
 tar = "0.4.38"
