@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::{App, AppInner, instance::importer};
+use crate::managers::{instance::importer, App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
@@ -1254,9 +1254,7 @@ impl From<ImportEntity> for importer::Entity {
 
 impl From<importer::ImportableInstance> for ImportableInstance {
     fn from(value: importer::ImportableInstance) -> Self {
-        Self {
-            name: value.name,
-        }
+        Self { name: value.name }
     }
 }
 

@@ -64,10 +64,10 @@ impl LegacyGDLauncherImporter {
     }
 
     pub fn get_default_scan_path() -> anyhow::Result<PathBuf> {
-       Ok(directories::BaseDirs::new()
-           .ok_or(anyhow!("Cannot build basedirs"))?
-           .data_dir()
-           .join("gdlauncher_next"))
+        Ok(directories::BaseDirs::new()
+            .ok_or(anyhow!("Cannot build basedirs"))?
+            .data_dir()
+            .join("gdlauncher_next"))
     }
 
     async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<ImportEntry>> {
