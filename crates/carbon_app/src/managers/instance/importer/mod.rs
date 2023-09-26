@@ -147,6 +147,13 @@ impl Entity {
             _ => todo!(),
         }
     }
+
+    pub fn get_default_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
+        Ok(match self {
+            Self::LegacyGDLauncher => Some(LegacyGDLauncherImporter::get_default_scan_path()?),
+            _ => None,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -180,7 +187,6 @@ pub struct FullImportScanStatus {
 #[async_trait::async_trait]
 pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
-    async fn get_default_scan_path(&self, app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>>;
     async fn get_status(&self) -> ImportScanStatus;
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
 }

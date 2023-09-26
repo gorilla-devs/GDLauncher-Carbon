@@ -63,6 +63,13 @@ impl LegacyGDLauncherImporter {
         }
     }
 
+    pub fn get_default_scan_path() -> anyhow::Result<PathBuf> {
+       Ok(directories::BaseDirs::new()
+           .ok_or(anyhow!("Cannot build basedirs"))?
+           .data_dir()
+           .join("gdlauncher_next"))
+    }
+
     async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<ImportEntry>> {
         let config = path.join("config.json");
         if !config.is_file() {
@@ -134,15 +141,6 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         }
 
         Ok(()) // TODO: invalidate on iter
-    }
-
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        Ok(Some(
-            directories::BaseDirs::new()
-                .ok_or(anyhow!("Cannot build basedirs"))?
-                .data_dir()
-                .join("gdlauncher_next"),
-        ))
     }
 
     async fn get_status(&self) -> ImportScanStatus {
