@@ -58,7 +58,7 @@ mod app {
     pub struct AppInner {
         settings_manager: SettingsManager,
         java_manager: JavaManager,
-        minecraft_manager: MinecraftManager,
+        pub(crate) minecraft_manager: MinecraftManager,
         account_manager: AccountManager,
         pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,

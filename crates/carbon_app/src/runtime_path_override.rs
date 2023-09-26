@@ -20,5 +20,8 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
         }
     }
 
-    path.expect("Runtime path not found").join("data")
+    path.expect("Runtime path not found")
+        .canonicalize()
+        .unwrap()
+        .join("data")
 }

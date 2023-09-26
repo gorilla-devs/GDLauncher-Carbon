@@ -5,7 +5,9 @@ use tracing::{trace, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
-    domain::java::{JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName},
+    domain::java::{
+        JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
+    },
 };
 
 use super::{discovery::Discovery, java_checker::JavaChecker};
@@ -299,13 +301,15 @@ where
 pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
     let all_javas = db.java().find_many(vec![]).exec().await?;
 
+    let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
+
     for profile in SystemJavaProfileName::iter() {
         trace!("Syncing system java profile: {}", profile.to_string());
         let java_in_profile = db
             .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(profile.to_string()),
-            )
+            .find_unique(crate::db::java_system_profile::name::equals(
+                profile.to_string(),
+            ))
             .exec()
             .await?
             .ok_or_else(|| {
@@ -333,7 +337,14 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
             }
 
             let java_version = JavaVersion::try_from(java.full_version.as_str())?;
-            if profile.is_java_version_compatible(&java_version) {
+            let java_arch = JavaArch::try_from(java.arch.as_str())?;
+
+            let is_arch_allowed = match java_arch {
+                JavaArch::X86_32 | JavaArch::Arm32 => is32bit,
+                _ => true,
+            };
+
+            if profile.is_java_version_compatible(&java_version) && is_arch_allowed {
                 trace!(
                     "Java {} is compatible with profile {}",
                     java.path,
@@ -341,11 +352,9 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                 );
                 db.java_system_profile()
                     .update(
-                        crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                            profile.to_string(),
-                        ),
-                        vec![crate::db::java_system_profile::SetParam::ConnectJava(
-                            crate::db::java::UniqueWhereParam::IdEquals(java.id.clone()),
+                        crate::db::java_system_profile::name::equals(profile.to_string()),
+                        vec![crate::db::java_system_profile::java::connect(
+                            crate::db::java::id::equals(java.id.clone()),
                         )],
                     )
                     .exec()
