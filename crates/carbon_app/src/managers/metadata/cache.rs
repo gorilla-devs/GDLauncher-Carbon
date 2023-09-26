@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::io::Read;
-use std::io::Seek;
 use std::path::PathBuf;
 use std::usize;
 
@@ -16,6 +15,7 @@ use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
+use tokio::sync::Semaphore;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -34,6 +34,7 @@ use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
 use crate::domain::modplatforms::curseforge::Mod;
 
+use crate::domain::modplatforms::modrinth::project::Project;
 use crate::domain::modplatforms::modrinth::responses::ProjectsResponse;
 use crate::domain::modplatforms::modrinth::responses::TeamResponse;
 use crate::domain::modplatforms::modrinth::responses::VersionHashesResponse;
@@ -47,8 +48,8 @@ use crate::managers::ManagerRef;
 use crate::once_send::OnceSend;
 
 use crate::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
+    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
 };
 use itertools::Itertools;
 
@@ -57,11 +58,15 @@ pub struct MetaCacheManager {
     scanned_instances: Mutex<HashSet<InstanceId>>,
     ignored_remote_cf_hashes: RwLock<HashSet<u32>>,
     ignored_remote_mr_hashes: RwLock<HashSet<String>>,
+    failed_cf_thumbs: RwLock<HashMap<i32, (std::time::Instant, u32)>>,
+    failed_mr_thumbs: RwLock<HashMap<String, (std::time::Instant, u32)>>,
     priority_instance: Mutex<Option<InstanceId>>,
     remote_instance: watch::Sender<Option<InstanceId>>,
     waiting_notify: watch::Sender<()>,
     // local cache notify, remote cache notify
     background_watches: OnceSend<(watch::Receiver<()>, watch::Receiver<Option<InstanceId>>)>,
+    image_scale_semaphore: Semaphore,
+    image_download_semaphore: Semaphore,
 }
 
 impl Default for MetaCacheManager {
@@ -80,10 +85,14 @@ impl MetaCacheManager {
             scanned_instances: Mutex::new(HashSet::new()),
             ignored_remote_cf_hashes: RwLock::new(HashSet::new()),
             ignored_remote_mr_hashes: RwLock::new(HashSet::new()),
+            failed_cf_thumbs: RwLock::new(HashMap::new()),
+            failed_mr_thumbs: RwLock::new(HashMap::new()),
             priority_instance: Mutex::new(None),
             remote_instance: remote_tx,
             waiting_notify: local_tx,
             background_watches: OnceSend::new((local_rx, remote_rx)),
+            image_scale_semaphore: Semaphore::new(num_cpus::get()),
+            image_download_semaphore: Semaphore::new(10),
         }
     }
 }
@@ -171,8 +180,29 @@ impl ManagerRef<'_, MetaCacheManager> {
         let app_local = self.app.clone();
         let app_cf = self.app.clone();
         let app_mr = self.app.clone();
+        let app_debounce = self.app.clone();
         let cf_remote_watch = remote_watch.clone();
-        let mr_remote_watch = remote_watch;
+        let mr_remote_watch = remote_watch.clone();
+        let debounce_remote_watch = remote_watch;
+
+        let (list_debounce_tx, mut list_debounce_rx) = mpsc::unbounded_channel::<()>();
+
+        let cf_list_debounce_tx = list_debounce_tx.clone();
+        let mr_list_debounce_tx = list_debounce_tx;
+
+        tokio::spawn(async move {
+            while list_debounce_rx.recv().await.is_some() {
+                let target_instance = (*debounce_remote_watch.borrow()).clone();
+
+                // clear notification queue
+                while list_debounce_rx.try_recv().is_ok() {}
+
+                if let Some(target_instance) = target_instance {
+                    app_debounce.invalidate(INSTANCE_MODS, Some(target_instance.0.into()));
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                }
+            }
+        });
 
         tokio::spawn(async move {
             let app = app_local;
@@ -200,14 +230,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                         (false, next.and_then(|n| waiting.take(&n)))
                     };
 
-                    let Some(instance_id) = instance_id else { break };
+                    let Some(instance_id) = instance_id else {
+                        break;
+                    };
                     info!(
                         { priority },
                         "recaching instance mod metadata for {instance_id}"
                     );
 
                     let instances = instance_manager.instances.read().await;
-                    let Some(instance) = instances.get(&instance_id) else { continue };
+                    let Some(instance) = instances.get(&instance_id) else {
+                        continue;
+                    };
 
                     let cache_app = app.clone();
                     let cached_entries = tokio::spawn(async move {
@@ -242,7 +276,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                     while let Ok(Some(entry)) = entries.next_entry().await {
                         trace!("scanning mods folder entry `{:?}`", entry.file_name());
                         let file_name = entry.file_name();
-                        let Some(mut utf8_name) = file_name.to_str() else { continue };
+                        let Some(mut utf8_name) = file_name.to_str() else {
+                            continue;
+                        };
 
                         let is_jar = utf8_name.ends_with(".jar");
                         let is_jar_disabled = utf8_name.ends_with(".jar.disabled");
@@ -255,7 +291,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                             utf8_name = utf8_name.strip_suffix(".disabled").unwrap();
                         }
 
-                        let Ok(metadata) = entry.metadata().await else { continue };
+                        let Ok(metadata) = entry.metadata().await else {
+                            continue;
+                        };
                         // file || symlink
                         if metadata.is_dir() {
                             continue;
@@ -264,8 +302,6 @@ impl ManagerRef<'_, MetaCacheManager> {
                         trace!("tracking mod `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(utf8_name.to_string(), (!is_jar_disabled, metadata.len()));
                     }
-
-                    let mut dirty_cache = Vec::<fcdb::UniqueWhereParam>::new();
 
                     if let Ok(Ok(cached_entries)) = cached_entries.await {
                         for entry in cached_entries {
@@ -286,180 +322,25 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 "outdated metadata entry for mod `{}`, adding to update list",
                                 &entry.filename
                             );
-
-                            dirty_cache.push(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
-                                *instance_id,
-                                entry.filename,
-                            ));
                         }
                     }
 
-                    let entry_futures =
-                        modpaths.into_iter().map(|(subpath, (enabled, filesize))| {
-                            let pathbuf = &pathbuf;
-                            let db = &app.prisma_client;
-                            async move {
-                                let mut path = pathbuf.join(&subpath);
-                                if !enabled {
-                                    path.set_extension("jar.disabled");
-                                }
+                    let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
+                        let app = &app;
+                        let pathbuf = &pathbuf;
 
-                                let content = tokio::fs::read(path).await?;
-                                let (content, sha512, meta, murmur2) =
-                                    tokio::task::spawn_blocking(move || {
-                                        let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
-                                        let meta = super::mods::parse_metadata(Cursor::new(&content));
+                        async move {
+                            app.meta_cache_manager()
+                                .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
+                                .await
+                                .map(|_| ())
+                        }
+                    });
 
-                                        // curseforge's api removes whitespace in murmur2 hashes
-                                        let mut murmur_content = content.clone();
-                                        murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                                        let murmur2 = murmurhash32::murmurhash2(&murmur_content);
-
-                                        (
-                                            content,
-                                            sha512,
-                                            meta,
-                                            murmur2,
-                                        )
-                                    })
-                                    .await?;
-
-                                let meta = meta?;
-
-                                let dbmeta = db
-                                    .mod_metadata()
-                                    // just check both hashes for now
-                                    .find_first(vec![
-                                        metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(
-                                            sha512,
-                                        ))),
-                                        metadb::WhereParam::Murmur2(IntFilter::Equals(
-                                            murmur2 as i32,
-                                        )),
-                                    ])
-                                    .exec()
-                                    .await?;
-
-
-                                let (meta_id, meta, logo_data) = match dbmeta {
-                                    Some(dbmeta) => (dbmeta.id, None, None),
-                                    None => {
-                                        let logo_data = 'logo: {
-                                            let Some(meta) = &meta else { break 'logo None };
-
-                                            let logo_data = (|| {
-                                                let Some(logo_file) = &meta.logo_file else { return Ok(None) };
-                                                let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
-                                                let Ok(mut file) = zip.by_name(logo_file) else { return Ok(None) };
-                                                let mut image = Vec::with_capacity(file.size() as usize);
-                                                file.read_to_end(&mut image)?;
-                                                let scaled = scale_mod_image(&image[..])?;
-                                                Ok::<_, anyhow::Error>(Some(scaled))
-                                            })();
-
-                                            match logo_data {
-                                                Ok(data) => data,
-                                                Err(e) => {
-                                                    error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
-                                                    None
-                                                },
-                                            }
-                                        };
-
-
-                                        (Uuid::new_v4().to_string(), Some(meta), logo_data)
-                                    },
-                                };
-
-                                Ok::<_, anyhow::Error>(Some((
-                                    subpath, filesize, enabled, sha512, murmur2, meta_id, meta, logo_data,
-                                )))
-                            }
-                        });
-
-                    let (new_fc_entries, new_meta_entries): (_, Vec<_>) =
-                        futures::future::join_all(entry_futures)
-                            .await
-                            .into_iter()
-                            .filter_map(|m| m.unwrap_or(None))
-                            .map(
-                                |(
-                                    subpath,
-                                    filesize,
-                                    enabled,
-                                    sha512,
-                                    murmur2,
-                                    meta_id,
-                                    meta,
-                                    logo_data,
-                                )| {
-                                    (
-                                        (
-                                            *instance_id,
-                                            subpath,
-                                            filesize as i32,
-                                            enabled,
-                                            meta_id.clone(),
-                                            Vec::new(),
-                                        ),
-                                        meta.map(|meta| {
-                                            (
-                                                meta_id,
-                                                murmur2 as i32,
-                                                Vec::from(sha512),
-                                                meta.as_ref()
-                                                    .map(|meta| &meta.modloaders)
-                                                    .map(|vec| {
-                                                        vec.iter().map(|m| m.to_string()).join(",")
-                                                    })
-                                                    .unwrap_or(String::new()),
-                                                match meta {
-                                                    Some(meta) => vec![
-                                                        metadb::SetParam::SetName(meta.name),
-                                                        metadb::SetParam::SetModid(Some(
-                                                            meta.modid,
-                                                        )),
-                                                        metadb::SetParam::SetVersion(meta.version),
-                                                        metadb::SetParam::SetDescription(
-                                                            meta.description,
-                                                        ),
-                                                        metadb::SetParam::SetAuthors(meta.authors),
-                                                        metadb::SetParam::SetLogoImage(logo_data),
-                                                    ],
-
-                                                    // Prisma sucks and is generating invalid sql.
-                                                    // As a workaround, all the defaults are explicitly set manually.
-                                                    None => vec![
-                                                        metadb::SetParam::SetName(None),
-                                                        metadb::SetParam::SetModid(None),
-                                                        metadb::SetParam::SetVersion(None),
-                                                        metadb::SetParam::SetDescription(None),
-                                                        metadb::SetParam::SetAuthors(None),
-                                                        metadb::SetParam::SetLogoImage(None),
-                                                    ],
-                                                },
-                                            )
-                                        }),
-                                    )
-                                },
-                            )
-                            .unzip();
-
-                    let r = app
-                        .prisma_client
-                        ._batch((
-                            dirty_cache
-                                .into_iter()
-                                .map(|id| app.prisma_client.mod_file_cache().delete(id))
-                                .collect::<Vec<_>>(),
-                            app.prisma_client
-                                .mod_metadata()
-                                .create_many(new_meta_entries.into_iter().flatten().collect()),
-                            app.prisma_client
-                                .mod_file_cache()
-                                .create_many(new_fc_entries),
-                        ))
-                        .await;
+                    let r = futures::future::join_all(entry_futures)
+                        .await
+                        .into_iter()
+                        .collect::<anyhow::Result<()>>();
 
                     if let Err(e) = r {
                         error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
@@ -485,13 +366,154 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         tokio::spawn(async move {
             let app = app_cf;
+            let list_debounce = &cf_list_debounce_tx;
             let mut remote_watch = cf_remote_watch;
 
             while remote_watch.changed().await.is_ok() {
                 loop {
                     debug!("remote watch target updated (curseforge)");
-                    let Some(instance_id) = *remote_watch.borrow() else { break };
+                    let Some(instance_id) = *remote_watch.borrow() else {
+                        break;
+                    };
                     info!("updating curseforge metadata cache for instance {instance_id}");
+
+                    let icons_fut = async {
+                        let modlist =
+                            app.prisma_client
+                                .mod_file_cache()
+                                .find_many(vec![
+                                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                                    fcdb::WhereParam::MetadataIs(vec![
+                                        metadb::WhereParam::CurseforgeIs(vec![
+                                            cfdb::WhereParam::LogoImageIs(vec![
+                                                cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
+                                            ]),
+                                        ]),
+                                    ]),
+                                ])
+                                .with(fcdb::metadata::fetch().with(
+                                    metadb::curseforge::fetch().with(cfdb::logo_image::fetch()),
+                                ))
+                                .exec()
+                                .await;
+
+                        let modlist = match modlist {
+                            Ok(modlist) => modlist,
+                            Err(e) => {
+                                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                                return;
+                            }
+                        };
+
+                        let modlist = modlist.into_iter().map(|file| {
+                            let meta = file
+                                .metadata
+                                .expect("metadata was ensured present but not returned");
+                            let cf = meta
+                                .curseforge
+                                .flatten()
+                                .expect("curseforge was ensured present but not returned");
+                            let row = cf
+                                .logo_image
+                                .flatten()
+                                .expect("mod image was ensured present but not returned");
+
+                            (
+                                file.instance_id,
+                                file.filename,
+                                cf.project_id,
+                                cf.file_id,
+                                row,
+                            )
+                        });
+
+                        let app = &app;
+                        let futures = modlist
+                            .map(|(instance_id, filename, project_id, file_id, row)| async move {
+                                let mcm = app.meta_cache_manager();
+
+                                {
+                                    let fails = mcm.failed_cf_thumbs.read().await;
+                                    if let Some((time, _)) = fails.get(&project_id) {
+                                        if *time > std::time::Instant::now() {
+                                            return
+                                        } else {
+                                            mcm.failed_cf_thumbs.write().await.remove(&project_id);
+                                        }
+                                    }
+                                }
+
+                                let r = async {
+                                    let dl_guard = mcm
+                                        .image_download_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image download semaphore is never closed");
+
+                                    debug!("thumbnailing curseforge mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
+
+                                    let icon = app.reqwest_client
+                                        .get(&row.url)
+                                        .header("avoid-caching", "")
+                                        .send()
+                                        .await?
+                                        .error_for_status()?
+                                        .bytes()
+                                        .await?;
+
+                                    drop(dl_guard);
+
+                                    let scale_guard = mcm
+                                        .image_scale_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image scale semaphore is never closed");
+
+                                    let image = icon.to_vec();
+
+                                    let image = tokio::task::spawn_blocking(move || {
+                                        let scaled = scale_mod_image(&image[..])?;
+                                        Ok::<_, anyhow::Error>(scaled)
+                                    })
+                                        .await??;
+
+                                    drop(scale_guard);
+
+                                    app.prisma_client.curse_forge_mod_image_cache()
+                                        .update(
+                                            cfimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
+                                            vec![
+                                                cfimgdb::SetParam::SetUpToDate(1),
+                                                cfimgdb::SetParam::SetData(Some(image))
+                                            ]
+                                        )
+                                        .exec()
+                                        .await?;
+
+                                    debug!("saved curseforge mod thumbnail for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
+
+                                    let _ = list_debounce.send(());
+                                    Ok::<_, anyhow::Error>(())
+                                }.await;
+
+                                if let Err(e) = r {
+                                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id}, image url: {})", row.url);
+
+                                    let mut fails = mcm.failed_cf_thumbs.write().await;
+                                    fails.entry(project_id)
+                                        .and_modify(|v| *v = (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
+                                            v.1 + 1,
+                                        ))
+                                        .or_insert_with(|| (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(2),
+                                            1
+                                        ));
+                                }
+                            });
+
+                        futures::future::join_all(futures).await.into_iter();
+                    };
 
                     let fut = async {
                         let modlist = app
@@ -539,6 +561,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         )>();
 
                         let app_db = app.clone();
+                        let list_debounce = list_debounce.clone();
                         tokio::spawn(async move {
                             while let Some((fingerprints, batch, fp_response, mods_response)) =
                                 batch_rx.recv().await
@@ -564,64 +587,28 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 );
                                 drop(ignored_hashes);
 
-                                let (deletes, insert_data) = batch
-                                    .into_iter()
-                                    .filter_map(|(metadata_id, murmur2)| {
+                                let app_db = &app_db;
+                                let futures =
+                                    batch.into_iter().filter_map(|(metadata_id, murmur2)| {
                                         let fpmatch = matches.remove(&murmur2);
-                                        fpmatch.map(|(fileinfo, modinfo)| {
-                                            (
-                                                app_db
-                                                    .prisma_client
-                                                    .curse_forge_mod_cache()
-                                                    .delete_many(vec![
-                                                        cfdb::WhereParam::MetadataId(
-                                                            StringFilter::Equals(
-                                                                metadata_id.clone(),
-                                                            ),
-                                                        ),
-                                                    ]),
-                                                (
-                                                    murmur2 as i32,
-                                                    modinfo.id,
+                                        fpmatch.map(|(fileinfo, modinfo)| async move {
+                                            let r = app_db
+                                                .meta_cache_manager()
+                                                .cache_curseforge_meta_unchecked(
+                                                    metadata_id,
                                                     fileinfo.file.id,
-                                                    modinfo.name,
-                                                    modinfo.slug,
-                                                    modinfo.summary,
-                                                    modinfo
-                                                        .authors
-                                                        .into_iter()
-                                                        .map(|a| a.name)
-                                                        .join(", "),
-                                                    chrono::Utc::now().into(),
-                                                    metadata_id.clone(),
-                                                    Vec::new(),
-                                                ),
-                                            )
+                                                    murmur2,
+                                                    modinfo,
+                                                ).await;
+
+                                            if let Err(e) = r {
+                                                tracing::error!({ error = ?e }, "Could not store curseforge mod metadata");
+                                            }
                                         })
-                                    })
-                                    .unzip::<_, _, Vec<_>, Vec<_>>();
+                                    });
 
-                                trace!(
-                                    "saving curseforge mod metadata batch of size {}",
-                                    deletes.len()
-                                );
-                                // may fail if the user removed a mod
-                                let r = app_db
-                                    .prisma_client
-                                    ._batch((
-                                        deletes,
-                                        app_db
-                                            .prisma_client
-                                            .curse_forge_mod_cache()
-                                            .create_many(insert_data),
-                                    ))
-                                    .await;
-
-                                if let Err(e) = r {
-                                    tracing::error!({ error = ?e }, "Could not store curseforge mod metadata");
-                                }
-
-                                app_db.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+                                futures::future::join_all(futures).await;
+                                let _ = list_debounce.send(());
                             }
                         });
 
@@ -664,16 +651,24 @@ impl ManagerRef<'_, MetaCacheManager> {
                         Ok::<_, anyhow::Error>(())
                     };
 
-                    // TODO: if we changed to the same instance, just add new mods instead of
-                    // forcing the whole thing to rerun
-                    tokio::select! {
-                        _ = remote_watch.changed() => continue,
-                        r = fut => {
-                            if let Err(e) = r {
-                                error!({ error = ?e }, "failed to query curseforge for instance {instance_id} mods");
+                    // not done inline to avoid indenting it even further
+                    let fut = async {
+                        if let Err(e) = fut.await {
+                            error!({ error = ?e }, "failed to query curseforge for instance {instance_id} mods");
+                        }
+                    };
+
+                    let wait_changed = async {
+                        while remote_watch.changed().await.is_ok() {
+                            if *remote_watch.borrow() != Some(instance_id) {
+                                break;
                             }
-                            break
-                        },
+                        }
+                    };
+
+                    tokio::select! {
+                        _ = wait_changed => continue,
+                        _ = futures::future::join(fut, icons_fut) => break,
                     };
                 }
             }
@@ -681,13 +676,154 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         tokio::spawn(async move {
             let app = app_mr;
+            let list_debounce = &mr_list_debounce_tx;
             let mut remote_watch = mr_remote_watch;
 
             while remote_watch.changed().await.is_ok() {
                 loop {
                     debug!("remote watch updated (modrinth)");
-                    let Some(instance_id) = *remote_watch.borrow() else { break };
+                    let Some(instance_id) = *remote_watch.borrow() else {
+                        break;
+                    };
                     info!("updating modrinth metadata cache for instance {instance_id}");
+
+                    let icons_fut = async {
+                        let modlist = app
+                            .prisma_client
+                            .mod_file_cache()
+                            .find_many(vec![
+                                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(
+                                    vec![mrdb::WhereParam::LogoImageIs(vec![
+                                        mrimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
+                                    ])],
+                                )]),
+                            ])
+                            .with(
+                                fcdb::metadata::fetch().with(
+                                    metadb::modrinth::fetch().with(mrdb::logo_image::fetch()),
+                                ),
+                            )
+                            .exec()
+                            .await;
+
+                        let modlist = match modlist {
+                            Ok(modlist) => modlist,
+                            Err(e) => {
+                                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                                return;
+                            }
+                        };
+
+                        let modlist = modlist.into_iter().map(|file| {
+                            let meta = file
+                                .metadata
+                                .expect("metadata was ensured present but not returned");
+                            let mr = meta
+                                .modrinth
+                                .flatten()
+                                .expect("modrinth was ensured present but not returned");
+                            let row = mr
+                                .logo_image
+                                .flatten()
+                                .expect("mod image was ensured present but not returned");
+
+                            (
+                                file.instance_id,
+                                file.filename,
+                                mr.project_id,
+                                mr.version_id,
+                                row,
+                            )
+                        });
+
+                        let app = &app;
+                        let futures = modlist
+                            .into_iter()
+                            .map(|(instance_id, filename, project_id, version_id, row)| async move {
+                                let mcm = app.meta_cache_manager();
+
+                                {
+                                    let fails = mcm.failed_mr_thumbs.read().await;
+                                    if let Some((time, _)) = fails.get(&project_id) {
+                                        if *time > std::time::Instant::now() {
+                                            return
+                                        } else {
+                                            mcm.failed_mr_thumbs.write().await.remove(&project_id);
+                                        }
+                                    }
+                                }
+
+                                let r = async {
+                                    let dl_guard = mcm
+                                        .image_download_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image download semaphore is never closed");
+
+                                    debug!("thumbnailing modrinth mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
+
+                                    let icon = app.reqwest_client
+                                        .get(&row.url)
+                                        .header("avoid-caching", "")
+                                        .send()
+                                        .await?
+                                        .error_for_status()?
+                                        .bytes()
+                                        .await?;
+
+                                    drop(dl_guard);
+                                    let scale_guard = mcm
+                                        .image_scale_semaphore
+                                        .acquire()
+                                        .await
+                                        .expect("the image scale semaphore is never closed");
+
+                                    let image = icon.to_vec();
+
+                                    let image = tokio::task::spawn_blocking(move || {
+                                        let scaled = scale_mod_image(&image[..])?;
+                                        Ok::<_, anyhow::Error>(scaled)
+                                    })
+                                        .await??;
+
+                                    drop(scale_guard);
+
+                                    app.prisma_client.modrinth_mod_image_cache()
+                                        .update(
+                                            mrimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
+                                            vec![
+                                                mrimgdb::SetParam::SetUpToDate(1),
+                                                mrimgdb::SetParam::SetData(Some(image))
+                                            ]
+                                        )
+                                        .exec()
+                                        .await?;
+
+                                    debug!("saved modrinth mod thumbnail for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
+
+                                    let _ = list_debounce.send(());
+                                    Ok::<_, anyhow::Error>(())
+                                }.await;
+
+                                if let Err(e) = r {
+                                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id}, image url: {})", row.url);
+
+                                    let mut fails = mcm.failed_mr_thumbs.write().await;
+                                    fails.entry(project_id)
+                                        .and_modify(|v| *v = (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
+                                            v.1 + 1,
+                                        ))
+                                        .or_insert_with(|| (
+                                            std::time::Instant::now() + std::time::Duration::from_secs(2),
+                                            1
+                                        ));
+                                }
+                            });
+
+                        futures::future::join_all(futures).await.into_iter();
+                    };
 
                     let fut = async {
                         let modlist = app
@@ -734,6 +870,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         )>();
 
                         let app_db = app.clone();
+                        let list_debounce = list_debounce.clone();
                         tokio::spawn(async move {
                             while let Some((sha512_hashes, batch, versions, projects, teams)) =
                                 batch_rx.recv().await
@@ -762,16 +899,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 );
                                 drop(ignored_hashes);
 
-                                let (deletes, insert_data) = batch
+                                let app_db = &app_db;
+                                let futures = batch
                                     .into_iter()
                                     .filter_map(|(metadata_id, sha512)| {
                                         let sha512_match = matches.remove(&sha512);
-                                        sha512_match.map(|(project, team, version)| {
+                                        sha512_match.map(|(project, team, version)| async move {
                                             let file = version
                                                 .files
                                                 .iter()
                                                 .find(|file| file.hashes.sha512 == sha512)
                                                 .expect("file to be present in it's response");
+
                                             let authors = team
                                                 .iter()
                                                 .map(|member| {
@@ -780,56 +919,24 @@ impl ManagerRef<'_, MetaCacheManager> {
                                                     })
                                                 })
                                                 .join(", ");
-                                            (
-                                                app_db
-                                                    .prisma_client
-                                                    .modrinth_mod_cache()
-                                                    .delete_many(vec![
-                                                        mrdb::WhereParam::MetadataId(
-                                                            StringFilter::Equals(
-                                                                metadata_id.clone(),
-                                                            ),
-                                                        ),
-                                                    ]),
-                                                (
-                                                    file.hashes.sha512.clone(),
-                                                    file.hashes.sha1.clone(),
-                                                    file.filename.clone(),
-                                                    project.id.clone(),
+
+                                            let r = app_db.meta_cache_manager()
+                                                .cache_modrinth_meta_unchecked(
+                                                    metadata_id,
                                                     version.id.clone(),
-                                                    project.title.clone(),
-                                                    project.slug.clone(),
-                                                    project.description.clone(),
+                                                    file.hashes.sha512.clone(),
+                                                    project.clone(),
                                                     authors,
-                                                    chrono::Utc::now().into(),
-                                                    metadata_id.clone(),
-                                                    Vec::new(),
-                                                ),
-                                            )
+                                                ).await;
+
+                                            if let Err(e) = r {
+                                                tracing::error!({ error = ?e }, "Could not store modrinth mod metadata");
+                                            }
                                         })
-                                    })
-                                    .unzip::<_, _, Vec<_>, Vec<_>>();
+                                    });
 
-                                trace!(
-                                    "saving modrinth mod metadata batch of size {}",
-                                    deletes.len()
-                                );
-
-                                // may fail if the user removed a mod
-                                let r = app_db
-                                    .prisma_client
-                                    ._batch((
-                                        deletes,
-                                        app_db
-                                            .prisma_client
-                                            .modrinth_mod_cache()
-                                            .create_many(insert_data),
-                                    ))
-                                    .await;
-
-                                if let Err(e) = r {
-                                    tracing::error!({error = ?e}, "could not store modrinth mod metadata");
-                                }
+                                futures::future::join_all(futures).await;
+                                let _ = list_debounce.send(());
                             }
                         });
 
@@ -878,20 +985,384 @@ impl ManagerRef<'_, MetaCacheManager> {
                         Ok::<_, anyhow::Error>(())
                     };
 
-                    // TODO: if we changed to the same instance, just add new mods instead of
-                    // forcing the whole thing to rerun
-                    tokio::select! {
-                        _ = remote_watch.changed() => continue,
-                        r = fut => {
-                            if let Err(e) = r {
-                                error!({ error = ?e }, "failed to query modrinth for instance {instance_id} mods");
+                    // not done inline to avoid indenting it even further
+                    let fut = async {
+                        if let Err(e) = fut.await {
+                            error!({ error = ?e }, "failed to query modrinth for instance {instance_id} mods");
+                        }
+                    };
+
+                    let wait_changed = async {
+                        while remote_watch.changed().await.is_ok() {
+                            if *remote_watch.borrow() != Some(instance_id) {
+                                break;
                             }
-                            break
-                        },
+                        }
+                    };
+
+                    tokio::select! {
+                        _ = wait_changed => continue,
+                        _ = futures::future::join(fut, icons_fut) => break,
                     };
                 }
             }
         });
+    }
+
+    /// Cache a mod file without first checking the validity of the instance
+    async fn cache_mod_file_unchecked(
+        self,
+        instance_id: InstanceId,
+        mods_dir_path: &PathBuf,
+        mod_filename: String,
+        enabled: bool,
+    ) -> anyhow::Result<String> {
+        let mut path = mods_dir_path.join(&mod_filename);
+
+        if !enabled {
+            path.set_extension("jar.disabled");
+        }
+
+        let content = tokio::fs::read(path).await?;
+        let content_len = content.len();
+        let (content, sha512, meta, murmur2) = tokio::task::spawn_blocking(move || {
+            let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
+            let meta = super::mods::parse_metadata(Cursor::new(&content));
+
+            // curseforge's api removes whitespace in murmur2 hashes
+            let mut murmur_content = content.clone();
+            murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+            let murmur2 = murmurhash32::murmurhash2(&murmur_content);
+
+            (content, sha512, meta, murmur2)
+        })
+        .await?;
+
+        let meta = meta?;
+
+        let dbmeta = self
+            .app
+            .prisma_client
+            .mod_metadata()
+            // just check both hashes for now
+            .find_first(vec![
+                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(sha512))),
+                metadb::WhereParam::Murmur2(IntFilter::Equals(murmur2 as i32)),
+            ])
+            .exec()
+            .await?;
+
+        let (meta_id, meta_insert, logo_insert) = match dbmeta {
+            Some(meta) => (meta.id, None, None),
+            None => {
+                let meta_id = Uuid::new_v4().to_string();
+
+                let logo_insert = 'logo: {
+                    let Some(meta) = &meta else { break 'logo None };
+                    let Some(logo_file) = &meta.logo_file else {
+                        break 'logo None;
+                    };
+                    let logo_file = logo_file.to_string();
+
+                    let mcm = self.app.meta_cache_manager();
+                    let guard = mcm
+                        .image_scale_semaphore
+                        .acquire()
+                        .await
+                        .expect("the image scale semaphore is never closed");
+
+                    let logo = tokio::task::spawn_blocking(move || {
+                        let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
+                        let Ok(mut file) = zip.by_name(&logo_file) else {
+                            return Ok(None);
+                        };
+                        let mut image = Vec::with_capacity(file.size() as usize);
+                        file.read_to_end(&mut image)?;
+                        let scaled = scale_mod_image(&image[..])?;
+                        Ok::<_, anyhow::Error>(Some(scaled))
+                    })
+                    .await;
+
+                    drop(guard);
+
+                    match logo {
+                        Ok(Ok(Some(data))) => {
+                            Some(self.app.prisma_client.local_mod_image_cache().create(
+                                data,
+                                metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+                                Vec::new(),
+                            ))
+                        }
+                        Ok(Ok(None)) => None,
+                        Ok(Err(e)) => {
+                            error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
+                            None
+                        }
+                        Err(e) => {
+                            error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
+                            None
+                        }
+                    }
+                };
+
+                let meta_insert = self.app.prisma_client.mod_metadata().create(
+                    meta_id.clone(),
+                    murmur2 as i32,
+                    Vec::from(sha512),
+                    meta.as_ref()
+                        .map(|meta| &meta.modloaders)
+                        .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
+                        .unwrap_or(String::new()),
+                    match meta {
+                        Some(meta) => vec![
+                            metadb::SetParam::SetName(meta.name),
+                            metadb::SetParam::SetModid(Some(meta.modid)),
+                            metadb::SetParam::SetVersion(meta.version),
+                            metadb::SetParam::SetDescription(meta.description),
+                            metadb::SetParam::SetAuthors(meta.authors),
+                        ],
+
+                        // Prisma sucks and is generating invalid sql.
+                        // As a workaround, all the defaults are manually set to None.
+                        None => vec![
+                            metadb::SetParam::SetName(None),
+                            metadb::SetParam::SetModid(None),
+                            metadb::SetParam::SetVersion(None),
+                            metadb::SetParam::SetDescription(None),
+                            metadb::SetParam::SetAuthors(None),
+                        ],
+                    },
+                );
+
+                (meta_id, Some(meta_insert), logo_insert)
+            }
+        };
+
+        let filecache_delete = self.app.prisma_client.mod_file_cache().delete_many(vec![
+            fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+            fcdb::WhereParam::Filename(StringFilter::Equals(mod_filename.to_string())),
+        ]);
+
+        let filecache_insert = self.app.prisma_client.mod_file_cache().create(
+            crate::db::instance::UniqueWhereParam::IdEquals(*instance_id),
+            mod_filename.to_string(),
+            content_len as i32,
+            enabled,
+            metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+            Vec::new(),
+        );
+
+        debug!(
+            "updating metadata entries for {}/{mod_filename}",
+            *instance_id
+        );
+
+        self.app
+            .prisma_client
+            ._batch((
+                meta_insert.into_iter().collect::<Vec<_>>(),
+                logo_insert.into_iter().collect::<Vec<_>>(),
+                filecache_delete,
+                filecache_insert,
+            ))
+            .await?;
+
+        Ok(meta_id)
+    }
+
+    // Cache curseforge metadata for a mod without downloading the icon
+    async fn cache_curseforge_meta_unchecked(
+        self,
+        metadata_id: String,
+        file_id: i32,
+        murmur2: u32,
+        modinfo: Mod,
+    ) -> anyhow::Result<()> {
+        let prev = self
+            .app
+            .prisma_client
+            .curse_forge_mod_cache()
+            .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
+                metadata_id.clone(),
+            ))
+            .with(cfdb::logo_image::fetch())
+            .exec()
+            .await?;
+
+        let mut o_delete_cfmeta = None;
+        let mut o_insert_logo = None;
+        let mut o_update_logo = None;
+        let mut o_delete_logo = None;
+
+        let o_insert_cfmeta = self.app.prisma_client.curse_forge_mod_cache().create(
+            murmur2 as i32,
+            modinfo.id,
+            file_id,
+            modinfo.name,
+            modinfo.slug,
+            modinfo.summary,
+            modinfo.authors.into_iter().map(|a| a.name).join(", "),
+            chrono::Utc::now().into(),
+            metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+            Vec::new(),
+        );
+
+        if let Some(prev) = prev {
+            o_delete_cfmeta = Some(self.app.prisma_client.curse_forge_mod_cache().delete(
+                cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+            ));
+
+            if let Some(prev) = prev
+                .logo_image
+                .expect("logo_image was requesred but not returned by prisma")
+            {
+                match modinfo.logo.as_ref().map(|it| &it.url) {
+                    Some(url) => {
+                        if *url != prev.url {
+                            o_update_logo =
+                                Some(self.app.prisma_client.curse_forge_mod_image_cache().update(
+                                    cfimgdb::UniqueWhereParam::MetadataIdEquals(
+                                        metadata_id.clone(),
+                                    ),
+                                    vec![
+                                        cfimgdb::SetParam::SetUrl(url.clone()),
+                                        cfimgdb::SetParam::SetUpToDate(0),
+                                    ],
+                                ));
+                        }
+                    }
+                    None => {
+                        o_delete_logo =
+                            Some(self.app.prisma_client.curse_forge_mod_image_cache().delete(
+                                cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                            ));
+                    }
+                }
+            }
+        }
+
+        if o_update_logo.is_none() && o_delete_logo.is_none() {
+            if let Some(url) = modinfo.logo.map(|it| it.url) {
+                o_insert_logo = Some(self.app.prisma_client.curse_forge_mod_image_cache().create(
+                    url,
+                    cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                    Vec::new(),
+                ));
+            }
+        }
+
+        debug!("updating curseforge metadata entry for {metadata_id}");
+
+        self.app
+            .prisma_client
+            ._batch((
+                o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
+                o_insert_cfmeta,
+                o_delete_logo.into_iter().collect::<Vec<_>>(),
+                o_insert_logo.into_iter().collect::<Vec<_>>(),
+                o_update_logo.into_iter().collect::<Vec<_>>(),
+            ))
+            .await?;
+
+        Ok(())
+    }
+
+    // Cache modrinth metadata for a mod without downloading the icon
+    async fn cache_modrinth_meta_unchecked(
+        self,
+        metadata_id: String,
+        version_id: String,
+        sha512: String,
+        project: Project,
+        authors: String,
+    ) -> anyhow::Result<()> {
+        let prev = self
+            .app
+            .prisma_client
+            .modrinth_mod_cache()
+            .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
+                metadata_id.clone(),
+            ))
+            .with(mrdb::logo_image::fetch())
+            .exec()
+            .await?;
+
+        let mut o_delete_mrmeta = None;
+        let mut o_insert_logo = None;
+        let mut o_update_logo = None;
+        let mut o_delete_logo = None;
+
+        let o_insert_mrmeta = self.app.prisma_client.modrinth_mod_cache().create(
+            sha512.clone(),
+            project.id,
+            version_id,
+            project.title,
+            project.slug,
+            project.description,
+            authors,
+            chrono::Utc::now().into(),
+            metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+            Vec::new(),
+        );
+
+        if let Some(prev) = prev {
+            o_delete_mrmeta = Some(self.app.prisma_client.modrinth_mod_cache().delete(
+                mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+            ));
+
+            if let Some(prev) = prev
+                .logo_image
+                .expect("logo_image was requesred but not returned by prisma")
+            {
+                match project.icon_url.as_ref() {
+                    Some(url) => {
+                        if *url != prev.url {
+                            o_update_logo =
+                                Some(self.app.prisma_client.modrinth_mod_image_cache().update(
+                                    mrimgdb::UniqueWhereParam::MetadataIdEquals(
+                                        metadata_id.clone(),
+                                    ),
+                                    vec![
+                                        mrimgdb::SetParam::SetUrl(url.clone()),
+                                        mrimgdb::SetParam::SetUpToDate(0),
+                                    ],
+                                ));
+                        }
+                    }
+                    None => {
+                        o_delete_logo =
+                            Some(self.app.prisma_client.modrinth_mod_image_cache().delete(
+                                mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                            ));
+                    }
+                }
+            }
+        }
+
+        if o_update_logo.is_none() && o_delete_logo.is_none() {
+            if let Some(url) = project.icon_url {
+                o_insert_logo = Some(self.app.prisma_client.modrinth_mod_image_cache().create(
+                    url,
+                    mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                    Vec::new(),
+                ));
+            }
+        }
+
+        debug!("updating modrinth metadata entry for {metadata_id}");
+
+        self.app
+            .prisma_client
+            ._batch((
+                o_delete_mrmeta.into_iter().collect::<Vec<_>>(),
+                o_insert_mrmeta,
+                o_delete_logo.into_iter().collect::<Vec<_>>(),
+                o_insert_logo.into_iter().collect::<Vec<_>>(),
+                o_update_logo.into_iter().collect::<Vec<_>>(),
+            ))
+            .await?;
+
+        Ok(())
     }
 }
 

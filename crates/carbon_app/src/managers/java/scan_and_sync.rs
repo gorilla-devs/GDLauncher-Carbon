@@ -157,8 +157,12 @@ where
             Err(err) => {
                 trace!("Java is invalid due to: {:?}", err);
                 let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-                    let Some(java) = profile.java.as_ref() else { return false; };
-                    let Some(java) = java.as_ref() else { return false; };
+                    let Some(java) = profile.java.as_ref() else {
+                        return false;
+                    };
+                    let Some(java) = java.as_ref() else {
+                        return false;
+                    };
                     let java_path = java.path.clone();
                     java_path == resolved_java_path.display().to_string()
                 });
@@ -205,8 +209,12 @@ where
         let is_used_in_profile = java_profiles
             .iter()
             .filter_map(|profile| {
-                let Some(java) = profile.java.as_ref() else { return None; };
-                let Some(java) = java else { return None; };
+                let Some(java) = profile.java.as_ref() else {
+                    return None;
+                };
+                let Some(java) = java else {
+                    return None;
+                };
                 Some(java.path.clone())
             })
             .any(|java_profile_path| local_java_from_db.path == java_profile_path);

@@ -477,7 +477,9 @@ pub async fn generate_startup_command(
     }
 
     for cap in extra_args_regex.captures_iter(extra_java_args) {
-        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else { continue };
+        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else {
+            continue;
+        };
         command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
     }
 

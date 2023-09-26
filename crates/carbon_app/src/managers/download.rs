@@ -245,9 +245,15 @@ impl ManagerRef<'_, DownloadManager> {
                                     _ => return Err(()),
                                 }
 
-                                let Some((range, _)) = header_str.split_once('/') else { return Err(()) };
-                                let Some((start, _)) = range.split_once('-') else { return Err(()) };
-                                let Ok(start) = u64::from_str(start) else { return Err(()) };
+                                let Some((range, _)) = header_str.split_once('/') else {
+                                    return Err(());
+                                };
+                                let Some((start, _)) = range.split_once('-') else {
+                                    return Err(());
+                                };
+                                let Ok(start) = u64::from_str(start) else {
+                                    return Err(());
+                                };
 
                                 Ok(start)
                             };

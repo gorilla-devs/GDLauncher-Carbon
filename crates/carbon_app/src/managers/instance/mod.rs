@@ -886,7 +886,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let info = info::Instance {
             name: name.clone(),
             icon,
-            last_played: Utc::now(),
+            last_played: None,
             seconds_played: 0,
             modpack,
             game_configuration: info::GameConfig {
@@ -1128,7 +1128,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path()
             .join(shortpath as &str);
 
-        data.config.last_played = Utc::now();
+        data.config.last_played = Some(Utc::now());
         data.config.seconds_played += added_seconds;
 
         let json = schema::make_instance_config(data.config.clone())?;

@@ -15,7 +15,7 @@ use crate::{
     db::PrismaClient,
     domain::java::{
         Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
-        SystemJavaProfileName, SystemJavaProfileNameIter,
+        SystemJavaProfileName,
     },
     managers::java::java_checker::RealJavaChecker,
 };

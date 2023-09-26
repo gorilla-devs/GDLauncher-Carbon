@@ -164,7 +164,7 @@ export const generateSequence = (
   const sequence: Record<number, string> = {};
 
   while (current <= max) {
-    sequence[current] = `${current} MB`;
+    sequence[current] = `${Math.floor(current / 1024)} GB`;
     current *= 2;
   }
 

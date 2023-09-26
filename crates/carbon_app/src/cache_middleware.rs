@@ -77,7 +77,9 @@ impl Middleware for CacheMiddleware {
         }
 
         let response = next.run(req, extensions).await;
-        let Ok(response) = response else { return response };
+        let Ok(response) = response else {
+            return response;
+        };
         let headers = response.headers();
 
         'use_cache: {

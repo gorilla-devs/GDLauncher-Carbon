@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use markdown::{CompileOptions, Options};
 use serde::Serialize;
 use tokio::sync::Mutex;

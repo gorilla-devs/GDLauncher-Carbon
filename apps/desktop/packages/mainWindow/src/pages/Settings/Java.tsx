@@ -10,7 +10,7 @@ import {
   Tabs,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch, createMemo } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -20,6 +20,7 @@ import Row from "./components/Row";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
 import RightHandSide from "./components/RightHandSide";
+import { generateSequence } from "@/utils/helpers";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -43,7 +44,11 @@ const Java = () => {
   const mbTotalRAM = () =>
     Math.round(Number(routeData.totalRam.data) / 1024 / 1024);
 
-  const initailJavaArgs = settings.data?.javaCustomArgs;
+  const initialJavaArgs = createMemo((prev: string | undefined) => {
+    if (prev) return prev;
+
+    return settings.data?.javaCustomArgs;
+  });
 
   const flattenedAvailableJavas = () =>
     Object.values(routeData.availableJavas.data || {}).reduce(
@@ -95,7 +100,7 @@ const Java = () => {
         />
       </PageTitle>
       <RowsContainer>
-        <Row>
+        <Row class="flex-col items-stretch">
           <Title>
             <Trans
               key="java.java_memory_title"
@@ -104,18 +109,12 @@ const Java = () => {
               }}
             />
           </Title>
-          <RightHandSide class="flex w-86 gap box-content gap-12">
+          <div class="flex gap-4 justify-center items-center w-full">
             <Slider
               min={256}
               max={mbTotalRAM()}
               steps={1}
-              marks={{
-                256: "256MB",
-                [Math.round(mbTotalRAM() / 2)]: `${Math.round(
-                  mbTotalRAM() / 2
-                )}MB`,
-                [mbTotalRAM()]: `${mbTotalRAM()}MB`,
-              }}
+              marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
               onChange={(val) =>
                 settingsMutation.mutate({
@@ -132,7 +131,7 @@ const Java = () => {
                 });
               }}
             />
-          </RightHandSide>
+          </div>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
@@ -160,16 +159,24 @@ const Java = () => {
               textColor="text-red-500"
               onClick={() => {
                 settingsMutation.mutate({
-                  javaCustomArgs: initailJavaArgs,
+                  javaCustomArgs: initialJavaArgs(),
                 });
               }}
             >
-              <Trans
-                key="java.reset_java_args"
-                options={{
-                  defaultValue: "Reset",
-                }}
-              />
+              <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+            </Button>
+            <Button
+              rounded={false}
+              type="secondary"
+              class="h-10"
+              textColor="text-red-500"
+              onClick={() => {
+                settingsMutation.mutate({
+                  javaCustomArgs: "",
+                });
+              }}
+            >
+              <i class="w-5 h-5 i-ri:close-fill" />
             </Button>
           </div>
         </Row>
