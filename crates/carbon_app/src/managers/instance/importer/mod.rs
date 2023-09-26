@@ -1,13 +1,122 @@
-use std::sync::Arc;
+use std::{sync::Arc, path::PathBuf};
 
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
+use tokio::sync::{watch, RwLock};
+use tracing::debug;
 
-use crate::{domain::vtask::VisualTaskId, managers::AppInner};
+use crate::{domain::vtask::VisualTaskId, managers::{AppInner, ManagerRef}, api::translation::Translation};
+
+use self::legacy_gdlauncher::LegacyGDLauncherImporter;
+
+use super::InstanceManager;
 
 pub mod legacy_gdlauncher;
 
-#[derive(Debug, Serialize, Deserialize, EnumIter)]
+#[derive(Debug)]
+pub struct InstanceImportManager {
+    scan_path: watch::Sender<Option<(Entity, PathBuf)>>,
+    scanner: RwLock<Option<(bool, Arc<dyn InstanceImporter>)>>,
+}
+
+impl InstanceImportManager {
+    pub fn new() -> Self {
+        Self {
+            scan_path: watch::channel(None).0,
+            scanner: RwLock::new(None),
+        }
+    }
+}
+
+impl ManagerRef<'_, InstanceImportManager> {
+    pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {
+        self.scan_path.send(path)
+            .map_err(|_| anyhow!("import scanning background task has died"))?;
+
+        Ok(())
+    }
+
+    pub fn launch_background_tasks(self) {
+        let mut rx = self.scan_path.subscribe();
+        let app = self.app.clone();
+
+        tokio::task::spawn(async move {
+            while rx.changed().await.is_ok() {
+                loop {
+                    let target = rx.borrow().clone();
+                    debug!({ target = ?target }, "import scanning target updated");
+                    let Some((entity, path)) = target else {
+                        *app.instance_manager()
+                            .import_manager()
+                            .scanner
+                            .write()
+                            .await = None;
+
+                        break
+                    };
+
+                    let scanner = entity.create_importer();
+
+                    *app.instance_manager()
+                        .import_manager()
+                        .scanner
+                        .write()
+                        .await = Some((true, scanner.clone()));
+
+                    let fut = async {
+                        let r = scanner.scan(&app, path.clone()).await;
+
+                        if let Err(e) = r {
+                            tracing::error!({ error = ?e }, "instance scanning failed for path {path:?}");
+                        }
+                    };
+
+                    let target_changed = async {
+                        while rx.changed().await.is_ok() {
+                            if matches!(&*rx.borrow(), Some((e, p)) if e == &entity && p == &path) {
+                                break
+                            }
+                        }
+                    };
+
+                    tokio::select! {
+                        _ = target_changed => continue,
+                        _ = fut => break,
+                    }
+                }
+            }
+        });
+    }
+
+    pub async fn scan_status(self) -> anyhow::Result<FullImportScanStatus> {
+        match self.scanner.read().await.as_ref() {
+            Some((scanning, scanner)) => Ok(FullImportScanStatus {
+                status: scanner.get_status().await,
+                scanning: *scanning,
+            }),
+            None => Err(anyhow!("scan target is not set")),
+        }
+    }
+
+    pub async fn begin_import(self, index: u32) -> anyhow::Result<VisualTaskId> {
+        match self.scanner.read().await.as_ref() {
+            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index).await?),
+            None => Err(anyhow!("scan target is not set")),
+        }
+    }
+}
+
+impl<'a> ManagerRef<'a, InstanceManager> {
+    pub fn import_manager(self) -> ManagerRef<'a, InstanceImportManager> {
+        ManagerRef {
+            manager: &self.app.instance_manager.import_manager,
+            app: self.app,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq)]
 pub enum Entity {
     LegacyGDLauncher,
     MRPack,
@@ -26,22 +135,47 @@ impl Entity {
         use strum::IntoEnumIterator;
         Self::iter().collect()
     }
+
+    pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
+        match self {
+            Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
+            _ => todo!()
+        }
+    }
 }
 
+#[derive(Debug)]
 pub struct ImportableInstance {
     pub name: String,
 }
 
-#[async_trait::async_trait]
-pub trait InstanceImporter {
-    type Config: Sized;
-
-    async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()>;
-    async fn get_available(&self) -> anyhow::Result<Vec<ImportableInstance>>;
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
+#[derive(Debug, Clone)]
+pub struct InvalidImportEntry {
+    pub name: String,
+    pub reason: Translation,
 }
 
-#[derive(Debug, Default)]
-pub struct Importer {
-    pub legacy_gdlauncher: legacy_gdlauncher::LegacyGDLauncherImporter,
+#[derive(Debug)]
+pub enum ImportEntry {
+    Valid(ImportableInstance),
+    Invalid(InvalidImportEntry),
+}
+
+pub enum ImportScanStatus {
+    NoResults,
+    SingleResult(ImportEntry),
+    MultiResult(Vec<ImportEntry>),
+}
+
+pub struct FullImportScanStatus {
+    pub scanning: bool,
+    pub status: ImportScanStatus,
+}
+
+#[async_trait::async_trait]
+pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
+    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
+    async fn get_default_scan_path(&self, app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>>;
+    async fn get_status(&self) -> ImportScanStatus;
+    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
 }

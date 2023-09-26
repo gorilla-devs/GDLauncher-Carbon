@@ -175,7 +175,18 @@ impl ManagerRef<'_, InstanceManager> {
                 let first_run_path = instance_path.get_root().join(".first_run_incomplete");
                 let is_first_run = first_run_path.is_file();
 
-                let t_modpack = match is_first_run {
+                let firstrun_text = match is_first_run {
+                    true => Some(tokio::fs::read_to_string(&first_run_path).await?),
+                    false => None,
+                };
+
+                let do_modpack_install = match firstrun_text {
+                    Some(ref text) if text == "skip-modpack-init" => false,
+                    Some(_) => true,
+                    None => false,
+                };
+
+                let t_modpack = match do_modpack_install {
                     true => Some((
                         task.subtask(Translation::InstanceTaskLaunchRequestModpack),
                         task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),

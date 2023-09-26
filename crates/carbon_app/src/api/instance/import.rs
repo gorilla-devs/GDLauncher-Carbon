@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, path::PathBuf};
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     api::vtask::FETaskId,
     managers::{
-        instance::importer::{self, InstanceImporter},
+        instance::importer::{self, Entity, ImportScanStatus, ImportEntry},
         AppInner,
     },
 };
@@ -81,46 +81,41 @@ pub struct FEImportInstance {
     pub index: u32,
 }
 
-pub async fn scan_importable_instances(app: Arc<AppInner>, entity: FEEntity) -> anyhow::Result<()> {
-    let locker = app.instance_manager();
-    let mut locker = locker.importer.lock().await;
-
-    match entity {
-        FEEntity::LegacyGDLauncher => locker.legacy_gdlauncher.scan(app.clone()).await,
-        _ => anyhow::bail!("Unsupported entity"),
-    }
+pub async fn scan_importable_instances(app: Arc<AppInner>, _entity: FEEntity) -> anyhow::Result<()> {
+    app.instance_manager()
+        .import_manager()
+        .set_scan_target(Some((Entity::LegacyGDLauncher, PathBuf::from("/home/admin/lpwinsync/gdlauncher_next"))))
 }
 
 pub async fn get_importable_instances(
     app: Arc<AppInner>,
-    entity: FEEntity,
+    _entity: FEEntity,
 ) -> anyhow::Result<Vec<FEImportableInstance>> {
-    let locker = app.instance_manager();
-    let locker = locker.importer.lock().await;
+    let status = app.instance_manager()
+        .import_manager()
+        .scan_status()
+        .await?;
 
-    match entity {
-        FEEntity::LegacyGDLauncher => locker
-            .legacy_gdlauncher
-            .get_available()
-            .await
-            .map(|instances| instances.into_iter().map(Into::into).collect()),
-        _ => anyhow::bail!("Unsupported entity"),
-    }
+    let v = match status.status {
+        ImportScanStatus::SingleResult(ImportEntry::Valid(r)) => vec![r.into()],
+        ImportScanStatus::MultiResult(r) => r.into_iter()
+            .filter_map(|r| match r {
+                ImportEntry::Valid(r) => Some(r),
+                _ => None,
+            }).map(Into::into).collect(),
+        _ => vec![],
+    };
+
+    Ok(v)
 }
 
 pub async fn import_instance(
     app: Arc<AppInner>,
     args: FEImportInstance,
 ) -> anyhow::Result<FETaskId> {
-    let locker = app.instance_manager();
-    let locker = locker.importer.lock().await;
-
-    match args.entity {
-        FEEntity::LegacyGDLauncher => locker
-            .legacy_gdlauncher
-            .import(app.clone(), args.index)
-            .await
-            .map(|task_id| task_id.into()),
-        _ => anyhow::bail!("Unsupported entity"),
-    }
+    Ok(app.instance_manager()
+        .import_manager()
+        .begin_import(args.index)
+        .await?
+        .into())
 }

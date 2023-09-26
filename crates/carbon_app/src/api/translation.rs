@@ -33,4 +33,5 @@ pub enum Translation {
     },
     InstanceTaskInstallModDownloadFile,
     FinalizingImport,
+    InstanceImportLegacyBadConfigFile,
 }

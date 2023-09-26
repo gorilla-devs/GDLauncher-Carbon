@@ -7,11 +7,11 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
-use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use fs_extra::dir::CopyOptions;
+use futures::Future;
 use futures::future::BoxFuture;
 
 use prisma_client_rust::Direction;
@@ -24,6 +24,7 @@ use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
+use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
@@ -41,13 +42,13 @@ mod schema;
 
 #[derive(Debug)]
 pub struct InstanceManager {
-    pub importer: Mutex<importer::Importer>,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
+    import_manager: InstanceImportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
@@ -60,18 +61,23 @@ impl Default for InstanceManager {
 impl InstanceManager {
     pub fn new() -> Self {
         Self {
-            importer: Mutex::new(importer::Importer::default()),
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
+            import_manager: InstanceImportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
         }
     }
 }
 
 impl<'s> ManagerRef<'s, InstanceManager> {
+    pub async fn launch_background_tasks(self) {
+        let _ = self.scan_instances().await;
+        self.import_manager().launch_background_tasks();
+    }
+
     pub async fn scan_instances(self) -> anyhow::Result<()> {
         let instance_cache = self
             .app
@@ -829,6 +835,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
+        self.create_instance_ext(
+            group,
+            name,
+            use_loaded_icon,
+            version,
+            notes,
+            |_| async { Ok(()) },
+        ).await
+    }
+
+    pub async fn create_instance_ext<F, I>(
+        self,
+        group: GroupId,
+        name: String,
+        use_loaded_icon: bool,
+        version: InstanceVersionSource,
+        notes: String,
+        initializer: F,
+    ) -> anyhow::Result<InstanceId>
+    where
+        F: FnOnce(PathBuf) -> I,
+        I: Future<Output = anyhow::Result<()>>,
+    {
         let tmpdir = self
             .app
             .settings_manager()
@@ -853,6 +882,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (version, modpack) = match version {
             InstanceVersionSource::Version(version) => (Some(version), None),
             InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
+            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => (Some(version), Some(modpack)),
         };
 
         let info = info::Instance {
@@ -890,6 +920,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .to_path(),
         )
         .await?;
+
+        initializer((&*tmpdir).to_path_buf()).await?;
 
         tmpdir
             .rename(path)
@@ -1613,6 +1645,7 @@ pub struct Mod {
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
+    ModpackWithKnownVersion(info::GameVersion, info::Modpack),
 }
 
 #[derive(Error, Debug)]
