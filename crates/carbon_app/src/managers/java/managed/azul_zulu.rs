@@ -197,7 +197,7 @@ impl Managed for AzulZulu {
 
         let main_binary_path = {
             let tmp = result?;
-            match tmp.canonicalize() {
+            match dunce::canonicalize(&tmp) {
                 Ok(p) => p,
                 Err(_) => tmp,
             }
