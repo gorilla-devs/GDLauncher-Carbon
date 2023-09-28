@@ -416,9 +416,12 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               }}
               onClick={() => {
                 window
-                  .openFileDialog([
-                    { name: "Image", extensions: ["png", "jpg", "jpeg"] },
-                  ])
+                  .openFileDialog({
+                    title: "Select Icon",
+                    filters: [
+                      { name: "Image", extensions: ["png", "jpg", "jpeg"] },
+                    ],
+                  })
                   .then((files) => {
                     if (!files.filePaths[0]) return;
                     loadIcon(files.filePaths[0]);
