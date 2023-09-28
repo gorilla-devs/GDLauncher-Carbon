@@ -14,14 +14,14 @@ const Privacy = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings.Privacy" />
+        <Trans key="settings:Privacy" />
       </PageTitle>
       <RowsContainer>
         <Row>
           <Title
-            description={<Trans key="settings.ads_personalization_text" />}
+            description={<Trans key="settings:ads_personalization_text" />}
           >
-            <Trans key="settings.ads_personalization_title" />
+            <Trans key="settings:ads_personalization_title" />
           </Title>
           <RightHandSide>
             <Button
@@ -37,8 +37,8 @@ const Privacy = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings.enable_metrics_text" />}>
-            <Trans key="settings.enable_metrics_title" />
+          <Title description={<Trans key="settings:enable_metrics_text" />}>
+            <Trans key="settings:enable_metrics_title" />
           </Title>
           <RightHandSide>
             <Switch

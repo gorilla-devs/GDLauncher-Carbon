@@ -1,11 +1,19 @@
 import { Dropdown, createNotification } from "@gd/ui";
-import { createSignal, Switch, Match, Show, createEffect } from "solid-js";
+import {
+  createSignal,
+  Switch,
+  Match,
+  Show,
+  createEffect,
+  getOwner,
+  runWithOwner,
+} from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
 import { supportedLanguages, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { handleStatus } from "@/utils/login";
@@ -18,6 +26,7 @@ export type DeviceCodeObjectType = {
 };
 
 export default function Login() {
+  const owner = getOwner();
   const [step, setStep] = createSignal<number>(0);
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
@@ -29,13 +38,6 @@ export default function Login() {
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
     routeData.settings.data?.termsAndPrivacyAccepted;
-
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      if (newSettings.language) changeLanguage(newSettings.language as string);
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
-  });
 
   const accountEnrollFinalizeMutation = rspc.createMutation([
     "account.enroll.finalize",
@@ -104,7 +106,9 @@ export default function Login() {
                 key: lang,
               }))}
               onChange={(lang) => {
-                settingsMutation.mutate({ language: lang.key as string });
+                runWithOwner(owner, () => {
+                  changeLanguage(lang.key as string);
+                });
               }}
               rounded
             />

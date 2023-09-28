@@ -26,7 +26,7 @@ const Appearance = () => {
     <LoadingError routeData={routeData}>
       <>
         <PageTitle>
-          <Trans key="settings.Appearance" />
+          <Trans key="settings:Appearance" />
         </PageTitle>
         <Row class="gap-4 w-full border-box flex-wrap max-w-full">
           <For each={themes}>

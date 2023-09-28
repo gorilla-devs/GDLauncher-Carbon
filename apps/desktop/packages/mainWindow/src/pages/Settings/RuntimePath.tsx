@@ -46,12 +46,12 @@ const RuntimePath = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings.RuntimePath" />
+        <Trans key="settings:RuntimePath" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
-          <Title description={<Trans key="settings.runtime_path_text" />}>
-            <Trans key="settings.runtime_path_title" />
+          <Title description={<Trans key="settings:runtime_path_text" />}>
+            <Trans key="settings:runtime_path_title" />
           </Title>
           <Center>
             <Input

@@ -6,7 +6,7 @@ import ModalLayout from "../ModalLayout";
 import { Suspense } from "solid-js";
 
 const PrivacyStatement = (props: ModalProps) => {
-  const body = rspc.createQuery(() => ["settings.getPrivacyStatementBody"]);
+  const body = rspc.createQuery(() => ["settings:getPrivacyStatementBody"]);
 
   const sanitizedHtml = () => {
     if (!body.data) return undefined;

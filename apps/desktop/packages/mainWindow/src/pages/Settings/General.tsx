@@ -37,14 +37,14 @@ const General = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings.General" />
+        <Trans key="settings:General" />
       </PageTitle>
       <RowsContainer>
         <Row>
           <Title
             description={
               <Trans
-                key="settings.release_channel_text"
+                key="settings:release_channel_text"
                 options={{
                   defaultValue: "Select the preferred release channel",
                 }}
@@ -52,7 +52,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.release_channel_title"
+              key="settings:release_channel_title"
               options={{
                 defaultValue: "Release Channel",
               }}
@@ -62,9 +62,9 @@ const General = () => {
             <Dropdown
               value={settings.releaseChannel}
               options={[
-                { label: t("settings.release_channel_stable"), key: "stable" },
-                { label: t("settings.release_channel_beta"), key: "beta" },
-                { label: t("settings.release_channel_alpha"), key: "alpha" },
+                { label: t("settings:release_channel_stable"), key: "stable" },
+                { label: t("settings:release_channel_beta"), key: "beta" },
+                { label: t("settings:release_channel_alpha"), key: "alpha" },
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
@@ -78,7 +78,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.concurrent_downloads_text"
+                key="settings:concurrent_downloads_text"
                 options={{
                   defaultValue:
                     "Select the number of concurrent downloads. If you have slow connection, select at most 3",
@@ -87,7 +87,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.concurrent_downloads_title"
+              key="settings:concurrent_downloads_title"
               options={{
                 defaultValue: "Concurrent Downloads",
               }}
@@ -111,7 +111,7 @@ const General = () => {
         <Row>
           <Title>
             <Trans
-              key="settings.game_resolution_title"
+              key="settings:game_resolution_title"
               options={{
                 defaultValue: "Game Resolution",
               }}
@@ -119,7 +119,7 @@ const General = () => {
           </Title>
           <RightHandSide>
             <Dropdown
-              placeholder={t("settings.resolution_presets") || ""}
+              placeholder={t("settings:resolution_presets") || ""}
               options={[
                 { label: "800x600", key: "800x600" },
                 { label: "1024x768", key: "1024x768" },
@@ -132,7 +132,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.instance_sorting_text"
+                key="settings:instance_sorting_text"
                 options={{
                   defaultValue:
                     "Select the method in which instances should be sorted.",
@@ -141,7 +141,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.instance_sorting_title"
+              key="settings:instance_sorting_title"
               options={{
                 defaultValue: "Instance Sorting",
               }}
@@ -160,7 +160,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.show_news_text"
+                key="settings:show_news_text"
                 options={{
                   defaultValue: "Show or hide the news",
                 }}
@@ -168,7 +168,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.show_news_title"
+              key="settings:show_news_title"
               options={{
                 defaultValue: "Show news",
               }}
@@ -189,7 +189,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.discord_integration_text"
+                key="settings:discord_integration_text"
                 options={{
                   defaultValue:
                     "Enable or disable discord integration. This display what are you playing in discord",
@@ -198,7 +198,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.discord_integration_title"
+              key="settings:discord_integration_title"
               options={{
                 defaultValue: "Discord Integration",
               }}
@@ -219,7 +219,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.hide_launcher_playing_text"
+                key="settings:hide_launcher_playing_text"
                 options={{
                   defaultValue:
                     "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
@@ -228,7 +228,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.hide_launcher_playing_title"
+              key="settings:hide_launcher_playing_title"
               options={{
                 defaultValue: "Hide launcher while playing",
               }}
@@ -242,7 +242,7 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.potato_mode_text"
+                key="settings:potato_mode_text"
                 options={{
                   defaultValue:
                     "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
@@ -251,7 +251,7 @@ const General = () => {
             }
           >
             <Trans
-              key="settings.potato_mode_title"
+              key="settings:potato_mode_title"
               options={{
                 defaultValue: "Potato PC mode",
               }}
@@ -270,7 +270,7 @@ const General = () => {
         </Row>
         <Row>
           <Title>
-            <Trans key="settings.rerun_onboarding" />
+            <Trans key="settings:rerun_onboarding" />
           </Title>
           <RightHandSide>
             <Button
@@ -279,7 +279,7 @@ const General = () => {
                 modalsContext?.openModal({ name: "onBoarding" });
               }}
             >
-              <Trans key="settings.rerun_onboarding" />
+              <Trans key="settings:rerun_onboarding" />
             </Button>
           </RightHandSide>
         </Row>
@@ -292,7 +292,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:restart-line" />
                     <div>
-                      <Trans key="settings.restart_app" />
+                      <Trans key="settings:restart_app" />
                     </div>
                   </div>
                 </Button>
@@ -300,7 +300,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:delete-bin-7-line" />
                     <div>
-                      <Trans key="settings.reset_all_data" />
+                      <Trans key="settings:reset_all_data" />
                     </div>
                   </div>
                 </Button>

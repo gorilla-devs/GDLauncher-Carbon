@@ -94,7 +94,7 @@ const Java = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings.Java" />
+        <Trans key="settings:Java" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>

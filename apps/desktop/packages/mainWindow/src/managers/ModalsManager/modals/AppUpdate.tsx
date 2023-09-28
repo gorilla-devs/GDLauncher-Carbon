@@ -16,11 +16,11 @@ const AppUpdate = (props: ModalProps) => {
   const releaseChannelTransKey = () => {
     switch (settings.data?.releaseChannel) {
       case "stable":
-        return "settings.release_channel_stable";
+        return "settings:release_channel_stable";
       case "beta":
-        return "settings.release_channel_beta";
+        return "settings:release_channel_beta";
       case "alpha":
-        return "settings.release_channel_alpha";
+        return "settings:release_channel_alpha";
       default:
         return "";
     }
