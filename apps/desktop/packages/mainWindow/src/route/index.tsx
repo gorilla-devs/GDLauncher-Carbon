@@ -188,6 +188,10 @@ export const routes: RouteDefinition[] = [
             path: "/privacy",
             component: lazy(() => import("@/pages/Settings/Privacy")),
           },
+          {
+            path: "/runtime-path",
+            component: lazy(() => import("@/pages/Settings/RuntimePath")),
+          },
         ],
       },
       {

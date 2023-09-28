@@ -8,6 +8,7 @@ import {
   TabList,
   TabPanel,
   Tabs,
+  Tooltip,
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createMemo } from "solid-js";
@@ -21,6 +22,7 @@ import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
 import RightHandSide from "./components/RightHandSide";
 import { generateSequence } from "@/utils/helpers";
+import Center from "./components/Center";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -92,15 +94,10 @@ const Java = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="java.java"
-          options={{
-            defaultValue: "Java",
-          }}
-        />
+        <Trans key="settings.Java" />
       </PageTitle>
       <RowsContainer>
-        <Row class="flex-col items-stretch">
+        <Row forceContentBelow>
           <Title>
             <Trans
               key="java.java_memory_title"
@@ -109,7 +106,7 @@ const Java = () => {
               }}
             />
           </Title>
-          <div class="flex gap-4 justify-center items-center w-full">
+          <Center>
             <Slider
               min={256}
               max={mbTotalRAM()}
@@ -131,7 +128,7 @@ const Java = () => {
                 });
               }}
             />
-          </div>
+          </Center>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
@@ -152,32 +149,36 @@ const Java = () => {
                 });
               }}
             />
-            <Button
-              rounded={false}
-              type="secondary"
-              class="h-10"
-              textColor="text-red-500"
-              onClick={() => {
-                settingsMutation.mutate({
-                  javaCustomArgs: initialJavaArgs(),
-                });
-              }}
-            >
-              <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
-            </Button>
-            <Button
-              rounded={false}
-              type="secondary"
-              class="h-10"
-              textColor="text-red-500"
-              onClick={() => {
-                settingsMutation.mutate({
-                  javaCustomArgs: "",
-                });
-              }}
-            >
-              <i class="w-5 h-5 i-ri:close-fill" />
-            </Button>
+            <Tooltip content={<Trans key="tooltip.undo" />}>
+              <Button
+                rounded={false}
+                type="secondary"
+                class="h-10"
+                size="small"
+                onClick={() => {
+                  settingsMutation.mutate({
+                    javaCustomArgs: initialJavaArgs(),
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={<Trans key="tooltip.reset" />}>
+              <Button
+                rounded={false}
+                type="secondary"
+                class="h-10"
+                size="small"
+                onClick={() => {
+                  settingsMutation.mutate({
+                    javaCustomArgs: "",
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:close-fill" />
+              </Button>
+            </Tooltip>
           </div>
         </Row>
         <Row>

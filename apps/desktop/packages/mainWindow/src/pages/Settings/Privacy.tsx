@@ -14,12 +14,7 @@ const Privacy = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="settings.Privacy"
-          options={{
-            defaultValue: "Privacy",
-          }}
-        />
+        <Trans key="settings.Privacy" />
       </PageTitle>
       <RowsContainer>
         <Row>

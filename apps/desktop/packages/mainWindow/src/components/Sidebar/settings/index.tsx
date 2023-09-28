@@ -35,6 +35,11 @@ const settings: Array<settingsItem> = [
     icon: "i-ri:shield-keyhole-line",
     path: "/settings/privacy",
   },
+  {
+    name: "Runtime Path",
+    icon: "i-ri-folder-fill",
+    path: "/settings/runtime-path",
+  },
 ];
 
 const Sidebar = () => {

@@ -4,8 +4,9 @@ import fs from "fs";
 import path from "path";
 import handleUncaughtException from "./handleUncaughtException";
 import {
-  INITIAL_RUNTIME_PATH,
   RUNTIME_PATH_OVERRIDE_NAME,
+  getInitialRTPath,
+  setCurrentRTPath,
 } from "./runtimePath";
 
 const args = process.argv.slice(1);
@@ -39,13 +40,14 @@ function validateArgument(arg: string): Argument | null {
 if (app.isPackaged) {
   const overrideDataPath = validateArgument("--runtime_path");
   if (overrideDataPath?.value) {
-    app.setPath("userData", overrideDataPath?.value);
+    setCurrentRTPath(overrideDataPath?.value);
   } else {
-    const userData = path.join(app.getPath("appData"), "gdlauncher_carbon");
+    const initialRTPath = getInitialRTPath();
 
-    INITIAL_RUNTIME_PATH.value = userData;
-
-    const runtimeOverridePath = path.join(userData, RUNTIME_PATH_OVERRIDE_NAME);
+    const runtimeOverridePath = path.join(
+      initialRTPath,
+      RUNTIME_PATH_OVERRIDE_NAME
+    );
 
     const runtimePathExists = fs.existsSync(runtimeOverridePath);
 
@@ -54,19 +56,15 @@ if (app.isPackaged) {
       override = fs.readFileSync(runtimeOverridePath).toString();
     }
 
-    if (override) {
-      app.setPath("userData", override);
-    } else {
-      app.setPath("userData", userData);
-    }
+    setCurrentRTPath(override || initialRTPath);
   }
 } else {
-  const userData = import.meta.env.RUNTIME_PATH;
-  if (!userData) {
+  const rtPath = import.meta.env.RUNTIME_PATH;
+  if (!rtPath) {
     throw new Error("Missing runtime path");
   }
 
-  app.setPath("userData", userData);
+  setCurrentRTPath(rtPath);
 }
 
 const allowMultipleInstances = validateArgument(

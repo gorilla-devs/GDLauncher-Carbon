@@ -20,12 +20,7 @@ const Language = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="settings.language"
-          options={{
-            defaultValue: "Language",
-          }}
-        />
+        <Trans key="settings.language" />
       </PageTitle>
       <RowsContainer>
         <Row class="flex-col justify-start">

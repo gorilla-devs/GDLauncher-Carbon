@@ -82,8 +82,16 @@
   "settings.ads_personalization_text": "View and manage how GDLauncher may use your data for ad personalization",
   "settings.enable_metrics_title": "Enable Anonymous Metrics & Experimental Features",
   "settings.enable_metrics_text": "Select whether or not to enable anonymous metrics and experimental features through feature flags.",
+  "settings.runtime_path_title": "Runtime Path",
+  "settings.runtime_path_text": "Select the path where the instances and configuration files will be stored. This is useful if you want to store the instances in a different drive",
   "settings.restart_app": "Restart App",
   "settings.reset_all_data": "Reset All Data",
+  "settings.Privacy": "Privacy",
+  "settings.RuntimePath": "Runtime Path",
+  "settings.language": "Language",
+  "settings.Java": "Java",
+  "settings.General": "General",
+  "settings.Appearance": "Appearance",
   "sidebar.plus_add_instance": "+ Add Instance",
   "instance.instance_name": "Instance name",
   "instance.instance_description": "Description",
@@ -295,5 +303,10 @@
   "adbanner.beta_text": "This is a GDLauncher beta release.\nThis means that it might contain some bugs but it should be mostly stable.",
 
   "adbanner.alpha_title": "GDLauncher Alpha Release",
-  "adbanner.alpha_text": "This is a GDLauncher alpha release.\nThis means that it is unstable and contains many bugs."
+  "adbanner.alpha_text": "This is a GDLauncher alpha release.\nThis means that it is unstable and contains many bugs.",
+
+  "tooltip.undo": "Undo",
+  "tooltip.reset": "Reset",
+  "tooltip.apply_and_restart": "Apply and restart",
+  "tooltip.rtp_not_valid": "The runtime path is not valid. Either the path is not a folder or it's not an empty directory"
 }

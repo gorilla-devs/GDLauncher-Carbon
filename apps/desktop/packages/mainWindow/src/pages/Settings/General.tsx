@@ -37,12 +37,7 @@ const General = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="settings.general"
-          options={{
-            defaultValue: "General",
-          }}
-        />
+        <Trans key="settings.General" />
       </PageTitle>
       <RowsContainer>
         <Row>
