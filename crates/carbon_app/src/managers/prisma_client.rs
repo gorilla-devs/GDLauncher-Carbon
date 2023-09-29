@@ -27,6 +27,8 @@ pub enum DatabaseError {
 
 #[instrument]
 pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
+    let runtime_path = dunce::simplified(&runtime_path);
+
     let db_uri = format!(
         "file:{}?connection_limit=1",
         runtime_path.join("gdl_conf.db").to_str().unwrap()

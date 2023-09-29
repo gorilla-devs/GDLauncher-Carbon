@@ -97,8 +97,6 @@ export type Procedures = {
 
 export type FETask = { name: Translation; progress: Progress; downloaded: number; download_total: number; active_subtasks: FESubtask[] }
 
-export type FESystemJavaProfile = { name: FESystemJavaProfileName; javaId: string | null }
-
 export type ModLoader = { type_: CFFEModLoaderType; version: string }
 
 export type MRFESearchFacet = { Category: string } | { Version: string } | { License: string } | { ProjectType: string }
@@ -153,7 +151,7 @@ export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
 
 export type ModpackPlatform = "Curseforge" | "Modrinth"
 
-export type FESystemJavaProfileName = "legacy" | "alpha" | "beta" | "gamma" | "minecraftJavaExe"
+export type FESystemJavaProfileName = "legacy" | "alpha" | "beta" | "gamma" | "gammaSnapshot" | "minecraftJavaExe"
 
 export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; urlslug: string; description: string; authors: string; has_image: boolean }
 
@@ -289,6 +287,8 @@ export type CFFECategory = { id: number; name: string; slug: string; url: string
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 
 export type MRFESearchFacetOr = MRFESearchFacet[]
+
+export type FESystemJavaProfile = { name: FESystemJavaProfileName; javaId: string | null }
 
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
