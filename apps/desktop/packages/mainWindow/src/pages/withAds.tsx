@@ -45,7 +45,7 @@ function withAdsLayout() {
 
       const curseforgeModpackModloaders = () => {
         const filtered = routeData.curseForgeModloaders.data?.filter(
-          (modloader) => supportedCfModloaders.includes(modloader)
+          (modloader) => supportedCfModloaders.includes(modloader as string)
         );
         return filtered || [];
       };

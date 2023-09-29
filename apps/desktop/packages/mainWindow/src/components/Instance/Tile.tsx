@@ -350,7 +350,7 @@ const Tile = (props: Props) => {
                         )}
                       />
                     </Show>
-                    <p class="m-0">{props.modloader}</p>
+                    <p class="m-0">{props.modloader?.toString()}</p>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>
@@ -475,7 +475,7 @@ const Tile = (props: Props) => {
                     />
                   </Show>
                   <Show when={props.modloader}>
-                    <p class="m-0">{props.modloader}</p>
+                    <p class="m-0">{props.modloader?.toString()}</p>
                   </Show>
                 </span>
                 <p class="m-0">{props.version}</p>

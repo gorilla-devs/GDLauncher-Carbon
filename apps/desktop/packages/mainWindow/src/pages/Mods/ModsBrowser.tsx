@@ -164,7 +164,7 @@ const ModsBrowser = () => {
         newQuery["modloaders"].push("fabric");
         newQuery["modloaders"].push("quilt");
       } else {
-        newQuery["modloaders"] = [...modloaders];
+        newQuery["modloaders"] = [...modloaders] as any;
       }
     }
 
