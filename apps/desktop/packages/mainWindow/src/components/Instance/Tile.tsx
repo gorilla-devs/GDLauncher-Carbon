@@ -6,7 +6,7 @@ import {
   FESubtask,
   Translation,
   UngroupedInstance,
-  ModpackPlatform,
+  ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
@@ -49,28 +49,28 @@ const Tile = (props: Props) => {
   const modalsContext = useModal();
 
   const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance",
+    "instance.launchInstance"
   ]);
 
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
 
   const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder",
+    "instance.openInstanceFolder"
   ]);
 
   const duplicateInstanceMutation = rspc.createMutation([
-    "instance.duplicateInstance",
+    "instance.duplicateInstance"
   ]);
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    props.instance.id,
+    props.instance.id
   ]);
 
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: props.instance.id,
-      folder: "Root",
+      folder: "Root"
     });
   };
 
@@ -82,11 +82,11 @@ const Tile = (props: Props) => {
     // deleteInstanceMutation.mutate(props.instance.id);
     modalsContext?.openModal(
       {
-        name: "confirmInstanceDeletion",
+        name: "confirmInstanceDeletion"
       },
       {
         id: props.instance.id,
-        name: props.instance.name,
+        name: props.instance.name
       }
     );
   };
@@ -100,7 +100,7 @@ const Tile = (props: Props) => {
   const handleEdit = () => {
     modalsContext?.openModal(
       {
-        name: "instanceCreation",
+        name: "instanceCreation"
       },
       {
         id: props.instance.id,
@@ -108,7 +108,7 @@ const Tile = (props: Props) => {
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
         modloaderVersion: instanceDetails?.data?.modloaders[0]?.version,
-        img: props.img,
+        img: props.img
       }
     );
   };
@@ -117,7 +117,7 @@ const Tile = (props: Props) => {
     if (!props.isInvalid) {
       duplicateInstanceMutation.mutate({
         instance: props.instance.id,
-        new_name: props.instance.name,
+        new_name: props.instance.name
       });
     }
   };
@@ -126,38 +126,38 @@ const Tile = (props: Props) => {
     {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-      action: handlePlay,
+      action: handlePlay
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit,
+      action: handleEdit
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
-      action: handleSettings,
+      action: handleSettings
     },
     ...(!props.isInvalid
       ? [
           {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
-            action: handleDuplicate,
-          },
+            action: handleDuplicate
+          }
         ]
       : []),
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
-      action: handleOpenFolder,
+      action: handleOpenFolder
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
-      action: handleDelete,
-    },
+      action: handleDelete
+    }
   ];
 
   const getTranslationArgs = (translation: Translation) => {
@@ -204,13 +204,13 @@ const Tile = (props: Props) => {
                     !isInQueue() &&
                     !props.isInvalid &&
                     !props.failError &&
-                    !props.isRunning,
+                    !props.isRunning
                 }}
                 style={{
                   "background-image": props.img
                     ? `url("${props.img as string}")`
                     : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "cover" : "120%",
+                  "background-size": props.img ? "cover" : "120%"
                 }}
               >
                 <Show when={props.isInvalid}>
@@ -229,7 +229,7 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 transition-all h-12 hidden w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
@@ -240,7 +240,7 @@ const Tile = (props: Props) => {
                       !isInQueue() &&
                       !props.isInvalid &&
                       !props.failError &&
-                      !props.isRunning,
+                      !props.isRunning
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -251,7 +251,7 @@ const Tile = (props: Props) => {
                     class="text-white"
                     classList={{
                       "i-ri:play-fill": !props.isRunning,
-                      "i-ri:stop-fill text-xl": props.isRunning,
+                      "i-ri:stop-fill text-xl": props.isRunning
                     }}
                   />
                 </div>
@@ -275,7 +275,7 @@ const Tile = (props: Props) => {
                             classList={{
                               "text-xs":
                                 props.subTasks && props.subTasks?.length > 1,
-                              "text-md": props.subTasks?.length === 1,
+                              "text-md": props.subTasks?.length === 1
                             }}
                           >
                             <Trans
@@ -316,7 +316,7 @@ const Tile = (props: Props) => {
                 <div
                   class="absolute left-0 bottom-0 rounded-full z-40 bg-primary-500 h-1"
                   style={{
-                    width: `${props.percentage}%`,
+                    width: `${props.percentage}%`
                   }}
                 />
               </Show>
@@ -325,7 +325,7 @@ const Tile = (props: Props) => {
               class="max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
-                "text-lightGray-900": props.isLoading || isInQueue(),
+                "text-lightGray-900": props.isLoading || isInQueue()
               }}
             >
               <Tooltip
@@ -380,7 +380,7 @@ const Tile = (props: Props) => {
               }
             }}
             classList={{
-              grayscale: props.isLoading || isInQueue(),
+              grayscale: props.isLoading || isInQueue()
             }}
           >
             <Show when={props.isInvalid}>
@@ -411,14 +411,14 @@ const Tile = (props: Props) => {
                   !isInQueue() &&
                   !props.isInvalid &&
                   !props.failError &&
-                  !props.isRunning,
+                  !props.isRunning
               }}
             >
               <div
                 class="text-white"
                 classList={{
                   "i-ri:play-fill text-lg": !props.isRunning,
-                  "i-ri:stop-fill text-md": props.isRunning,
+                  "i-ri:stop-fill text-md": props.isRunning
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -431,7 +431,7 @@ const Tile = (props: Props) => {
               <div
                 class="absolute top-0 left-0 bottom-0 opacity-10 bg-white"
                 style={{
-                  width: `${props.percentage}%`,
+                  width: `${props.percentage}%`
                 }}
               />
             </Show>
@@ -440,10 +440,10 @@ const Tile = (props: Props) => {
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`,
+                  : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading,
+                grayscale: props.isLoading
               }}
             />
             <div class="flex flex-col">
@@ -451,7 +451,7 @@ const Tile = (props: Props) => {
                 class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
                 classList={{
                   "text-darkSlate-50": mergedProps.isLoading,
-                  "text-white": !mergedProps.isLoading,
+                  "text-white": !mergedProps.isLoading
                 }}
               >
                 {props.instance.name}
@@ -514,10 +514,10 @@ const Tile = (props: Props) => {
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`,
+                  : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading || isInQueue(),
+                grayscale: props.isLoading || isInQueue()
               }}
             >
               <Show when={props.isInvalid}>
@@ -538,14 +538,14 @@ const Tile = (props: Props) => {
                     !isInQueue() &&
                     !props.isInvalid &&
                     !props.failError &&
-                    !props.isRunning,
+                    !props.isRunning
                 }}
               >
                 <div
                   class="text-white text-lg"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
-                    "i-ri:stop-fill": props.isRunning,
+                    "i-ri:stop-fill": props.isRunning
                   }}
                   onClick={(e) => {
                     e.stopPropagation();

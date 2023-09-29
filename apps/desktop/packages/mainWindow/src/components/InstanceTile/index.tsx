@@ -9,13 +9,13 @@ import {
   getPreparingState,
   getRunningState,
   getInValideInstance,
-  getInactiveState,
+  getInactiveState
 } from "@/utils/instances";
 import {
   ListInstance,
   UngroupedInstance,
   FESubtask,
-  FETask,
+  FETask
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
@@ -42,7 +42,7 @@ const InstanceTile = (props: {
     totalDownload: 0,
     downloaded: 0,
     percentage: 0,
-    subTasks: undefined,
+    subTasks: undefined
   });
   const [imageResource, { refetch }] = createResource(
     () => props.instance.id,

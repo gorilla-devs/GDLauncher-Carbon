@@ -6,7 +6,7 @@ import {
   createSignal,
   Match,
   Show,
-  Switch,
+  Switch
 } from "solid-js";
 import { Router, hashIntegration } from "@solidjs/router";
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient";
@@ -22,55 +22,58 @@ import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
 import "@/utils/analytics"; // preinit
 
-render(() => {
-  const [coreModuleLoaded] = createResource(async () => {
-    let port;
-    try {
-      port = await window.getCoreModulePort();
-    } catch (e) {
-      window.fatalError(e as string, "CoreModule");
-      throw e;
-    }
-    return port;
-  });
-
-  const [isReady, setIsReady] = createSignal(false);
-
-  createEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      setIsReady(coreModuleLoaded.state === "ready");
-    }
-  });
-
-  return (
-    <Switch
-      fallback={
-        <div class="w-full flex justify-center items-center h-screen">
-          <RiveAppWapper
-            src={GDAnimation}
-            onStop={() => {
-              setIsReady(coreModuleLoaded.state === "ready");
-            }}
-          />
-        </div>
+render(
+  () => {
+    const [coreModuleLoaded] = createResource(async () => {
+      let port;
+      try {
+        port = await window.getCoreModulePort();
+      } catch (e) {
+        window.fatalError(e as string, "CoreModule");
+        throw e;
       }
-    >
-      <Match when={isReady()}>
-        <InnerApp port={coreModuleLoaded() as unknown as number} />
-      </Match>
-      <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
-        <div class="w-full flex justify-center items-center h-screen">
-          <RiveAppWapper
-            src={GDAnimation}
-            onStop={() => {
-              setIsReady(coreModuleLoaded.state === "ready");
-            }}
-          />
-        </div>
-      </Match>
-    </Switch>
-  );
-}, document.getElementById("root") as HTMLElement);
+      return port;
+    });
+
+    const [isReady, setIsReady] = createSignal(false);
+
+    createEffect(() => {
+      if (process.env.NODE_ENV === "development") {
+        setIsReady(coreModuleLoaded.state === "ready");
+      }
+    });
+
+    return (
+      <Switch
+        fallback={
+          <div class="w-full flex justify-center items-center h-screen">
+            <RiveAppWapper
+              src={GDAnimation}
+              onStop={() => {
+                setIsReady(coreModuleLoaded.state === "ready");
+              }}
+            />
+          </div>
+        }
+      >
+        <Match when={isReady()}>
+          <InnerApp port={coreModuleLoaded() as unknown as number} />
+        </Match>
+        <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
+          <div class="w-full flex justify-center items-center h-screen">
+            <RiveAppWapper
+              src={GDAnimation}
+              onStop={() => {
+                setIsReady(coreModuleLoaded.state === "ready");
+              }}
+            />
+          </div>
+        </Match>
+      </Switch>
+    );
+  },
+  document.getElementById("root") as HTMLElement
+);
 
 type InnerAppProps = {
   port: number;
@@ -108,17 +111,17 @@ const TransWrapper = (props: TransWrapperProps) => {
           lng: language,
           fallbackLng: "english",
           resources: {
-            [language]: defaultNamespacesMap,
+            [language]: defaultNamespacesMap
           },
           partialBundledLanguages: true,
-          debug: true,
+          debug: true
         });
 
         setIsI18nReady(true);
 
         return;
       }
-    },
+    }
   });
 
   createEffect(() => {

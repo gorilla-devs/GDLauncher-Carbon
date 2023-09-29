@@ -6,7 +6,7 @@ import {
   Show,
   createEffect,
   getOwner,
-  runWithOwner,
+  runWithOwner
 } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
@@ -40,7 +40,7 @@ export default function Login() {
     routeData.settings.data?.termsAndPrivacyAccepted;
 
   const accountEnrollFinalizeMutation = rspc.createMutation([
-    "account.enroll.finalize",
+    "account.enroll.finalize"
   ]);
 
   const nextStep = () => {
@@ -63,7 +63,7 @@ export default function Login() {
         setDeviceCodeObject({
           userCode: info.userCode,
           link: info.verificationUri,
-          expiresAt: info.expiresAt,
+          expiresAt: info.expiresAt
         });
         if (routeData.status.data) setStep(2);
       },
@@ -73,7 +73,7 @@ export default function Login() {
       },
       onComplete() {
         accountEnrollFinalizeMutation.mutate(undefined);
-      },
+      }
     });
   });
 
@@ -90,7 +90,7 @@ export default function Login() {
         <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.jpg">
           <div
             style={{
-              "mix-blend-mode": "hard-light",
+              "mix-blend-mode": "hard-light"
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
           />
@@ -103,7 +103,7 @@ export default function Login() {
                     {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
                   </div>
                 ),
-                key: lang,
+                key: lang
               }))}
               onChange={(lang) => {
                 runWithOwner(owner, () => {
@@ -117,12 +117,12 @@ export default function Login() {
             class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 1 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center"
             }}
             classList={{
               "overflow-hidden": step() === 2,
               "w-140": step() !== 0,
-              "max-w-160": step() === 0,
+              "max-w-160": step() === 0
             }}
           >
             <Show when={step() === 0}>

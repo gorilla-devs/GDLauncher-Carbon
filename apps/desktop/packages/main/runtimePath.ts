@@ -65,7 +65,7 @@ ipcMain.handle("changeRuntimePath", async (_, _newPath: string | null) => {
     filter: (src) => {
       return !src.includes(RUNTIME_PATH_OVERRIDE_NAME);
     },
-    errorOnExist: false,
+    errorOnExist: false
   });
 
   await fs.writeFile(runtimeOverridePath, newPath);

@@ -8,7 +8,7 @@ import {
   setCurseForgeModloaders,
   setCurseforgeCategories,
   setModrinthCategories,
-  setSupportedModloaders,
+  setSupportedModloaders
 } from "@/utils/sidebar";
 import { supportedCfModloaders } from "@/utils/constants";
 import adSize from "@/utils/adhelper";
@@ -28,13 +28,13 @@ function withAdsLayout() {
         if (version.type === "release") {
           setMappedMcVersions((prev) => [
             ...prev,
-            { label: version.id, key: version.id },
+            { label: version.id, key: version.id }
           ]);
         }
       });
       setMappedMcVersions((prev) => [
         { key: "", label: "All version" },
-        ...prev,
+        ...prev
       ]);
     }
   });
@@ -75,7 +75,7 @@ function withAdsLayout() {
               "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] xl:grid-cols-[auto_2fr_440px]":
                 !isDetailPage(),
               "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
-                isDetailPage(),
+                isDetailPage()
             }}
           >
             <Outlet />
@@ -83,7 +83,7 @@ function withAdsLayout() {
               id="ads-layout-container"
               class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
               style={{
-                width: `${adSize.width + 40}px`,
+                width: `${adSize.width + 40}px`
               }}
             >
               <AdsBanner />

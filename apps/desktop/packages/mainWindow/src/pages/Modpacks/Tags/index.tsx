@@ -33,7 +33,7 @@ const Tags = (props: Props) => {
         <Trans
           key="instance.clear_filters_modpacks"
           options={{
-            defaultValue: "Clear filters",
+            defaultValue: "Clear filters"
           }}
         />
       </Button>

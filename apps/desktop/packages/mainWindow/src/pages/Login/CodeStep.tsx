@@ -16,7 +16,7 @@ import { EnrollmentError } from "@gd/core_module/bindings";
 
 interface Props {
   deviceCodeObject: DeviceCodeObjectType | null;
-  setDeviceCodeObject: Setter<DeviceCodeObjectType>;
+  setDeviceCodeObject: Setter<DeviceCodeObjectType | null>;
   nextStep: () => void;
   prevStep: () => void;
 }
@@ -29,7 +29,7 @@ const CodeStep = (props: Props) => {
     {
       onError(error) {
         setError(error.message);
-      },
+      }
     }
   );
 
@@ -38,7 +38,7 @@ const CodeStep = (props: Props) => {
     {
       onError(error) {
         setError(error.message);
-      },
+      }
     }
   );
 
@@ -125,7 +125,7 @@ const CodeStep = (props: Props) => {
     handleStatus(routeData.status, {
       onFail(error) {
         handleErrorMessages(error);
-      },
+      }
     });
   });
 
@@ -146,7 +146,7 @@ const CodeStep = (props: Props) => {
           <Trans
             key="login.step_back"
             options={{
-              defaultValue: "Back",
+              defaultValue: "Back"
             }}
           />
         </Button>
@@ -167,7 +167,7 @@ const CodeStep = (props: Props) => {
               <Trans
                 key="login.code_expired_message"
                 options={{
-                  defaultValue: "The code has been expired",
+                  defaultValue: "The code has been expired"
                 }}
               />
             </p>
@@ -179,7 +179,7 @@ const CodeStep = (props: Props) => {
             <Trans
               key="login.before_expiring"
               options={{
-                defaultValue: "before the code expires",
+                defaultValue: "before the code expires"
               }}
             />
           </p>
@@ -188,7 +188,7 @@ const CodeStep = (props: Props) => {
               key="login.enter_code_in_browser"
               options={{
                 defaultValue:
-                  "Enter the specified code on the browser page to complete the authorization",
+                  "Enter the specified code on the browser page to complete the authorization"
               }}
             />
           </p>
@@ -202,7 +202,7 @@ const CodeStep = (props: Props) => {
           <Trans
             key="login.waiting_login_code_msg"
             options={{
-              defaultValue: "Waiting for authorization...",
+              defaultValue: "Waiting for authorization..."
             }}
           />
         </span>
@@ -223,7 +223,7 @@ const CodeStep = (props: Props) => {
           <Trans
             key="login.open_in_browser"
             options={{
-              defaultValue: "Copy and open in browser",
+              defaultValue: "Copy and open in browser"
             }}
           />
           <div class="text-md i-ri:link" />
@@ -239,7 +239,7 @@ const CodeStep = (props: Props) => {
             <Trans
               key="login.refresh"
               options={{
-                defaultValue: "refresh",
+                defaultValue: "refresh"
               }}
             />
           </h3>

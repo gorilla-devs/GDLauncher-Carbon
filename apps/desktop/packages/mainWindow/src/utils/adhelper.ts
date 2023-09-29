@@ -7,7 +7,7 @@ export interface BoundsSize {
 
 export const [adSize, _setAdSize] = createStore<BoundsSize>({
   width: 0,
-  height: 0,
+  height: 0
 });
 
 const init = async () => {

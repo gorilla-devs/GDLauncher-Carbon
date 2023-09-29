@@ -6,7 +6,7 @@ import { BoundsSize } from "./utils/adhelper";
 import type {
   ProgressInfo,
   UpdateCheckResult,
-  UpdateInfo,
+  UpdateInfo
 } from "electron-updater";
 
 declare global {

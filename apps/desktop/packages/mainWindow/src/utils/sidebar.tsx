@@ -8,7 +8,7 @@ import {
   CFFEModLoaderType,
   FEUnifiedSearchCategoryID,
   MRFECategory,
-  MRFELoader,
+  MRFELoader
 } from "@gd/core_module/bindings";
 
 export const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);

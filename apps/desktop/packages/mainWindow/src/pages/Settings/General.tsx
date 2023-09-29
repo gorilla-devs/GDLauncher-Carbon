@@ -27,7 +27,7 @@ const General = () => {
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
+    }
   });
 
   createEffect(() => {
@@ -46,7 +46,7 @@ const General = () => {
               <Trans
                 key="settings:release_channel_text"
                 options={{
-                  defaultValue: "Select the preferred release channel",
+                  defaultValue: "Select the preferred release channel"
                 }}
               />
             }
@@ -54,7 +54,7 @@ const General = () => {
             <Trans
               key="settings:release_channel_title"
               options={{
-                defaultValue: "Release Channel",
+                defaultValue: "Release Channel"
               }}
             />
           </Title>
@@ -64,11 +64,11 @@ const General = () => {
               options={[
                 { label: t("settings:release_channel_stable"), key: "stable" },
                 { label: t("settings:release_channel_beta"), key: "beta" },
-                { label: t("settings:release_channel_alpha"), key: "alpha" },
+                { label: t("settings:release_channel_alpha"), key: "alpha" }
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
-                  releaseChannel: channel.key as FEReleaseChannel,
+                  releaseChannel: channel.key as FEReleaseChannel
                 });
               }}
             />
@@ -81,7 +81,7 @@ const General = () => {
                 key="settings:concurrent_downloads_text"
                 options={{
                   defaultValue:
-                    "Select the number of concurrent downloads. If you have slow connection, select at most 3",
+                    "Select the number of concurrent downloads. If you have slow connection, select at most 3"
                 }}
               />
             }
@@ -89,7 +89,7 @@ const General = () => {
             <Trans
               key="settings:concurrent_downloads_title"
               options={{
-                defaultValue: "Concurrent Downloads",
+                defaultValue: "Concurrent Downloads"
               }}
             />
           </Title>
@@ -98,11 +98,11 @@ const General = () => {
               value={(settings.concurrentDownloads || "1").toString()}
               options={Array.from({ length: 20 }, (_, i) => ({
                 label: (i + 1).toString(),
-                key: (i + 1).toString(),
+                key: (i + 1).toString()
               }))}
               onChange={(downloads) => {
                 settingsMutation.mutate({
-                  concurrentDownloads: parseInt(downloads.key as string, 10),
+                  concurrentDownloads: parseInt(downloads.key as string, 10)
                 });
               }}
             />
@@ -113,7 +113,7 @@ const General = () => {
             <Trans
               key="settings:game_resolution_title"
               options={{
-                defaultValue: "Game Resolution",
+                defaultValue: "Game Resolution"
               }}
             />
           </Title>
@@ -123,7 +123,7 @@ const General = () => {
               options={[
                 { label: "800x600", key: "800x600" },
                 { label: "1024x768", key: "1024x768" },
-                { label: "1920x1080", key: "1920x1080" },
+                { label: "1920x1080", key: "1920x1080" }
               ]}
             />
           </RightHandSide>
@@ -135,7 +135,7 @@ const General = () => {
                 key="settings:instance_sorting_text"
                 options={{
                   defaultValue:
-                    "Select the method in which instances should be sorted.",
+                    "Select the method in which instances should be sorted."
                 }}
               />
             }
@@ -143,7 +143,7 @@ const General = () => {
             <Trans
               key="settings:instance_sorting_title"
               options={{
-                defaultValue: "Instance Sorting",
+                defaultValue: "Instance Sorting"
               }}
             />
           </Title>
@@ -151,7 +151,7 @@ const General = () => {
             <Dropdown
               options={[
                 { label: "Alphabetical", key: "alphabetical" },
-                { label: "Creation Date", key: "creation" },
+                { label: "Creation Date", key: "creation" }
               ]}
             />
           </RightHandSide>
@@ -162,7 +162,7 @@ const General = () => {
               <Trans
                 key="settings:show_news_text"
                 options={{
-                  defaultValue: "Show or hide the news",
+                  defaultValue: "Show or hide the news"
                 }}
               />
             }
@@ -170,7 +170,7 @@ const General = () => {
             <Trans
               key="settings:show_news_title"
               options={{
-                defaultValue: "Show news",
+                defaultValue: "Show news"
               }}
             />
           </Title>
@@ -179,7 +179,7 @@ const General = () => {
               checked={settings.showNews}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  showNews: e.currentTarget.checked,
+                  showNews: e.currentTarget.checked
                 });
               }}
             />
@@ -192,7 +192,7 @@ const General = () => {
                 key="settings:discord_integration_text"
                 options={{
                   defaultValue:
-                    "Enable or disable discord integration. This display what are you playing in discord",
+                    "Enable or disable discord integration. This display what are you playing in discord"
                 }}
               />
             }
@@ -200,7 +200,7 @@ const General = () => {
             <Trans
               key="settings:discord_integration_title"
               options={{
-                defaultValue: "Discord Integration",
+                defaultValue: "Discord Integration"
               }}
             />
           </Title>
@@ -209,7 +209,7 @@ const General = () => {
               checked={settings.discordIntegration}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  discordIntegration: e.currentTarget.checked,
+                  discordIntegration: e.currentTarget.checked
                 });
               }}
             />
@@ -222,7 +222,7 @@ const General = () => {
                 key="settings:hide_launcher_playing_text"
                 options={{
                   defaultValue:
-                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
+                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray."
                 }}
               />
             }
@@ -230,7 +230,7 @@ const General = () => {
             <Trans
               key="settings:hide_launcher_playing_title"
               options={{
-                defaultValue: "Hide launcher while playing",
+                defaultValue: "Hide launcher while playing"
               }}
             />
           </Title>
@@ -245,7 +245,7 @@ const General = () => {
                 key="settings:potato_mode_text"
                 options={{
                   defaultValue:
-                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
+                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled."
                 }}
               />
             }
@@ -253,7 +253,7 @@ const General = () => {
             <Trans
               key="settings:potato_mode_title"
               options={{
-                defaultValue: "Potato PC mode",
+                defaultValue: "Potato PC mode"
               }}
             />
           </Title>
@@ -262,7 +262,7 @@ const General = () => {
               checked={settings.reducedMotion}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  reducedMotion: e.currentTarget.checked,
+                  reducedMotion: e.currentTarget.checked
                 });
               }}
             />

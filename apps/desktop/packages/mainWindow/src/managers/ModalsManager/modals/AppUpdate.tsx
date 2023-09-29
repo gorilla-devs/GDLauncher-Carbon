@@ -4,7 +4,7 @@ import ModalLayout from "../ModalLayout";
 import { Trans } from "@gd/i18n";
 import updateAvailable, {
   updateDownloaded,
-  updateProgress,
+  updateProgress
 } from "@/utils/updater";
 import { rspc } from "@/utils/rspcClient";
 import { Match, Show, Switch, createResource } from "solid-js";

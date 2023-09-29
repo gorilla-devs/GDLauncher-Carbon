@@ -14,7 +14,7 @@ const FirstStep = (props: StepsProps) => {
               key="java.java_missing"
               options={{
                 defaultValue: "Java {{version}} missing",
-                version: 8,
+                version: 8
               }}
             />
           </h3>
@@ -24,7 +24,7 @@ const FirstStep = (props: StepsProps) => {
             key="java.missing_java_text"
             options={{
               defaultValue:
-                "For an optimal experience, we sugges letting us take care of java for you. Only manually manage java if you know what yur're doing, it may result in GDLauncher not working!",
+                "For an optimal experience, we sugges letting us take care of java for you. Only manually manage java if you know what yur're doing, it may result in GDLauncher not working!"
             }}
           />
         </p>
@@ -41,7 +41,7 @@ const FirstStep = (props: StepsProps) => {
             <Trans
               key="java.manual_setup"
               options={{
-                defaultValue: "Manual setup",
+                defaultValue: "Manual setup"
               }}
             />
           </Button>
@@ -56,7 +56,7 @@ const FirstStep = (props: StepsProps) => {
             <Trans
               key="java.automatic_setup"
               options={{
-                defaultValue: "Automatic setup",
+                defaultValue: "Automatic setup"
               }}
             />
           </Button>

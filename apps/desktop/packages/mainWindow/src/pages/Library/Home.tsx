@@ -6,7 +6,7 @@ import {
   Suspense,
   Switch,
   createEffect,
-  createSignal,
+  createSignal
 } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import { createStore } from "solid-js/store";
@@ -97,7 +97,7 @@ const Home = () => {
                   key="instance.no_instances_text"
                   options={{
                     defaultValue:
-                      "At the moment there are not instances. Add one to start playing!",
+                      "At the moment there are not instances. Add one to start playing!"
                   }}
                 />
               </p>

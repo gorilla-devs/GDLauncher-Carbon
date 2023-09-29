@@ -54,7 +54,7 @@ const Mod = (props: Props) => {
             }}
           />
           <div class="flex items-center gap-2">
-            <div class="h-10 w-10 rounded-xl border border-solid border-darkSlate-500 overflow-hidden flex items-center justify-center">
+            <div class="h-10 w-10 rounded-xl border-solid border-darkSlate-500 overflow-hidden flex items-center justify-center border">
               <Show
                 when={imageResource()}
                 fallback={
@@ -106,7 +106,7 @@ const Mod = (props: Props) => {
             onClick={() => {
               deleteModMutation.mutate({
                 instance_id: parseInt(params.id, 10),
-                mod_id: props.mod.id,
+                mod_id: props.mod.id
               });
             }}
           />
@@ -117,12 +117,12 @@ const Mod = (props: Props) => {
               if (e.target.checked) {
                 enableModMutation.mutate({
                   instance_id: parseInt(instanceId() as string, 10),
-                  mod_id: props.mod.id,
+                  mod_id: props.mod.id
                 });
               } else {
                 disableModMutation.mutate({
                   instance_id: parseInt(instanceId() as string, 10),
-                  mod_id: props.mod.id,
+                  mod_id: props.mod.id
                 });
               }
             }}

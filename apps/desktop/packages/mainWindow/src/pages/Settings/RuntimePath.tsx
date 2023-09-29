@@ -9,7 +9,7 @@ import {
   Switch,
   createEffect,
   createResource,
-  createSignal,
+  createSignal
 } from "solid-js";
 import Center from "./components/Center";
 
@@ -59,12 +59,12 @@ const RuntimePath = () => {
               value={runtimePath()}
               icon={
                 <div
-                  class="w-5 h-5 i-ri:folder-fill cursor-pointer hover:text-darkSlate-100 ease-in-out transition-colors"
+                  class="w-5 h-5 cursor-pointer hover:text-darkSlate-100 ease-in-out i-ri:folder-fill transition-colors"
                   onClick={async () => {
                     const result = await window.openFileDialog({
                       title: "Select Runtime Path",
                       defaultPath: runtimePath(),
-                      properties: ["openDirectory"],
+                      properties: ["openDirectory"]
                     });
 
                     if (result.canceled) {

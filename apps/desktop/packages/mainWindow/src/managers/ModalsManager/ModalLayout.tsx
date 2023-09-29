@@ -26,7 +26,7 @@ const ModalLayout = (props: Props) => {
       class={`${props.height || ""} ${props.width || ""}`}
       classList={{
         "h-full": !props.height,
-        "h-auto": !props.width,
+        "h-auto": !props.width
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -37,7 +37,7 @@ const ModalLayout = (props: Props) => {
           props.class ?? ""
         }`}
         classList={{
-          "overflow-hidden": !props.overflowHiddenDisabled,
+          "overflow-hidden": !props.overflowHiddenDisabled
         }}
       >
         <Show when={props.background}>{props.background}</Show>
@@ -58,7 +58,7 @@ const ModalLayout = (props: Props) => {
         <div
           class="box-border overflow-hidden z-10 h-full"
           classList={{
-            "p-5": !props.noPadding,
+            "p-5": !props.noPadding
           }}
         >
           {c()}

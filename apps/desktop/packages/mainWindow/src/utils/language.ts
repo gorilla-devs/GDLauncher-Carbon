@@ -22,7 +22,7 @@ export default async function changeLanguage(lang: string) {
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
+    }
   });
 
   const resources = await loadLanguageFiles(lang);
@@ -31,7 +31,7 @@ export default async function changeLanguage(lang: string) {
   }
 
   settingsMutation.mutate({
-    language: lang,
+    language: lang
   });
 
   changeLanguage(lang);

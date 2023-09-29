@@ -11,7 +11,7 @@ import {
   shell,
   screen,
   ipcMain,
-  OpenDialogOptions,
+  OpenDialogOptions
 } from "electron";
 import { release } from "os";
 import { join, resolve } from "path";
@@ -38,7 +38,7 @@ if (process.platform === "win32") app.setAppUserModelId(app.getName());
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient("gdlauncher", process.execPath, [
-      resolve(process.argv[1]),
+      resolve(process.argv[1])
     ]);
   }
 } else {
@@ -67,8 +67,8 @@ async function createWindow() {
       preload: join(__dirname, "../preload/index.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
-    },
+      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
+    }
   });
 
   initAutoUpdater(win);
@@ -118,7 +118,7 @@ async function createWindow() {
     }`;
 
     win.loadURL(url, {
-      userAgent: "GDLauncher Carbon",
+      userAgent: "GDLauncher Carbon"
     });
   }
 
@@ -160,7 +160,7 @@ async function createWindow() {
         upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"]);
         upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"]);
         callback({
-          responseHeaders,
+          responseHeaders
         });
       }
     );
@@ -181,7 +181,7 @@ app.whenReady().then(() => {
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
-      urls: ["http://*/*", "https://*/*"],
+      urls: ["http://*/*", "https://*/*"]
     },
     (details, callback) => {
       details.requestHeaders["Origin"] = "https://app.gdlauncher.com";
@@ -191,7 +191,7 @@ app.whenReady().then(() => {
 
   session.defaultSession.webRequest.onHeadersReceived(
     {
-      urls: ["http://*/*", "https://*/*"],
+      urls: ["http://*/*", "https://*/*"]
     },
     (details, callback) => {
       // eslint-disable-next-line
@@ -201,7 +201,7 @@ app.whenReady().then(() => {
       details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"];
       callback({
         cancel: false,
-        responseHeaders: details.responseHeaders,
+        responseHeaders: details.responseHeaders
       });
     }
   );

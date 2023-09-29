@@ -6,7 +6,7 @@ import handleUncaughtException from "./handleUncaughtException";
 import {
   RUNTIME_PATH_OVERRIDE_NAME,
   getInitialRTPath,
-  setCurrentRTPath,
+  setCurrentRTPath
 } from "./runtimePath";
 
 const args = process.argv.slice(1);
@@ -23,14 +23,14 @@ function validateArgument(arg: string): Argument | null {
   if (hasValue) {
     return {
       argument: arg,
-      value: args[args.indexOf(arg) + 1],
+      value: args[args.indexOf(arg) + 1]
     };
   }
 
   if (args.includes(arg)) {
     return {
       argument: arg,
-      value: null,
+      value: null
     };
   }
 
@@ -86,7 +86,7 @@ if (!disableSentry) {
     process.removeListener("uncaughtException", handleUncaughtException);
 
     Sentry.init({
-      dsn: import.meta.env.VITE_MAIN_DSN,
+      dsn: import.meta.env.VITE_MAIN_DSN
     });
   }
 }

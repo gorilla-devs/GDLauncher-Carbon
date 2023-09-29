@@ -8,7 +8,7 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  Tooltip,
+  Tooltip
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createMemo } from "solid-js";
@@ -36,9 +36,9 @@ const Java = () => {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], {
         ...settings?.data,
-        ...newSettings,
+        ...newSettings
       });
-    },
+    }
   });
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
@@ -102,7 +102,7 @@ const Java = () => {
             <Trans
               key="java.java_memory_title"
               options={{
-                defaultValue: "Java Memory",
+                defaultValue: "Java Memory"
               }}
             />
           </Title>
@@ -115,7 +115,7 @@ const Java = () => {
               value={settings.data?.xmx}
               onChange={(val) =>
                 settingsMutation.mutate({
-                  xmx: val,
+                  xmx: val
                 })
               }
             />
@@ -124,7 +124,7 @@ const Java = () => {
               value={settings.data?.xmx}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  xmx: parseInt(e.currentTarget.value, 10),
+                  xmx: parseInt(e.currentTarget.value, 10)
                 });
               }}
             />
@@ -135,7 +135,7 @@ const Java = () => {
             <Trans
               key="java.java_arguments_title"
               options={{
-                defaultValue: "Java Arguments",
+                defaultValue: "Java Arguments"
               }}
             />
           </Title>
@@ -145,7 +145,7 @@ const Java = () => {
               value={settings.data?.javaCustomArgs}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  javaCustomArgs: e.target.value,
+                  javaCustomArgs: e.target.value
                 });
               }}
             />
@@ -157,7 +157,7 @@ const Java = () => {
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: initialJavaArgs(),
+                    javaCustomArgs: initialJavaArgs()
                   });
                 }}
               >
@@ -172,7 +172,7 @@ const Java = () => {
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: "",
+                    javaCustomArgs: ""
                   });
                 }}
               >
@@ -186,7 +186,7 @@ const Java = () => {
             <Trans
               key="java.auto_handle_java"
               options={{
-                defaultValue: "Auto handle java",
+                defaultValue: "Auto handle java"
               }}
             />
           </Title>
@@ -195,7 +195,7 @@ const Java = () => {
               checked={settings.data?.autoManageJava}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: e.target.checked,
+                  autoManageJava: e.target.checked
                 });
               }}
             />
@@ -210,7 +210,7 @@ const Java = () => {
                     <Trans
                       key="java.manage"
                       options={{
-                        defaultValue: "Manage",
+                        defaultValue: "Manage"
                       }}
                     />
                   </Tab>
@@ -218,7 +218,7 @@ const Java = () => {
                     <Trans
                       key="java.profiles"
                       options={{
-                        defaultValue: "Profiles",
+                        defaultValue: "Profiles"
                       }}
                     />
                   </Tab>
@@ -231,7 +231,7 @@ const Java = () => {
                           key="java.found_java_text"
                           options={{
                             defaultValue:
-                              "We found the following java versions on your pc",
+                              "We found the following java versions on your pc"
                           }}
                         />
                       </h2>
@@ -279,7 +279,7 @@ const Java = () => {
                                 <Trans
                                   key="java.no_found_java_text"
                                   options={{
-                                    defaultValue: "No java available",
+                                    defaultValue: "No java available"
                                   }}
                                 />
                               </p>

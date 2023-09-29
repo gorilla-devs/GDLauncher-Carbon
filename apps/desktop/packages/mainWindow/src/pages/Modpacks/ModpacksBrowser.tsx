@@ -8,11 +8,11 @@ import {
   createEffect,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import {
   CFFEModSearchSortField,
-  MRFESearchIndex,
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { mappedMcVersions } from "@/utils/mcVersion";
@@ -26,7 +26,7 @@ import {
   ErrorFetchingModpacks,
   FetchingModpacks,
   NoModpacksAvailable,
-  NoMoreModpacks,
+  NoMoreModpacks
 } from "./ModpacksStatus";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
 
@@ -113,26 +113,26 @@ const ModpackBrowser = () => {
                   <Trans
                     key="instance.sort_by"
                     options={{
-                      defaultValue: "Sort by:",
+                      defaultValue: "Sort by:"
                     }}
                   />
                 </p>
                 <Dropdown
                   options={sortingFields().map((field) => ({
                     label: t(`instance.sort_by_${field}`),
-                    key: field,
+                    key: field
                   }))}
                   onChange={(val) => {
                     const sortIndex = isCurseforge()
                       ? {
-                          curseForge: val.key as CFFEModSearchSortField,
+                          curseForge: val.key as CFFEModSearchSortField
                         }
                       : {
-                          modrinth: val.key as MRFESearchIndex,
+                          modrinth: val.key as MRFESearchIndex
                         };
 
                     infiniteQuery?.setQuery({
-                      sortIndex: sortIndex,
+                      sortIndex: sortIndex
                     });
                   }}
                   value={0}
@@ -146,7 +146,7 @@ const ModpackBrowser = () => {
                     value={mappedMcVersions()[0].key}
                     onChange={(val) => {
                       infiniteQuery?.setQuery({
-                        gameVersions: [val.key as string],
+                        gameVersions: [val.key as string]
                       });
                     }}
                   />
@@ -159,14 +159,14 @@ const ModpackBrowser = () => {
                 type="outline"
                 onClick={() => {
                   modalsContext?.openModal({
-                    name: "instanceCreation",
+                    name: "instanceCreation"
                   });
                 }}
               >
                 <Trans
                   key="sidebar.plus_add_instance"
                   options={{
-                    defaultValue: "+ Add Instance",
+                    defaultValue: "+ Add Instance"
                   }}
                 />
               </Button>
@@ -176,12 +176,12 @@ const ModpackBrowser = () => {
                   "i-ri:sort-asc":
                     infiniteQuery?.query.sortOrder === "ascending",
                   "i-ri:sort-desc":
-                    infiniteQuery?.query.sortOrder === "descending",
+                    infiniteQuery?.query.sortOrder === "descending"
                 }}
                 onClick={() => {
                   const isAsc = infiniteQuery?.query.sortOrder === "ascending";
                   infiniteQuery?.setQuery({
-                    sortOrder: isAsc ? "descending" : "ascending",
+                    sortOrder: isAsc ? "descending" : "ascending"
                   });
                 }}
               />
@@ -203,7 +203,7 @@ const ModpackBrowser = () => {
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{
-            top: `${headerHeight()}px`,
+            top: `${headerHeight()}px`
           }}
         >
           <Switch>
@@ -226,7 +226,7 @@ const ModpackBrowser = () => {
                   style={{
                     height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
                     width: "100%",
-                    position: "relative",
+                    position: "relative"
                   }}
                 >
                   <For each={allVirtualRows()}>
@@ -247,7 +247,7 @@ const ModpackBrowser = () => {
                             left: 0,
                             width: "100%",
                             height: `${virtualItem.size}px`,
-                            transform: `translateY(${virtualItem.start}px)`,
+                            transform: `translateY(${virtualItem.start}px)`
                           }}
                         >
                           <div>

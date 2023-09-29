@@ -3,7 +3,7 @@ const path = require("path");
 const dotenv = require("dotenv");
 
 dotenv.config({
-  path: "../../.env",
+  path: "../../.env"
 });
 
 let arch = process.argv[4].replace(/-/g, "");
@@ -15,7 +15,7 @@ let coreModuleBinName = os === "win" ? "core_module.exe" : "core_module";
 let targetTripleLookup = {
   "win-x64": ["x86_64-pc-windows-msvc"],
   "linux-x64": ["x86_64-unknown-linux-gnu"],
-  "mac-universal": ["x86_64-apple-darwin", "aarch64-apple-darwin"],
+  "mac-universal": ["x86_64-apple-darwin", "aarch64-apple-darwin"]
 };
 
 let files = targetTripleLookup[`${os}-${arch}`].map((targetTriple) => {
@@ -23,7 +23,7 @@ let files = targetTripleLookup[`${os}-${arch}`].map((targetTriple) => {
     from: `../../target/${targetTriple}/${profile}/${carbonAppBinName}`,
     to: `./binaries/${
       targetTriple.includes("aarch") ? "arm64" : "x64"
-    }/${coreModuleBinName}`,
+    }/${coreModuleBinName}`
   };
 });
 
@@ -42,7 +42,7 @@ let publish =
         url:
           (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn") +
           "/" +
-          process.env.PUBLISH_URL_FOLDER,
+          process.env.PUBLISH_URL_FOLDER
       };
 
 module.exports = {
@@ -54,43 +54,43 @@ module.exports = {
   asar: true,
   directories: {
     output: "release",
-    buildResources: "build",
+    buildResources: "build"
   },
   files: ["dist", "package.json"],
   extraResources: [
     {
       from: "binaries/${arch}",
-      to: `binaries`,
-    },
+      to: `binaries`
+    }
   ],
   npmRebuild: false,
   protocols: [
     {
       name: "gdlauncher",
       role: "Viewer",
-      schemes: ["gdlauncher"],
-    },
+      schemes: ["gdlauncher"]
+    }
   ],
   win: {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "nsis"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
-    verifyUpdateCodeSignature: false,
+    verifyUpdateCodeSignature: false
   },
   nsis: {
     oneClick: false,
     perMachine: false,
     allowToChangeInstallationDirectory: false,
-    deleteAppDataOnUninstall: false,
+    deleteAppDataOnUninstall: false
   },
   mac: {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
-    extendInfo: "./entitlements.mac.bundles.plist",
+    extendInfo: "./entitlements.mac.bundles.plist"
   },
   linux: {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "appImage"],
-    artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
+    artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}"
   },
   afterAllArtifactBuild: (buildResult) => {
     const path = require("path");
@@ -106,5 +106,5 @@ module.exports = {
       `${JSON.stringify(packageJson, null, 2)}\n`,
       "utf8"
     );
-  },
+  }
 };

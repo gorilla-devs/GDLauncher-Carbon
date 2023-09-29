@@ -52,9 +52,9 @@ const AppNavbar = () => {
           icon: `http://localhost:${port}/account/headImage?uuid=${account.uuid}`,
           uuid: account.uuid,
           type: account.type,
-          status: accountStatusQuery.data,
+          status: accountStatusQuery.data
         },
-        key: account?.uuid,
+        key: account?.uuid
       };
     });
 
@@ -86,13 +86,13 @@ const AppNavbar = () => {
                         <div
                           onClick={() =>
                             navigate(route.path, {
-                              getLastInstance: true,
+                              getLastInstance: true
                             })
                           }
                           class="no-underline"
                           classList={{
                             "text-white": !!isMatch(),
-                            "text-slate-400": !isMatch(),
+                            "text-slate-400": !isMatch()
                           }}
                         >
                           <Tab>
@@ -116,14 +116,14 @@ const AppNavbar = () => {
                     type="primary"
                     onClick={() => {
                       modalsContext?.openModal({
-                        name: "instanceCreation",
+                        name: "instanceCreation"
                       });
                     }}
                   >
                     <Trans
                       key="sidebar.add_instance"
                       options={{
-                        defaultValue: "Add Instance",
+                        defaultValue: "Add Instance"
                       }}
                     />
                   </Button>
@@ -132,7 +132,7 @@ const AppNavbar = () => {
                   <div
                     onClick={() =>
                       navigate("/settings", {
-                        getLastInstance: true,
+                        getLastInstance: true
                       })
                     }
                   >
@@ -141,7 +141,7 @@ const AppNavbar = () => {
                         class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
                         classList={{
                           "bg-primary-500":
-                            !!isSettings() || !!isSettingsNested(),
+                            !!isSettings() || !!isSettingsNested()
                         }}
                       />
                     </Tab>
